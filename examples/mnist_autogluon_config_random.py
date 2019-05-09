@@ -17,6 +17,8 @@ import ConfigSpace.hyperparameters as CSH
 parser = argparse.ArgumentParser(description='AutoGluon MNIST Example')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     help='initial learning rate')
+parser.add_argument('--epochs', default=5, type=int,
+                    help='number of epochs')
 parser.add_argument('--scheduler', type=str, default='fifo',
                     help='scheduler name (default: fifo)')
 
@@ -74,10 +76,9 @@ def train_mnist(args, reporter):
         return acc.get()[1]
 
     # start training
-    epochs = 5
     smoothing_constant = .01
 
-    for e in range(epochs):
+    for e in range(args.epochs):
         for i, (data, label) in enumerate(train_data):
             data = gluon.utils.split_and_load(data, ctx_list=ctx)
             label = gluon.utils.split_and_load(label, ctx_list=ctx)
@@ -114,7 +115,8 @@ if __name__ == "__main__":
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.Hyperband_Scheduler(train_mnist, args,
                                                        {'num_cpus': 2, 'num_gpus': 2}, searcher,
-                                                       time_attr='epoch', reward_attr="accuracy")
+                                                       time_attr='epoch', reward_attr="accuracy",
+                                                       max_t=args.epochs, grace_period=1)
     else:
         myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
                                                   {'num_cpus': 2, 'num_gpus': 2}, searcher)

@@ -33,6 +33,7 @@ class FIFO_Scheduler(TaskScheduler):
         """
         for i in range(num_trials):
             self.schedule_next()
+        self.join_tasks()
 
     def schedule_next(self):
         """Schedule next searcher suggested task
