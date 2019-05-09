@@ -33,11 +33,14 @@ VERSION = find_version('autogluon', '__init__.py')
 
 requirements = [
     'numpy',
+    'scipy',
     'requests',
     'ray',
     'pytest',
     'configspace',
-    'nose'
+    'nose',
+    'gluoncv',
+    'gluonnlp',
 ]
 
 setup(

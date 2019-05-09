@@ -1,6 +1,6 @@
 import gluoncv as cv
 
-from autogluon.networks import autogluon_nets, autogluon_net_instances
+from autogluon.network import autogluon_nets, autogluon_net_instances
 
 __all__ = ['models', 'get_model', 'get_model_instances']
 
