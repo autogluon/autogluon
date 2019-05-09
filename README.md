@@ -1,8 +1,212 @@
-# AutoGluon
+AutoGluon: AutoML Toolkit with MXNet Gluon
+===
+![downloads](https://img.shields.io/github/downloads/atom/atom/total.svg)
+![build](https://img.shields.io/appveyor/ci/:user/:repo.svg)
+![chat](https://img.shields.io/discord/:serverId.svg)
 
-## Install
-```bash
-python setup.py install
+## Table of Contents
+
+[TOC]
+
+## Installation
+    python setup.py install
+
+## Beginners Guide
+```python
+import logging
+import autogluon as ag
+import autogluon.image_classification as task
+
+train_dataset, valid_dataset = task.Dataset('./CIFAR10/train', 
+                                            './CIFAR10/valid')
+
+models = task.fit(train_dataset)
+
+logging.info('trials results:')
+logging.info(models[0])
+```
+
+## Advanced User Guide
+```python
+import logging
+
+import autogluon as ag
+import autogluon.image_classification as task
+
+train_dataset, valid_dataset = task.Dataset('./CIFAR10/train', './CIFAR10/valid')
+
+models, best_result, search_space = task.fit(train_dataset,
+                                             nets=ag.Nets([task.model_zoo.get_model('resnet18_v1'),
+                                                   task.model_zoo.get_model('resnet34_v1'),
+                                                   task.model_zoo.get_model('resnet50_v1'),
+                                                   task.model_zoo.get_model('resnet101_v1'),
+                                                   task.model_zoo.get_model('resnet152_v1')]),
+                                             optimizers=ag.Optimizers([ag.optims.get_optim('sgd'),
+                                                         ag.optims.get_optim('adam')]))
+logging.info('trials results:')
+logging.info(models)
+logging.info('=========================')
+logging.info('best results:')
+logging.info(best_result)
+logging.info('=========================')
+logging.info('print search space')
+logging.info(search_space)
+
+```
+
+## Auto Fit Usage
+```python
+def fit(data,
+        nets,
+        optimizers=None,
+        metrics=None,
+        losses=None,
+        searcher=None,
+        trial_scheduler=None,
+        resume=False,
+        savedir='./outputdir/',
+        visualizer='tensorboard',
+        stop_criterion={'time_limits': 1 * 60 * 60,
+                        'max_metric': 0.80,
+                        'max_trial_count': 100},
+        resources_per_trial={'max_num_gpus': 1,
+                             'max_num_cpus': 4,
+                             'max_training_epochs': 2},
+        *args):
+    cs = CS.ConfigurationSpace()
+    assert data is not None
+    assert nets is not None
+    if data.search_space is not None:
+        cs.add_configuration_space(data.search_space)
+    if nets.search_space is not None:
+        cs.add_configuration_space(nets.search_space)
+    if optimizers.search_space is not None:
+        cs.add_configuration_space(optimizers.search_space)
+    if metrics.search_space is not None:
+        cs.add_configuration_space(metrics.search_space)
+    if losses.search_space is not None:
+        cs.add_configuration_space(losses.search_space)
+    import json
+    with open('config_space.json', 'w') as f:
+        f.write(json.write(cs))
+    with open('config_space.json') as f:
+        search_space = json.load(f)
+
+    if searcher is None:
+        searcher = tune.automl.search_policy.RandomSearch(search_space,
+                                                          stop_criterion['max_metric'],
+                                                          stop_criterion['max_trial_count'])
+    if trial_scheduler is None:
+        trial_scheduler = tune.schedulers.FIFOScheduler()
+
+    tune.register_trainable(
+        "TRAIN_FN", lambda config, reporter: pipeline.train_image_classification(
+            args, config, reporter))
+    trials = tune.run(
+        "TRAIN_FN",
+        name=args.expname,
+        verbose=2,
+        scheduler=trial_scheduler,
+        **{
+            "stop": {
+                "mean_accuracy": stop_criterion['max_metric'],
+                "training_iteration": resources_per_trial['max_training_epochs']
+            },
+            "resources_per_trial": {
+                "cpu": int(resources_per_trial['max_num_cpus']),
+                "gpu": int(resources_per_trial['max_num_gpus'])
+            },
+            "num_samples": resources_per_trial['max_trial_count'],
+            "config": {
+                "lr": tune.sample_from(lambda spec: np.power(
+                    10.0, np.random.uniform(-4, -1))),
+                "momentum": tune.sample_from(lambda spec: np.random.uniform(
+                    0.85, 0.95)),
+            }
+        })
+    best_result = max([trial.best_result for trial in trials])
+    return trials, best_result, cs
+```
+
+## Auto Nets Usage
+```python
+nets = ag.Nets([ag.task.model_zoo.get_model('resnet18_v1'),
+                ag.task.model_zoo.get_model('resnet34_v1'),
+                ag.task.model_zoo.get_model('resnet50_v1'),
+                ag.task.model_zoo.get_model('resnet101_v1'),
+                ag.task.model_zoo.get_model('resnet152_v1')])
+logging.info(nets)
+```
+
+Some implementaion details:
+```python
+def add_search_space(self):
+    cs = CS.ConfigurationSpace()
+    net_list_hyper_param = List('autonets', choices=self.net_list).get_hyper_param()
+    cs.add_hyperparameter(net_list_hyper_param)
+    for net in self.net_list:
+        #TODO(cgraywang): distinguish between different nets, only support resnet for now
+        net_hyper_params = net.get_hyper_params()
+        cs.add_hyperparameters(net_hyper_params)
+        conds = []
+        for net_hyper_param in net_hyper_params:
+            #TODO(cgraywang): put condition in presets? split task settings out
+            cond = CS.InCondition(net_hyper_param, net_list_hyper_param,
+                                  ['resnet18_v1', 'resnet34_v1',
+                                   'resnet50_v1', 'resnet101_v1',
+                                   'resnet152_v1'])
+            conds.append(cond)
+        cs.add_conditions(conds)
+    self._set_search_space(cs)
+
+@autogluon_nets
+def get_model(name):
+    name = name.lower()
+    if name not in models:
+        err_str = '"%s" is not among the following model list:\n\t' % (name)
+        err_str += '%s' % ('\n\t'.join(sorted(models)))
+        raise ValueError(err_str)
+    net = name
+    return net
+```
+
+## Auto Optimizers Usage
+```python
+optims = ag.Optimizers([ag.Optimizers([ag.optims.get_optim('sgd'),
+                                       ag.optims.get_optim('adam')])])
+logging.info(optims)
+```
+
+Some implementation details:
+```python
+@autogluon_optims
+def get_optim(name):
+    name = name.lower()
+    if name not in optims:
+        err_str = '"%s" is not among the following optim list:\n\t' % (name)
+        err_str += '%s' % ('\n\t'.join(sorted(optims)))
+        raise ValueError(err_str)
+    optim = name
+    return optim
+```
+
+## Auto Space Usage
+- Categorical space
+```python
+list_space = ag.space.List('listspace', ['0',
+                                         '1',
+                                         '2'])
+logging.info(list_space)
+```
+- Linear space
+```python
+linear_space = ag.space.Linear('linspace', 0, 10)
+logging.info(linear_space)
+```
+- Log space
+```python
+log_space = ag.space.Log('logspace', 10**-10, 10**-1)
+logging.info(log_space)
 ```
 
 ## Understand Task, Resource and Scheduler
@@ -110,3 +314,11 @@ for i in range(10):
 ```
 
 See [`bash_scheduler.py`](./examples/bash_scheduler.py).
+
+## Appendix and FAQ
+
+:::info
+**Find this document incomplete?** Leave a comment!
+:::
+
+###### tags: `Templates` `Documentation`
