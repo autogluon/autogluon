@@ -1,8 +1,11 @@
+import copy
 import logging
+import numpy as np
 import multiprocessing as mp
-from ..distribution import gen_config
 
-__all__ = ['autogluon_method']
+from ..distribution import Sample
+
+__all__ = ['autogluon_method', 'gen_config']
 
 logger = logging.getLogger(__name__)
 
@@ -26,3 +29,11 @@ class autogluon_method(object):
 
     def __repr__(self):
         return repr(self.f)
+
+def gen_config(seed, config):
+    new_config = copy.deepcopy(config)
+    np.random.seed(seed)
+    for k, v in config.items():
+        if isinstance(v, Sample):
+            new_config[k] = v()
+    return new_config

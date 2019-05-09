@@ -9,16 +9,26 @@ __all__ = ['TaskScheduler', 'Task']
 
 logger = logging.getLogger(__name__)
 
-Task = namedtuple('Task', 'fn args resources')
+BasicTask = namedtuple('Task', 'fn args resources')
+
+class Task(BasicTask):
+    TASK_ID = mp.Value('i', 0)
+    LOCK = mp.Lock()
+    def __new__(cls, fn, args, resources):
+        self = super(Task, cls).__new__(cls, fn, args, resources)
+        with Task.LOCK:
+            self.task_id = Task.TASK_ID.value
+            Task.TASK_ID.value += 1
+        return self
 
 class TaskScheduler(object):
     """Basic Task Scheduler w/o Searcher
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = ResourceManager()
-    M = mp.Manager()
     SCHEDULED_TASKS = []
     FINISHED_TASKS = []
+    ERROR_QUEUE = mp.Queue()
 
     def add_task(self, task):
         # adding the task
@@ -37,7 +47,15 @@ class TaskScheduler(object):
     def _run_task(fn, args, resources, resource_manager):
         """Executing the task
         """
-        fn(**args)
+        try:
+            fn(**args)
+        except Exception as e:
+            exc_buffer = io.StringIO()
+            traceback.print_exc(file=exc_buffer)
+            logging.error(
+                'Uncaught exception in worker process:\n%s',
+                exc_buffer.getvalue())
+            TaskScheduler.ERROR_QUEUE.put(e)
         resource_manager._release(resources)
 
     @classmethod

@@ -1,7 +1,5 @@
-import copy
-import numpy as np
 
-__all__ = ['Sample', 'sample_from', 'gen_config']
+__all__ = ['Sample', 'sample_from']
 
 class Sample(object):
     pass
@@ -25,12 +23,3 @@ class sample_from(Sample):
 
     def __repr__(self):
         return "autogluon.sample_from({})".format(repr(self.func))
-
-
-def gen_config(seed, config):
-    new_config = copy.deepcopy(config)
-    np.random.seed(seed)
-    for k, v in config.items():
-        if isinstance(v, Sample):
-            new_config[k] = v()
-    return new_config

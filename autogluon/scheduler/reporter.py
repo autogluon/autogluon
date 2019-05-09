@@ -27,8 +27,6 @@ class StatusReporter(object):
         Example:
             >>> reporter(accuracy=1, training_iters=4)
         """
-        logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
-
         report_time = time.time()
         if 'time_this_iter' not in kwargs:
             kwargs['time_this_iter'] = report_time - self._last_report_time
@@ -37,10 +35,14 @@ class StatusReporter(object):
         self._queue.put(kwargs.copy(), block=True)
         self._continue_semaphore.acquire()
 
+        logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
+
     def fetch(self, block=True):
         kwargs = self._queue.get(block=block)
-        self._continue_semaphore.release()
         return kwargs
+
+    def move_on(self):
+        self._continue_semaphore.release()
 
     def _start(self):
         """Adjust the real starting time
