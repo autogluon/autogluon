@@ -1,76 +1,58 @@
-##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-## Created by: Hang Zhang
-## Email: zhanghang0704@gmail.com
-## Copyright (c) 2019
-##
-## LICENSE file in the root directory of this source tree 
-##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-import io
+#!/usr/bin/env python
 import os
-import subprocess
-
+import io
+import re
+import shutil
+import sys
 from setuptools import setup, find_packages
-import setuptools.command.develop 
-import setuptools.command.install 
 
-cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.1'
-try:
-    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], 
-        cwd=cwd).decode('ascii').strip()
-    version += '+' + sha[:7]
-except Exception:
-    pass
+def read(*names, **kwargs):
+    with io.open(
+        os.path.join(os.path.dirname(__file__), *names),
+        encoding=kwargs.get("encoding", "utf8")
+    ) as fp:
+        return fp.read()
 
-def create_version_file():
-    global version, cwd
-    print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'autogluon', 'version.py')
-    with open(version_path, 'w') as f:
-        f.write('"""This is autogluon version file."""\n')
-        f.write("__version__ = '{}'\n".format(version))
 
-# run test scrip after installation
-class install(setuptools.command.install.install):
-    def run(self):
-        create_version_file()
-        setuptools.command.install.install.run(self)
-
-class develop(setuptools.command.develop.develop):
-    def run(self):
-        create_version_file()
-        setuptools.command.develop.develop.run(self)
-        #subprocess.check_call("python tests/unit_test.py".split())
+def find_version(*file_paths):
+    version_file = read(*file_paths)
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                              version_file, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError("Unable to find version string.")
 
 try:
     import pypandoc
-    readme = pypandoc.convert('README.md', 'rst')
+    long_description = pypandoc.convert('README.md', 'rst')
 except(IOError, ImportError):
-    readme = open('README.md').read()
+    long_description = open('README.md').read()
+
+VERSION = find_version('autogluon', '__init__.py')
 
 requirements = [
-    'mxnet==1.4.1',
     'numpy',
-    'nose',
+    'requests',
+    'ray',
+    'pytest',
+    'configspace',
+    'nose'
 ]
 
 setup(
-    name="AutoGluon",
-    version=version,
-    author="AutoGluon Community",
-    url="https://github.com/dmlc/AutoGluon",
-    description="AutoGluon Package",
-    long_description=readme,
+    # Metadata
+    name='autogluon',
+    version=VERSION,
+    author='AutoGluon team',
+    url='https://github.com/dmlc/AutoGluon',
+    description='MXNet Gluon AutoML Toolkit',
+    long_description=long_description,
     license='MIT',
+
+    # Package info
+    packages=find_packages(exclude=('docs', 'tests', 'scripts')),
+    zip_safe=True,
+    include_package_data=True,
     install_requires=requirements,
-    packages=find_packages(exclude=["tests", "examples"]),
-    package_data={'autogluon': [
-        'LICENSE',
-    ]},
-    cmdclass={
-        'install': install,
-        'develop': develop,
-    },
 )
