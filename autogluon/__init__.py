@@ -31,6 +31,7 @@ from .optim import *
 from .space import *
 from .task import *
 from .basic import *
+from .utils import *
 from . import scheduler, distribution, searcher
 
 __all__ = dataset.__all__ \
@@ -40,7 +41,3 @@ __all__ = dataset.__all__ \
           + optim.__all__ \
           + space.__all__ \
           + task.__all__\
-          + basic.__all__\
-          + scheduler.__all__\
-          + distribution.__all__\
-          + searcher.__all__

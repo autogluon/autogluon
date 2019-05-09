@@ -2,6 +2,8 @@ from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
 
+from ..utils.sanity_check import SanityCheck
+
 __all__ = ['Dataset']
 
 class Dataset(object):
@@ -40,6 +42,7 @@ class Dataset(object):
                 batch_size=64,
                 shuffle=False,
                 num_workers=4)
+            SanityCheck.check_dataset_class_num(train_data, test_data)
         else:
             train_data = None
             test_data = None
