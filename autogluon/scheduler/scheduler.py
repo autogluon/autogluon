@@ -21,6 +21,11 @@ class Task(BasicTask):
             Task.TASK_ID.value += 1
         return self
 
+    def __repr__(self):
+        reprstr = '(' + 'TASK_ID: ' + str(self.task_id) + ') ' + \
+            super(Task, self).__repr__() + ')'
+        return reprstr
+
 class TaskScheduler(object):
     """Basic Task Scheduler w/o Searcher
     """
@@ -64,6 +69,11 @@ class TaskScheduler(object):
             for i, task_dick in enumerate(cls.SCHEDULED_TASKS):
                 if not task_dick['Process'].is_alive():
                     cls.FINISHED_TASKS.append(cls.SCHEDULED_TASKS.pop(i))
+
+    @classmethod
+    def join_tasks(cls):
+        for i, task_dic in enumerate(cls.SCHEDULED_TASKS):
+            task_dic['Process'].join()
 
     @classmethod
     def logging_running_tasks(cls):

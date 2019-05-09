@@ -69,13 +69,14 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                             task.fn, task.args, task.resources,
                             Hyperband_Scheduler.RESOURCE_MANAGER))
             rp = threading.Thread(target=Hyperband_Scheduler._run_reporter,
-                                  args=(task, tp, reporter, self.searcher, self.hyperbander))
+                                  args=(task, tp, reporter, self.searcher, self.hyperbander,
+                                        Hyperband_Scheduler.RESOURCE_MANAGER))
             tp.start()
             rp.start()
             self.SCHEDULED_TASKS.append({'Task': task, 'Process': tp, 'ReporterThread': rp})
 
     @staticmethod
-    def _run_reporter(task, task_process, reporter, searcher, scheduler):
+    def _run_reporter(task, task_process, reporter, searcher, scheduler, resource_manager):
         last_result = None
         while task_process.is_alive():
             reported_results = reporter.fetch()
@@ -88,6 +89,8 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 logger.debug('Removing task {} due to low performance'.format(task))
                 task_process.terminate()
                 scheduler.on_task_remove(task)
+                resource_manager._release(task.resources)
+                break
                 # TODO need to discuss, do we report to searcher if terminated early?
             last_result = reported_results
         searcher.update(**last_result)
