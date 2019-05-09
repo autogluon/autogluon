@@ -58,7 +58,7 @@ for i in range(5):
     myscheduler.add_task(task)
 ```
 
-See [`mnist_autogluon.py`](./examples/mnist_autogluon_numpy_config.py) for details.
+See [`mnist_autogluon_numpy_config.py`](./examples/mnist_autogluon_numpy_config.py) for details.
 
 ### ConfigSpace and Random Searcher with FIFO Scheduler
 
@@ -72,18 +72,22 @@ def train_mnist(args, reporter):
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
 
-# creating hyperparameters configuration
+# create hyperparameters configuration
 cs = CS.ConfigurationSpace()
 lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
 cs.add_hyperparameter(lr)
-# create searcher and scheduler
+
+# construct searcher from the configuration space
 searcher = ag.searcher.RandomSampling(cs)
+
+# use FIFO scheduler
 myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
                                           {'num_cpus': 2, 'num_gpus': 2}, searcher)
 # run tasks
 myscheduler.run(num_trials=10)
 ```
 
+See [`mnist_autogluon_config_random.py`](./examples/mnist_autogluon_config_random.py) for details.
 
 ## Schedule Bash Tasks
 

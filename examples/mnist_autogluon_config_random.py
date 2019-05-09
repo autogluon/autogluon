@@ -17,10 +17,11 @@ import ConfigSpace.hyperparameters as CSH
 parser = argparse.ArgumentParser(description='AutoGluon MNIST Example')
 parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     help='initial learning rate')
+parser.add_argument('--scheduler', type=str, default='fifo',
+                    help='scheduler name (default: fifo)')
 
 @autogluon_method
 def train_mnist(args, reporter):
-    print('LR =', args.lr)
     ctx = [mx.gpu(0)]
 
     # MNIST dataset
@@ -54,7 +55,6 @@ def train_mnist(args, reporter):
 
     # Initializae the model wieghts and get Parallel mode
     net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
-    print(net)
 
     # Loss and Optimizer
     softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
@@ -97,9 +97,7 @@ def train_mnist(args, reporter):
                            else (1 - smoothing_constant) * moving_loss + smoothing_constant * curr_loss)
 
         test_accuracy = evaluate_accuracy(test_data, net)
-        #train_accuracy = evaluate_accuracy(train_data, net)
-        #print("Epoch %s. Loss: %s, Train_acc %s, Test_acc %s" % (e, moving_loss, train_accuracy, test_accuracy))
-        reporter(accuracy=test_accuracy)
+        reporter(epoch=e, accuracy=test_accuracy)
 
 
 if __name__ == "__main__":
@@ -110,9 +108,15 @@ if __name__ == "__main__":
     cs = CS.ConfigurationSpace()
     lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
     cs.add_hyperparameter(lr)
+
     # create searcher and scheduler
     searcher = ag.searcher.RandomSampling(cs)
-    myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
-                                              {'num_cpus': 2, 'num_gpus': 2}, searcher)
+    if args.scheduler == 'hyperband':
+        myscheduler = ag.scheduler.Hyperband_Scheduler(train_mnist, args,
+                                                       {'num_cpus': 2, 'num_gpus': 2}, searcher,
+                                                       time_attr='epoch', reward_attr="accuracy")
+    else:
+        myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
+                                                  {'num_cpus': 2, 'num_gpus': 2}, searcher)
 
     myscheduler.run(num_trials=10)
