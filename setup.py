@@ -34,6 +34,7 @@ VERSION = find_version('autogluon', '__init__.py')
 requirements = [
     'numpy',
     'scipy',
+    'matplotlib',
     'requests',
     'ray',
     'pytest',
