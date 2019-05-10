@@ -1,7 +1,11 @@
 import warnings
+import logging
+
 import numpy as np
 from scipy.stats import ks_2samp
 from mxnet import gluon
+
+from .visualizer import Visualizer
 
 __all__ = ['SanityCheck']
 
@@ -33,6 +37,22 @@ class SanityCheck(object):
             pass
 
     @staticmethod
+    def check_dataset_label_histogram(a, b):
+        if isinstance(a, gluon.data.dataset.Dataset) and isinstance(b, gluon.data.dataset.Dataset):
+            min_len = min(len(a._label), len(b._label))
+            #TODO(cgraywang): sample a min_len?
+            a_area, _ = np.histogram(a._label[:min_len], bins=len(np.unique(a._label)))
+            b_area, _ = np.histogram(b._label[:min_len], bins=len(np.unique(b._label)))
+            if (a_area <= b_area).all() or (a_area >= b_area).all():
+                warnings.warn('Warning: '
+                              'data label histogram seems not in a good shape')
+                logging.info('data label histogram is save at ./histogram.png')
+                Visualizer.visualize_dataset_label_histogram(a, b)
+        else:
+            pass
+
+    @staticmethod
     def check_dataset(a, b):
         SanityCheck.check_dataset_label_num(a, b)
         SanityCheck.check_dataset_label_KStest(a, b)
+        SanityCheck.check_dataset_label_histogram(a, b)

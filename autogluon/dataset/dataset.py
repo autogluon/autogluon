@@ -30,19 +30,21 @@ class Dataset(object):
         ])
 
         if 'CIFAR10' in cls.train_path or 'CIFAR10' in cls.val_path:
+            train_dataset = gluon.data.vision.CIFAR10(train=True)
+            test_dataset = gluon.data.vision.CIFAR10(train=False)
             train_data = gluon.data.DataLoader(
-                gluon.data.vision.CIFAR10(train=True).transform_first(transform_train),
+                train_dataset.transform_first(transform_train),
                 batch_size=64,
                 shuffle=True,
                 last_batch="discard",
                 num_workers=4)
 
             test_data = gluon.data.DataLoader(
-                gluon.data.vision.CIFAR10(train=False).transform_first(transform_test),
+                test_dataset.transform_first(transform_test),
                 batch_size=64,
                 shuffle=False,
                 num_workers=4)
-            SanityCheck.check_dataset_class_num(train_data, test_data)
+            SanityCheck.check_dataset(train_dataset, test_dataset)
         else:
             train_data = None
             test_data = None
