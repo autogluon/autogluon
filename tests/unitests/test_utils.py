@@ -7,18 +7,22 @@ import mxnet as mx
 import autogluon as ag
 
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+
+
 @pytest.mark.serial
-def test_dataset_santity_check():
-    logging.info('Testing dataset santitycheck')
+def test_dataset_analyzer():
+    logger.debug('Testing dataset santitycheck')
     a = mx.gluon.data.vision.CIFAR10(train=True)
     b = mx.gluon.data.vision.CIFAR10(train=False)
-    ag.SanityCheck.check_dataset(a, b)
-    logging.info('Finished.')
+    ag.DataAnalyzer.check_dataset(a, b)
+    logger.debug('Finished.')
 
 @pytest.mark.serial
 def test_dataset_histogram_viz():
-    logging.info('Testing dataset histogram viz')
+    logger.debug('Testing dataset histogram viz')
     a = mx.gluon.data.vision.CIFAR10(train=True)
     b = mx.gluon.data.vision.CIFAR10(train=False)
     ag.Visualizer.visualize_dataset_label_histogram(a, b)
-    logging.info('Finished.')
+    logger.debug('Finished.')

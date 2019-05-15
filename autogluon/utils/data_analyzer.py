@@ -7,10 +7,10 @@ from mxnet import gluon
 
 from .visualizer import Visualizer
 
-__all__ = ['SanityCheck']
+__all__ = ['DataAnalyzer']
 
 
-class SanityCheck(object):
+class DataAnalyzer(object):
     def __init__(self):
         pass
 
@@ -53,6 +53,6 @@ class SanityCheck(object):
 
     @staticmethod
     def check_dataset(a, b):
-        SanityCheck.check_dataset_label_num(a, b)
-        SanityCheck.check_dataset_label_KStest(a, b)
-        SanityCheck.check_dataset_label_histogram(a, b)
+        DataAnalyzer.check_dataset_label_num(a, b)
+        DataAnalyzer.check_dataset_label_KStest(a, b)
+        DataAnalyzer.check_dataset_label_histogram(a, b)

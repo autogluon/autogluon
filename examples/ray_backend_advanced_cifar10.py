@@ -18,7 +18,8 @@ if __name__ == '__main__':
                                                       task.model_zoo.get_model('resnet152_v1')]),
                                                  optimizers=ag.Optimizers(
                                                      [ag.optims.get_optim('sgd'),
-                                                      ag.optims.get_optim('adam')]))
+                                                      ag.optims.get_optim('adam')]),
+                                                 backend='ray')
     logger.debug('trials results:')
     logger.debug(models)
     logger.debug('=========================')

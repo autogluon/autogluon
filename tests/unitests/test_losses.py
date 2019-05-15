@@ -5,9 +5,11 @@ import logging
 
 import autogluon as ag
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+
 
 @pytest.mark.serial
 def test_losses():
     losses = ag.Losses([])
-    logging.info(losses)
-    pass
+    logger.debug(losses)

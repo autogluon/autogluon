@@ -8,7 +8,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     dataset = task.Dataset('./CIFAR10/train', './CIFAR10/valid')
-    models = task.fit(dataset)
+    models = task.fit(dataset, backend='ray')
 
     logger.debug('trials results:')
     logger.debug(models[0])

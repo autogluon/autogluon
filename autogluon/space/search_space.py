@@ -15,8 +15,11 @@ class List(object):
     def get_hyper_param(self):
         return self.hyper_param
 
+    def __repr__(self):
+        return "AutoGluon List Space %s: %s" % (self.name, str(self.choices))
+
     def __str__(self):
-        return "List Space %s1: %s" % (self.name, str(self.hyper_param))
+        return "AutoGluon List Space %s: %s" % (self.name, str(self.choices))
 
 
 class Linear(object):
@@ -38,8 +41,15 @@ class Linear(object):
     def get_hyper_param(self):
         return self.hyper_param
 
+    def __repr__(self):
+        return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+                                                                  self.lower,
+                                                                  self.upper)
+
     def __str__(self):
-        return "Linear Space %s: %s" % (self.name, str(self.hyper_param))
+        return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+                                                                  self.lower,
+                                                                  self.upper)
 
 
 class Log(object):
@@ -61,5 +71,12 @@ class Log(object):
     def get_hyper_param(self):
         return self.hyper_param
 
+    def __repr__(self):
+        return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
+                                                               self.lower,
+                                                               self.upper)
+
     def __str__(self):
-        return "Log Space %s: %s" % (self.name, str(self.hyper_param))
+        return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
+                                                               self.lower,
+                                                               self.upper)
