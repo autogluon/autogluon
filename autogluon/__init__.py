@@ -29,7 +29,7 @@ from .metric import *
 from .network import *
 from .optim import *
 from .space import *
-from .task import *
+from .task import image_classification as image_classification
 from .basic import *
 from .utils import *
 from . import scheduler, distribution, searcher
@@ -40,4 +40,4 @@ __all__ = dataset.__all__ \
           + network.__all__ \
           + optim.__all__ \
           + space.__all__ \
-          + task.__all__\
+          + task.__all__
