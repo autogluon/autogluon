@@ -291,7 +291,7 @@ myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
 myscheduler.run(num_trials=10)
 ```
 
-See [`mnist_autogluon_config_random.py`](./examples/mnist_autogluon_config_random.py) for details.
+See [`mnist_autogluon.py`](./examples/mnist_autogluon.py) for details.
 
 ## Schedule Bash Tasks
 

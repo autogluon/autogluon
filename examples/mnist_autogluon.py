@@ -19,8 +19,16 @@ parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
                     help='initial learning rate')
 parser.add_argument('--epochs', default=5, type=int,
                     help='number of epochs')
+parser.add_argument('--num-trials', default=10, type=int,
+                    help='number of trail tasks')
 parser.add_argument('--scheduler', type=str, default='fifo',
                     help='scheduler name (default: fifo)')
+parser.add_argument('--checkpoint', type=str, default='checkpoint/exp1.ag',
+                    help='checkpoint path (default: None)')
+parser.add_argument('--resume', action='store_true', default= False,
+                    help='resume from the checkpoint if needed')
+parser.add_argument('--debug', action='store_true', default= False,
+                    help='debug if needed')
 
 @autogluon_method
 def train_mnist(args, reporter):
@@ -99,11 +107,15 @@ def train_mnist(args, reporter):
 
         test_accuracy = evaluate_accuracy(test_data, net)
         reporter(epoch=e, accuracy=test_accuracy)
+        #reporter(epoch=e, accuracy=test_accuracy, model_params=net.collect_params())
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG)
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     # creating hyperparameters
     cs = CS.ConfigurationSpace()
@@ -115,10 +127,20 @@ if __name__ == "__main__":
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.Hyperband_Scheduler(train_mnist, args,
                                                        {'num_cpus': 2, 'num_gpus': 2}, searcher,
+                                                       num_trials=args.num_trials,
+                                                       checkpoint=args.checkpoint,
+                                                       resume = args.resume,
                                                        time_attr='epoch', reward_attr="accuracy",
                                                        max_t=args.epochs, grace_period=1)
     else:
         myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
-                                                  {'num_cpus': 2, 'num_gpus': 2}, searcher)
+                                                  {'num_cpus': 2, 'num_gpus': 2}, searcher,
+                                                  num_trials=args.num_trials,
+                                                  checkpoint=args.checkpoint,
+                                                  resume = args.resume,
+                                                  reward_attr="accuracy")
 
-    myscheduler.run(num_trials=10)
+    myscheduler.run()
+
+    print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
+                                                                   myscheduler.get_best_reward()))
