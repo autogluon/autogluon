@@ -1,4 +1,5 @@
 import os
+import pickle
 import logging
 import threading
 import numpy as np
@@ -47,12 +48,15 @@ class Hyperband_Scheduler(FIFO_Scheduler):
     """
     
     def __init__(self, train_fn, args, resource, searcher,
+                 checkpoint=None, resume=False,
+                 num_trials=None,
                  time_attr="training_epoch",
                  reward_attr="accuracy",
                  max_t=100, grace_period=10,
                  reduction_factor=4, brackets=1):
-        super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher)
-        self.hyperbander = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
+        super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
+                                                  checkpoint, resume, num_trials, reward_attr)
+        self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                              reduction_factor, brackets)
 
     def add_task(self, task):
@@ -64,37 +68,65 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 os.environ['CUDA_VISIBLE_DEVICES'] = str(task.resources.gpu_ids)[1:-1]
             reporter = StatusReporter()
             task.args['reporter'] = reporter
-            self.hyperbander.on_task_add(task)
+            self.terminator.on_task_add(task)
             tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(
                             task.fn, task.args, task.resources,
                             Hyperband_Scheduler.RESOURCE_MANAGER))
+            # reporter Process
+            checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             rp = threading.Thread(target=Hyperband_Scheduler._run_reporter,
-                                  args=(task, tp, reporter, self.searcher, self.hyperbander,
-                                        Hyperband_Scheduler.RESOURCE_MANAGER))
+                                  args=(task, tp, reporter, self.searcher, self.terminator,
+                                        self._reward_attr, Hyperband_Scheduler.RESOURCE_MANAGER,
+                                        checkpoint_semaphore))
             tp.start()
             rp.start()
-            self.SCHEDULED_TASKS.append({'Task': task, 'Process': tp, 'ReporterThread': rp})
+            if self._checkpoint is not None:
+                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
+                sp.start()
+            self.SCHEDULED_TASKS.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
+                                         'Process': tp, 'ReporterProcess': rp})
 
     @staticmethod
-    def _run_reporter(task, task_process, reporter, searcher, scheduler, resource_manager):
+    def _run_reporter(task, task_process, reporter, searcher, terminator, reward_attr,
+                      resource_manager, checkpoint_semaphore):
         last_result = None
         while task_process.is_alive():
             reported_results = reporter.fetch()
             if 'done' in reported_results and reported_results['done'] is True:
-                scheduler.on_task_complete(task, last_result)
+                terminator.on_task_complete(task, last_result)
+                task_process.join()
+                if checkpoint_semaphore is not None:
+                    checkpoint_semaphore.release()
                 break
-            if scheduler.on_task_report(task, reported_results):
+            if terminator.on_task_report(task, reported_results):
                 reporter.move_on()
             else:
                 logger.debug('Removing task {} due to low performance'.format(task))
                 task_process.terminate()
-                scheduler.on_task_remove(task)
+                terminator.on_task_remove(task)
+                task_process.join()
                 resource_manager._release(task.resources)
+                if checkpoint_semaphore is not None:
+                    checkpoint_semaphore.release()
                 break
                 # TODO need to discuss, do we report to searcher if terminated early?
             last_result = reported_results
-        searcher.update(**last_result)
+        searcher.update(task.args['config'], last_result[reward_attr])
+        #reporting = [last_result[reward_attr]]
+        #if 'model_params' in last_result:
+        #    # update model params if reported
+        #    reporting.append(last_result['model_params'])
+        #searcher.update(task.args['config'], *reporting)
 
+    def state_dict(self, destination=None):
+        destination = super(Hyperband_Scheduler, self).state_dict(destination)
+        destination['terminator'] = pickle.dumps(self.terminator)
+        return destination
+
+    def load_state_dict(self, state_dict):
+        super(Hyperband_Scheduler, self).load_state_dict(state_dict)
+        self.terminator = pickle.loads(state_dict['terminator'])
+        logger.info('Loading Terminator State {}'.format(self.terminator))
 
 class Hyperband_Manager(object):
     """Hyperband Manager
@@ -115,8 +147,6 @@ class Hyperband_Manager(object):
         brackets (int): Number of brackets. Each bracket has a different
             halving rate, specified by the reduction factor.
     """
-
-    # TODO add a lock
     LOCK = mp.Lock()
     def __init__(self, time_attr='training_epoch',
                  reward_attr='accuracy',
@@ -167,7 +197,16 @@ class Hyperband_Manager(object):
     def on_task_remove(self, task):
         with Hyperband_Manager.LOCK:
             del self._task_info[task.task_id]
-        
+ 
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + '(' +  \
+            'reward_attr: ' + self._reward_attr + \
+            ', time_attr: ' + self._time_attr + \
+            ', reduction_factor: ' + str(self._reduction_factor) + \
+            ', max_t: ' + str(self._max_t) + \
+            ', brackets: ' + str(self._brackets) + \
+             ')'
+        return reprstr
 
 # adapted from ray-project
 class _Bracket():
@@ -211,7 +250,7 @@ class _Bracket():
                 break
         return action
 
-    def debug_str(self):
+    def __repr__(self):
         iters = " | ".join([
             "Iter {:.3f}: {}".format(milestone, self.cutoff(recorded))
             for milestone, recorded in self._rungs
