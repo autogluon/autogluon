@@ -36,7 +36,6 @@ requirements = [
     'scipy',
     'matplotlib',
     'requests',
-    #'ray',
     'pytest',
     'configspace',
     'nose',
