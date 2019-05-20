@@ -1,3 +1,5 @@
+import numpy as np
+
 from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
@@ -16,9 +18,18 @@ class Dataset(dataset.Dataset):
         self.val_path = val_path
         self.train_data = None
         self.val_data = None
+        self._num_classes = None
         self._read_dataset()
         self.search_space = None
         self.add_search_space()
+
+    @property
+    def num_classes(self):
+        return self._num_classes
+
+    @num_classes.setter
+    def num_classes(self, value):
+        self._num_classes = value
 
     def _read_dataset(self):
         transform_train = transforms.Compose([
@@ -51,6 +62,7 @@ class Dataset(dataset.Dataset):
                 shuffle=False,
                 num_workers=4)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
+            self.num_classes = len(np.unique(train_dataset._label))
         else:
             train_data = None
             test_data = None

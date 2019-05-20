@@ -45,8 +45,7 @@ def train_image_classification(args, reporter):
     # Define Network
     net = get_model(args.model, pretrained=args.pretrained)
     with net.name_scope():
-        #num_classes = len(np.unique(train_data._dataset._label))
-        num_classes = 10
+        num_classes = dataset.num_classes
         if hasattr(args, 'classes'):
             warnings.warn('Warning: '
                           'number of class of labels can be inferred.')
@@ -59,15 +58,19 @@ def train_image_classification(args, reporter):
         net.collect_params().reset_ctx(ctx)
 
     # Define trainer
-    if hasattr(args, 'momentum'):
-        optimizer_params = {
-            'learning_rate': args.lr,
-            'momentum': args.momentum
-        }
-    else:
-        optimizer_params = {
-            'learning_rate': args.lr,
-        }
+    def _set_optimizer_params(args):
+        if hasattr(args, 'momentum'):
+            optimizer_params = {
+                'learning_rate': args.lr,
+                'momentum': args.momentum
+            }
+        else:
+            optimizer_params = {
+                'learning_rate': args.lr,
+            }
+        return optimizer_params
+
+    optimizer_params = _set_optimizer_params(args)
     trainer = gluon.Trainer(net.collect_params(),
                             args.optimizer,
                             optimizer_params)
