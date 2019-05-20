@@ -1,8 +1,10 @@
 import os
 import pickle
+import json
 import logging
 import threading
 import multiprocessing as mp
+from collections import OrderedDict
 
 from .scheduler import *
 from .resource_manager import Resources
@@ -29,14 +31,17 @@ class FIFO_Scheduler(TaskScheduler):
             procedures will use this attribute.
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint=None,
-                 resume=False, num_trials=None, reward_attr='accuracy'):
+                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy'):
         self.train_fn = train_fn
         self.args = args
         self.resource = resource
         self.searcher = searcher
         self.num_trials = num_trials
         self._checkpoint = checkpoint
+        self._time_attr = time_attr
         self._reward_attr = reward_attr
+        self.log_lock = mp.Lock()
+        self.training_history = OrderedDict()
         if resume:
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
@@ -44,6 +49,29 @@ class FIFO_Scheduler(TaskScheduler):
                 msg = 'checkpoint path {} is not available for resume.'.format(checkpoint)
                 logger.exception(msg)
                 raise FileExistsError(msg)
+
+    def add_training_result(self, task_id, reward):
+        with self.log_lock:
+            if task_id in self.training_history:
+                self.training_history[task_id].append(reward)
+            else:
+                self.training_history[task_id] = [reward]
+
+    def get_training_curves(self, filename=None, plot=False, use_legend=True):
+        if filename is None and not plot:
+            logger.warning('Please either provide filename or allow plot in get_training_curves')
+        import matplotlib.pyplot as plt
+        plt.ylabel(self._reward_attr)
+        plt.xlabel(self._time_attr)
+        for task_id, task_res in self.training_history.items():
+            x = list(range(len(task_res)))
+            plt.plot(x, task_res, label='task {}'.format(task_id))
+        if use_legend:
+            plt.legend(loc='best')
+        if filename is not None:
+            logger.info('Saving Training Curve in {}'.format(filename))
+            plt.savefig(filename)
+        if plot: plt.show()
 
     def run(self, num_trials=None):
         """Run multiple number of trials
@@ -81,14 +109,17 @@ class FIFO_Scheduler(TaskScheduler):
                 os.environ['CUDA_VISIBLE_DEVICES'] = str(task.resources.gpu_ids)[1:-1]
             reporter = StatusReporter()
             task.args['reporter'] = reporter
+            # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
                             task.fn, task.args, task.resources,
                             FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
-            rp = threading.Thread(target=FIFO_Scheduler._run_reporter, args=(task, tp, reporter,
-                                  self.searcher, self._reward_attr, checkpoint_semaphore))
+            # reporter thread
+            rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
+                                  self.searcher, checkpoint_semaphore))
             tp.start()
             rp.start()
+            # checkpoint thread
             if self._checkpoint is not None:
                 sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
                 sp.start()
@@ -100,21 +131,21 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug('Saving Checkerpoint')
         self.save()
 
-    @staticmethod
-    def _run_reporter(task, task_process, reporter, searcher, reward_attr,
+    def _run_reporter(self, task, task_process, reporter, searcher,
                       checkpoint_semaphore):
         last_result = None
         while task_process.is_alive():
-            kwargs = reporter.fetch()
-            if 'done' in kwargs and kwargs['done'] is True:
+            reported_result = reporter.fetch()
+            if 'done' in reported_result and reported_result['done'] is True:
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
+            self.add_training_result(task.task_id, reported_result[self._reward_attr])
             reporter.move_on()
-            last_result = kwargs
-        searcher.update(task.args['config'], last_result[reward_attr])
-        #reporting = [last_result[reward_attr]]
+            last_result = reported_result
+        searcher.update(task.args['config'], last_result[self._reward_attr])
+        #reporting = [last_result[self._reward_attr]]
         #if 'model_params' in last_result:
         #    # update model params if reported
         #    reporting.append(last_result['model_params'])
@@ -130,13 +161,12 @@ class FIFO_Scheduler(TaskScheduler):
 
     def state_dict(self, destination=None):
         destination = super(FIFO_Scheduler, self).state_dict(destination)
-        destination['num_trials'] = self.num_trials
-        #destination['searcher_state_dict'] = self.searcher.state_dict()
         destination['searcher'] = pickle.dumps(self.searcher)
+        destination['training_history'] = json.dumps(self.training_history)
         return destination
 
     def load_state_dict(self, state_dict):
         super(FIFO_Scheduler, self).load_state_dict(state_dict)
-        #self.searcher.load_state_dict(state_dict['searcher_state_dict'])
         self.searcher = pickle.loads(state_dict['searcher'])
+        self.training_history = json.loads(state_dict['training_history'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))

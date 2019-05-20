@@ -91,6 +91,9 @@ class TaskScheduler(object):
         cls._cleaning_tasks()
         for i, task_dic in enumerate(cls.SCHEDULED_TASKS):
             task_dic['Process'].join()
+        while not cls.ERROR_QUEUE.empty():
+            e = cls.ERROR_QUEUE.get()
+            logger.error(str(e))
 
     @classmethod
     def state_dict(cls, destination=None):
