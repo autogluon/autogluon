@@ -20,7 +20,6 @@ class autogluon_method(object):
             autogluon_method.SEED.value += 1
             spec_config = gen_config(autogluon_method.SEED.value, config)
 
-        logger.debug('spec_config {}'.format(spec_config))
         vars(args).update(spec_config)
         self.f(args, **kwargs)
         if 'reporter' in kwargs:
