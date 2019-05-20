@@ -11,6 +11,25 @@ AutoGluon: AutoML Toolkit with MXNet Gluon
 ## Installation
     python setup.py install
 
+
+## Contribution Guide
+
+Step 1: Install the ![mwinit](https://midway.amazon.com/nextgen/ssh)
+
+Step 2: Install toolbox, brazil and cr following this ![wiki](https://w.amazon.com/index.php/BuilderToolbox/GettingStarted#Install_Toolbox)
+
+Step 3: Use git commit to add and commit any changes you wish to have in your code review, but do not push them
+
+Step 4 (one time): make sure using curl from /usr/bin. update ~/.bash_profile with the below command to be the last line in the file 
+    
+    export PATH="/usr/bin:$PATH"
+
+Step 5: Type cr to begin (CRUX will generate a URL of the form: https://code.amazon.com/reviews/CR-######.)
+In the generated link, you could select reviewers. Once everything is set. Please do not forget `Publish` top-right corner of the CR URL.
+
+For more detailed information on how to submit PR and revisions, please refer to ![cr link](https://builderhub.corp.amazon.com/docs/getting-started-cr.html)
+
+
 ## Beginners Guide
 ```python
 import logging

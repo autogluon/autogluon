@@ -10,5 +10,8 @@ if __name__ == '__main__':
     dataset = task.Dataset('./CIFAR10/train', './CIFAR10/valid')
     models = task.fit(dataset)
 
-    logger.debug('trials results:')
-    logger.debug(models[0])
+    logger.debug('Best result:')
+    logger.debug(models[1])
+    logger.debug('=========================')
+    logger.debug('Best search space:')
+    logger.debug(models[2])

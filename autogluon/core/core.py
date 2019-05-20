@@ -16,26 +16,23 @@ __all__ = ['fit']
 
 
 # TODO (cgraywang): put into class that can be inherited and add readme
-def fit(data,
-        nets=Nets([]),
-        optimizers=Optimizers([]),
-        metrics=Metrics([]),
-        losses=Losses([]),
+# This is an abstract method
+def fit(data=None,
+        nets=None,
+        optimizers=None,
+        metrics=None,
+        losses=None,
         searcher=None,
         trial_scheduler=None,
         resume=False,
         savedir='./outputdir/',
         visualizer='tensorboard',
-        stop_criterion={'time_limits': 1 * 60 * 60,
-                        'max_metric': 0.80,
-                        'max_trial_count': 10},
-        resources_per_trial={'max_num_gpus': 1,
-                             'max_num_cpus': 4,
-                             'max_training_epochs': 1},
-        backend='autogluon',
+        stop_criterion={},
+        resources_per_trial={},
+        backend='default',
         **kwargs):
     r"""
-    Fit networks on dataset
+    Abstract Fit networks on dataset
 
     Parameters
     ----------
@@ -50,30 +47,22 @@ def fit(data,
         the return result of 'train()', whichever is reached first.
         Defaults to empty dict.
     resources_per_trial (dict): Machine resources to allocate per trial,
-        e.g. ``{"cpu": 64, "gpu": 8}``. Note that GPUs will not be
-        assigned unless you specify them here. Defaults to 1 CPU and 0
-        GPUs in ``Trainable.default_resource_request()``.
+        e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
+        assigned unless you specify them here.
     savedir (str): Local dir to save training results to.
-    checkpoint_freq (int): How many training iterations between
-        checkpoints. A value of 0 (default) disables checkpointing.
-    checkpoint_at_end (bool): Whether to checkpoint at the end of the
-        experiment regardless of the checkpoint_freq. Default is False.
-    searcher (SearchAlgorithm): Search Algorithm. Defaults to
-        BasicVariantGenerator.
-    trial_scheduler (TrialScheduler): Scheduler for executing
-        the experiment. Choose among FIFO (default), MedianStopping,
-        AsyncHyperBand, and HyperBand.
-    resume (bool|"prompt"): If checkpoint exists, the experiment will
-        resume from there. If resume is "prompt", Tune will prompt if
-        checkpoint detected.
+    searcher: Search Algorithm.
+    trial_scheduler: Scheduler for executing
+        the experiment. Choose among FIFO (default) and HyperBand.
+    resume (bool): If checkpoint exists, the experiment will
+        resume from there.
+    backend: support autogluon default backend, ray. (Will support SageMaker)
     **kwargs: Used for backwards compatibility.
 
     Returns
     ----------
-    List of Trial objects.
+    model: the parameters associated with the best model. (TODO: use trial to infer for now)
+    best_result: accuracy
+    best_config: best configuration
     """
 
-    trials = None
-    best_result = None
-    cs = CS.ConfigurationSpace()
-    return trials, best_result, cs
+    raise NotImplementedError("The method not implemented")

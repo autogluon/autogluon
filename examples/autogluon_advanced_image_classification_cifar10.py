@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     dataset = task.Dataset('./CIFAR10/train', './CIFAR10/valid')
 
-    models, best_result, search_space = task.fit(dataset,
+    trials, best_result, search_space = task.fit(dataset,
                                                  nets=ag.Nets(
                                                      [task.model_zoo.get_model('resnet18_v1'),
                                                       task.model_zoo.get_model('resnet34_v1'),
@@ -17,13 +17,10 @@ if __name__ == '__main__':
                                                       task.model_zoo.get_model('resnet101_v1'),
                                                       task.model_zoo.get_model('resnet152_v1')]),
                                                  optimizers=ag.Optimizers(
-                                                     [ag.optims.get_optim('sgd'),
-                                                      ag.optims.get_optim('adam')]))
-    logger.debug('trials results:')
-    logger.debug(models)
-    logger.debug('=========================')
-    logger.debug('best results:')
+                                                     [ag.optim.get_optim('sgd'),
+                                                      ag.optim.get_optim('adam')]))
+    logger.debug('Best Results:')
     logger.debug(best_result)
     logger.debug('=========================')
-    logger.debug('print search space')
+    logger.debug('Print search space:')
     logger.debug(search_space)

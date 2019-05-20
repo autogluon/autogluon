@@ -9,55 +9,54 @@ from mxnet.gluon import nn
 from gluoncv.model_zoo import get_model
 
 from ...basic import autogluon_method
-
+from .dataset import Dataset
 
 __all__ = ['train_ray_image_classification', 'train_image_classification']
 
 
 @autogluon_method
 def train_image_classification(args, reporter):
-    if hasattr(args, 'seed'):
-        np.random.seed(args.seed)
-        random.seed(args.seed)
-        mx.random.seed(args.seed)
-    else:
-        np.random.seed(1)
-        random.seed(1)
-        mx.random.seed(1)
 
     # Set Hyper-params
-    if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
-        batch_size = args.batch_size * max(args.num_gpus, 1)
-        ctx = [mx.gpu(i)
-               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-    else:
-        if hasattr(args, 'num_gpus'):
-            num_gpus = args.num_gpus
+    def _init_env():
+        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
+            batch_size = args.batch_size * max(args.num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
         else:
-            num_gpus = 1
-        if hasattr(args, 'batch_size'):
-            batch_size = args.batch_size * max(num_gpus, 1)
-        else:
-            batch_size = 64 * max(num_gpus, 1)
-        ctx = [mx.gpu(i)
-               for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+            if hasattr(args, 'num_gpus'):
+                num_gpus = args.num_gpus
+            else:
+                num_gpus = 1
+            if hasattr(args, 'batch_size'):
+                batch_size = args.batch_size * max(num_gpus, 1)
+            else:
+                batch_size = 64 * max(num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        return batch_size, ctx
+    batch_size, ctx = _init_env()
 
     # Define DataLoader
-    train_data = args.train_data
-    val_data = args.val_data
+    dataset = Dataset(args.train_data, args.val_data)
+    train_data = dataset.train_data
+    val_data = dataset.val_data  
 
-    # Load model architecture and Initialize the net with pretrained model
+    # Define Network
     net = get_model(args.model, pretrained=args.pretrained)
     with net.name_scope():
-        num_classes = len(np.unique(train_data._dataset._label))
+        #num_classes = len(np.unique(train_data._dataset._label))
+        num_classes = 10
         if hasattr(args, 'classes'):
             warnings.warn('Warning: '
                           'number of class of labels can be inferred.')
             num_classes = args.classes
-        net.fc = nn.Dense(num_classes)
-    net.fc.initialize(init.Xavier(), ctx=ctx)
-    net.collect_params().reset_ctx(ctx)
-    net.hybridize()
+        net.output = nn.Dense(num_classes)
+    if not args.pretrained:
+        net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
+    else:
+        net.output.initialize(init.Xavier(), ctx=ctx)
+        net.collect_params().reset_ctx(ctx)
 
     # Define trainer
     if hasattr(args, 'momentum'):
@@ -74,21 +73,17 @@ def train_image_classification(args, reporter):
                             optimizer_params)
 
     #TODO (cgraywang): update with search space
-    if hasattr(args, 'loss'):
-        L = gluon.loss.SoftmaxCrossEntropyLoss()
-    if hasattr(args, 'metric'):
-        metric = mx.metric.Accuracy()
-
+    L = gluon.loss.SoftmaxCrossEntropyLoss()
+    metric = mx.metric.Accuracy()
+    
     def train(epoch):
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0],
                                               ctx_list=ctx,
-                                              batch_axis=0,
-                                              even_split=False)
+                                              )
             label = gluon.utils.split_and_load(batch[1],
                                                ctx_list=ctx,
-                                               batch_axis=0,
-                                               even_split=False)
+                                                )
             with autograd.record():
                 outputs = [net(X) for X in data]
                 loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
@@ -114,7 +109,6 @@ def train_image_classification(args, reporter):
 
             test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
             metric.update(label, outputs)
-
         _, test_acc = metric.get()
         test_loss /= len(val_data)
         reporter(epoch=epoch, accuracy=test_acc)
