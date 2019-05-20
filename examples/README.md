@@ -24,7 +24,8 @@ Create new task folder, e.g.,
 
 Then follow image_classification folder to create:
 
-    -`__init__.py` contains `fit` and `Dataset`
+    -`core.py` contains `fit`
+    -`dataset.py` contains `Dataset`
     -`model_zoo.py` contains `models` for the task, this should depend on gluoncv and gluonnlp.
     -`pipeline.py` contains training logic for the task.
     
