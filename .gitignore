@@ -8,6 +8,7 @@
 *.npy
 *.npz
 *.json
+*.ag
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

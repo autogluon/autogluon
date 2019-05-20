@@ -3,7 +3,7 @@ Step-by-step on creating new examples
 
 ## Step 1: Installation
 
-    python setup.py install
+    python setup.py develop
 
 ## Step 2: Create new example
 
