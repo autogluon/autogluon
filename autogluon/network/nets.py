@@ -3,6 +3,8 @@ import ConfigSpace as CS
 from ..space import *
 from .utils import Net
 
+from ..task.image_classification import get_model
+
 __all__ = ['Nets']
 
 
@@ -25,6 +27,8 @@ class Nets(object):
         cs.add_hyperparameter(net_list_hyper_param)
         for net in self.net_list:
             #TODO(cgraywang): distinguish between different nets, only support resnet for now
+            if isinstance(net, str):
+                net = get_model(net)
             net_hyper_params = net.get_hyper_params()
             conds = []
             for net_hyper_param in net_hyper_params:
@@ -45,6 +49,10 @@ class Nets(object):
         for net in self.net_list:
             if isinstance(net, Net):
                 net_strs.append(net.name)
+            elif isinstance(net, str):
+                net_strs.append(net)
+            else:
+                pass
         return net_strs
 
     def __repr__(self):
