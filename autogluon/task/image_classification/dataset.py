@@ -11,16 +11,12 @@ __all__ = ['Dataset']
 
 
 class Dataset(dataset.Dataset):
-    def __init__(self, train_path=None, val_path=None):
+    def __init__(self, name=None, train_path=None, val_path=None):
+        super(Dataset, self).__init__(name, train_path, val_path)
         # TODO (cgraywang): add search space, handle batch_size, num_workers
 
-        self.train_path = train_path
-        self.val_path = val_path
-        self.train_data = None
-        self.val_data = None
         self._num_classes = None
         self._read_dataset()
-        self.search_space = None
         self.add_search_space()
 
     @property
@@ -46,7 +42,7 @@ class Dataset(dataset.Dataset):
                                  [0.2023, 0.1994, 0.2010])
         ])
 
-        if 'CIFAR10' in self.train_path or 'CIFAR10' in self.val_path:
+        if self.name.lower() == 'cifar10':
             train_dataset = gluon.data.vision.CIFAR10(train=True)
             test_dataset = gluon.data.vision.CIFAR10(train=False)
             train_data = gluon.data.DataLoader(
