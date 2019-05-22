@@ -37,7 +37,7 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
-    'configspace',
+    'ConfigSpace',
     'nose',
     'gluoncv',
     'gluonnlp',
