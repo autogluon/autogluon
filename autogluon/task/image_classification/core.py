@@ -18,6 +18,12 @@ __all__ = ['fit']
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+class Results(object):
+    def __init__(self, model, accuracy, config):
+        self.model = model
+        self.accuracy = accuracy
+        self.config =config
+
 
 def fit(data,
         nets=Nets([
@@ -160,8 +166,9 @@ def fit(data,
         best_result = max([trial.best_result for trial in trials])
         # TODO (cgraywang)
         best_config = None
+        results = Results(None, best_result, best_config)
         logger.debug('Finished.')
-        return trials, best_result, cs
+        return results
 
     def _run_backend(searcher, trial_scheduler):
         logger.debug('Start using default backend.')
@@ -209,12 +216,13 @@ def fit(data,
         trials = None
         best_result = trial_scheduler.get_best_reward()
         best_config = trial_scheduler.get_best_config()
+        results = Results(None, best_result, best_config)
         logger.debug('Finished.')
-        return trials, best_result, best_config
+        return results
 
     if backend == 'ray':
-        result = _run_ray_backend(searcher, trial_scheduler)
+        results = _run_ray_backend(searcher, trial_scheduler)
     else:
-        result = _run_backend(searcher, trial_scheduler)
+        results = _run_backend(searcher, trial_scheduler)
     logger.debug('Finished.')
-    return result
+    return results
