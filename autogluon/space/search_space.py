@@ -3,8 +3,6 @@ __all__ = ['List', 'Linear', 'Log']
 import ConfigSpace.hyperparameters as CSH
 
 
-# TODO (cgraywang): add constant parameter?
-
 class List(object):
     def __init__(self, name, choices):
         self.name = name
@@ -42,12 +40,20 @@ class Linear(object):
         return self.hyper_param
 
     def __repr__(self):
-        return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+        if isinstance(self.lower, int) and isinstance(self.upper, int):
+            return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+                                                                      self.lower,
+                                                                      self.upper)
+        return "AutoGluon Linear Space %s: lower %f, upper %f" % (self.name,
                                                                   self.lower,
                                                                   self.upper)
 
     def __str__(self):
-        return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+        if isinstance(self.lower, int) and isinstance(self.upper, int):
+            return "AutoGluon Linear Space %s: lower %d, upper %d" % (self.name,
+                                                                      self.lower,
+                                                                      self.upper)
+        return "AutoGluon Linear Space %s: lower %f, upper %f" % (self.name,
                                                                   self.lower,
                                                                   self.upper)
 
@@ -71,12 +77,21 @@ class Log(object):
     def get_hyper_param(self):
         return self.hyper_param
 
+
     def __repr__(self):
-        return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
-                                                               self.lower,
-                                                               self.upper)
+        if isinstance(self.lower, int) and isinstance(self.upper, int):
+            return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
+                                                                      self.lower,
+                                                                      self.upper)
+        return "AutoGluon Log Space %s: lower %f, upper %f" % (self.name,
+                                                                  self.lower,
+                                                                  self.upper)
 
     def __str__(self):
-        return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
-                                                               self.lower,
-                                                               self.upper)
+        if isinstance(self.lower, int) and isinstance(self.upper, int):
+            return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
+                                                                      self.lower,
+                                                                      self.upper)
+        return "AutoGluon Log Space %s: lower %f, upper %f" % (self.name,
+                                                                  self.lower,
+                                                                  self.upper)

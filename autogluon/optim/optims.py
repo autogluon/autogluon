@@ -44,6 +44,12 @@ class Optimizers(object):
                 optim_strs.append(optim.name)
         return optim_strs
 
+    def __repr__(self):
+        return "AutoGluon Optimizers %s with %s" % (str(self.get_optim_strs()), str(self.search_space))
+
+    def __str__(self):
+        return "AutoGluon Optimizers %s with %s" % (str(self.get_optim_strs()), str(self.search_space))
+    
 
 optims = ['sgd',
           'nag',
