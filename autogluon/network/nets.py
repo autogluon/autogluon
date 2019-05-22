@@ -46,3 +46,9 @@ class Nets(object):
             if isinstance(net, Net):
                 net_strs.append(net.name)
         return net_strs
+
+    def __repr__(self):
+        return "AutoGluon Nets %s with %s" % (str(self.get_net_strs()), str(self.search_space))
+
+    def __str__(self):
+        return "AutoGluon Nets %s with %s" % (str(self.get_net_strs()), str(self.search_space))

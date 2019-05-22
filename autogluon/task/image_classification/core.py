@@ -1,4 +1,6 @@
 import logging
+import os
+
 import numpy as np
 import ConfigSpace as CS
 import argparse
@@ -163,7 +165,7 @@ def fit(data,
 
     def _run_backend(searcher, trial_scheduler):
         logger.debug('Start using default backend.')
-        if searcher is None:
+        if searcher is None or searcher == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         if trial_scheduler == 'hyperband':
             trial_scheduler = ag.scheduler.Hyperband_Scheduler(
@@ -202,6 +204,7 @@ def fit(data,
                 checkpoint=savedir,
                 resume=resume)
         trial_scheduler.run(num_trials=stop_criterion['max_trial_count'])
+        trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
         # TODO (cgraywang)
         trials = None
         best_result = trial_scheduler.get_best_reward()

@@ -69,3 +69,4 @@ class Dataset(dataset.Dataset):
             raise NotImplementedError
         self.train_data = train_data
         self.val_data = test_data
+
