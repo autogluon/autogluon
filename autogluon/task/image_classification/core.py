@@ -46,7 +46,7 @@ def fit(data,
             'max_trial_count': 2
         },
         resources_per_trial={
-            'max_num_gpus': 1,
+            'max_num_gpus': 0,
             'max_num_cpus': 4,
             'max_training_epochs': 10
         },
