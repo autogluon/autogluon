@@ -10,15 +10,23 @@ class ResourceManager(object):
     LOCK = mp.Lock()
     CPU_QUEUE = mp.Queue()
     GPU_QUEUE = mp.Queue()
-    for cid in range(cpu_count()):
+    MAX_CPU_COUNT = cpu_count()
+    MAX_GPU_COUNT = gpu_count()
+    for cid in range(MAX_CPU_COUNT):
         CPU_QUEUE.put(cid)
-    for gid in range(gpu_count()):
+    for gid in range(MAX_GPU_COUNT):
         GPU_QUEUE.put(gid)
 
     @classmethod
     def _request(cls, resource):
         # Despite ResourceManager is thread/process safe, we do recommand
         # using single scheduler.
+        assert resource.num_cpus <= cls.MAX_CPU_COUNT, \
+            'Requested num_cpu={} should be less than or equal to system available CPU count={}'. \
+            format(resource.num_cpus, cls.MAX_CPU_COUNT)
+        assert resource.num_gpus <= cls.MAX_GPU_COUNT, \
+            'Requested num_gpu={} should be less than or equal to system available GPUs count={}'. \
+            format(resource.num_gpus, cls.MAX_GPU_COUNT)
         with cls.LOCK:
             cpu_ids = [cls.CPU_QUEUE.get() for i in range(resource.num_cpus)]
             gpu_ids = [cls.GPU_QUEUE.get() for i in range(resource.num_gpus)]

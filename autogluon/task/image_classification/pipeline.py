@@ -27,7 +27,7 @@ def train_image_classification(args, reporter):
             if hasattr(args, 'num_gpus'):
                 num_gpus = args.num_gpus
             else:
-                num_gpus = 1
+                num_gpus = 0
             if hasattr(args, 'batch_size'):
                 batch_size = args.batch_size * max(num_gpus, 1)
             else:
