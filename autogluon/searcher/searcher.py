@@ -9,9 +9,9 @@ __all__ = ['BaseSearcher', 'RandomSampling']
 logger = logging.getLogger(__name__)
 
 class BaseSearcher(object):
-    """The config generator determines how new configurations are sampled. This can take very different levels of
-    complexity, from random sampling to the construction of complex empirical prediction models for promising
-    configurations.
+    """The config generator determines how new configurations are sampled. This can take
+    very different levels of complexity, from random sampling to the construction of complex
+    empirical prediction models for promising configurations.
     """
     def __init__(self, configspace):
         """Basic Searcher

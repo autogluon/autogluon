@@ -57,15 +57,13 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                                                   checkpoint, resume, num_trials,
                                                   time_attr, reward_attr)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
-                                             reduction_factor, brackets)
+                                            reduction_factor, brackets)
 
     def add_task(self, task):
         # adding the task
         logger.debug("Adding A New Task {}".format(task))
         Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            if task.resources.num_gpus > 0:
-                os.environ['CUDA_VISIBLE_DEVICES'] = str(task.resources.gpu_ids)[1:-1]
             reporter = StatusReporter()
             task.args['reporter'] = reporter
             self.terminator.on_task_add(task)
@@ -114,11 +112,6 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 break
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
-        #reporting = [last_result[self._reward_attr]]
-        #if 'model_params' in last_result:
-        #    # update model params if reported
-        #    reporting.append(last_result['model_params'])
-        #searcher.update(task.args['config'], *reporting)
 
     def state_dict(self, destination=None):
         destination = super(Hyperband_Scheduler, self).state_dict(destination)

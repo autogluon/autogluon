@@ -31,7 +31,7 @@ class Task(BasicTask):
 
     @classmethod
     def set_id(cls, taskid):
-        logger.info('Seeting TASK ID: {}'.format(taskid))
+        logger.info('Seting TASK ID: {}'.format(taskid))
         cls.TASK_ID.value = taskid
 
     def __repr__(self):
@@ -45,9 +45,11 @@ class TaskScheduler(object):
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = ResourceManager()
-    SCHEDULED_TASKS = []
-    FINISHED_TASKS = []
     ERROR_QUEUE = mp.Queue()
+    def __init__(self):
+        self.scheduler_tasks = []
+        self.finished_tasks = []
+
     def add_task(self, task):
         """Adding a training task to the scheduler.
         Args:
@@ -56,19 +58,19 @@ class TaskScheduler(object):
         # adding the task
         logger.debug("Adding A New Task {}".format(task))
         TaskScheduler.RESOURCE_MANAGER._request(task.resources)
-        if task.resources.num_gpus > 0:
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(task.resources.gpu_ids)[1:-1]
         p = mp.Process(target=TaskScheduler._run_task, args=(
                        task.fn, task.args, task.resources,
                        TaskScheduler.RESOURCE_MANAGER))
         p.start()
         with self.LOCK:
-            self.SCHEDULED_TASKS.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
+            self.scheduler_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
 
     @staticmethod
     def _run_task(fn, args, resources, resource_manager):
         """Executing the task
         """
+        if resources.num_gpus > 0:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str,resources.gpu_ids))
         try:
             fn(**args)
         except Exception as e:
@@ -77,43 +79,40 @@ class TaskScheduler(object):
             TaskScheduler.ERROR_QUEUE.put(e)
         resource_manager._release(resources)
 
-    @classmethod
-    def _cleaning_tasks(cls):
-        with cls.LOCK:
-            for i, task_dick in enumerate(cls.SCHEDULED_TASKS):
+    def _cleaning_tasks(self):
+        with self.LOCK:
+            for i, task_dick in enumerate(self.scheduler_tasks):
                 if not task_dick['Process'].is_alive():
-                    task_dict = cls.SCHEDULED_TASKS.pop(i)
-                    cls.FINISHED_TASKS.append({'TASK_ID': task_dict['TASK_ID'],
+                    task_dict = self.scheduler_tasks.pop(i)
+                    self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
                                                'Config': task_dict['Config']})
 
-    @classmethod
-    def join_tasks(cls):
-        cls._cleaning_tasks()
-        for i, task_dic in enumerate(cls.SCHEDULED_TASKS):
+    def join_tasks(self):
+        self._cleaning_tasks()
+        for i, task_dic in enumerate(self.scheduler_tasks):
             task_dic['Process'].join()
-        while not cls.ERROR_QUEUE.empty():
-            e = cls.ERROR_QUEUE.get()
+        while not TaskScheduler.ERROR_QUEUE.empty():
+            e = TaskScheduler.ERROR_QUEUE.get()
             logger.error(str(e))
 
-    @classmethod
-    def state_dict(cls, destination=None):
+    def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
         """
-        cls._cleaning_tasks()
+        self._cleaning_tasks()
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
-        logger.debug('State_Dict cls.FINISHED_TASKS: {}'.format(cls.FINISHED_TASKS))
-        destination['FINISHED_TASKS'] = pickle.dumps(cls.FINISHED_TASKS)
+        logger.debug('State_Dict self.finished_tasks: {}'.format(self.finished_tasks))
+        destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['TASK_ID'] = Task.TASK_ID.value
         return destination
 
     @classmethod
-    def load_state_dict(cls, state_dict):
-        cls.FINISHED_TASKS = pickle.loads(state_dict['FINISHED_TASKS'])
+    def load_state_dict(self, state_dict):
+        self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])
-        logger.debug('Loading FINISHED_TASKS: {} '.format(cls.FINISHED_TASKS))
+        logger.debug('Loading finished_tasks: {} '.format(self.finished_tasks))
 
     @property
     def num_finished_tasks(self):
-        return len(self.FINISHED_TASKS)
+        return len(self.finished_tasks)
