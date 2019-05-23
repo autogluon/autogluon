@@ -38,6 +38,12 @@ class ResourceManager(object):
             for gid in gpu_ids:
                 cls.GPU_QUEUE.put(gid)
 
+    @classmethod
+    def get_available_resources(cls):
+        cpu_count = self.CPU_QUEUE.qsize()
+        gpu_count = self.GPU_QUEUE.qsize()
+        return cpu_count, gpu_count
+
 
 class Resources(object):
     def __init__(self, num_cpus, num_gpus):

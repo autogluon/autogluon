@@ -32,6 +32,7 @@ class FIFO_Scheduler(TaskScheduler):
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint=None,
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy'):
+        super(FIFO_Scheduler, self).__init__()
         self.train_fn = train_fn
         self.args = args
         self.resource = resource
@@ -105,8 +106,6 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            if task.resources.num_gpus > 0:
-                os.environ['CUDA_VISIBLE_DEVICES'] = str(task.resources.gpu_ids)[1:-1]
             reporter = StatusReporter()
             task.args['reporter'] = reporter
             # main process
@@ -123,7 +122,7 @@ class FIFO_Scheduler(TaskScheduler):
             if self._checkpoint is not None:
                 sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
                 sp.start()
-            self.SCHEDULED_TASKS.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
+            self.scheduler_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})
 
     def _run_checkpoint(self, checkpoint_semaphore):
@@ -145,18 +144,13 @@ class FIFO_Scheduler(TaskScheduler):
             reporter.move_on()
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
-        #reporting = [last_result[self._reward_attr]]
-        #if 'model_params' in last_result:
-        #    # update model params if reported
-        #    reporting.append(last_result['model_params'])
-        #searcher.update(task.args['config'], *reporting)
 
     def get_best_config(self):
-        FIFO_Scheduler.join_tasks()
+        self.join_tasks()
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
-        FIFO_Scheduler.join_tasks()
+        self.join_tasks()
         return self.searcher.get_best_reward()
 
     def state_dict(self, destination=None):
