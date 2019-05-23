@@ -47,7 +47,7 @@ class TaskScheduler(object):
     RESOURCE_MANAGER = ResourceManager()
     ERROR_QUEUE = mp.Queue()
     def __init__(self):
-        self.scheduler_tasks = []
+        self.scheduled_tasks = []
         self.finished_tasks = []
 
     def add_task(self, task):
@@ -63,7 +63,7 @@ class TaskScheduler(object):
                        TaskScheduler.RESOURCE_MANAGER))
         p.start()
         with self.LOCK:
-            self.scheduler_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
+            self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
 
     @staticmethod
     def _run_task(fn, args, resources, resource_manager):
@@ -74,22 +74,22 @@ class TaskScheduler(object):
         try:
             fn(**args)
         except Exception as e:
-            logging.error(
+            logger.error(
                 'Uncaught exception in worker process: {}'.format(e))
             TaskScheduler.ERROR_QUEUE.put(e)
         resource_manager._release(resources)
 
     def _cleaning_tasks(self):
         with self.LOCK:
-            for i, task_dick in enumerate(self.scheduler_tasks):
+            for i, task_dick in enumerate(self.scheduled_tasks):
                 if not task_dick['Process'].is_alive():
-                    task_dict = self.scheduler_tasks.pop(i)
+                    task_dict = self.scheduled_tasks.pop(i)
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
                                                'Config': task_dict['Config']})
 
     def join_tasks(self):
         self._cleaning_tasks()
-        for i, task_dic in enumerate(self.scheduler_tasks):
+        for i, task_dic in enumerate(self.scheduled_tasks):
             task_dic['Process'].join()
         while not TaskScheduler.ERROR_QUEUE.empty():
             e = TaskScheduler.ERROR_QUEUE.get()
@@ -107,7 +107,6 @@ class TaskScheduler(object):
         destination['TASK_ID'] = Task.TASK_ID.value
         return destination
 
-    @classmethod
     def load_state_dict(self, state_dict):
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])

@@ -23,8 +23,6 @@ class Optimizers(object):
         cs.add_hyperparameter(optim_list_hyper_param)
         for optim in self.optim_list:
             # TODO: add more optims
-            if isinstance(optim, str):
-                optim = get_optim(optim)
             optim_hyper_params = optim.get_hyper_params()
             conds = []
             for optim_hyper_param in optim_hyper_params:
@@ -44,10 +42,6 @@ class Optimizers(object):
         for optim in self.optim_list:
             if isinstance(optim, Optimizer):
                 optim_strs.append(optim.name)
-            elif isinstance(optim, str):
-                optim_strs.append(optim)
-            else:
-                pass
         return optim_strs
 
     def __repr__(self):

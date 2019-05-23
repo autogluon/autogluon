@@ -82,7 +82,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             if self._checkpoint is not None:
                 sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
                 sp.start()
-            self.SCHEDULED_TASKS.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
+            self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})
 
     def _run_reporter(self, task, task_process, reporter, searcher, terminator,
