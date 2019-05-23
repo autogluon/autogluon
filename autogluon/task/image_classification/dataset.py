@@ -11,10 +11,9 @@ __all__ = ['Dataset']
 
 
 class Dataset(dataset.Dataset):
-    def __init__(self, name=None, train_path=None, val_path=None):
+    def __init__(self, name=None, train_path='cifar10', val_path='cifar10'):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO (cgraywang): add search space, handle batch_size, num_workers
-
         self._num_classes = None
         self._read_dataset()
         self.add_search_space()
@@ -65,4 +64,8 @@ class Dataset(dataset.Dataset):
             raise NotImplementedError
         self.train_data = train_data
         self.val_data = test_data
-
+        self.train = train_dataset
+        self.val = test_dataset
+    
+    def __repr__(self):
+        return "AutoGluon Dataset %s" % self.__str__()

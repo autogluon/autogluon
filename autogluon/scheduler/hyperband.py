@@ -55,7 +55,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                  reduction_factor=4, brackets=1):
         super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
                                                   checkpoint, resume, num_trials,
-                                                  time_attr, reward_attr)
+                                                  time_attr, reward_attr) 
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
 

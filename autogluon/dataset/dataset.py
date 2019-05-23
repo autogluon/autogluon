@@ -8,6 +8,8 @@ class Dataset(object):
         self.train_path = train_path
         self.val_path = val_path
         self.search_space = None
+        self.train = None
+        self.val = None
         self.train_data = None
         self.val_data = None
 

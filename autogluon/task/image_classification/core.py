@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import numpy as np
 import ConfigSpace as CS
@@ -16,15 +17,19 @@ from ...optim import Optimizers, get_optim
 __all__ = ['fit']
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
+class Results(object):
+    def __init__(self, model, accuracy, config, time):
+        self.model = model
+        self.val_accuracy = accuracy
+        self.config = config
+        self.time = time
 
 def fit(data,
         nets=Nets([
-            get_model('resnet18_v1'),
-            get_model('resnet34_v1'),
-            get_model('resnet50_v1'),
-            get_model('resnet101_v1')]),
+            get_model('cifar_resnet20_v1'),
+            get_model('cifar_resnet56_v1'),
+            get_model('cifar_resnet110_v1')]),
         optimizers=Optimizers(
             [get_optim('sgd'),
              get_optim('adam')]),
@@ -36,14 +41,14 @@ def fit(data,
         savedir='checkpoint/exp1.ag',
         visualizer='tensorboard',
         stop_criterion={
-            'time_limits': 1 * 60 * 60,
+            'time_limits': 1*60*60,
             'max_metric': 0.80,
-            'max_trial_count': 10
+            'max_trial_count': 2
         },
         resources_per_trial={
             'max_num_gpus': 1,
             'max_num_cpus': 4,
-            'max_training_epochs': 1
+            'max_training_epochs': 10
         },
         backend='default',
         **kwargs):
@@ -81,7 +86,7 @@ def fit(data,
     best_config: best configuration
     """
     logger.debug('Start fitting')
-
+    start_fit_time = time.time()
     def _construct_search_space(objs, obj_names):
         def _init_args():
             args = argparse.Namespace()
@@ -113,7 +118,6 @@ def fit(data,
                 if obj_name == 'data':
                     _assert_fit_error(obj, obj_name)
         return cs, args
-
     logger.debug('Start constructing search space')
     search_objs = [data, nets, optimizers, losses, metrics]
     # TODO (cgraywang) : replace with autogluon*.name
@@ -158,10 +162,12 @@ def fit(data,
                 }
             })
         best_result = max([trial.best_result for trial in trials])
+
         # TODO (cgraywang)
         best_config = None
+        results = Results(None, best_result, best_config, time.time()-start_fit_time)
         logger.debug('Finished.')
-        return trials, best_result, cs
+        return results
 
     def _run_backend(searcher, trial_scheduler):
         logger.debug('Start using default backend.')
@@ -209,12 +215,13 @@ def fit(data,
         trials = None
         best_result = trial_scheduler.get_best_reward()
         best_config = trial_scheduler.get_best_config()
+        results = Results(trials, best_result, best_config, time.time() - start_fit_time)
         logger.debug('Finished.')
-        return trials, best_result, best_config
+        return results
 
     if backend == 'ray':
-        result = _run_ray_backend(searcher, trial_scheduler)
+        results = _run_ray_backend(searcher, trial_scheduler)
     else:
-        result = _run_backend(searcher, trial_scheduler)
+        results = _run_backend(searcher, trial_scheduler)
     logger.debug('Finished.')
-    return result
+    return results

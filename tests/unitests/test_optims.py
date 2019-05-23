@@ -22,3 +22,16 @@ def test_optims():
         print(hparam.name)
         print(type(hparam.name))
     logger.debug('Finished.')
+
+
+def test_optim_strs():
+    logger.debug('Start testing optimizers')
+    optims = ag.Optimizers(['sgd', 'adam'])
+    print('optims:')
+    print(optims)
+    print('search space:')
+    print(optims.search_space)
+    for hparam in optims.search_space.get_hyperparameters():
+        print(hparam.name)
+        print(type(hparam.name))
+    logger.debug('Finished.')

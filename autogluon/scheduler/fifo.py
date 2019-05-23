@@ -122,7 +122,7 @@ class FIFO_Scheduler(TaskScheduler):
             if self._checkpoint is not None:
                 sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
                 sp.start()
-            self.scheduler_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
+            self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})
 
     def _run_checkpoint(self, checkpoint_semaphore):

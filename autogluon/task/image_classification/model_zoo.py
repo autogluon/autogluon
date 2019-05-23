@@ -31,7 +31,12 @@ models = ['resnet18_v1', 'resnet34_v1',
           'residualattentionnet200', 'residualattentionnet236', 'residualattentionnet452',
           'resnet18_v1b_0.89', 'resnet50_v1d_0.86', 'resnet50_v1d_0.48',
           'resnet50_v1d_0.37', 'resnet50_v1d_0.11',
-          'resnet101_v1d_0.76', 'resnet101_v1d_0.73']
+          'resnet101_v1d_0.76', 'resnet101_v1d_0.73',
+          'cifar_resnet20_v1', 'cifar_resnet20_v2',
+          'cifar_resnet56_v1', 'cifar_resnet56_v2',
+          'cifar_resnet110_v1', 'cifar_resnet110_v2',
+          'cifar_wideresnet16_10', 'cifar_wideresnet28_10',
+          'cifar_wideresnet40_8', 'cifar_resnext29_16x64d']
 
 
 @autogluon_net_instances
