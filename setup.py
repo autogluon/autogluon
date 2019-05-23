@@ -41,6 +41,7 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
+    'mxnet',
 ]
 
 setup(
