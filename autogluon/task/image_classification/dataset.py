@@ -66,8 +66,3 @@ class Dataset(dataset.Dataset):
         self.train_data = train_data
         self.val_data = test_data
 
-    def __repr__(self):
-        return "AutoGluon Dataset %s" % self.__str__()
-
-    # def __str__(self):
-    #     return "AutoGluon List Space %s: %s" % (self.name, str(self.choices))
