@@ -30,6 +30,7 @@ from .network import *
 from .optim import *
 from .space import *
 from .task import image_classification as image_classification
+from .task import text_classification as text_classification
 from .basic import *
 from .utils import *
 from . import scheduler, distribution, searcher
