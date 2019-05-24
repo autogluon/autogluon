@@ -22,6 +22,10 @@ def autogluon_optims(func):
         elif optim.name == 'adam':
             setattr(optim, 'hyper_params',
                     [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param()])
+
+        elif optim.name == 'ftml':
+            setattr(optim, 'hyper_params',
+                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param()])
         else:
             raise NotImplementedError
         return optim

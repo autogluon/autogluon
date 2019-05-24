@@ -70,7 +70,8 @@ optims = ['sgd',
           'signum',
           'ftml',
           'lbsgd',
-          'ftrl']
+          'ftrl',
+          'ftml']
 
 
 @autogluon_optims
@@ -197,4 +198,9 @@ def LBSGD(**kwargs):
 
 @autogluon_optims
 def FTRL(**kwargs):
+    pass
+
+
+@autogluon_optims
+def FTML(**kwargs):
     pass
