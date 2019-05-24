@@ -62,10 +62,10 @@ class Dataset(dataset.Dataset):
             train_data = None
             test_data = None
             raise NotImplementedError
-        self.train_data = train_data
-        self.val_data = test_data
-        self.train = train_dataset
-        self.val = test_dataset
+        self.train_data_loader = train_data
+        self.val_data_loader = test_data
+        self.train_dataset = train_dataset
+        self.val_dataset = test_dataset
     
     def __repr__(self):
-        return "AutoGluon Dataset %s" % self.__str__()
+        return "AutoGluon Dataset "

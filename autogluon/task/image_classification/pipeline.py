@@ -39,8 +39,8 @@ def train_image_classification(args, reporter):
 
     # Define DataLoader
     dataset = Dataset(args.train_data, args.val_data)
-    train_data = dataset.train_data
-    val_data = dataset.val_data  
+    train_data = dataset.train_data_loader
+    val_data = dataset.val_data_loader
 
     # Define Network
     net = get_model(args.model, pretrained=args.pretrained)
