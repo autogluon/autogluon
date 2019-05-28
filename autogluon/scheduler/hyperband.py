@@ -7,7 +7,7 @@ import multiprocessing as mp
 
 from .scheduler import *
 from .fifo import FIFO_Scheduler
-from .resource_manager import Resources
+from ..resource import Resources
 from .reporter import StatusReporter
 
 __all__ = ['Hyperband_Scheduler']
@@ -75,12 +75,13 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             rp = threading.Thread(target=self._run_reporter,
                                   args=(task, tp, reporter, self.searcher, self.terminator,
-                                        checkpoint_semaphore))
+                                        checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
             # checkpoint thread
             if self._checkpoint is not None:
-                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
+                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                      daemon=False)
                 sp.start()
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})

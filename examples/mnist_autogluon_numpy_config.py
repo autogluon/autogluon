@@ -1,4 +1,4 @@
-# adapt from http://zh.d2l.ai/chapter_convolutional-neural-networks/lenet.html
+Resources# adapt from http://zh.d2l.ai/chapter_convolutional-neural-networks/lenet.html
 from __future__ import print_function
 import argparse
 import numpy as np
@@ -105,6 +105,6 @@ if __name__ == "__main__":
                   lambda: np.power(10.0, np.random.uniform(-4, -1)))}
     myscheduler = ag.scheduler.TaskScheduler()
     for i in range(5):
-        resource = ag.scheduler.Resources(num_cpus=2, num_gpus=1)
+        resource = ag.resource.Resources(num_cpus=2, num_gpus=1)
         task = ag.scheduler.Task(train_mnist, {'args': args, 'config': config}, resource)
         myscheduler.add_task(task)
