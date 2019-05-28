@@ -74,6 +74,7 @@ class RandomSampling(BaseSearcher):
         returns: (config, info_dict)
             must return a valid configuration and a (possibly empty) info dict
         """
+        # TODO : The config that comes here has dict keys with a prefix. Split and re-create the dict.
         return self.configspace.sample_configuration().get_dictionary()
 
     def update(self, *args, **kwargs):

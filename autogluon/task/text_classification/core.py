@@ -119,8 +119,9 @@ def fit(data: Dataset,
             args = argparse.Namespace()
             args_dict = vars(args)
             args_dict['epochs'] = resources_per_trial['max_training_epochs']
-            args_dict['train_data'] = data.train_path
-            args_dict['model'] = 'standard_lstm_lm_200'  # TODO Change this
+            args_dict['train_path'] = data.train_path
+            args_dict['val_path'] = data.val_path
+            args_dict['model'] = 'standard_lstm_lm_200'  # TODO Change this. Standard defaults.
             args_dict['pretrained'] = True
             args_dict['lr'] = 5 * (10 ** -3)
             args_dict['optimizer'] = 'ftml'
@@ -137,7 +138,7 @@ def fit(data: Dataset,
         def _assert_fit_error(obj, name):
             assert obj is not None, '%s cannot be None' % name
 
-        cs = CS.ConfigurationSpace()
+        cs = CS.ConfigurationSpace(name='text_classification')
         for obj_name, obj in search_space_dict.items():
             _assert_fit_error(obj, obj_name)
             _set_range(obj, obj_name)
