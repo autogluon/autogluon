@@ -7,7 +7,7 @@ import multiprocessing as mp
 from collections import OrderedDict
 
 from .scheduler import *
-from .resource_manager import Resources
+from ..resource import Resources
 from .reporter import StatusReporter
 from ..basic import save, load
 from ..utils import mkdir
@@ -83,7 +83,6 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         for i in range(self.num_finished_tasks, self.num_trials):
             self.schedule_next()
-        self.join_tasks()
 
     def save(self, checkpoint=None):
         if checkpoint is None and self._checkpoint is None:
@@ -115,12 +114,13 @@ class FIFO_Scheduler(TaskScheduler):
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                                  self.searcher, checkpoint_semaphore))
+                                  self.searcher, checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
             # checkpoint thread
             if self._checkpoint is not None:
-                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,))
+                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                      daemon=False)
                 sp.start()
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})
