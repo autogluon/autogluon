@@ -24,8 +24,9 @@ def autogluon_net_instances(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
-        net.hyper_params = [List('pretrained', [True, False]).get_hyper_param()]
-        net.get_hyper_params = types.MethodType(get_hyper_params, net)
+        # TODO (ghaipiyu) : This was causing an exception. Should this hyperparam be here?
+        # net.hyper_params = [List('pretrained', [True, False]).get_hyper_param()]
+        # net.get_hyper_params = types.MethodType(get_hyper_params, net)
         return net
     return wrapper_decorator
 

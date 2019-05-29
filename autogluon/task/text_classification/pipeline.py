@@ -73,17 +73,13 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     batch_size, ctx = _init_env()
 
-    ## Initialize the dataset here.
-    dataset = Dataset(args.train_path, args.val_path)
-
     # Define the network and get an instance from model zoo.
-    pre_trained_network, vocab = get_model_instances(args.model, pretrained=args.pretrained)
+    pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     # pre_trained_network is a misnomer here. This can be untrained network too.
 
-    ## This is where the dataset is actually initialized.
-    ## TODO : Can the dataset param come as an arg in dict to this method ?
-    dataset.vocab = vocab
-    dataset._init()
+    ## Initialize the dataset here.
+    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
+                      batch_size=batch_size)
 
     net = TextClassificationNet(num_classes=dataset.num_classes)
     net.embedding = pre_trained_network.embedding
@@ -92,19 +88,20 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     net.hybridize()
 
     # define the initializer :
+    # TODO : This should come from the config
     initializer = mx.init.Xavier(magnitude=2.24)
     if not args.pretrained:
-        net.collect_params().initialize(initializer=initializer, ctx=ctx)
+        net.collect_params().initialize(init=initializer, ctx=ctx)
 
     else:
-        net.output.initialize(initializer=initializer, ctx=ctx)
+        net.output.initialize(init=initializer, ctx=ctx)
         net.collect_params().reset_ctx(ctx=ctx)
 
     # TODO : Update with search space
     loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
-    trainer = gluon.Trainer(net.collect_params(), optimizer='ftml', optimizer_params={'learning_rate': args.lr})
-    estimator = Estimator(net=net, loss=loss, metrics='Accuracy', trainer=trainer, context=ctx)
+    trainer = gluon.Trainer(net.collect_params(), 'ftml', {'learning_rate': args.lr})
+    estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs)
 

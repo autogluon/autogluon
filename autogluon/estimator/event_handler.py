@@ -8,7 +8,6 @@ import time
 import warnings
 
 import numpy as np
-
 from mxnet.metric import EvalMetric, Loss
 
 
@@ -245,7 +244,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
     def train_begin(self, estimator, *args, **kwargs):
         self.train_start = time.time()
         trainer = estimator.trainer
-        optimizer = trainer.optimizer.__class__.__name__
+        optimizer = trainer._optimizer.__class__.__name__
         lr = trainer.learning_rate
         self.logger.info("Training begin: using optimizer %s "
                          "with current learning rate %.4f ",
@@ -413,7 +412,7 @@ class CheckpointHandler(TrainBegin, BatchEnd, EpochEnd):
         self.current_epoch = 0
         self.current_batch = 0
         if self.save_best:
-            self.best = np.Inf if self.monitor_op == np.less else -np.Inf # pylint: disable=comparison-with-callable
+            self.best = np.Inf if self.monitor_op == np.less else -np.Inf  # pylint: disable=comparison-with-callable
         if self.resume_from_checkpoint:
             error_msg = "To use resume from checkpoint, you must only specify " \
                         "the same type of period you used for training." \
@@ -649,7 +648,7 @@ class EarlyStoppingHandler(TrainBegin, EpochEnd, TrainEnd):
                                  "if you want otherwise", self.monitor.get()[0])
                 self.monitor_op = np.less
 
-        if self.monitor_op == np.greater: # pylint: disable=comparison-with-callable
+        if self.monitor_op == np.greater:  # pylint: disable=comparison-with-callable
             self.min_delta *= 1
         else:
             self.min_delta *= -1
@@ -662,7 +661,7 @@ class EarlyStoppingHandler(TrainBegin, EpochEnd, TrainEnd):
         if self.baseline is not None:
             self.best = self.baseline
         else:
-            self.best = np.Inf if self.monitor_op == np.less else -np.Inf # pylint: disable=comparison-with-callable
+            self.best = np.Inf if self.monitor_op == np.less else -np.Inf  # pylint: disable=comparison-with-callable
 
     def epoch_end(self, estimator, *args, **kwargs):
         monitor_name, monitor_value = self.monitor.get()

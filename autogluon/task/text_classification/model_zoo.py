@@ -22,13 +22,13 @@ models = ['standard_lstm_lm_200',
 
 @autogluon_net_instances
 def get_model_instances(name: AnyStr,
-                        pretrained_dataset='wikitext-2', **kwargs) -> (Block, nlp.vocab):
+                        dataset_name: AnyStr = 'wikitext-2', **kwargs) -> (Block, nlp.vocab):
     """
     Parameters
     ----------
     name : str
         Name of the model.
-    pretrained_dataset : str or None, default 'wikitext-2'.
+    dataset_name : str or None, default 'wikitext-2'.
         The dataset name on which the pre-trained model is trained.
         For language model, options are 'wikitext-2'.
         For ELMo, Options are 'gbw' and '5bw'.
@@ -62,7 +62,7 @@ def get_model_instances(name: AnyStr,
     if name not in models:
         err_str = '{} is not among the following model list: \n\t'.format(name)
         raise ValueError(err_str)
-    return nlp.model.get_model(name=name, dataset_name=pretrained_dataset, **kwargs)
+    return nlp.model.get_model(name=name, dataset_name=dataset_name, **kwargs)
 
 
 @autogluon_nets

@@ -1,4 +1,6 @@
+import os
 from multiprocessing import cpu_count
+from typing import AnyStr
 
 import gluonnlp as nlp
 from autogluon.dataset import TextDataTransform, utils
@@ -9,28 +11,43 @@ from ... import dataset
 __all__ = ['Dataset']
 
 
+def get_gluon_nlp_dataset_fn(name):
+    if name == 'sst_2':
+        return nlp.data.SST_2
+    elif name == 'imdb':
+        return nlp.data.IMDB
+    else:
+        raise NotImplementedError
+
+
 class Dataset(dataset.Dataset):
     """
     Python class to represent TextClassification Datasets
     """
 
-    def __init__(self, name=None, train_path=None, val_path=None, lazy=True, vocab=None):
+    def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None, lazy: bool = True,
+                 vocab: nlp.Vocab = None, batch_size: int = 32):
         super(Dataset, self).__init__(name, train_path, val_path)
+        # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
-        self._num_classes = 0
-        self.vocab: nlp.vocab = vocab
+        self._num_classes: int = 0
+        self._vocab: nlp.Vocab = vocab
         self._train_ds_transformed = None
         self._val_ds_transformed = None
         self._train_data_lengths = None  # TODO There is an alternative way possible to avoid creating this list
         self.data_format = 'json'  # TODO This should come from config
         self._label_set = set()
-        self.batch_size = 32
-        if not lazy:
-            self._read_dataset()
-            self.add_search_space()
-            self._num_classes = len(self._label_set)
+        self.batch_size = batch_size
+        self._download_dataset()
 
-    def _init(self):
+        if vocab is None and lazy is False:
+            raise ValueError("Please specify a vocabulary object to init the dataset.")
+
+        if not lazy:
+            self._init_()
+
+    def _init_(self):
+
         self._read_dataset()
         self.add_search_space()
         self._num_classes = len(self._label_set)
@@ -41,13 +58,30 @@ class Dataset(dataset.Dataset):
 
     @property
     def vocab(self) -> nlp.vocab:
-        return self.vocab()
+        return self._vocab
 
     @vocab.setter
-    def vocab(self, value: nlp.vocab):
+    def vocab(self, value: nlp.vocab) -> None:
         self.vocab = value
+        self._init_()
 
-    def _read_dataset(self):
+    def _download_dataset(self) -> None:
+        """
+        This method downloads the datasets and returns the file path where the data was downloaded.
+        :return:
+        """
+        root = os.path.join(os.getcwd(), 'data')
+
+        gluon_nlp_data_fn = get_gluon_nlp_dataset_fn(self.name)
+
+        if self.train_path is None:
+            train_dataset, val_dataset = [gluon_nlp_data_fn(root=root, segment=segment)
+                                          for segment in ('train', 'test')]
+
+        self.train_path = os.path.join(os.getcwd(), 'data', 'train.json')
+        self.val_path = os.path.join(os.getcwd(), 'data', 'test.json')
+
+    def _read_dataset(self) -> None:
         """
         This method reads the datasets. Performs transformations on it. Preprocesses the data.
         Prepares data loader from it.
@@ -81,14 +115,14 @@ class Dataset(dataset.Dataset):
             raise NotImplementedError("Error. Different formats are not supported yet")
 
     def _preprocess(self):
-        transform = TextDataTransform(self.vocab)
+        transform = TextDataTransform(self._vocab)
 
         self.train_dataset = self.train_dataset.transform(transform, lazy=True)
         self.val_dataset = self.val_dataset.transform(transform, lazy=True)
 
         # Bottle neck --->
         # TODO Think of a better approach here
-        self._train_data_lengths = gluon.data.SimpleDataset([float(len(x[0])) for x in self._train_ds_transformed])
+        self._train_data_lengths = gluon.data.SimpleDataset([float(len(x[0])) for x in self.train_dataset])
 
     def _prepare_data_loader(self):
         # TODO : Currently hardcoding the batch_samplers and batchify_fn.
@@ -123,4 +157,4 @@ class Dataset(dataset.Dataset):
         return nlp.data.utils.train_valid_split(dataset, valid_ratio)
 
     def __repr__(self):
-        return "AutoGluon Dataset"
+        return "AutoGluon Dataset %s" % self.name

@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 import time
 from typing import Any, AnyStr
 
@@ -36,7 +35,7 @@ default_optimizers = Optimizers([
 default_stop_criterion = {
     'time_limits': 1 * 60 * 60,
     'max_metric': 0.80,  # TODO Should be place a bound on metric?
-    'max_trial_count': 2
+    'max_trial_count': 1
 }
 
 default_resources_per_trial = {
@@ -119,6 +118,7 @@ def fit(data: Dataset,
             args = argparse.Namespace()
             args_dict = vars(args)
             args_dict['epochs'] = resources_per_trial['max_training_epochs']
+            args_dict['data_name'] = data.name
             args_dict['train_path'] = data.train_path
             args_dict['val_path'] = data.val_path
             args_dict['model'] = 'standard_lstm_lm_200'  # TODO Change this. Standard defaults.
@@ -130,17 +130,14 @@ def fit(data: Dataset,
         args = _init_args()
 
         def _set_range(obj, name):
-            if obj.search_space is not None:
+            if obj is not None and obj.search_space is not None:
                 # TODO Should this prefix be blank or something else ?
-                cs.add_configuration_space(prefix='',
-                                           configuration_space=obj.search_space)
-
-        def _assert_fit_error(obj, name):
-            assert obj is not None, '%s cannot be None' % name
+                cs.add_configuration_space(prefix='text_classification',
+                                           configuration_space=obj.search_space,
+                                           delimiter=':')
 
         cs = CS.ConfigurationSpace(name='text_classification')
         for obj_name, obj in search_space_dict.items():
-            _assert_fit_error(obj, obj_name)
             _set_range(obj, obj_name)
 
         return cs, args
@@ -244,8 +241,8 @@ def fit(data: Dataset,
                 resume=resume)
 
         trial_scheduler.run(num_trials=stop_criterion['max_trial_count'])
-        trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
-        # TODO (cgraywang)
+        # trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
+
         trials = None
         best_result = trial_scheduler.get_best_reward()
         best_config = trial_scheduler.get_best_config()
