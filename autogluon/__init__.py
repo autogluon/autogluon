@@ -32,7 +32,7 @@ from .space import *
 from .task import image_classification as image_classification
 from .basic import *
 from .utils import *
-from . import scheduler, distribution, searcher, dist, resource
+from . import scheduler, searcher, distributed, resource
 
 __all__ = dataset.__all__ \
           + loss.__all__ \

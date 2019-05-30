@@ -21,7 +21,7 @@ def test_scheduler():
     scheduler.join_tasks()
 
 def test_dist_scheduler():
-    scheduler = ag.dist.DistributedTaskScheduler(['172.31.3.95'])
+    scheduler = ag.distributed.DistributedTaskScheduler()
     print('scheduler', scheduler)
     for i in range(10):
         resource = ag.resource.DistributedResource(num_cpus=2, num_gpus=1)
