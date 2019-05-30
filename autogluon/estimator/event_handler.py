@@ -8,6 +8,7 @@ import time
 import warnings
 
 import numpy as np
+from mxnet import gluon
 from mxnet.metric import EvalMetric, Loss
 
 
@@ -685,3 +686,30 @@ class EarlyStoppingHandler(TrainBegin, EpochEnd, TrainEnd):
         if self.stopped_epoch > 0:
             self.logger.info('[Epoch %d] EarlyStoppingHanlder: early stopping due to %s not improving',
                              self.stopped_epoch, self.monitor.get()[0])
+
+
+class DataLoaderHandler(BatchBegin):
+    """
+    Handler which enables to return the data, label in appropriate format from the data loader.
+    This default handler assumes that the data is at the 0th index in the batch, while label is at the 1st index.
+    """
+
+    def __init__(self):
+        pass
+
+    def batch_begin(self, estimator, *args, **kwargs):
+        """
+        :param estimator:
+        :param batch: The batch of data
+        :param ctx: The context in which to load the data.
+        :param batch_axis: The batch axis about which to split the data onto multiple devices if context is passed as a list
+        :return:
+        """
+        batch = kwargs['batch']
+        ctx = kwargs['ctx']
+        batch_axis = kwargs['batch_axis']
+        data = batch[0]
+        label = batch[1]
+        data = gluon.utils.split_and_load(data, ctx_list=ctx, batch_axis=batch_axis)
+        label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis)
+        return data, label
