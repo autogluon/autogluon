@@ -51,7 +51,6 @@ class FIFO_Scheduler(TaskScheduler):
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
-
     def add_training_result(self, task_id, reward):
         with self.log_lock:
             if task_id in self.training_history:
@@ -126,7 +125,16 @@ class FIFO_Scheduler(TaskScheduler):
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
                                          'Process': tp, 'ReporterProcess': rp})
 
+    def _cleaning_tasks(self):
+        with self.LOCK:
+            for i, task_dick in enumerate(self.scheduled_tasks):
+                if not task_dick['Process'].is_alive():
+                    task_dict = self.scheduled_tasks.pop(i)
+                    self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
+                                               'Config': task_dict['Config']})
+
     def _run_checkpoint(self, checkpoint_semaphore):
+        self._cleaning_tasks()
         checkpoint_semaphore.acquire()
         logger.debug('Saving Checkerpoint')
         self.save()
