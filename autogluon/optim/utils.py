@@ -18,10 +18,17 @@ def autogluon_optims(func):
         if optim.name == 'sgd':
             setattr(optim, 'hyper_params',
                     [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
-                     Linear('momentum', 0.85, 0.95).get_hyper_param()])
+                     Linear('momentum', 0.85, 0.95).get_hyper_param(),
+                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
         elif optim.name == 'adam':
             setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param()])
+                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
+                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+        elif optim.name == 'nag':
+            setattr(optim, 'hyper_params',
+                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
+                     Linear('momentum', 0.85, 0.95).get_hyper_param(),
+                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
         else:
             raise NotImplementedError
         return optim

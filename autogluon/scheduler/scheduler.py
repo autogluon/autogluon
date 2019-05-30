@@ -27,6 +27,7 @@ class Task(BasicTask):
         with Task.LOCK:
             self.task_id = Task.TASK_ID.value
             Task.TASK_ID.value += 1
+            vars(args['args']).update({'task_id': self.task_id})
         return self
 
     @classmethod

@@ -9,18 +9,17 @@ if __name__ == '__main__':
 
     dataset = task.Dataset(name='CIFAR10')
 
-    trials, best_result, search_space = task.fit(dataset,
-                                                 nets=ag.Nets(
-                                                     [task.model_zoo.get_model('resnet18_v1'),
-                                                      task.model_zoo.get_model('resnet34_v1'),
-                                                      task.model_zoo.get_model('resnet50_v1'),
-                                                      task.model_zoo.get_model('resnet101_v1'),
-                                                      task.model_zoo.get_model('resnet152_v1')]),
-                                                 optimizers=ag.Optimizers(
-                                                     [ag.optim.get_optim('sgd'),
-                                                      ag.optim.get_optim('adam')]))
-    logger.debug('Best Results:')
-    logger.debug(best_result)
+    results = task.fit(dataset,
+                       nets=ag.Nets(['cifar_resnet20_v1',
+                                     'cifar_resnet56_v1',
+                                     'cifar_resnet110_v1']),
+                       optimizers=ag.Optimizers(['sgd', 'adam']))
+
+    logger.debug('Best result:')
+    logger.debug(results.val_accuracy)
     logger.debug('=========================')
-    logger.debug('Print search space:')
-    logger.debug(search_space)
+    logger.debug('Best search space:')
+    logger.debug(results.config)
+    logger.debug('=========================')
+    logger.debug('Total time cost:')
+    logger.debug(results.time)
