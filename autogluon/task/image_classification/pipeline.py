@@ -1,4 +1,5 @@
 import warnings
+import logging
 
 import random
 import mxnet as mx
@@ -11,14 +12,15 @@ from gluoncv.model_zoo import get_model
 from ...basic import autogluon_method
 from .dataset import Dataset
 
-__all__ = ['train_ray_image_classification', 'train_image_classification']
+__all__ = ['train_image_classification', 'train_ray_image_classification']
+
+logger = logging.getLogger(__name__)
 
 
 @autogluon_method
 def train_image_classification(args, reporter):
-
     # Set Hyper-params
-    def _init_env():
+    def _init_hparams():
         if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
             batch_size = args.batch_size * max(args.num_gpus, 1)
             ctx = [mx.gpu(i)
@@ -35,12 +37,13 @@ def train_image_classification(args, reporter):
             ctx = [mx.gpu(i)
                    for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
-    batch_size, ctx = _init_env()
+
+    batch_size, ctx = _init_hparams()
 
     # Define DataLoader
-    dataset = Dataset(args.train_data, args.val_data)
+    dataset = Dataset(args.data)
     train_data = dataset.train_data
-    val_data = dataset.val_data  
+    val_data = dataset.val_data
 
     # Define Network
     net = get_model(args.model, pretrained=args.pretrained)
@@ -59,15 +62,20 @@ def train_image_classification(args, reporter):
 
     # Define trainer
     def _set_optimizer_params(args):
-        if hasattr(args, 'momentum'):
+        # TODO (cgraywang): a better way?
+        if args.optimizer == 'sgd' or args.optimizer == 'nag':
             optimizer_params = {
                 'learning_rate': args.lr,
-                'momentum': args.momentum
+                'momentum': args.momentum,
+                'wd': args.wd
+            }
+        elif args.optimizer == 'adam':
+            optimizer_params = {
+                'learning_rate': args.lr,
+                'wd': args.wd
             }
         else:
-            optimizer_params = {
-                'learning_rate': args.lr,
-            }
+            raise NotImplementedError
         return optimizer_params
 
     optimizer_params = _set_optimizer_params(args)
@@ -75,10 +83,16 @@ def train_image_classification(args, reporter):
                             args.optimizer,
                             optimizer_params)
 
-    #TODO (cgraywang): update with search space
+    def _print_debug_info(args):
+        for k, v in vars(args).items():
+            logger.debug('%s:%s' % (k, v))
+
+    _print_debug_info(args)
+
+    # TODO (cgraywang): update with search space
     L = gluon.loss.SoftmaxCrossEntropyLoss()
     metric = mx.metric.Accuracy()
-    
+
     def train(epoch):
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0],
@@ -86,7 +100,7 @@ def train_image_classification(args, reporter):
                                               )
             label = gluon.utils.split_and_load(batch[1],
                                                ctx_list=ctx,
-                                                )
+                                               )
             with autograd.record():
                 outputs = [net(X) for X in data]
                 loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
@@ -94,6 +108,8 @@ def train_image_classification(args, reporter):
                 l.backward()
 
             trainer.step(batch_size)
+        if epoch == 0 and hasattr(args, 'viz'):
+            args.viz.add_graph(net)
         mx.nd.waitall()
 
     def test(epoch):
@@ -115,6 +131,13 @@ def train_image_classification(args, reporter):
         _, test_acc = metric.get()
         test_loss /= len(val_data)
         reporter(epoch=epoch, accuracy=test_acc)
+        if hasattr(args, 'viz'):
+            args.viz.add_scalar(tag='loss',
+                                value=('task %d valid_loss' % args.task_id, test_loss),
+                                global_step=epoch)
+            args.viz.add_scalar(tag='accuracy_curves',
+                                value=('task %d valid_acc' % args.task_id, test_acc),
+                                global_step=epoch)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)

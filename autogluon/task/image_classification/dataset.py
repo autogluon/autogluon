@@ -1,6 +1,6 @@
 import numpy as np
 
-from mxnet import gluon
+from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
 
@@ -27,21 +27,20 @@ class Dataset(dataset.Dataset):
         self._num_classes = value
 
     def _read_dataset(self):
-        transform_train = transforms.Compose([
-            gcv_transforms.RandomCrop(32, pad=4),
-            transforms.RandomFlipLeftRight(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                 [0.2023, 0.1994, 0.2010])
-        ])
-
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                 [0.2023, 0.1994, 0.2010])
-        ])
-
         if self.name.lower() == 'cifar10':
+            transform_train = transforms.Compose([
+                gcv_transforms.RandomCrop(32, pad=4),
+                transforms.RandomFlipLeftRight(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.4914, 0.4822, 0.4465],
+                                     [0.2023, 0.1994, 0.2010])
+            ])
+
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize([0.4914, 0.4822, 0.4465],
+                                     [0.2023, 0.1994, 0.2010])
+            ])
             train_dataset = gluon.data.vision.CIFAR10(train=True)
             test_dataset = gluon.data.vision.CIFAR10(train=False)
             train_data = gluon.data.DataLoader(
@@ -58,6 +57,21 @@ class Dataset(dataset.Dataset):
                 num_workers=4)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
             self.num_classes = len(np.unique(train_dataset._label))
+        elif self.name.lower() == 'mnist':
+            def transform(data, label):
+                return nd.transpose(data.astype(np.float32), (2, 0, 1)) / 255, label.astype(
+                    np.float32)
+            train_dataset = gluon.data.vision.MNIST(train=True)
+            test_dataset = gluon.data.vision.MNIST(train=False)
+            train_data = gluon.data.DataLoader(
+                train_dataset.transform(transform),
+                batch_size=64, shuffle=True, last_batch='rollover',
+                num_workers=4)
+            test_data = gluon.data.DataLoader(
+                test_dataset.transform(transform),
+                batch_size=64, shuffle=False, num_workers=4)
+            DataAnalyzer.check_dataset(train_dataset, test_dataset)
+            self.num_classes = len(np.unique(train_dataset._label))
         else:
             train_data = None
             test_data = None
@@ -68,4 +82,4 @@ class Dataset(dataset.Dataset):
         self.val = test_dataset
     
     def __repr__(self):
-        return "AutoGluon Dataset %s" % self.__str__()
+        return "AutoGluon Dataset: number of classes = %d" % self.num_classes

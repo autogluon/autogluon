@@ -43,6 +43,9 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
+    'mxboard',
+    'tensorflow',
+    'tensorboard'
 ]
 
 setup(

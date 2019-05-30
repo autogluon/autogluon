@@ -8,10 +8,13 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     dataset = task.Dataset(name='CIFAR10')
-    models = task.fit(dataset)
+    results = task.fit(dataset)
 
     logger.debug('Best result:')
-    logger.debug(models[1])
+    logger.debug(results.val_accuracy)
     logger.debug('=========================')
     logger.debug('Best search space:')
-    logger.debug(models[2])
+    logger.debug(results.config)
+    logger.debug('=========================')
+    logger.debug('Total time cost:')
+    logger.debug(results.time)

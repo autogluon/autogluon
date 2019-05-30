@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import multiprocessing as mp
 
-from ..distribution import Sample
+from ..searcher import Sample
 
 __all__ = ['autogluon_method', 'gen_config']
 
@@ -19,7 +19,6 @@ class autogluon_method(object):
         with autogluon_method.LOCK:
             autogluon_method.SEED.value += 1
             spec_config = gen_config(autogluon_method.SEED.value, config)
-
         vars(args).update(spec_config)
         self.f(args, **kwargs)
         if 'reporter' in kwargs:

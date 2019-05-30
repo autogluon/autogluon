@@ -6,6 +6,7 @@ import numpy as np
 import ConfigSpace as CS
 import argparse
 from ConfigSpace import InCondition
+from mxboard import SummaryWriter
 
 import autogluon as ag
 
@@ -18,12 +19,14 @@ __all__ = ['fit']
 
 logger = logging.getLogger(__name__)
 
+
 class Results(object):
     def __init__(self, model, accuracy, config, time):
         self.model = model
         self.val_accuracy = accuracy
         self.config = config
         self.time = time
+
 
 def fit(data,
         nets=Nets([
@@ -81,34 +84,24 @@ def fit(data,
 
     Returns
     ----------
-    model: the parameters associated with the best model. (TODO: use trial to infer for now)
-    best_result: accuracy
-    best_config: best configuration
+    results:
+        model: the parameters associated with the best model. (TODO:)
+        val_accuracy: validation set accuracy
+        config: best configuration
+        time: total time cost
     """
-    logger.debug('Start fitting')
+    logger.info('Start fitting')
     start_fit_time = time.time()
-    def _construct_search_space(objs, obj_names):
-        def _init_args():
-            args = argparse.Namespace()
-            args_dict = vars(args)
-            args_dict['epochs'] = resources_per_trial['max_training_epochs']
-            args_dict['train_data'] = data.train_path
-            args_dict['val_data'] = data.val_path
-            args_dict['model'] = 'resnet18_v1'
-            args_dict['pretrained'] = True
-            args_dict['lr'] = 10 ** -4
-            args_dict['optimizer'] = 'sgd'
-            return args
-        args = _init_args()
 
+    def _construct_search_space(objs, obj_names):
         def _set_range(obj, name):
             if obj.search_space is not None:
-                cs.add_configuration_space(prefix='fitspace',
+                cs.add_configuration_space(prefix='',
+                                           delimiter='',
                                            configuration_space=obj.search_space)
 
         def _assert_fit_error(obj, name):
             assert obj is not None, '%s cannot be None' % name
-
 
         cs = CS.ConfigurationSpace()
         for _, (obj, obj_name) in enumerate(zip(objs, obj_names)):
@@ -117,16 +110,33 @@ def fit(data,
             else:
                 if obj_name == 'data':
                     _assert_fit_error(obj, obj_name)
+
+        def _init_args(cs):
+            args = argparse.Namespace()
+            args_dict = vars(args)
+            args_dict['epochs'] = resources_per_trial['max_training_epochs']
+            args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
+            args_dict['data'] = data.name
+            for hparam in cs.get_hyperparameters():
+                args_dict[hparam.name] = hparam.default_value
+            return args
+        args = _init_args(cs)
         return cs, args
-    logger.debug('Start constructing search space')
+    logger.info('Start constructing search space')
     search_objs = [data, nets, optimizers, losses, metrics]
     # TODO (cgraywang) : replace with autogluon*.name
     search_obj_names = ['data', 'net', 'optimizer', 'loss', 'metric']
     cs, args = _construct_search_space(search_objs, search_obj_names)
-    logger.debug('Finished.')
+    if visualizer is not None:
+        logger.info('Start initializing visualizer')
+        logdir = os.path.join(os.path.splitext(savedir)[0], 'logs')
+        sw = SummaryWriter(logdir=logdir, flush_secs=3)
+        vars(args).update({'viz': sw})
+        logger.info('Finished.')
+    logger.info('Finished.')
 
     def _run_ray_backend(searcher, trial_scheduler):
-        logger.debug('Start using ray as backend')
+        logger.info('Start using ray as backend')
         from ray import tune
         if searcher is None:
             searcher = tune.search_policy.RandomSearch(cs,
@@ -166,11 +176,12 @@ def fit(data,
         # TODO (cgraywang)
         best_config = None
         results = Results(None, best_result, best_config, time.time()-start_fit_time)
-        logger.debug('Finished.')
+        logger.info('Finished.')
         return results
 
     def _run_backend(searcher, trial_scheduler):
-        logger.debug('Start using default backend.')
+        logger.info('Start using default backend.')
+
         if searcher is None or searcher == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         if trial_scheduler == 'hyperband':
@@ -210,18 +221,20 @@ def fit(data,
                 checkpoint=savedir,
                 resume=resume)
         trial_scheduler.run(num_trials=stop_criterion['max_trial_count'])
-        trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
+        if hasattr(args, 'viz'):
+            args.viz.export_scalars('{}.json'.format(os.path.splitext(savedir)[0]))
+            args.viz.close()
         # TODO (cgraywang)
         trials = None
         best_result = trial_scheduler.get_best_reward()
         best_config = trial_scheduler.get_best_config()
         results = Results(trials, best_result, best_config, time.time() - start_fit_time)
-        logger.debug('Finished.')
+        logger.info('Finished.')
         return results
 
     if backend == 'ray':
         results = _run_ray_backend(searcher, trial_scheduler)
     else:
         results = _run_backend(searcher, trial_scheduler)
-    logger.debug('Finished.')
+    logger.info('Finished.')
     return results

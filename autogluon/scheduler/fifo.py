@@ -51,6 +51,7 @@ class FIFO_Scheduler(TaskScheduler):
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
+
     def add_training_result(self, task_id, reward):
         with self.log_lock:
             if task_id in self.training_history:
