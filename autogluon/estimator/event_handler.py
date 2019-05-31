@@ -179,7 +179,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
     def epoch_end(self, estimator, *args, **kwargs):
         self.current_epoch += 1
         if self.epoch_period and self.current_epoch % self.epoch_period == 0:
-            self.eval_fn(val_data=self.val_data,
+            self.eval_fn(estimator, val_data=self.val_data,
                          val_metrics=self.val_metrics)
 
 
@@ -707,9 +707,11 @@ class DataLoaderHandler(BatchBegin):
         """
         batch = kwargs['batch']
         ctx = kwargs['ctx']
-        batch_axis = kwargs['batch_axis']
+        batch_axis = kwargs['batch_axis'] or 0
         data = batch[0]
         label = batch[1]
         data = gluon.utils.split_and_load(data, ctx_list=ctx, batch_axis=batch_axis)
         label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis)
-        return data, label
+        batch_size = data.shape[0]
+
+        return data, label, batch_size

@@ -5,11 +5,12 @@
 import copy
 import warnings
 
-from .event_handler import MetricHandler, ValidationHandler, LoggingHandler, StoppingHandler
+from .event_handler import MetricHandler, ValidationHandler, LoggingHandler, StoppingHandler, DataLoaderHandler
 from .event_handler import TrainBegin, EpochBegin, BatchBegin, BatchEnd, EpochEnd, TrainEnd
 from mxnet import gluon, autograd
 from mxnet.context import Context, cpu, gpu, num_gpus
 from mxnet.metric import EvalMetric, Loss, Accuracy
+import numpy as np
 
 __all__ = ['Estimator']
 
@@ -50,6 +51,7 @@ class Estimator(object):
         self.context = self._check_context(context)
         self._initialize(initializer)
         self.trainer = self._check_trainer(trainer)
+        self.data_loader_handler = None
 
     def _check_loss(self, loss):
         if isinstance(loss, gluon.loss.Loss):
@@ -145,13 +147,6 @@ class Estimator(object):
                 return False
         return True
 
-    def _get_data_and_label(self, batch, ctx, batch_axis=0):
-        data = batch[0]
-        label = batch[1]
-        data = gluon.utils.split_and_load(data, ctx_list=ctx, batch_axis=batch_axis)
-        label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis)
-        return data, label
-
     def prepare_loss_and_metrics(self):
         """
         Based on loss functions and training metrics in estimator
@@ -184,16 +179,16 @@ class Estimator(object):
               batch_axis=0):
 
         for i, batch in enumerate(train_data):
-            data, label = self._get_data_and_label(batch, self.context, batch_axis)
-
-            batch_size = batch[0].shape[0]
 
             # batch begin
             for handler in batch_begin:
                 handler.batch_begin(estimator_ref, batch=batch)
 
+            data, label, batch_size = self.data_loader_handler.batch_begin(estimator_ref, batch=batch,
+                                                                                    ctx=self.context,
+                                                                                    batch_axis=batch_axis)
             with autograd.record():
-                pred = [self.net(x) for x in data]
+                pred = [self.net(*d_) for d_ in data]
                 loss = [self.loss[0](y_hat, y) for y_hat, y in zip(pred, label)]
 
             for l in loss:
@@ -210,7 +205,7 @@ class Estimator(object):
             if any(batch_end_result):
                 break
 
-    def evaluate(self,
+    def evaluate(self, estimator_ref,
                  val_data,
                  val_metrics,
                  batch_axis=0):
@@ -234,8 +229,8 @@ class Estimator(object):
             metric.reset()
 
         for _, batch in enumerate(val_data):
-            data, label = self._get_data_and_label(batch, self.context, batch_axis)
-            pred = [self.net(x) for x in data]
+            data, label, _ = self.data_loader_handler.batch_begin(estimator_ref, batch=batch, ctx=self.context, batch_axis=batch_axis)
+            pred = [self.net(*d_) for d_ in data]
             loss = [self.loss[0](y_hat, y) for y_hat, y in zip(pred, label)]
             # update metrics
             for metric in val_metrics:
@@ -303,7 +298,7 @@ class Estimator(object):
             for handler in epoch_begin:
                 handler.epoch_begin(estimator_ref)
 
-            self.train(train_data, estimator_ref, batch_begin, batch_end,  batch_axis)
+            self.train(train_data, estimator_ref, batch_begin, batch_end, batch_axis)
 
             # epoch end
             epoch_end_result = []
@@ -338,6 +333,17 @@ class Estimator(object):
             event_handlers.append(LoggingHandler(train_metrics=train_metrics,
                                                  val_metrics=val_metrics))
             default_handlers.append("LoggingHandler")
+
+        for handler in event_handlers:
+            if isinstance(handler, DataLoaderHandler):
+                self.data_loader_handler = handler
+                event_handlers.remove(handler)
+                break
+
+        if self.data_loader_handler is None:
+            self.data_loader_handler = DataLoaderHandler()
+
+        default_handlers.append("DataLoaderHandler")
 
         # if there is a mix of user defined event handlers and default event handlers
         # they should have the same set of loss and metrics

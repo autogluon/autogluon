@@ -1,5 +1,6 @@
 import mxnet as mx
 from autogluon.estimator import *
+from autogluon.estimator.event_handler import DataLoaderHandler
 from autogluon.scheduler.reporter import StatusReporter
 from mxnet import gluon
 
@@ -18,11 +19,11 @@ class MeanPoolingLayer(gluon.Block):
     def __init__(self, prefix=None, params=None):
         super(MeanPoolingLayer, self).__init__(prefix=prefix, params=params)
 
-    def forward(self, data, sequence_length):  # pylint: disable=arguments-differ
-        masked_encoded = mx.ndarray.SequenceMask(data, sequence_length=sequence_length, use_sequence_length=True)
+    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
+        masked_encoded = mx.ndarray.SequenceMask(data, sequence_length=valid_length, use_sequence_length=True)
 
         agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
-                                             mx.ndarray.expand_dims(sequence_length, axis=1))
+                                             mx.ndarray.expand_dims(valid_length, axis=1))
 
         return agg_state
 
@@ -48,6 +49,33 @@ class TextClassificationNet(gluon.Block):
         agg_state = self.agg_layer(encoded, valid_length)
         out = self.output(agg_state)
         return out
+
+
+class SentimentDataLoaderHandler(DataLoaderHandler):
+
+    def batch_begin(self, estimator, *args, **kwargs):
+        """
+        :param estimator:
+        :param batch: The batch of data
+        :param ctx: The context in which to load the data.
+        :param batch_axis: The batch axis about which to split the data onto multiple devices if context is passed as a list
+        :return: A tuple of : (data, length), label and batch_size
+        """
+        batch = kwargs['batch']
+        ctx = kwargs['ctx']
+        batch_axis = kwargs['batch_axis'] or 0
+        data = batch[0][0]
+        batch_size = data.shape[0]
+        lengths = batch[0][1]
+        label = batch[1]
+        data = gluon.utils.split_and_load(data, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        lengths = gluon.utils.split_and_load(lengths, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        ret_data = []
+        for d, length in zip(data, lengths):
+            ret_data.append((d.T, length.astype(np.float32)))
+
+        return ret_data, label, batch_size
 
 
 @autogluon_method
@@ -103,7 +131,8 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     trainer = gluon.Trainer(net.collect_params(), 'ftml', {'learning_rate': args.lr})
     estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
-    estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs)
+    estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
+                  event_handlers=[SentimentDataLoaderHandler()])
 
     print(estimator.val_metrics)  # TODO: Add callback here
 
