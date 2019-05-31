@@ -102,7 +102,8 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     batch_size, ctx = _init_env()
 
-    logger.info('{} : The pretrained model chosen is : {}' % (os.getpid(), args.model))
+    logger.info('{0} : The pretrained model chosen is : {1}'.format(os.getpid(), args.model))
+
 
     # Define the network and get an instance from model zoo.
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
