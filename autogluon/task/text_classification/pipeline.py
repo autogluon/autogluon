@@ -9,6 +9,7 @@ from .model_zoo import get_model_instances
 from ...basic import autogluon_method
 
 __all__ = ['train_text_classification']
+logger = logging.getLogger(__name__)
 
 
 class MeanPoolingLayer(gluon.Block):
@@ -101,6 +102,8 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     batch_size, ctx = _init_env()
 
+    logger.info('{} : The pretrained model chosen is : {}' % (os.getpid(), args.model))
+
     # Define the network and get an instance from model zoo.
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     # pre_trained_network is a misnomer here. This can be untrained network too.
@@ -134,6 +137,6 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
                   event_handlers=[SentimentDataLoaderHandler()])
 
-    print(estimator.val_metrics)  # TODO: Add callback here
+    logger.info('{} : {}' % (os.getpid(), estimator.val_metrics))  # TODO: Add callback here
 
     # TODO : Add More event handlers here to plug the results
