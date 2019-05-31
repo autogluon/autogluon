@@ -74,6 +74,8 @@ class TaskScheduler(object):
         try:
             fn(**args)
         except Exception as e:
+            import traceback
+            traceback.print_exception(e)
             logger.error(
                 'Uncaught exception in worker process: {}'.format(e))
             TaskScheduler.ERROR_QUEUE.put(e)
