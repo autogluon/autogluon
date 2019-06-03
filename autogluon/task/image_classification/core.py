@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import shutil
 
 import numpy as np
 import ConfigSpace as CS
@@ -44,15 +45,16 @@ def fit(data,
         visualizer='tensorboard',
         stop_criterion={
             'time_limits': 1*60*60,
-            'max_metric': 0.80,
+            'max_metric': 1.0,
             'max_trial_count': 2
         },
         resources_per_trial={
             'max_num_gpus': 0,
             'max_num_cpus': 4,
-            'max_training_epochs': 10
+            'max_training_epochs': 3
         },
         backend='default',
+        demo=False,
         **kwargs):
     r"""
     Fit networks on dataset
@@ -115,7 +117,11 @@ def fit(data,
             args_dict = vars(args)
             args_dict['epochs'] = resources_per_trial['max_training_epochs']
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
+            args_dict['lr_step'] = 150 #TODO(cgraywang)
+            args_dict['lr_factor'] = 0.1 #TODO(cgraywang)
+            args_dict['batch_size'] = 32 #TODO(cgraywang)
             args_dict['data'] = data.name
+            args_dict['demo'] = demo
             for hparam in cs.get_hyperparameters():
                 args_dict[hparam.name] = hparam.default_value
             return args
@@ -126,14 +132,14 @@ def fit(data,
     # TODO (cgraywang) : replace with autogluon*.name
     search_obj_names = ['data', 'net', 'optimizer', 'loss', 'metric']
     cs, args = _construct_search_space(search_objs, search_obj_names)
-    if visualizer is not None:
-        from mxboard import SummaryWriter
-        logger.info('Start initializing visualizer')
-        logdir = os.path.join(os.path.splitext(savedir)[0], 'logs')
-        sw = SummaryWriter(logdir=logdir, flush_secs=3)
-        vars(args).update({'viz': sw})
-        logger.info('Finished.')
     logger.info('Finished.')
+
+    def _reset_checkpoint(dir, resume):
+        dir = os.path.splitext(dir)[0]
+        if not resume and os.path.exists(dir):
+            shutil.rmtree(dir)
+            os.makedirs(dir)
+    _reset_checkpoint(savedir, resume)
 
     def _run_ray_backend(searcher, trial_scheduler):
         logger.info('Start using ray as backend')
@@ -204,7 +210,10 @@ def fit(data,
                 reward_attr='accuracy',
                 max_t=resources_per_trial[
                     'max_training_epochs'],
-                grace_period=1)
+                grace_period=resources_per_trial[
+                    'max_training_epochs']//4,
+                visualizer=visualizer)
+            # TODO (cgraywang): use empiral val now
         else:
             trial_scheduler = ag.scheduler.FIFO_Scheduler(
                 train_image_classification,
@@ -219,11 +228,9 @@ def fit(data,
                                 'max_num_gpus'])},
                 searcher,
                 checkpoint=savedir,
-                resume=resume)
+                resume=resume,
+                visualizer=visualizer)
         trial_scheduler.run(num_trials=stop_criterion['max_trial_count'])
-        if hasattr(args, 'viz'):
-            args.viz.export_scalars('{}.json'.format(os.path.splitext(savedir)[0]))
-            args.viz.close()
         # TODO (cgraywang)
         trials = None
         best_result = trial_scheduler.get_best_reward()

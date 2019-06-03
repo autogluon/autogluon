@@ -52,10 +52,11 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                  time_attr="training_epoch",
                  reward_attr="accuracy",
                  max_t=100, grace_period=10,
-                 reduction_factor=4, brackets=1):
+                 reduction_factor=4, brackets=1,
+                 visualizer='tensorboard'):
         super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
                                                   checkpoint, resume, num_trials,
-                                                  time_attr, reward_attr) 
+                                                  time_attr, reward_attr, visualizer)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
 
@@ -97,7 +98,14 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(task.task_id, reported_result[self._reward_attr])
+            self.visualizer.add_scalar(tag='loss',
+                                       value=('task %d valid_loss' % task.task_id,
+                                              reported_result['loss']),
+                                       global_step=reported_result['epoch'])
+            self.visualizer.add_scalar(tag='accuracy_curves',
+                                       value=('task %d valid_acc' % task.task_id,
+                                              reported_result[self._reward_attr]),
+                                       global_step=reported_result['epoch'])
             if terminator.on_task_report(task, reported_result):
                 reporter.move_on()
             else:

@@ -2,11 +2,12 @@ __all__ = ['Dataset']
 
 
 class Dataset(object):
-    def __init__(self, name, train_path=None, val_path=None):
+    def __init__(self, name, train_path=None, val_path=None, batch_size=None):
         # TODO (cgraywang): add search space, handle batch_size, num_workers
         self.name = name
         self.train_path = train_path
         self.val_path = val_path
+        self.batch_size = batch_size
         self.search_space = None
         self.train = None
         self.val = None

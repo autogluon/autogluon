@@ -5,7 +5,7 @@ import random
 import mxnet as mx
 import numpy as np
 
-from mxnet import gluon, init, autograd
+from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
 from gluoncv.model_zoo import get_model
 
@@ -84,6 +84,7 @@ def train_image_classification(args, reporter):
                             optimizer_params)
 
     def _print_debug_info(args):
+        logger.debug('Print debug info:')
         for k, v in vars(args).items():
             logger.debug('%s:%s' % (k, v))
 
@@ -93,7 +94,16 @@ def train_image_classification(args, reporter):
     L = gluon.loss.SoftmaxCrossEntropyLoss()
     metric = mx.metric.Accuracy()
 
+    def _demo_early_stopping(batch_id):
+        if batch_id == 3:
+            return True
+        return False
+
     def train(epoch):
+        #TODO (cgraywang): change to lr scheduler
+        if epoch % args.lr_step == 0 and epoch != 0:
+            trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
+
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0],
                                               ctx_list=ctx,
@@ -108,8 +118,8 @@ def train_image_classification(args, reporter):
                 l.backward()
 
             trainer.step(batch_size)
-        if epoch == 0 and hasattr(args, 'viz'):
-            args.viz.add_graph(net)
+            if args.demo and _demo_early_stopping(i):
+                break
         mx.nd.waitall()
 
     def test(epoch):
@@ -128,16 +138,11 @@ def train_image_classification(args, reporter):
 
             test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
             metric.update(label, outputs)
+            if args.demo and _demo_early_stopping(i):
+                break
         _, test_acc = metric.get()
         test_loss /= len(val_data)
-        reporter(epoch=epoch, accuracy=test_acc)
-        if hasattr(args, 'viz'):
-            args.viz.add_scalar(tag='loss',
-                                value=('task %d valid_loss' % args.task_id, test_loss),
-                                global_step=epoch)
-            args.viz.add_scalar(tag='accuracy_curves',
-                                value=('task %d valid_acc' % args.task_id, test_acc),
-                                global_step=epoch)
+        reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)

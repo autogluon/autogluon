@@ -5,6 +5,7 @@ import logging
 import threading
 import multiprocessing as mp
 from collections import OrderedDict
+from mxboard import SummaryWriter
 
 from .scheduler import *
 from ..resource import Resources
@@ -31,7 +32,8 @@ class FIFO_Scheduler(TaskScheduler):
             procedures will use this attribute.
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint=None,
-                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy'):
+                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
+                 visualizer='tensorboard'):
         super(FIFO_Scheduler, self).__init__()
         self.train_fn = train_fn
         self.args = args
@@ -41,8 +43,13 @@ class FIFO_Scheduler(TaskScheduler):
         self._checkpoint = checkpoint
         self._time_attr = time_attr
         self._reward_attr = reward_attr
+        assert visualizer.lower() == 'tensorboard' or visualizer.lower() == 'mxboard', \
+            'Only Tensorboard and MXboard are supported.'
+        self.visualizer = SummaryWriter(
+            logdir=os.path.join(os.path.splitext(checkpoint)[0], 'logs'),
+            flush_secs=3,
+            verbose=False)
         self.log_lock = mp.Lock()
-        self.training_history = OrderedDict()
         if resume:
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
@@ -50,29 +57,6 @@ class FIFO_Scheduler(TaskScheduler):
                 msg = 'checkpoint path {} is not available for resume.'.format(checkpoint)
                 logger.exception(msg)
                 raise FileExistsError(msg)
-
-    def add_training_result(self, task_id, reward):
-        with self.log_lock:
-            if task_id in self.training_history:
-                self.training_history[task_id].append(reward)
-            else:
-                self.training_history[task_id] = [reward]
-
-    def get_training_curves(self, filename=None, plot=False, use_legend=True):
-        if filename is None and not plot:
-            logger.warning('Please either provide filename or allow plot in get_training_curves')
-        import matplotlib.pyplot as plt
-        plt.ylabel(self._reward_attr)
-        plt.xlabel(self._time_attr)
-        for task_id, task_res in self.training_history.items():
-            x = list(range(len(task_res)))
-            plt.plot(x, task_res, label='task {}'.format(task_id))
-        if use_legend:
-            plt.legend(loc='best')
-        if filename is not None:
-            logger.info('Saving Training Curve in {}'.format(filename))
-            plt.savefig(filename)
-        if plot: plt.show()
 
     def run(self, num_trials=None):
         """Run multiple number of trials
@@ -83,6 +67,8 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         for i in range(self.num_finished_tasks, self.num_trials):
             self.schedule_next()
+        self.visualizer.export_scalars('{}.json'.format(os.path.splitext(self._checkpoint)[0]))
+        self.visualizer.close()
 
     def save(self, checkpoint=None):
         if checkpoint is None and self._checkpoint is None:
@@ -149,7 +135,14 @@ class FIFO_Scheduler(TaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(task.task_id, reported_result[self._reward_attr])
+            self.visualizer.add_scalar(tag='loss',
+                                       value=('task %d valid_loss' % task.task_id,
+                                              reported_result['loss']),
+                                       global_step=reported_result['epoch'])
+            self.visualizer.add_scalar(tag='accuracy_curves',
+                                       value=('task %d valid_acc' % task.task_id,
+                                              reported_result[self._reward_attr]),
+                                       global_step=reported_result['epoch'])
             reporter.move_on()
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
@@ -165,11 +158,9 @@ class FIFO_Scheduler(TaskScheduler):
     def state_dict(self, destination=None):
         destination = super(FIFO_Scheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
-        destination['training_history'] = json.dumps(self.training_history)
         return destination
 
     def load_state_dict(self, state_dict):
         super(FIFO_Scheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
-        self.training_history = json.loads(state_dict['training_history'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
