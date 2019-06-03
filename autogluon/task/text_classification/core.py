@@ -241,12 +241,13 @@ def fit(data: Dataset,
                 resume=resume)
 
         trial_scheduler.run(num_trials=stop_criterion['max_trial_count'])
-        # trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
+        trial_scheduler.get_training_curves('{}.png'.format(os.path.splitext(savedir)[0]))
 
         trials = None
         best_result = trial_scheduler.get_best_reward()
         best_config = trial_scheduler.get_best_config()
         results = Results(trials, best_result, best_config, time.time() - start_fit_time)
+
         logger.debug('Finished.')
         return results
 
