@@ -138,6 +138,7 @@ class Dataset(dataset.Dataset):
 
         self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_sampler=batch_sampler,
                                                        batchify_fn=batchify_fn, num_workers=cpu_count())
+        # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
                                                      batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)

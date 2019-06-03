@@ -200,7 +200,7 @@ def fit(data: Dataset,
             searcher = ag.searcher.RandomSampling(cs)
 
         if trial_scheduler is None:
-            trial_scheduler = 'hyperband'
+            trial_scheduler = 'default'
 
         if trial_scheduler == 'hyperband':
             trial_scheduler = ag.scheduler.Hyperband_Scheduler(
