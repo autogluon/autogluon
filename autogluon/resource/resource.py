@@ -8,7 +8,7 @@ __all__ = ['Resources', 'DistributedResource',
 logger = logging.getLogger(__name__)
 
 class Resources(object):
-    def __init__(self, num_cpus, num_gpus):
+    def __init__(self, num_cpus=1, num_gpus=0):
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
         self.cpu_ids = []
@@ -38,7 +38,7 @@ class Resources(object):
         return reprstr
 
 class DistributedResource(Resources):
-    def __init__(self, num_cpus, num_gpus):
+    def __init__(self, num_cpus=1, num_gpus=0):
         super(DistributedResource, self).__init__(num_cpus, num_gpus)
         self.node = None
 
@@ -51,9 +51,9 @@ class DistributedResource(Resources):
         self.node = None
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '('
+        reprstr = self.__class__.__name__ + '(\n\t'
         if self.node: reprstr  += 'Node = ' + str(self.node)
-        reprstr  += 'nCPUs = ' + str(self.num_cpus)
+        reprstr  += '\n\tnCPUs = ' + str(self.num_cpus)
         if len(self.cpu_ids) > 0:
             reprstr += ', CPU_IDs = {' + str(self.cpu_ids) + '}'
         if self.num_gpus > 0:

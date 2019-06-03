@@ -6,7 +6,6 @@ import numpy as np
 import ConfigSpace as CS
 import argparse
 from ConfigSpace import InCondition
-from mxboard import SummaryWriter
 
 import autogluon as ag
 
@@ -128,6 +127,7 @@ def fit(data,
     search_obj_names = ['data', 'net', 'optimizer', 'loss', 'metric']
     cs, args = _construct_search_space(search_objs, search_obj_names)
     if visualizer is not None:
+        from mxboard import SummaryWriter
         logger.info('Start initializing visualizer')
         logdir = os.path.join(os.path.splitext(savedir)[0], 'logs')
         sw = SummaryWriter(logdir=logdir, flush_secs=3)
