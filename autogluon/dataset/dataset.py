@@ -3,6 +3,8 @@ from typing import AnyStr
 import ConfigSpace as CS
 from mxnet import gluon
 
+from ..space import *
+
 __all__ = ['Dataset']
 
 
@@ -21,11 +23,16 @@ class Dataset(object):
     def _read_dataset(self):
         pass
 
-    def _set_search_space(self, cs):
+    def _set_search_space(self, cs: CS.ConfigurationSpace):
         self.search_space = cs
 
     def add_search_space(self):
-        pass
+        # TODO Think of other hyperparams for data
+        cs = CS.ConfigurationSpace()
+        data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
+                                       upper_exponent=7).get_hyper_param()
+        cs.add_hyperparameter(data_hyperparams)
+        self._set_search_space(cs)
 
     def get_search_space(self):
         return self.search_space

@@ -39,6 +39,7 @@ class Dataset(dataset.Dataset):
         self._label_set = set()
         self.batch_size = batch_size
         self._download_dataset()
+        self.add_search_space()
 
         if vocab is None and lazy is False:
             raise ValueError("Please specify a vocabulary object to init the dataset.")
