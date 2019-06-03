@@ -139,6 +139,6 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     logger.info('{} : {}'.format(os.getpid(), estimator.val_metrics))  # TODO: Add callback here
 
-    reporter(mean_loss=estimator.val_metrics[1].get()[1], mean_accuracy=estimator.val_metrics[0].get()[1])
+    reporter(epoch=args.epochs, accuracy=estimator.val_metrics[0].get()[1])
 
     # TODO : Add More event handlers here to plug the results

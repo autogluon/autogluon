@@ -114,6 +114,8 @@ class FIFO_Scheduler(TaskScheduler):
                             FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
+            print (str(os.getpid()) + " INSIDE FIFO : " + str(threading.currentThread().ident))
+
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
                                   self.searcher, checkpoint_semaphore))
             tp.start()
@@ -143,6 +145,7 @@ class FIFO_Scheduler(TaskScheduler):
             self.add_training_result(task.task_id, reported_result[self._reward_attr])
             reporter.move_on()
             last_result = reported_result
+        print (str(os.getpid()) + " INSIDE REPORTER : RUN" + str(threading.currentThread().ident))
         searcher.update(task.args['config'], last_result[self._reward_attr])
 
     def get_best_config(self):
@@ -150,6 +153,8 @@ class FIFO_Scheduler(TaskScheduler):
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
+        import time
+        time.sleep(1)
         self.join_tasks()
         return self.searcher.get_best_reward()
 

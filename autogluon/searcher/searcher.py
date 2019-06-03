@@ -43,14 +43,17 @@ class BaseSearcher(object):
         """
         # if model_params is not None and reward > self.get_best_reward():
         #    self._best_model_params = model_params
+        logger.info(" INSIDE UPDATE METHOD ")
         self._results[json.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
 
     def get_best_reward(self):
+        logger.info( " INSIDE GET_BEST_REWARD ")
         config = max(self._results, key=self._results.get)
         return self._results[config]
 
     def get_best_config(self):
+        logger.info(" INSIDE GET_BEST_CONFIG : RUN")
         config = max(self._results, key=self._results.get)
         return json.loads(config)
 
