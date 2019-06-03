@@ -31,7 +31,7 @@ class FIFO_Scheduler(TaskScheduler):
             with `time_attr`, this may refer to any objective value. Stopping
             procedures will use this attribute.
     """
-    def __init__(self, train_fn, args, resource, searcher, checkpoint=None,
+    def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='tensorboard'):
         super(FIFO_Scheduler, self).__init__()
@@ -67,7 +67,8 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         for i in range(self.num_finished_tasks, self.num_trials):
             self.schedule_next()
-        self.visualizer.export_scalars('{}.json'.format(os.path.splitext(self._checkpoint)[0]))
+        self.visualizer.export_scalars('{}.json'.format(
+            os.path.join(os.path.splitext(self._checkpoint)[0], 'logs')))
         self.visualizer.close()
 
     def save(self, checkpoint=None):
@@ -135,12 +136,15 @@ class FIFO_Scheduler(TaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.visualizer.add_scalar(tag='loss',
-                                       value=('task %d valid_loss' % task.task_id,
-                                              reported_result['loss']),
-                                       global_step=reported_result['epoch'])
-            self.visualizer.add_scalar(tag='accuracy_curves',
-                                       value=('task %d valid_acc' % task.task_id,
+
+            if 'loss' in reported_result:
+                self.visualizer.add_scalar(tag='loss',
+                                           value=('task %d valid_loss' % task.task_id,
+                                                  reported_result['loss']),
+                                           global_step=reported_result['epoch'])
+            self.visualizer.add_scalar(tag=self._reward_attr,
+                                       value=('task {task_id} {reward_attr}'.format(
+                                              task_id=task.task_id, reward_attr=self._reward_attr),
                                               reported_result[self._reward_attr]),
                                        global_step=reported_result['epoch'])
             reporter.move_on()
