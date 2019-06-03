@@ -16,6 +16,8 @@ parser.add_argument('--searcher', type=str, default='random',
                     help='searcher name (default: random)')
 parser.add_argument('--trial_scheduler', type=str, default='fifo',
                     help='trial scheduler name (options: fifo or hyperband)')
+parser.add_argument('--batch_size', default=64, type=int,
+                    help='batch_size')
 parser.add_argument('--resume', action='store_true', default=False,
                     help='resume from the checkpoint if needed')
 parser.add_argument('--savedir', type=str, default='checkpoint/exp1.ag',
@@ -52,7 +54,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO, handlers=logging_handlers)
 
-    dataset = task.Dataset(name=args.data)
+    dataset = task.Dataset(name=args.data, batch_size=args.batch_size)
     net_list = [net for net in args.nets.split(',')]
     optim_list = [opt for opt in args.optims.split(',')]
     stop_criterion = {

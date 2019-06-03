@@ -11,8 +11,8 @@ __all__ = ['Dataset']
 
 
 class Dataset(dataset.Dataset):
-    def __init__(self, name=None, train_path='cifar10', val_path='cifar10'):
-        super(Dataset, self).__init__(name, train_path, val_path)
+    def __init__(self, name=None, train_path='cifar10', val_path='cifar10', batch_size=64):
+        super(Dataset, self).__init__(name, train_path, val_path, batch_size)
         # TODO (cgraywang): add search space, handle batch_size, num_workers
         self._num_classes = None
         self._read_dataset()
@@ -45,14 +45,14 @@ class Dataset(dataset.Dataset):
             test_dataset = gluon.data.vision.CIFAR10(train=False)
             train_data = gluon.data.DataLoader(
                 train_dataset.transform_first(transform_train),
-                batch_size=64,
+                batch_size=self.batch_size,
                 shuffle=True,
                 last_batch="discard",
                 num_workers=4)
 
             test_data = gluon.data.DataLoader(
                 test_dataset.transform_first(transform_test),
-                batch_size=64,
+                batch_size=self.batch_size,
                 shuffle=False,
                 num_workers=4)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
@@ -65,11 +65,11 @@ class Dataset(dataset.Dataset):
             test_dataset = gluon.data.vision.MNIST(train=False)
             train_data = gluon.data.DataLoader(
                 train_dataset.transform(transform),
-                batch_size=64, shuffle=True, last_batch='rollover',
+                batch_size=self.batch_size, shuffle=True, last_batch='rollover',
                 num_workers=4)
             test_data = gluon.data.DataLoader(
                 test_dataset.transform(transform),
-                batch_size=64, shuffle=False, num_workers=4)
+                batch_size=self.batch_size, shuffle=False, num_workers=4)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
             self.num_classes = len(np.unique(train_dataset._label))
         else:
@@ -80,6 +80,21 @@ class Dataset(dataset.Dataset):
         self.val_data = test_data
         self.train = train_dataset
         self.val = test_dataset
-    
+
     def __repr__(self):
-        return "AutoGluon Dataset: number of classes = %d" % self.num_classes
+        train_stats = DataAnalyzer.stat_dataset(self.train)
+        val_stats = DataAnalyzer.stat_dataset(self.val)
+        repr_str = "AutoGluon Dataset: " \
+                   "\n ======== " \
+                   "\n name = %s" \
+                   "\n ======== " \
+                   "\n Train data statistic " \
+                   "\n number of classes = %d" \
+                   "\n number of samples = %d" \
+                   "\n ======== " \
+                   "\n Val data statistic " \
+                   "\n number of classes = %d" \
+                   "\n number of samples = %d" % (self.name,
+                                                  train_stats[0], train_stats[1],
+                                                  val_stats[0], val_stats[1])
+        return repr_str
