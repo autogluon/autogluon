@@ -47,7 +47,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             halving rate, specified by the reduction factor.
     """
     def __init__(self, train_fn, args, resource, searcher,
-                 checkpoint=None, resume=False,
+                 checkpoint='./exp/checkerpoint.ag', resume=False,
                  num_trials=None,
                  time_attr="training_epoch",
                  reward_attr="accuracy",
@@ -98,12 +98,14 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.visualizer.add_scalar(tag='loss',
-                                       value=('task %d valid_loss' % task.task_id,
-                                              reported_result['loss']),
-                                       global_step=reported_result['epoch'])
-            self.visualizer.add_scalar(tag='accuracy_curves',
-                                       value=('task %d valid_acc' % task.task_id,
+            if 'loss' in reported_result:
+                self.visualizer.add_scalar(tag='loss',
+                                           value=('task %d valid_loss' % task.task_id,
+                                                  reported_result['loss']),
+                                           global_step=reported_result['epoch'])
+            self.visualizer.add_scalar(tag=self._reward_attr,
+                                       value=('task {task_id} {reward_attr}'.format(
+                                              task_id=task.task_id, reward_attr=self._reward_attr),
                                               reported_result[self._reward_attr]),
                                        global_step=reported_result['epoch'])
             if terminator.on_task_report(task, reported_result):

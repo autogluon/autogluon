@@ -16,17 +16,18 @@ class RemoteManager(object):
     NODES = []
     LOCK = mp.Lock()
     PORT_ID = mp.Value('i', 8780)
-    MASTER_IP = socket.gethostbyname(socket.gethostname())
     def __init__(self, ip_addrs=[]):
-        RemoteManager.start_local_node()
+        self.start_local_node()
+        # TODO
+        self.MASTER_IP = socket.gethostbyname(socket.gethostname())
         for ip_addr in ip_addrs:
             RemoteManager.add_remote_node(ip_addr)
 
-    @classmethod
-    def start_local_node(cls):
-        port = cls.get_port_id()
-        remote = Remote(cls.MASTER_IP, port, local=True)
-        cls.NODES.append(remote)
+    #@classmethod
+    def start_local_node(self):
+        port = self.get_port_id()
+        remote = Remote(self.MASTER_IP, port, local=True)
+        self.NODES.append(remote)
 
     @classmethod
     def add_remote_node(cls, node_ip):
