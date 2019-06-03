@@ -1,7 +1,9 @@
 """Task Scheduler"""
 import os
+import copy
 import pickle
 import logging
+import argparse
 import multiprocessing as mp
 from collections import namedtuple, OrderedDict
 from ..resource import ResourceManager
@@ -10,9 +12,9 @@ __all__ = ['TaskScheduler', 'Task']
 
 logger = logging.getLogger(__name__)
 
-BasicTask = namedtuple('Task', 'fn args resources')
+#BasicTask = namedtuple('Task', 'fn args resources')
 
-class Task(BasicTask):
+class Task(object):
     """Individual training task, containing the lauch function, default arguments and
     required resources.
     Args:
@@ -22,13 +24,19 @@ class Task(BasicTask):
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
-    def __new__(cls, fn, args, resources):
-        self = super(Task, cls).__new__(cls, fn, args, resources)
+    #def __new__(cls, fn, args, resources):
+    def __init__(self, fn, args, resources):
+        #self = super(Task, cls).__new__(cls, fn, args, resources)
+        self.fn = fn
+        self.args = copy.deepcopy(args)
+        self.resources = resources
         with Task.LOCK:
             self.task_id = Task.TASK_ID.value
+            #logger.debug('creating task_id: {}'.format(self.task_id))
+            if 'args' in self.args:
+                vars(self.args['args']).update({'task_id': self.task_id})
             Task.TASK_ID.value += 1
-            vars(args['args']).update({'task_id': self.task_id})
-        return self
+        #return self
 
     @classmethod
     def set_id(cls, taskid):
@@ -37,8 +45,16 @@ class Task(BasicTask):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ +  \
-            ' (' + 'TASK_ID: ' + str(self.task_id) + ') ' + \
-            super(Task, self).__repr__() + ')'
+            ' (' + 'task_id: ' + str(self.task_id) + \
+            ',\n\tfn: ' + str(self.fn) + \
+            ',\n\targs: {'
+        for k, v in self.args.items():
+            reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
+            #if isinstance(v, argparse.ArgumentParser):
+            #    reprstr +=  '{}'.format(k) + ': ' + str(vars(v)) + ', '
+            #else:
+            #    reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
+        reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
         return reprstr
 
 class TaskScheduler(object):
@@ -56,7 +72,7 @@ class TaskScheduler(object):
             task (autogluon.scheduler.Task): a new trianing task
         """
         # adding the task
-        logger.debug("\n\nAdding A New Task {}".format(task))
+        logger.debug("\nAdding A New Task {}".format(task))
         TaskScheduler.RESOURCE_MANAGER._request(task.resources)
         p = mp.Process(target=TaskScheduler._run_task, args=(
                        task.fn, task.args, task.resources,
@@ -102,7 +118,7 @@ class TaskScheduler(object):
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
-        logger.debug('\n\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
+        logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['TASK_ID'] = Task.TASK_ID.value
         return destination
@@ -110,7 +126,7 @@ class TaskScheduler(object):
     def load_state_dict(self, state_dict):
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])
-        logger.debug('\n\nLoading finished_tasks: {} '.format(self.finished_tasks))
+        logger.debug('\nLoading finished_tasks: {} '.format(self.finished_tasks))
 
     @property
     def num_finished_tasks(self):

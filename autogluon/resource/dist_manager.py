@@ -48,7 +48,7 @@ class DistributedResourceManager(object):
 
     @classmethod
     def _release(cls, resource):
-        logger.debug('\n\nReleasing resource {}'.format(resource))
+        logger.debug('\nReleasing resource {}'.format(resource))
         cls.NODE_RESOURCE_MANAGER[resource.node]._release(resource)
         cls._evoke_request()
 
@@ -71,10 +71,9 @@ class DistributedResourceManager(object):
         """Unsafe check
         """
         candidate_nodes = cls._get_possible_nodes(resource)
-        logger.debug('\n\ncandidate_nodes: {}'.format(candidate_nodes))
         for node in candidate_nodes:
             if cls.NODE_RESOURCE_MANAGER[node].check_availability(resource):
-                logger.debug('\n\nSuccessfully find node {}'.format(node))
+                #logger.debug('\nSuccessfully find node {}'.format(node))
                 return node
         return None
 
@@ -85,16 +84,6 @@ class DistributedResourceManager(object):
         if resource.num_cpus > cls.MAX_CPU_COUNT or resource.num_gpus > cls.MAX_GPU_COUNT:
             return False
         return True
-
-    @classmethod
-    def add_remote(cls, remotes):
-        """Enables dynamically adding nodes
-        """
-        if isinstance(remotes, str):
-            remotes = [remotes]
-        for remote in remotes:
-            cls.NODE_RESOURCE_MANAGER[remote] = NodeResourceManager(remote)
-        cls._refresh_resource()
 
     @classmethod
     def remove_remote(cls, remotes):
@@ -113,9 +102,9 @@ class DistributedResourceManager(object):
         return candidates
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '{\n\n'
+        reprstr = self.__class__.__name__ + '{\n'
         for remote, manager in self.NODE_RESOURCE_MANAGER.items():
-            reprstr += '(Remote: {}, Resource: {})\n\n'.format(remote, manager)
+            reprstr += '(Remote: {}, Resource: {})\n'.format(remote, manager)
         reprstr += '}'
         return reprstr
 
@@ -133,8 +122,8 @@ class NodeResourceManager(object):
             self.CPU_QUEUE.put(cid)
         for gid in range(self.MAX_GPU_COUNT):
             self.GPU_QUEUE.put(gid)
-        logger.debug('\n\self.CPU_QUEUE.qsize() {}'.format(self.CPU_QUEUE.qsize()) + \
-                     ', self.GPU_QUEUE.qsize() {}'.format(self.GPU_QUEUE.qsize()))
+        #logger.debug('\n\self.CPU_QUEUE.qsize() {}'.format(self.CPU_QUEUE.qsize()) + \
+        #             ', self.GPU_QUEUE.qsize() {}'.format(self.GPU_QUEUE.qsize()))
 
     def _request(self, remote, resource):
         """ResourceManager, we recommand using scheduler instead of creating your own
@@ -149,7 +138,7 @@ class NodeResourceManager(object):
             cpu_ids = [self.CPU_QUEUE.get() for i in range(resource.num_cpus)]
             gpu_ids = [self.GPU_QUEUE.get() for i in range(resource.num_gpus)]
             resource._ready(remote, cpu_ids, gpu_ids)
-            logger.debug("\n\nReqeust succeed {}".format(resource))
+            #logger.debug("\nReqeust succeed {}".format(resource))
             return
  
     def _release(self, resource):
@@ -172,10 +161,6 @@ class NodeResourceManager(object):
         """
         if resource.num_cpus > self.CPU_QUEUE.qsize() or resource.num_gpus > self.GPU_QUEUE.qsize():
             return False
-        logger.debug('\n\nresource.num_cpus {}, self.CPU_QUEUE.qsize() {}'. \
-                        format(resource.num_cpus, self.CPU_QUEUE.qsize()) + \
-                     ', resource.num_gpus {}, self.GPU_QUEUE.qsize() {}'. \
-                        format(resource.num_gpus, self.GPU_QUEUE.qsize()))
         return True
 
     def check_possible(self, resource):
