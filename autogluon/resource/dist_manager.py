@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 from .resource import *
+from ..utils import Queue
 
 __all__ = ['DistributedResourceManager', 'NodeResourceManager']
 
@@ -116,14 +117,12 @@ class NodeResourceManager(object):
         self.LOCK = mp.Lock()
         self.MAX_CPU_COUNT = get_remote_cpu_count(remote)
         self.MAX_GPU_COUNT = get_remote_gpu_count(remote)
-        self.CPU_QUEUE = mp.Queue()
-        self.GPU_QUEUE = mp.Queue()
+        self.CPU_QUEUE = Queue()
+        self.GPU_QUEUE = Queue()
         for cid in range(self.MAX_CPU_COUNT):
             self.CPU_QUEUE.put(cid)
         for gid in range(self.MAX_GPU_COUNT):
             self.GPU_QUEUE.put(gid)
-        #logger.debug('\n\self.CPU_QUEUE.qsize() {}'.format(self.CPU_QUEUE.qsize()) + \
-        #             ', self.GPU_QUEUE.qsize() {}'.format(self.GPU_QUEUE.qsize()))
 
     def _request(self, remote, resource):
         """ResourceManager, we recommand using scheduler instead of creating your own
@@ -153,7 +152,6 @@ class NodeResourceManager(object):
                 self.GPU_QUEUE.put(gid)
 
     def get_all_resources(self):
-        gpu_count = self.GPU_QUEUE.qsize()
         return self.MAX_CPU_COUNT, self.MAX_GPU_COUNT
 
     def check_availability(self, resource):

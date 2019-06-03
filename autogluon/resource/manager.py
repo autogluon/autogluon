@@ -1,6 +1,7 @@
 import logging
 import multiprocessing as mp
 from .resource import *
+from ..utils import Queue
 
 __all__ = ['ResourceManager']
 
@@ -10,8 +11,8 @@ class ResourceManager(object):
     """Resource Manager to keep track of the cpu and gpu usage
     """
     LOCK = mp.Lock()
-    CPU_QUEUE = mp.Queue()
-    GPU_QUEUE = mp.Queue()
+    CPU_QUEUE = Queue()
+    GPU_QUEUE = Queue()
     MAX_CPU_COUNT = get_cpu_count()
     MAX_GPU_COUNT = get_gpu_count()
     for cid in range(MAX_CPU_COUNT):
