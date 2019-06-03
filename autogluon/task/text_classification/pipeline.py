@@ -138,6 +138,6 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
                   event_handlers=[SentimentDataLoaderHandler()])
 
-    logger.info('{} : {}' % (os.getpid(), estimator.val_metrics))  # TODO: Add callback here
+    logger.info('{} : {}'.format(os.getpid(), estimator.val_metrics))  # TODO: Add callback here
 
     # TODO : Add More event handlers here to plug the results
