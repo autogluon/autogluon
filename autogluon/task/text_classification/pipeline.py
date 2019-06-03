@@ -104,7 +104,6 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     logger.info('{0} : The pretrained model chosen is : {1}'.format(os.getpid(), args.model))
 
-
     # Define the network and get an instance from model zoo.
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     # pre_trained_network is a misnomer here. This can be untrained network too.
@@ -139,5 +138,7 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
                   event_handlers=[SentimentDataLoaderHandler()])
 
     logger.info('{} : {}'.format(os.getpid(), estimator.val_metrics))  # TODO: Add callback here
+
+    reporter(mean_loss=estimator.val_metrics[1].get()[1], mean_accuracy=estimator.val_metrics[0].get()[1])
 
     # TODO : Add More event handlers here to plug the results
