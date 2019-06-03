@@ -43,7 +43,7 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
-    'mxboard',
+    'mxboard', #TODO (cgraywang): move out of setup
     'tensorflow',
     'tensorboard'
 ]

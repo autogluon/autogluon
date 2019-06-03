@@ -91,10 +91,20 @@ class Dataset(dataset.Dataset):
                    "\n Train data statistic " \
                    "\n number of classes = %d" \
                    "\n number of samples = %d" \
+                   "\n mean (label) = %.2f" \
+                   "\n std (label) = %.2f" \
+                   "\n var (label) = %.2f" \
                    "\n ======== " \
                    "\n Val data statistic " \
                    "\n number of classes = %d" \
-                   "\n number of samples = %d" % (self.name,
-                                                  train_stats[0], train_stats[1],
-                                                  val_stats[0], val_stats[1])
+                   "\n number of samples = %d" \
+                   "\n mean (label) = %.2f" \
+                   "\n std (label) = %.2f" \
+                   "\n var (label) = %.2f" % (self.name,
+                                            train_stats[0], train_stats[1],
+                                            train_stats[2], train_stats[3],
+                                            train_stats[4],
+                                            val_stats[0], val_stats[1],
+                                            val_stats[2], val_stats[3],
+                                            val_stats[4])
         return repr_str

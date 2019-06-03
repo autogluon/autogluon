@@ -60,4 +60,5 @@ class DataAnalyzer(object):
     @staticmethod
     def stat_dataset(a):
         assert a is not None
-        return len(np.unique(a._label)), a.__len__()
+        return len(np.unique(a._label)), a.__len__(), \
+               np.mean(a._label), np.std(a._label), np.var(a._label)
