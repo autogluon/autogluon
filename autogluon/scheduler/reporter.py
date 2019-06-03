@@ -52,4 +52,4 @@ class StatusReporter(EpochEnd):
 
     def epoch_end(self, estimator: Estimator, *args, **kwargs):
         self.current_epoch += 1
-        self(epoch=args.epochs, accuracy=estimator.val_metrics[0].get()[1])
+        self(epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1])
