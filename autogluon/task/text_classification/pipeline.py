@@ -1,9 +1,9 @@
 import mxnet as mx
+from mxnet import gluon
+
 from autogluon.estimator import *
 from autogluon.estimator.event_handler import DataLoaderHandler
 from autogluon.scheduler.reporter import StatusReporter
-from mxnet import gluon
-
 from .dataset import Dataset
 from .model_zoo import get_model_instances
 from ...basic import autogluon_method
@@ -135,10 +135,4 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
-                  event_handlers=[SentimentDataLoaderHandler()])
-
-    logger.info('{} : {}'.format(os.getpid(), estimator.val_metrics))  # TODO: Add callback here
-
-    reporter(epoch=args.epochs, accuracy=estimator.val_metrics[0].get()[1])
-
-    # TODO : Add More event handlers here to plug the results
+                  event_handlers=[SentimentDataLoaderHandler(), reporter])
