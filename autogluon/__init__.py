@@ -21,6 +21,28 @@ except ImportError:
         "Unable to import dependency mxnet. "
         "A quick tip is to install via `pip install mxnet-mkl/mxnet-cu90mkl --pre`. ")
 
+try:
+    import mxboard
+except ImportError:
+    raise ImportError(
+        "Unable to import dependency mxboard. "
+        "A quick tip is to install via `pip install mxboard`. ")
+
+try:
+    import tensorboard
+except ImportError:
+    raise ImportError(
+        "Unable to import dependency tensorboard. "
+        "A quick tip is to install via `pip install tensorflow tensorboard`. ")
+
+try:
+    import dask
+except ImportError:
+    raise ImportError(
+        "Unable to import dependency tensorboard. "
+        "A quick tip is to install via `conda install dask`. ")
+
+
 __version__ = '0.0.1'
 
 from .dataset import *

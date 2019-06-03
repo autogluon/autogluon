@@ -9,6 +9,8 @@ AutoGluon: AutoML Toolkit with MXNet Gluon
 [TOC]
 
 ## Installation
+    git clone ssh://git.amazon.com/pkg/AutoGluon
+    cd AutoGluon
     python setup.py install
 
 
@@ -33,16 +35,23 @@ For more detailed information on how to submit PR and revisions, please refer to
 ## Beginners Guide
 ```python
 import logging
-import autogluon as ag
-import autogluon.image_classification as task
 
-train_dataset, valid_dataset = task.Dataset('./CIFAR10/train', 
-                                            './CIFAR10/valid')
+from autogluon import image_classification as task
 
-models = task.fit(train_dataset)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
-logging.info('trials results:')
-logging.info(models[0])
+dataset = task.Dataset(name='CIFAR10')
+results = task.fit(dataset)
+
+logger.debug('Best result:')
+logger.debug(results.val_accuracy)
+logger.debug('=========================')
+logger.debug('Best search space:')
+logger.debug(results.config)
+logger.debug('=========================')
+logger.debug('Total time cost:')
+logger.debug(results.time)
 ```
 
 ## Advanced User Guide
@@ -50,143 +59,148 @@ logging.info(models[0])
 import logging
 
 import autogluon as ag
-import autogluon.image_classification as task
+from autogluon import image_classification as task
 
-train_dataset, valid_dataset = task.Dataset('./CIFAR10/train', './CIFAR10/valid')
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
-models, best_result, search_space = task.fit(train_dataset,
-                                             nets=ag.Nets([task.model_zoo.get_model('resnet18_v1'),
-                                                   task.model_zoo.get_model('resnet34_v1'),
-                                                   task.model_zoo.get_model('resnet50_v1'),
-                                                   task.model_zoo.get_model('resnet101_v1'),
-                                                   task.model_zoo.get_model('resnet152_v1')]),
-                                             optimizers=ag.Optimizers([ag.optims.get_optim('sgd'),
-                                                         ag.optims.get_optim('adam')]))
-logging.info('trials results:')
-logging.info(models)
-logging.info('=========================')
-logging.info('best results:')
-logging.info(best_result)
-logging.info('=========================')
-logging.info('print search space')
-logging.info(search_space)
+dataset = task.Dataset(name='CIFAR10')
+
+results = task.fit(dataset,
+                   nets=ag.Nets(['cifar_resnet20_v1',
+                                 'cifar_resnet56_v1',
+                                 'cifar_resnet110_v1']),
+                   optimizers=ag.Optimizers(['sgd', 'adam']))
+
+logger.debug('Best result:')
+logger.debug(results.val_accuracy)
+logger.debug('=========================')
+logger.debug('Best search space:')
+logger.debug(results.config)
+logger.debug('=========================')
+logger.debug('Total time cost:')
+logger.debug(results.time)
 
 ```
 
 ## Auto Fit Usage
 ```python
 def fit(data,
-        nets,
-        optimizers=None,
+        nets=Nets([
+            get_model('cifar_resnet20_v1'),
+            get_model('cifar_resnet56_v1'),
+            get_model('cifar_resnet110_v1')]),
+        optimizers=Optimizers(
+            [get_optim('sgd'),
+             get_optim('adam')]),
         metrics=None,
         losses=None,
         searcher=None,
         trial_scheduler=None,
         resume=False,
-        savedir='./outputdir/',
+        savedir='checkpoint/exp1.ag',
         visualizer='tensorboard',
-        stop_criterion={'time_limits': 1 * 60 * 60,
-                        'max_metric': 0.80,
-                        'max_trial_count': 100},
-        resources_per_trial={'max_num_gpus': 1,
-                             'max_num_cpus': 4,
-                             'max_training_epochs': 2},
-        *args):
-    cs = CS.ConfigurationSpace()
-    assert data is not None
-    assert nets is not None
-    if data.search_space is not None:
-        cs.add_configuration_space(data.search_space)
-    if nets.search_space is not None:
-        cs.add_configuration_space(nets.search_space)
-    if optimizers.search_space is not None:
-        cs.add_configuration_space(optimizers.search_space)
-    if metrics.search_space is not None:
-        cs.add_configuration_space(metrics.search_space)
-    if losses.search_space is not None:
-        cs.add_configuration_space(losses.search_space)
-    import json
-    with open('config_space.json', 'w') as f:
-        f.write(json.write(cs))
-    with open('config_space.json') as f:
-        search_space = json.load(f)
+        stop_criterion={
+            'time_limits': 1*60*60,
+            'max_metric': 1.0,
+            'max_trial_count': 2
+        },
+        resources_per_trial={
+            'max_num_gpus': 0,
+            'max_num_cpus': 4,
+            'max_training_epochs': 3
+        },
+        backend='default',
+        demo=False,
+        **kwargs):
+    r"""
+    Fit networks on dataset
 
-    if searcher is None:
-        searcher = tune.automl.search_policy.RandomSearch(search_space,
-                                                          stop_criterion['max_metric'],
-                                                          stop_criterion['max_trial_count'])
-    if trial_scheduler is None:
-        trial_scheduler = tune.schedulers.FIFOScheduler()
+    Parameters
+    ----------
+    data: Input data. It could be:
+        autogluon.Datasets
+        task.Datasets
+    nets: autogluon.Nets
+    optimizers: autogluon.Optimizers
+    metrics: autogluon.Metrics
+    losses: autogluon.Losses
+    stop_criterion (dict): The stopping criteria. The keys may be any field in
+        the return result of 'train()', whichever is reached first.
+        Defaults to empty dict.
+    resources_per_trial (dict): Machine resources to allocate per trial,
+        e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
+        assigned unless you specify them here.
+    savedir (str): Local dir to save training results to.
+    searcher: Search Algorithm.
+    trial_scheduler: Scheduler for executing
+        the experiment. Choose among FIFO (default) and HyperBand.
+    resume (bool): If checkpoint exists, the experiment will
+        resume from there.
+    backend: support autogluon default backend, ray. (Will support SageMaker)
+    **kwargs: Used for backwards compatibility.
 
-    tune.register_trainable(
-        "TRAIN_FN", lambda config, reporter: pipeline.train_image_classification(
-            args, config, reporter))
-    trials = tune.run(
-        "TRAIN_FN",
-        name=args.expname,
-        verbose=2,
-        scheduler=trial_scheduler,
-        **{
-            "stop": {
-                "mean_accuracy": stop_criterion['max_metric'],
-                "training_iteration": resources_per_trial['max_training_epochs']
-            },
-            "resources_per_trial": {
-                "cpu": int(resources_per_trial['max_num_cpus']),
-                "gpu": int(resources_per_trial['max_num_gpus'])
-            },
-            "num_samples": resources_per_trial['max_trial_count'],
-            "config": {
-                "lr": tune.sample_from(lambda spec: np.power(
-                    10.0, np.random.uniform(-4, -1))),
-                "momentum": tune.sample_from(lambda spec: np.random.uniform(
-                    0.85, 0.95)),
-            }
-        })
-    best_result = max([trial.best_result for trial in trials])
-    return trials, best_result, cs
+    Returns
+    ----------
+    results:
+        model: the parameters associated with the best model. (TODO:)
+        val_accuracy: validation set accuracy
+        config: best configuration
+        time: total time cost
+    """
+    logger.info('Start fitting')
+    start_fit_time = time.time()
+
+    def _construct_search_space(objs, obj_names):
+        def _set_range(obj, name):
+            pass
+        def _assert_fit_error(obj, name):
+            pass
+        def _init_args(cs):
+            pass
+        return cs, args
+    logger.info('Start constructing search space')
+    search_objs = [data, nets, optimizers, losses, metrics]
+    # TODO (cgraywang) : replace with autogluon*.name
+    search_obj_names = ['data', 'net', 'optimizer', 'loss', 'metric']
+    cs, args = _construct_search_space(search_objs, search_obj_names)
+    logger.info('Finished.')
+
+    def _reset_checkpoint(dir, resume):
+        pass
+    _reset_checkpoint(savedir, resume)
+
+    def _run_backend(searcher, trial_scheduler):
+        logger.info('Start using default backend.')
+
+        if searcher is None or searcher == 'random':
+            searcher = ag.searcher.RandomSampling(cs)
+        if trial_scheduler == 'hyperband':
+            trial_scheduler = ag.scheduler.Hyperband_Scheduler()
+            # TODO (cgraywang): use empiral val now
+        else:
+            trial_scheduler = ag.scheduler.FIFO_Scheduler()
+        trial_scheduler.run()
+        # TODO (cgraywang)
+        trials = None
+        best_result = trial_scheduler.get_best_reward()
+        best_config = trial_scheduler.get_best_config()
+        results = Results(trials, best_result, best_config, time.time() - start_fit_time)
+        logger.info('Finished.')
+        return results
+    results = _run_backend(searcher, trial_scheduler)
+    logger.info('Finished.')
+    return results
 ```
 
 ## Auto Nets Usage
 ```python
-nets = ag.Nets([ag.task.model_zoo.get_model('resnet18_v1'),
-                ag.task.model_zoo.get_model('resnet34_v1'),
-                ag.task.model_zoo.get_model('resnet50_v1'),
-                ag.task.model_zoo.get_model('resnet101_v1'),
-                ag.task.model_zoo.get_model('resnet152_v1')])
+nets = ag.Nets(['resnet18_v1',
+                'resnet34_v1',
+                'resnet50_v1',
+                'resnet101_v1',
+                'resnet152_v1'])
 logging.info(nets)
-```
-
-Some implementaion details:
-```python
-def add_search_space(self):
-    cs = CS.ConfigurationSpace()
-    net_list_hyper_param = List('autonets', choices=self.net_list).get_hyper_param()
-    cs.add_hyperparameter(net_list_hyper_param)
-    for net in self.net_list:
-        #TODO(cgraywang): distinguish between different nets, only support resnet for now
-        net_hyper_params = net.get_hyper_params()
-        cs.add_hyperparameters(net_hyper_params)
-        conds = []
-        for net_hyper_param in net_hyper_params:
-            #TODO(cgraywang): put condition in presets? split task settings out
-            cond = CS.InCondition(net_hyper_param, net_list_hyper_param,
-                                  ['resnet18_v1', 'resnet34_v1',
-                                   'resnet50_v1', 'resnet101_v1',
-                                   'resnet152_v1'])
-            conds.append(cond)
-        cs.add_conditions(conds)
-    self._set_search_space(cs)
-
-@autogluon_nets
-def get_model(name):
-    name = name.lower()
-    if name not in models:
-        err_str = '"%s" is not among the following model list:\n\t' % (name)
-        err_str += '%s' % ('\n\t'.join(sorted(models)))
-        raise ValueError(err_str)
-    net = name
-    return net
 ```
 
 ## Auto Optimizers Usage
