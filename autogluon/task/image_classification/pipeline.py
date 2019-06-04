@@ -99,8 +99,9 @@ def train_image_classification(args, reporter):
 
     def train(epoch):
         #TODO (cgraywang): change to lr scheduler
-        if epoch % args.lr_step == 0:
-            trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
+        if hasattr(args, 'lr_step') and hasattr(args, 'lr_factor'):
+            if epoch % args.lr_step == 0:
+                trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
 
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0],

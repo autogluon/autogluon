@@ -123,8 +123,9 @@ def fit(data,
             args_dict = vars(args)
             args_dict['epochs'] = resources_per_trial['max_training_epochs']
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
-            args_dict['lr_factor'] = kwargs['lr_factor']
-            args_dict['lr_step'] = kwargs['lr_step']
+            if 'lr_factor' in kwargs or 'lr_step' in kwargs:
+                args_dict['lr_factor'] = kwargs['lr_factor']
+                args_dict['lr_step'] = kwargs['lr_step']
             args_dict['data'] = data.name
             args_dict['train_path'] = data.train_path
             args_dict['val_path'] = data.val_path
