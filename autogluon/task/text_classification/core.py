@@ -26,8 +26,7 @@ default_nets = Nets([
     get_model('standard_lstm_lm_650'),
     get_model('standard_lstm_lm_1500'),
     get_model('awd_lstm_lm_600'),
-    get_model('awd_lstm_lm_1150'),
-    get_model('big_rnn_lm_2048_512')
+    get_model('awd_lstm_lm_1150')
 ])
 
 default_optimizers = Optimizers([
