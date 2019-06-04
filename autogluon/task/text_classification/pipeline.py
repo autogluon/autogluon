@@ -1,5 +1,4 @@
 import mxnet as mx
-from mxnet import gluon
 
 from autogluon.estimator import *
 from autogluon.estimator.event_handler import DataLoaderHandler
@@ -34,7 +33,7 @@ class TextClassificationNet(gluon.Block):
     Network for Text Classification
     """
 
-    def __init__(self, prefix=None, params=None, num_classes=2):
+    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
         super(TextClassificationNet, self).__init__(prefix=prefix, params=params)
         with self.name_scope():
             self.embedding = None
@@ -42,7 +41,13 @@ class TextClassificationNet(gluon.Block):
             self.agg_layer = MeanPoolingLayer()
             self.output = gluon.nn.Sequential()
             with self.output.name_scope():
-                self.output.add(gluon.nn.Dropout(rate=0.4))
+                hidden_units = 40 # TODO Make this also a Hyperparam.
+                for i in range(num_classification_layers):
+                    self.output.add(gluon.nn.Dropout(rate=dropout))
+                    self.output.add(gluon.nn.Dense(int(hidden_units)))
+                    hidden_units = hidden_units / 2
+
+                self.output.add(gluon.nn.Dropout(rate=dropout))
                 self.output.add(gluon.nn.Dense(num_classes))
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
@@ -112,13 +117,14 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
                       batch_size=batch_size)
 
-    net = TextClassificationNet(num_classes=dataset.num_classes)
+    net = TextClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
+                                dropout=args.dropout)
     net.embedding = pre_trained_network.embedding
     net.encoder = pre_trained_network.encoder
 
     net.hybridize()
 
-    logger.info('Network architecture : {}'.join(net))
+    logger.info(net)
 
     # define the initializer :
     # TODO : This should come from the config

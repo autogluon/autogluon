@@ -16,17 +16,18 @@ from .model_zoo import *
 from .pipeline import *
 from ...network import Nets
 from ...optim import Optimizers, get_optim
+from autogluon.space import *
 
 __all__ = ['fit']
 
 logger = logging.getLogger(__name__)
 # TODO Add More default networks here. Possibly Bert ?
 default_nets = Nets([
-    get_model('standard_lstm_lm_200'),
-    get_model('standard_lstm_lm_650'),
-    get_model('standard_lstm_lm_1500'),
-    get_model('awd_lstm_lm_600'),
-    get_model('awd_lstm_lm_1150')
+    get_model('standard_lstm_lm_200', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('standard_lstm_lm_650', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('standard_lstm_lm_1500', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('awd_lstm_lm_600', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=1, upper=2)})
 ])
 
 default_optimizers = Optimizers([
