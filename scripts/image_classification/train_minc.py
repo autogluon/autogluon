@@ -40,8 +40,6 @@ parser.add_argument('--lr_factor', default=0.75, type=float,
                     help='learning rate decay ratio')
 parser.add_argument('--lr_step', default=20, type=int,
                     help='list of learning rate decay epochs as in str')
-parser.add_argument('--demo', action='store_true', default=False,
-                    help='demo if needed')
 parser.add_argument('--debug', action='store_true', default=False,
                     help='debug if needed')
 
@@ -53,14 +51,18 @@ if __name__ == '__main__':
     if not os.path.exists(logdir):
         os.makedirs(logdir)
     logging_handlers.append(logging.FileHandler(
-        '%s/train_cifar10.log' % logdir))
+        '%s/train_minc.log' % logdir))
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG, handlers=logging_handlers)
     else:
         logging.basicConfig(level=logging.INFO, handlers=logging_handlers)
 
-    dataset = task.Dataset(name=args.data, batch_size=args.batch_size)
+    dataset = task.Dataset(name='minc2500',
+                           train_path=os.path.join(args.data, 'train'),
+                           val_path=os.path.join(args.data, 'test'),
+                           batch_size=args.batch_size,
+                           num_workers=args.max_num_cpus)
     net_list = [net for net in args.nets.split(',')]
     optim_list = [opt for opt in args.optims.split(',')]
     stop_criterion = {
@@ -73,7 +75,6 @@ if __name__ == '__main__':
         'max_num_cpus': args.max_num_cpus,
         'max_training_epochs': args.max_training_epochs
     }
-
     results = task.fit(dataset,
                        nets=ag.Nets(net_list),
                        optimizers=ag.Optimizers(optim_list),
@@ -85,8 +86,7 @@ if __name__ == '__main__':
                        stop_criterion=stop_criterion,
                        resources_per_trial=resources_per_trial,
                        lr_factor=args.lr_factor,
-                       lr_step=args.lr_step,
-                       demo=args.demo)
+                       lr_step=args.lr_step)
 
     logger.info('Best result:')
     logger.info(results.val_accuracy)

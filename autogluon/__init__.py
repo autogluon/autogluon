@@ -39,7 +39,7 @@ try:
     import dask
 except ImportError:
     raise ImportError(
-        "Unable to import dependency tensorboard. "
+        "Unable to import dependency dask. "
         "A quick tip is to install via `conda install dask`. ")
 
 

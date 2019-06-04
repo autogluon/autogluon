@@ -11,6 +11,8 @@ from gluoncv.model_zoo import get_model
 
 from ...basic import autogluon_method
 from .dataset import Dataset
+from .losses import get_loss_instance
+from .metrics import get_metric_instance
 
 __all__ = ['train_image_classification', 'train_ray_image_classification']
 
@@ -21,27 +23,16 @@ logger = logging.getLogger(__name__)
 def train_image_classification(args, reporter):
     # Set Hyper-params
     def _init_hparams():
-        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
-            batch_size = args.batch_size * max(args.num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        else:
-            if hasattr(args, 'num_gpus'):
-                num_gpus = args.num_gpus
-            else:
-                num_gpus = 0
-            if hasattr(args, 'batch_size'):
-                batch_size = args.batch_size * max(num_gpus, 1)
-            else:
-                batch_size = 64 * max(num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        batch_size = args.batch_size * max(args.num_gpus, 1)
+        ctx = [mx.gpu(i)
+               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
 
     batch_size, ctx = _init_hparams()
 
     # Define DataLoader
-    dataset = Dataset(args.data)
+    dataset = Dataset(name=args.data, train_path=args.train_path, val_path=args.val_path,
+                      batch_size=batch_size, num_workers=args.num_workers)
     train_data = dataset.train_data
     val_data = dataset.val_data
 
@@ -53,12 +44,19 @@ def train_image_classification(args, reporter):
             warnings.warn('Warning: '
                           'number of class of labels can be inferred.')
             num_classes = args.classes
-        net.output = nn.Dense(num_classes)
+        if hasattr(net, 'output'):
+            net.output = nn.Dense(num_classes)
+        else:
+            net.fc = nn.Dense(num_classes) #TODO (cgraywang): deal with resnet v1/2 diff
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
     else:
-        net.output.initialize(init.Xavier(), ctx=ctx)
+        if hasattr(net, 'output'):
+            net.output.initialize(init.Xavier(), ctx=ctx)
+        else:
+            net.fc.initialize(init.Xavier(), ctx=ctx)
         net.collect_params().reset_ctx(ctx)
+    net.hybridize()
 
     # Define trainer
     def _set_optimizer_params(args):
@@ -91,8 +89,8 @@ def train_image_classification(args, reporter):
     _print_debug_info(args)
 
     # TODO (cgraywang): update with search space
-    L = gluon.loss.SoftmaxCrossEntropyLoss()
-    metric = mx.metric.Accuracy()
+    L = get_loss_instance(args.loss)
+    metric = get_metric_instance(args.metric)
 
     def _demo_early_stopping(batch_id):
         if batch_id == 3:
@@ -101,16 +99,18 @@ def train_image_classification(args, reporter):
 
     def train(epoch):
         #TODO (cgraywang): change to lr scheduler
-        if epoch % args.lr_step == 0 and epoch != 0:
+        if epoch % args.lr_step == 0:
             trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
 
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0],
                                               ctx_list=ctx,
-                                              )
+                                              batch_axis=0,
+                                              even_split=False)
             label = gluon.utils.split_and_load(batch[1],
                                                ctx_list=ctx,
-                                               )
+                                               batch_axis=0,
+                                               even_split=False)
             with autograd.record():
                 outputs = [net(X) for X in data]
                 loss = [L(yhat, y) for yhat, y in zip(outputs, label)]

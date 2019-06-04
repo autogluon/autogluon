@@ -84,3 +84,37 @@ $ python train_cifar10.py --nets cifar_resnet20_v1,cifar_resnet56_v1,
 #### Fig. [6]
 
 <img src="../img/cifar_accuracy_curves_6.svg" width="400" height="400" />
+
+
+
+## MINC
+
+|             | Prev. SOTA                |          | Our      |          |           |          |
+|-------------|---------------------------|----------|----------|----------|-----------|----------|
+|             |                           |          | FIFO     |          | Hyperband |          |
+|             | Val acc                   | Time (s) |  Val acc | Time (s) |  Val acc  | Time (s) |
+|             | 77.6(finetune)/81.3(sota) | -        | 78.5     | 46469    | 78.8      | 45879    |
+| Command     |                           |          | Com. [7] |          | Com. [8]  |          |
+| Tensorboard |                           |          | Fig. [7] |          | Fig. [8]  |          |
+
+```shell
+Com. [7]
+$ python prepare_minc.py --data ~/data/minc-2500 --split 1
+$ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --max_trial_count 400 
+    --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 1 
+    --max_num_cpus 8
+
+Com. [8]
+$ python prepare_minc.py --data ~/data/minc-2500 --split 1
+$ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --max_trial_count 400 
+    --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 1 
+    --max_num_cpus 8 --trial_scheduler hyperband
+```
+
+#### Fig. [7]
+
+<img src="../img/cifar_accuracy_curves_7.svg" width="400" height="400" />
+
+#### Fig. [8]
+
+<img src="../img/cifar_accuracy_curves_8.svg" width="400" height="400" />
