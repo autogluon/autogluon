@@ -113,6 +113,8 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     # pre_trained_network is a misnomer here. This can be untrained network too.
 
+    # fine_tune_lm(pre_trained_network) # TODO
+
     ## Initialize the dataset here.
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
                       batch_size=batch_size)
