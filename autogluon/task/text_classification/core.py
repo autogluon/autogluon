@@ -125,10 +125,8 @@ def fit(data: Dataset,
             args_dict['data_name'] = data.name
             args_dict['train_path'] = data.train_path
             args_dict['val_path'] = data.val_path
-            args_dict['model'] = 'standard_lstm_lm_200'  # TODO Change this. Standard defaults.
+            args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
             args_dict['pretrained'] = True
-            args_dict['lr'] = 5 * (10 ** -3)
-            args_dict['optimizer'] = 'ftml'
             return args
 
         args = _init_args()
