@@ -118,6 +118,8 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     net.hybridize()
 
+    logger.info('Network architecture : {}'.join(net))
+
     # define the initializer :
     # TODO : This should come from the config
     initializer = mx.init.Xavier(magnitude=2.24)
