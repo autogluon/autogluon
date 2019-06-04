@@ -68,8 +68,8 @@ class TextDataTransform(object):
         """
         self._vocab = vocab
         self._tokenizer = tokenizer
-        self._pre_tokenize_rules = get_or_else(pre_tokenize_rules, [replace_punctuations])
-        self._post_tokenize_rules = get_or_else(post_tokenize_rules, [stop_words, stemming])
+        self._pre_tokenize_rules = get_or_else(pre_tokenize_rules, [])
+        self._post_tokenize_rules = get_or_else(post_tokenize_rules, [])
         self._length_clip = nlp.data.ClipSequence(max_sequence_length)
 
     def __call__(self, sample):
