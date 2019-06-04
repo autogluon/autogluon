@@ -103,19 +103,18 @@ class FIFO_Scheduler(TaskScheduler):
 
     def add_task(self, task):
         # adding the task
-        logger.debug("Adding A New Task {}".format(task))
+        logger.info("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
             reporter = StatusReporter()
             task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
                             task.fn, task.args, task.resources,
                             FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
-            print (str(os.getpid()) + " INSIDE FIFO : " + str(threading.currentThread().ident))
-
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
                                   self.searcher, checkpoint_semaphore))
             tp.start()
@@ -145,7 +144,7 @@ class FIFO_Scheduler(TaskScheduler):
             self.add_training_result(task.task_id, reported_result[self._reward_attr])
             reporter.move_on()
             last_result = reported_result
-        print (str(os.getpid()) + " INSIDE REPORTER : RUN" + str(threading.currentThread().ident))
+
         searcher.update(task.args['config'], last_result[self._reward_attr])
 
     def get_best_config(self):

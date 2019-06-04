@@ -70,7 +70,7 @@ class TaskScheduler(object):
         """Executing the task
         """
         if resources.num_gpus > 0:
-            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str,resources.gpu_ids))
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, resources.gpu_ids))
         try:
             fn(**args)
         except Exception as e:

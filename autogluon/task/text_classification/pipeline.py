@@ -85,7 +85,7 @@ class SentimentDataLoaderHandler(DataLoaderHandler):
 
 
 @autogluon_method
-def train_text_classification(args: dict, reporter: StatusReporter) -> None:
+def train_text_classification(args: dict, reporter: StatusReporter, task_id: int) -> None:
     # TODO Add Estimator here.
     def _init_env():
         if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
@@ -96,7 +96,7 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
             if hasattr(args, 'num_gpus'):
                 num_gpus = args.num_gpus
             else:
-                num_gpus = 4
+                num_gpus = 0
             if hasattr(args, 'batch_size'):
                 batch_size = args.batch_size * max(num_gpus, 1)
             else:
@@ -107,7 +107,7 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     batch_size, ctx = _init_env()
 
-    logger.info('Process ID : {0}, args : {1}'.format(os.getpid(), args))
+    logger.info('Task ID : {0}, args : {1}'.format(task_id, args))
 
     # Define the network and get an instance from model zoo.
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
@@ -126,7 +126,7 @@ def train_text_classification(args: dict, reporter: StatusReporter) -> None:
 
     net.hybridize()
 
-    logger.info(net)
+    logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
 
     # define the initializer :
     # TODO : This should come from the config
