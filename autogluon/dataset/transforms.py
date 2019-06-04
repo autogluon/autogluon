@@ -56,7 +56,7 @@ class TextDataTransform(object):
     This class is constructed using
     """
 
-    def __init__(self, vocab, tokenizer=nlp.data.SpacyTokenizer('en'), max_sequence_length=100, pre_tokenize_rules=None,
+    def __init__(self, vocab, tokenizer=nlp.data.SpacyTokenizer('en'), max_sequence_length=500, pre_tokenize_rules=None,
                  post_tokenize_rules=None):
         """
         Init method for TextDataTransform. This is a utility class for defining custom transforms on the text dataset.
@@ -68,8 +68,8 @@ class TextDataTransform(object):
         """
         self._vocab = vocab
         self._tokenizer = tokenizer
-        self._pre_tokenize_rules = get_or_else(pre_tokenize_rules, [])
-        self._post_tokenize_rules = get_or_else(post_tokenize_rules, [])
+        self._pre_tokenize_rules = get_or_else(pre_tokenize_rules, [replace_punctuations])
+        self._post_tokenize_rules = get_or_else(post_tokenize_rules, [stop_words, stemming])
         self._length_clip = nlp.data.ClipSequence(max_sequence_length)
 
     def __call__(self, sample):
