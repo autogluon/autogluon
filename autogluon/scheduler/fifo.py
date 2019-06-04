@@ -64,6 +64,7 @@ class FIFO_Scheduler(TaskScheduler):
         import matplotlib.pyplot as plt
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
+        logger.info('Training History : {}'.format(self.training_history))
         for task_id, task_res in self.training_history.items():
             x = list(range(len(task_res)))
             plt.plot(x, task_res, label='task {}'.format(task_id))
@@ -106,7 +107,7 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            reporter = StatusReporter(task_id=task.task_id)
             task.args['reporter'] = reporter
             task.args['task_id'] = task.task_id
             # main process

@@ -64,7 +64,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         logger.debug("Adding A New Task {}".format(task))
         Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            reporter = StatusReporter(task_id=task.task_id)
             task.args['reporter'] = reporter
             self.terminator.on_task_add(task)
             # main process
