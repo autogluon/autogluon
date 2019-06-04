@@ -11,8 +11,8 @@ __all__ = ['Dataset']
 
 
 class Dataset(dataset.Dataset):
-    def __init__(self, name=None, train_path='cifar10', val_path='cifar10', batch_size=64):
-        super(Dataset, self).__init__(name, train_path, val_path, batch_size)
+    def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=4):
+        super(Dataset, self).__init__(name, train_path, val_path, batch_size, num_workers)
         # TODO (cgraywang): add search space, handle batch_size, num_workers
         self._num_classes = None
         self._read_dataset()
@@ -48,13 +48,13 @@ class Dataset(dataset.Dataset):
                 batch_size=self.batch_size,
                 shuffle=True,
                 last_batch="discard",
-                num_workers=4)
+                num_workers=self.num_workers)
 
             test_data = gluon.data.DataLoader(
                 test_dataset.transform_first(transform_test),
                 batch_size=self.batch_size,
                 shuffle=False,
-                num_workers=4)
+                num_workers=self.num_workers)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
             self.num_classes = len(np.unique(train_dataset._label))
         elif self.name.lower() == 'mnist':
@@ -66,12 +66,47 @@ class Dataset(dataset.Dataset):
             train_data = gluon.data.DataLoader(
                 train_dataset.transform(transform),
                 batch_size=self.batch_size, shuffle=True, last_batch='rollover',
-                num_workers=4)
+                num_workers=self.num_workers)
             test_data = gluon.data.DataLoader(
                 test_dataset.transform(transform),
-                batch_size=self.batch_size, shuffle=False, num_workers=4)
+                batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
             DataAnalyzer.check_dataset(train_dataset, test_dataset)
             self.num_classes = len(np.unique(train_dataset._label))
+        elif 'minc' in self.name.lower():
+            jitter_param = 0.4
+            lighting_param = 0.1
+            normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+            transform_train = transforms.Compose([
+                transforms.Resize(480),
+                transforms.RandomResizedCrop(224),
+                transforms.RandomFlipLeftRight(),
+                transforms.RandomColorJitter(brightness=jitter_param, contrast=jitter_param,
+                                             saturation=jitter_param),
+                transforms.RandomLighting(lighting_param),
+                transforms.ToTensor(),
+                normalize
+            ])
+
+            transform_test = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize
+            ])
+            train_dataset = gluon.data.vision.ImageFolderDataset(self.train_path)
+            test_dataset = gluon.data.vision.ImageFolderDataset(self.val_path)
+            train_data = gluon.data.DataLoader(
+                train_dataset.transform_first(transform_train),
+                batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+
+            test_data = gluon.data.DataLoader(
+                test_dataset.transform_first(transform_test),
+                batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+            # TODO (cgraywang): folder dataset support
+            # DataAnalyzer.check_dataset(train_dataset, test_dataset)
+            # self.num_classes = len(np.unique(train_dataset._label))
+            self.num_classes = 23
         else:
             train_data = None
             test_data = None

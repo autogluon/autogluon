@@ -12,8 +12,12 @@ import autogluon as ag
 
 from .pipeline import *
 from .model_zoo import *
+from .losses import *
+from .metrics import *
 from ...network import Nets
 from ...optim import Optimizers, get_optim
+from ...loss import Losses
+from ...metric import Metrics
 
 __all__ = ['fit']
 
@@ -33,18 +37,20 @@ def fit(data,
             get_model('cifar_resnet20_v1'),
             get_model('cifar_resnet56_v1'),
             get_model('cifar_resnet110_v1')]),
-        optimizers=Optimizers(
-            [get_optim('sgd'),
-             get_optim('adam')]),
-        metrics=None,
-        losses=None,
+        optimizers=Optimizers([
+            get_optim('sgd'),
+            get_optim('adam')]),
+        metrics=Metrics([
+            get_metric('Accuracy')]),
+        losses=Losses([
+            get_loss('SoftmaxCrossEntropyLoss')]),
         searcher=None,
         trial_scheduler=None,
         resume=False,
         savedir='checkpoint/exp1.ag',
         visualizer='tensorboard',
         stop_criterion={
-            'time_limits': 1*60*60,
+            'time_limits': 1 * 60 * 60,
             'max_metric': 1.0,
             'max_trial_count': 2
         },
@@ -117,10 +123,13 @@ def fit(data,
             args_dict = vars(args)
             args_dict['epochs'] = resources_per_trial['max_training_epochs']
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
-            args_dict['lr_step'] = 150 #TODO(cgraywang)
-            args_dict['lr_factor'] = 0.1 #TODO(cgraywang)
-            args_dict['batch_size'] = 32 #TODO(cgraywang)
+            args_dict['lr_factor'] = kwargs['lr_factor']
+            args_dict['lr_step'] = kwargs['lr_step']
             args_dict['data'] = data.name
+            args_dict['train_path'] = data.train_path
+            args_dict['val_path'] = data.val_path
+            args_dict['batch_size'] = data.batch_size
+            args_dict['num_workers'] = resources_per_trial['max_num_cpus']
             args_dict['demo'] = demo
             for hparam in cs.get_hyperparameters():
                 args_dict[hparam.name] = hparam.default_value
