@@ -1,28 +1,53 @@
+from abc import abstractmethod
+
+from ..core import *
+
 __all__ = ['Dataset']
 
 
-class Dataset(object):
-    def __init__(self, name, train_path=None, val_path=None, batch_size=None, num_workers=None):
+class Dataset(BaseAutoObject):
+    def __init__(self, name, train_path=None, val_path=None, batch_size=None, num_workers=None,
+                 transform_train_fn=None, transform_val_fn=None,
+                 transform_train_list=None, transform_val_list=None, **kwargs):
         # TODO (cgraywang): add search space, handle batch_size, num_workers
+        super(Dataset, self).__init__()
         self.name = name
         self.train_path = train_path
         self.val_path = val_path
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.search_space = None
-        self.train = None
-        self.val = None
-        self.train_data = None
-        self.val_data = None
+        self.transform_train_fn = transform_train_fn
+        self.transform_val_fn = transform_val_fn
+        self.transform_train_list = transform_train_list
+        self.transform_val_list = transform_val_list
+        self._train = None
+        self._val = None
+        self._num_classes = None
 
+    @property
+    def train(self):
+        return self._train
+
+    @train.setter
+    def train(self, value):
+        self._train = value
+
+    @property
+    def val(self):
+        return self._val
+
+    @val.setter
+    def val(self, value):
+        self._val = value
+
+    @property
+    def num_classes(self):
+        return self._num_classes
+
+    @num_classes.setter
+    def num_classes(self, value):
+        self._num_classes = value
+
+    @abstractmethod
     def _read_dataset(self):
         pass
-
-    def _set_search_space(self, cs):
-        self.search_space = cs
-
-    def add_search_space(self):
-        pass
-
-    def get_search_space(self):
-        return self.search_space

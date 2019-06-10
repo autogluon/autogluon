@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import pytest
 import logging
 
@@ -14,24 +12,24 @@ def test_optims():
     logger.debug('Start testing optimizers')
     optims = ag.Optimizers([ag.optim.optims.get_optim('sgd'),
                             ag.optim.optims.get_optim('adam')])
-    print('optims:')
-    print(optims)
-    print('search space:')
-    print(optims.search_space)
+    logger.debug('optims:')
+    logger.debug(optims)
+    logger.debug('search space:')
+    logger.debug(optims.search_space)
     for hparam in optims.search_space.get_hyperparameters():
-        print(hparam.name)
-        print(type(hparam.name))
+        logger.debug(hparam.name)
+        logger.debug(type(hparam.name))
     logger.debug('Finished.')
 
 
 def test_optim_strs():
     logger.debug('Start testing optimizers')
     optims = ag.Optimizers(['sgd', 'adam'])
-    print('optims:')
-    print(optims)
-    print('search space:')
-    print(optims.search_space)
+    logger.debug('optims:')
+    logger.debug(optims)
+    logger.debug('search space:')
+    logger.debug(optims.search_space)
     for hparam in optims.search_space.get_hyperparameters():
-        print(hparam.name)
-        print(type(hparam.name))
+        logger.debug(hparam.name)
+        logger.debug(type(hparam.name))
     logger.debug('Finished.')

@@ -1,18 +1,29 @@
-import numpy as np
-import ConfigSpace as CS
-import argparse
+from abc import ABC, abstractmethod
 
-import autogluon as ag
+__all__ = ['fit', 'BaseAutoObject']
 
-from ..task.image_classification import pipeline
-from ..task.image_classification.model_zoo import get_model
-from ..network import Nets
-from ..optim import Optimizers, get_optim
-from ..loss import Losses
-from ..metric import Metrics
-from ..searcher import *
 
-__all__ = ['fit']
+class BaseAutoObject(ABC):
+    def __init__(self):
+        super(BaseAutoObject, self).__init__()
+        self._search_space = None
+
+    @property
+    def search_space(self):
+        return self._search_space
+
+    @search_space.setter
+    def search_space(self, cs):
+        self._search_space = cs
+
+    @abstractmethod
+    def _add_search_space(self):
+        pass
+
+    @abstractmethod
+    def _get_search_space_strs(self):
+        pass
+
 
 
 # TODO (cgraywang): put into class that can be inherited and add readme

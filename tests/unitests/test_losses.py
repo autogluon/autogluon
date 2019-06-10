@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import pytest
 import logging
 
@@ -15,12 +13,12 @@ def test_losses():
     losses = ag.Losses([ag.task.image_classification.get_loss('L2Loss'),
                         ag.task.image_classification.get_loss('L1Loss'),
                         ag.task.image_classification.get_loss('SoftmaxCrossEntropyLoss')])
-    print('losses:')
-    print(losses)
-    print('search space:')
-    print(losses.search_space)
+    logger.debug('losses:')
+    logger.debug(losses)
+    logger.debug('search space:')
+    logger.debug(losses.search_space)
     for hparam in losses.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')
 
 
@@ -30,10 +28,11 @@ def test_loss_strs():
     losses = ag.Losses(['L2Loss',
                         'L1Loss',
                         'SoftmaxCrossEntropyLoss'])
-    print('losses:')
-    print(losses)
-    print('search space:')
-    print(losses.search_space)
+    logger.debug('losses:')
+    logger.debug(losses)
+    logger.debug('search space:')
+    logger.debug(losses.search_space)
     for hparam in losses.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')
+

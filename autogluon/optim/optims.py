@@ -1,25 +1,24 @@
 import ConfigSpace as CS
 
+from ..core import *
 from ..space import *
 from .utils import autogluon_optims, Optimizer
 
 __all__ = ['Optimizers', 'get_optim']
 
 
-class Optimizers(object):
+class Optimizers(BaseAutoObject):
+    #TODO (cgraywang): add optimizer hparams config
     def __init__(self, optim_list):
         assert isinstance(optim_list, list), type(optim_list)
+        super(Optimizers, self).__init__()
         self.optim_list = optim_list
-        self.search_space = None
-        self.add_search_space()
+        self._add_search_space()
 
-    def _set_search_space(self, cs):
-        self.search_space = cs
-
-    def add_search_space(self):
+    def _add_search_space(self):
         cs = CS.ConfigurationSpace()
-        optim_list_hyper_param = List('optimizer', choices=self.get_optim_strs()).\
-            get_hyper_param()
+        optim_list_hyper_param = List('optimizer', choices=self._get_search_space_strs()) \
+            .get_hyper_param()
         cs.add_hyperparameter(optim_list_hyper_param)
         for optim in self.optim_list:
             # TODO: add more optims
@@ -31,15 +30,12 @@ class Optimizers(object):
                 if optim_hyper_param not in cs.get_hyperparameters():
                     cs.add_hyperparameter(optim_hyper_param)
                 cond = CS.InCondition(optim_hyper_param, optim_list_hyper_param,
-                                      self.get_optim_strs())
+                                      self._get_search_space_strs())
                 conds.append(cond)
             cs.add_conditions(conds)
-        self._set_search_space(cs)
+        self.search_space = cs
 
-    def get_search_space(self):
-        return self.search_space
-
-    def get_optim_strs(self):
+    def _get_search_space_strs(self):
         optim_strs = []
         for optim in self.optim_list:
             if isinstance(optim, Optimizer):
@@ -47,14 +43,14 @@ class Optimizers(object):
             elif isinstance(optim, str):
                 optim_strs.append(optim)
             else:
-                pass
+                raise NotImplementedError
         return optim_strs
 
     def __repr__(self):
-        return "AutoGluon Optimizers %s with %s" % (str(self.get_optim_strs()), str(self.search_space))
+        return "AutoGluon Optimizers %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
 
     def __str__(self):
-        return "AutoGluon Optimizers %s with %s" % (str(self.get_optim_strs()), str(self.search_space))
+        return "AutoGluon Optimizers %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
     
 
 optims = ['sgd',

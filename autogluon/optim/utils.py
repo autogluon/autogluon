@@ -6,10 +6,6 @@ from ..space import *
 __all__ = ['autogluon_optims', 'Optimizer']
 
 
-def get_hyper_params(self):
-    return self.hyper_params
-
-
 def autogluon_optims(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):

@@ -126,11 +126,8 @@ def fit(data,
             if 'lr_factor' in kwargs or 'lr_step' in kwargs:
                 args_dict['lr_factor'] = kwargs['lr_factor']
                 args_dict['lr_step'] = kwargs['lr_step']
-            args_dict['data'] = data.name
-            args_dict['train_path'] = data.train_path
-            args_dict['val_path'] = data.val_path
-            args_dict['batch_size'] = data.batch_size
-            args_dict['num_workers'] = resources_per_trial['max_num_cpus']
+            args_dict['data'] = data
+            args_dict['backend'] = backend
             args_dict['demo'] = demo
             for hparam in cs.get_hyperparameters():
                 args_dict[hparam.name] = hparam.default_value
@@ -153,21 +150,31 @@ def fit(data,
 
     def _run_ray_backend(searcher, trial_scheduler):
         logger.info('Start using ray as backend')
-        from ray import tune
-        if searcher is None:
+        try:
+            from ray import tune
+        except ImportError:
+            raise ImportError(
+                "Unable to import dependency ray. "
+                "A quick tip is to install via `pip install ray`. ")
+        if searcher is None or searcher == 'random':
+            assert isinstance(cs, dict)
             searcher = tune.search_policy.RandomSearch(cs,
                                                        stop_criterion['max_metric'],
                                                        stop_criterion['max_trial_count'])
-        if trial_scheduler is None:
+        if trial_scheduler == 'hyperband':
+            trial_scheduler = tune.schedulers.AsyncHyperBandScheduler(
+                time_attr="training_iteration",
+                reward_attr="mean_accuracy",
+                max_t=resources_per_trial['max_training_epochs'],
+                grace_period=resources_per_trial['max_training_epochs'] // 4)
+        else:
             trial_scheduler = tune.schedulers.FIFOScheduler()
-
         tune.register_trainable(
-            "TRAIN_FN", lambda config, reporter: train_image_classification(
-                args, config, reporter))
+            "TRAIN_FN", lambda reporter: train_image_classification(
+                args, reporter))
         trials = tune.run(
             "TRAIN_FN",
-            name=args.expname,
-            verbose=2,
+            name=savedir,
             scheduler=trial_scheduler,
             search_alg=searcher,
             **{
@@ -179,16 +186,9 @@ def fit(data,
                     "cpu": int(resources_per_trial['max_num_cpus']),
                     "gpu": int(resources_per_trial['max_num_gpus'])
                 },
-                "num_samples": resources_per_trial['max_trial_count'],
-                "config": {
-                    "lr": tune.sample_from(lambda spec: np.power(
-                        10.0, np.random.uniform(-4, -1))),
-                    "momentum": tune.sample_from(lambda spec: np.random.uniform(
-                        0.85, 0.95)),
-                }
+                "num_samples": stop_criterion['max_trial_count']
             })
         best_result = max([trial.best_result for trial in trials])
-
         # TODO (cgraywang)
         best_config = None
         results = Results(None, best_result, best_config, time.time()-start_fit_time)
@@ -204,15 +204,8 @@ def fit(data,
             trial_scheduler = ag.scheduler.Hyperband_Scheduler(
                 train_image_classification,
                 args,
-                {
-                    'num_cpus':
-                        int(
-                            resources_per_trial[
-                                'max_num_cpus']),
-                    'num_gpus':
-                        int(
-                            resources_per_trial[
-                                'max_num_gpus'])},
+                {'num_cpus': int(resources_per_trial['max_num_cpus']),
+                 'num_gpus': int(resources_per_trial['max_num_gpus'])},
                 searcher,
                 checkpoint=savedir,
                 resume=resume,
@@ -228,14 +221,8 @@ def fit(data,
             trial_scheduler = ag.scheduler.FIFO_Scheduler(
                 train_image_classification,
                 args,
-                {
-                    'num_cpus':
-                        int(
-                            resources_per_trial['max_num_cpus']),
-                    'num_gpus':
-                        int(
-                            resources_per_trial[
-                                'max_num_gpus'])},
+                {'num_cpus': int(resources_per_trial['max_num_cpus']),
+                 'num_gpus': int(resources_per_trial['max_num_gpus'])},
                 searcher,
                 checkpoint=savedir,
                 resume=resume,

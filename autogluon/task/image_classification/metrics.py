@@ -5,6 +5,7 @@ from autogluon.metric import autogluon_metrics, Metric
 
 __all__ = ['get_metric', 'get_metric_instance']
 
+#TODO(cgraywang): abstract general loss shared across tasks
 metrics = {'Accuracy': mxnet.metric.Accuracy,
            'TopKAccuracy': mxnet.metric.TopKAccuracy,
            'F1': mxnet.metric.F1,

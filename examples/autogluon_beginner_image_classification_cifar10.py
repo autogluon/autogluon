@@ -7,8 +7,13 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.DEBUG)
 
-    dataset = task.Dataset(name='CIFAR10')
-    results = task.fit(dataset)
+    resources_per_trial = {
+        'max_num_gpus': 1,
+        'max_num_cpus': 4,
+        'max_training_epochs': 3
+    }
+    dataset = task.Dataset(name='CIFAR10', num_workers=resources_per_trial['max_num_cpus'])
+    results = task.fit(dataset, resources_per_trial=resources_per_trial)
 
     logger.debug('Best result:')
     logger.debug(results.val_accuracy)
