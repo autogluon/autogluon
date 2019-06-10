@@ -2,6 +2,8 @@ import logging
 import argparse
 import os
 
+from mxnet.gluon.data.vision import transforms
+
 import autogluon as ag
 from autogluon import image_classification as task
 
@@ -58,11 +60,34 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO, handlers=logging_handlers)
 
+    jitter_param = 0.4
+    lighting_param = 0.1
+    normalize = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+    transform_train_list = [
+        transforms.Resize(480),
+        transforms.RandomResizedCrop(224),
+        transforms.RandomFlipLeftRight(),
+        transforms.RandomColorJitter(brightness=jitter_param, contrast=jitter_param,
+                                     saturation=jitter_param),
+        transforms.RandomLighting(lighting_param),
+        transforms.ToTensor(),
+        normalize]
+
+    transform_val_list = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        normalize]
+
     dataset = task.Dataset(name='minc2500',
                            train_path=os.path.join(args.data, 'train'),
                            val_path=os.path.join(args.data, 'test'),
                            batch_size=args.batch_size,
-                           num_workers=args.max_num_cpus)
+                           num_workers=args.max_num_cpus,
+                           transform_train_list=transform_train_list,
+                           transform_val_list=transform_val_list,
+                           num_class=23)
     net_list = [net for net in args.nets.split(',')]
     optim_list = [opt for opt in args.optims.split(',')]
     stop_criterion = {

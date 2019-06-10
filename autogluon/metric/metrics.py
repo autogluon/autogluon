@@ -1,36 +1,30 @@
 import ConfigSpace as CS
 
-import autogluon as ag
+from ..core import *
 from ..space import *
 from .utils import Metric
 
 __all__ = ['Metrics']
 
 
-class Metrics(object):
+class Metrics(BaseAutoObject):
     def __init__(self, metric_list):
-        # TODO(cgraywang): add model instance, for now, use a list of model names
+        # TODO(cgraywang): add instance, for now, use a list
+        # TODO(cgraywang): use all option
         assert isinstance(metric_list, list), type(metric_list)
+        super(Metrics, self).__init__()
         self.metric_list = metric_list
-        self.search_space = None
-        self.add_search_space()
+        self._add_search_space()
 
-    def _set_search_space(self, cs):
+    def _add_search_space(self):
+        cs = CS.ConfigurationSpace()
+        # TODO (cgraywang): add more hparams for metric, e.g., weight
+        metric_list_hyper_param = List('metric',
+                                       choices=self._get_search_space_strs()).get_hyper_param()
+        cs.add_hyperparameter(metric_list_hyper_param)
         self.search_space = cs
 
-    def add_search_space(self):
-        cs = CS.ConfigurationSpace()
-        metric_list_hyper_param = List('metric',
-                                       choices=self.get_metric_strs()) \
-            .get_hyper_param()
-        cs.add_hyperparameter(metric_list_hyper_param)
-        # TODO (cgraywang): do not add hyper-params for metric
-        self._set_search_space(cs)
-
-    def get_search_space(self):
-        return self.search_space
-
-    def get_metric_strs(self):
+    def _get_search_space_strs(self):
         metric_strs = []
         for metric in self.metric_list:
             if isinstance(metric, Metric):
@@ -38,13 +32,13 @@ class Metrics(object):
             elif isinstance(metric, str):
                 metric_strs.append(metric)
             else:
-                pass
+                raise NotImplementedError
         return metric_strs
 
     def __repr__(self):
         return "AutoGluon Metrics %s with %s" % (
-        str(self.get_metric_strs()), str(self.search_space))
+            str(self._get_search_space_strs()), str(self.search_space))
 
     def __str__(self):
         return "AutoGluon Metrics %s with %s" % (
-        str(self.get_metric_strs()), str(self.search_space))
+            str(self._get_search_space_strs()), str(self.search_space))

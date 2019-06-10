@@ -37,7 +37,7 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
-    'dask',
+    'dask[complete]',
     'tornado',
     'ConfigSpace',
     'nose',

@@ -1,10 +1,11 @@
 from mxnet import gluon
 import gluoncv
 
-from autogluon.loss import autogluon_losses, Loss
+from ...loss import autogluon_losses, Loss
 
 __all__ = ['get_loss', 'get_loss_instance']
 
+#TODO(cgraywang): abstract general loss shared across tasks
 losses = {'SoftmaxCrossEntropyLoss': gluon.loss.SoftmaxCrossEntropyLoss,
           'L2Loss': gluon.loss.L2Loss,
           'L1Loss': gluon.loss.L1Loss,
@@ -42,6 +43,7 @@ def get_loss(name, **kwargs):
         raise ValueError(err_str)
     loss = Loss(name)
     return loss
+
 
 def get_loss_instance(name, **kwargs):
     """Returns a loss with search space by name

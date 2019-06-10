@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import pytest
 import logging
 
@@ -15,12 +13,12 @@ def test_metrics():
     metrics = ag.Metrics([ag.task.image_classification.get_metric('Accuracy'),
                           ag.task.image_classification.get_metric('TopKAccuracy'),
                           ag.task.image_classification.get_metric('F1')])
-    print('metrics:')
-    print(metrics)
-    print('search space:')
-    print(metrics.search_space)
+    logger.debug('metrics:')
+    logger.debug(metrics)
+    logger.debug('search space:')
+    logger.debug(metrics.search_space)
     for hparam in metrics.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')
 
 
@@ -30,10 +28,10 @@ def test_metric_strs():
     metrics = ag.Metrics(['Accuracy',
                           'TopKAccuracy',
                           'F1'])
-    print('metrics:')
-    print(metrics)
-    print('search space:')
-    print(metrics.search_space)
+    logger.debug('metrics:')
+    logger.debug(metrics)
+    logger.debug('search space:')
+    logger.debug(metrics.search_space)
     for hparam in metrics.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')

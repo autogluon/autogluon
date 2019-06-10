@@ -8,13 +8,14 @@ import numpy as np
 from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
 from gluoncv.model_zoo import get_model
+from mxnet.gluon.data.vision import transforms
+
 
 from ...basic import autogluon_method
-from .dataset import Dataset
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
 
-__all__ = ['train_image_classification', 'train_ray_image_classification']
+__all__ = ['train_image_classification']
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 def train_image_classification(args, reporter):
     # Set Hyper-params
     def _init_hparams():
-        batch_size = args.batch_size * max(args.num_gpus, 1)
+        batch_size = args.data.batch_size * max(args.num_gpus, 1)
         ctx = [mx.gpu(i)
                for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
@@ -31,15 +32,36 @@ def train_image_classification(args, reporter):
     batch_size, ctx = _init_hparams()
 
     # Define DataLoader
-    dataset = Dataset(name=args.data, train_path=args.train_path, val_path=args.val_path,
-                      batch_size=batch_size, num_workers=args.num_workers)
-    train_data = dataset.train_data
-    val_data = dataset.val_data
+    def _get_dataloader():
+        def _init_dataset(dataset, transform_fn, transform_list):
+            if transform_fn is not None:
+                dataset = dataset.transform(transform_fn)
+            if transform_list is not None:
+                dataset = dataset.transform_first(transforms.Compose(transform_list))
+            return dataset
+        train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
+                                      args.data.transform_train_list)
+        val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
+                                    args.data.transform_val_list)
+        train_data = gluon.data.DataLoader(
+            train_dataset,
+            batch_size=args.data.batch_size,
+            shuffle=True,
+            last_batch="discard",
+            num_workers=args.data.num_workers)
+
+        val_data = gluon.data.DataLoader(
+            val_dataset,
+            batch_size=args.data.batch_size,
+            shuffle=False,
+            num_workers=args.data.num_workers)
+        return train_data, val_data
+    train_data, val_data = _get_dataloader()
 
     # Define Network
     net = get_model(args.model, pretrained=args.pretrained)
     with net.name_scope():
-        num_classes = dataset.num_classes
+        num_classes = args.data.num_classes
         if hasattr(args, 'classes'):
             warnings.warn('Warning: '
                           'number of class of labels can be inferred.')
@@ -51,6 +73,7 @@ def train_image_classification(args, reporter):
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
     else:
+        # TODO (cgraywang): hparams for initializer
         if hasattr(net, 'output'):
             net.output.initialize(init.Xavier(), ctx=ctx)
         else:
@@ -143,85 +166,12 @@ def train_image_classification(args, reporter):
                 break
         _, test_acc = metric.get()
         test_loss /= len(val_data)
-        reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
+        # TODO (cgraywang): unify the ray and autogluon interface
+        if args.backend == 'default':
+            reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
+        elif args.backend == 'ray':
+            reporter(training_iteration=epoch, mean_accuracy=test_acc, mean_loss=test_loss)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
         test(epoch)
-
-
-def train_ray_image_classification(args, config, reporter):
-    vars(args).update(config)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-    mx.random.seed(args.seed)
-
-    # Set Hyper-params
-    batch_size = args.batch_size * max(args.num_gpus, 1)
-    ctx = [mx.gpu(i)
-           for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-
-    # Define DataLoader
-    train_data = args.train_data
-    test_data = args.test_data
-
-    # Load model architecture and Initialize the net with pretrained model
-    finetune_net = get_model(args.model, pretrained=args.pretrained)
-    with finetune_net.name_scope():
-        finetune_net.fc = nn.Dense(args.classes)
-    finetune_net.fc.initialize(init.Xavier(), ctx=ctx)
-    finetune_net.collect_params().reset_ctx(ctx)
-    finetune_net.hybridize()
-
-    # Define trainer
-    trainer = gluon.Trainer(finetune_net.collect_params(), args.optimizer, {
-        "learning_rate": args.lr,
-        "momentum": args.momentum,
-        "wd": args.wd
-    })
-    L = args.loss
-    metric = args.metric
-
-    def train(epoch):
-        for i, batch in enumerate(train_data):
-            data = gluon.utils.split_and_load(batch[0],
-                                              ctx_list=ctx,
-                                              batch_axis=0,
-                                              even_split=False)
-            label = gluon.utils.split_and_load(batch[1],
-                                               ctx_list=ctx,
-                                               batch_axis=0,
-                                               even_split=False)
-            with autograd.record():
-                outputs = [finetune_net(X) for X in data]
-                loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
-            for l in loss:
-                l.backward()
-
-            trainer.step(batch_size)
-        mx.nd.waitall()
-
-    def test():
-        test_loss = 0
-        for i, batch in enumerate(test_data):
-            data = gluon.utils.split_and_load(batch[0],
-                                              ctx_list=ctx,
-                                              batch_axis=0,
-                                              even_split=False)
-            label = gluon.utils.split_and_load(batch[1],
-                                               ctx_list=ctx,
-                                               batch_axis=0,
-                                               even_split=False)
-            outputs = [finetune_net(X) for X in data]
-            loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
-
-            test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
-            metric.update(label, outputs)
-
-        _, test_acc = metric.get()
-        test_loss /= len(test_data)
-        reporter(mean_loss=test_loss, mean_accuracy=test_acc)
-
-    for epoch in range(1, args.epochs + 1):
-        train(epoch)
-        test()

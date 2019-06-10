@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import pytest
 import logging
 
@@ -17,12 +15,12 @@ def test_nets():
                     ag.task.image_classification.model_zoo.get_model('resnet50_v1'),
                     ag.task.image_classification.model_zoo.get_model('resnet101_v1'),
                     ag.task.image_classification.model_zoo.get_model('resnet152_v1')])
-    print('nets:')
-    print(nets)
-    print('search space:')
-    print(nets.search_space)
+    logger.debug('nets:')
+    logger.debug(nets)
+    logger.debug('search space:')
+    logger.debug(nets.search_space)
     for hparam in nets.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')
 
 
@@ -34,10 +32,10 @@ def test_net_strs():
                     'resnet50_v1',
                     'resnet101_v1',
                     'resnet152_v1'])
-    print('nets:')
-    print(nets)
-    print('search space:')
-    print(nets.search_space)
+    logger.debug('nets:')
+    logger.debug(nets)
+    logger.debug('search space:')
+    logger.debug(nets.search_space)
     for hparam in nets.search_space.get_hyperparameters():
-        print(hparam.name)
+        logger.debug(hparam.name)
     logger.debug('Finished.')

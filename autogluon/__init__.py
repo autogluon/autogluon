@@ -40,11 +40,12 @@ try:
 except ImportError:
     raise ImportError(
         "Unable to import dependency dask. "
-        "A quick tip is to install via `conda install dask`. ")
+        "A quick tip is to install via `pip install dask[complete]`. ")
 
 
 __version__ = '0.0.1'
 
+from .core import *
 from .dataset import *
 from .loss import *
 from .metric import *
@@ -62,4 +63,5 @@ __all__ = dataset.__all__ \
           + network.__all__ \
           + optim.__all__ \
           + space.__all__ \
-          + task.__all__
+          + task.__all__ \
+          + core.__all__
