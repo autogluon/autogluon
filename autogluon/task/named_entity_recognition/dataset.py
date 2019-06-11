@@ -113,7 +113,8 @@ class Dataset(dataset.Dataset):
         self.tag_vocab = nlp.Vocab(tag_counter, padding_token=NULL_TAG,
                                    bos_token=None, eos_token=None, unknown_token=None)
         self.null_tag_index = self.tag_vocab[NULL_TAG]
-        print("Number of tag types: {}".format(len(self.tag_vocab)))
+        self._num_classes = len(self.tag_vocab)
+        print("Number of tag types: {}".format(self._num_classes))
 
 
     def encode_as_input(self, sentence):

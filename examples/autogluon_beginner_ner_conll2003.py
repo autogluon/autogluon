@@ -8,7 +8,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     dataset = task.Dataset(name='CoNLL2003',
-                           train_path='/Users/karjar/Downloads/conll2003/train.txt',
-                           val_path='/Users/karjar/Downloads/conll2003/valid.txt')
-    print()
+                           train_path='/home/ubuntu/conll2003/train.txt',
+                           val_path = '/home/ubuntu/conll2003/test.txt')
+    results = task.fit(dataset)
 
+    logger.info('Best result:')
+    logger.info(results.metric)
+    logger.info('=========================')
+    logger.info('Best search space:')
+    logger.info(results.config)

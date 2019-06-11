@@ -197,7 +197,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                       batch_size=batch_size)
 
     # TODO: remove hardcode num_classes
-    net = NERNet(num_classes=18, dropout=args.dropout)
+    net = NERNet(num_classes=dataset.num_classes(), dropout=args.dropout)
     net.backbone = pre_trained_network
 
     logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
@@ -258,8 +258,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
             np_valid_length = valid_length.astype('int32').asnumpy()
             np_true_tags = tag_ids.asnumpy()
 
-            # TODO: get tag vocab from dataset
-            predictions += convert_arrays_to_text(vocab, data.tag_vocab, np_text_ids,
+            predictions += convert_arrays_to_text(vocab, dataset.tag_vocab, np_text_ids,
                                                   np_true_tags, np_pred_tags, np_valid_length)
 
         all_true_tags = [[entry.true_tag for entry in entries] for entries in predictions]

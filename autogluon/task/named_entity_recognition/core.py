@@ -36,13 +36,13 @@ default_optimizers = Optimizers([
 default_stop_criterion = {
     'time_limits': 1 * 60 * 60,
     'max_metric': 0.80,  # TODO Should be place a bound on metric?
-    'max_trial_count': 1
+    'max_trial_count': 3
 }
 
 default_resources_per_trial = {
-    'max_num_gpus': 4,
+    'max_num_gpus': 1,
     'max_num_cpus': 4,
-    'max_training_epochs': 5
+    'max_training_epochs': 2
 }
 
 
