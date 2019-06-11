@@ -93,7 +93,7 @@ $ python train_cifar10.py --nets cifar_resnet20_v1,cifar_resnet56_v1,
 |-------------|---------------------------|----------|----------|----------|-----------|----------|
 |             |                           |          | FIFO     |          | Hyperband |          |
 |             | Val acc                   | Time (s) |  Val acc | Time (s) |  Val acc  | Time (s) |
-|             | 77.6(finetune)/81.3(sota) | -        | 78.5     | 46469    | 78.8      | 45879    |
+|             | 77.6(finetune)/81.3(sota) | -        | 80.3     | -        | 80.0      | -        |
 | Command     |                           |          | Com. [7] |          | Com. [8]  |          |
 | Tensorboard |                           |          | Fig. [7] |          | Fig. [8]  |          |
 
@@ -118,3 +118,36 @@ $ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --max_trial_
 #### Fig. [8]
 
 <img src="../img/cifar_accuracy_curves_8.svg" width="400" height="400" />
+
+## [Shopee-IET (from Kaggle)](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/) 
+
+|             | SOTA    |          | Our      |          |           |          |
+|-------------|---------|----------|----------|----------|-----------|----------|
+|             |         |          | FIFO     |          | Hyperband |          |
+|             | Val acc | Time (s) |  Val acc | Time (s) |  Val acc  | Time (s) |
+|             | 86.7    | -        | 84.6     |          | 84.5      |          |
+| Command     |         |          | Com. [9] |          | Com. [10] |          |
+| Tensorboard |         |          | Fig. [9] |          | Fig. [10] |          |
+
+
+```shell
+Com. [9]
+$ python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
+$ python train_shopeeiet.py --data ~/data/shopeeiet/ 
+    --nets resnet152_v1d --max_trial_count 400 --max_training_epochs 100 --batch_size 32 
+    --lr_factor 0.1 --lr_step 20 --max_num_gpus 1 --max_num_cpus 8
+
+Com. [10]
+$ python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
+$ python train_shopeeiet.py --data ~/data/shopeeiet/ --nets resnet152_v1d --max_trial_count 400 
+    --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 2 
+    --max_num_cpus 16 --trial_scheduler hyperband
+```
+
+#### Fig. [9]
+
+<img src="../img/cifar_accuracy_curves_9.svg" width="400" height="400" />
+
+#### Fig. [10]
+
+<img src="../img/cifar_accuracy_curves_10.svg" width="400" height="400" />

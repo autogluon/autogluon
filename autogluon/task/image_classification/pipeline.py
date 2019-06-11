@@ -45,14 +45,13 @@ def train_image_classification(args, reporter):
                                     args.data.transform_val_list)
         train_data = gluon.data.DataLoader(
             train_dataset,
-            batch_size=args.data.batch_size,
+            batch_size=batch_size,
             shuffle=True,
             last_batch="discard",
             num_workers=args.data.num_workers)
-
         val_data = gluon.data.DataLoader(
             val_dataset,
-            batch_size=args.data.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=args.data.num_workers)
         return train_data, val_data

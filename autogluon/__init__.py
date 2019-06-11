@@ -42,6 +42,13 @@ except ImportError:
         "Unable to import dependency dask. "
         "A quick tip is to install via `pip install dask[complete]`. ")
 
+try:
+    import cv2
+except ImportError:
+    raise ImportError(
+        "Unable to import dependency cv2. "
+        "A quick tip is to install via `pip install opencv-python`. ")
+
 
 __version__ = '0.0.1'
 
