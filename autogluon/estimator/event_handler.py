@@ -715,3 +715,42 @@ class DataLoaderHandler(BatchBegin):
         batch_size = data.shape[0]
 
         return data, label, batch_size
+
+class LRHandler(TrainBegin, BatchBegin):
+    """Learning rate scheduler (with warmup)
+    Parameters
+    ----------
+    estimator : Estimator
+        The :py:class:`Estimator` to get training statistics
+    warmup_ratio : ratio of total steps used for warmup
+    batch_size : train data batch size
+    num_epochs : number of training epochs
+    train_length : number of training samples
+    """
+
+    def __init__(self, warmup_ratio=0,
+                 batch_size=None,
+                 num_epochs=None,
+                 train_length=None):
+        super(LRHandler, self).__init__()
+
+        self.warmup_ratio = warmup_ratio
+        self.batch_size = batch_size
+        self.num_epochs = num_epochs
+        self.train_length = train_length
+        self.step_num = 0
+
+    def train_begin(self, estimator, *args, **kwargs):
+        self.num_train_steps = int(self.train_length / self.batch_size * self.num_epochs)
+        self.num_warmup_steps = int(self.num_train_steps * self.warmup_ratio)
+        self.init_lr = estimator.trainer.learning_rate
+
+    def batch_begin(self, estimator, *args, **kwargs):
+        self.step_num += 1
+        if self.step_num < self.num_warmup_steps:
+            new_lr = self.init_lr * self.step_num / self.num_warmup_steps
+        else:
+            offset = ((self.step_num - self.num_warmup_steps) * self.init_lr /
+                      (self.num_train_steps - self.num_warmup_steps))
+            new_lr = self.init_lr - offset
+        estimator.trainer.set_learning_rate(new_lr)

@@ -1,4 +1,5 @@
 from typing import AnyStr, Any, Collection
+from collections import namedtuple
 import os
 import mxnet as mx
 from mxnet import gluon
@@ -84,3 +85,38 @@ def flatten_dataset(dataset: gluon.data.SimpleDataset,
             flattened_data.append(word)
     print ("Flattened LEN", len(flattened_data))
     return flattened_data
+
+def convert_arrays_to_text(text_vocab, tag_vocab, np_text_ids, np_true_tags, np_pred_tags, np_valid_length):
+    """Convert numpy array data into text
+    Parameters
+    ----------
+    np_text_ids: token text ids (batch_size, seq_len)
+    np_true_tags: tag_ids (batch_size, seq_len)
+    np_pred_tags: tag_ids (batch_size, seq_len)
+    np.array: valid_length (batch_size,) the number of tokens until [SEP] token
+    Returns
+    -------
+    List[List[PredictedToken]]:
+    """
+    TaggedToken = namedtuple('TaggedToken', ['text', 'tag'])
+    PredictedToken = namedtuple('PredictedToken', ['text', 'true_tag', 'pred_tag'])
+
+    NULL_TAG = "X"
+    predictions = []
+    for sample_index in range(np_valid_length.shape[0]):
+        sample_len = np_valid_length[sample_index]
+        entries = []
+        for i in range(1, sample_len - 1):
+            token_text = text_vocab.idx_to_token[np_text_ids[sample_index, i]]
+            true_tag = tag_vocab.idx_to_token[int(np_true_tags[sample_index, i])]
+            pred_tag = tag_vocab.idx_to_token[int(np_pred_tags[sample_index, i])]
+            # we don't need to predict on NULL tags
+            if true_tag == NULL_TAG:
+                last_entry = entries[-1]
+                entries[-1] = PredictedToken(text=last_entry.text + token_text,
+                                             true_tag=last_entry.true_tag, pred_tag=last_entry.pred_tag)
+            else:
+                entries.append(PredictedToken(text=token_text, true_tag=true_tag, pred_tag=pred_tag))
+
+        predictions.append(entries)
+    return predictions

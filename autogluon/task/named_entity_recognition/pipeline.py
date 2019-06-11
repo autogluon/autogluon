@@ -1,1 +1,284 @@
-__all__ = []
+import mxnet as mx
+
+from autogluon.estimator import *
+from autogluon.scheduler.reporter import StatusReporter
+from autogluon.dataset.utils import convert_arrays_to_text
+from .dataset import Dataset
+from .model_zoo import get_model_instances
+from ...basic import autogluon_method
+
+__all__ = ['train_named_entity_recognizer']
+logger = logging.getLogger(__name__)
+
+
+class NERNet(gluon.Block):
+    """
+    Network for Named Entity Recognition
+    """
+    def __init__(self, prefix=None, params=None, num_classes=2, dropout=0.1):
+        super(NERNet, self).__init__(prefix=prefix, params=params)
+        self.backbone = None
+        self.output = nn.HybridSequential()
+        with self.output.name_scope():
+            self.output.add(gluon.nn.Dropout(rate=dropout))
+            self.output.add(gluon.nn.Dense(num_classes))
+
+    def forward(self, token_ids, token_types, valid_length):
+        """Generate an unnormalized score for the tag of each token
+        Parameters
+        ----------
+        token_ids: NDArray, shape (batch_size, seq_length)
+            ID of tokens in sentences
+            See `input` of `glounnlp.model.BERTModel`
+        token_types: NDArray, shape (batch_size, seq_length)
+            See `gluonnlp.model.BERTModel`
+        valid_length: NDArray, shape (batch_size,)
+            See `gluonnlp.model.BERTModel`
+        Returns
+        -------
+        NDArray, shape (batch_size, seq_length, num_tag_types):
+            Unnormalized prediction scores for each tag on each position.
+        """
+        output = self.output(self.backbone(token_ids, token_types, valid_length))
+        return output
+
+class NEREstimator(Estimator):
+    def __init__(self, net,
+                 loss,
+                 metrics=None,
+                 initializer=None,
+                 trainer=None,
+                 context=None,
+                 grad_clip=True):
+
+        super().__init__(net,
+                         loss,
+                         metrics,
+                         initializer,
+                         trainer,
+                         context)
+
+        self.params = [p for p in self.net.collect_params().values() if p.grad_req != 'null']
+        self.grad_clip = grad_clip
+
+    def train(self,
+              train_data,
+              estimator_ref,
+              batch_begin,
+              batch_end,
+              batch_axis=0):
+        for batch_id, batch in enumerate(train_data):
+
+            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
+                x.astype(np.float32).as_in_context(self.context[0]) for x in batch]
+
+            # batch begin
+            for handler in batch_begin:
+                handler.batch_begin(estimator_ref, batch=batch)
+
+            with mx.autograd.record():
+                out = self.net(text_ids, token_types, valid_length)
+                loss_value = self.loss[0](out, tag_ids, flag_nonnull_tag.expand_dims(axis=2)).mean()
+
+            loss_value.backward()
+
+            if self.grad_clip:
+                nlp.utils.clip_grad_global_norm(self.params, 1)
+
+            self.trainer.step(1)
+
+            # batch end
+            batch_end_result = []
+            for handler in batch_end:
+                batch_end_result.append(handler.batch_end(estimator_ref, batch=batch,
+                                                          pred=out, label=tag_ids,
+                                                          flag_nonnull_tag=flag_nonnull_tag, loss=loss_value))
+            # if any handler signaled to stop
+            if any(batch_end_result):
+                break
+
+class NERMetricHandler(MetricHandler):
+
+    def __init__(self, train_metrics):
+        super().__init__(train_metrics)
+
+    def batch_end(self, estimator, *args, **kwargs):
+        pred = kwargs['pred']
+        label = kwargs['label']
+        flag_nonnull_tag = kwargs['flag_nonnull_tag']
+        loss = kwargs['loss']
+        for metric in self.train_metrics:
+            if isinstance(metric, Loss):
+                # metric wrapper for loss values
+                metric.update(0, loss)
+            elif isinstance(metric, acc_ner):
+                metric.update(label, pred, flag_nonnull_tag)
+
+
+# TODO: move custom metrics inside ag.metrics?
+class f1_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='f1_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds):
+        true_entities = set(get_entities(labels))
+        pred_entities = set(get_entities(preds))
+
+        nb_correct = len(true_entities & pred_entities)
+        nb_pred = len(pred_entities)
+        nb_true = len(true_entities)
+
+        p = nb_correct / nb_pred if nb_pred > 0 else 0
+        r = nb_correct / nb_true if nb_true > 0 else 0
+        self.value = 2 * p * r / (p + r) if p + r > 0 else 0
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
+
+class acc_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='acc_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds, flag_nonnull_tag):
+        pred_tags = preds.argmax(axis=-1)
+        num_tag_preds = flag_nonnull_tag.sum().asscalar()
+        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
+
+
+@autogluon_method
+def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id: int) -> None:
+    # TODO Add Estimator here.
+    def _init_env():
+        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
+            batch_size = args.batch_size * max(args.num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+        else:
+            if hasattr(args, 'num_gpus'):
+                num_gpus = args.num_gpus
+            else:
+                num_gpus = 0
+            if hasattr(args, 'batch_size'):
+                batch_size = args.batch_size * max(num_gpus, 1)
+            else:
+                batch_size = 8 * max(num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        return batch_size, ctx
+
+    batch_size, ctx = _init_env()
+
+    logger.info('Task ID : {0}, args : {1}'.format(task_id, args))
+
+    # Define the network and get an instance from model zoo.
+    model_kwargs = {'pretrained': args.pretrained,
+                    'ctx': ctx,
+                    'use_pooler': False,
+                    'use_decoder': False,
+                    'use_classifier': False,
+                    'dropout_prob': 0.1}
+    pre_trained_network, vocab = get_model_instances(name=args.model,
+                                                     dataset_name='book_corpus_wiki_en_cased',
+                                                     **model_kwargs)
+
+    ## Initialize the dataset here.
+    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
+                      batch_size=batch_size)
+
+    # TODO: remove hardcode num_classes
+    net = NERNet(num_classes=18, dropout=args.dropout)
+    net.backbone = pre_trained_network
+
+    logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
+
+    # define the initializer :
+    # TODO : This should come from the config
+    initializer = mx.init.Normal(sigma=0.02)
+    if not args.pretrained:
+        net.collect_params().initialize(init=initializer, ctx=ctx)
+
+    else:
+        net.output.initialize(init=initializer, ctx=ctx)
+
+    net.hybridize(static_alloc=True)
+
+    # do not apply weight decay on LayerNorm and bias terms
+    for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
+        v.wd_mult = 0.0
+
+    # TODO : Update with search space
+    loss = gluon.loss.SoftmaxCrossEntropyLoss()
+
+    trainer = gluon.Trainer(net.collect_params(), 'Adam', {'learning_rate': args.lr})
+
+    lr_handler = LRHandler(warmup_ratio=0.1,
+                           batch_size=batch_size,
+                           num_epochs=args.epochs,
+                           train_length=len(dataset._train_ds))
+
+    train_metrics = [acc_ner()]
+    val_metrics = [f1_ner()]
+    for metric in val_metrics:
+        metric.name = "validation " + metric.name
+
+    metric_handler = NERMetricHandler(train_metrics)
+
+    def eval(val_data,
+             val_metrics,
+             batch_axis=0):
+        if not isinstance(val_data, gluon.data.DataLoader):
+            raise ValueError("Estimator only support input as Gluon DataLoader. Alternatively, you "
+                             "can transform your DataIter or any NDArray into Gluon DataLoader. "
+                             "Refer to gluon.data.dataloader")
+
+        for metric in val_metrics:
+            metric.reset()
+
+        predictions = []
+        for _, batch in enumerate(val_data):
+            # TODO: support multi-gpu
+            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
+                x.astype(np.float32).as_in_context(ctx[0]) for x in batch]
+            out = net(text_ids, token_types, valid_length)
+
+            # convert results to numpy arrays for easier access
+            np_text_ids = text_ids.astype('int32').asnumpy()
+            np_pred_tags = out.argmax(axis=-1).asnumpy()
+            np_valid_length = valid_length.astype('int32').asnumpy()
+            np_true_tags = tag_ids.asnumpy()
+
+            # TODO: get tag vocab from dataset
+            predictions += convert_arrays_to_text(vocab, data.tag_vocab, np_text_ids,
+                                                  np_true_tags, np_pred_tags, np_valid_length)
+
+        all_true_tags = [[entry.true_tag for entry in entries] for entries in predictions]
+        all_pred_tags = [[entry.pred_tag for entry in entries] for entries in predictions]
+
+        # update metrics
+        for metric in val_metrics:
+            if isinstance(metric, f1_ner):
+                metric.update(all_true_tags, all_pred_tags)
+
+    val_handler = ValidationHandler(val_data=dataset.val_data_loader,
+                                    eval_fn=eval,
+                                    val_metrics=val_metrics)
+
+    log_handler = LoggingHandler(train_metrics=train_metrics,
+                                 val_metrics=val_metrics,
+                                 verbose=LoggingHandler.LOG_PER_BATCH)
+
+    estimator = Estimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
+
+    estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
+                  event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])
