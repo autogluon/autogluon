@@ -83,29 +83,36 @@ class Dataset(dataset.Dataset):
         pass
 
     def __repr__(self):
-        train_stats = DataAnalyzer.stat_dataset(self.train)
-        val_stats = DataAnalyzer.stat_dataset(self.val)
-        repr_str = "AutoGluon Dataset: " \
-                   "\n ======== " \
-                   "\n name = %s" \
-                   "\n ======== " \
-                   "\n Train data statistic " \
-                   "\n number of classes = %d" \
-                   "\n number of samples = %d" \
-                   "\n mean (label) = %.2f" \
-                   "\n std (label) = %.2f" \
-                   "\n var (label) = %.2f" \
-                   "\n ======== " \
-                   "\n Val data statistic " \
-                   "\n number of classes = %d" \
-                   "\n number of samples = %d" \
-                   "\n mean (label) = %.2f" \
-                   "\n std (label) = %.2f" \
-                   "\n var (label) = %.2f" % (self.name,
-                                            train_stats[0], train_stats[1],
-                                            train_stats[2], train_stats[3],
-                                            train_stats[4],
-                                            val_stats[0], val_stats[1],
-                                            val_stats[2], val_stats[3],
-                                            val_stats[4])
+        try:
+            train_stats = DataAnalyzer.stat_dataset(self.train)
+            val_stats = DataAnalyzer.stat_dataset(self.val)
+            repr_str = "AutoGluon Dataset: " \
+                       "\n ======== " \
+                       "\n name = %s" \
+                       "\n ======== " \
+                       "\n Train data statistic " \
+                       "\n number of classes = %d" \
+                       "\n number of samples = %d" \
+                       "\n mean (label) = %.2f" \
+                       "\n std (label) = %.2f" \
+                       "\n var (label) = %.2f" \
+                       "\n ======== " \
+                       "\n Val data statistic " \
+                       "\n number of classes = %d" \
+                       "\n number of samples = %d" \
+                       "\n mean (label) = %.2f" \
+                       "\n std (label) = %.2f" \
+                       "\n var (label) = %.2f" % (self.name,
+                                                train_stats[0], train_stats[1],
+                                                train_stats[2], train_stats[3],
+                                                train_stats[4],
+                                                val_stats[0], val_stats[1],
+                                                val_stats[2], val_stats[3],
+                                                val_stats[4])
+        except AttributeError:
+            #TODO: add more info for folder dataset
+            repr_str = "AutoGluon Dataset: " \
+                       "\n ======== " \
+                       "\n name = %s" \
+                       "\n ======== " % self.name
         return repr_str
