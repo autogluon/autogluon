@@ -21,15 +21,12 @@ from autogluon.space import *
 __all__ = ['fit']
 
 logger = logging.getLogger(__name__)
-# TODO Add More default networks here. Possibly Bert ?
 default_nets = Nets([
-    get_model('standard_lstm_lm_200', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('standard_lstm_lm_650', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('standard_lstm_lm_1500', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('awd_lstm_lm_600', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=1, upper=2)})
+    get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
 ])
 
+# TODO: add BertADAM optimizer
 default_optimizers = Optimizers([
     get_optim('adam'),
     get_optim('sgd'),
@@ -134,11 +131,11 @@ def fit(data: Dataset,
         def _set_range(obj, name):
             if obj is not None and obj.search_space is not None:
                 # TODO Should this prefix be blank or something else ?
-                cs.add_configuration_space(prefix='text_classification',
+                cs.add_configuration_space(prefix='named_entity_recognition',
                                            configuration_space=obj.search_space,
                                            delimiter=':')
 
-        cs = CS.ConfigurationSpace(name='text_classification')
+        cs = CS.ConfigurationSpace(name='named_entity_recognition')
         for obj_name, obj in search_space_dict.items():
             _set_range(obj, obj_name)
 
