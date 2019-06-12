@@ -26,11 +26,10 @@ default_nets = Nets([
     get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
 ])
 
-# TODO: add BertADAM optimizer
 default_optimizers = Optimizers([
     get_optim('adam'),
     get_optim('sgd'),
-    get_optim('ftml')
+    get_optim('bertadam')
 ])
 
 default_stop_criterion = {

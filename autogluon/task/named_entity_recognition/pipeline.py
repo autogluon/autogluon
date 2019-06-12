@@ -279,7 +279,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                                  verbose=LoggingHandler.LOG_PER_EPOCH)
 
     estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
-    estimator.val_metrics = [val_metrics]
+    estimator.val_metrics = val_metrics
 
     estimator.fit(train_data=dataset.train_dataloader, val_data=dataset.valid_dataloader, epochs=args.epochs,
                   event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])

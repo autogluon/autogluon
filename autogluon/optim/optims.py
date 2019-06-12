@@ -71,7 +71,7 @@ optims = ['sgd',
           'ftml',
           'lbsgd',
           'ftrl',
-          'ftml']
+          'bertadam']
 
 
 @autogluon_optims
@@ -202,5 +202,5 @@ def FTRL(**kwargs):
 
 
 @autogluon_optims
-def FTML(**kwargs):
+def BERTADAM(**kwargs):
     pass

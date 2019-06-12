@@ -17,15 +17,20 @@ def autogluon_optims(func):
         # TODO (cgraywang): parse user provided config to generate hyper_params
         if optim.name == 'sgd':
             setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -6, 10 ** -1).get_hyper_param(),
+                    [Log('lr', 10 ** -5, 10 ** -1).get_hyper_param(),
                      Linear('momentum', 0.85, 0.95).get_hyper_param()])
         elif optim.name == 'adam':
             setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -6, 10 ** -1).get_hyper_param()])
+                    [Log('lr', 10 ** -5, 10 ** -1).get_hyper_param()])
 
         elif optim.name == 'ftml':
             setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -6, 10 ** -1).get_hyper_param()])
+                    [Log('lr', 10 ** -5, 10 ** -1).get_hyper_param()])
+
+        elif optim.name == 'bertadam':
+            setattr(optim, 'hyper_params',
+                    [Log('lr', 10 ** -5, 10 ** -1).get_hyper_param()])
+
         else:
             raise NotImplementedError
         return optim
