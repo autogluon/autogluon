@@ -248,7 +248,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
         optimizer = trainer._optimizer.__class__.__name__
         lr = trainer.learning_rate
         self.logger.info("Training begin: using optimizer %s "
-                         "with current learning rate %.4f ",
+                         "with current learning rate %.6f ",
                          optimizer, lr)
         if estimator.max_epoch:
             self.logger.info("Train for %d epochs.", estimator.max_epoch)
@@ -295,7 +295,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
     def epoch_begin(self, estimator, *args, **kwargs):
         if self.verbose >= self.LOG_PER_EPOCH:
             self.epoch_start = time.time()
-            self.logger.info("[Epoch %d] Begin, current learning rate: %.4f",
+            self.logger.info("[Epoch %d] Begin, current learning rate: %.6f",
                              self.current_epoch, estimator.trainer.learning_rate)
 
     def epoch_end(self, estimator, *args, **kwargs):
