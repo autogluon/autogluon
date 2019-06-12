@@ -55,7 +55,10 @@ class Dataset(dataset.Dataset):
     def _init_(self):
         self._read_dataset()
         self.add_search_space()
-        self._num_classes = len(self._label_set)
+
+    @property
+    def num_classes(self) -> int:
+        return self._num_classes
 
     @property
     def vocab(self) -> nlp.vocab:
