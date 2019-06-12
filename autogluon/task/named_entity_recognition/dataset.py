@@ -20,11 +20,11 @@ class Dataset(dataset.Dataset):
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
                  lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 180,
                  tokenizer: nlp.data.transforms = None, indexes_format: dict = None,
-                 batch_size: int = 32):
+                 batch_size: int = 8):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
-        # self._num_classes: int = 0
+        self._num_classes: int = 0
         self._vocab: nlp.Vocab = vocab
         self._train_ds_transformed = None
         self._val_ds_transformed = None
@@ -55,6 +55,7 @@ class Dataset(dataset.Dataset):
     def _init_(self):
         self._read_dataset()
         self.add_search_space()
+        self._num_classes = len(self._label_set)
 
     @property
     def vocab(self) -> nlp.vocab:
@@ -104,7 +105,8 @@ class Dataset(dataset.Dataset):
         self.tag_vocab = nlp.Vocab(tag_counter, padding_token=NULL_TAG,
                                    bos_token=None, eos_token=None, unknown_token=None)
         self.null_tag_index = self.tag_vocab[NULL_TAG]
-        print("Number of tag types: {}".format(len(self.tag_vocab)))
+        self._num_classes = len(self.tag_vocab)
+        print("Number of tag types: {}".format(self._num_classes))
 
     def encode_as_input(self, sentence):
         # check whether the given sequence can be fit into `seq_len`.
