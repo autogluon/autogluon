@@ -30,7 +30,7 @@ class Dataset(object):
         # TODO Think of other hyperparams for data
         cs = CS.ConfigurationSpace()
         data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
-                                       upper_exponent=6).get_hyper_param()
+                                       upper_exponent=3).get_hyper_param()
         cs.add_hyperparameter(data_hyperparams)
         self._set_search_space(cs)
 

@@ -1,5 +1,5 @@
 import mxnet as mx
-
+import gluonnlp as nlp
 from autogluon.estimator import *
 from autogluon.scheduler.reporter import StatusReporter
 from autogluon.dataset.utils import convert_arrays_to_text
@@ -18,10 +18,10 @@ class NERNet(gluon.Block):
     def __init__(self, prefix=None, params=None, num_classes=2, dropout=0.1):
         super(NERNet, self).__init__(prefix=prefix, params=params)
         self.backbone = None
-        self.output = nn.HybridSequential()
+        self.output = gluon.nn.HybridSequential()
         with self.output.name_scope():
             self.output.add(gluon.nn.Dropout(rate=dropout))
-            self.output.add(gluon.nn.Dense(num_classes))
+            self.output.add(gluon.nn.Dense(num_classes, flatten=False))
 
     def forward(self, token_ids, token_types, valid_length):
         """Generate an unnormalized score for the tag of each token
@@ -197,7 +197,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                       batch_size=batch_size)
 
     # TODO: remove hardcode num_classes
-    net = NERNet(num_classes=dataset.num_classes(), dropout=args.dropout)
+    net = NERNet(num_classes=dataset.num_classes, dropout=args.dropout)
     net.backbone = pre_trained_network
 
     logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
@@ -225,7 +225,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     lr_handler = LRHandler(warmup_ratio=0.1,
                            batch_size=batch_size,
                            num_epochs=args.epochs,
-                           train_length=len(dataset._train_ds))
+                           train_length=len(dataset.train_dataset))
 
     train_metrics = [acc_ner()]
     val_metrics = [f1_ner()]
@@ -234,9 +234,10 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     metric_handler = NERMetricHandler(train_metrics)
 
-    def eval(val_data,
-             val_metrics,
-             batch_axis=0):
+    def eval_ner(estimator,
+                 val_data,
+                 val_metrics,
+                 batch_axis=0):
         if not isinstance(val_data, gluon.data.DataLoader):
             raise ValueError("Estimator only support input as Gluon DataLoader. Alternatively, you "
                              "can transform your DataIter or any NDArray into Gluon DataLoader. "
@@ -269,15 +270,15 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
             if isinstance(metric, f1_ner):
                 metric.update(all_true_tags, all_pred_tags)
 
-    val_handler = ValidationHandler(val_data=dataset.val_data_loader,
-                                    eval_fn=eval,
+    val_handler = ValidationHandler(val_data=dataset.valid_dataloader,
+                                    eval_fn=eval_ner,
                                     val_metrics=val_metrics)
 
     log_handler = LoggingHandler(train_metrics=train_metrics,
                                  val_metrics=val_metrics,
                                  verbose=LoggingHandler.LOG_PER_BATCH)
 
-    estimator = Estimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
+    estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
 
-    estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
+    estimator.fit(train_data=dataset.train_dataloader, val_data=dataset.valid_dataloader, epochs=args.epochs,
                   event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])

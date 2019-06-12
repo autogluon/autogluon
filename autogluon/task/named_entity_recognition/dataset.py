@@ -19,7 +19,7 @@ class Dataset(dataset.Dataset):
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
                  lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 180,
                  tokenizer: nlp.data.transforms = None,
-                 batch_size: int = 32):
+                 batch_size: int = 8):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
@@ -46,8 +46,8 @@ class Dataset(dataset.Dataset):
             _, self._vocab = nlp.model.get_model(name='bert_12_768_12',
                                                 dataset_name='book_corpus_wiki_en_cased')
             logger.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
-                        "on `book_corpus_wiki_en_cased`. If you would like to use different"
-                        "vocabulary then please pass parameter `vocab` as an instance of"
+                        "on `book_corpus_wiki_en_cased`. If you would like to use different "
+                        "vocabulary then please pass parameter `vocab` as an instance of "
                         "`nlp.Vocab`.")
 
         # if not lazy:
