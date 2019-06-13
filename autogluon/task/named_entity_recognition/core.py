@@ -123,6 +123,8 @@ def fit(data: Dataset,
             args_dict['val_path'] = data.val_path
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
             args_dict['pretrained'] = True
+            args_dict['indexes_format'] = data.indexes_format
+            args_dict['max_sequence_length'] = data.max_sequence_length
             return args
 
         args = _init_args()

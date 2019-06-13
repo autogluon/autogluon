@@ -193,8 +193,9 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                                                      **model_kwargs)
 
     ## Initialize the dataset here.
-    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
-                      batch_size=batch_size)
+    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
+                      lazy=False, vocab=vocab, batch_size=batch_size,
+                      indexes_format=args.indexes_format, max_sequence_length=args.max_sequence_length)
 
     # TODO: remove hardcode num_classes
     net = NERNet(num_classes=dataset.num_classes, dropout=args.dropout)
