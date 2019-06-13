@@ -161,7 +161,8 @@ def fit(data: Dataset,
         if trial_scheduler is None:
             trial_scheduler = tune.schedulers.FIFOScheduler()
 
-        tune.register_trainable("TRAIN_FN", lambda config, reporter: train_named_entity_recognizer(args, config, reporter))
+        tune.register_trainable("TRAIN_FN",
+                                lambda config, reporter: train_named_entity_recognizer(args, config, reporter))
 
         trials = tune.run(
             "TRAIN_FN",

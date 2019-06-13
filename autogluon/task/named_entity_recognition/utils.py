@@ -1,7 +1,7 @@
 import re
 import sys
 from collections import namedtuple
-
+import mxnet as mx
 import logging
 
 log = logging.getLogger(__name__)
@@ -11,34 +11,7 @@ TaggedToken = namedtuple('TaggedToken', ['text', 'tag'])
 NULL_TAG = "X"
 
 
-def read_data(name, file_path, column_format):
-    """Calls specific read method based on dataset.
-    
-    Parameters
-    ----------
-    name : str
-        Name of the dataset
-    file_path : str
-        A file path
-    column_format : dict
-        A dictionary contains key as an index and value as text/tag to find
-        location in a file
-
-    Returns
-    -------
-    List[List[TaggedToken]]:
-        A list of sentences with each sentence breaks down into TaggedToken
-    """
-    if name.lower() == 'conll2003':
-        return read_conll2003(file_path, column_format)
-    elif name.lower() == 'wnut2017':
-        return read_wnut2017(file_path, column_format)
-    else:
-        print(name.lower())
-        raise NotImplementedError  # TODO: More dataset support
-
-
-def read_wnut2017(file_path, column_format):
+def read_data(file_path, column_format):
     """Reads the data from the file and convert into list of sentences.
 
     Parameters
@@ -54,23 +27,6 @@ def read_wnut2017(file_path, column_format):
     List[List[TaggedToken]]:
         A list of sentences with each sentence breaks down into TaggedToken
     """
-    sentence_list = []
-    current_sentence = []
-
-    try:
-        lines = open(
-            str(file_path), encoding="utf-8"
-        ).read().strip().split("\n")
-    except:
-        log.info(
-            'UTF-8 can\'t read: {} ... using "latin-1" instead.'.format(
-                file_path
-            )
-        )
-        lines = open(
-            str(file_path), encoding="latin1"
-        ).read().strip().split("\n")
-
     # get the text and ner column
     text_column: int = sys.maxsize
     ner_column: int = sys.maxsize
@@ -82,59 +38,25 @@ def read_wnut2017(file_path, column_format):
         else:
             raise ValueError("Invalid column type")
 
-    for line in lines:
-        if line.startswith("#"):
-            continue
-
-        if line.strip().replace("﻿", "") == "":
-            if len(current_sentence) > 0:
-                sentence_list.append(current_sentence)
-            current_sentence = []
-
-        else:
-            fields = re.split("\s+", line)
-            # token = TaggedToken(text=fields[text_column], tag=None)
-            for column in column_format:
-                if len(fields) > column:
-                    if column != text_column:
-                        token = TaggedToken(text=fields[text_column], tag=fields[column])
-
-            current_sentence.append(token)
-
-    if len(current_sentence) > 0:
-        sentence_list.append(current_sentence)
-
-    return sentence_list
-
-
-def read_conll2003(file_path, column_format):
-    """Reads the data from the file and convert into list of sentences.
-
-    Parameters
-    ----------
-    file_path : str
-        A file path
-    column_format : dict
-        A dictionary contains key as an index and value as text/tag to find
-        location in a file
-
-    Returns
-    -------
-    List[List[TaggedToken]]:
-        A list of sentences with each sentence breaks down into TaggedToken
-    """
     with open(file_path, 'r') as ifp:
         sentence_list = []
         current_sentence = []
 
         for line in ifp:
+            if '-DOCSTART-' in line:
+                continue
+            if line.startswith("#"):
+                continue
             if len(line.strip()) > 0:
-                word, _, _, tag = line.rstrip().split(" ")
-                current_sentence.append(TaggedToken(text=word, tag=tag))
+                fields = re.split("\s+", line.rstrip())
+                if len(fields) > ner_column:
+                    current_sentence.append(TaggedToken(text=fields[text_column],
+                                                        tag=fields[ner_column]))
             else:
                 # the sentence was completed if an empty line occurred; flush the current sentence.
-                sentence_list.append(current_sentence)
-                current_sentence = []
+                if len(current_sentence) > 0:
+                    sentence_list.append(current_sentence)
+                    current_sentence = []
 
         # check if there is a remaining token. in most CoNLL data files, this does not happen.
         if len(current_sentence) > 0:
@@ -267,8 +189,8 @@ def bert_tokenize_sentence(sentence, bert_tokenizer):
     return ret
 
 
-def load_segment(dataset_name, file_path, tokenizer, indexes_format):
-    sentences = read_data(dataset_name, file_path, indexes_format)
+def load_segment(file_path, tokenizer, indexes_format):
+    sentences = read_data(file_path, indexes_format)
     bio2_sentences = remove_docstart_sentence(bio_to_bio2(sentences))
     bioes_sentences = [bio2_to_bioes(sentence) for sentence in bio2_sentences]
     subword_sentences = [bert_tokenize_sentence(sentence, tokenizer) for sentence in bioes_sentences]

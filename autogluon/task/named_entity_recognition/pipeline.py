@@ -15,6 +15,7 @@ class NERNet(gluon.Block):
     """
     Network for Named Entity Recognition
     """
+
     def __init__(self, prefix=None, params=None, num_classes=2, dropout=0.1):
         super(NERNet, self).__init__(prefix=prefix, params=params)
         self.backbone = None
@@ -41,6 +42,7 @@ class NERNet(gluon.Block):
         """
         output = self.output(self.backbone(token_ids, token_types, valid_length))
         return output
+
 
 class NEREstimator(Estimator):
     def __init__(self, net,
@@ -97,6 +99,7 @@ class NEREstimator(Estimator):
             if any(batch_end_result):
                 break
 
+
 class NERMetricHandler(MetricHandler):
 
     def __init__(self, train_metrics):
@@ -113,6 +116,49 @@ class NERMetricHandler(MetricHandler):
                 metric.update(0, loss)
             elif isinstance(metric, acc_ner):
                 metric.update(label, pred, flag_nonnull_tag)
+
+
+# TODO: move custom metrics inside ag.metrics?
+class f1_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='f1_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds):
+        true_entities = set(get_entities(labels))
+        pred_entities = set(get_entities(preds))
+
+        nb_correct = len(true_entities & pred_entities)
+        nb_pred = len(pred_entities)
+        nb_true = len(true_entities)
+
+        p = nb_correct / nb_pred if nb_pred > 0 else 0
+        r = nb_correct / nb_true if nb_true > 0 else 0
+        self.value = 2 * p * r / (p + r) if p + r > 0 else 0
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
+
+
+class acc_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='acc_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds, flag_nonnull_tag):
+        pred_tags = preds.argmax(axis=-1)
+        num_tag_preds = flag_nonnull_tag.sum().asscalar()
+        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
+
 
 @autogluon_method
 def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id: int) -> None:
@@ -146,7 +192,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                     'use_classifier': False,
                     'dropout_prob': 0.1}
     pre_trained_network, vocab = get_model_instances(name=args.model,
-                                                     dataset_name='book_corpus_wiki_en_cased',
+                                                     dataset_name='book_corpus_wiki_en_uncased',
                                                      **model_kwargs)
 
     ## Initialize the dataset here.
@@ -157,7 +203,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     net = NERNet(num_classes=dataset.num_classes, dropout=args.dropout)
     net.backbone = pre_trained_network
 
-    logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
+    logger.info('Task ID : {0}, network : {1}'.format(task_id, net))
 
     # define the initializer :
     # TODO : This should come from the config

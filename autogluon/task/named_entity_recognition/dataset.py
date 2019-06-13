@@ -22,7 +22,6 @@ class Dataset(dataset.Dataset):
                  tokenizer: nlp.data.transforms = None, indexes_format: dict = None,
                  batch_size: int = 8):
         super(Dataset, self).__init__(name, train_path, val_path)
-        # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
         self._num_classes: int = 0
         self._vocab: nlp.Vocab = vocab
@@ -35,21 +34,16 @@ class Dataset(dataset.Dataset):
         self._download_dataset()
         self.add_search_space()
 
-        if vocab is None and lazy is False:
-            raise ValueError("Please specify a vocabulary object to initialize the dataset.")
-
         if self._vocab is None:
             _, self._vocab = nlp.model.get_model(name='bert_12_768_12',
-                                                 dataset_name='book_corpus_wiki_en_cased')
+                                                 dataset_name='book_corpus_wiki_en_uncased')
             logger.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
-                        "on `book_corpus_wiki_en_cased`. If you would like to use different"
+                        "on `book_corpus_wiki_en_uncased`. If you would like to use different"
                         "vocabulary then please pass parameter `vocab` as an instance of"
                         "`nlp.Vocab`.")
 
         # if not lazy:
         if not lazy:
-            self._init_()
-        else:
             self._init_()
 
     def _init_(self):
@@ -70,33 +64,34 @@ class Dataset(dataset.Dataset):
         self._init_()
 
     def _download_dataset(self) -> None:
-        if self.name.lower() == 'conll2003' or self.name.lower() == 'wnut2017':
+        if self.name.lower() in {'conll2003', 'wnut2017'}:
             if self.train_path is None or self.val_path is None:
                 raise ValueError("{} can't be downloaded directly from Gluon due to"
                                  "license Issue. Please provide the downloaded filepath"
-                                 "in `train_path` and `val_path`".format(self.name.lower()))
+                                 "as `train_path` and `val_path`".format(self.name.lower()))
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
 
     def _read_dataset(self) -> None:
         """
-        This method reads the datasets. Performs transformations on it. Preprocesses the data.
+        This method reads the datasets. Preprocesses the data.
         Prepares data loader from it.
-        :return:
         """
         self._load_dataset()
         self._preprocess()
         self._prepare_data_loader()
 
     def _load_dataset(self):
+        """Load the dataset from file, convert into BIOES scheme and build tag
+        vocabulary"""
         print("Loading the dataset...")
         if self.tokenizer is None:
             self.tokenizer = getattr(nlp.data.transforms, 'BERTTokenizer')
         self.tokenizer = self.tokenizer(vocab=self.vocab, lower=False)
-        self.train_dataset = load_segment(dataset_name=self.name, file_path=self.train_path,
-                                          tokenizer=self.tokenizer, indexes_format=self.indexes_format)
-        self.val_dataset = load_segment(dataset_name=self.name, file_path=self.val_path,
-                                        tokenizer=self.tokenizer, indexes_format=self.indexes_format)
+        self.train_dataset = load_segment(file_path=self.train_path, tokenizer=self.tokenizer,
+                                          indexes_format=self.indexes_format)
+        self.val_dataset = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
+                                        indexes_format=self.indexes_format)
 
         print("Train data length: {}".format(len(self.train_dataset)))
         print("Validation data length: {}".format(len(self.val_dataset)))
