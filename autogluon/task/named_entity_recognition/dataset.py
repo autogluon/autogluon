@@ -18,7 +18,7 @@ NULL_TAG = "X"
 
 class Dataset(dataset.Dataset):
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
-                 lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 180,
+                 lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 300,
                  tokenizer: nlp.data.transforms = None, indexes_format: dict = None,
                  batch_size: int = 8):
         super(Dataset, self).__init__(name, train_path, val_path)
