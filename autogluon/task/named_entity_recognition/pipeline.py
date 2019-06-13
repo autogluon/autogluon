@@ -114,7 +114,7 @@ class NERMetricHandler(MetricHandler):
             if isinstance(metric, Loss):
                 # metric wrapper for loss values
                 metric.update(0, loss)
-            elif isinstance(metric, acc_ner):
+            elif isinstance(metric, AccNer):
                 metric.update(label, pred, flag_nonnull_tag)
 
 
@@ -228,7 +228,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
         # update metrics
         for metric in val_metrics:
-            if isinstance(metric, f1_ner):
+            if isinstance(metric, F1Ner):
                 metric.update(all_true_tags, all_pred_tags)
 
     val_handler = ValidationHandler(val_data=dataset.valid_dataloader,
