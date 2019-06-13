@@ -323,7 +323,7 @@ def get_entities(seq, suffix=False):
     return chunks
 
 
-class f1_ner(mx.metric.EvalMetric):
+class F1Ner(mx.metric.EvalMetric):
     def __init__(self):
         super().__init__(name='f1_ner')
         self.value = float('nan')
@@ -347,7 +347,7 @@ class f1_ner(mx.metric.EvalMetric):
         self.value = float('nan')
 
 
-class acc_ner(mx.metric.EvalMetric):
+class AccNer(mx.metric.EvalMetric):
     def __init__(self):
         super().__init__(name='acc_ner')
         self.value = float('nan')

@@ -118,48 +118,6 @@ class NERMetricHandler(MetricHandler):
                 metric.update(label, pred, flag_nonnull_tag)
 
 
-# TODO: move custom metrics inside ag.metrics?
-class f1_ner(mx.metric.EvalMetric):
-    def __init__(self):
-        super().__init__(name='f1_ner')
-        self.value = float('nan')
-
-    def update(self, labels, preds):
-        true_entities = set(get_entities(labels))
-        pred_entities = set(get_entities(preds))
-
-        nb_correct = len(true_entities & pred_entities)
-        nb_pred = len(pred_entities)
-        nb_true = len(true_entities)
-
-        p = nb_correct / nb_pred if nb_pred > 0 else 0
-        r = nb_correct / nb_true if nb_true > 0 else 0
-        self.value = 2 * p * r / (p + r) if p + r > 0 else 0
-
-    def get(self):
-        return (self.name, self.value)
-
-    def reset(self):
-        self.value = float('nan')
-
-
-class acc_ner(mx.metric.EvalMetric):
-    def __init__(self):
-        super().__init__(name='acc_ner')
-        self.value = float('nan')
-
-    def update(self, labels, preds, flag_nonnull_tag):
-        pred_tags = preds.argmax(axis=-1)
-        num_tag_preds = flag_nonnull_tag.sum().asscalar()
-        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
-
-    def get(self):
-        return (self.name, self.value)
-
-    def reset(self):
-        self.value = float('nan')
-
-
 @autogluon_method
 def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id: int) -> None:
     def _init_env():
@@ -192,7 +150,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                     'use_classifier': False,
                     'dropout_prob': 0.1}
     pre_trained_network, vocab = get_model_instances(name=args.model,
-                                                     dataset_name='book_corpus_wiki_en_uncased',
+                                                     dataset_name='book_corpus_wiki_en_cased',
                                                      **model_kwargs)
 
     ## Initialize the dataset here.
@@ -230,8 +188,8 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                            num_epochs=args.epochs,
                            train_length=len(dataset.train_dataset))
 
-    train_metrics = [acc_ner()]
-    val_metrics = [f1_ner()]
+    train_metrics = [AccNer()]
+    val_metrics = [F1Ner()]
     for metric in val_metrics:
         metric.name = "validation " + metric.name
 

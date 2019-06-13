@@ -36,9 +36,9 @@ class Dataset(dataset.Dataset):
 
         if self._vocab is None:
             _, self._vocab = nlp.model.get_model(name='bert_12_768_12',
-                                                 dataset_name='book_corpus_wiki_en_uncased')
+                                                 dataset_name='book_corpus_wiki_en_cased')
             logger.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
-                        "on `book_corpus_wiki_en_uncased`. If you would like to use different"
+                        "on `book_corpus_wiki_en_cased`. If you would like to use different"
                         "vocabulary then please pass parameter `vocab` as an instance of"
                         "`nlp.Vocab`.")
 
