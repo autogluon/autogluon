@@ -2,7 +2,7 @@ import mxnet as mx
 import gluonnlp as nlp
 from autogluon.estimator import *
 from autogluon.scheduler.reporter import StatusReporter
-from autogluon.dataset.utils import *
+from .utils import *
 from .dataset import Dataset
 from .model_zoo import get_model_instances
 from ...basic import autogluon_method
@@ -114,51 +114,8 @@ class NERMetricHandler(MetricHandler):
             elif isinstance(metric, acc_ner):
                 metric.update(label, pred, flag_nonnull_tag)
 
-
-# TODO: move custom metrics inside ag.metrics?
-class f1_ner(mx.metric.EvalMetric):
-    def __init__(self):
-        super().__init__(name='f1_ner')
-        self.value = float('nan')
-
-    def update(self, labels, preds):
-        true_entities = set(get_entities(labels))
-        pred_entities = set(get_entities(preds))
-
-        nb_correct = len(true_entities & pred_entities)
-        nb_pred = len(pred_entities)
-        nb_true = len(true_entities)
-
-        p = nb_correct / nb_pred if nb_pred > 0 else 0
-        r = nb_correct / nb_true if nb_true > 0 else 0
-        self.value = 2 * p * r / (p + r) if p + r > 0 else 0
-
-    def get(self):
-        return (self.name, self.value)
-
-    def reset(self):
-        self.value = float('nan')
-
-class acc_ner(mx.metric.EvalMetric):
-    def __init__(self):
-        super().__init__(name='acc_ner')
-        self.value = float('nan')
-
-    def update(self, labels, preds, flag_nonnull_tag):
-        pred_tags = preds.argmax(axis=-1)
-        num_tag_preds = flag_nonnull_tag.sum().asscalar()
-        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
-
-    def get(self):
-        return (self.name, self.value)
-
-    def reset(self):
-        self.value = float('nan')
-
-
 @autogluon_method
 def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id: int) -> None:
-    # TODO Add Estimator here.
     def _init_env():
         if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
             batch_size = args.batch_size * max(args.num_gpus, 1)
@@ -197,7 +154,6 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                       lazy=False, vocab=vocab, batch_size=batch_size,
                       indexes_format=args.indexes_format, max_sequence_length=args.max_sequence_length)
 
-    # TODO: remove hardcode num_classes
     net = NERNet(num_classes=dataset.num_classes, dropout=args.dropout)
     net.backbone = pre_trained_network
 

@@ -273,3 +273,170 @@ def load_segment(dataset_name, file_path, tokenizer, indexes_format):
     bioes_sentences = [bio2_to_bioes(sentence) for sentence in bio2_sentences]
     subword_sentences = [bert_tokenize_sentence(sentence, tokenizer) for sentence in bioes_sentences]
     return subword_sentences
+
+def convert_arrays_to_text(text_vocab, tag_vocab, np_text_ids, np_true_tags, np_pred_tags, np_valid_length):
+    """Convert numpy array data into text
+    Parameters
+    ----------
+    np_text_ids: token text ids (batch_size, seq_len)
+    np_true_tags: tag_ids (batch_size, seq_len)
+    np_pred_tags: tag_ids (batch_size, seq_len)
+    np.array: valid_length (batch_size,) the number of tokens until [SEP] token
+    Returns
+    -------
+    List[List[PredictedToken]]:
+    """
+    TaggedToken = namedtuple('TaggedToken', ['text', 'tag'])
+    PredictedToken = namedtuple('PredictedToken', ['text', 'true_tag', 'pred_tag'])
+
+    NULL_TAG = "X"
+    predictions = []
+    for sample_index in range(np_valid_length.shape[0]):
+        sample_len = np_valid_length[sample_index]
+        entries = []
+        for i in range(1, sample_len - 1):
+            token_text = text_vocab.idx_to_token[np_text_ids[sample_index, i]]
+            true_tag = tag_vocab.idx_to_token[int(np_true_tags[sample_index, i])]
+            pred_tag = tag_vocab.idx_to_token[int(np_pred_tags[sample_index, i])]
+            # we don't need to predict on NULL tags
+            if true_tag == NULL_TAG:
+                last_entry = entries[-1]
+                entries[-1] = PredictedToken(text=last_entry.text + token_text,
+                                             true_tag=last_entry.true_tag, pred_tag=last_entry.pred_tag)
+            else:
+                entries.append(PredictedToken(text=token_text, true_tag=true_tag, pred_tag=pred_tag))
+
+        predictions.append(entries)
+    return predictions
+
+def end_of_chunk(prev_tag, tag, prev_type, type_):
+    """Checks if a chunk ended between the previous and current word.
+    Args:
+        prev_tag: previous chunk tag.
+        tag: current chunk tag.
+        prev_type: previous type.
+        type_: current type.
+    Returns:
+        chunk_end: boolean.
+    """
+    chunk_end = False
+
+    if prev_tag == 'E': chunk_end = True
+    if prev_tag == 'S': chunk_end = True
+
+    if prev_tag == 'B' and tag == 'B': chunk_end = True
+    if prev_tag == 'B' and tag == 'S': chunk_end = True
+    if prev_tag == 'B' and tag == 'O': chunk_end = True
+    if prev_tag == 'I' and tag == 'B': chunk_end = True
+    if prev_tag == 'I' and tag == 'S': chunk_end = True
+    if prev_tag == 'I' and tag == 'O': chunk_end = True
+
+    if prev_tag != 'O' and prev_tag != '.' and prev_type != type_:
+        chunk_end = True
+
+    return chunk_end
+
+def start_of_chunk(prev_tag, tag, prev_type, type_):
+    """Checks if a chunk started between the previous and current word.
+    Args:
+        prev_tag: previous chunk tag.
+        tag: current chunk tag.
+        prev_type: previous type.
+        type_: current type.
+    Returns:
+        chunk_start: boolean.
+    """
+    chunk_start = False
+
+    if tag == 'B': chunk_start = True
+    if tag == 'S': chunk_start = True
+
+    if prev_tag == 'E' and tag == 'E': chunk_start = True
+    if prev_tag == 'E' and tag == 'I': chunk_start = True
+    if prev_tag == 'S' and tag == 'E': chunk_start = True
+    if prev_tag == 'S' and tag == 'I': chunk_start = True
+    if prev_tag == 'O' and tag == 'E': chunk_start = True
+    if prev_tag == 'O' and tag == 'I': chunk_start = True
+
+    if tag != 'O' and tag != '.' and prev_type != type_:
+        chunk_start = True
+
+    return chunk_start
+
+def get_entities(seq, suffix=False):
+    """Gets entities from sequence.
+    Args:
+        seq (list): sequence of labels.
+    Returns:
+        list: list of (chunk_type, chunk_start, chunk_end).
+    Example:
+        >>> from seqeval.metrics.sequence_labeling import get_entities
+        >>> seq = ['B-PER', 'I-PER', 'O', 'B-LOC']
+        >>> get_entities(seq)
+        [('PER', 0, 1), ('LOC', 3, 3)]
+    """
+    # for nested list
+    if any(isinstance(s, list) for s in seq):
+        seq = [item for sublist in seq for item in sublist + ['O']]
+
+    prev_tag = 'O'
+    prev_type = ''
+    begin_offset = 0
+    chunks = []
+    for i, chunk in enumerate(seq + ['O']):
+        if suffix:
+            tag = chunk[-1]
+            type_ = chunk.split('-')[0]
+        else:
+            tag = chunk[0]
+            type_ = chunk.split('-')[-1]
+
+        if end_of_chunk(prev_tag, tag, prev_type, type_):
+            chunks.append((prev_type, begin_offset, i-1))
+        if start_of_chunk(prev_tag, tag, prev_type, type_):
+            begin_offset = i
+        prev_tag = tag
+        prev_type = type_
+
+    return chunks
+
+
+class f1_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='f1_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds):
+        true_entities = set(get_entities(labels))
+        pred_entities = set(get_entities(preds))
+
+        nb_correct = len(true_entities & pred_entities)
+        nb_pred = len(pred_entities)
+        nb_true = len(true_entities)
+
+        p = nb_correct / nb_pred if nb_pred > 0 else 0
+        r = nb_correct / nb_true if nb_true > 0 else 0
+        self.value = 2 * p * r / (p + r) if p + r > 0 else 0
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
+
+
+class acc_ner(mx.metric.EvalMetric):
+    def __init__(self):
+        super().__init__(name='acc_ner')
+        self.value = float('nan')
+
+    def update(self, labels, preds, flag_nonnull_tag):
+        pred_tags = preds.argmax(axis=-1)
+        num_tag_preds = flag_nonnull_tag.sum().asscalar()
+        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
+
+    def get(self):
+        return (self.name, self.value)
+
+    def reset(self):
+        self.value = float('nan')
