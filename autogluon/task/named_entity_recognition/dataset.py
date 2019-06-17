@@ -3,8 +3,8 @@ from multiprocessing import cpu_count
 from typing import AnyStr
 import numpy as np
 import gluonnlp as nlp
-from autogluon.dataset import TextDataTransform, utils
 from mxnet import gluon
+from mxnet.gluon.utils import download
 
 from ... import dataset
 from .utils import *
@@ -63,12 +63,30 @@ class Dataset(dataset.Dataset):
         self.vocab = value
         self._init_()
 
+    def _root_path(self):
+        return os.path.abspath(os.sep)
+
     def _download_dataset(self) -> None:
-        if self.name.lower() in {'conll2003', 'wnut2017'}:
+        self.name = re.sub('[^0-9a-zA-Z]+', '', self.name).lower()
+        if self.name in {'conll2003'}:
             if self.train_path is None or self.val_path is None:
                 raise ValueError("{} can't be downloaded directly from Gluon due to"
                                  "license Issue. Please provide the downloaded filepath"
                                  "as `train_path` and `val_path`".format(self.name.lower()))
+        elif self.name == 'wnut2017':
+            url_format = 'https://noisy-text.github.io/2017/files/{}'
+            train_filename = 'wnut17train.conll'
+            val_filename = 'emerging.dev.conll'
+            data_dir = os.path.join(self._root_path(), 'tmp', self.name)
+            train_path = os.path.join(data_dir, train_filename)
+            val_path = os.path.join(data_dir, val_filename)
+            download(url_format.format(train_filename), path=train_path)
+            download(url_format.format(val_filename), path=val_path)
+            if self.train_path is not None or self.val_path is not None:
+                log.info("AutoGluon downloads the dataset automatically and saved it"
+                         " in `{}` directory".format(data_dir))
+            self.train_path = train_path
+            self.val_path = val_path
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
 
