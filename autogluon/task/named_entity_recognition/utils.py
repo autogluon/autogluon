@@ -266,9 +266,17 @@ class AccNer(mx.metric.EvalMetric):
         self.value = float('nan')
 
     def update(self, labels, preds, flag_nonnull_tag):
-        pred_tags = preds.argmax(axis=-1)
-        num_tag_preds = flag_nonnull_tag.sum().asscalar()
-        self.value = ((pred_tags == labels) * flag_nonnull_tag).sum().asscalar() / num_tag_preds
+        if not isinstance(labels, list):
+            labels = [labels]
+            preds = [preds]
+            flag_nonnull_tag = [flag_nonnull_tag]
+
+        for p, l, f in zip(preds, labels, flag_nonnull_tag):
+            pred_tags = p.argmax(axis=-1)
+            num_tag_preds = f.sum().asscalar()
+            self.value += ((pred_tags == l) * f).sum().asscalar() / num_tag_preds
+        self.value /= len(labels)
+
 
     def get(self):
         return (self.name, self.value)

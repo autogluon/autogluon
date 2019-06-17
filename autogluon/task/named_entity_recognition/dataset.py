@@ -196,7 +196,7 @@ class Dataset(dataset.Dataset):
         print("Preparing dataloaders...")
         self.train_dataloader = gluon.data.DataLoader(
             self.train_dataset, batch_size=self.batch_size, shuffle=True,
-            last_batch='keep', num_workers=cpu_count())
+            last_batch='rollover', num_workers=cpu_count())
         self.val_dataloader = gluon.data.DataLoader(
             self.val_dataset, batch_size=self.batch_size, shuffle=False,
-            last_batch='keep', num_workers=cpu_count())
+            last_batch='rollover', num_workers=cpu_count())

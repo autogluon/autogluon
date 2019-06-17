@@ -72,17 +72,18 @@ class NEREstimator(Estimator):
         for batch_id, batch in enumerate(train_data):
 
             text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
-                x.astype(np.float32).as_in_context(self.context[0]) for x in batch]
+                mx.gluon.utils.split_and_load(x.astype(np.float32), ctx_list=self.context, even_split=False) for x in batch]
 
             # batch begin
             for handler in batch_begin:
                 handler.batch_begin(estimator_ref, batch=batch)
 
             with mx.autograd.record():
-                out = self.net(text_ids, token_types, valid_length)
-                loss_value = self.loss[0](out, tag_ids, flag_nonnull_tag.expand_dims(axis=2)).mean()
+                out = [self.net(ti, tt, vl) for ti, tt, vl in zip(text_ids, token_types, valid_length)]
+                loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2)).mean() for o, ti, fl in zip(out, tag_ids, flag_nonnull_tag)]
 
-            loss_value.backward()
+            for l in loss_value:
+                l.backward()
 
             if self.grad_clip:
                 nlp.utils.clip_grad_global_norm(self.params, 1)
@@ -231,7 +232,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
             if isinstance(metric, F1Ner):
                 metric.update(all_true_tags, all_pred_tags)
 
-    val_handler = ValidationHandler(val_data=dataset.valid_dataloader,
+    val_handler = ValidationHandler(val_data=dataset.val_dataloader,
                                     eval_fn=eval_ner,
                                     val_metrics=val_metrics)
 
@@ -242,5 +243,5 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
     estimator.val_metrics = val_metrics
 
-    estimator.fit(train_data=dataset.train_dataloader, val_data=dataset.valid_dataloader, epochs=args.epochs,
+    estimator.fit(train_data=dataset.train_dataloader, val_data=dataset.val_dataloader, epochs=args.epochs,
                   event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])
