@@ -76,21 +76,21 @@ class NEREstimator(Estimator):
               batch_end,
               batch_axis=0):
         for batch in train_data:
-
             text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = \
                 [gluon.utils.split_and_load(x.astype(np.float32),
                                             ctx_list=self.context,
                                             even_split=False)
                  for x in batch]
+            batch_size = batch[0].shape[0]
 
             # batch begin
             for handler in batch_begin:
                 handler.batch_begin(estimator_ref, batch=batch)
 
-            with autograd.record():
-                out = [self.net(ti, tt, vl) for ti, tt, vl in
-                       zip(text_ids, token_types, valid_length)]
-                loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2)).mean()
+            with mx.autograd.record():
+                out = [self.net(ti, tt, vl) for ti, tt, vl
+                       in zip(text_ids, token_types, valid_length)]
+                loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2))
                               for o, ti, fl in zip(out, tag_ids, flag_nonnull_tag)]
 
             for l in loss_value:
@@ -99,7 +99,7 @@ class NEREstimator(Estimator):
             if self.grad_clip:
                 nlp.utils.clip_grad_global_norm(self.params, 1)
 
-            self.trainer.step(1)
+            self.trainer.step(batch_size)
 
             # batch end
             batch_end_result = []
@@ -220,8 +220,8 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
         predictions = []
         for _, batch in enumerate(val_data):
-            # TODO : support multi-gpu
-            text_ids, token_types, valid_length, tag_ids, _ = [
+
+            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
                 x.astype(np.float32).as_in_context(ctx[0]) for x in batch]
             out = net(text_ids, token_types, valid_length)
 

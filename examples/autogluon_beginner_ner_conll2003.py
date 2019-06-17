@@ -10,7 +10,8 @@ if __name__ == '__main__':
     dataset = task.Dataset(name='CoNLL2003',
                            train_path='/home/ubuntu/conll2003/train.txt',
                            val_path='/home/ubuntu/conll2003/test.txt',
-                           indexes_format=indexes_format)
+                           indexes_format=indexes_format,
+                           max_sequence_length=180)
     results = task.fit(dataset)
 
     logger.info('Best result:')

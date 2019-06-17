@@ -270,7 +270,7 @@ class AccNer(mx.metric.EvalMetric):
             labels = [labels]
             preds = [preds]
             flag_nonnull_tag = [flag_nonnull_tag]
-
+        self.value = 0
         for p, l, f in zip(preds, labels, flag_nonnull_tag):
             pred_tags = p.argmax(axis=-1)
             num_tag_preds = f.sum().asscalar()
