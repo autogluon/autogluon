@@ -3,42 +3,41 @@ import logging
 import os
 import time
 from typing import Any, AnyStr
-
-import ConfigSpace as CS
 import numpy as np
+import ConfigSpace as CS
 from ray import tune
 from ray.tune.automl.search_policy import AutoMLSearcher
 from ray.tune.schedulers import TrialScheduler
 
 import autogluon as ag
-from .dataset import *
-from .model_zoo import *
-from .pipeline import *
+from autogluon.space import Linear
+from .dataset import Dataset
+from .model_zoo import get_model
+from .pipeline import train_named_entity_recognizer
 from ...network import Nets
 from ...optim import Optimizers, get_optim
-from autogluon.space import *
 
 __all__ = ['fit']
 
-logger = logging.getLogger(__name__)
-default_nets = Nets([
+LOG = logging.getLogger(__name__)
+DEFAULT_NETS = Nets([
     get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
     get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
 ])
 
-default_optimizers = Optimizers([
+DEFAULT_OPT = Optimizers([
     get_optim('adam'),
     get_optim('sgd'),
     get_optim('bertadam')
 ])
 
-default_stop_criterion = {
+DEFAULT_STOP_CRITERION = {
     'time_limits': 1 * 60 * 60,
     'max_metric': 0.80,  # TODO Should be place a bound on metric?
     'max_trial_count': 3
 }
 
-default_resources_per_trial = {
+DEFAULT_RESOURCES_PER_TRIAL = {
     'max_num_gpus': 1,
     'max_num_cpus': 4,
     'max_training_epochs': 2
@@ -50,16 +49,16 @@ class Results(object):
     Python class to hold the results for the trials
     """
 
-    def __init__(self, model: Any, metric: Any, config: Any, time: int):
+    def __init__(self, model: Any, metric: Any, config: Any, total_time: int):
         self.model = model
         self.metric = metric
         self.config = config
-        self.time = time
+        self.time = total_time
 
 
 def fit(data: Dataset,
-        nets: Nets = default_nets,
-        optimizers: Optimizers = default_optimizers,
+        nets: Nets = DEFAULT_NETS,
+        optimizers: Optimizers = DEFAULT_OPT,
         metrics=None,
         losses=None,
         searcher=None,
@@ -67,8 +66,8 @@ def fit(data: Dataset,
         resume=False,
         savedir='checkpoint/exp1_tc.ag',
         visualizer='tensorboard',
-        stop_criterion=default_stop_criterion,
-        resources_per_trial=default_resources_per_trial,
+        stop_criterion=DEFAULT_STOP_CRITERION,
+        resources_per_trial=DEFAULT_RESOURCES_PER_TRIAL,
         backend='default',
         **kwargs
         ) -> Results:
@@ -105,7 +104,7 @@ def fit(data: Dataset,
     best_result: accuracy
     best_config: best configuration
     """
-    logger.debug('Starting fit method call')
+    LOG.debug('Starting fit method call')
     start_fit_time = time.time()
 
     def _construct_search_space(search_space_dict: dict) -> (CS.ConfigurationSpace, argparse.Namespace):
@@ -142,7 +141,7 @@ def fit(data: Dataset,
 
         return cs, args
 
-    logger.debug('Start constructing search space')
+    LOG.debug('Start constructing search space')
     search_space_dict = {'data': data,
                          'net': nets,
                          'optimizer': optimizers,
@@ -150,10 +149,10 @@ def fit(data: Dataset,
                          'metric': metrics}
 
     cs, args = _construct_search_space(search_space_dict)
-    logger.debug('Finished constucting search space')
+    LOG.debug('Finished constucting search space')
 
     def _run_ray_backend(searcher: AutoMLSearcher, trial_scheduler: TrialScheduler) -> Results:
-        logger.debug('Start using Ray as a backend')
+        LOG.debug('Start using Ray as a backend')
         if searcher is None:
             searcher = tune.search_policy.RandomSearch(cs, stop_criterion['max_metric'],
                                                        stop_criterion['max_trial_count'])
@@ -192,11 +191,11 @@ def fit(data: Dataset,
         best_result = max([trial.best_result for trial in trials])
         best_config = None
         results = Results(None, best_result, best_config, time.time() - start_fit_time)
-        logger.debug('Finished.')
+        LOG.debug('Finished.')
         return results
 
     def _run_backend(searcher: AutoMLSearcher, trial_scheduler: AnyStr) -> Results:
-        logger.debug('Start using default backend')
+        LOG.debug('Start using default backend')
         if searcher is None:
             searcher = ag.searcher.RandomSampling(cs)
 
@@ -249,7 +248,7 @@ def fit(data: Dataset,
         best_config = trial_scheduler.get_best_config()
         results = Results(trials, best_result, best_config, time.time() - start_fit_time)
 
-        logger.debug('Finished.')
+        LOG.debug('Finished.')
         return results
 
     if backend == 'ray':
@@ -258,5 +257,5 @@ def fit(data: Dataset,
     else:
         results = _run_backend(searcher, trial_scheduler)
 
-    logger.debug('Finished experiments!')
+    LOG.debug('Finished experiments!')
     return results

@@ -1,8 +1,14 @@
+import logging
+import numpy as np
 import mxnet as mx
+from mxnet import gluon
 import gluonnlp as nlp
-from autogluon.estimator import *
+from autogluon.estimator.event_handler import LoggingHandler, LRHandler
+from autogluon.estimator.event_handler import ValidationHandler, MetricHandler
+from autogluon.estimator.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
-from .utils import *
+
+from .utils import AccNer, F1Ner, convert_arrays_to_text
 from .dataset import Dataset
 from .model_zoo import get_model_instances
 from ...basic import autogluon_method
@@ -45,6 +51,7 @@ class NERNet(gluon.Block):
 
 
 class NEREstimator(Estimator):
+    """NER Estimator class that overrides the train method"""
     def __init__(self, net,
                  loss,
                  metrics=None,
@@ -69,7 +76,7 @@ class NEREstimator(Estimator):
               batch_begin,
               batch_end,
               batch_axis=0):
-        for batch_id, batch in enumerate(train_data):
+        for batch in train_data:
 
             text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
                 mx.gluon.utils.split_and_load(x.astype(np.float32), ctx_list=self.context, even_split=False) for x in batch]
@@ -95,14 +102,15 @@ class NEREstimator(Estimator):
             for handler in batch_end:
                 batch_end_result.append(handler.batch_end(estimator_ref, batch=batch,
                                                           pred=out, label=tag_ids,
-                                                          flag_nonnull_tag=flag_nonnull_tag, loss=loss_value))
+                                                          flag_nonnull_tag=flag_nonnull_tag,
+                                                          loss=loss_value))
             # if any handler signaled to stop
             if any(batch_end_result):
                 break
 
 
 class NERMetricHandler(MetricHandler):
-
+    """Metric update Handler for NER"""
     def __init__(self, train_metrics):
         super().__init__(train_metrics)
 
@@ -112,7 +120,7 @@ class NERMetricHandler(MetricHandler):
         flag_nonnull_tag = kwargs['flag_nonnull_tag']
         loss = kwargs['loss']
         for metric in self.train_metrics:
-            if isinstance(metric, Loss):
+            if isinstance(metric, gluon.loss.Loss):
                 # metric wrapper for loss values
                 metric.update(0, loss)
             elif isinstance(metric, AccNer):
@@ -121,6 +129,7 @@ class NERMetricHandler(MetricHandler):
 
 @autogluon_method
 def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id: int) -> None:
+    """Train method for NER"""
     def _init_env():
         if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
             batch_size = args.batch_size * max(args.num_gpus, 1)
@@ -141,7 +150,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     batch_size, ctx = _init_env()
 
-    logger.info('Task ID : {0}, args : {1}'.format(task_id, args))
+    logger.info('Task ID : %d, args : %s', task_id, args)
 
     # Define the network and get an instance from model zoo.
     model_kwargs = {'pretrained': args.pretrained,
@@ -156,13 +165,13 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     ## Initialize the dataset here.
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
-                      lazy=False, vocab=vocab, batch_size=batch_size,
-                      indexes_format=args.indexes_format, max_sequence_length=args.max_sequence_length)
+                      lazy=False, vocab=vocab, indexes_format=args.indexes_format,
+                      batch_size=batch_size, max_sequence_length=args.max_sequence_length)
 
     net = NERNet(num_classes=dataset.num_classes, dropout=args.dropout)
     net.backbone = pre_trained_network
 
-    logger.info('Task ID : {0}, network : {1}'.format(task_id, net))
+    logger.info('Task ID : %d, network : %s', task_id, net)
 
     # define the initializer :
     # TODO : This should come from the config
@@ -196,10 +205,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     metric_handler = NERMetricHandler(train_metrics)
 
-    def eval_ner(estimator,
-                 val_data,
-                 val_metrics,
-                 batch_axis=0):
+    def eval_ner(val_data, val_metrics):
         if not isinstance(val_data, gluon.data.DataLoader):
             raise ValueError("Estimator only support input as Gluon DataLoader. Alternatively, you "
                              "can transform your DataIter or any NDArray into Gluon DataLoader. "
@@ -211,7 +217,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
         predictions = []
         for _, batch in enumerate(val_data):
             # TODO : support multi-gpu
-            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
+            text_ids, token_types, valid_length, tag_ids, _ = [
                 x.astype(np.float32).as_in_context(ctx[0]) for x in batch]
             out = net(text_ids, token_types, valid_length)
 
@@ -240,8 +246,11 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                                  val_metrics=val_metrics,
                                  verbose=LoggingHandler.LOG_PER_EPOCH)
 
-    estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics, trainer=trainer, context=ctx)
+    estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics,
+                             trainer=trainer, context=ctx)
     estimator.val_metrics = val_metrics
 
-    estimator.fit(train_data=dataset.train_dataloader, val_data=dataset.val_dataloader, epochs=args.epochs,
+    estimator.fit(train_data=dataset.train_dataloader,
+                  val_data=dataset.val_dataloader,
+                  epochs=args.epochs,
                   event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])
