@@ -97,7 +97,7 @@ def get_model(name: AnyStr, **kwargs) -> Net:
     return net
 
 
-# TODO (ghaipiyu): add more models using method
+# TODO (abhinav): add more models using method
 
 @autogluon_nets
 def standard_lstm_lm_200(**kwargs):

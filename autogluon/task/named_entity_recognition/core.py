@@ -49,7 +49,7 @@ class Results(object):
     Python class to hold the results for the trials
     """
 
-    def __init__(self, model: Any, metric: Any, config: Any, total_time: int):
+    def __init__(self, model: Any, metric: Any, config: Any, total_time: float):
         self.model = model
         self.metric = metric
         self.config = config
@@ -107,7 +107,8 @@ def fit(data: Dataset,
     LOG.debug('Starting fit method call')
     start_fit_time = time.time()
 
-    def _construct_search_space(search_space_dict: dict) -> (CS.ConfigurationSpace, argparse.Namespace):
+    def _construct_search_space(search_space_dict: dict) -> (CS.ConfigurationSpace,
+                                                             argparse.Namespace):
         def _init_args() -> argparse.Namespace:
             """
             This method adds some defaults to the args.
@@ -161,7 +162,8 @@ def fit(data: Dataset,
             trial_scheduler = tune.schedulers.FIFOScheduler()
 
         tune.register_trainable("TRAIN_FN",
-                                lambda config, reporter: train_named_entity_recognizer(args, config, reporter))
+                                lambda config, reporter:
+                                train_named_entity_recognizer(args, config, reporter))
 
         trials = tune.run(
             "TRAIN_FN",

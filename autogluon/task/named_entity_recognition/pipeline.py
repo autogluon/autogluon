@@ -1,7 +1,6 @@
 import logging
 import numpy as np
-import mxnet as mx
-from mxnet import gluon
+from mxnet import autograd, gluon, cpu, gpu, init
 import gluonnlp as nlp
 from autogluon.estimator.event_handler import LoggingHandler, LRHandler
 from autogluon.estimator.event_handler import ValidationHandler, MetricHandler
@@ -60,12 +59,12 @@ class NEREstimator(Estimator):
                  context=None,
                  grad_clip=True):
 
-        super().__init__(net,
-                         loss,
-                         metrics,
-                         initializer,
-                         trainer,
-                         context)
+        super(NEREstimator, self).__init__(net,
+                                           loss,
+                                           metrics,
+                                           initializer,
+                                           trainer,
+                                           context)
 
         self.params = [p for p in self.net.collect_params().values() if p.grad_req != 'null']
         self.grad_clip = grad_clip
@@ -78,16 +77,21 @@ class NEREstimator(Estimator):
               batch_axis=0):
         for batch in train_data:
 
-            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
-                mx.gluon.utils.split_and_load(x.astype(np.float32), ctx_list=self.context, even_split=False) for x in batch]
+            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = \
+                [gluon.utils.split_and_load(x.astype(np.float32),
+                                            ctx_list=self.context,
+                                            even_split=False)
+                 for x in batch]
 
             # batch begin
             for handler in batch_begin:
                 handler.batch_begin(estimator_ref, batch=batch)
 
-            with mx.autograd.record():
-                out = [self.net(ti, tt, vl) for ti, tt, vl in zip(text_ids, token_types, valid_length)]
-                loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2)).mean() for o, ti, fl in zip(out, tag_ids, flag_nonnull_tag)]
+            with autograd.record():
+                out = [self.net(ti, tt, vl) for ti, tt, vl in
+                       zip(text_ids, token_types, valid_length)]
+                loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2)).mean()
+                              for o, ti, fl in zip(out, tag_ids, flag_nonnull_tag)]
 
             for l in loss_value:
                 l.backward()
@@ -112,7 +116,7 @@ class NEREstimator(Estimator):
 class NERMetricHandler(MetricHandler):
     """Metric update Handler for NER"""
     def __init__(self, train_metrics):
-        super().__init__(train_metrics)
+        super(NERMetricHandler, self).__init__(train_metrics)
 
     def batch_end(self, estimator, *args, **kwargs):
         pred = kwargs['pred']
@@ -133,8 +137,8 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     def _init_env():
         if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
             batch_size = args.batch_size * max(args.num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+            ctx = [gpu(i)
+                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [cpu()]
         else:
             if hasattr(args, 'num_gpus'):
                 num_gpus = args.num_gpus
@@ -144,8 +148,8 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                 batch_size = args.batch_size * max(num_gpus, 1)
             else:
                 batch_size = 8 * max(num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+            ctx = [gpu(i)
+                   for i in range(num_gpus)] if num_gpus > 0 else [cpu()]
         return batch_size, ctx
 
     batch_size, ctx = _init_env()
@@ -175,7 +179,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     # define the initializer :
     # TODO : This should come from the config
-    initializer = mx.init.Normal(sigma=0.02)
+    initializer = init.Normal(sigma=0.02)
     if not args.pretrained:
         net.collect_params().initialize(init=initializer, ctx=ctx)
 
