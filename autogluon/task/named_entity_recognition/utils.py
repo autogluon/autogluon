@@ -4,6 +4,10 @@ from collections import namedtuple
 import mxnet as mx
 import logging
 
+"""Methods modified from below link
+https://github.com/dmlc/gluon-nlp/blob/master/scripts/bert/data/ner.py"""
+
+
 log = logging.getLogger(__name__)
 
 TaggedToken = namedtuple('TaggedToken', ['text', 'tag'])
@@ -138,45 +142,20 @@ def bio2_to_bioes(tokens):
     return ret
 
 
-def remove_docstart_sentence(sentences):
-    """Remove -DOCSTART- sentences in the list of sentences.
-
-    Parameters
-    ----------
-    sentences: List[List[TaggedToken]]
-        List of sentences, each of which is a List of TaggedTokens;
-        this list may contain DOCSTART sentences.
-
-    Returns
-    -------
-        List of sentences, each of which is a List of TaggedTokens;
-        this list does not contain DOCSTART sentences.
-    """
-    ret = []
-    for sentence in sentences:
-        current_sentence = []
-        for token in sentence:
-            if token.text != '-DOCSTART-':
-                current_sentence.append(token)
-        if len(current_sentence) > 0:
-            ret.append(current_sentence)
-    return ret
-
-
 def bert_tokenize_sentence(sentence, bert_tokenizer):
-    """Convert the text word into BERTTokenize format.
+    """Apply BERT tokenizer on a tagged sentence to break words into sub-words.
+    This function assumes input tags are following IOBES, and outputs IOBES tags.
 
     Parameters
     ----------
-    sentence : List[List[TaggedToken]]
-        A list of sentences with each sentence breaks down into TaggedToken
-    bert_tokenizer : gluonnlp.data.transforms
-        A Bert Tokenize instance
+    sentence: List[TaggedToken]
+        List of tagged words
+    bert_tokenizer: nlp.data.BertTokenizer
+        BERT tokenizer
 
     Returns
     -------
-    List[List[TaggedToken]]:
-        A list of sentences in BERT scheme
+    List[TaggedToken]: list of annotated sub-word tokens
     """
     ret = []
     for token in sentence:
@@ -186,12 +165,13 @@ def bert_tokenize_sentence(sentence, bert_tokenizer):
         ret.append(TaggedToken(text=sub_token_texts[0], tag=token.tag))
         ret += [TaggedToken(text=sub_token_text, tag=NULL_TAG)
                 for sub_token_text in sub_token_texts[1:]]
+
     return ret
 
 
 def load_segment(file_path, tokenizer, indexes_format):
     sentences = read_data(file_path, indexes_format)
-    bio2_sentences = remove_docstart_sentence(bio_to_bio2(sentences))
+    bio2_sentences = bio_to_bio2(sentences)
     bioes_sentences = [bio2_to_bioes(sentence) for sentence in bio2_sentences]
     subword_sentences = [bert_tokenize_sentence(sentence, tokenizer) for sentence in bioes_sentences]
     return subword_sentences
