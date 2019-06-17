@@ -1,22 +1,29 @@
+"""Some methods modified from below link
+https://github.com/dmlc/gluon-nlp/blob/master/scripts/bert/data/ner.py"""
+
 import os
+import re
 from multiprocessing import cpu_count
 from typing import AnyStr
+import logging
 import numpy as np
 import gluonnlp as nlp
 from mxnet import gluon
 from mxnet.gluon.utils import download
 
 from ... import dataset
-from .utils import *
-import logging
+from .utils import load_segment
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 __all__ = ['Dataset']
 NULL_TAG = "X"
 
 
 class Dataset(dataset.Dataset):
+    """
+    Named Entity Recognition Dataset class
+    """
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
                  lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 300,
                  tokenizer: nlp.data.transforms = None, indexes_format: dict = None,
@@ -27,20 +34,24 @@ class Dataset(dataset.Dataset):
         self._vocab: nlp.Vocab = vocab
         self._train_ds_transformed = None
         self._val_ds_transformed = None
+        self.tag_vocab = None
+        self.null_tag_index = None
         self.batch_size = batch_size
         self.max_sequence_length = max_sequence_length  # TODO This should come from config
         self.tokenizer = tokenizer
         self.indexes_format = indexes_format
+        self.train_dataloader = None
+        self.val_dataloader = None
         self._download_dataset()
         self.add_search_space()
 
         if self._vocab is None:
             _, self._vocab = nlp.model.get_model(name='bert_12_768_12',
                                                  dataset_name='book_corpus_wiki_en_cased')
-            logger.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
-                        "on `book_corpus_wiki_en_cased`. If you would like to use different"
-                        "vocabulary then please pass parameter `vocab` as an instance of"
-                        "`nlp.Vocab`.")
+            LOG.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
+                     "on `book_corpus_wiki_en_cased`. If you would like to use different"
+                     "vocabulary then please pass parameter `vocab` as an instance of"
+                     "`nlp.Vocab`.")
 
         # if not lazy:
         if not lazy:
@@ -70,9 +81,9 @@ class Dataset(dataset.Dataset):
         self.name = re.sub('[^0-9a-zA-Z]+', '', self.name).lower()
         if self.name in {'conll2003'}:
             if self.train_path is None or self.val_path is None:
-                raise ValueError("{} can't be downloaded directly from Gluon due to"
+                raise ValueError("%s can't be downloaded directly from Gluon due to"
                                  "license Issue. Please provide the downloaded filepath"
-                                 "as `train_path` and `val_path`".format(self.name.lower()))
+                                 "as `train_path` and `val_path`" %self.name)
         elif self.name == 'wnut2017':
             url_format = 'https://noisy-text.github.io/2017/files/{}'
             train_filename = 'wnut17train.conll'
@@ -83,8 +94,8 @@ class Dataset(dataset.Dataset):
             download(url_format.format(train_filename), path=train_path)
             download(url_format.format(val_filename), path=val_path)
             if self.train_path is not None or self.val_path is not None:
-                log.info("AutoGluon downloads the dataset automatically and saved it"
-                         " in `{}` directory".format(data_dir))
+                LOG.info("AutoGluon downloads the dataset automatically and saved it"
+                         " in `%s` directory", data_dir)
             self.train_path = train_path
             self.val_path = val_path
         else:
@@ -117,7 +128,8 @@ class Dataset(dataset.Dataset):
         # Build tag vocab
         print("\nBuilding tag vocabulary...")
         all_sentences = self.train_dataset + self.val_dataset
-        tag_counter = nlp.data.count_tokens(token.tag for sentence in all_sentences for token in sentence)
+        tag_counter = nlp.data.count_tokens(token.tag for sentence in all_sentences
+                                            for token in sentence)
         self.tag_vocab = nlp.Vocab(tag_counter, padding_token=NULL_TAG,
                                    bos_token=None, eos_token=None, unknown_token=None)
         self.null_tag_index = self.tag_vocab[NULL_TAG]
@@ -125,15 +137,33 @@ class Dataset(dataset.Dataset):
         print("Number of tag types: {}".format(self._num_classes))
 
     def encode_as_input(self, sentence):
+        """Encode a single sentence into numpy arrays as input to the BERTTagger model.
+
+        Parameters
+        ----------
+        sentence: List[TaggedToken]
+            A sentence as a list of tagged tokens.
+
+        Returns
+        -------
+        np.array: token text ids (batch_size, seq_len)
+        np.array: token types (batch_size, seq_len),
+                which is all zero because we have only one sentence for tagging.
+        np.array: valid_length (batch_size,) the number of tokens until [SEP] token
+        np.array: tag_ids (batch_size, seq_len)
+        np.array: flag_nonnull_tag (batch_size, seq_len),
+                which is simply tag_ids != self.null_tag_index
+        """
         # check whether the given sequence can be fit into `seq_len`.
         assert len(sentence) <= self.max_sequence_length - 2, \
-            'the number of tokens {} should not be larger than {} - 2. offending sentence: {}'.format(
-                len(sentence), self.max_sequence_length, sentence)
+            'the number of tokens {} should not be larger than {} - 2. offending sentence: {}'\
+                .format(len(sentence), self.max_sequence_length, sentence)
 
         text_tokens = ([self.vocab.cls_token] + [token.text for token in sentence] +
                        [self.vocab.sep_token])
         padded_text_ids = (self.vocab.to_indices(text_tokens)
-                           + [self.vocab[self.vocab.padding_token]] * (self.max_sequence_length - len(text_tokens)))
+                           + [self.vocab[self.vocab.padding_token]] *
+                           (self.max_sequence_length - len(text_tokens)))
 
         tags = [NULL_TAG] + [token.tag for token in sentence] + [NULL_TAG]
         padded_tag_ids = (self.tag_vocab.to_indices(tags)
@@ -164,7 +194,9 @@ class Dataset(dataset.Dataset):
 
     def _prepare_data_loader(self):
         print("Preparing dataloaders...")
-        self.train_dataloader = gluon.data.DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True,
-                                                      last_batch='keep', num_workers=cpu_count())
-        self.valid_dataloader = gluon.data.DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False,
-                                                      last_batch='keep', num_workers=cpu_count())
+        self.train_dataloader = gluon.data.DataLoader(
+            self.train_dataset, batch_size=self.batch_size, shuffle=True,
+            last_batch='keep', num_workers=cpu_count())
+        self.val_dataloader = gluon.data.DataLoader(
+            self.val_dataset, batch_size=self.batch_size, shuffle=False,
+            last_batch='keep', num_workers=cpu_count())
