@@ -1,4 +1,4 @@
-"""Some methods modified from below link
+"""Some methods are modified from below link
 https://github.com/dmlc/gluon-nlp/blob/master/scripts/bert/data/ner.py"""
 
 import os
