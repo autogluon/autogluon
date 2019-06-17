@@ -113,7 +113,6 @@ class Dataset(dataset.Dataset):
     def _load_dataset(self):
         """Load the dataset from file, convert into BIOES scheme and build tag
         vocabulary"""
-        print("Loading the dataset...")
         if self.tokenizer is None:
             self.tokenizer = getattr(nlp.data.transforms, 'BERTTokenizer')
         self.tokenizer = self.tokenizer(vocab=self.vocab, lower=False)
@@ -122,11 +121,10 @@ class Dataset(dataset.Dataset):
         self.val_dataset = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
                                         indexes_format=self.indexes_format)
 
-        print("Train data length: {}".format(len(self.train_dataset)))
-        print("Validation data length: {}".format(len(self.val_dataset)))
+        LOG.info("Train data length: {}".format(len(self.train_dataset)))
+        LOG.info("Validation data length: {}".format(len(self.val_dataset)))
 
         # Build tag vocab
-        print("\nBuilding tag vocabulary...")
         all_sentences = self.train_dataset + self.val_dataset
         tag_counter = nlp.data.count_tokens(token.tag for sentence in all_sentences
                                             for token in sentence)
@@ -134,7 +132,7 @@ class Dataset(dataset.Dataset):
                                    bos_token=None, eos_token=None, unknown_token=None)
         self.null_tag_index = self.tag_vocab[NULL_TAG]
         self._num_classes = len(self.tag_vocab)
-        print("Number of tag types: {}".format(self._num_classes))
+        LOG.info("Number of tag types: {}".format(self._num_classes))
 
     def encode_as_input(self, sentence):
         """Encode a single sentence into numpy arrays as input to the BERTTagger model.
@@ -193,7 +191,6 @@ class Dataset(dataset.Dataset):
         self.val_dataset = [self.encode_as_input(sentence) for sentence in self.val_dataset]
 
     def _prepare_data_loader(self):
-        print("Preparing dataloaders...")
         self.train_dataloader = gluon.data.DataLoader(
             self.train_dataset, batch_size=self.batch_size, shuffle=True,
             last_batch='rollover', num_workers=cpu_count())

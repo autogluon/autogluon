@@ -193,7 +193,7 @@ def load_segment(file_path, tokenizer, indexes_format):
     subword_sentences = [bert_tokenize_sentence(sentence, tokenizer) for sentence in
                          bioes_sentences]
 
-    logging.info('load %s, its max seq len: %d',
+    LOG.info('load %s, its max seq len: %d',
                  file_path, max(len(sentence) for sentence in subword_sentences))
 
     return subword_sentences
