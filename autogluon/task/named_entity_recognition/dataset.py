@@ -121,8 +121,8 @@ class Dataset(dataset.Dataset):
         self.val_dataset = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
                                         indexes_format=self.indexes_format)
 
-        LOG.info("Train data length: {}".format(len(self.train_dataset)))
-        LOG.info("Validation data length: {}".format(len(self.val_dataset)))
+        LOG.info("Train data length: %d", len(self.train_dataset))
+        LOG.info("Validation data length: %d", len(self.val_dataset))
 
         # Build tag vocab
         all_sentences = self.train_dataset + self.val_dataset
@@ -132,7 +132,7 @@ class Dataset(dataset.Dataset):
                                    bos_token=None, eos_token=None, unknown_token=None)
         self.null_tag_index = self.tag_vocab[NULL_TAG]
         self._num_classes = len(self.tag_vocab)
-        LOG.info("Number of tag types: {}".format(self._num_classes))
+        LOG.info("Number of tag types: %d", self._num_classes)
 
     def encode_as_input(self, sentence):
         """Encode a single sentence into numpy arrays as input to the BERTTagger model.

@@ -87,7 +87,7 @@ class NEREstimator(Estimator):
             for handler in batch_begin:
                 handler.batch_begin(estimator_ref, batch=batch)
 
-            with mx.autograd.record():
+            with autograd.record():
                 out = [self.net(ti, tt, vl) for ti, tt, vl
                        in zip(text_ids, token_types, valid_length)]
                 loss_value = [self.loss[0](o, ti, fl.expand_dims(axis=2))
@@ -221,7 +221,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
         predictions = []
         for _, batch in enumerate(val_data):
 
-            text_ids, token_types, valid_length, tag_ids, flag_nonnull_tag = [
+            text_ids, token_types, valid_length, tag_ids, _ = [
                 x.astype(np.float32).as_in_context(ctx[0]) for x in batch]
             out = net(text_ids, token_types, valid_length)
 
