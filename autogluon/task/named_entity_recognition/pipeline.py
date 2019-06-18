@@ -195,7 +195,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     # TODO : Update with search space
     loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
-    trainer = gluon.Trainer(net.collect_params(), 'Adam', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(net.collect_params(), args.optimizer, {'learning_rate': args.lr})
 
     lr_handler = LRHandler(warmup_ratio=0.1,
                            batch_size=batch_size,
@@ -209,7 +209,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
 
     metric_handler = NERMetricHandler(train_metrics)
 
-    def eval_ner(val_data, val_metrics):
+    def eval_ner(estimator, val_data, val_metrics):
         if not isinstance(val_data, gluon.data.DataLoader):
             raise ValueError("Estimator only support input as Gluon DataLoader. Alternatively, you "
                              "can transform your DataIter or any NDArray into Gluon DataLoader. "

@@ -25,7 +25,7 @@ class Dataset(dataset.Dataset):
     Named Entity Recognition Dataset class
     """
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
-                 lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = 300,
+                 lazy: bool = True, vocab: nlp.Vocab = None, max_sequence_length: int = None,
                  tokenizer: nlp.data.transforms = None, indexes_format: dict = None,
                  batch_size: int = 8):
         super(Dataset, self).__init__(name, train_path, val_path)
@@ -84,6 +84,8 @@ class Dataset(dataset.Dataset):
                 raise ValueError("%s can't be downloaded directly from Gluon due to"
                                  "license Issue. Please provide the downloaded filepath"
                                  "as `train_path` and `val_path`" %self.name)
+            self.max_sequence_length = self.max_sequence_length or 180
+            self.indexes_format = self.indexes_format or {0: 'text', 3: 'ner'}
         elif self.name == 'wnut2017':
             url_format = 'https://noisy-text.github.io/2017/files/{}'
             train_filename = 'wnut17train.conll'
@@ -98,6 +100,8 @@ class Dataset(dataset.Dataset):
                          " in `%s` directory", data_dir)
             self.train_path = train_path
             self.val_path = val_path
+            self.max_sequence_length = self.max_sequence_length or 100
+            self.indexes_format = self.indexes_format or {0: 'text', 1: 'ner'}
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
 
