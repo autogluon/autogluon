@@ -100,7 +100,7 @@ class Dataset(dataset.Dataset):
                          " in `%s` directory", data_dir)
             self.train_path = train_path
             self.val_path = val_path
-            self.max_sequence_length = self.max_sequence_length or 100
+            self.max_sequence_length = self.max_sequence_length or 200
             self.indexes_format = self.indexes_format or {0: 'text', 1: 'ner'}
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
