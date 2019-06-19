@@ -66,8 +66,8 @@ def fit(data: Dataset,
         resume=False,
         savedir='checkpoint/exp1_tc.ag',
         visualizer='tensorboard',
-        stop_criterion=DEFAULT_STOP_CRITERION,
-        resources_per_trial=DEFAULT_RESOURCES_PER_TRIAL,
+        stop_criterion: dict = DEFAULT_STOP_CRITERION,
+        resources_per_trial: dict = DEFAULT_RESOURCES_PER_TRIAL,
         backend='default',
         **kwargs
         ) -> Results:

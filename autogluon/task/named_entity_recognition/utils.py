@@ -237,7 +237,7 @@ def convert_arrays_to_text(text_vocab, tag_vocab, np_text_ids, np_true_tags, np_
 class F1Ner(mx.metric.EvalMetric):
     """Evaluation F-1 score metric for NER"""
     def __init__(self):
-        super().__init__(name='f1_ner')
+        super(F1Ner, self).__init__(name='f1_ner')
         self.value = float('nan')
 
     def update(self, labels, preds):
@@ -262,7 +262,7 @@ class F1Ner(mx.metric.EvalMetric):
 class AccNer(mx.metric.EvalMetric):
     """Evaluation Accuracy metric for NER"""
     def __init__(self):
-        super().__init__(name='acc_ner')
+        super(AccNer, self).__init__(name='acc_ner')
         self.value = float('nan')
 
     def update(self, labels, preds, flag_nonnull_tag):
