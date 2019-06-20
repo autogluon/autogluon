@@ -42,6 +42,9 @@ requirements = [
     'gluoncv',
     'gluonnlp',
     'mxnet',
+    'mxboard',
+    'tensorboard',
+    'tensorflow'
 ]
 
 setup(
