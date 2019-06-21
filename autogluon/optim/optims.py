@@ -1,7 +1,7 @@
 import ConfigSpace as CS
 
-from ..space import *
 from .utils import autogluon_optims, Optimizer
+from ..space import *
 
 __all__ = ['Optimizers', 'get_optim']
 
@@ -18,7 +18,7 @@ class Optimizers(object):
 
     def add_search_space(self):
         cs = CS.ConfigurationSpace()
-        optim_list_hyper_param = List('optimizer', choices=self.get_optim_strs()).\
+        optim_list_hyper_param = List('optimizer', choices=self.get_optim_strs()). \
             get_hyper_param()
         cs.add_hyperparameter(optim_list_hyper_param)
         for optim in self.optim_list:
@@ -55,7 +55,7 @@ class Optimizers(object):
 
     def __str__(self):
         return "AutoGluon Optimizers %s with %s" % (str(self.get_optim_strs()), str(self.search_space))
-    
+
 
 optims = ['sgd',
           'nag',
@@ -129,7 +129,8 @@ def get_optim(name):
     optim = Optimizer(name)
     return optim
 
-#TODO: add more method based optim auto decorator
+
+# TODO: add more method based optim auto decorator
 
 @autogluon_optims
 def SGD(**kwargs):

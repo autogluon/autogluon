@@ -149,7 +149,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     # TODO : Update with search space
     loss = gluon.loss.SoftmaxCrossEntropyLoss()
 
-    trainer = gluon.Trainer(net.collect_params(), 'ftml', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(net.collect_params(), args.optimizer, {'learning_rate': args.lr})
     estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
     event_handlers = [SentimentDataLoaderHandler(), reporter]

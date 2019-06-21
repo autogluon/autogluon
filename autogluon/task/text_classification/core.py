@@ -34,7 +34,8 @@ default_nets = Nets([
 default_optimizers = Optimizers([
     get_optim('adam'),
     get_optim('sgd'),
-    get_optim('ftml')
+    get_optim('ftml'),
+    get_optim('bertadam')
 ])
 
 default_stop_criterion = {
