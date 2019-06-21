@@ -1,8 +1,10 @@
 import mxnet as mx
+import gluonnlp as nlp
 
 from autogluon.estimator import *
 from autogluon.estimator.event_handler import DataLoaderHandler
 from autogluon.scheduler.reporter import StatusReporter
+from autogluon.dataset.transforms import TextDataTransform
 from .dataset import Dataset
 from .model_zoo import get_model_instances
 from ...basic import autogluon_method
@@ -120,8 +122,10 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     # fine_tune_lm(pre_trained_network) # TODO
 
     ## Initialize the dataset here.
-    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False, vocab=vocab,
-                      batch_size=batch_size)
+    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=500)])
+
+    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
+                      transform=dataset_transform, batch_size=batch_size)
 
     net = TextClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                                 dropout=args.dropout)

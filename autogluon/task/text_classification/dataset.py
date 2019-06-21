@@ -1,11 +1,11 @@
 import os
 from multiprocessing import cpu_count
-from typing import AnyStr
+from typing import AnyStr, List, Any
 
 import gluonnlp as nlp
-from autogluon.dataset import TextDataTransform, utils
 from mxnet import gluon
 
+from autogluon.dataset import TextDataTransform, utils
 from ... import dataset
 
 __all__ = ['Dataset']
@@ -20,18 +20,22 @@ def get_gluon_nlp_dataset_fn(name):
         raise NotImplementedError
 
 
+def _get_len(x):
+    return float(len(x[0]))
+
+
 class Dataset(dataset.Dataset):
     """
     Python class to represent TextClassification Datasets
     """
 
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None, lazy: bool = True,
-                 vocab: nlp.Vocab = None, batch_size: int = 32):
+                 transform: TextDataTransform = None, batch_size: int = 32):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
         self._num_classes: int = 0
-        self._vocab: nlp.Vocab = vocab
+        self._transform: TextDataTransform = transform
         self._train_ds_transformed = None
         self._val_ds_transformed = None
         self._train_data_lengths = None  # TODO There is an alternative way possible to avoid creating this list
@@ -41,9 +45,7 @@ class Dataset(dataset.Dataset):
         self._download_dataset()
         self.add_search_space()
 
-        if vocab is None and lazy is False:
-            raise ValueError("Please specify a vocabulary object to init the dataset.")
-
+        self._vocab = None
         if not lazy:
             self._init_()
 
@@ -116,14 +118,20 @@ class Dataset(dataset.Dataset):
             raise NotImplementedError("Error. Different formats are not supported yet")
 
     def _preprocess(self):
-        transform = TextDataTransform(self._vocab)
 
-        self.train_dataset = self.train_dataset.transform(transform, lazy=True)
-        self.val_dataset = self.val_dataset.transform(transform, lazy=True)
+        self.train_dataset = self.train_dataset.transform(self._transform, lazy=True)
+        self.val_dataset = self.val_dataset.transform(self._transform, lazy=True)
 
         # Bottle neck --->
         # TODO Think of a better approach here
-        self._train_data_lengths = gluon.data.SimpleDataset([float(len(x[0])) for x in self.train_dataset])
+        self._train_data_lengths = self._get_train_data_lengths()
+
+    def _get_train_data_lengths(self) -> List[int]:
+
+        import multiprocessing as mp
+        with mp.Pool() as pool:
+            lengths = gluon.data.SimpleDataset(pool.map(_get_len, self.train_dataset))
+        return lengths
 
     def _prepare_data_loader(self):
         # TODO : Currently hardcoding the batch_samplers and batchify_fn.
