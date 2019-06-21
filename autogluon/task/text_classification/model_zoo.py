@@ -1,8 +1,9 @@
 from typing import AnyStr
 
 import gluonnlp as nlp
-from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 from mxnet.gluon import Block
+
+from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 
 __all__ = ['get_model_instances', 'get_model', 'models']
 
@@ -58,6 +59,10 @@ def get_model_instances(name: AnyStr,
     if name is None:
         raise ValueError("model name cannot be passed as none for the model")
     name = name.lower()
+
+    if 'bert' in name:
+        # Currently the dataset for BERT is book corpus wiki only on gluon model zoo
+        dataset_name = 'book_corpus_wiki_en_cased'
 
     if name not in models:
         err_str = '{} is not among the following model list: \n\t'.format(name)

@@ -11,7 +11,7 @@ from ray.tune.automl.search_policy import AutoMLSearcher
 from ray.tune.schedulers import TrialScheduler
 
 import autogluon as ag
-from autogluon.space import *
+from autogluon import Linear
 from autogluon.utils.mxboard_handler import MXBoardHandler
 from .dataset import *
 from .model_zoo import *
