@@ -41,7 +41,7 @@ class TextClassificationNet(gluon.Block):
             self.agg_layer = MeanPoolingLayer()
             self.output = gluon.nn.Sequential()
             with self.output.name_scope():
-                hidden_units = 40 # TODO Make this also a Hyperparam.
+                hidden_units = 40  # TODO Make this also a Hyperparam.
                 for i in range(num_classification_layers):
                     self.output.add(gluon.nn.Dropout(rate=dropout))
                     self.output.add(gluon.nn.Dense(int(hidden_units)))
@@ -109,6 +109,10 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     logger.info('Task ID : {0}, args : {1}'.format(task_id, args))
 
+    mxboard_handler = args.viz if 'viz' in args else None
+    if mxboard_handler is not None:
+        mxboard_handler.task_id = task_id
+
     # Define the network and get an instance from model zoo.
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     # pre_trained_network is a misnomer here. This can be untrained network too.
@@ -126,7 +130,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     net.hybridize()
 
-    logger.info('Task ID : {0}, network : {1}' .format(task_id, net))
+    logger.info('Task ID : {0}, network : {1}'.format(task_id, net))
 
     # define the initializer :
     # TODO : This should come from the config
@@ -144,5 +148,10 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     trainer = gluon.Trainer(net.collect_params(), 'ftml', {'learning_rate': args.lr})
     estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
+    event_handlers = [SentimentDataLoaderHandler(), reporter]
+
+    if mxboard_handler is not None:
+        event_handlers.append(mxboard_handler)
+
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
-                  event_handlers=[SentimentDataLoaderHandler(), reporter])
+                  event_handlers=event_handlers)

@@ -4,7 +4,11 @@ from mxboard import SummaryWriter
 
 from ..estimator import *
 
+__name__ = 'MXBoardHandler'
+
 logger = logging.getLogger(__name__)
+
+__all__ = ['MXBoardHandler']
 
 
 class MXBoardHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, BatchEnd):
@@ -12,11 +16,14 @@ class MXBoardHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
     def __init__(self, task_id: int, log_dir: AnyStr = './logs', checkpoint_dir: AnyStr = None,
                  events_to_log: set = None, when_to_log: set = None):
         self.task_id = task_id
-        self.summary_writer = SummaryWriter(logdir=log_dir)
+        logger.info(log_dir)
+        self.log_dir = log_dir
+        self.summary_writer = SummaryWriter(logdir=log_dir, flush_secs=2)
         self.checkpoint_dir = checkpoint_dir
         self.events_to_log = None
         self.when_to_log = None
         self.is_graph_added = False
+        self.current_epoch = 0
 
     def train_begin(self, estimator, *args, **kwargs):
         # TODO Ideally the add_graph should be called here, but in Gluon it requires one to have called forward pass
@@ -35,15 +42,15 @@ class MXBoardHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
         # Get the metrics from estimator.
         # Add those as scalars.
         # TODO Add metrics as per the list specified to track. Currently just doing Validation metrics
-        for metric in estimator.val_metrics:
-            self.summary_writer.add_scalar(tag=metric.name, value=(
-                    'Task ID : %d val_%s %.6f' % (self.task_id, metric.name, metric.get()[1])))
+        with SummaryWriter(logdir=self.log_dir, flush_secs=2) as sw:
+            for metric in estimator.val_metrics:
+                sw.add_scalar(tag=metric.name, value=('task_%d' % self.task_id, metric.get()[1]),
+                              global_step=self.current_epoch)
+
+        self.current_epoch += 1
 
     def batch_begin(self, estimator, *args, **kwargs):
-        # TODO Ideally the add_graph should be called in batch_begin, but in Gluon it requires one to have called
-        #  forward pass atleast once on the graph.
-        if not self.is_graph_added:
-            self.summary_writer.add_graph(estimator.net)
+        pass
 
     def batch_end(self, estimator, *args, **kwargs):
         pass

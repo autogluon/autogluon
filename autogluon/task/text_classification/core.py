@@ -11,12 +11,13 @@ from ray.tune.automl.search_policy import AutoMLSearcher
 from ray.tune.schedulers import TrialScheduler
 
 import autogluon as ag
+from autogluon.space import *
+from autogluon.utils.mxboard_handler import MXBoardHandler
 from .dataset import *
 from .model_zoo import *
 from .pipeline import *
 from ...network import Nets
 from ...optim import Optimizers, get_optim
-from autogluon.space import *
 
 __all__ = ['fit']
 
@@ -153,6 +154,10 @@ def fit(data: Dataset,
 
     cs, args = _construct_search_space(search_space_dict)
     logger.debug('Finished constucting search space')
+    mxboard_handler = init_visualizer(visualizer, os.path.splitext(savedir)[0])
+
+    if mxboard_handler is not None:
+        vars(args).update({'viz': mxboard_handler})
 
     def _run_ray_backend(searcher: AutoMLSearcher, trial_scheduler: TrialScheduler) -> Results:
         logger.debug('Start using Ray as a backend')
@@ -261,3 +266,15 @@ def fit(data: Dataset,
 
     logger.debug('Finished experiments!')
     return results
+
+
+def init_visualizer(visualizer: AnyStr = None, checkpoint_dir: AnyStr = None) -> MXBoardHandler:
+    if visualizer is not None:
+        logger.info('Initializing visualizer %s' % visualizer)
+        log_dir = os.path.join(os.path.split(checkpoint_dir)[0], 'logs')
+        # TODO Add events to log and more from the config
+        mxboard_handler = MXBoardHandler(-1, log_dir=log_dir, checkpoint_dir=checkpoint_dir)
+
+        return mxboard_handler
+
+    return None
