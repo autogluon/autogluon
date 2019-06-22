@@ -28,7 +28,9 @@ default_nets = Nets([
     get_model('standard_lstm_lm_650', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
     get_model('standard_lstm_lm_1500', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
     get_model('awd_lstm_lm_600', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=1, upper=2)})
+    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)})
 ])
 
 default_optimizers = Optimizers([
