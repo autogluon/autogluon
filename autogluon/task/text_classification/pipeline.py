@@ -1,10 +1,10 @@
-import mxnet as mx
 import gluonnlp as nlp
+import mxnet as mx
 
+from autogluon.dataset.transforms import TextDataTransform
 from autogluon.estimator import *
 from autogluon.estimator.event_handler import DataLoaderHandler
 from autogluon.scheduler.reporter import StatusReporter
-from autogluon.dataset.transforms import TextDataTransform
 from .dataset import Dataset
 from .model_zoo import get_model_instances
 from ...basic import autogluon_method
@@ -84,6 +84,29 @@ class SentimentDataLoaderHandler(DataLoaderHandler):
             ret_data.append((d.T, length.astype(np.float32)))
 
         return ret_data, label, batch_size
+
+
+class BERTClassifier(gluon.Block):
+
+    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
+        super(BERTClassifier, self).__init__(prefix=prefix, params=params)
+        self.pre_trained_network = None
+        self.output = gluon.nn.HybridSequential()
+        with self.output.name_scope():
+            hidden_units = 40  # TODO Make this also a Hyperparam.
+            for i in range(num_classification_layers):
+                self.output.add(gluon.nn.Dropout(rate=dropout))
+                self.output.add(gluon.nn.Dense(int(hidden_units)))
+                hidden_units = hidden_units / 2
+
+            self.output.add(gluon.nn.Dropout(rate=dropout))
+            self.output.add(gluon.nn.Dense(num_classes))
+
+    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
+        encoded = self.encoder(self.embedding(data))
+        agg_state = self.agg_layer(encoded, valid_length)
+        out = self.output(agg_state)
+        return out
 
 
 @autogluon_method
