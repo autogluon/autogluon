@@ -107,6 +107,33 @@ class BERTClassifier(gluon.Block):
         return self.output(pooler_out)
 
 
+class BertDataLoaderHandler(DataLoaderHandler):
+    def batch_begin(self, estimator, *args, **kwargs):
+        """
+        :param estimator:
+        :param batch: The batch of data
+        :param ctx: The context in which to load the data.
+        :param batch_axis: The batch axis about which to split the data onto multiple devices if context is passed as a list
+        :return: A tuple of : (data, length), label and batch_size
+        """
+        batch = kwargs['batch']
+        ctx = kwargs['ctx']
+        batch_axis = kwargs['batch_axis'] or 0
+        data = batch[0]
+        token_ids = data[0]
+        valid_length = data[1].astype(np.float32)
+        segment_ids = data[2]
+        label = data[3]
+        batch_size = label.shape[0]
+
+        token_ids = gluon.utils.split_and_load(token_ids, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        valid_length = gluon.utils.split_and_load(valid_length, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        segment_ids = gluon.utils.split_and_load(segment_ids, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+
+        return token_ids, valid_length, segment_ids, label, batch_size
+
+
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int) -> None:
     # TODO Add Estimator here.
