@@ -102,11 +102,9 @@ class BERTClassifier(gluon.Block):
             self.output.add(gluon.nn.Dropout(rate=dropout))
             self.output.add(gluon.nn.Dense(num_classes))
 
-    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
-        encoded = self.encoder(self.embedding(data))
-        agg_state = self.agg_layer(encoded, valid_length)
-        out = self.output(agg_state)
-        return out
+    def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
+        _, pooler_out = self.bert(inputs, token_types, valid_length)
+        return self.output(pooler_out)
 
 
 @autogluon_method
@@ -139,7 +137,13 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         mxboard_handler.task_id = task_id
 
     # Define the network and get an instance from model zoo.
-    pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
+    kwargs = None
+    if 'bert' in args.model:
+        kwargs = {'use_pooler': False,
+                  'use_decoder': False,
+                  'use_classifier': False,
+                  'dropout_prob': 0.1}
+    pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
     # pre_trained_network is a misnomer here. This can be untrained network too.
 
     # fine_tune_lm(pre_trained_network) # TODO
@@ -150,10 +154,16 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                       transform=dataset_transform, batch_size=batch_size)
 
-    net = TextClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
-                                dropout=args.dropout)
-    net.embedding = pre_trained_network.embedding
-    net.encoder = pre_trained_network.encoder
+    if 'bert' in args.model:
+        net = BERTClassifier(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
+                             dropout=args.dropout)
+        net.pre_trained_network = pre_trained_network
+
+    else:
+        net = TextClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
+                                    dropout=args.dropout)
+        net.embedding = pre_trained_network.embedding
+        net.encoder = pre_trained_network.encoder
 
     net.hybridize()
 
