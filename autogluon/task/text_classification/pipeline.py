@@ -212,7 +212,13 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     trainer = gluon.Trainer(net.collect_params(), args.optimizer, {'learning_rate': args.lr})
     estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
 
-    event_handlers = [SentimentDataLoaderHandler(), reporter]
+    data_loader_handler = None
+    if 'bert' in args.model:
+        data_loader_handler = BertDataLoaderHandler()
+    else:
+        data_loader_handler = SentimentDataLoaderHandler()
+
+    event_handlers = [data_loader_handler, reporter]
 
     if mxboard_handler is not None:
         event_handlers.append(mxboard_handler)
