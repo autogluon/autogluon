@@ -118,3 +118,4 @@ ENV/
 *.jpg*
 *.jpeg*
 .idea/*
+train/*
