@@ -91,7 +91,6 @@ class DistributedTaskScheduler(object):
             if 'reporter' in args:
                 cp = Communicator.Create(p, local_reporter, dist_reporter)
             p.join()
-            #fn(**args)
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
 
