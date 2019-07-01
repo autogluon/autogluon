@@ -2,8 +2,7 @@ import logging
 import numpy as np
 from mxnet import autograd, gluon, cpu, gpu, init
 import gluonnlp as nlp
-from autogluon.estimator.event_handler import LoggingHandler, LRHandler
-from autogluon.estimator.event_handler import ValidationHandler, MetricHandler
+from autogluon.estimator.event_handler import *
 from autogluon.estimator.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
 
@@ -250,6 +249,9 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                                  val_metrics=val_metrics,
                                  verbose=LoggingHandler.LOG_PER_EPOCH)
 
+    stop_handler = EarlyStoppingHandler(monitor=val_metrics[0],
+                                        mode='max')
+
     estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics,
                              trainer=trainer, context=ctx)
     estimator.val_metrics = val_metrics
@@ -257,4 +259,4 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
     estimator.fit(train_data=dataset.train_dataloader,
                   val_data=dataset.val_dataloader,
                   epochs=args.epochs,
-                  event_handlers=[lr_handler, metric_handler, val_handler, log_handler, reporter])
+                  event_handlers=[lr_handler, metric_handler, val_handler, stop_handler, log_handler, reporter])
