@@ -14,13 +14,21 @@ class DistributedResourceManager(object):
     MAX_CPU_COUNT = 0
     MAX_GPU_COUNT = 0
     NODE_RESOURCE_MANAGER = {}
-    def __new__(cls, remotes=[]):
-        self = super(DistributedResourceManager, cls).__new__(cls)
+    __instance = None
+    def __new__(cls):
+        # Singleton
+        if cls.__instance is None:
+            cls.__instance = object.__new__(cls)
+        return cls.__instance
+
+    @classmethod
+    def add_remote(cls, remotes):
+        """Enables dynamically removing nodes
+        """
+        remotes = remotes if isinstance(remotes, list) else [remotes]
         for remote in remotes:
             cls.NODE_RESOURCE_MANAGER[remote] = NodeResourceManager(remote)
-
         cls._refresh_resource()
-        return self
 
     @classmethod
     def _refresh_resource(cls):
@@ -166,7 +174,6 @@ class NodeResourceManager(object):
         if resource.num_cpus > self.MAX_CPU_COUNT or resource.num_gpus > self.MAX_GPU_COUNT:
             return False
         return True
-
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

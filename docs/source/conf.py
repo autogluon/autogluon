@@ -20,7 +20,7 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-import AutoGluon
+import autogluon
 import sphinx_rtd_theme
 
 
@@ -43,7 +43,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-    'sphinxcontrib.googleanalytics',
+    #'sphinxcontrib.googleanalytics',
 ]
 
 napoleon_use_ivar = True
@@ -73,7 +73,7 @@ author = 'AutoGluon Community'
 # built documents.
 #
 # The short X.Y version.
-version = 'master (' + AutoGluon.__version__ + ')'
+version = 'master (' + autogluon.__version__ + ')'
 # The full version, including alpha/beta/rc tags.
 # TODO: verify this works as expected
 release = 'master'
@@ -124,8 +124,8 @@ html_static_path = ['_static']
 
 html_context = {
     'css_files': [
-        'https://fonts.googleapis.com/css?family=Lato',
-        #'_static/css/encoding.css'
+        #'https://fonts.googleapis.com/css?family=Lato',
+        '_static/css/encoding.css'
     ],
 }
 

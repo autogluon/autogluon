@@ -1,4 +1,3 @@
-import os
 import pickle
 import logging
 import threading
@@ -22,6 +21,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
     is when using multiple brackets, task allocation to bracket is done
     randomly with over a softmax probability.
     See https://arxiv.org/abs/1810.05934
+
     Args:
         train_fn (callable): A task launch function for training.
             Note: please add the `@autogluon_method` decorater to the original function.
@@ -45,9 +45,31 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             is simply a unit-less scalar.
         brackets (int): Number of brackets. Each bracket has a different
             halving rate, specified by the reduction factor.
+
+    Example:
+        >>> @autogluon_method
+        >>> def train_fn(args, reporter):
+        >>>     for e in range(10):
+        >>>         # forward, backward, optimizer step and evaluation metric
+        >>>         # generate fake top1_accuracy
+        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+        >>>         reporter(epoch=e, accuracy=top1_accuracy)
+        >>> import ConfigSpace as CS
+        >>> import ConfigSpace.hyperparameters as CSH
+        >>> cs = CS.ConfigurationSpace()
+        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
+        >>> cs.add_hyperparameter(lr)
+        >>> searcher = RandomSampling(cs)
+        >>> myscheduler = Hyperband_Scheduler(train_fn, args,
+        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                   searcher=searcher, num_trials=20,
+        >>>                                   reward_attr='accuracy',
+        >>>                                   time_attr='epoch',
+        >>>                                   grace_period=1)
     """
     def __init__(self, train_fn, args, resource, searcher,
-                 checkpoint='./exp/checkerpoint.ag', resume=False,
+                 checkpoint='./exp/checkerpoint.ag',
+                 resume=False,
                  num_trials=None,
                  time_attr="training_epoch",
                  reward_attr="accuracy",
@@ -61,7 +83,11 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                                             reduction_factor, brackets)
 
     def add_task(self, task):
-        # adding the task
+        """Adding a training task to the scheduler.
+
+        Args:
+            task (:class:`autogluon.scheduler.Task`): a new trianing task
+        """
         logger.debug("Adding A New Task {}".format(task))
         Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
@@ -79,13 +105,15 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                                         checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
+            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
+                         'Process': tp, 'ReporterThread': rp}
             # checkpoint thread
             if self._checkpoint is not None:
                 sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
                                       daemon=False)
                 sp.start()
-            self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'],
-                                         'Process': tp, 'ReporterProcess': rp})
+                task_dict['CheckpointThead'] = sp
+            self.scheduled_tasks.append(task_dict)
 
     def _run_reporter(self, task, task_process, reporter, searcher, terminator,
                       checkpoint_semaphore):
@@ -98,16 +126,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            if 'loss' in reported_result:
-                self.visualizer.add_scalar(tag='loss',
-                                           value=('task %d valid_loss' % task.task_id,
-                                                  reported_result['loss']),
-                                           global_step=reported_result['epoch'])
-            self.visualizer.add_scalar(tag=self._reward_attr,
-                                       value=('task {task_id} {reward_attr}'.format(
-                                              task_id=task.task_id, reward_attr=self._reward_attr),
-                                              reported_result[self._reward_attr]),
-                                       global_step=reported_result['epoch'])
+            self.add_training_result(task.task_id, reported_result)
             if terminator.on_task_report(task, reported_result):
                 reporter.move_on()
             else:
@@ -134,8 +153,10 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
 
+
 class Hyperband_Manager(object):
     """Hyperband Manager
+
     Args:
         time_attr (str): A training result attr to use for comparing time.
             Note that you can pass in something non-temporal such as

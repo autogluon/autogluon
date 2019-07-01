@@ -5,40 +5,57 @@ import logging
 from threading import Thread 
 import multiprocessing as mp
 
-from ..resource import DistributedResourceManager
 from .remote import Remote
+from ..utils import get_ip
 
 __all__ = ['RemoteManager']
 
 logger = logging.getLogger(__name__)
 
 class RemoteManager(object):
-    NODES = []
+    NODES = {}
     LOCK = mp.Lock()
     PORT_ID = mp.Value('i', 8780)
-    def __init__(self, ip_addrs=[]):
-        self.start_local_node()
-        # TODO
-        self.MASTER_IP = socket.gethostbyname(socket.gethostname())
-        for ip_addr in ip_addrs:
-            RemoteManager.add_remote_node(ip_addr)
-
-    #@classmethod
-    def start_local_node(self):
-        port = self.get_port_id()
-        remote = Remote(self.MASTER_IP, port, local=True)
-        self.NODES.append(remote)
+    MASTER_IP = None
+    __instance = None
+    def __new__(cls):
+        # Singleton
+        if cls.__instance is None:
+            cls.__instance = object.__new__(cls)
+            cls.MASTER_IP = get_ip()
+            cls.start_local_node()
+        return cls.__instance
 
     @classmethod
-    def add_remote_node(cls, node_ip):
+    def start_local_node(cls):
         port = cls.get_port_id()
-        remote = Remote(node_ip, port)
-        cls.NODES.append(remote)
+        remote = Remote.create_local_node(cls.MASTER_IP, port)
+        with cls.LOCK:
+            cls.NODES[cls.MASTER_IP] = remote
+
+    @classmethod
+    def get_remotes(cls):
+        return list(cls.NODES.values())
+
+    @classmethod
+    def add_remote_nodes(cls, ip_addrs):
+        ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
+        remotes = []
+        for node_ip in ip_addrs:
+            if node_ip in cls.NODES.keys():
+                logger.warning('Already added remote {}'.format(node_ip))
+                continue
+            port = cls.get_port_id()
+            remote = Remote(node_ip, port)
+            with cls.LOCK:
+                cls.NODES[node_ip] = remote
+            remotes.append(remote)
+        return remotes
     
     @classmethod
     def shutdown(cls):
-        for node in cls.NODES:
-            node.shutdown()
+        for node in cls.NODES.values():
+            node.close()
 
     @classmethod
     def get_port_id(cls):
@@ -46,24 +63,16 @@ class RemoteManager(object):
             cls.PORT_ID.value += 1
             return cls.PORT_ID.value
 
-    @classmethod
-    def get_remotes(cls):
-        return cls.NODES
-
-    @classmethod
-    def create_resource_mamager(cls):
-        return DistributedResourceManager(cls.NODES)
-
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        for node in self.NODES:
+        for node in cls.NODES.values():
             node.shutdown()
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(\n'
-        for node in self.NODES:
+        for node in cls.NODES.values():
            reprstr += '{}, \n'.format(node)
         reprstr += ')\n'
         return reprstr
