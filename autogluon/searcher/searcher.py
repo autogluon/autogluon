@@ -9,31 +9,26 @@ __all__ = ['BaseSearcher', 'RandomSampling']
 logger = logging.getLogger(__name__)
 
 class BaseSearcher(object):
-    """The config generator determines how new configurations are sampled. This can take
-    very different levels of complexity, from random sampling to the construction of complex
-    empirical prediction models for promising configurations.
-    """
-    def __init__(self, configspace):
-        """Basic Searcher
-        Parameters:
-        -----------
+    """Base Searcher (A virtual class to inherit from)
+
+    Args:
         configspace: ConfigSpace.ConfigurationSpace
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
-        """
+    """
+    def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
         self._best_model_params = None
 
-    def get_config(self, budget):
+    def get_config(self):
         """Function to sample a new configuration
-        This function is called inside Hyperband to query a new configuration
-        Parameters
-        ----------
-        budget: float
-            the budget for which this configuration is scheduled
-        returns: (config, info_dict)
-            must return a valid configuration and a (possibly empty) info dict
+
+        This function is called inside TaskScheduler to query a new configuration
+
+        Args:
+            returns: (config, info_dict)
+                must return a valid configuration and a (possibly empty) info dict
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
@@ -63,16 +58,30 @@ class BaseSearcher(object):
 
 class RandomSampling(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
+
+    Args:
+        configspace: ConfigSpace.ConfigurationSpace
+            The configuration space to sample from. It contains the full
+            specification of the Hyperparameters with their priors
+
+    Example:
+        >>> import ConfigSpace as CS
+        >>> import ConfigSpace.hyperparameters as CSH
+        >>> # create configuration space
+        >>> cs = CS.ConfigurationSpace()
+        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
+        >>> cs.add_hyperparameter(lr)
+        >>> # create searcher
+        >>> searcher = RandomSampling(cs)
+        >>> searcher.get_config()
     """
-    def get_config(self, budget=None):
+    def get_config(self):
         """Function to sample a new configuration
         This function is called inside Hyperband to query a new configuration
-        Parameters
-        ----------
-        budget: float
-            the budget for which this configuration is scheduled
-        returns: (config, info_dict)
-            must return a valid configuration and a (possibly empty) info dict
+
+        Args:
+            returns: (config, info_dict)
+                must return a valid configuration and a (possibly empty) info dict
         """
         return self.configspace.sample_configuration().get_dictionary()
 

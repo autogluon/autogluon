@@ -17,10 +17,17 @@ logger = logging.getLogger(__name__)
 class Task(object):
     """Individual training task, containing the lauch function, default arguments and
     required resources.
+
     Args:
         fn (callable): Lauch function for the training task.
         args (argparse.ArgumentParser): Default function arguments.
         resources (autogluon.scheduler.Resources): Required resources for lauching the task.
+
+    Example:
+        >>> def my_task():
+        >>>     pass
+        >>> resource = Resources(num_cpus=2, num_gpus=0)
+        >>> task = Task(my_task, {}, resource)
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
@@ -50,15 +57,19 @@ class Task(object):
             ',\n\targs: {'
         for k, v in self.args.items():
             reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
-            #if isinstance(v, argparse.ArgumentParser):
-            #    reprstr +=  '{}'.format(k) + ': ' + str(vars(v)) + ', '
-            #else:
-            #    reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
         reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
         return reprstr
 
 class TaskScheduler(object):
     """Basic Task Scheduler
+
+    Example:
+        >>> def my_task():
+        >>>     pass
+        >>> resource = Resources(num_cpus=2, num_gpus=0)
+        >>> task = Task(my_task, {}, resource)
+        >>> scheduler = TaskScheduler()
+        >>> scheduler.add_task(task)
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = ResourceManager()
@@ -68,10 +79,10 @@ class TaskScheduler(object):
 
     def add_task(self, task):
         """Adding a training task to the scheduler.
+
         Args:
-            task (autogluon.scheduler.Task): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        # adding the task
         logger.debug("\nAdding A New Task {}".format(task))
         TaskScheduler.RESOURCE_MANAGER._request(task.resources)
         p = mp.Process(target=TaskScheduler._run_task, args=(
@@ -107,9 +118,6 @@ class TaskScheduler(object):
         self._cleaning_tasks()
         for i, task_dic in enumerate(self.scheduled_tasks):
             task_dic['Process'].join()
-        #while not TaskScheduler.ERROR_QUEUE.empty():
-        #    e = TaskScheduler.ERROR_QUEUE.get()
-        #    logger.error(str(e))
 
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler

@@ -22,32 +22,18 @@ except ImportError:
         "A quick tip is to install via `pip install mxnet-mkl/mxnet-cu90mkl --pre`. ")
 
 try:
-    import mxboard
-except ImportError:
-    raise ImportError(
-        "Unable to import dependency mxboard. "
-        "A quick tip is to install via `pip install mxboard`. ")
-
-try:
-    import tensorboard
-except ImportError:
-    raise ImportError(
-        "Unable to import dependency tensorboard. "
-        "A quick tip is to install via `pip install tensorflow tensorboard`. ")
-
-try:
     import dask
 except ImportError:
     raise ImportError(
         "Unable to import dependency dask. "
         "A quick tip is to install via `pip install dask[complete]`. ")
 
-try:
-    import cv2
-except ImportError:
-    raise ImportError(
-        "Unable to import dependency cv2. "
-        "A quick tip is to install via `pip install opencv-python`. ")
+#try:
+#    import cv2
+#except ImportError:
+#    raise ImportError(
+#        "Unable to import dependency cv2. "
+#        "A quick tip is to install via `pip install opencv-python`. ")
 
 
 __version__ = '0.0.1'

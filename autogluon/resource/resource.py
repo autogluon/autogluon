@@ -8,6 +8,18 @@ __all__ = ['Resources', 'DistributedResource',
 logger = logging.getLogger(__name__)
 
 class Resources(object):
+    """Resource for AutoGluon Scheduler :class:`autogluon.scheduler.TaskScheduler`
+
+    Args:
+        num_cpus (int): number of cpu cores required for the training task.
+        num_gpus (int): number of gpu required for the training task.
+
+    Example:
+        >>> def my_task():
+        >>>     pass
+        >>> resource = Resources(num_cpus=2, num_gpus=0)
+        >>> task = Task(my_task, {}, resource)
+    """
     def __init__(self, num_cpus=1, num_gpus=0):
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
@@ -38,6 +50,18 @@ class Resources(object):
         return reprstr
 
 class DistributedResource(Resources):
+    """Resource for AutoGluon Distributed Scheduler :class:`autogluon.distributed.DistributedTaskScheduler`
+
+    Args:
+        num_cpus (int): number of cpu cores required for the training task.
+        num_gpus (int): number of gpu required for the training task.
+
+    Example:
+        >>> def my_task():
+        >>>     pass
+        >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
+        >>> task = Task(my_task, {}, resource)
+    """
     def __init__(self, num_cpus=1, num_gpus=0):
         super(DistributedResource, self).__init__(num_cpus, num_gpus)
         self.node = None

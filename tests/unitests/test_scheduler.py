@@ -37,6 +37,9 @@ def test_dist_scheduler():
     scheduler.join_tasks()
     scheduler.shutdown()
 
+def test_dist_fifo():
+    pass
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     import nose

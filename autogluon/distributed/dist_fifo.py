@@ -6,17 +6,18 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
-from .scheduler import *
-from ..resource import Resources
-from .reporter import StatusReporter
+from ..resource import DistributedResource
 from ..basic import save, load
 from ..utils import mkdir, try_import_mxboard
+from ..scheduler import Task, FIFO_Scheduler
+from .dist_scheduler import DistributedTaskScheduler
+from .dist_reporter import DistStatusReporter
 
-__all__ = ['FIFO_Scheduler']
+__all__ = ['DistributedFIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
-class FIFO_Scheduler(TaskScheduler):
+class DistributedFIFOScheduler(DistributedTaskScheduler):
     """Simple scheduler that just runs trials in submission order.
 
     Args:
@@ -45,19 +46,19 @@ class FIFO_Scheduler(TaskScheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
-        >>> myscheduler = FIFO_Scheduler(train_fn, args,
-        >>>                              resource={'num_cpus': 2, 'num_gpus': 0}, 
-        >>>                              searcher=searcher, num_trials=20,
-        >>>                              reward_attr='accuracy',
-        >>>                              time_attr='epoch',
-        >>>                              grace_period=1)
+        >>> myscheduler = DistributedFIFOScheduler(train_fn, args,
+        >>>                                        resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                        searcher=searcher, num_trials=20,
+        >>>                                        reward_attr='accuracy',
+        >>>                                        time_attr='epoch',
+        >>>                                        grace_period=1)
         >>> # run tasks
         >>> myscheduler.run()
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
-                 visualizer='none'):
-        super(FIFO_Scheduler, self).__init__()
+                 visualizer='none', dist_ip_addrs=[]):
+        super(DistributedFIFOScheduler,self).__init__(dist_ip_addrs)
         self.train_fn = train_fn
         self.args = args
         self.resource = resource
@@ -95,6 +96,8 @@ class FIFO_Scheduler(TaskScheduler):
             self.schedule_next()
 
     def save(self, checkpoint=None):
+        """Save Checkpoint
+        """
         if checkpoint is None and self._checkpoint is None:
             msg = 'Please set checkpoint path.'
             logger.exception(msg)
@@ -107,7 +110,7 @@ class FIFO_Scheduler(TaskScheduler):
         """Schedule next searcher suggested task
         """
         task = Task(self.train_fn, {'args': self.args, 'config': self.searcher.get_config()},
-                    Resources(**self.resource))
+                    DistributedResource(**self.resource))
         self.add_task(task)
 
     def add_task(self, task):
@@ -117,21 +120,20 @@ class FIFO_Scheduler(TaskScheduler):
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
         logger.debug("Adding A New Task {}".format(task))
-        FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
+        DistributedFIFOScheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            reporter = DistStatusReporter()
             task.args['reporter'] = reporter
             # main process
-            tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
-                            task.fn, task.args, task.resources,
-                            FIFO_Scheduler.RESOURCE_MANAGER))
+            tp = threading.Thread(target=DistributedFIFOScheduler._start_distributed_task, args=(
+                                  task, DistributedTaskScheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
                                   self.searcher, checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
-            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
+            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'], 'Task': task,
                          'Process': tp, 'ReporterThread': rp}
             # checkpoint thread
             if self._checkpoint is not None:
@@ -168,7 +170,6 @@ class FIFO_Scheduler(TaskScheduler):
         while task_process.is_alive():
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
-                reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
@@ -222,14 +223,14 @@ class FIFO_Scheduler(TaskScheduler):
         if plot: plt.show()
 
     def state_dict(self, destination=None):
-        destination = super(FIFO_Scheduler, self).state_dict(destination)
+        destination = super(DistributedFIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
 
     def load_state_dict(self, state_dict):
-        super(FIFO_Scheduler, self).load_state_dict(state_dict)
+        super(DistributedFIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
