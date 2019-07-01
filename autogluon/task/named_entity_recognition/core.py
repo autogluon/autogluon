@@ -21,8 +21,8 @@ __all__ = ['fit']
 
 LOG = logging.getLogger(__name__)
 DEFAULT_NETS = Nets([
-    get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
+    get_model('bert_12_768_12'),
+    get_model('bert_24_1024_16'),
 ])
 
 DEFAULT_OPT = Optimizers([
