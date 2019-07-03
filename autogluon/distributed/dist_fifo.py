@@ -119,7 +119,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        logger.debug("Adding A New Task {}".format(task))
+        logger.debug("\nAdding A New Task {}".format(task))
         DistributedFIFOScheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
             reporter = DistStatusReporter()
@@ -177,7 +177,8 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
             self.add_training_result(task.task_id, reported_result)
             reporter.move_on()
             last_result = reported_result
-        searcher.update(task.args['config'], last_result[self._reward_attr])
+        if last_result is not None:
+            searcher.update(task.args['config'], last_result[self._reward_attr])
 
     def get_best_config(self):
         self.join_tasks()

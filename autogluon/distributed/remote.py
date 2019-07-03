@@ -52,49 +52,6 @@ class Remote(Client):
             super(Remote, self).__repr__()
         return reprstr
 
-#class Remote(Client):
-#    LOCK = mp.Lock()
-#    REMOTE_ID = mp.Value('i', 0)
-#    def __init__(self, remote_ip=None, port=None, ssh_username=None,
-#            ssh_port=22, ssh_private_key=None, remote_python=None,
-#            remote_dask_worker="distributed.cli.dask_worker"):
-#        remote_addr = (remote_ip + ':{}'.format(port))
-#        self.service = DaskRemoteService(remote_ip, port, ssh_username,
-#                                         ssh_port, ssh_private_key, remote_python,
-#                                         remote_dask_worker)
-#        super(Remote, self).__init__(remote_addr)
-#        with Remote.LOCK:
-#            self.remote_id = Remote.REMOTE_ID.value
-#            Remote.REMOTE_ID.value += 1
-#
-#    def shutdown(self):
-#        self.close()
-#        self.service.shutdown()
-#
-#    @property
-#    def is_local(self):
-#        return True
-#
-#    def get_reporter(self):
-#        return DistStatusReporter()
-#
-#    def __enter__(self):
-#        return self
-#
-#    def __exit__(self, *args):
-#        self.service.shutdown()
-#
-#    def __repr__(self):
-#        reprstr = self.__class__.__name__ + ' REMOTE_ID: {}, \n\t'.format(self.remote_id) + \
-#            super(Remote, self).__repr__()
-#        return reprstr
-#
-#    @classmethod
-#    def create_local_node(cls, ip, port):
-#        with cls.LOCK:
-#            remote_id = Remote.REMOTE_ID.value
-#            Remote.REMOTE_ID.value += 1
-#        return LocalNode(ip, port, remote_id)
 
 class DaskLocalService(object):
     def __init__(self, remote_addr, scheduler_port):
@@ -137,24 +94,6 @@ class DaskLocalService(object):
     def __exit__(self, *args):
         self.shutdown()
 
-#class LocalNode(concurrent.futures.ProcessPoolExecutor):
-#    def __init__(self, ip, port, remote_id):
-#        super(LocalNode, self).__init__()
-#        self.ip = ip
-#        self.port = port
-#        self.remote_id = remote_id
-#
-#    @property
-#    def is_local(self):
-#        return True
-#
-#    def get_reporter(self):
-#        return StatusReporter()
-#
-#    def __repr__(self):
-#        reprstr = self.__class__.__name__ + ' REMOTE_ID: {}, \n\t'.format(self.remote_id) + \
-#            '{}:{}'.format(self.ip, self.port)
-#        return reprstr
 
 class DaskRemoteService(object):
     def __init__(self, remote_addr, scheduler_port, ssh_username=None,

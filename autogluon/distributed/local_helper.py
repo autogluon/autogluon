@@ -2,10 +2,6 @@ import time
 import logging
 import threading
 import subprocess
-#try: 
-#    import queue
-#except ImportError:
-#    import Queue as queue
 import multiprocessing as queue
 
 from .ssh_helper import bcolors
@@ -47,7 +43,7 @@ class AsyncLineReader(threading.Thread):
         return reader, stdqueue
 
 def start_local_worker(master_ip, port):
-    process = subprocess.Popen('dask-worker '#'python -m distributed.cli.dask_worker '
+    process = subprocess.Popen('python -m distributed.cli.dask_worker '
                                '{}:{} --no-nanny'.format(master_ip, port),
                                shell=True,
                                stdout=subprocess.PIPE,
@@ -55,23 +51,23 @@ def start_local_worker(master_ip, port):
     (stdoutReader, stdoutQueue) = AsyncLineReader.getForFd(process.stdout, name='worker')
     (stderrReader, stderrQueue) = AsyncLineReader.getForFd(process.stderr, name='worker', err=True)
     worker = {'Process': process,
-                'stdoutReader': stdoutReader,
-                'stdout_queue': stdoutQueue,
-                'stderrReader': stderrReader,
-                'stderr_queue': stderrQueue}
+              'stdoutReader': stdoutReader,
+              'stdout_queue': stdoutQueue,
+              'stderrReader': stderrReader,
+              'stderr_queue': stderrQueue}
     return worker
 
 
 def start_local_scheduler(port):
-    process = subprocess.Popen('dask-scheduler ' #'python -m distributed.cli.dask_scheduler '
+    process = subprocess.Popen('python -m distributed.cli.dask_scheduler '
                                '--port {}'.format(port),
                                shell=True, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     (stdoutReader, stdoutQueue) = AsyncLineReader.getForFd(process.stdout, name='scheduler')
     (stderrReader, stderrQueue) = AsyncLineReader.getForFd(process.stderr, name='scheduler', err=True)
     scheduler = {'Process': process,
-                'stdoutReader': stdoutReader,
-                'stdout_queue': stdoutQueue,
-                'stderrReader': stderrReader,
-                'stderr_queue': stderrQueue}
+                 'stdoutReader': stdoutReader,
+                 'stdout_queue': stdoutQueue,
+                 'stderrReader': stderrReader,
+                 'stderr_queue': stderrQueue}
     return scheduler
