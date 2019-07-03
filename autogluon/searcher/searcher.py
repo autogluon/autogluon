@@ -83,7 +83,11 @@ class RandomSampling(BaseSearcher):
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
-        return self.configspace.sample_configuration().get_dictionary()
+        new_config = self.configspace.sample_configuration().get_dictionary()
+        while json.dumps(new_config) in self._results.keys():
+            new_config = self.configspace.sample_configuration().get_dictionary()
+        self._results[json.dumps(new_config)] = None
+        return new_config
 
     def update(self, *args, **kwargs):
         """Update the searcher with the newest metric report

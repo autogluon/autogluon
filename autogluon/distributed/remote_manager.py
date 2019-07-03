@@ -34,6 +34,11 @@ class RemoteManager(object):
             cls.NODES[cls.MASTER_IP] = remote
 
     @classmethod
+    def launch_each(cls, launch_fn, *args, **kwargs):
+        for node in cls.NODES.values():
+            node.submit(launch_fn, *args, **kwargs)
+
+    @classmethod
     def get_remotes(cls):
         return list(cls.NODES.values())
 

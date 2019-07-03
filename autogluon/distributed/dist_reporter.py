@@ -6,6 +6,8 @@ from dask.distributed import Queue
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['Communicator', 'DistStatusReporter']
+
 class Communicator(threading.Thread):
     def __init__(self, process, local_reporter, dist_reporter):
         super(Communicator, self).__init__()
@@ -57,10 +59,9 @@ class DistStatusReporter(object):
             kwargs['time_this_iter'] = report_time - self._last_report_time
         self._last_report_time = report_time
 
+        #logger.debug('Reporting {}'.format(json.dumps(kwargs)))
         self._queue.put(kwargs.copy())
         self._continue_semaphore.acquire()
-
-        logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
 
     def fetch(self, block=True):
         kwargs = self._queue.get()
