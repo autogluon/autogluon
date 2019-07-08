@@ -197,8 +197,8 @@ class ClassificationHead(gluon.Block):
         with self.net.name_scope():
             hidden_units = 40  # TODO Make this also a Hyperparam.
             for i in range(num_classification_layers + 1):
-                self.output.add(gluon.nn.Dropout(rate=dropout))
-                self.output.add(gluon.nn.Dense(int(hidden_units)))
+                self.net.add(gluon.nn.Dropout(rate=dropout))
+                self.net.add(gluon.nn.Dense(int(hidden_units)))
                 hidden_units = hidden_units / 2
 
             self.net.add(gluon.nn.Dropout(rate=dropout))
