@@ -97,7 +97,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx):
 
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int) -> None:
-    batch_size, ctx = _init_env()
+    batch_size, ctx = _init_env(args)
     args.pretrained = True
     args.task_id = task_id
 
