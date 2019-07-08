@@ -1,20 +1,21 @@
-import os
-import pickle
 import json
 import logging
-import threading
 import multiprocessing as mp
+import os
+import pickle
+import threading
 from collections import OrderedDict
 
-from .scheduler import *
-from .resource_manager import Resources
 from .reporter import StatusReporter
+from .resource_manager import Resources
+from .scheduler import *
 from ..basic import save, load
 from ..utils import mkdir
 
 __all__ = ['FIFO_Scheduler']
 
 logger = logging.getLogger(__name__)
+
 
 class FIFO_Scheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
@@ -30,6 +31,7 @@ class FIFO_Scheduler(TaskScheduler):
             with `time_attr`, this may refer to any objective value. Stopping
             procedures will use this attribute.
     """
+
     def __init__(self, train_fn, args, resource, searcher, checkpoint=None,
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy'):
         super(FIFO_Scheduler, self).__init__()
@@ -112,12 +114,12 @@ class FIFO_Scheduler(TaskScheduler):
             task.args['task_id'] = task.task_id
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
-                            task.fn, task.args, task.resources,
-                            FIFO_Scheduler.RESOURCE_MANAGER))
+                task.fn, task.args, task.resources,
+                FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                                  self.searcher, checkpoint_semaphore))
+                                                                   self.searcher, checkpoint_semaphore))
             tp.start()
             rp.start()
             # checkpoint thread

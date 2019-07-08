@@ -1,9 +1,10 @@
 """Task Scheduler"""
-import os
-import pickle
 import logging
 import multiprocessing as mp
+import os
+import pickle
 from collections import namedtuple, OrderedDict
+
 from .resource_manager import ResourceManager
 
 __all__ = ['TaskScheduler', 'Task']
@@ -22,6 +23,7 @@ class Task(BasicTask):
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
+
     def __new__(cls, fn, args, resources):
         self = super(Task, cls).__new__(cls, fn, args, resources)
         with Task.LOCK:
@@ -35,10 +37,11 @@ class Task(BasicTask):
         cls.TASK_ID.value = taskid
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ +  \
-            '(' + 'TASK_ID: ' + str(self.task_id) + ') ' + \
-            super(Task, self).__repr__() + ')'
+        reprstr = self.__class__.__name__ + \
+                  '(' + 'TASK_ID: ' + str(self.task_id) + ') ' + \
+                  super(Task, self).__repr__() + ')'
         return reprstr
+
 
 class TaskScheduler(object):
     """Basic Task Scheduler w/o Searcher
@@ -46,6 +49,7 @@ class TaskScheduler(object):
     LOCK = mp.Lock()
     RESOURCE_MANAGER = ResourceManager()
     ERROR_QUEUE = mp.Queue()
+
     def __init__(self):
         self.scheduled_tasks = []
         self.finished_tasks = []
@@ -59,8 +63,8 @@ class TaskScheduler(object):
         logger.debug("Adding A New Task {}".format(task))
         TaskScheduler.RESOURCE_MANAGER._request(task.resources)
         p = mp.Process(target=TaskScheduler._run_task, args=(
-                       task.fn, task.args, task.resources,
-                       TaskScheduler.RESOURCE_MANAGER))
+            task.fn, task.args, task.resources,
+            TaskScheduler.RESOURCE_MANAGER))
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
@@ -87,7 +91,7 @@ class TaskScheduler(object):
                 if not task_dick['Process'].is_alive():
                     task_dict = self.scheduled_tasks.pop(i)
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                               'Config': task_dict['Config']})
+                                                'Config': task_dict['Config']})
 
     def join_tasks(self):
         self._cleaning_tasks()
