@@ -1,12 +1,11 @@
-from typing import AnyStr, Any, Collection
-from collections import namedtuple
 import os
-import mxnet as mx
-from mxnet import gluon
+from typing import AnyStr, Any, Collection
+
 import gluonnlp as nlp
+from mxnet import gluon
 
 
-def read_text_from_file(path:AnyStr) -> AnyStr:
+def read_text_from_file(path: AnyStr) -> AnyStr:
     text = []
     for line in open(path, 'r'):
         line = line.lower().strip()
@@ -14,8 +13,8 @@ def read_text_from_file(path:AnyStr) -> AnyStr:
     return ' '.join(line for line in text)
 
 
-def get_dataset_from_files(path:AnyStr,
-                           label_folders:Collection[AnyStr] = None) -> (gluon.data.SimpleDataset, Collection[int]):
+def get_dataset_from_files(path: AnyStr,
+                           label_folders: Collection[AnyStr] = None) -> (gluon.data.SimpleDataset, Collection[int]):
     """
     Utility method that reads a dataset from files and returns text, label pairs if labels=True
     :param path:
@@ -39,7 +38,7 @@ def get_dataset_from_files(path:AnyStr,
             line = read_text_from_file(os.path.join(path, folder, filename))
             if include_labels:
                 # TODO: remove hardcoding!
-                lbl = 0 if folder=='neg' else 1
+                lbl = 0 if folder == 'neg' else 1
                 lines.append([line, lbl])  # Text , Label pair
                 label_set.add(lbl)
             else:
@@ -62,6 +61,21 @@ def get_dataset_from_json_files(path: AnyStr) -> (gluon.data.SimpleDataset, Coll
     return gluon.data.SimpleDataset(content), label_set
 
 
+def get_dataset_from_tsv_files(path: AnyStr, field_indices: list = None) -> (gluon.data.SimpleDataset, Collection[int]):
+    label_set = set()
+    dataset = nlp.data.TSVDataset(filename=path, num_discard_samples=1, field_indices=field_indices)
+
+    for _ in dataset:
+        label_set.add(_[-1])
+
+    lbl_dict = dict([(y, x + 1) for x, y in enumerate(label_set)])
+
+    for elem in dataset:
+        elem[-1] = lbl_dict[elem[-1]]
+
+    return dataset, set(lbl_dict.values())
+
+
 def get_or_else(x: Any, y: Any) -> Any:
     return y if x is None else x
 
@@ -78,10 +92,10 @@ def flatten_dataset(dataset: gluon.data.SimpleDataset,
     """
 
     flattened_data = list()
-    print ("Original LEN", len(dataset))
+    print("Original LEN", len(dataset))
     for (sent, label) in dataset:
         sent = transform_fn(sent)
         for word in sent.split():
             flattened_data.append(word)
-    print ("Flattened LEN", len(flattened_data))
+    print("Flattened LEN", len(flattened_data))
     return flattened_data

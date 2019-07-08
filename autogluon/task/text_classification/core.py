@@ -24,13 +24,13 @@ __all__ = ['fit']
 logger = logging.getLogger(__name__)
 # TODO Add More default networks here. Possibly Bert ?
 default_nets = Nets([
-    get_model('standard_lstm_lm_200', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('standard_lstm_lm_650', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('standard_lstm_lm_1500', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('awd_lstm_lm_600', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=1, upper=2)}),
-    get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=1, upper=2)})
+    get_model('standard_lstm_lm_200', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('standard_lstm_lm_650', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('standard_lstm_lm_1500', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('awd_lstm_lm_600', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('awd_lstm_lm_1150', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('bert_12_768_12', **{'classification_layers': Linear('dense', lower=0, upper=2)}),
+    get_model('bert_24_1024_16', **{'classification_layers': Linear('dense', lower=0, upper=2)})
 ])
 
 default_optimizers = Optimizers([
@@ -131,6 +131,9 @@ def fit(data: Dataset,
             args_dict['val_path'] = data.val_path
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
             args_dict['pretrained'] = True
+            args_dict['data_format'] = data.data_format
+            args_dict['dataset'] = data
+            args_dict['task_id'] = 0
             return args
 
         args = _init_args()
@@ -274,7 +277,7 @@ def fit(data: Dataset,
 def init_visualizer(visualizer: AnyStr = None, checkpoint_dir: AnyStr = None) -> MXBoardHandler:
     if visualizer is not None:
         logger.info('Initializing visualizer %s' % visualizer)
-        log_dir = os.path.join(os.path.split(checkpoint_dir)[0], 'logs')
+        log_dir = os.path.join(checkpoint_dir, 'logs')
         # TODO Add events to log and more from the config
         mxboard_handler = MXBoardHandler(-1, log_dir=log_dir, checkpoint_dir=checkpoint_dir)
 

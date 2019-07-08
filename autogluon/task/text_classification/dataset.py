@@ -1,14 +1,14 @@
 import os
 from multiprocessing import cpu_count
-from typing import AnyStr, List, Any
+from typing import AnyStr, List
 
 import gluonnlp as nlp
 from mxnet import gluon
 
-from autogluon.dataset import TextDataTransform, utils
+from autogluon.dataset import TextDataTransform, BERTDataTransform, utils
 from ... import dataset
 
-__all__ = ['Dataset']
+__all__ = ['Dataset', 'BERTDataset']
 
 
 def get_gluon_nlp_dataset_fn(name):
@@ -16,12 +16,20 @@ def get_gluon_nlp_dataset_fn(name):
         return nlp.data.SST_2
     elif name == 'imdb':
         return nlp.data.IMDB
+    elif name == 'glue_sst':
+        return nlp.data.GlueSST2
+    elif name == 'glue_mnli':
+        return nlp.data.GlueMNLI
     else:
         raise NotImplementedError
 
 
 def _get_len(x):
-    return float(len(x[0]))
+    return int(len(x[0]))
+
+
+def _get_len_bert(x):
+    return int(x[1])
 
 
 class Dataset(dataset.Dataset):
@@ -30,7 +38,7 @@ class Dataset(dataset.Dataset):
     """
 
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None, lazy: bool = True,
-                 transform: TextDataTransform = None, batch_size: int = 32):
+                 transform: TextDataTransform = None, batch_size: int = 32, data_format='json', field_indices=None):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
@@ -39,13 +47,18 @@ class Dataset(dataset.Dataset):
         self._train_ds_transformed = None
         self._val_ds_transformed = None
         self._train_data_lengths = None  # TODO There is an alternative way possible to avoid creating this list
-        self.data_format = 'json'  # TODO This should come from config
+        self.data_format = data_format  # TODO This should come from config
         self._label_set = set()
         self.batch_size = batch_size
         self._download_dataset()
         self.add_search_space()
 
         self._vocab = None
+
+        if data_format == 'tsv' and field_indices is None:
+            raise ValueError('Specified tsv, but found the field indices empty.')
+
+        self.field_indices = field_indices
         if not lazy:
             self._init_()
 
@@ -73,16 +86,16 @@ class Dataset(dataset.Dataset):
         This method downloads the datasets and returns the file path where the data was downloaded.
         :return:
         """
-        root = os.path.join(os.getcwd(), 'data')
+        if self.train_path is None:  # We need to download the dataset.
+            root = os.path.join(os.getcwd(), 'data')
+            gluon_nlp_data_fn = get_gluon_nlp_dataset_fn(self.name)
 
-        gluon_nlp_data_fn = get_gluon_nlp_dataset_fn(self.name)
+            val_set = 'dev_matched'
 
-        if self.train_path is None:
             train_dataset, val_dataset = [gluon_nlp_data_fn(root=root, segment=segment)
-                                          for segment in ('train', 'test')]
-
-        self.train_path = os.path.join(os.getcwd(), 'data', 'train.json')
-        self.val_path = os.path.join(os.getcwd(), 'data', 'test.json')
+                                          for segment in ('train', val_set)]
+            self.train_path = os.path.join(os.getcwd(), 'data', 'train.{}'.format(self.data_format))
+            self.val_path = os.path.join(os.getcwd(), 'data', '{}.{}'.format(val_set, self.data_format))
 
     def _read_dataset(self) -> None:
         """
@@ -114,6 +127,20 @@ class Dataset(dataset.Dataset):
                 self.train_dataset, self._label_set = utils.get_dataset_from_json_files(path=self.train_path)
                 self.val_dataset, _ = utils.get_dataset_from_json_files(path=self.val_path)
 
+        elif self.data_format == 'tsv':
+
+            if self.val_path is None:
+                # Read the training data and perform split on it.
+                dataset, self._label_set = utils.get_dataset_from_tsv_files(path=self.train_path,
+                                                                            field_indices=self.field_indices)
+                self.train_dataset, self.val_dataset = self._train_valid_split(dataset, valid_ratio=0.2)
+
+            else:
+                self.train_dataset, self._label_set = utils.get_dataset_from_tsv_files(path=self.train_path,
+                                                                                       field_indices=self.field_indices)
+                self.val_dataset, _ = utils.get_dataset_from_tsv_files(path=self.val_path,
+                                                                       field_indices=self.field_indices)
+
         else:
             raise NotImplementedError("Error. Different formats are not supported yet")
 
@@ -121,15 +148,12 @@ class Dataset(dataset.Dataset):
 
         self.train_dataset = self.train_dataset.transform(self._transform, lazy=True)
         self.val_dataset = self.val_dataset.transform(self._transform, lazy=True)
-
-        # Bottle neck --->
-        # TODO Think of a better approach here
-        self._train_data_lengths = self._get_train_data_lengths()
+        # self._train_data_lengths = self._get_train_data_lengths()
 
     def _get_train_data_lengths(self) -> List[int]:
 
         import multiprocessing as mp
-        with mp.Pool() as pool:
+        with mp.Pool(cpu_count() - 1) as pool:
             lengths = gluon.data.SimpleDataset(pool.map(_get_len, self.train_dataset))
         return lengths
 
@@ -141,15 +165,17 @@ class Dataset(dataset.Dataset):
         :return:
         """
 
-        batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size, shuffle=True)
+        # batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size, shuffle=True)
         batchify_fn = nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
                                               nlp.data.batchify.Stack(dtype='float32'))
 
-        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_sampler=batch_sampler,
+        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_size=self.batch_size,
+                                                       shuffle=True, last_batch='rollover',
                                                        batchify_fn=batchify_fn, num_workers=cpu_count())
         # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
+                                                     last_batch='rollover',
                                                      batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)
 
     @staticmethod
@@ -168,3 +194,42 @@ class Dataset(dataset.Dataset):
 
     def __repr__(self):
         return "AutoGluon Dataset %s" % self.name
+
+
+class BERTDataset(Dataset):
+
+    def _preprocess(self):
+        self._transform = BERTDataTransform(tokenizer=self._transform.tokenizer,
+                                            max_seq_length=self._transform.max_seq_length,
+                                            class_labels=self._label_set, pair=False)
+        self.train_dataset = self.train_dataset.transform(self._transform, lazy=True)
+        self.val_dataset = self.val_dataset.transform(self._transform, lazy=True)
+        # self._train_data_lengths = self._get_train_data_lengths()
+
+    def _get_train_data_lengths(self) -> List[int]:
+        import multiprocessing as mp
+        with mp.Pool() as pool:
+            lengths = gluon.data.SimpleDataset(pool.map(_get_len_bert, self.train_dataset))
+        return lengths
+
+    def _prepare_data_loader(self):
+        """
+        Method which prepares and populates the data loader.
+        :return:
+        """
+
+        # batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size, shuffle=True,
+        #                                             num_buckets=5)
+
+        batchify_fn = nlp.data.batchify.Tuple(
+            nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
+            nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
+
+        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_size=self.batch_size,
+                                                       shuffle=True, last_batch='rollover',
+                                                       batchify_fn=batchify_fn, num_workers=cpu_count())
+        # TODO Think about cpu_count here.
+
+        self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
+                                                     last_batch='rollover',
+                                                     batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)

@@ -1,11 +1,13 @@
 from typing import AnyStr
 
 import gluonnlp as nlp
+import mxnet as mx
+from mxnet import gluon
 from mxnet.gluon import Block
 
 from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 
-__all__ = ['get_model_instances', 'get_model', 'models']
+__all__ = ['get_model_instances', 'get_model', 'models', 'LMClassificationNet', 'BERTClassificationNet']
 
 models = ['standard_lstm_lm_200',
           'standard_lstm_lm_650',
@@ -162,3 +164,84 @@ def bert_12_768_12(**kwargs):
 @autogluon_nets
 def bert_24_1024_16(**kwargs):
     pass
+
+
+# Network architectures that work with these above models
+class MeanPoolingLayer(gluon.Block):
+    """
+    A block for mean pooling of encoder features.
+    This is used with the LMClassificationNet
+    """
+
+    def __init__(self, prefix=None, params=None):
+        super(MeanPoolingLayer, self).__init__(prefix=prefix, params=params)
+
+    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
+        masked_encoded = mx.ndarray.SequenceMask(data, sequence_length=valid_length, use_sequence_length=True)
+
+        agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
+                                             mx.ndarray.expand_dims(valid_length, axis=1))
+
+        return agg_state
+
+
+class ClassificationHead(gluon.Block):
+    """
+    Simple Dense layer network which forms the classification head on top of the pre-trained models.
+    """
+
+    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
+        super(ClassificationHead, self).__init__(prefix=prefix, params=params)
+        self.net = gluon.nn.Sequential()
+
+        with self.net.name_scope():
+            hidden_units = 40  # TODO Make this also a Hyperparam.
+            for i in range(num_classification_layers + 1):
+                self.output.add(gluon.nn.Dropout(rate=dropout))
+                self.output.add(gluon.nn.Dense(int(hidden_units)))
+                hidden_units = hidden_units / 2
+
+            self.net.add(gluon.nn.Dropout(rate=dropout))
+            self.net.add(gluon.nn.Dense(num_classes))
+
+    def forward(self, inputs):
+        return self.net(inputs)
+
+
+class LMClassificationNet(gluon.Block):
+    """
+    Network for Text Classification which uses a pre-trained language model.
+    This works with  standard_lstm_lm_200, standard_lstm_lm_650, standard_lstm_lm_1500, awd_lstm_lm_1150, awd_lstm_lm_600
+    """
+
+    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
+        super(LMClassificationNet, self).__init__(prefix=prefix, params=params)
+        with self.name_scope():
+            self.embedding = None
+            self.encoder = None
+            self.agg_layer = MeanPoolingLayer()
+            self.output = ClassificationHead(num_classes=num_classes,
+                                             num_classification_layers=num_classification_layers, dropout=dropout)
+
+    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
+        encoded = self.encoder(self.embedding(data))
+        agg_state = self.agg_layer(encoded, valid_length)
+        out = self.output(agg_state)
+        return out
+
+
+class BERTClassificationNet(gluon.Block):
+    """
+    Network for Text Classification which uses a BERT pre-trained model.
+    This works with  bert_12_768_12, bert_24_1024_16
+    """
+
+    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
+        super(BERTClassificationNet, self).__init__(prefix=prefix, params=params)
+        self.pre_trained_network = None
+        self.output = ClassificationHead(num_classes=num_classes, num_classification_layers=num_classification_layers,
+                                         dropout=dropout)
+
+    def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
+        _, pooler_out = self.pre_trained_network(inputs, token_types, valid_length)
+        return self.output(pooler_out)

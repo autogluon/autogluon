@@ -5,12 +5,12 @@
 import copy
 import warnings
 
-from .event_handler import MetricHandler, ValidationHandler, LoggingHandler, StoppingHandler, DataLoaderHandler
-from .event_handler import TrainBegin, EpochBegin, BatchBegin, BatchEnd, EpochEnd, TrainEnd
 from mxnet import gluon, autograd
 from mxnet.context import Context, cpu, gpu, num_gpus
 from mxnet.metric import EvalMetric, Loss, Accuracy
-import numpy as np
+
+from .event_handler import MetricHandler, ValidationHandler, LoggingHandler, StoppingHandler, DataLoaderHandler
+from .event_handler import TrainBegin, EpochBegin, BatchBegin, BatchEnd, EpochEnd, TrainEnd
 
 __all__ = ['Estimator']
 
@@ -185,8 +185,8 @@ class Estimator(object):
                 handler.batch_begin(estimator_ref, batch=batch)
 
             data, label, batch_size = self.data_loader_handler.batch_begin(estimator_ref, batch=batch,
-                                                                                    ctx=self.context,
-                                                                                    batch_axis=batch_axis)
+                                                                           ctx=self.context,
+                                                                           batch_axis=batch_axis)
             with autograd.record():
                 pred = [self.net(*d_) for d_ in data]
                 loss = [self.loss[0](y_hat, y) for y_hat, y in zip(pred, label)]
@@ -229,7 +229,8 @@ class Estimator(object):
             metric.reset()
 
         for _, batch in enumerate(val_data):
-            data, label, _ = self.data_loader_handler.batch_begin(estimator_ref, batch=batch, ctx=self.context, batch_axis=batch_axis)
+            data, label, _ = self.data_loader_handler.batch_begin(estimator_ref, batch=batch, ctx=self.context,
+                                                                  batch_axis=batch_axis)
             pred = [self.net(*d_) for d_ in data]
             loss = [self.loss[0](y_hat, y) for y_hat, y in zip(pred, label)]
             # update metrics
