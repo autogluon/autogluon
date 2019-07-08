@@ -90,7 +90,7 @@ class Dataset(dataset.Dataset):
             root = os.path.join(os.getcwd(), 'data')
             gluon_nlp_data_fn = get_gluon_nlp_dataset_fn(self.name)
 
-            val_set = 'dev_matched'
+            val_set = 'dev'
 
             train_dataset, val_dataset = [gluon_nlp_data_fn(root=root, segment=segment)
                                           for segment in ('train', val_set)]
