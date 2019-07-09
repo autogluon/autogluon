@@ -102,6 +102,14 @@ class Dataset(dataset.Dataset):
             self.val_path = val_path
             self.max_sequence_length = self.max_sequence_length or 200
             self.indexes_format = self.indexes_format or {0: 'text', 1: 'ner'}
+        elif self.name == 'ontonotesv5':
+            if self.train_path is None or self.val_path is None:
+                raise ValueError("%s can't be downloaded directly from Gluon due to"
+                                 "license Issue. Please provide the downloaded filepath"
+                                 "as `train_path` and `val_path`" %self.name)
+            self.max_sequence_length = self.max_sequence_length or 300
+            self.indexes_format = self.indexes_format or {0: 'text', 3: 'ner'}
+
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
 
@@ -120,10 +128,13 @@ class Dataset(dataset.Dataset):
         if self.tokenizer is None:
             self.tokenizer = getattr(nlp.data.transforms, 'BERTTokenizer')
         self.tokenizer = self.tokenizer(vocab=self.vocab, lower=False)
-        self.train_dataset = load_segment(file_path=self.train_path, tokenizer=self.tokenizer,
+        self.train_dataset, max_seq_len_train = load_segment(file_path=self.train_path, tokenizer=self.tokenizer,
                                           indexes_format=self.indexes_format)
-        self.val_dataset = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
+        self.val_dataset, max_seq_len_val = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
                                         indexes_format=self.indexes_format)
+
+        # Set max sequence length based on data if not provided by user
+        self.max_sequence_length = self.max_sequence_length or max(max_seq_len_train, max_seq_len_val) + 1
 
         LOG.info("Train data length: %d", len(self.train_dataset))
         LOG.info("Validation data length: %d", len(self.val_dataset))

@@ -2,7 +2,9 @@ import logging
 import numpy as np
 from mxnet import autograd, gluon, cpu, gpu, init
 import gluonnlp as nlp
-from autogluon.estimator.event_handler import *
+from autogluon.estimator.event_handler import LoggingHandler, LRHandler
+from autogluon.estimator.event_handler import ValidationHandler, MetricHandler
+from autogluon.estimator.event_handler import EarlyStoppingHandler
 from autogluon.estimator.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
 

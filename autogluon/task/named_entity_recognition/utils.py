@@ -192,11 +192,11 @@ def load_segment(file_path, tokenizer, indexes_format):
     bioes_sentences = [bio2_to_bioes(sentence) for sentence in bio2_sentences]
     subword_sentences = [bert_tokenize_sentence(sentence, tokenizer) for sentence in
                          bioes_sentences]
-
+    max_seq_len = max(len(sentence) for sentence in subword_sentences)
     LOG.info('load %s, its max seq len: %d',
-             file_path, max(len(sentence) for sentence in subword_sentences))
+             file_path, max_seq_len)
 
-    return subword_sentences
+    return subword_sentences, max_seq_len
 
 
 def convert_arrays_to_text(text_vocab, tag_vocab, np_text_ids, np_true_tags, np_pred_tags,
