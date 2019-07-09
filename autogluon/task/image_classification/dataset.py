@@ -9,10 +9,10 @@ from ...utils.data_analyzer import DataAnalyzer
 
 __all__ = ['Dataset', 'transform_fn']
 
-_dataset = {'MNIST': gluon.data.vision.MNIST,
-            'FashionMNIST': gluon.data.vision.FashionMNIST,
-            'CIFAR10': gluon.data.vision.CIFAR10,
-            'CIFAR100': gluon.data.vision.CIFAR100}
+_dataset = {'mnist': gluon.data.vision.MNIST,
+            'fashionmnist': gluon.data.vision.FashionMNIST,
+            'cifar10': gluon.data.vision.CIFAR10,
+            'cifar100': gluon.data.vision.CIFAR100}
 
 
 def get_dataset(name, **kwargs):
@@ -28,7 +28,8 @@ def get_dataset(name, **kwargs):
     Dataset
         The dataset.
     """
-    if name not in _dataset and name.lower() not in _dataset:
+    name = name.lower()
+    if name not in _dataset:
         err_str = '"%s" is not among the following loss list:\n\t' % (name)
         err_str += '%s' % ('\n\t'.join(sorted(_dataset.keys())))
         raise ValueError(err_str)
