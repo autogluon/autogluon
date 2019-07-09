@@ -1,3 +1,20 @@
+# To build and upload a new version, follow the steps below.
+# Notes:
+# - this is a "Universal Wheels" package that is pure Python and supports both Python2 and Python3
+# - Twine is a secure PyPi upload package
+# - Make sure you have bumped the version! at mms/version.py
+# $ pip install twine
+# $ pip install wheel
+# $ python setup.py bdist_wheel --universal
+
+# *** TEST YOUR PACKAGE WITH TEST PI ******
+# twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+# If this is successful then push it to actual pypi
+
+# $ twine upload dist/*
+
+
 import os
 import sys
 from datetime import date
