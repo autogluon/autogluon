@@ -1,86 +1,85 @@
-#!/usr/bin/env python
 import os
-import shutil
-import subprocess
+import sys
+from datetime import date
+from shutil import rmtree
 
-from setuptools import setup, find_packages
-import setuptools.command.develop
-import setuptools.command.install
+from setuptools import setup, find_packages, Command
 
-cwd = os.path.dirname(os.path.abspath(__file__))
+import autogluon
 
-version = '0.0.1'
-try:
-    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], 
-        cwd=cwd).decode('ascii').strip()
-    version += '+' + sha[:7]
-except Exception:
-    pass
+pkgs = find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"])  # TODO Refine the excludes list further
 
-def create_version_file():
-    global version, cwd
-    print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'autogluon', 'version.py')
-    with open(version_path, 'w') as f:
-        f.write('"""This is autogluon version file."""\n')
-        f.write("__version__ = '{}'\n".format(version))
 
-# run test scrip after installation
-class install(setuptools.command.install.install):
-    def run(self):
-        create_version_file()
-        setuptools.command.install.install.run(self)
+def pypi_description():
+    """
+    Imports the project description for the project page.
+    :return:
+    """
+    try:
+        import pypandoc
+        long_description = pypandoc.convert('README.md', 'rst')
+    except(IOError, ImportError):
+        long_description = open('README.md').read()
 
-class develop(setuptools.command.develop.develop):
-    def run(self):
-        create_version_file()
-        setuptools.command.develop.develop.run(self)
+    return long_description
 
-try:
-    import pypandoc
-    long_description = pypandoc.convert('README.md', 'rst')
-except(IOError, ImportError):
-    long_description = open('README.md').read()
 
-requirements = [
-    'numpy==1.16.0',
-    'scipy',
-    'matplotlib',
-    'requests',
-    'pytest',
-    'dask[complete]',
-    'tornado',
-    'ConfigSpace',
-    'nose',
-    'gluoncv',
-    'gluonnlp',
-    'mxnet',
-    'mxboard',
-    'tensorboard',
-    'tensorflow',
-    'psutil'
-]
+def detect_auto_gluon_version():
+    """
+    Creates a version for package with either beta tag + date appended or an actual release version
+    :return:
+    """
+    if '--release' in sys.argv:
+        return autogluon.__version__.strip()
 
-setup(
-    # Metadata
-    name='autogluon',
-    version=version,
-    author='AutoGluon Community',
-    url='https://github.com/awslabs/autogluon',
-    description='Gluon AutoML Toolkit',
-    long_description=long_description,
-    license='Apache',
+    return autogluon.__version__.strip() + 'b' + str(date.today()).replace('-', '')
 
-    # Package info
-    packages=find_packages(exclude=('docs', 'tests', 'scripts')),
-    zip_safe=True,
-    include_package_data=True,
-    install_requires=requirements,
-    package_data={'autogluon': [
-        'LICENSE',
-    ]},
-    cmdclass={
-        'install': install,
-        'develop': develop,
-    },
-)
+
+def clean_residual_builds():
+    try:
+        pwd = os.path.abspath(os.path.dirname(__file__))
+        if os.path.exists(os.path.join(pwd, 'dist')):
+            rmtree(os.path.join(pwd, 'dist'))
+    except OSError:
+        pass
+
+
+if __name__ == '__main__':
+    version = detect_auto_gluon_version()
+
+    requirements = [
+        'scipy',
+        'spaCy',
+        'matplotlib',
+        'requests',
+        'pytest',
+        'ConfigSpace',
+        'nose',
+        'gluoncv',
+        'gluonnlp',
+        'mxnet',
+        'mxboard',
+        'tensorboard',
+        'tensorflow',
+        'numpy',
+        'ray',
+        'seqeval'
+    ]
+
+    setup(
+        name='AutoGluon',
+        version=version,
+        author='AutoGluon team',
+        url='https://github.com/awslabs/AutoGluon',
+        description='MXNet Gluon AutoML Toolkit',  # To be refined
+        long_description=pypi_description(),
+        license='MIT',
+        keywords='MXNet Gluon AutoModel AutoML AutoGluon CV NLP',
+
+        # Package info
+        packages=pkgs,
+        zip_safe=True,
+        include_package_data=True,
+        install_requires=requirements,
+
+    )
