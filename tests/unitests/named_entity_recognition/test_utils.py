@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import pytest
+from mxnet import nd
 from autogluon.task.named_entity_recognition.utils import *
 
 
@@ -75,7 +76,7 @@ def test_f1ner():
     labels = ['S-ORG', 'O', 'S-MISC', 'O', 'O', 'O', 'S-MISC', 'O', 'O']
     preds = ['S-ORG', 'O', 'S-MISC', 'O', 'O', 'O', 'S-MISC', 'O', 'O']
 
-    # Test same outout as expected with f1 score as 1
+    # Test the predicted with expected output with f1 score as 1
     f1 = F1Ner()
     f1.update(labels, preds)
     assert f1.value == 1.0
@@ -86,3 +87,21 @@ def test_f1ner():
     f1 = F1Ner()
     f1.update(labels, preds)
     assert f1.value == 0
+
+
+@pytest.mark.serial
+def test_accner():
+    labels = nd.ones((1, 2))
+    preds = nd.ones((1, 2, 2))
+    flag_nonnull_tag = nd.ones((1, 2))
+
+    # Predicted output is not the expected output results an accuracy of 0
+    acc = AccNer()
+    acc.update(labels, preds, flag_nonnull_tag)
+    assert acc.value == 0
+
+    # Test the predicted with expected output with an accuracy of 1
+    preds[:, :, -1] += 1
+    acc = AccNer()
+    acc.update(labels, preds, flag_nonnull_tag)
+    assert acc.value == 1
