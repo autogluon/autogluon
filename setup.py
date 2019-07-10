@@ -15,14 +15,16 @@
 # $ twine upload dist/*
 
 
+import distutils.cmd
+import io
 import os
+import re
+import subprocess
 import sys
 from datetime import date
 from shutil import rmtree
 
-from setuptools import setup, find_packages, Command
-
-import autogluon
+from setuptools import setup, find_packages
 
 pkgs = find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"])  # TODO Refine the excludes list further
 
@@ -41,15 +43,30 @@ def pypi_description():
     return long_description
 
 
+def read(*names, **kwargs):
+    with io.open(
+            os.path.join(os.path.dirname(__file__), *names),
+            encoding=kwargs.get("encoding", "utf8")
+    ) as fp:
+        return fp.read()
+
+
 def detect_auto_gluon_version():
     """
     Creates a version for package with either beta tag + date appended or an actual release version
     :return:
     """
-    if '--release' in sys.argv:
-        return autogluon.__version__.strip()
 
-    return autogluon.__version__.strip() + 'b' + str(date.today()).replace('-', '')
+    version_file = read('autogluon', '__init__.py')
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                              version_file, re.M)
+    if version_match:
+        if '--release' in sys.argv:
+            return version_match.group(1)
+
+        return version_match.group(1) + 'b' + str(date.today()).replace('-', '')
+
+    raise RuntimeError("Unable to find version string.")
 
 
 def clean_residual_builds():
@@ -61,10 +78,27 @@ def clean_residual_builds():
         pass
 
 
+class SpacyEnInstall(distutils.cmd.Command):
+    description = 'Installing spacy english'
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        command = ['python', '-m', 'spacy', 'download', 'en']
+
+        subprocess.check_call(command)
+
+
 if __name__ == '__main__':
     version = detect_auto_gluon_version()
 
     requirements = [
+        'numpy',
         'scipy',
         'spaCy',
         'matplotlib',
@@ -78,7 +112,6 @@ if __name__ == '__main__':
         'mxboard',
         'tensorboard',
         'tensorflow',
-        'numpy',
         'ray',
         'seqeval'
     ]
@@ -98,5 +131,9 @@ if __name__ == '__main__':
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements,
+
+        cmdclass={
+            'spacy_en': SpacyEnInstall
+        },
 
     )
