@@ -15,11 +15,9 @@
 # $ twine upload dist/*
 
 
-import distutils.cmd
 import io
 import os
 import re
-import subprocess
 import sys
 from datetime import date
 from shutil import rmtree
@@ -78,43 +76,10 @@ def clean_residual_builds():
         pass
 
 
-class SpacyEnInstall(distutils.cmd.Command):
-    description = 'Installing spacy english'
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        command = ['python', '-m', 'spacy', 'download', 'en']
-
-        subprocess.check_call(command)
-
-
 if __name__ == '__main__':
     version = detect_auto_gluon_version()
 
-    requirements = [
-        'numpy',
-        'scipy',
-        'spaCy',
-        'matplotlib',
-        'requests',
-        'pytest',
-        'ConfigSpace',
-        'nose',
-        'gluoncv',
-        'gluonnlp',
-        'mxnet',
-        'mxboard',
-        'tensorboard',
-        'tensorflow',
-        'ray',
-        'seqeval'
-    ]
+    reqs = open('requirements.txt').read()
 
     setup(
         name='AutoGluon',
@@ -130,10 +95,6 @@ if __name__ == '__main__':
         packages=pkgs,
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements,
-
-        cmdclass={
-            'spacy_en': SpacyEnInstall
-        },
-
+        install_requires=reqs,
+        tests_require=['nose', 'pytest']
     )
