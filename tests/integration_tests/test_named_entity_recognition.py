@@ -1,15 +1,19 @@
-import argparse
 import re
 import os
 import sys
-import ConfigSpace as CS
+import unittest
 import numpy as np
+import mxnet as mx
+import ConfigSpace as CS
+
 import autogluon as ag
 from autogluon.space import Log, List, Linear, Exponential
 from autogluon import named_entity_recognition as task
 
 import logging
+
 logging.basicConfig(level=logging.INFO)
+
 
 def prepare_nets(network_list, dropout_list=None):
     if not dropout_list:
@@ -20,7 +24,8 @@ def prepare_nets(network_list, dropout_list=None):
     for net, dropout in zip(network_list, dropout_list):
         network = task.model_zoo.get_model(net)
         setattr(network, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
-                                         Linear('dropout', lower=dropout[0], upper=dropout[1]).get_hyper_param()])
+                                          Linear('dropout', lower=dropout[0],
+                                                 upper=dropout[1]).get_hyper_param()])
         net_list.append(network)
     nets = ag.Nets(net_list)
     return nets
@@ -48,6 +53,7 @@ def set_batch_size(dataset, batch_size=8):
     cs.add_hyperparameter(data_hyperparams)
     dataset._set_search_space(cs)
     return dataset
+
 
 def generate_mini_dataset(source_file_path,
                           dest_file_name,
@@ -98,13 +104,15 @@ def generate_mini_dataset(source_file_path,
             fp.write('\n')
     return file_path
 
+
 def get_mini_dataset():
     train_path = generate_mini_dataset(source_file_path='/home/ubuntu/conll2003/train.txt',
                                        dest_file_name='train.txt',
                                        column_format={0: 'text', 3: 'ner'})
     val_path = generate_mini_dataset(source_file_path='/home/ubuntu/conll2003/valid.txt',
                                      dest_file_name='valid.txt',
-                                     column_format={0: 'text', 3: 'ner'})
+                                     column_format={0: 'text', 3: 'ner'},
+                                     sentences_limit=8)
 
     dataset = task.Dataset(name='CoNLL2003',
                            train_path=train_path,
@@ -114,9 +122,10 @@ def get_mini_dataset():
     set_batch_size(dataset, 8)
     return dataset
 
+
 def test_with_auto_hyp_cpu():
     """
-    Test NER task on cpu.
+    Test NER task on cpu with auto hyperparameter search.
     Run 10 trials on random samples for 1 epoch each.
     """
 
@@ -129,7 +138,7 @@ def test_with_auto_hyp_cpu():
     stop_criterion = {
         'time_limits': 15000,
         'max_metric': 0.95,
-        'max_trial_count': 10
+        'max_trial_count': 1
     }
     resources_per_trial = {
         'max_num_gpus': 0,
@@ -144,6 +153,7 @@ def test_with_auto_hyp_cpu():
                        resources_per_trial=resources_per_trial)
 
     assert results.metric is not None
+
 
 def test_with_fixed_hyp_cpu():
     """
@@ -175,9 +185,11 @@ def test_with_fixed_hyp_cpu():
 
     assert results.metric is not None
 
+
+@unittest.skipIf(mx.context.num_gpus() < 1, "skip if no GPU found")
 def test_with_auto_hyp_gpu():
     """
-    Test NER task on GPU.
+    Test NER task on GPU with auto hyperparameter search.
     Run 10 trails on CoNLL2003 for 5 epochs each and assert score.
     """
 
@@ -193,12 +205,12 @@ def test_with_auto_hyp_gpu():
     stop_criterion = {
         'time_limits': 15000,
         'max_metric': 0.95,
-        'max_trial_count': 10
+        'max_trial_count': 1
     }
     resources_per_trial = {
         'max_num_gpus': 1,
         'max_num_cpus': 4,
-        'max_training_epochs': 5
+        'max_training_epochs': 1
     }
 
     results = task.fit(dataset,
@@ -209,6 +221,8 @@ def test_with_auto_hyp_gpu():
 
     assert results.metric > 0.85
 
+
+@unittest.skipIf(mx.context.num_gpus() < 1, "skip if no GPU found")
 def test_with_fixed_hyp_gpu():
     """
     Test NER task on GPU with fixed set of hyperparameters to assert the
@@ -232,10 +246,8 @@ def test_with_fixed_hyp_gpu():
     resources_per_trial = {
         'max_num_gpus': 1,
         'max_num_cpus': 4,
-        'max_training_epochs': 5
+        'max_training_epochs': 1
     }
-
-
 
     results = task.fit(dataset,
                        nets=nets,
@@ -243,25 +255,10 @@ def test_with_fixed_hyp_gpu():
                        stop_criterion=stop_criterion,
                        resources_per_trial=resources_per_trial)
 
-    assert results.metric > 0.91
+    assert results.metric > 0.90
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Test Named Entity Recognition')
-    parser.add_argument('--type', type=str, default='fixed',
-                        help='Options are `fixed` or `auto`')
-    parser.add_argument('--machine', type=str, default='cpu',
-                        help='Options are `cpu` or `gpu`')
-    opt = parser.parse_args()
+    import nose
 
-    if opt.machine == 'cpu' and opt.type == 'fixed':
-        test_with_fixed_hyp_cpu()
-    elif opt.machine == 'cpu' and opt.type == 'auto':
-        test_with_auto_hyp_cpu()
-    elif opt.machine == 'gpu' and opt.type == 'fixed':
-        test_with_fixed_hyp_gpu()
-    elif opt.machine == 'gpu' and opt.type == 'auto':
-        test_with_auto_hyp_gpu()
-    else:
-        raise ValueError('Please provide the proper argument values. '
-                         'Run with `--help` keyword argument to get the argument information')
+    nose.runmodule()
