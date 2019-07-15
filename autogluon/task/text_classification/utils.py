@@ -68,7 +68,7 @@ def get_dataset_from_tsv_files(path: AnyStr, field_indices: list = None) -> (glu
     for _ in dataset:
         label_set.add(_[-1])
 
-    lbl_dict = dict([(y, x + 1) for x, y in enumerate(label_set)])
+    lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
 
     for elem in dataset:
         elem[-1] = lbl_dict[elem[-1]]
