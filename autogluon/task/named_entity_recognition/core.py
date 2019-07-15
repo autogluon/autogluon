@@ -10,30 +10,22 @@ from ray.tune.automl.search_policy import AutoMLSearcher
 from ray.tune.schedulers import TrialScheduler
 
 import autogluon as ag
-from autogluon.space import Linear
 from .dataset import Dataset
-from .model_zoo import get_model
 from .pipeline import train_named_entity_recognizer
 from ...network import Nets
-from ...optim import Optimizers, get_optim
-
+from ...optim import Optimizers
+from .utils import prepare_nets, prepare_optims
 __all__ = ['fit']
 
 LOG = logging.getLogger(__name__)
-DEFAULT_NETS = Nets([
-    get_model('bert_12_768_12'),
-    get_model('bert_24_1024_16'),
-])
 
-DEFAULT_OPT = Optimizers([
-    get_optim('adam'),
-    get_optim('sgd'),
-    get_optim('bertadam')
-])
+DEFAULT_NETS = prepare_nets(['bert_12_768_12', 'bert_24_1024_16'])
+
+DEFAULT_OPT = prepare_optims(['adam', 'bertadam'])
 
 DEFAULT_STOP_CRITERION = {
     'time_limits': 1 * 60 * 60,
-    'max_metric': 0.80,  # TODO Should be place a bound on metric?
+    'max_metric': 0.80,
     'max_trial_count': 3
 }
 

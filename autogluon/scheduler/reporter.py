@@ -53,5 +53,4 @@ class StatusReporter(EpochEnd):
 
     def epoch_end(self, estimator: Estimator, *args, **kwargs):
         self.current_epoch += 1
-        # TODO (shaabhn): fix for custom eval metric
         self(task_id=self.task_id, epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1])

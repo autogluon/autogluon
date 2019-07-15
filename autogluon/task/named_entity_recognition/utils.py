@@ -9,6 +9,11 @@ import mxnet as mx
 
 from seqeval.metrics.sequence_labeling import get_entities
 
+from .model_zoo import get_model
+from ...optim import Optimizers, get_optim
+from ...network import Nets
+from ...space import Log, List, Linear
+
 LOG = logging.getLogger(__name__)
 
 TAGGED_TOKEN = namedtuple('TaggedToken', ['text', 'tag'])
@@ -283,3 +288,33 @@ class AccNer(mx.metric.EvalMetric):
 
     def reset(self):
         self.value = float('nan')
+
+
+# TODO(shaabhn): remove after backend update
+def prepare_nets(network_list, dropout_list=None):
+    if not dropout_list:
+        dropout_list = [(0.0, 0.5)] * len(network_list)
+    else:
+        assert len(network_list) == len(dropout_list)
+    net_list = []
+    for net, dropout in zip(network_list, dropout_list):
+        network = get_model(net)
+        setattr(network, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
+                                         Linear('dropout', lower=dropout[0], upper=dropout[1]).get_hyper_param()])
+        net_list.append(network)
+    nets = Nets(net_list)
+    return nets
+
+
+def prepare_optims(optim_list, lr_list=None):
+    if not lr_list:
+        lr_list = [(10 ** -5, 10 ** -4)] * len(optim_list)
+    else:
+        assert len(optim_list) == len(lr_list)
+    opt_list = []
+    for opt, lr in zip(optim_list, lr_list):
+        optim = get_optim(opt)
+        setattr(optim, 'hyper_params', [Log('lr', lr[0], lr[1]).get_hyper_param()])
+        opt_list.append(optim)
+    optims = Optimizers(opt_list)
+    return optims

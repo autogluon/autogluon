@@ -7,11 +7,13 @@ from multiprocessing import cpu_count
 from typing import AnyStr
 import logging
 import numpy as np
+import ConfigSpace as CS
 import gluonnlp as nlp
 from mxnet import gluon
 from mxnet.gluon.utils import download
 
 from ... import dataset
+from ...space import Exponential
 from .utils import load_segment
 
 LOG = logging.getLogger(__name__)
@@ -60,6 +62,14 @@ class Dataset(dataset.Dataset):
     def _init_(self):
         self._read_dataset()
         self.add_search_space()
+
+    def add_search_space(self):
+        exp = int(np.log2(self.batch_size))
+        cs = CS.ConfigurationSpace()
+        data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=exp,
+                                       upper_exponent=exp).get_hyper_param()
+        cs.add_hyperparameter(data_hyperparams)
+        self._set_search_space(cs)
 
     @property
     def num_classes(self) -> int:

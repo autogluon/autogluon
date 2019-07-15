@@ -6,43 +6,12 @@ import numpy as np
 import mxnet as mx
 import ConfigSpace as CS
 
-import autogluon as ag
-from autogluon.space import Log, List, Linear, Exponential
+from autogluon.space import Exponential
 from autogluon import named_entity_recognition as task
 
 import logging
 
 logging.basicConfig(level=logging.INFO)
-
-
-def prepare_nets(network_list, dropout_list=None):
-    if not dropout_list:
-        dropout_list = [(0.0, 0.5)] * len(network_list)
-    else:
-        assert len(network_list) == len(dropout_list)
-    net_list = []
-    for net, dropout in zip(network_list, dropout_list):
-        network = task.model_zoo.get_model(net)
-        setattr(network, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
-                                          Linear('dropout', lower=dropout[0],
-                                                 upper=dropout[1]).get_hyper_param()])
-        net_list.append(network)
-    nets = ag.Nets(net_list)
-    return nets
-
-
-def prepare_optims(optim_list, lr_list=None):
-    if not lr_list:
-        lr_list = [(10 ** -5, 10 ** -4)] * len(optim_list)
-    else:
-        assert len(optim_list) == len(lr_list)
-    opt_list = []
-    for opt, lr in zip(optim_list, lr_list):
-        optim = ag.optim.get_optim(opt)
-        setattr(optim, 'hyper_params', [Log('lr', lr[0], lr[1]).get_hyper_param()])
-        opt_list.append(optim)
-    optims = ag.Optimizers(opt_list)
-    return optims
 
 
 def set_batch_size(dataset, batch_size=8):
@@ -131,9 +100,9 @@ def test_with_auto_hyp_cpu():
 
     dataset = get_mini_dataset()
 
-    nets = prepare_nets(['bert_12_768_12', 'bert_24_1024_16'])
+    nets = task.utils.prepare_nets(['bert_12_768_12', 'bert_24_1024_16'])
 
-    optims = prepare_optims(['adam', 'bertadam'])
+    optims = task.utils.prepare_optims(['adam', 'bertadam'])
 
     stop_criterion = {
         'time_limits': 15000,
@@ -161,9 +130,9 @@ def test_with_fixed_hyp_cpu():
     """
     dataset = get_mini_dataset()
 
-    nets = prepare_nets(['bert_24_1024_16'])
+    nets = task.utils.prepare_nets(['bert_24_1024_16'])
 
-    optims = prepare_optims(['bertadam'], lr_list=[[0.00004, 0.00005]])
+    optims = task.utils.prepare_optims(['bertadam'], lr_list=[[0.00004, 0.00005]])
 
     stop_criterion = {
         'time_limits': 15000,
@@ -198,9 +167,9 @@ def test_with_auto_hyp_gpu():
                            val_path='/home/ubuntu/conll2003/test.txt')
     dataset = set_batch_size(dataset, 8)
 
-    nets = prepare_nets(['bert_12_768_12', 'bert_24_1024_16'])
+    nets = task.utils.prepare_nets(['bert_12_768_12', 'bert_24_1024_16'])
 
-    optims = prepare_optims(['adam', 'bertadam'])
+    optims = task.utils.prepare_optims(['adam', 'bertadam'])
 
     stop_criterion = {
         'time_limits': 15000,
@@ -233,9 +202,9 @@ def test_with_fixed_hyp_gpu():
                            val_path='/home/ubuntu/conll2003/test.txt')
     dataset = set_batch_size(dataset, 8)
 
-    nets = prepare_nets(['bert_24_1024_16'])
+    nets = task.utils.prepare_nets(['bert_24_1024_16'])
 
-    optims = prepare_optims(['bertadam'], lr_list=[[0.00004, 0.00005]])
+    optims = task.utils.prepare_optims(['bertadam'], lr_list=[[0.00004, 0.00005]])
 
     stop_criterion = {
         'time_limits': 15000,
