@@ -1,6 +1,8 @@
 import functools
 import types
 
+from mxnet import gluon
+
 from ..space import *
 
 __all__ = ['autogluon_net_instances', 'autogluon_nets', 'Net']
@@ -15,7 +17,9 @@ def autogluon_nets(func):
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
         #TODO (cgraywang): add more hparams
-        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param()])
+        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param(),
+                                      List('pretrained_base', [True, False]).get_hyper_param(),
+                                      List('norm_layer', ['BatchNorm']).get_hyper_param()])
         return net
     return wrapper_decorator
 
