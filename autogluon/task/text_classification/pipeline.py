@@ -51,10 +51,12 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
               'use_classifier': False}
 
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
-    dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab), max_seq_length=200)
+    dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True), max_seq_length=80,
+                                          pair=True)
     dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                           transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                          field_indices=args.dataset.field_indices, num_workers=num_workers)
+                          train_field_indices=args.dataset.train_field_indices,
+                          val_field_indices=args.dataset.val_field_indices, num_workers=num_workers)
 
     net = BERTClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                                 dropout=args.dropout)
@@ -96,7 +98,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
 
 
 @autogluon_method
-def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources = None) -> None:
+def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
     import psutil, os
     batch_size, ctx = _init_env(args)
     args.pretrained = True
