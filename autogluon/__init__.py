@@ -46,6 +46,7 @@ from .network import *
 from .optim import *
 from .space import *
 from .task import image_classification as image_classification
+from .task import object_detection as object_detection
 from .basic import *
 from .utils import *
 from . import scheduler, searcher, distributed, resource

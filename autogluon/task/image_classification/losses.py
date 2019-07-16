@@ -30,7 +30,7 @@ def get_loss(name, **kwargs):
     Parameters
     ----------
     name : str
-        Name of the model.
+        Name of the loss.
 
     Returns
     -------
@@ -46,17 +46,17 @@ def get_loss(name, **kwargs):
 
 
 def get_loss_instance(name, **kwargs):
-    """Returns a loss with search space by name
+    """Returns a loss instance by name
 
     Parameters
     ----------
     name : str
-        Name of the model.
+        Name of the loss.
 
     Returns
     -------
     Loss
-        The loss with search space.
+        The loss instance.
     """
     if name not in losses and name.lower() not in losses:
         err_str = '"%s" is not among the following loss list:\n\t' % (name)

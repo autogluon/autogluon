@@ -25,7 +25,7 @@ class Nets(BaseAutoObject):
         for net in self.net_list:
             #TODO(cgraywang): distinguish between different nets, only support resnet for now
             if isinstance(net, str):
-                net = ag.task.get_model(net)
+                net = self._get_task_model(net)
             net_hyper_params = net.get_hyper_params()
             conds = []
             for net_hyper_param in net_hyper_params:
@@ -49,8 +49,21 @@ class Nets(BaseAutoObject):
                 raise NotImplementedError
         return net_strs
 
+    def _get_task_model(self, net):
+        #TODO: temporal solution, we now have limit application support
+        net = net.lower()
+        if net in ag.task.image_classification.models:
+            net = ag.task.image_classification.get_model(net)
+        elif net in ag.task.object_detection.models:
+            net = ag.task.object_detection.get_model(net)
+        else:
+            raise NotImplementedError
+        return net
+
     def __repr__(self):
-        return "AutoGluon Nets %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
+        return "AutoGluon Nets %s with %s" % \
+               (str(self._get_search_space_strs()), str(self.search_space))
 
     def __str__(self):
-        return "AutoGluon Nets %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
+        return "AutoGluon Nets %s with %s" % \
+               (str(self._get_search_space_strs()), str(self.search_space))
