@@ -63,7 +63,7 @@ class MXBoardHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
         # Add those as scalars.
         # TODO Add metrics as per the list specified to track. Currently just doing Validation metrics
         with SummaryWriter(logdir=self.log_dir, flush_secs=2) as sw:
-            for metric in estimator.val_metrics:
+            for metric in estimator.val_metrics + estimator.train_metrics:
                 sw.add_scalar(tag='{}_epoch'.format(metric.name), value=('task_%d' % self.task_id, metric.get()[1]),
                               global_step=self.current_epoch)
 

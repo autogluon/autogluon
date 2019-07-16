@@ -33,7 +33,8 @@ if __name__ == '__main__':
         'max_training_epochs': 10
     }
 
-    dataset = task.Dataset(name='glue_mnli', data_format='tsv', field_indices=[8, 9, 10])
+    dataset = task.Dataset(name='glue_mnli', data_format='tsv', train_field_indices=[8, 9, 11],
+                           val_field_indices=[8, 9, 15])
     results = task.fit(dataset,
                        nets=nets_to_search,
                        optimizers=optims,
