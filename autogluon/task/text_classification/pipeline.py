@@ -148,7 +148,12 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     early_stopping_handler = EarlyStoppingHandler(monitor=estimator.train_metrics[0], mode='max')
 
-    event_handlers = [reporter, early_stopping_handler] + model_handlers
+    lr_handler = LRHandler(warmup_ratio=0.1,
+                           batch_size=batch_size,
+                           num_epochs=args.epochs,
+                           train_length=len(dataset.train_dataset))
+
+    event_handlers = [reporter, early_stopping_handler, lr_handler] + model_handlers
 
     if mxboard_handler is not None:
         event_handlers.append(mxboard_handler)
