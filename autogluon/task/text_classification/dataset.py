@@ -22,6 +22,8 @@ def get_gluon_nlp_dataset_fn(name):
         return nlp.data.GlueSST2
     elif name == 'glue_mnli':
         return nlp.data.GlueMNLI
+    elif name == 'mrpc':
+        return nlp.data.GlueMRPC
     else:
         raise NotImplementedError
 

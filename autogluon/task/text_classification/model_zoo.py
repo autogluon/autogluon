@@ -64,7 +64,7 @@ def get_model_instances(name: AnyStr,
 
     if 'bert' in name:
         # Currently the dataset for BERT is book corpus wiki only on gluon model zoo
-        dataset_name = 'book_corpus_wiki_en_cased'
+        dataset_name = 'book_corpus_wiki_en_uncased'
 
     if name not in models:
         err_str = '{} is not among the following model list: \n\t'.format(name)
