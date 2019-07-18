@@ -53,7 +53,7 @@ class Dataset(dataset.Dataset):
         self.batch_size = batch_size
         self._download_dataset()
         self.add_search_space()
-        self.num_workers = cpu_count() if num_workers is None else num_workers/2 # dividing by 2 to use for train and valid dataloaders
+        self.num_workers = cpu_count() if num_workers is None else int(num_workers/2) # dividing by 2 to use for train and valid dataloaders
 
         self._vocab = None
 
