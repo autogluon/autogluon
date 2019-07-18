@@ -65,6 +65,8 @@ class TaskScheduler(object):
         p = mp.Process(target=TaskScheduler._run_task, args=(
             task.fn, task.args, task.resources,
             TaskScheduler.RESOURCE_MANAGER))
+        # set cpu affinity (https://linux.die.net/man/1/taskset)
+        os.system("taskset --pid {} --cpu-list {}".format(p.pid, str(task.resources.cpu_ids)[1:-1]))
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
