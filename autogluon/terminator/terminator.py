@@ -50,7 +50,7 @@ class MedianStopping(BaseTerminator):
                  min_samples:int = 3,
                  abort_trial = True,
                  *args, **kwargs):
-        super(HyperBand, self).__init__(time_attr, reward_attr, *args, **kwargs)
+        super(MedianStopping, self).__init__(time_attr, reward_attr, *args, **kwargs)
         self._min_samples = min_samples
         self._abort_trial = abort_trial
         self._completed_tasks = set()
@@ -58,6 +58,9 @@ class MedianStopping(BaseTerminator):
         self._scores = defaultdict(list)
 
     def on_task_add(self, task_id):
+        pass
+
+    def on_task_remove(self, task_id):
         pass
 
     def on_task_report(self, task_id, result):

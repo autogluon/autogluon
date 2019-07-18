@@ -18,6 +18,7 @@ from .model_zoo import *
 from .pipeline import *
 from ...network import Nets
 from ...optim import Optimizers, get_optim
+from ...terminator import *
 
 __all__ = ['fit']
 
@@ -214,6 +215,7 @@ def fit(data: Dataset,
 
         if trial_scheduler is None:
             trial_scheduler = 'default'
+            terminator = MedianStopping()
 
         if trial_scheduler == 'hyperband':
             trial_scheduler = ag.scheduler.Hyperband_Scheduler(
@@ -229,6 +231,7 @@ def fit(data: Dataset,
                             resources_per_trial[
                                 'max_num_gpus'])},
                 searcher,
+                terminator,
                 checkpoint=savedir,
                 resume=resume,
                 time_attr='epoch',

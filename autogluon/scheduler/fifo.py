@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 from .scheduler import *
 from ..terminator import *
-from ..resource import Resources
+from .resource_manager import Resources
 from .reporter import StatusReporter
 from ..basic import save, load
 from ..utils import mkdir, try_import_mxboard
@@ -57,7 +57,7 @@ class FIFO_Scheduler(TaskScheduler):
         >>> myscheduler.run()
     """
     def __init__(self, train_fn, args, resource, searcher,
-                 terminator: BaseTerminator,
+                 terminator: BaseTerminator = None,
                  checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none'):
@@ -125,11 +125,12 @@ class FIFO_Scheduler(TaskScheduler):
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
 
         with self.LOCK:
-            reporter = StatusReporter()
+            reporter = StatusReporter(task.task_id)
             task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
 
-            if terminator is not None:
-                terminator.on_task_add(task.task_id)
+            if self.terminator is not None:
+                self.terminator.on_task_add(task.task_id)
 
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
@@ -180,17 +181,17 @@ class FIFO_Scheduler(TaskScheduler):
             self.add_training_result(task.task_id, reported_result)
 
             if 'done' in reported_result and reported_result['done'] is True:
-                if terminator:
-                    terminator.on_task_complete(task.task_id, reported_result)
+                if self.terminator:
+                    self.terminator.on_task_complete(task.task_id, reported_result)
                 reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            elif terminator:
-                if not terminator.on_task_report(task.task_id, reported_result):
+            elif self.terminator:
+                if not self.terminator.on_task_report(task.task_id, reported_result):
                     logger.info('Removing task {} due to low performance'.format(task))
-                    terminator.on_task_remove(task.task_id)
+                    self.terminator.on_task_remove(task.task_id)
                     task_process.terminate()
                     task_process.join()
                     FIFO_Scheduler.RESOURCE_MANAGER._release(task.resources)

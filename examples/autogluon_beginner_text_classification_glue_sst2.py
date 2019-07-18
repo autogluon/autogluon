@@ -15,10 +15,10 @@ if __name__ == '__main__':
     ])
 
     optims = default_optimizers = Optimizers([
-        get_optim('adam'),
+        get_optim('adam')
         # get_optim('sgd'),
         # get_optim('ftml'),
-        get_optim('bertadam')
+        # get_optim('bertadam')
     ])
 
     default_stop_criterion = {
@@ -28,8 +28,8 @@ if __name__ == '__main__':
     }
 
     default_resources_per_trial = {
-        'max_num_gpus': 4,
-        'max_num_cpus': 32,
+        'max_num_gpus': 2,
+        'max_num_cpus': 16,
         'max_training_epochs': 10
     }
 
