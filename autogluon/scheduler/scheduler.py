@@ -65,8 +65,6 @@ class TaskScheduler(object):
         p = mp.Process(target=TaskScheduler._run_task, args=(
             task.fn, task.args, task.resources,
             TaskScheduler.RESOURCE_MANAGER))
-        # set cpu affinity (https://linux.die.net/man/1/taskset)
-        os.system("taskset --pid {} --cpu-list {}".format(p.pid, str(task.resources.cpu_ids)[1:-1]))
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Config': task.args['config'], 'Process': p})
@@ -78,6 +76,7 @@ class TaskScheduler(object):
         if resources.num_gpus > 0:
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, resources.gpu_ids))
         try:
+            args['resources'] = resources
             fn(**args)
         except Exception as e:
             import traceback

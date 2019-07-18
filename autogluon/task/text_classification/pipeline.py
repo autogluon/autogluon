@@ -37,7 +37,7 @@ def _init_env(args: dict):
     return batch_size, ctx
 
 
-def get_bert_model_attributes(args: dict, batch_size: int, ctx):
+def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     """
     Utility method which defines a BertModel for classification and also initializes
     dataset object compatible with BertModel.
@@ -54,7 +54,7 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx):
     dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab), max_seq_length=200)
     dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                           transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                          field_indices=args.dataset.field_indices)
+                          field_indices=args.dataset.field_indices, num_workers=num_workers)
 
     net = BERTClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                                 dropout=args.dropout)
@@ -67,7 +67,7 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx):
     return net, dataset, model_handlers
 
 
-def get_lm_model_attributes(args: dict, batch_size: int, ctx):
+def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     """
     Utility method which defines a Language Model for classification and also initializes
     dataset object compatible with Language Model.
@@ -82,7 +82,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx):
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                      field_indices=args.dataset.field_indices)
+                      field_indices=args.dataset.field_indices, num_workers=num_workers)
 
     net = LMClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                               dropout=args.dropout)
@@ -96,12 +96,14 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx):
 
 
 @autogluon_method
-def train_text_classification(args: dict, reporter: StatusReporter, task_id: int) -> None:
+def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources = None) -> None:
+    import psutil, os
     batch_size, ctx = _init_env(args)
     args.pretrained = True
     args.task_id = task_id
-
-    logger.info('Task ID : {0}, args : {1}'.format(task_id, args))
+    logger.info('Task ID : {0}, args : {1}, resources:{2}, pid:{3}'.format(task_id, args, resources, os.getpid()))
+    ps_p = psutil.Process(os.getpid())
+    ps_p.cpu_affinity(resources.cpu_ids)
 
     mxboard_handler = args.viz if 'viz' in args else None
     if mxboard_handler is not None:
@@ -109,9 +111,9 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         mxboard_handler.trial_args = args.__dict__
 
     if 'bert' in args.model:  # Get bert specific model attributes
-        net, dataset, model_handlers = get_bert_model_attributes(args, batch_size, ctx)
+        net, dataset, model_handlers = get_bert_model_attributes(args, batch_size, ctx, resources.num_cpus)
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
-        net, dataset, model_handlers = get_lm_model_attributes(args, batch_size, ctx)
+        net, dataset, model_handlers = get_lm_model_attributes(args, batch_size, ctx, resources.num_cpus)
 
     else:
         raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))

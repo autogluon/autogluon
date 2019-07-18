@@ -38,7 +38,8 @@ class Dataset(dataset.Dataset):
     """
 
     def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None, lazy: bool = True,
-                 transform: TextDataTransform = None, batch_size: int = 32, data_format='json', field_indices=None):
+                 transform: TextDataTransform = None, batch_size: int = 32, data_format='json', field_indices=None,
+                 num_workers=None):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
@@ -52,6 +53,7 @@ class Dataset(dataset.Dataset):
         self.batch_size = batch_size
         self._download_dataset()
         self.add_search_space()
+        self.num_workers = cpu_count() if num_workers is None else num_workers/2 # dividing by 2 to use for train and valid dataloaders
 
         self._vocab = None
 
@@ -171,12 +173,12 @@ class Dataset(dataset.Dataset):
 
         self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_size=self.batch_size,
                                                        shuffle=True, last_batch='rollover',
-                                                       batchify_fn=batchify_fn, num_workers=cpu_count())
+                                                       batchify_fn=batchify_fn, num_workers=self.num_workers)
         # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
                                                      last_batch='rollover',
-                                                     batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)
+                                                     batchify_fn=batchify_fn, num_workers=self.num_workers, shuffle=False)
 
     @staticmethod
     def _train_valid_split(dataset: gluon.data.Dataset, valid_ratio=0.20) -> [gluon.data.Dataset,
@@ -227,9 +229,9 @@ class BERTDataset(Dataset):
 
         self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, batch_size=self.batch_size,
                                                        shuffle=True, last_batch='rollover',
-                                                       batchify_fn=batchify_fn, num_workers=cpu_count())
+                                                       batchify_fn=batchify_fn, num_workers=self.num_workers)
         # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
                                                      last_batch='rollover',
-                                                     batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)
+                                                     batchify_fn=batchify_fn, num_workers=self.num_workers, shuffle=False)

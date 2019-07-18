@@ -44,7 +44,8 @@ requirements = [
     'mxnet',
     'mxboard',
     'tensorboard',
-    'tensorflow'
+    'tensorflow',
+    'psutil'
 ]
 
 setup(
