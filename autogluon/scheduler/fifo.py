@@ -181,17 +181,17 @@ class FIFO_Scheduler(TaskScheduler):
             self.add_training_result(task.task_id, reported_result)
 
             if 'done' in reported_result and reported_result['done'] is True:
-                if self.terminator:
-                    self.terminator.on_task_complete(task.task_id, reported_result)
+                if terminator:
+                    terminator.on_task_complete(task.task_id, reported_result)
                 reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
             elif self.terminator:
-                if not self.terminator.on_task_report(task.task_id, reported_result):
+                if not terminator.on_task_report(task.task_id, reported_result):
                     logger.info('Removing task {} due to low performance'.format(task))
-                    self.terminator.on_task_remove(task.task_id)
+                    terminator.on_task_remove(task.task_id)
                     task_process.terminate()
                     task_process.join()
                     FIFO_Scheduler.RESOURCE_MANAGER._release(task.resources)

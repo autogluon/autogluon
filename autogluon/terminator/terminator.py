@@ -65,8 +65,7 @@ class MedianStopping(BaseTerminator):
 
     def on_task_report(self, task_id, result):
 
-        self._scores.append(result[self._reward_attr])
-
+        self._scores[task_id].append(result[self._reward_attr])
         # don't evaluate if we don't have a min number of samples
         if len(self._scores) < self._min_samples:
             return True
