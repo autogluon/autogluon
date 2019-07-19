@@ -165,7 +165,7 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                     'use_classifier': False,
                     'dropout_prob': 0.1}
     pre_trained_network, vocab = get_model_instances(name=args.model,
-                                                     dataset_name='book_corpus_wiki_en_cased',
+                                                     dataset_name=args.pretrained_dataset_name,
                                                      **model_kwargs)
 
     ## Initialize the dataset here.
@@ -252,7 +252,8 @@ def train_named_entity_recognizer(args: dict, reporter: StatusReporter, task_id:
                                  verbose=LoggingHandler.LOG_PER_EPOCH)
 
     stop_handler = EarlyStoppingHandler(monitor=val_metrics[0],
-                                        mode='max')
+                                        mode='max',
+                                        patience=3)
 
     estimator = NEREstimator(net=net, loss=loss, metrics=train_metrics,
                              trainer=trainer, context=ctx)

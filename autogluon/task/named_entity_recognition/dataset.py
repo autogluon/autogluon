@@ -34,6 +34,7 @@ class Dataset(dataset.Dataset):
         # TODO : add search space, handle batch_size, num_workers
         self._num_classes: int = 0
         self._vocab: nlp.Vocab = vocab
+        self.pretrained_dataset_name = 'book_corpus_wiki_en_cased'
         self._train_ds_transformed = None
         self._val_ds_transformed = None
         self.tag_vocab = None
@@ -49,11 +50,12 @@ class Dataset(dataset.Dataset):
 
         if self._vocab is None:
             _, self._vocab = nlp.model.get_model(name='bert_12_768_12',
-                                                 dataset_name='book_corpus_wiki_en_cased')
-            LOG.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
-                     "on `book_corpus_wiki_en_cased`. If you would like to use different"
-                     "vocabulary then please pass parameter `vocab` as an instance of"
-                     "`nlp.Vocab`.")
+                                                 dataset_name=self.pretrained_dataset_name)
+            if self.pretrained_dataset_name == 'book_corpus_wiki_en_cased':
+                LOG.info("Taking default vocabulary of pre-trained model `bert_12_768_12` "
+                         "on `book_corpus_wiki_en_cased`. If you would like to use different"
+                         "vocabulary then please pass parameter `vocab` as an instance of"
+                         "`nlp.Vocab`.")
 
         # if not lazy:
         if not lazy:
@@ -81,7 +83,7 @@ class Dataset(dataset.Dataset):
 
     @vocab.setter
     def vocab(self, value: nlp.vocab) -> None:
-        self.vocab = value
+        self._vocab = value
         self._init_()
 
     def _root_path(self):
@@ -119,7 +121,22 @@ class Dataset(dataset.Dataset):
                                  "as `train_path` and `val_path`" %self.name)
             self.max_sequence_length = self.max_sequence_length or 300
             self.indexes_format = self.indexes_format or {0: 'text', 3: 'ner'}
-
+        elif self.name == 'jnlpba':
+            if self.train_path is None or self.val_path is None:
+                raise ValueError("%s can't be downloaded directly from Gluon due to"
+                                 "license Issue. Please provide the downloaded filepath"
+                                 "as `train_path` and `val_path`" %self.name)
+            self.indexes_format = self.indexes_format or {0: 'text', 1: 'ner'}
+            # Use SciBERT vocab for this dataset
+            self.pretrained_dataset_name = 'scibert_scivocab_cased'
+        elif self.name == 'bc5cdr':
+            if self.train_path is None or self.val_path is None:
+                raise ValueError("%s can't be downloaded directly from Gluon due to"
+                                 "license Issue. Please provide the downloaded filepath"
+                                 "as `train_path` and `val_path`" %self.name)
+            self.indexes_format = self.indexes_format or {0: 'text', 3: 'ner'}
+            # Use SciBERT vocab for this dataset
+            self.pretrained_dataset_name = 'scibert_scivocab_cased'
         else:
             raise NotImplementedError  # TODO: Add support for more dataset
 
@@ -137,14 +154,14 @@ class Dataset(dataset.Dataset):
         vocabulary"""
         if self.tokenizer is None:
             self.tokenizer = getattr(nlp.data.transforms, 'BERTTokenizer')
-        self.tokenizer = self.tokenizer(vocab=self.vocab, lower=False)
+        self.tokenizer = self.tokenizer(vocab=self._vocab, lower=False)
         self.train_dataset, max_seq_len_train = load_segment(file_path=self.train_path, tokenizer=self.tokenizer,
                                           indexes_format=self.indexes_format)
         self.val_dataset, max_seq_len_val = load_segment(file_path=self.val_path, tokenizer=self.tokenizer,
                                         indexes_format=self.indexes_format)
 
         # Set max sequence length based on data if not provided by user
-        self.max_sequence_length = self.max_sequence_length or max(max_seq_len_train, max_seq_len_val) + 1
+        self.max_sequence_length = self.max_sequence_length or max(max_seq_len_train, max_seq_len_val) + 10
 
         LOG.info("Train data length: %d", len(self.train_dataset))
         LOG.info("Validation data length: %d", len(self.val_dataset))
@@ -182,10 +199,10 @@ class Dataset(dataset.Dataset):
             'the number of tokens {} should not be larger than {} - 2. offending sentence: {}'\
                 .format(len(sentence), self.max_sequence_length, sentence)
 
-        text_tokens = ([self.vocab.cls_token] + [token.text for token in sentence] +
-                       [self.vocab.sep_token])
-        padded_text_ids = (self.vocab.to_indices(text_tokens)
-                           + [self.vocab[self.vocab.padding_token]] *
+        text_tokens = ([self._vocab.cls_token] + [token.text for token in sentence] +
+                       [self._vocab.sep_token])
+        padded_text_ids = (self._vocab.to_indices(text_tokens)
+                           + [self._vocab[self._vocab.padding_token]] *
                            (self.max_sequence_length - len(text_tokens)))
 
         tags = [NULL_TAG] + [token.tag for token in sentence] + [NULL_TAG]

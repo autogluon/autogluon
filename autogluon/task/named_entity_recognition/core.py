@@ -25,7 +25,7 @@ DEFAULT_OPT = prepare_optims(['adam', 'bertadam'])
 
 DEFAULT_STOP_CRITERION = {
     'time_limits': 1 * 60 * 60,
-    'max_metric': 0.80,
+    'max_metric': 0.80,  # TODO Should be place a bound on metric?
     'max_trial_count': 3
 }
 
@@ -113,6 +113,7 @@ def fit(data: Dataset,
             args_dict['data_name'] = data.name
             args_dict['train_path'] = data.train_path
             args_dict['val_path'] = data.val_path
+            args_dict['pretrained_dataset_name'] = data.pretrained_dataset_name
             args_dict['num_gpus'] = resources_per_trial['max_num_gpus']
             args_dict['pretrained'] = True
             args_dict['indexes_format'] = data.indexes_format
