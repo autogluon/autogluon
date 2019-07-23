@@ -14,6 +14,7 @@ class Communicator(threading.Thread):
         self.process = process
         self.local_reporter = local_reporter
         self.dist_reporter = dist_reporter
+        self._stop_event = threading.Event()
 
     def run(self):
         while self.process.is_alive():
@@ -24,11 +25,21 @@ class Communicator(threading.Thread):
                 self.process.join()
                 break
 
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
     @classmethod
     def Create(cls, process, local_reporter, dist_reporter):
         communicator = cls(process, local_reporter, dist_reporter)
         communicator.start()
         return communicator
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        return reprstr
 
 class DistStatusReporter(object):
     """Report status through the training scheduler.
@@ -41,7 +52,7 @@ class DistStatusReporter(object):
 
     def __init__(self):
         self._queue = Queue()
-        self._continue_semaphore = DistSemaphore(1)
+        self._continue_semaphore = DistSemaphore(0)
         self._last_report_time = time.time()
 
     def __call__(self, **kwargs):
@@ -75,6 +86,10 @@ class DistStatusReporter(object):
         """
         self._last_report_time = time.time()
 
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        return reprstr
+
 
 class DistSemaphore(object):
     def __init__(self, value):
@@ -87,3 +102,7 @@ class DistSemaphore(object):
 
     def release(self):
         self._queue.put(1)
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        return reprstr

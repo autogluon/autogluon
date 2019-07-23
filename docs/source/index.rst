@@ -14,6 +14,12 @@ An AutoML Toolkit.
    install
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/build/backend/index
+
+.. toctree::
    :maxdepth: 1
    :caption: Package Reference
 

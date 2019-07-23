@@ -8,8 +8,8 @@ from collections import namedtuple, OrderedDict
 
 from .remote_manager import RemoteManager
 from ..resource import DistributedResourceManager
-from ..scheduler import Task
-from .dist_reporter import Communicator
+from ..basic import Task
+from .dist_reporter import Communicator, DistSemaphore
 from ..scheduler.reporter import StatusReporter
 
 logger = logging.getLogger(__name__)
@@ -34,14 +34,16 @@ class DistributedTaskScheduler(object):
     RESOURCE_MANAGER = DistributedResourceManager()
     REMOTE_MANAGER = None
     def __init__(self, dist_ip_addrs=[]):
-        if DistributedTaskScheduler.REMOTE_MANAGER is None:
-            DistributedTaskScheduler.REMOTE_MANAGER = RemoteManager()
-            DistributedTaskScheduler.RESOURCE_MANAGER.add_remote(
-                DistributedTaskScheduler.REMOTE_MANAGER.get_remotes())
-        remotes = DistributedTaskScheduler.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
-        DistributedTaskScheduler.RESOURCE_MANAGER.add_remote(remotes)
+        cls = DistributedTaskScheduler
+        if cls.REMOTE_MANAGER is None:
+            cls.REMOTE_MANAGER = RemoteManager()
+            cls.RESOURCE_MANAGER.add_remote(
+                cls.REMOTE_MANAGER.get_remotes())
+        remotes = cls.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
+        cls.RESOURCE_MANAGER.add_remote(remotes)
         self.scheduled_tasks = []
         self.finished_tasks = []
+        self.env_sem = DistSemaphore(1)
 
     def add_remote(self, ip_addrs):
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
@@ -56,41 +58,59 @@ class DistributedTaskScheduler(object):
             task (autogluon.scheduler.Task): a new trianing task
         """
         # adding the task
-        DistributedTaskScheduler.RESOURCE_MANAGER._request(task.resources)
-        p = Thread(target=DistributedTaskScheduler._start_distributed_task, args=(
-                   task, DistributedTaskScheduler.RESOURCE_MANAGER))
+        cls = DistributedTaskScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        p = Thread(target=cls._start_distributed_task, args=(
+                   task, cls.RESOURCE_MANAGER, self.env_sem))
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Args': task.args,
                                          'Process': p})
 
     @staticmethod
-    def _start_distributed_task(task, resource_manager):
+    def _start_distributed_task(task, resource_manager, env_sem):
         logger.debug('\nScheduling {}'.format(task))
         job = task.resources.node.submit(DistributedTaskScheduler._run_dist_task,
-                                         task.fn, task.args, task.resources.gpu_ids)
+                                         task.fn, task.args, task.resources.gpu_ids,
+                                         env_sem)
         job.result()
         resource_manager._release(task.resources)
 
     @staticmethod
-    def _run_dist_task(fn, args, gpu_ids):
+    def _run_dist_task(fn, args, gpu_ids, env_semaphore):
         """Executing the task
         """
-        if len(gpu_ids) > 0:
-            # handle GPU devices
-            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+        # create local communicator
+        if 'reporter' in args:
+            local_reporter = StatusReporter()
+            dist_reporter = args['reporter']
+            args['reporter'] = local_reporter
+        # handle terminator
+        terminator_semaphore = None
+        if 'terminator_semaphore' in args:
+            terminator_semaphore = args.pop('terminator_semaphore')
         try:
-            # create local communicator
-            if 'reporter' in args:
-                local_reporter = StatusReporter()
-                dist_reporter = args['reporter']
-                args['reporter'] = local_reporter
+            env_semaphore.acquire()
+            if len(gpu_ids) > 0:
+                # handle GPU devices
+                os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
             # start local progress
             p = mp.Process(target=fn, kwargs=args)
             p.start()
+            env_semaphore.release()
             if 'reporter' in args:
                 cp = Communicator.Create(p, local_reporter, dist_reporter)
-            p.join()
+            if terminator_semaphore is not None:
+                terminator_semaphore.acquire()
+                if p.is_alive():
+                    if 'kill' in dir(p):
+                        p.kill()
+                        p.join()
+                    else:
+                        logger.warning('Please use python 3.7 for distributed early stopping.')
+                        p.terminate()
+            else:
+                p.join()
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
 

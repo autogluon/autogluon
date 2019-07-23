@@ -1,5 +1,4 @@
 import os
-import socket
 import logging
 #import subprocess
 from threading import Thread 
@@ -60,7 +59,7 @@ class RemoteManager(object):
     @classmethod
     def shutdown(cls):
         for node in cls.NODES.values():
-            node.close()
+            node.shutdown()
 
     @classmethod
     def get_port_id(cls):

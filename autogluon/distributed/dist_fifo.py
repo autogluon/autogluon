@@ -9,7 +9,7 @@ from collections import OrderedDict
 from ..resource import DistributedResource
 from ..basic import save, load
 from ..utils import mkdir, try_import_mxboard
-from ..scheduler import Task, FIFO_Scheduler
+from ..basic import Task
 from .dist_scheduler import DistributedTaskScheduler
 from .dist_reporter import DistStatusReporter
 
@@ -119,28 +119,30 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        logger.debug("\nAdding A New Task {}".format(task))
-        DistributedFIFOScheduler.RESOURCE_MANAGER._request(task.resources)
+        cls = DistributedFIFOScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        # reporter
+        reporter = DistStatusReporter()
+        task.args['reporter'] = reporter
+        # main process
+        tp = threading.Thread(target=cls._start_distributed_task, args=(
+                              task, cls.RESOURCE_MANAGER, self.env_sem))
+        # reporter thread
+        checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
+        rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
+                              self.searcher, checkpoint_semaphore), daemon=False)
+        tp.start()
+        rp.start()
+        task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'], 'Task': task,
+                     'Process': tp, 'ReporterThread': rp}
+        # checkpoint thread
+        if self._checkpoint is not None:
+            sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                  daemon=False)
+            sp.start()
+            task_dict['CheckpointThead'] = sp
+
         with self.LOCK:
-            reporter = DistStatusReporter()
-            task.args['reporter'] = reporter
-            # main process
-            tp = threading.Thread(target=DistributedFIFOScheduler._start_distributed_task, args=(
-                                  task, DistributedTaskScheduler.RESOURCE_MANAGER))
-            checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
-            # reporter thread
-            rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                                  self.searcher, checkpoint_semaphore), daemon=False)
-            tp.start()
-            rp.start()
-            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'], 'Task': task,
-                         'Process': tp, 'ReporterThread': rp}
-            # checkpoint thread
-            if self._checkpoint is not None:
-                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
-                                      daemon=False)
-                sp.start()
-                task_dict['CheckpointThead'] = sp
             self.scheduled_tasks.append(task_dict)
 
     def join_tasks(self):
@@ -170,6 +172,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         while task_process.is_alive():
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
+                reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()

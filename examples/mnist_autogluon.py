@@ -33,7 +33,7 @@ parser.add_argument('--debug', action='store_true', default= False,
 
 @autogluon_method
 def train_mnist(args, reporter):
-    ctx = [mx.gpu(0)]
+    ctx = [mx.cpu(0)]
 
     # MNIST dataset
     batch_size = 128
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     searcher = ag.searcher.RandomSampling(cs)
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.Hyperband_Scheduler(train_mnist, args,
-                                                       {'num_cpus': 2, 'num_gpus': 1}, searcher,
+                                                       {'num_cpus': 2, 'num_gpus': 0}, searcher,
                                                        num_trials=args.num_trials,
                                                        checkpoint=args.checkpoint,
                                                        resume = args.resume,
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                                                        max_t=args.epochs, grace_period=1)
     else:
         myscheduler = ag.scheduler.FIFO_Scheduler(train_mnist, args,
-                                                  {'num_cpus': 2, 'num_gpus': 1}, searcher,
+                                                  {'num_cpus': 2, 'num_gpus': 0}, searcher,
                                                   num_trials=args.num_trials,
                                                   checkpoint=args.checkpoint,
                                                   resume = args.resume,

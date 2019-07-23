@@ -9,7 +9,7 @@ from collections import OrderedDict
 from .scheduler import *
 from ..resource import Resources
 from .reporter import StatusReporter
-from ..basic import save, load
+from ..basic import save, load, Task
 from ..utils import mkdir, try_import_mxboard
 
 __all__ = ['FIFO_Scheduler']
@@ -224,6 +224,7 @@ class FIFO_Scheduler(TaskScheduler):
     def state_dict(self, destination=None):
         destination = super(FIFO_Scheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
+        destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
@@ -231,6 +232,7 @@ class FIFO_Scheduler(TaskScheduler):
     def load_state_dict(self, state_dict):
         super(FIFO_Scheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
+        self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))

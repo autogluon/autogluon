@@ -16,7 +16,7 @@ class StatusReporter(object):
     def __init__(self):#, result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
         self._last_report_time = None
-        self._continue_semaphore = mp.Semaphore(1)
+        self._continue_semaphore = mp.Semaphore(0)
         self._last_report_time = time.time()
 
     def __call__(self, **kwargs):
@@ -48,3 +48,7 @@ class StatusReporter(object):
         """Adjust the real starting time
         """
         self._last_report_time = time.time()
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        return reprstr
