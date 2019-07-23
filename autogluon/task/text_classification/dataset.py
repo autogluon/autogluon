@@ -40,24 +40,22 @@ class Dataset(dataset.Dataset):
     Python class to represent TextClassification Datasets
     """
 
-    def __init__(self, name: AnyStr = None, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
+    def __init__(self, name: AnyStr, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
                  lazy: bool = True, transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
                  **kwargs):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
-        self._num_classes: int = 0
         self._transform: TextDataTransform = transform
         self._train_ds_transformed = None
         self._val_ds_transformed = None
         self._train_data_lengths = None
         self.data_format = data_format
         self._label_set = set()
+        self.class_labels = None
         self.batch_size = batch_size
         self._download_dataset(url)
         self.add_search_space()
-
-        self._vocab = None
 
         if kwargs:
             if 'train_field_indices' in kwargs:
@@ -81,16 +79,7 @@ class Dataset(dataset.Dataset):
 
     @property
     def num_classes(self) -> int:
-        return self._num_classes
-
-    @property
-    def vocab(self) -> nlp.vocab:
-        return self._vocab
-
-    @vocab.setter
-    def vocab(self, value: nlp.vocab) -> None:
-        self.vocab = value
-        self._init_()
+        return len(self._label_set)
 
     def _download_dataset(self, url) -> None:
         """
