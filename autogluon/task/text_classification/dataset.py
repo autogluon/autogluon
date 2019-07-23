@@ -1,6 +1,5 @@
 import multiprocessing
 import os
-from multiprocessing import cpu_count
 from typing import AnyStr, List
 
 import gluonnlp as nlp
@@ -41,8 +40,9 @@ class Dataset(dataset.Dataset):
     Python class to represent TextClassification Datasets
     """
 
-    def __init__(self, name: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None, lazy: bool = True,
-                 transform: TextDataTransform = None, batch_size: int = 32, data_format='json', **kwargs):
+    def __init__(self, name: AnyStr = None, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
+                 lazy: bool = True, transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
+                 **kwargs):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
@@ -50,11 +50,11 @@ class Dataset(dataset.Dataset):
         self._transform: TextDataTransform = transform
         self._train_ds_transformed = None
         self._val_ds_transformed = None
-        self._train_data_lengths = None  # TODO There is an alternative way possible to avoid creating this list
-        self.data_format = data_format  # TODO This should come from config
+        self._train_data_lengths = None
+        self.data_format = data_format
         self._label_set = set()
         self.batch_size = batch_size
-        self._download_dataset()
+        self._download_dataset(url)
         self.add_search_space()
 
         self._vocab = None
@@ -92,21 +92,28 @@ class Dataset(dataset.Dataset):
         self.vocab = value
         self._init_()
 
-    def _download_dataset(self) -> None:
+    def _download_dataset(self, url) -> None:
         """
         This method downloads the datasets and returns the file path where the data was downloaded.
         :return:
         """
         if self.train_path is None:  # We need to download the dataset.
+
+            if url is None:
+                raise ValueError('Cannot download the dataset as the url is None.')
+
             root = os.path.join(os.getcwd(), 'data')
-            gluon_nlp_data_fn = get_gluon_nlp_dataset_fn(self.name)
+            train_segment = '{}/{}.{}'.format(root, 'train', self.data_format)
+            val_segment = '{}/{}.{}'.format(root, 'val', self.data_format)
+            segments = [train_segment, val_segment]
 
-            val_set = 'dev'
+            for path in segments:
+                gluon.utils.download(url='{}/{}'.format(url, path.split('/')[-1]), path=path, overwrite=True)
 
-            train_dataset, val_dataset = [gluon_nlp_data_fn(root=root, segment=segment)
-                                          for segment in ('train', val_set)]
-            self.train_path = os.path.join(os.getcwd(), 'data', 'train.{}'.format(self.data_format))
-            self.val_path = os.path.join(os.getcwd(), 'data', '{}.{}'.format(val_set, self.data_format))
+            self.train_path = train_segment
+            self.val_path = val_segment
+
+        return self.train_path, self.val_path
 
     def _read_dataset(self) -> None:
         """
