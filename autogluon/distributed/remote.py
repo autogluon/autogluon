@@ -7,9 +7,6 @@ from threading import Thread
 import multiprocessing as mp
 from distributed import Client
 
-#from ..scheduler.reporter import StatusReporter 
-#from .dist_reporter import DistStatusReporter
-
 from .local_helper import start_local_worker, start_local_scheduler
 from .ssh_helper import start_scheduler, start_worker
 

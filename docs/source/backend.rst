@@ -1,6 +1,27 @@
 .. role:: hidden
     :class: hidden-section
 
+autogluon
+=========
+
+.. currentmodule:: autogluon
+
+:hidden:`Task`
+~~~~~~~~~~~~~~
+
+.. autoclass:: Task
+    :members:
+
+:hidden:`save`
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: save
+
+:hidden:`load`
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: load
+
 autogluon.resource
 ==================
 
@@ -41,12 +62,6 @@ autogluon.scheduler
 ===================
 
 .. currentmodule:: autogluon.scheduler
-
-:hidden:`Task`
-~~~~~~~~~~~~~~
-
-.. autoclass:: Task
-    :members:
 
 :hidden:`TaskScheduler`
 ~~~~~~~~~~~~~~~~~~~~~~~

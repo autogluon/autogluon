@@ -37,17 +37,28 @@ _package_registry = []
 
 def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL):
     """Saves an object to a disk file.
+
     Args:
-        obj: saved object
-        f: a file-like object (has to implement write and flush) or a string
-           containing a file name
-        pickle_module: module used for pickling metadata and objects
-        pickle_protocol: can be specified to override the default protocol
+        obj (object): saved object
+        f (string or file object): a file-like object (has to implement write and flush)
+            or a string containing a file name
+        pickle_module (pickle): module used for pickling metadata and objects
+        pickle_protocol (protocol): can be specified to override the default protocol
+
+    Example:
+        >>> save(scheduler.state_dict(), checkname)
     """
     return _with_file_like(f, "wb", lambda f: _save(obj, f, pickle_module, pickle_protocol))
 
 def load(f, map_location=None, pickle_module=pickle, **pickle_load_args):
     """Loads an object saved with :func:`save` from a file.
+
+    Args:
+        f (string or file object): a file-like object (has to implement write and flush)
+            or a string containing a file name
+
+    Example:
+        >>> scheduler.load_state_dict(load(checkpoint))
     """
     new_fd = False
     if isinstance(f, str) or \

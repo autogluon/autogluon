@@ -433,10 +433,6 @@ def imagenet_main(opt, reporter):
             err_top1_val, err_top5_val = test(ctx, val_data)
             reporter(epoch=epoch, accuracy=(1.0-err_top1_val))
 
-        #if save_frequency and save_dir:
-        #    net.save_parameters('%s/imagenet-%s-%d.params'%(save_dir, model_name, opt.num_epochs-1))
-        #    trainer.save_states('%s/imagenet-%s-%d.states'%(save_dir, model_name, opt.num_epochs-1))
-
     if opt.mode == 'hybrid':
         net.hybridize(static_alloc=True, static_shape=True)
         if distillation:

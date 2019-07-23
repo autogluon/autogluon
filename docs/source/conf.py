@@ -22,6 +22,7 @@
 # sys.path.insert(0, os.path.abspath('.'))
 import autogluon
 import sphinx_rtd_theme
+from sphinx_gallery.sorting import ExampleTitleSortKey
 
 
 # -- General configuration ------------------------------------------------
@@ -43,8 +44,28 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'sphinx_gallery.gen_gallery',
     #'sphinxcontrib.googleanalytics',
 ]
+
+sphinx_gallery_conf = {
+    # path to your examples scripts
+    'examples_dirs': [
+        'tutorials/backend'
+    ],
+    # path where to save gallery generated examples
+    'gallery_dirs': [
+        'tutorials/build/backend',],
+    'filename_pattern': '.py',
+    'ignore_pattern': 'im2rec.py',
+    'within_subsection_order': ExampleTitleSortKey,
+    'plot_gallery': True,
+    'download_section_examples': False,
+    'reference_url': {
+        'gluoncv': None,
+    },
+    'backreferences_dir': False,
+}
 
 napoleon_use_ivar = True
 

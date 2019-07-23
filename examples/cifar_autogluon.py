@@ -163,6 +163,13 @@ if __name__ == '__main__':
                                                        resume = args.resume,
                                                        time_attr='epoch', reward_attr="accuracy",
                                                        max_t=args.epochs, grace_period=args.epochs//4)
+    elif args.scheduler == 'fifo':
+        myscheduler = ag.scheduler.FIFO_Scheduler(train_cifar, args,
+                                                  {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
+                                                  num_trials=args.num_trials,
+                                                  checkpoint=args.checkpoint,
+                                                  resume = args.resume,
+                                                  reward_attr="accuracy")
     elif args.scheduler == 'dist_fifo':
         myscheduler = ag.distributed.DistributedFIFOScheduler(train_cifar, args,
                                                               {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
@@ -170,18 +177,22 @@ if __name__ == '__main__':
                                                               checkpoint=args.checkpoint,
                                                               resume = args.resume,
                                                               reward_attr="accuracy")
+    elif args.scheduler == 'dist_hyperband':
+        myscheduler = ag.distributed.DistributedHyperbandScheduler(train_cifar, args,
+                                                                   {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
+                                                                   num_trials=args.num_trials,
+                                                                   checkpoint=args.checkpoint,
+                                                                   resume = args.resume,
+                                                                   time_attr='epoch', reward_attr="accuracy",
+                                                                   max_t=args.epochs, grace_period=args.epochs//4)
     else:
-        myscheduler = ag.scheduler.FIFO_Scheduler(train_cifar, args,
-                                                  {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                  num_trials=args.num_trials,
-                                                  checkpoint=args.checkpoint,
-                                                  resume = args.resume,
-                                                  reward_attr="accuracy")
+        raise RuntimeError('Unsuported Scheduler!')
 
     myscheduler.run()
     myscheduler.join_tasks()
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
-    if args.scheduler == 'dist_fifo':
+    if args.scheduler == 'dist_fifo' or args.scheduler == 'dist_hyperband':
+        print('Shutting Down the Scheduler')
         myscheduler.shutdown()
 
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
