@@ -12,29 +12,6 @@ from ... import dataset
 __all__ = ['Dataset', 'BERTDataset']
 
 
-def get_gluon_nlp_dataset_fn(name):
-    if name == 'sst_2':
-        return nlp.data.SST_2
-    elif name == 'imdb':
-        return nlp.data.IMDB
-    elif name == 'glue_sst':
-        return nlp.data.GlueSST2
-    elif name == 'glue_mnli':
-        return nlp.data.GlueMNLI
-    elif name == 'mrpc':
-        return nlp.data.GlueMRPC
-    else:
-        raise NotImplementedError
-
-
-def _get_len(x):
-    return int(len(x[0]))
-
-
-def _get_len_bert(x):
-    return int(x[1])
-
-
 class Dataset(dataset.Dataset):
     """
     Python class to represent TextClassification Datasets
@@ -42,9 +19,8 @@ class Dataset(dataset.Dataset):
 
     def __init__(self, name: AnyStr, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
                  lazy: bool = True, transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
-                 **kwargs):
+                 num_workers=4, **kwargs):
         super(Dataset, self).__init__(name, train_path, val_path)
-        # TODO : This currently works only for datasets from GluonNLP. This needs to be made more generic.
         # TODO : add search space, handle batch_size, num_workers
         self._transform: TextDataTransform = transform
         self._train_ds_transformed = None
@@ -56,6 +32,9 @@ class Dataset(dataset.Dataset):
         self.batch_size = batch_size
         self._download_dataset(url)
         self.add_search_space()
+        self.train_field_indices = None
+        self.val_field_indices = None
+        self.class_labels = None
 
         if kwargs:
             if 'train_field_indices' in kwargs:
@@ -72,9 +51,7 @@ class Dataset(dataset.Dataset):
             self._init_()
 
     def _init_(self):
-
         self._read_dataset()
-        self.add_search_space()
         self._num_classes = len(self._label_set)
 
     @property
@@ -91,7 +68,7 @@ class Dataset(dataset.Dataset):
             if url is None:
                 raise ValueError('Cannot download the dataset as the url is None.')
 
-            root = os.path.join(os.getcwd(), 'data')
+            root = os.path.join(os.getcwd(), 'data', self.name)
             train_segment = '{}/{}.{}'.format(root, 'train', self.data_format)
             val_segment = '{}/{}.{}'.format(root, 'val', self.data_format)
             segments = [train_segment, val_segment]
@@ -160,7 +137,7 @@ class Dataset(dataset.Dataset):
         self._train_data_lengths = self._get_train_data_lengths()
 
     def _get_train_data_lengths(self) -> List[int]:
-        return self.train_dataset.transform(lambda x: int(len(x[0])), lazy=False)
+        return self.train_dataset.transform(lambda data, label: int(len(data)), lazy=False)
 
     def _prepare_data_loader(self):
         # TODO : Currently hardcoding the batch_samplers and batchify_fn.
@@ -202,13 +179,11 @@ class Dataset(dataset.Dataset):
 
 class BERTDataset(Dataset):
 
-    def _preprocess(self):
-        pool = multiprocessing.Pool()
-        self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
-        self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
-        self._train_data_lengths = self._get_train_data_lengths()
-
     def _get_train_data_lengths(self) -> List[int]:
+        """
+        Need a separate method because BERT Transformer divides data into 4 parts, different from other transformers
+        :return:
+        """
         return self.train_dataset.transform(lambda token_id, length, segment_id, label_id: length, lazy=False)
 
     def _prepare_data_loader(self):

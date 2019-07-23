@@ -1,3 +1,4 @@
+import json
 import os
 from typing import AnyStr, Any, Collection
 
@@ -48,7 +49,6 @@ def get_dataset_from_files(path: AnyStr,
 
 
 def get_dataset_from_json_files(path: AnyStr) -> (gluon.data.SimpleDataset, Collection[int]):
-    import json
     label_set = set()
     if not path.endswith('.json'):
         path = '.'.join([path, 'json'])
@@ -57,6 +57,11 @@ def get_dataset_from_json_files(path: AnyStr) -> (gluon.data.SimpleDataset, Coll
 
     for elem in content:
         label_set.add(elem[1])
+
+    lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
+
+    for elem in content:
+        elem[-1] = lbl_dict[elem[-1]]
 
     return gluon.data.SimpleDataset(content), label_set
 
@@ -73,7 +78,7 @@ def get_dataset_from_tsv_files(path: AnyStr, field_indices: list = None) -> (glu
     for elem in dataset:
         elem[-1] = lbl_dict[elem[-1]]
 
-    return dataset, set(lbl_dict.values())
+    return gluon.data.SimpleDataset(dataset), set(lbl_dict.values())
 
 
 def get_or_else(x: Any, y: Any) -> Any:
