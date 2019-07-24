@@ -1,12 +1,11 @@
 import json
-import pickle
-import copy
 import logging
 from collections import OrderedDict
 
 __all__ = ['BaseSearcher', 'RandomSampling']
 
 logger = logging.getLogger(__name__)
+
 
 class BaseSearcher(object):
     """Base Searcher (A virtual class to inherit from)
@@ -16,6 +15,7 @@ class BaseSearcher(object):
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
     """
+
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
@@ -30,12 +30,12 @@ class BaseSearcher(object):
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
-        raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
+        raise NotImplementedError('This function needs to be overwritten in %s.' % (self.__class__.__name__))
 
     def update(self, config, reward, model_params=None):
         """Update the searcher with the newest metric report
         """
-        #if model_params is not None and reward > self.get_best_reward():
+        # if model_params is not None and reward > self.get_best_reward():
         #    self._best_model_params = model_params
         self._results[json.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
@@ -49,10 +49,10 @@ class BaseSearcher(object):
         return json.loads(config)
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '(' +  \
-            'ConfigSpace: ' + str(self.configspace) + \
-            'Results: ' + str(self._results) + \
-            ')'
+        reprstr = self.__class__.__name__ + '(' + \
+                  'ConfigSpace: ' + str(self.configspace) + \
+                  'Results: ' + str(self._results) + \
+                  ')'
         return reprstr
 
 
@@ -75,6 +75,7 @@ class RandomSampling(BaseSearcher):
         >>> searcher = RandomSampling(cs)
         >>> searcher.get_config()
     """
+
     def get_config(self):
         """Function to sample a new configuration
         This function is called inside Hyperband to query a new configuration

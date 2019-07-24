@@ -2,9 +2,9 @@
 # pylint: disable=wrong-import-position
 """AutoGluon: AutoML toolkit with Gluon."""
 from __future__ import absolute_import
-from .version import __version__
 
 from .utils.try_import import *
+
 try_import_mxnet()
 try_import_dask()
 
@@ -16,6 +16,9 @@ from .network import *
 from .optim import *
 from .optim import optims as optims
 from .space import *
+from .task import text_classification as text_classification
+from .task import named_entity_recognition as named_entity_recognition
+from .basic import *
 from .utils import *
 from .task.image_classification import ImageClassification as image_classification
 from .task.object_detection import ObjectDetection as object_detection

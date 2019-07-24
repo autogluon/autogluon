@@ -54,6 +54,11 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
+    'mxnet',
+    'mxboard',
+    'tensorboard',
+    'tensorflow',
+    'psutil'
 ]
 
 setup(

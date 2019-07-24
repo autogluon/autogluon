@@ -35,3 +35,4 @@ def get_dataset(name, **kwargs):
 def transform_fn(data, label):
     return nd.transpose(data.astype(np.float32), (2, 0, 1)) / 255, label.astype(
         np.float32)
+

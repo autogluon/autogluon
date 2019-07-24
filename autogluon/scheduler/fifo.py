@@ -1,20 +1,21 @@
-import os
-import pickle
 import json
 import logging
-import threading
 import multiprocessing as mp
+import os
+import pickle
+import threading
 from collections import OrderedDict
 
-from .scheduler import *
-from ..resource import Resources
 from .reporter import StatusReporter
+from .scheduler import *
 from ..basic import save, load, Task
+from ..resource import Resources
 from ..utils import mkdir, try_import_mxboard
 
 __all__ = ['FIFO_Scheduler']
 
 logger = logging.getLogger(__name__)
+
 
 class FIFO_Scheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
@@ -46,7 +47,7 @@ class FIFO_Scheduler(TaskScheduler):
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
         >>> myscheduler = FIFO_Scheduler(train_fn, args,
-        >>>                              resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                              resource={'num_cpus': 2, 'num_gpus': 0},
         >>>                              searcher=searcher, num_trials=20,
         >>>                              reward_attr='accuracy',
         >>>                              time_attr='epoch',
@@ -54,6 +55,7 @@ class FIFO_Scheduler(TaskScheduler):
         >>> # run tasks
         >>> myscheduler.run()
     """
+
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none'):
@@ -123,12 +125,12 @@ class FIFO_Scheduler(TaskScheduler):
             task.args['reporter'] = reporter
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
-                            task.fn, task.args, task.resources,
-                            FIFO_Scheduler.RESOURCE_MANAGER))
+                task.fn, task.args, task.resources,
+                FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                                  self.searcher, checkpoint_semaphore), daemon=False)
+                                                                   self.searcher, checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
             task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
@@ -154,7 +156,7 @@ class FIFO_Scheduler(TaskScheduler):
                     task_dict = self.scheduled_tasks.pop(i)
                     task_dict['ReporterThread'].join()
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                               'Config': task_dict['Config']})
+                                                'Config': task_dict['Config']})
 
     def _run_checkpoint(self, checkpoint_semaphore):
         self._cleaning_tasks()
@@ -195,7 +197,7 @@ class FIFO_Scheduler(TaskScheduler):
                                         global_step=reported_result['epoch'])
             self.mxboard.add_scalar(tag=self._reward_attr,
                                     value=('task {task_id} {reward_attr}'.format(
-                                           task_id=task_id, reward_attr=self._reward_attr),
+                                        task_id=task_id, reward_attr=self._reward_attr),
                                            reported_result[self._reward_attr]),
                                     global_step=reported_result['epoch'])
         reward = reported_result[self._reward_attr]

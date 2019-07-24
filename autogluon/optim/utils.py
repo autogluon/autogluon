@@ -1,5 +1,4 @@
 import functools
-import types
 
 from ..space import *
 

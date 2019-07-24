@@ -1,17 +1,17 @@
-import pickle
 import logging
-import threading
-import numpy as np
 import multiprocessing as mp
+import pickle
+import threading
 
-from .scheduler import *
+import numpy as np
+
 from .fifo import FIFO_Scheduler
-from ..resource import Resources
 from .reporter import StatusReporter
 
 __all__ = ['Hyperband_Scheduler']
 
 logger = logging.getLogger(__name__)
+
 
 # Async version of Hyperband used in computation heavy tasks such as deep learning
 class Hyperband_Scheduler(FIFO_Scheduler):
@@ -67,6 +67,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         >>>                                   time_attr='epoch',
         >>>                                   grace_period=1)
     """
+
     def __init__(self, train_fn, args, resource, searcher,
                  checkpoint='./exp/checkerpoint.ag',
                  resume=False,
@@ -96,8 +97,8 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             self.terminator.on_task_add(task)
             # main process
             tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(
-                            task.fn, task.args, task.resources,
-                            Hyperband_Scheduler.RESOURCE_MANAGER))
+                task.fn, task.args, task.resources,
+                Hyperband_Scheduler.RESOURCE_MANAGER))
             # reporter thread
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             rp = threading.Thread(target=self._run_reporter,
@@ -175,6 +176,7 @@ class Hyperband_Manager(object):
             halving rate, specified by the reduction factor.
     """
     LOCK = mp.Lock()
+
     def __init__(self, time_attr='training_epoch',
                  reward_attr='accuracy',
                  max_t=100, grace_period=10,
@@ -195,7 +197,7 @@ class Hyperband_Manager(object):
 
     def on_task_add(self, task):
         sizes = np.array([len(b._rungs) for b in self._brackets])
-        probs = np.e**(sizes - sizes.max())
+        probs = np.e ** (sizes - sizes.max())
         normalized = probs / probs.sum()
         idx = np.random.choice(len(self._brackets), p=normalized)
         with Hyperband_Manager.LOCK:
@@ -224,16 +226,17 @@ class Hyperband_Manager(object):
     def on_task_remove(self, task):
         with Hyperband_Manager.LOCK:
             del self._task_info[task.task_id]
- 
+
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '(' +  \
-            'reward_attr: ' + self._reward_attr + \
-            ', time_attr: ' + self._time_attr + \
-            ', reduction_factor: ' + str(self._reduction_factor) + \
-            ', max_t: ' + str(self._max_t) + \
-            ', brackets: ' + str(self._brackets) + \
-             ')'
+        reprstr = self.__class__.__name__ + '(' + \
+                  'reward_attr: ' + self._reward_attr + \
+                  ', time_attr: ' + self._time_attr + \
+                  ', reduction_factor: ' + str(self._reduction_factor) + \
+                  ', max_t: ' + str(self._max_t) + \
+                  ', brackets: ' + str(self._brackets) + \
+                  ')'
         return reprstr
+
 
 # adapted from ray-project
 class _Bracket():
@@ -252,7 +255,7 @@ class _Bracket():
     def __init__(self, min_t, max_t, reduction_factor, s):
         self.rf = reduction_factor
         MAX_RUNGS = int(np.log(max_t / min_t) / np.log(self.rf) - s + 1)
-        self._rungs = [(min_t * self.rf**(k + s), {})
+        self._rungs = [(min_t * self.rf ** (k + s), {})
                        for k in reversed(range(MAX_RUNGS))]
 
     def cutoff(self, recorded):
