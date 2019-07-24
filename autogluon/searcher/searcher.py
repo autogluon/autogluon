@@ -37,8 +37,8 @@ class BaseSearcher(object):
         """
         #if model_params is not None and reward > self.get_best_reward():
         #    self._best_model_params = model_params
-        self._results[json.dumps(config)] = reward
-        logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
+        self._results[pickle.dumps(config)] = reward
+        logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
 
     def get_best_reward(self):
         config = max(self._results, key=self._results.get)
@@ -46,7 +46,7 @@ class BaseSearcher(object):
 
     def get_best_config(self):
         config = max(self._results, key=self._results.get)
-        return json.loads(config)
+        return pickle.loads(config)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -84,9 +84,9 @@ class RandomSampling(BaseSearcher):
                 must return a valid configuration and a (possibly empty) info dict
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
-        while json.dumps(new_config) in self._results.keys():
+        while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[json.dumps(new_config)] = None
+        self._results[pickle.dumps(new_config)] = None
         return new_config
 
     def update(self, *args, **kwargs):
