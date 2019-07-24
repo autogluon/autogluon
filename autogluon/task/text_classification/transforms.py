@@ -77,7 +77,12 @@ class BERTDataTransform(object):
         self.tokenizer = tokenizer
         self.max_seq_length = max_seq_length
         self.has_label = has_label
+        self.label_alias = None
+        self.class_labels = None
         self._label_dtype = 'int32' if class_labels else 'float32'
+        self.pair = pair
+        self.pad = pad
+        self.has_label = has_label
         if has_label and class_labels:
             self._label_map = {}
             for (i, label) in enumerate(class_labels):
@@ -151,3 +156,15 @@ class BERTDataTransform(object):
             return input_ids, valid_length, segment_ids, label
         else:
             return self._bert_xform(line)
+
+    def re_init(self):
+        self._label_dtype = 'int32' if self.class_labels else 'float32'
+        if self.has_label and self.class_labels:
+            self._label_map = {}
+            for (i, label) in enumerate(self.class_labels):
+                self._label_map[label] = i
+            if self.label_alias:
+                for key in self.label_alias:
+                    self._label_map[key] = self._label_map[self.label_alias[key]]
+        self._bert_xform = BERTSentenceTransform(
+            self.tokenizer, self.max_seq_length, pad=self.pad, pair=self.pair)
