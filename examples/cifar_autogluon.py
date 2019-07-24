@@ -3,9 +3,7 @@ import numpy as np
 
 import argparse, time, logging
 import mxnet as mx
-from mxnet import gluon, nd
-from mxnet import autograd
-from mxnet.gluon import nn
+from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 
 from gluoncv.model_zoo import get_model
@@ -121,7 +119,7 @@ def train_cifar(args, reporter):
                 data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
                 label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
 
-                with autograd.record():
+                with mx.autograd.record():
                     output = [net(X) for X in data]
                     loss = [loss_fn(yhat, y) for yhat, y in zip(output, label)]
                 for l in loss:
