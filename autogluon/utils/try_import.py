@@ -1,4 +1,4 @@
-__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask']
+__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2']
 
 def try_import_mxboard():
     try:
@@ -9,7 +9,7 @@ def try_import_mxboard():
             "A quick tip is to install via `pip install mxboard`. ")
 
 def try_import_mxnet():
-    mx_version = '1.4.0'
+    mx_version = '1.4.1'
     try:
         import mxnet as mx
         from distutils.version import LooseVersion
@@ -33,3 +33,11 @@ def try_import_dask():
         raise ImportError(
             "Unable to import dependency dask. "
             "A quick tip is to install via `pip install dask[complete]`. ")
+
+def try_import_cv2():
+    try:
+        import cv2
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency cv2. "
+            "A quick tip is to install via `pip install opencv-python`. ")

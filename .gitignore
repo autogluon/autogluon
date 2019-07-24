@@ -119,3 +119,7 @@ ENV/
 *.jpeg*
 .idea/*
 train/*
+
+tutorials/checkpoint/*
+tutorials/train/*
+autogluon/version.py

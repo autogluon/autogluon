@@ -11,22 +11,28 @@ def autogluon_optims(func):
     def wrapper_decorator(*args, **kwargs):
         optim = func(*args, **kwargs)
         # TODO (cgraywang): parse user provided config to generate hyper_params
-        if optim.name == 'sgd':
-            setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
-                     Linear('momentum', 0.85, 0.95).get_hyper_param(),
-                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
-        elif optim.name == 'adam':
-            setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
-                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
-        elif optim.name == 'nag':
-            setattr(optim, 'hyper_params',
-                    [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
-                     Linear('momentum', 0.85, 0.95).get_hyper_param(),
-                     Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+        if not kwargs:
+            if optim.name == 'sgd':
+                setattr(optim, 'hyper_params',
+                        [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
+                         Linear('momentum', 0.85, 0.95).get_hyper_param(),
+                         Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+            elif optim.name == 'adam':
+                setattr(optim, 'hyper_params',
+                        [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
+                         Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+            elif optim.name == 'nag':
+                setattr(optim, 'hyper_params',
+                        [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
+                         Linear('momentum', 0.85, 0.95).get_hyper_param(),
+                         Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+            else:
+                raise NotImplementedError
         else:
-            raise NotImplementedError
+            hyper_param_lst = []
+            for k, v in kwargs.items():
+                hyper_param_lst.append(v.get_hyper_param())
+            setattr(optim, 'hyper_params', hyper_param_lst)
         return optim
 
     return wrapper_decorator

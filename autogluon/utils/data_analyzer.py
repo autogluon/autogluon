@@ -46,7 +46,7 @@ class DataAnalyzer(object):
             if (a_area <= b_area).all() or (a_area >= b_area).all():
                 warnings.warn('Warning: '
                               'data label histogram seems not in a good shape')
-                logging.info('data label histogram is save at ./histogram.png')
+                logging.debug('data label histogram is save at ./histogram.png')
                 Visualizer.visualize_dataset_label_histogram(a, b)
         else:
             pass
