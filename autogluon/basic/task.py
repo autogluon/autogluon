@@ -42,6 +42,8 @@ class Task(object):
             ',\n\tfn: ' + str(self.fn) + \
             ',\n\targs: {'
         for k, v in self.args.items():
-            reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
+            data = str(v)
+            info = (data[:100] + '..') if len(data) > 100 else data
+            reprstr +=  '{}'.format(k) + ': ' + info + ', '
         reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
         return reprstr
