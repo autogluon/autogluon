@@ -89,7 +89,7 @@ if __name__ == '__main__':
                        demo=args.demo)
 
     logger.info('Best result:')
-    logger.info(results.val_accuracy)
+    logger.info(results.metric)
     logger.info('=========================')
     logger.info('Best search space:')
     logger.info(results.config)

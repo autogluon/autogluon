@@ -97,7 +97,7 @@ if __name__ == '__main__':
                        demo=args.demo,
                        val_interval=args.val_interval)
 
-    logger.info('Best result: %.2f mAP' % results.val_metric * 100)
+    logger.info('Best result: %.2f mAP' % results.metric * 100)
     logger.info('=========================')
     logger.info('Best search space:')
     logger.info(results.config)

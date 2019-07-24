@@ -4,11 +4,12 @@ from ..core import *
 from ..space import *
 from .utils import autogluon_optims, Optimizer
 
-__all__ = ['Optimizers', 'get_optim']
+__all__ = ['Optimizers', 'get_optim', 'SGD', 'NAG', 'RMSProp', 'Adam', 'AdaGrad', 'AdaDelta',
+           'Adamax', 'Nadam', 'DCASGD', 'SGLD', 'Signum', 'FTML', 'LBSGD', 'Ftrl']
 
 
 class Optimizers(BaseAutoObject):
-    #TODO (cgraywang): add optimizer hparams config
+    # TODO (cgraywang): add optimizer hparams config
     def __init__(self, optim_list):
         assert isinstance(optim_list, list), type(optim_list)
         super(Optimizers, self).__init__()
@@ -47,11 +48,13 @@ class Optimizers(BaseAutoObject):
         return optim_strs
 
     def __repr__(self):
-        return "AutoGluon Optimizers %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
+        return "AutoGluon Optimizers %s with %s" % (
+        str(self._get_search_space_strs()), str(self.search_space))
 
     def __str__(self):
-        return "AutoGluon Optimizers %s with %s" % (str(self._get_search_space_strs()), str(self.search_space))
-    
+        return "AutoGluon Optimizers %s with %s" % (
+        str(self._get_search_space_strs()), str(self.search_space))
+
 
 optims = ['sgd',
           'nag',
@@ -124,73 +127,72 @@ def get_optim(name):
     optim = Optimizer(name)
     return optim
 
-#TODO: add more method based optim auto decorator
 
 @autogluon_optims
 def SGD(**kwargs):
-    pass
+    return Optimizer('sgd')
 
 
 @autogluon_optims
 def NAG(**kwargs):
-    pass
+    return Optimizer('nag')
 
 
 @autogluon_optims
-def RMSPROP(**kwargs):
-    pass
+def RMSProp(**kwargs):
+    return Optimizer('rmsprop')
 
 
 @autogluon_optims
-def ADAM(**kwargs):
-    pass
+def Adam(**kwargs):
+    return Optimizer('adam')
 
 
 @autogluon_optims
-def ADAGRAD(**kwargs):
-    pass
+def AdaGrad(**kwargs):
+    return Optimizer('adagrad')
 
 
 @autogluon_optims
-def ADADELTA(**kwargs):
-    pass
+def AdaDelta(**kwargs):
+    return Optimizer('adadelta')
 
 
 @autogluon_optims
-def ADAMAX(**kwargs):
-    pass
+def Adamax(**kwargs):
+    return Optimizer('adamax')
 
 
 @autogluon_optims
-def NADAM(**kwargs):
-    pass
+def Nadam(**kwargs):
+    return Optimizer('nadam')
 
 
 @autogluon_optims
 def DCASGD(**kwargs):
-    pass
+    return Optimizer('dcasgd')
 
 
 @autogluon_optims
 def SGLD(**kwargs):
-    pass
+    return Optimizer('sgld')
 
 
 @autogluon_optims
-def SIGNUM(**kwargs):
-    pass
+def Signum(**kwargs):
+    return Optimizer('signum')
 
 
 @autogluon_optims
 def FTML(**kwargs):
-    pass
+    return Optimizer('ftml')
 
 
 @autogluon_optims
 def LBSGD(**kwargs):
-    pass
+    return Optimizer('lbsgd')
 
 
 @autogluon_optims
-def FTRL(**kwargs):
-    pass
+def Ftrl(**kwargs):
+    return Optimizer('ftrl')

@@ -16,7 +16,7 @@ if __name__ == '__main__':
                        optimizers=ag.Optimizers(['sgd', 'adam']))
 
     logger.debug('Best result:')
-    logger.debug(results.val_accuracy)
+    logger.debug(results.metric)
     logger.debug('=========================')
     logger.debug('Best search space:')
     logger.debug(results.config)

@@ -1,3 +1,6 @@
+from autogluon.utils.try_import import *
+try_import_cv2()
+
 import os, argparse, shutil, cv2
 
 # run `sh download_shopeeiet.sh` first

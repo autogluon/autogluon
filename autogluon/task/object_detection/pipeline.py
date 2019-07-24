@@ -187,11 +187,8 @@ def train_object_detection(args, reporter):
             if args.demo and _demo_early_stopping(i):
                 break
         map_name, mean_ap = metric.get()
-        # TODO (cgraywang): unify the ray and autogluon interface
-        if args.backend == 'default':
-            reporter(epoch=epoch, map=float(mean_ap[-1]))
-        elif args.backend == 'ray':
-            reporter(training_iteration=epoch, map=float(mean_ap[-1]))
+        # TODO (cgraywang): add ray
+        reporter(epoch=epoch, map=float(mean_ap[-1]))
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)

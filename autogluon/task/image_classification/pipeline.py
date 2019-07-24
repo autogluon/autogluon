@@ -1,9 +1,7 @@
 import warnings
 import logging
 
-import random
 import mxnet as mx
-import numpy as np
 
 from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
@@ -165,11 +163,8 @@ def train_image_classification(args, reporter):
                 break
         _, test_acc = metric.get()
         test_loss /= len(val_data)
-        # TODO (cgraywang): unify the ray and autogluon interface
-        if args.backend == 'default':
-            reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
-        elif args.backend == 'ray':
-            reporter(training_iteration=epoch, mean_accuracy=test_acc, mean_loss=test_loss)
+        # TODO (cgraywang): add ray
+        reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
