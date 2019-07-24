@@ -1,9 +1,12 @@
-__all__ = ['List', 'Linear', 'Log']
+__all__ = ['Space', 'List', 'Linear', 'Log', 'Int', 'Bool', 'Constant',
+           'get_config_space']
 
 import ConfigSpace.hyperparameters as CSH
 
+class Space(object):
+    pass
 
-class List(object):
+class List(Space):
     def __init__(self, name, choices):
         self.name = name
         self.choices = choices
@@ -20,7 +23,7 @@ class List(object):
         return "AutoGluon List Space %s: %s" % (self.name, str(self.choices))
 
 
-class Linear(object):
+class Linear(Space):
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
@@ -58,7 +61,7 @@ class Linear(object):
                                                                   self.upper)
 
 
-class Log(object):
+class Log(Space):
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
@@ -95,3 +98,32 @@ class Log(object):
         return "AutoGluon Log Space %s: lower %f, upper %f" % (self.name,
                                                                   self.lower,
                                                                   self.upper)
+
+
+class Int(Space):
+    def __init__(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+
+class Bool(IntSpace):
+    def __init__(self):
+        super(Bool, self).__init__(0, 1)
+
+class Constant(Space):
+    def __init__(self, val):
+        self.value = val
+
+def get_config_space(name, space):
+    assert isinstance(space, Space)
+    if isinstance(space, List):
+        return CSH.CategoricalHyperparameter(name=name, choices=space.data)
+    elif isinstance(space, Linear):
+        return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper)
+    elif isinstance(space, Log):
+        return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper, log=True)
+    elif isinstance(space, Int):
+        return CSH.UniformIntegerHyperparameter(name=name, lower=space.lower, upper=space.upper)
+    elif isinstance(space, Constant):
+        return CSH.Constant(name=name, value=space.value)
+    else:
+        raise NotImplemented

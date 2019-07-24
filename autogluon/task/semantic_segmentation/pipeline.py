@@ -1,4 +1,3 @@
-
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -26,74 +25,29 @@ def parse_args():
                         help='backbone name (default: resnet50)')
     parser.add_argument('--dataset', type=str, default='pascal_aug',
                         help='dataset name (default: pascal)')
-    parser.add_argument('--workers', type=int, default=16,
-                        metavar='N', help='dataloader threads')
-    parser.add_argument('--base-size', type=int, default=520,
-                        help='base image size')
-    parser.add_argument('--crop-size', type=int, default=480,
-                        help='crop image size')
-    parser.add_argument('--train-split', type=str, default='train',
-                        help='dataset train split (default: train)')
-    # training hyper params
-    parser.add_argument('--aux', action='store_true', default= False,
-                        help='Auxiliary loss')
-    parser.add_argument('--aux-weight', type=float, default=0.5,
-                        help='auxiliary loss weight')
-    parser.add_argument('--epochs', type=int, default=50, metavar='N',
-                        help='number of epochs to train (default: 50)')
-    parser.add_argument('--start_epoch', type=int, default=0,
-                        metavar='N', help='start epochs (default:0)')
-    parser.add_argument('--batch-size', type=int, default=16,
-                        metavar='N', help='input batch size for \
-                        training (default: 16)')
-    parser.add_argument('--test-batch-size', type=int, default=16,
-                        metavar='N', help='input batch size for \
-                        testing (default: 32)')
-    parser.add_argument('--lr', type=float, default=1e-3, metavar='LR',
-                        help='learning rate (default: 1e-3)')
-    parser.add_argument('--momentum', type=float, default=0.9,
-                        metavar='M', help='momentum (default: 0.9)')
-    parser.add_argument('--weight-decay', type=float, default=1e-4,
-                        metavar='M', help='w-decay (default: 1e-4)')
-    parser.add_argument('--no-wd', action='store_true',
-                        help='whether to remove weight decay on bias, \
-                        and beta/gamma for batchnorm layers.')
-    # cuda and logging
-    parser.add_argument('--no-cuda', action='store_true', default=
-                        False, help='disables CUDA training')
-    parser.add_argument('--ngpus', type=int,
-                        default=len(mx.test_utils.list_gpus()),
-                        help='number of GPUs (default: 4)')
-    parser.add_argument('--kvstore', type=str, default='device',
-                        help='kvstore to use for trainer/module.')
-    parser.add_argument('--dtype', type=str, default='float32',
-                        help='data type for training. default is float32')
-    # checking point
-    parser.add_argument('--resume', type=str, default=None,
-                        help='put the path to resuming file if needed')
-    parser.add_argument('--checkname', type=str, default='default',
-                        help='set the checkpoint name')
-    # synchronized Batch Normalization
-    parser.add_argument('--syncbn', action='store_true', default= False,
-                        help='using Synchronized Cross-GPU BatchNorm')
-    # the parser
-    args = parser.parse_args()
-    # handle contexts
-    if args.no_cuda:
-        print('Using CPU')
-        args.kvstore = 'local'
-        args.ctx = [mx.cpu(0)]
-    else:
-        print('Number of GPUs:', args.ngpus)
-        args.ctx = [mx.gpu(i) for i in range(args.ngpus)]
-    # Synchronized BatchNorm
-    args.norm_layer = mx.gluon.contrib.nn.SyncBatchNorm if args.syncbn \
-        else mx.gluon.nn.BatchNorm
-    args.norm_kwargs = {'num_devices': args.ngpus} if args.syncbn else {}
     print(args)
     return args
 
-def train_segmentation(args, reporter):
+@autogluon_register_args(
+    model=ListSpace(),
+    dataset=,
+    workers=16,
+    base_size=520,
+    crop_size=480,
+    aux=True,
+    aux_weight=LinearSpace(0.2, 0,8)
+    epochs=50,
+    batch_size=16,
+    lr=LogLinearSpace(1e-3, 1e-1),
+    momentum=0.9,
+    weight_decay=1e-4,
+    no_wd=True,
+    kvstore='device',
+    norm_layer=mx.gluon.contrib.nn.SyncBatchNorm,
+    norm_kwargs={'num_devices': args.ngpus},
+    )
+def train_semantic_segmentation(args, reporter):
+    args.ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
     # image transform
     input_transform = transforms.Compose([
         transforms.ToTensor(),
@@ -103,31 +57,28 @@ def train_segmentation(args, reporter):
     data_kwargs = {'transform': input_transform, 'base_size': args.base_size,
                    'crop_size': args.crop_size}
     trainset = get_segmentation_dataset(
-        args.dataset, split=args.train_split, mode='train', **data_kwargs)
+        args.dataset, split='train', mode='train', **data_kwargs)
     valset = get_segmentation_dataset(
         args.dataset, split='val', mode='val', **data_kwargs)
     train_data = gluon.data.DataLoader(
         trainset, args.batch_size, shuffle=True, last_batch='rollover',
         num_workers=args.workers)
-    eval_data = gluon.data.DataLoader(valset, args.test_batch_size,
+    eval_data = gluon.data.DataLoader(valset, args.batch_size,
         last_batch='rollover', num_workers=args.workers)
     # create network
-    #model = get_model(args.model_zoo, pretrained=True)
-    model = args.model
-    model.cast(args.dtype)
-    print(model)
-    net = DataParallelModel(model, args.ctx, args.syncbn)
+    if isinstance(args.model, mx.gluon.Block):
+        model = args.model
+    else:
+        assert isinstance(args.model, str)
+        model = get_segmentation_model(model=args.model, dataset=args.dataset,
+                                       backbone=args.backbone, norm_layer=args.norm_layer,
+                                       norm_kwargs=args.norm_kwargs, aux=args.aux,
+                                       crop_size=args.crop_size)
+    net = DataParallelModel(model, args.ctx)
     evaluator = DataParallelModel(SegEvalModel(model), args.ctx)
-    # resume checkpoint if needed
-    if args.resume is not None:
-        if os.path.isfile(args.resume):
-            model.load_parameters(args.resume, ctx=args.ctx)
-        else:
-            raise RuntimeError("=> no checkpoint found at '{}'" \
-                .format(args.resume))
     # create criterion
     criterion = MixSoftmaxCrossEntropyLoss(args.aux, aux_weight=args.aux_weight)
-    criterion = DataParallelCriterion(criterion, args.ctx, args.syncbn)
+    criterion = DataParallelCriterion(criterion, args.ctx)
     # optimizer and lr scheduling
     lr_scheduler = LRScheduler(mode='poly', base_lr=args.lr,
                                nepochs=args.epochs,
@@ -167,7 +118,6 @@ def train_segmentation(args, reporter):
             mx.nd.waitall()
 
     def validation(epoch):
-        #total_inter, total_union, total_correct, total_label = 0, 0, 0, 0
         metric.reset()
         tbar = tqdm(eval_data)
         for i, (data, target) in enumerate(tbar):
@@ -176,11 +126,9 @@ def train_segmentation(args, reporter):
             targets = mx.gluon.utils.split_and_load(target, args.ctx, even_split=False)
             metric.update(targets, outputs)
             pixAcc, mIoU = metric.get()
-            #tbar.set_description('Epoch %d, validation pixAcc: %.3f, mIoU: %.3f'%\
-            #    (epoch, pixAcc, mIoU))
             reporter(epoch=epoch, pixAcc=pixAcc, mIoU=mIoU)
             mx.nd.waitall()
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.epochs):
         training(epoch)
         validation(epoch)

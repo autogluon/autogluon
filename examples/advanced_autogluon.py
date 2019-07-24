@@ -11,14 +11,28 @@ from gluoncv.utils import LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
 import autogluon as ag
-from autogluon import autogluon_method, autogluon_register
+from autogluon import autogluon_method, autogluon_register_args
 
-from cifar_autogluon import parse_args
+@register_callable_kwargs(
+    net=ListSpace(get_model('CIFAR_ResNet20_v1'),
+                  get_model('CIFAR_ResNet20_v2')),
+    kwargs=[{'pretrained': True},
+            {}],
+    )
+def get_net(net, kwargs):
+    return net(**kwargs)
 
-@autogluon_register(
+@autogluon_register_args(
+        batch_size=64,
+        num_gpus=1,
         net=ag.ListSpace(get_model('CIFAR_ResNet20_v1'),
                          get_model('CIFAR_ResNet20_v2')),
-        lr=ag.LogLinearSpace(1e-3, 1e-1))
+        num_workers=4,
+        lr=ag.LogLinearSpace(1e-3, 1e-1),
+        momentum=0.9,
+        wd=0.0001,
+        epochs=20,
+        )
 def train_cifar(args, reporter):
     net = args.net
     batch_size = args.batch_size
@@ -27,7 +41,6 @@ def train_cifar(args, reporter):
     batch_size *= max(1, num_gpus)
     context = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
     num_workers = args.num_workers
-
 
     transform_train = transforms.Compose([
         gcv_transforms.RandomCrop(32, pad=4),
@@ -106,33 +119,17 @@ def train_cifar(args, reporter):
     train(args.epochs, context)
 
 if __name__ == '__main__':
-    args = parse_args()
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     
     # create searcher and scheduler
     searcher = ag.searcher.RandomSampling(train_cifar.cs)
-    if args.scheduler == 'hyperband':
-        myscheduler = ag.scheduler.Hyperband_Scheduler(train_cifar, args,
-                                                       {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                       num_trials=args.num_trials,
-                                                       checkpoint=args.checkpoint,
-                                                       resume = args.resume,
-                                                       time_attr='epoch', reward_attr="accuracy",
-                                                       max_t=args.epochs, grace_period=args.epochs//4)
-    elif args.scheduler == 'fifo':
-        myscheduler = ag.scheduler.FIFO_Scheduler(train_cifar, args,
-                                                  {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                  num_trials=args.num_trials,
-                                                  checkpoint=args.checkpoint,
-                                                  resume = args.resume,
-                                                  reward_attr="accuracy")
-    else:
-        raise RuntimeError('Please see other example for other schedulers!')
+    myscheduler = ag.scheduler.FIFO_Scheduler(train_cifar, train_cifar.args,
+                                              resource={'num_cpus': 2, 'num_gpus': 1},
+                                              searcher=searcher,
+                                              num_trials=10,
+                                              reward_attr="accuracy")
     myscheduler.run()
     myscheduler.join_tasks()
-    myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
+    myscheduler.get_training_curves('{advanced_autogluon}.png')
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
