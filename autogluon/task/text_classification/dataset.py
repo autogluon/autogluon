@@ -21,7 +21,6 @@ class Dataset(BaseTask.Dataset):
                  transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
                  num_workers=4, **kwargs):
         super(Dataset, self).__init__(name, train_path, val_path)
-        # TODO : add search space, handle batch_size, num_workers
         self._transform: TextDataTransform = transform
         self._train_ds_transformed = None
         self._val_ds_transformed = None

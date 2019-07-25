@@ -16,6 +16,7 @@ from ...metric import Metrics
 from ...network import Nets
 from ...optim import Optimizers, get_optim
 from ...space import List, Exponential
+from ...utils.mxboard_handler import MXBoardHandler
 
 __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class TextClassification(BaseTask):
                      transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
                      num_workers=4, **kwargs):
             super(TextClassification.Dataset, self).__init__(name, train_path, val_path)
-            
+
             self._transform: TextDataTransform = transform
             self._train_ds_transformed = None
             self._val_ds_transformed = None
@@ -182,6 +183,7 @@ class TextClassification(BaseTask):
         kwargs['data_name'] = data.name
         kwargs['train_path'] = data.train_path
         kwargs['val_path'] = data.val_path
+        kwargs['log_dir'] = savedir
 
         return BaseTask.fit(data=data, nets=nets, optimizers=optimizers, losses=losses, searcher=searcher,
                             trial_scheduler=trial_scheduler,

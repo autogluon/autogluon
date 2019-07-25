@@ -14,7 +14,7 @@ __all__ = ['MXBoardHandler']
 class MXBoardHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, BatchEnd):
 
     # TODO : Improve this with PubSub so that this runs and logs on a separate thread
-    def __init__(self, task_id: int, log_dir: AnyStr = './logs', checkpoint_dir: AnyStr = None,
+    def __init__(self, task_id: int = -1, log_dir: AnyStr = './logs', checkpoint_dir: AnyStr = None,
                  events_to_log: set = None, when_to_log: set = None, trial_args=None):
         self.task_id = task_id
         logger.info(log_dir)

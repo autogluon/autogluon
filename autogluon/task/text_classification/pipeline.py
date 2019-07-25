@@ -1,3 +1,5 @@
+from typing import AnyStr
+
 import gluonnlp as nlp
 import mxnet as mx
 
@@ -9,6 +11,7 @@ from .event_handlers import BertDataLoaderHandler, LSTMDataLoaderHandler
 from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
 from .transforms import BERTDataTransform, TextDataTransform
 from ...basic import autogluon_method
+from ...utils.mxboard_handler import MXBoardHandler
 
 __all__ = ['train_text_classification']
 logger = logging.getLogger(__name__)
@@ -98,6 +101,18 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     return net, dataset, model_handlers
 
 
+def _init_mxboard_handler(checkpoint_dir: AnyStr, task_id: int) -> MXBoardHandler:
+    try:
+        import mxboard
+    except ImportError:
+        return None
+
+    log_dir = os.path.join(checkpoint_dir, 'logs')
+    mxboard_handler = MXBoardHandler(task_id=task_id, log_dir=log_dir, checkpoint_dir=checkpoint_dir)
+
+    return mxboard_handler
+
+
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
     import psutil, os
@@ -108,9 +123,9 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
 
-    mxboard_handler = args.viz if 'viz' in args else None
+    if 'log_dir' in args:
+        mxboard_handler = _init_mxboard_handler(args.log_dir, task_id)
     if mxboard_handler is not None:
-        mxboard_handler.task_id = task_id
         mxboard_handler.trial_args = args.__dict__
 
     if 'bert' in args.model:  # Get bert specific model attributes
