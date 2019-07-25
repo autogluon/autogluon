@@ -1,13 +1,10 @@
 import logging
-import multiprocessing
 import os
 from typing import AnyStr
 
 import ConfigSpace as CS
-import gluonnlp as nlp
 from mxnet import gluon
 
-from . import utils
 from .losses import *
 from .metrics import *
 from .model_zoo import *
@@ -56,14 +53,16 @@ default_resources_per_trial = {
 class TextClassification(BaseTask):
     class Dataset(BaseTask.Dataset):
         """
-        Python class to represent TextClassification Datasets
+        Python class to represent TextClassification Datasets.
+        This is a lightweight version of the dataset. This class downloads the dataset if not found, and is used to
+        pass on the attributes to pipeline.py where actual dataset objects are constructed.
         """
 
         def __init__(self, name: AnyStr, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
-                     lazy: bool = True, transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
+                     transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
                      num_workers=4, **kwargs):
             super(TextClassification.Dataset, self).__init__(name, train_path, val_path)
-            # TODO : add search space, handle batch_size, num_workers
+            
             self._transform: TextDataTransform = transform
             self._train_ds_transformed = None
             self._val_ds_transformed = None
@@ -90,25 +89,14 @@ class TextClassification(BaseTask):
             if data_format == 'tsv' and self.train_field_indices is None:
                 raise ValueError('Specified tsv, but found the field indices empty.')
 
-            if not lazy:
-                self._init_()
-
-        def _init_(self):
-            self._read_dataset()
-            self._num_classes = len(self._label_set)
-
         def _add_search_space(self):
             cs = CS.ConfigurationSpace()
             data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
                                            upper_exponent=3).get_hyper_param()
 
             seq_length_hyperparams = List(name='max_sequence_length', choices=[50, 100, 150, 200]).get_hyper_param()
-            cs.add_hyperparameter(seq_length_hyperparams)
+            cs.add_hyperparameters([data_hyperparams, seq_length_hyperparams])
             self.search_space = cs
-
-        @property
-        def num_classes(self) -> int:
-            return len(self._label_set)
 
         def _download_dataset(self, url) -> None:
             """
@@ -133,140 +121,8 @@ class TextClassification(BaseTask):
 
             return self.train_path, self.val_path
 
-        def _read_dataset(self) -> None:
-            """
-            This method reads the datasets. Performs transformations on it. Preprocesses the data.
-            Prepares data loader from it.
-            :return:
-            """
-            self._load_dataset()
-            self._preprocess()
-            self._prepare_data_loader()
-
-        def _load_dataset(self):
-            """
-            Loads data from a given data path. If a url is passed, it downloads the data in the init method
-            :return:
-            """
-            # TODO Different datasets have a different parsing schema.
-            # TODO Should load_dataset be a part of a config as well ?
-            # What to do with nested folders ?
-
-            if self.data_format == 'json':
-
-                if self.val_path is None:
-                    # Read the training data and perform split on it.
-                    dataset, self._label_set = utils.get_dataset_from_json_files(path=self.train_path)
-                    self.train_dataset, self.val_dataset = self._train_valid_split(dataset, valid_ratio=0.2)
-
-                else:
-                    self.train_dataset, self._label_set = utils.get_dataset_from_json_files(path=self.train_path)
-                    self.val_dataset, _ = utils.get_dataset_from_json_files(path=self.val_path)
-
-            elif self.data_format == 'tsv':
-
-                if self.val_path is None:
-                    # Read the training data and perform split on it.
-                    dataset, self._label_set = utils.get_dataset_from_tsv_files(path=self.train_path,
-                                                                                field_indices=self.train_field_indices)
-                    self.train_dataset, self.val_dataset = self._train_valid_split(dataset, valid_ratio=0.2)
-
-                else:
-                    self.train_dataset, self._label_set = utils.get_dataset_from_tsv_files(path=self.train_path,
-                                                                                           field_indices=self.train_field_indices)
-                    self.val_dataset, _ = utils.get_dataset_from_tsv_files(path=self.val_path,
-                                                                           field_indices=self.val_field_indices)
-
-            else:
-                raise NotImplementedError("Error. Different formats are not supported yet")
-
-        def _preprocess(self):
-            with multiprocessing.Pool(self.num_workers) as pool:
-                self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
-                self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
-                self._train_data_lengths = self._get_train_data_lengths()
-
-        def _get_train_data_lengths(self) -> list:
-            return self.train_dataset.transform(lambda data, label: int(len(data)), lazy=False)
-
-        def _prepare_data_loader(self):
-            # TODO : Currently hardcoding the batch_samplers and batchify_fn.
-            # These need to come from configs.
-            """
-            Method which prepares and populates the data loader.
-            :return:
-            """
-
-            batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size,
-                                                        shuffle=True,
-                                                        num_buckets=10, ratio=0)
-            batchify_fn = nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
-                                                  nlp.data.batchify.Stack(dtype='float32'))
-
-            self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=4,
-                                                           batch_sampler=batch_sampler, batchify_fn=batchify_fn)
-            # TODO Think about cpu_count here.
-
-            self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
-                                                         batchify_fn=batchify_fn, num_workers=4, shuffle=False)
-
-        @staticmethod
-        def _train_valid_split(dataset: gluon.data.Dataset, valid_ratio=0.20) -> [gluon.data.Dataset,
-                                                                                  gluon.data.Dataset]:
-            """
-            Splits the dataset into training and validation sets.
-
-            :param valid_ratio: float, default 0.20
-                        Proportion of training samples to be split into validation set.
-                        range: [0, 1]
-            :return:
-
-            """
-            return nlp.data.utils.train_valid_split(dataset, valid_ratio)
-
         def __repr__(self):
             return "AutoGluon Dataset %s" % self.name
-
-    class BERTDataset(Dataset):
-
-        def _preprocess(self):
-            class_labels = self.class_labels if self.class_labels else list(self._label_set)
-
-            self._transform.class_labels = class_labels
-            self._transform.re_init()  # Need to this here, since class_labels information is not available before hand.
-
-            with multiprocessing.Pool(self.num_workers) as pool:
-                self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
-                self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
-                self._train_data_lengths = self._get_train_data_lengths()
-
-        def _get_train_data_lengths(self) -> list:
-            """
-            Need a separate method because BERT Transformer divides data into 4 parts, different from other transformers
-            :return:
-            """
-            return self.train_dataset.transform(lambda token_id, length, segment_id, label_id: length, lazy=False)
-
-        def _prepare_data_loader(self):
-            """
-            Method which prepares and populates the data loader.
-            :return:
-            """
-
-            batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size,
-                                                        shuffle=True,
-                                                        num_buckets=10, ratio=0)
-
-            batchify_fn = nlp.data.batchify.Tuple(
-                nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
-                nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
-
-            self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=4,
-                                                           batch_sampler=batch_sampler, batchify_fn=batchify_fn)
-            # TODO Think about cpu_count here.
-
-            self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
-                                                         batchify_fn=batchify_fn, num_workers=4, shuffle=False)
 
     @staticmethod
     def fit(data,

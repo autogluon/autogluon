@@ -18,7 +18,7 @@ class Dataset(BaseTask.Dataset):
     """
 
     def __init__(self, name: AnyStr, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
-                 lazy: bool = True, transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
+                 transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
                  num_workers=4, **kwargs):
         super(Dataset, self).__init__(name, train_path, val_path)
         # TODO : add search space, handle batch_size, num_workers
@@ -48,8 +48,7 @@ class Dataset(BaseTask.Dataset):
         if data_format == 'tsv' and self.train_field_indices is None:
             raise ValueError('Specified tsv, but found the field indices empty.')
 
-        if not lazy:
-            self._init_()
+        self._init_()
 
     def _init_(self):
         self._read_dataset()
