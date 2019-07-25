@@ -1,9 +1,8 @@
 import ConfigSpace as CS
 
-import autogluon as ag
 from ..core import *
 from ..space import *
-from .utils import Net
+from .utils import Net, autogluon_nets
 
 __all__ = ['Nets']
 
@@ -25,7 +24,7 @@ class Nets(BaseAutoObject):
         for net in self.net_list:
             #TODO(cgraywang): distinguish between different nets, only support resnet for now
             if isinstance(net, str):
-                net = self._get_task_model(net)
+                net = self._get_net(net)
             net_hyper_params = net.get_hyper_params()
             conds = []
             for net_hyper_param in net_hyper_params:
@@ -49,16 +48,9 @@ class Nets(BaseAutoObject):
                 raise NotImplementedError
         return net_strs
 
-    def _get_task_model(self, net):
-        #TODO: temporal solution, we now have limit application support
-        net = net.lower()
-        if net in ag.task.image_classification.models:
-            net = ag.task.image_classification.get_model(net)
-        elif net in ag.task.object_detection.models:
-            net = ag.task.object_detection.get_model(net)
-        else:
-            raise NotImplementedError
-        return net
+    @autogluon_nets
+    def _get_net(self, name):
+        return Net(name)
 
     def __repr__(self):
         return "AutoGluon Nets %s with %s" % \
