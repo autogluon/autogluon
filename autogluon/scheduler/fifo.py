@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 from .reporter import StatusReporter
 from .scheduler import *
-from ..basic import load, Task
+from ..basic import load, Task, save
 from ..resource import Resources
 from ..utils import mkdir, try_import_mxboard
 
@@ -103,7 +103,7 @@ class FIFO_Scheduler(TaskScheduler):
             raise RuntimeError(msg)
         checkname = checkpoint if checkpoint else self._checkpoint
         mkdir(os.path.dirname(checkname))
-        # save(self.state_dict(), checkname)
+        save(self.state_dict(), checkname)
 
     def schedule_next(self):
         """Schedule next searcher suggested task
