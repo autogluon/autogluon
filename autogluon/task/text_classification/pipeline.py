@@ -1,10 +1,10 @@
 import gluonnlp as nlp
 import mxnet as mx
 
-from autogluon.dataset.transforms import TextDataTransform, BERTDataTransform
 from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
+from autogluon.task.text_classification.transforms import TextDataTransform, BERTDataTransform
 from .dataset import BERTDataset, Dataset
 from .event_handlers import BertDataLoaderHandler, LSTMDataLoaderHandler
 from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
@@ -51,8 +51,9 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
               'use_classifier': False}
 
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
-    dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True), max_seq_length=80,
-                                          pair=True)
+    dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
+                                          max_seq_length=args.max_sequence_length,
+                                          pair=False)
     dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                           transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
                           train_field_indices=args.dataset.train_field_indices,
@@ -80,7 +81,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     :return: net, dataset, model_handlers
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
-    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=500)])
+    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=args.max_sequence_length)])
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
@@ -132,7 +133,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     # define the initializer :
     # TODO : This should come from the config
-    initializer = mx.init.Xavier(magnitude=2.24)
+    initializer = mx.init.Normal(0.02)
     if args.pretrained is False:
         net.collect_params().initialize(init=initializer, ctx=ctx)
 

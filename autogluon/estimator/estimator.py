@@ -344,8 +344,6 @@ class Estimator(object):
         if self.data_loader_handler is None:
             self.data_loader_handler = DataLoaderHandler()
 
-        #default_handlers.append("DataLoaderHandler")
-
         # if there is a mix of user defined event handlers and default event handlers
         # they should have the same set of loss and metrics
         if default_handlers:

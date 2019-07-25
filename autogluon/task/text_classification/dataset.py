@@ -35,6 +35,7 @@ class Dataset(dataset.Dataset):
         self.train_field_indices = None
         self.val_field_indices = None
         self.class_labels = None
+        self.num_workers = num_workers
 
         if kwargs:
             if 'train_field_indices' in kwargs:
@@ -121,20 +122,18 @@ class Dataset(dataset.Dataset):
 
             else:
                 self.train_dataset, self._label_set = utils.get_dataset_from_tsv_files(path=self.train_path,
-                                                                                       field_indices=self.train_field_indices,
-                                                                                       )
+                                                                                       field_indices=self.train_field_indices)
                 self.val_dataset, _ = utils.get_dataset_from_tsv_files(path=self.val_path,
-                                                                       field_indices=self.val_field_indices,
-                                                                       )
+                                                                       field_indices=self.val_field_indices)
 
         else:
             raise NotImplementedError("Error. Different formats are not supported yet")
 
     def _preprocess(self):
-        pool = multiprocessing.Pool()
-        self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
-        self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
-        self._train_data_lengths = self._get_train_data_lengths()
+        with multiprocessing.Pool(self.num_workers) as pool:
+            self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
+            self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
+            self._train_data_lengths = self._get_train_data_lengths()
 
     def _get_train_data_lengths(self) -> List[int]:
         return self.train_dataset.transform(lambda data, label: int(len(data)), lazy=False)
@@ -152,12 +151,12 @@ class Dataset(dataset.Dataset):
         batchify_fn = nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
                                               nlp.data.batchify.Stack(dtype='float32'))
 
-        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=cpu_count(),
+        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=4,
                                                        batch_sampler=batch_sampler, batchify_fn=batchify_fn)
         # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
-                                                     batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)
+                                                     batchify_fn=batchify_fn, num_workers=4, shuffle=False)
 
     @staticmethod
     def _train_valid_split(dataset: gluon.data.Dataset, valid_ratio=0.20) -> [gluon.data.Dataset,
@@ -179,6 +178,17 @@ class Dataset(dataset.Dataset):
 
 class BERTDataset(Dataset):
 
+    def _preprocess(self):
+        class_labels = self.class_labels if self.class_labels else list(self._label_set)
+
+        self._transform.class_labels = class_labels
+        self._transform.re_init()  # Need to this here, since class_labels information is not available before hand.
+
+        with multiprocessing.Pool(self.num_workers) as pool:
+            self.train_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.train_dataset))
+            self.val_dataset = gluon.data.SimpleDataset(pool.map(self._transform, self.val_dataset))
+            self._train_data_lengths = self._get_train_data_lengths()
+
     def _get_train_data_lengths(self) -> List[int]:
         """
         Need a separate method because BERT Transformer divides data into 4 parts, different from other transformers
@@ -199,9 +209,9 @@ class BERTDataset(Dataset):
             nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
             nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
 
-        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=cpu_count(),
+        self.train_data_loader = gluon.data.DataLoader(dataset=self.train_dataset, num_workers=4,
                                                        batch_sampler=batch_sampler, batchify_fn=batchify_fn)
         # TODO Think about cpu_count here.
 
         self.val_data_loader = gluon.data.DataLoader(dataset=self.val_dataset, batch_size=self.batch_size,
-                                                     batchify_fn=batchify_fn, num_workers=cpu_count(), shuffle=False)
+                                                     batchify_fn=batchify_fn, num_workers=4, shuffle=False)
