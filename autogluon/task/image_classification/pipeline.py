@@ -113,8 +113,9 @@ def train_image_classification(args, reporter):
     metric = get_metric_instance(args.metric)
 
     def _demo_early_stopping(batch_id):
-        if batch_id == 3:
-            return True
+        if 'demo' in vars(args):
+            if args.demo and batch_id == 3:
+                return True
         return False
 
     def train(epoch):
@@ -139,7 +140,7 @@ def train_image_classification(args, reporter):
                 l.backward()
 
             trainer.step(batch_size)
-            if args.demo and _demo_early_stopping(i):
+            if _demo_early_stopping(i):
                 break
         mx.nd.waitall()
 
@@ -159,7 +160,7 @@ def train_image_classification(args, reporter):
 
             test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
             metric.update(label, outputs)
-            if args.demo and _demo_early_stopping(i):
+            if _demo_early_stopping(i):
                 break
         _, test_acc = metric.get()
         test_loss /= len(val_data)
