@@ -25,8 +25,15 @@ def autogluon_optims(func):
                         [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param(),
                          Linear('momentum', 0.85, 0.95).get_hyper_param(),
                          Log('wd', 10 ** -6, 10 ** -2).get_hyper_param()])
+            elif optim.name == 'bertadam':
+                setattr(optim, 'hyper_params',
+                        [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param()])
+            elif optim.name == 'ftml':
+                setattr(optim, 'hyper_params',
+                        [Log('lr', 10 ** -4, 10 ** -1).get_hyper_param()])
             else:
                 raise NotImplementedError
+
         else:
             hyper_param_lst = []
             for k, v in kwargs.items():

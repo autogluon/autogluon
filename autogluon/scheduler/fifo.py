@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 from .reporter import StatusReporter
 from .scheduler import *
-from ..basic import save, load, Task
+from ..basic import load, Task
 from ..resource import Resources
 from ..utils import mkdir, try_import_mxboard
 
@@ -121,8 +121,10 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            reporter = StatusReporter(task_id=task.task_id)
             task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
+            task.args['resources'] = task.resources
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
                 task.fn, task.args, task.resources,

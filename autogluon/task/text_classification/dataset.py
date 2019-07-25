@@ -5,14 +5,14 @@ from typing import AnyStr, List
 import gluonnlp as nlp
 from mxnet import gluon
 
-from autogluon.dataset import TextDataTransform
 from . import utils
-from ... import dataset
+from .transforms import TextDataTransform
+from ..base import BaseTask
 
 __all__ = ['Dataset', 'BERTDataset']
 
 
-class Dataset(dataset.Dataset):
+class Dataset(BaseTask.Dataset):
     """
     Python class to represent TextClassification Datasets
     """
@@ -31,7 +31,7 @@ class Dataset(dataset.Dataset):
         self.class_labels = None
         self.batch_size = batch_size
         self._download_dataset(url)
-        self.add_search_space()
+        self._add_search_space()
         self.train_field_indices = None
         self.val_field_indices = None
         self.class_labels = None
@@ -146,7 +146,8 @@ class Dataset(dataset.Dataset):
         :return:
         """
 
-        batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size, shuffle=True,
+        batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size,
+                                                    shuffle=True,
                                                     num_buckets=10, ratio=0)
         batchify_fn = nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
                                               nlp.data.batchify.Stack(dtype='float32'))
@@ -202,7 +203,8 @@ class BERTDataset(Dataset):
         :return:
         """
 
-        batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size, shuffle=True,
+        batch_sampler = nlp.data.FixedBucketSampler(self._train_data_lengths, batch_size=self.batch_size,
+                                                    shuffle=True,
                                                     num_buckets=10, ratio=0)
 
         batchify_fn = nlp.data.batchify.Tuple(

@@ -11,7 +11,7 @@ import autogluon as ag
 from ...optim import Optimizers, get_optim
 from ... import dataset
 
-__all__ = ['BaseTask']
+__all__ = ['BaseTask', 'Results']
 
 logger = logging.getLogger(__name__)
 

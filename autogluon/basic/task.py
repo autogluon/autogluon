@@ -1,8 +1,11 @@
-
 import copy
+import logging
 import multiprocessing as mp
 
+logger = logging.getLogger(__name__)
+
 __all__ = ['Task']
+
 
 class Task(object):
     """Individual training task, containing the lauch function, default arguments and
@@ -21,6 +24,7 @@ class Task(object):
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
+
     def __init__(self, fn, args, resources):
         self.fn = fn
         self.args = copy.deepcopy(args)
@@ -37,11 +41,11 @@ class Task(object):
         cls.TASK_ID.value = taskid
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ +  \
-            ' (' + 'task_id: ' + str(self.task_id) + \
-            ',\n\tfn: ' + str(self.fn) + \
-            ',\n\targs: {'
+        reprstr = self.__class__.__name__ + \
+                  ' (' + 'task_id: ' + str(self.task_id) + \
+                  ',\n\tfn: ' + str(self.fn) + \
+                  ',\n\targs: {'
         for k, v in self.args.items():
-            reprstr +=  '{}'.format(k) + ': ' + str(v) + ', '
-        reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
+            reprstr += '{}'.format(k) + ': ' + str(v) + ', '
+        reprstr += '},\n\tresource: ' + str(self.resources) + ')\n'
         return reprstr

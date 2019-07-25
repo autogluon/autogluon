@@ -4,10 +4,10 @@ import mxnet as mx
 from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
-from autogluon.task.text_classification.transforms import TextDataTransform, BERTDataTransform
-from .dataset import BERTDataset, Dataset
+from .dataset import Dataset, BERTDataset
 from .event_handlers import BertDataLoaderHandler, LSTMDataLoaderHandler
 from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
+from .transforms import BERTDataTransform, TextDataTransform
 from ...basic import autogluon_method
 
 __all__ = ['train_text_classification']
@@ -56,8 +56,8 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
                                           pair=False)
     dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                           transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                          train_field_indices=args.dataset.train_field_indices,
-                          val_field_indices=args.dataset.val_field_indices, num_workers=num_workers)
+                          train_field_indices=args.data.train_field_indices,
+                          val_field_indices=args.data.val_field_indices, num_workers=num_workers)
 
     net = BERTClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                                 dropout=args.dropout)
@@ -85,7 +85,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path, lazy=False,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                      field_indices=args.dataset.field_indices, num_workers=num_workers)
+                      field_indices=args.data.field_indices, num_workers=num_workers)
 
     net = LMClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                               dropout=args.dropout)
@@ -103,7 +103,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     import psutil, os
     batch_size, ctx = _init_env(args)
     args.pretrained = True
-    args.task_id = task_id
+    vars(args).update({'task_id': task_id})
     logger.info('Task ID : {0}, args : {1}, resources:{2}, pid:{3}'.format(task_id, args, resources, os.getpid()))
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
@@ -139,7 +139,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     else:
         net.output.initialize(init=initializer, ctx=ctx)
-        net.collect_params().reset_ctx(ctx=ctx)
+    net.collect_params().reset_ctx(ctx=ctx)
 
     # TODO : Update with search space
     loss = gluon.loss.SoftmaxCrossEntropyLoss()

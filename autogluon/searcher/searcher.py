@@ -65,7 +65,7 @@ class RandomSampling(BaseSearcher):
             specification of the Hyperparameters with their priors
 
     Example:
-        >>> import ConfigSpace as CS
+        >>> import ConfigSpace as CSH
         >>> import ConfigSpace.hyperparameters as CSH
         >>> # create configuration space
         >>> cs = CS.ConfigurationSpace()
