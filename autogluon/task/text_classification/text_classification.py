@@ -16,7 +16,6 @@ from ...metric import Metrics
 from ...network import Nets
 from ...optim import Optimizers, get_optim
 from ...space import List, Exponential
-from ...utils.mxboard_handler import MXBoardHandler
 
 __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
@@ -78,10 +77,12 @@ class TextClassification(BaseTask):
             self.val_field_indices = None
             self.class_labels = None
             self.num_workers = num_workers
+            self.pair = False
 
             if kwargs:
                 if 'train_field_indices' in kwargs:
                     self.train_field_indices = kwargs['train_field_indices']
+                    self.pair = True if len(self.train_field_indices) == 3 else False
                 if 'val_field_indices' in kwargs:
                     self.val_field_indices = kwargs['val_field_indices']
                 else:

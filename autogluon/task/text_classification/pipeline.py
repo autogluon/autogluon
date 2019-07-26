@@ -56,7 +56,7 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
     dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
                                           max_seq_length=args.max_sequence_length,
-                                          pair=False)
+                                          pair=args.data.pair)
     dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
                           transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
                           train_field_indices=args.data.train_field_indices,
@@ -85,7 +85,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
     dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=args.max_sequence_length)],
-                                          max_sequence_length=args.max_sequence_length)
+                                          pair=args.data.pair, max_sequence_length=args.max_sequence_length)
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
