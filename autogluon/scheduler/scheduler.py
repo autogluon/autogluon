@@ -56,8 +56,9 @@ class TaskScheduler(object):
         try:
             fn(**args)
         except Exception as e:
+            import traceback
             logger.error(
-                'Uncaught exception in worker process: {}'.format(e))
+                'Uncaught exception in worker process: {}. {}'.format(e, traceback.print_exc()))
         resource_manager._release(resources)
 
     def _cleaning_tasks(self):
