@@ -1,51 +1,31 @@
 import json
-import os
 from typing import AnyStr, Any, Collection
 
 import gluonnlp as nlp
 from mxnet import gluon
 
 
-def read_text_from_file(path: AnyStr) -> AnyStr:
-    text = []
-    for line in open(path, 'r'):
-        line = line.lower().strip()
-        text.append(line)
-    return ' '.join(line for line in text)
-
-
-def get_dataset_from_files(path: AnyStr,
-                           label_folders: Collection[AnyStr] = None) -> (gluon.data.SimpleDataset, Collection[int]):
+def get_dataset_from_txt_files(path: AnyStr) -> (gluon.data.SimpleDataset, Collection[int]):
     """
-    Utility method that reads a dataset from files and returns text, label pairs if labels=True
+    This assumes the following format in the txt files: LABEL<delimeter>TEXT
     :param path:
-    :param label_folders: Whether labels are needed or not
     :return:
     """
-
-    include_labels = label_folders is not None
-    lines = list()
+    if not path.endswith('.txt'):
+        raise ValueError('Passed the dataformat as .txt, but the file extension is not .txt. It is {}'.format(path))
+    text = []
     label_set = set()
-    for folder in os.listdir(os.path.join(path)):
-        if include_labels and folder not in label_folders:
-            continue
-        if folder.startswith('.'):
-            # Ignore .DS_Store or something similar
-            continue
+    for line in open(path, 'r'):
+        line = line.lower().strip()
+        item = line.split(' ', 1)  # Split it into [LABEL, TEXT]
+        label_set.add(item[0])
+        text.append([item[1], item[0]])  # Adding ([TEXT, LABEL] tuple to list)
 
-        for filename in os.listdir(os.path.join(path, folder)):
-            if not filename.endswith('.txt'):
-                continue
-            line = read_text_from_file(os.path.join(path, folder, filename))
-            if include_labels:
-                # TODO: remove hardcoding!
-                lbl = 0 if folder == 'neg' else 1
-                lines.append([line, lbl])  # Text , Label pair
-                label_set.add(lbl)
-            else:
-                lines.append(line)
+    lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
+    for elem in text:
+        elem[-1] = lbl_dict[elem[-1]]
 
-    return gluon.data.SimpleDataset(lines), label_set
+    return gluon.data.SimpleDataset(text), label_set
 
 
 def get_dataset_from_json_files(path: AnyStr) -> (gluon.data.SimpleDataset, Collection[int]):

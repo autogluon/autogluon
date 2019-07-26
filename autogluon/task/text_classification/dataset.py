@@ -124,6 +124,20 @@ class Dataset(BaseTask.Dataset):
                 self.val_dataset, _ = utils.get_dataset_from_tsv_files(path=self.val_path,
                                                                        field_indices=self.val_field_indices)
 
+        elif self.data_format == 'txt':
+
+            if self.val_path is None:
+                dataset, self._label_set = utils.get_dataset_from_txt_files(path=self.train_path,
+                                                                            field_indices=self.train_field_indices)
+                self.train_dataset, self.val_dataset = self._train_valid_split(dataset, valid_ratio=0.2)
+
+            else:
+                self.train_dataset, self._label_set = utils.get_dataset_from_txt_files(path=self.train_path,
+                                                                                       field_indices=self.train_field_indices)
+                self.val_dataset, _ = utils.get_dataset_from_txt_files(path=self.val_path,
+                                                                       field_indices=self.val_field_indices)
+
+
         else:
             raise NotImplementedError("Error. Different formats are not supported yet")
 
