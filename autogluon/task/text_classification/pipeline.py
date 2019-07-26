@@ -88,7 +88,8 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                      field_indices=args.data.field_indices, num_workers=num_workers)
+                      train_field_indices=args.data.train_field_indices,
+                      val_field_indices=args.data.val_field_indices, num_workers=num_workers)
 
     net = LMClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
                               dropout=args.dropout)
