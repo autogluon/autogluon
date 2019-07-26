@@ -14,7 +14,7 @@ class TextDataTransform(object):
     """
 
     def __init__(self, vocab, tokenizer=nlp.data.SpacyTokenizer('en'),
-                 transforms: List = None):
+                 transforms: List = None, pair=False, max_sequence_length=100):
         """
         Init method for TextDataTransform. This is a utility class for defining custom transforms on the text dataset.
         :param vocab:
@@ -24,20 +24,51 @@ class TextDataTransform(object):
         self._vocab = vocab
         self._tokenizer = tokenizer
         self._transforms = transforms
+        self._pair = pair
+        self._max_sequence_length = max_sequence_length
 
     def __call__(self, sample):
-        text, label = sample
+        if self._pair:
+            text_a, text_b, label = sample
+        else:
+            text_a, label = sample
 
-        text = self._tokenizer(text)
+        tokens_a = self._tokenizer(text_a)
+        tokens_b = None
 
-        # TODO : Should this be called before tokenize ? Or after
+        if self._pair:
+            tokens_b = self._tokenizer(text_b)
+
+        if tokens_b:
+            self._truncate_seq_pair(tokens_a, tokens_b, max_length=self._max_sequence_length)
+
+        tokens = []
+        tokens.extend(tokens_a)
+
+        if tokens_b:
+            tokens.extend(tokens_b)
 
         for rule in self._transforms:
-            text = rule(text)
+            tokens = rule(tokens)
 
-        text = self._vocab[text]
+        tokens = self._vocab[tokens]
 
-        return text, label
+        return tokens, label
+
+    def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
+        """Truncates a sequence pair in place to the maximum length."""
+        # This is a simple heuristic which will always truncate the longer sequence
+        # one token at a time. This makes more sense than truncating an equal percent
+        # of tokens from each, since if one sequence is very short then each token
+        # that's truncated likely contains more information than a longer sequence.
+        while True:
+            total_length = len(tokens_a) + len(tokens_b)
+            if total_length <= max_length:
+                break
+            if len(tokens_a) > len(tokens_b):
+                tokens_a.pop()
+            else:
+                tokens_b.pop()
 
 
 class BERTDataTransform(object):

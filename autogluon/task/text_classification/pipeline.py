@@ -84,7 +84,8 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     :return: net, dataset, model_handlers
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
-    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=args.max_sequence_length)])
+    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=args.max_sequence_length)],
+                                          max_sequence_length=args.max_sequence_length)
 
     dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
                       transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
