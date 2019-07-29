@@ -60,31 +60,3 @@ def autogluon_register_args(**kwvars):
         logger.debug('Registering {}'.format(cs))
         return wrapper_call
     return registered_func
-
-def register_callable_kwargs(**kwvars):
-    def registered_func(func):
-        @autogluon_method
-        @functools.wraps(func)
-        def wrapper_call(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        assert(len(kwvars)==2)
-        call_name, kw_name = kwvars.keys()
-        call_list, kw_list = kwvars.values()
-        assert(len(call_list)==len(kw_list))
-
-        cs = CS.ConfigurationSpace()
-        cs.add_hyperparameter(get_config_space(call_name, call_list))
-
-        wrapper_call.cs = cs
-        return wrapper_call
-    return registered_func
-
-@register_callable_kwargs(
-    net=ListSpace(get_model('CIFAR_ResNet20_v1'),
-                  get_model('CIFAR_ResNet20_v2')),
-    kwargs=[{'pretrained': True},
-            {}],
-    )
-def get_net(net, kwargs):
-    return net(**kwargs)

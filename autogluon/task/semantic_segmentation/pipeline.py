@@ -14,37 +14,23 @@ from gluoncv.model_zoo import get_model
 from gluoncv.utils.parallel import *
 from gluoncv.data import get_segmentation_dataset
 
-def parse_args():
-    """Training Options for Segmentation Experiments"""
-    parser = argparse.ArgumentParser(description='MXNet Gluon \
-                                     Segmentation')
-    # model and dataset 
-    parser.add_argument('--model', type=str, default='fcn',
-                        help='model name (default: fcn)')
-    parser.add_argument('--backbone', type=str, default='resnet50',
-                        help='backbone name (default: resnet50)')
-    parser.add_argument('--dataset', type=str, default='pascal_aug',
-                        help='dataset name (default: pascal)')
-    print(args)
-    return args
-
 @autogluon_register_args(
-    model=ListSpace(),
-    dataset=,
-    workers=16,
-    base_size=520,
-    crop_size=480,
-    aux=True,
-    aux_weight=LinearSpace(0.2, 0,8)
-    epochs=50,
-    batch_size=16,
-    lr=LogLinearSpace(1e-3, 1e-1),
-    momentum=0.9,
-    weight_decay=1e-4,
-    no_wd=True,
-    kvstore='device',
-    norm_layer=mx.gluon.contrib.nn.SyncBatchNorm,
-    norm_kwargs={'num_devices': args.ngpus},
+        model=ListSpace(),
+        dataset=,
+        workers=16,
+        base_size=520,
+        crop_size=480,
+        aux=True,
+        aux_weight=LinearSpace(0.2, 0,8)
+        epochs=50,
+        batch_size=16,
+        lr=LogLinearSpace(1e-3, 1e-1),
+        momentum=0.9,
+        weight_decay=1e-4,
+        no_wd=True,
+        kvstore='device',
+        norm_layer=mx.gluon.contrib.nn.SyncBatchNorm,
+        norm_kwargs={'num_devices': args.ngpus},
     )
 def train_semantic_segmentation(args, reporter):
     args.ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]

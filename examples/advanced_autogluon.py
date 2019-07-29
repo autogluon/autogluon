@@ -13,15 +13,6 @@ from gluoncv.data import transforms as gcv_transforms
 import autogluon as ag
 from autogluon import autogluon_method, autogluon_register_args
 
-@register_callable_kwargs(
-    net=ListSpace(get_model('CIFAR_ResNet20_v1'),
-                  get_model('CIFAR_ResNet20_v2')),
-    kwargs=[{'pretrained': True},
-            {}],
-    )
-def get_net(net, kwargs):
-    return net(**kwargs)
-
 @autogluon_register_args(
         batch_size=64,
         num_gpus=1,
