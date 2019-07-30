@@ -17,7 +17,7 @@ __all__ = ['train_text_classification']
 logger = logging.getLogger(__name__)
 
 
-def _init_env(args: dict):
+def _init_hparams(args: dict):
     """
     Method required to initialize context and batch size based on supplied arguments.
     :return:
@@ -117,11 +117,33 @@ def _init_mxboard_handler(checkpoint_dir: AnyStr, task_id: int) -> MXBoardHandle
 
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
-    import psutil, os
-    batch_size, ctx = _init_env(args)
-    args.pretrained = True
+    # Set Hyper-params
+    def _init_hparams():
+        """
+        Method required to initialize context and batch size based on supplied arguments.
+        :return:
+        """
+        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
+            batch_size = args.batch_size * max(args.num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+        else:
+            if hasattr(args, 'num_gpus'):
+                num_gpus = args.num_gpus
+            else:
+                num_gpus = 0
+            if hasattr(args, 'batch_size'):
+                batch_size = args.batch_size * max(num_gpus, 1)
+            else:
+                batch_size = 64 * max(num_gpus, 1)
+            ctx = [mx.gpu(i)
+                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        return batch_size, ctx
+
+    batch_size, ctx = _init_hparams(args)
     vars(args).update({'task_id': task_id})
     logger.info('Task ID : {0}, args : {1}, resources:{2}, pid:{3}'.format(task_id, args, resources, os.getpid()))
+    import psutil, os
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
 
