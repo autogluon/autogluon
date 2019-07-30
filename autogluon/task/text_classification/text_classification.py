@@ -14,7 +14,7 @@ from ..base import BaseTask, Results
 from ...loss import Losses
 from ...metric import Metrics
 from ...network import Nets
-from ...optim import Optimizers, get_optim
+from .optims import *
 from ...space import List, Exponential
 
 __all__ = ['TextClassification']

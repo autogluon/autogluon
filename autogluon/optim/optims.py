@@ -5,7 +5,7 @@ from ..core import *
 from ..space import *
 
 __all__ = ['Optimizers', 'get_optim', 'SGD', 'NAG', 'RMSProp', 'Adam', 'AdaGrad', 'AdaDelta',
-           'Adamax', 'Nadam', 'DCASGD', 'SGLD', 'Signum', 'FTML', 'LBSGD', 'Ftrl', 'BertAdam']
+           'Adamax', 'Nadam', 'DCASGD', 'SGLD', 'Signum', 'FTML', 'LBSGD', 'Ftrl']
 
 
 class Optimizers(BaseAutoObject):
@@ -69,8 +69,7 @@ optims = ['sgd',
           'signum',
           'ftml',
           'lbsgd',
-          'ftrl',
-          'bertadam']
+          'ftrl']
 
 
 @autogluon_optims
@@ -197,8 +196,3 @@ def LBSGD(**kwargs):
 @autogluon_optims
 def Ftrl(**kwargs):
     return Optimizer('ftrl')
-
-
-@autogluon_optims
-def BertAdam(**kwargs):
-    return Optimizer('bertadam')
