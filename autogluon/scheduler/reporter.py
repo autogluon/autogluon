@@ -1,7 +1,10 @@
+import os
 import time
-import multiprocessing as mp
-import logging
 import json
+import logging
+import multiprocessing as mp
+
+from ..basic import save, load
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +16,13 @@ class StatusReporter(object):
         >>>     reporter(timesteps_this_iter=1)
     """
 
-    def __init__(self):#, result_queue, continue_semaphore):
+    def __init__(self, dict_path=None):#, result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
         self._last_report_time = None
         self._continue_semaphore = mp.Semaphore(0)
         self._last_report_time = time.time()
+        self._save_dict = False
+        self.dict_path = dict_path
 
     def __call__(self, **kwargs):
         """Report updated training status.
@@ -48,6 +53,19 @@ class StatusReporter(object):
         """Adjust the real starting time
         """
         self._last_report_time = time.time()
+
+    def save_dict(self, **state_dict):
+        """Save the serializable state_dict
+        """
+        logger.debug('Saving the task dict to {}'.format(self.dict_path))
+        save(state_dict, self.dict_path)
+
+    def has_dict(self):
+        logger.debug('has_dict {}'.format(os.path.isfile(self.dict_path)))
+        return os.path.isfile(self.dict_path)
+
+    def get_dict(self):
+        return load(self.dict_path)
 
     def __repr__(self):
         reprstr = self.__class__.__name__

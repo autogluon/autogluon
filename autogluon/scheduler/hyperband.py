@@ -1,3 +1,4 @@
+import os
 import pickle
 import logging
 import threading
@@ -91,7 +92,9 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         logger.debug("Adding A New Task {}".format(task))
         Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
             self.terminator.on_task_add(task)
             # main process
@@ -122,6 +125,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
                 terminator.on_task_complete(task, last_result)
+                reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
@@ -142,6 +146,8 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 break
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
 
     def state_dict(self, destination=None):
         destination = super(Hyperband_Scheduler, self).state_dict(destination)
