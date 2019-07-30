@@ -1,20 +1,18 @@
 import logging
-import os
 from typing import AnyStr
 
 import ConfigSpace as CS
-from mxnet import gluon
 
 from .losses import *
 from .metrics import *
 from .model_zoo import *
+from .optims import *
 from .pipeline import *
 from .transforms import TextDataTransform
 from ..base import BaseTask, Results
 from ...loss import Losses
 from ...metric import Metrics
 from ...network import Nets
-from .optims import *
 from ...space import List, Exponential
 
 __all__ = ['TextClassification']

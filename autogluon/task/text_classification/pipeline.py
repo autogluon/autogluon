@@ -171,7 +171,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                            num_epochs=args.epochs,
                            train_length=len(dataset.train_dataset))
 
-    event_handlers = [reporter, early_stopping_handler, lr_handler] + model_handlers
+    event_handlers = [early_stopping_handler, lr_handler] + model_handlers
 
     if mxboard_handler is not None:
         event_handlers.append(mxboard_handler)

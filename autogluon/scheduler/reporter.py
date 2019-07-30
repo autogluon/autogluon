@@ -1,12 +1,12 @@
 import json
+import logging
 import multiprocessing as mp
-
-from ..estimator import *
+import time
 
 logger = logging.getLogger(__name__)
 
 
-class StatusReporter(EpochEnd):
+class StatusReporter:
     """Report status through the training scheduler.
     Example:
         >>> def train_func(config, reporter):
@@ -54,7 +54,3 @@ class StatusReporter(EpochEnd):
     def __repr__(self):
         reprstr = self.__class__.__name__
         return reprstr
-
-    def epoch_end(self, estimator: Estimator, *args, **kwargs):
-        self.current_epoch += 1
-        self(epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1])
