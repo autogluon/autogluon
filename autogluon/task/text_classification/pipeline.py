@@ -7,7 +7,7 @@ from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
 from .dataset import Dataset, BERTDataset
-from .event_handlers import BertDataLoaderHandler, LSTMDataLoaderHandler
+from .event_handlers import TextDataLoaderHandler
 from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
 from .transforms import BERTDataTransform, TextDataTransform
 from ...basic import autogluon_method
@@ -68,7 +68,7 @@ def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
 
     net.hybridize(static_alloc=True)
 
-    model_handlers = [BertDataLoaderHandler()]
+    model_handlers = [TextDataLoaderHandler(args.model)]
 
     return net, dataset, model_handlers
 
@@ -99,7 +99,7 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
 
     net.hybridize(static_alloc=True)
 
-    model_handlers = [LSTMDataLoaderHandler()]
+    model_handlers = [TextDataLoaderHandler(model_name=args.model)]
     return net, dataset, model_handlers
 
 
