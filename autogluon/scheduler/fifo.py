@@ -121,7 +121,7 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter(task_id=task.task_id)
+            reporter = StatusReporter()
             task.args['reporter'] = reporter
             task.args['task_id'] = task.task_id
             task.args['resources'] = task.resources

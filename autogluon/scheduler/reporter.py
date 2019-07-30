@@ -14,13 +14,12 @@ class StatusReporter(EpochEnd):
         >>>     reporter(timesteps_this_iter=1)
     """
 
-    def __init__(self, task_id: int):  # , result_queue, continue_semaphore):
+    def __init__(self):  # , result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
         self._last_report_time = None
         self._continue_semaphore = mp.Semaphore(0)
         self._last_report_time = time.time()
         self.current_epoch = 0
-        self.task_id = task_id
 
     def __call__(self, **kwargs):
         """Report updated training status.
@@ -58,4 +57,4 @@ class StatusReporter(EpochEnd):
 
     def epoch_end(self, estimator: Estimator, *args, **kwargs):
         self.current_epoch += 1
-        self(task_id=self.task_id, epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1])
+        self(epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1])
