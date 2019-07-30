@@ -1,53 +1,39 @@
-import gluonnlp as nlp
 import mxnet as mx
+from mxnet.gluon import nn
 
 from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
-from .dataset import Dataset, BERTDataset
 from .event_handlers import TextDataLoaderHandler
-from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
-from .transforms import BERTDataTransform, TextDataTransform
+from .losses import get_loss_instance
+from .metrics import get_metric_instance
+from .model_zoo import get_model_instances, LMClassifier, BERTClassifier
 from ...basic import autogluon_method
 
 __all__ = ['train_text_classification']
 logger = logging.getLogger(__name__)
 
 
-def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
+def _get_bert_pre_trained_model(args: dict, ctx):
     """
-    Utility method which defines a BertModel for classification and also initializes
-    dataset object compatible with BertModel.
     :param args:
-    :param batch_size:
     :param ctx:
-    :return: net, dataset, model_handlers
+    :return: net,vocab,
     """
+
     kwargs = {'use_pooler': True,
               'use_decoder': False,
               'use_classifier': False}
 
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
-    dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
-                                          max_seq_length=args.max_sequence_length,
-                                          pair=args.data.pair)
-    dataset = BERTDataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
-                          transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                          train_field_indices=args.data.train_field_indices,
-                          val_field_indices=args.data.val_field_indices, num_workers=num_workers)
 
-    net = BERTClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
-                                dropout=args.dropout)
+    net = BERTClassifier()
     net.pre_trained_network = pre_trained_network
 
-    net.hybridize(static_alloc=True)
-
-    model_handlers = [TextDataLoaderHandler(args.model)]
-
-    return net, dataset, model_handlers
+    return net, vocab
 
 
-def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
+def _get_lm_pre_trained_model(args: dict, ctx):
     """
     Utility method which defines a Language Model for classification and also initializes
     dataset object compatible with Language Model.
@@ -58,23 +44,12 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     :return: net, dataset, model_handlers
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
-    dataset_transform = TextDataTransform(vocab, transforms=[nlp.data.ClipSequence(length=args.max_sequence_length)],
-                                          pair=args.data.pair, max_sequence_length=args.max_sequence_length)
 
-    dataset = Dataset(name=args.data_name, train_path=args.train_path, val_path=args.val_path,
-                      transform=dataset_transform, batch_size=batch_size, data_format=args.data_format,
-                      train_field_indices=args.data.train_field_indices,
-                      val_field_indices=args.data.val_field_indices, num_workers=num_workers)
-
-    net = LMClassificationNet(num_classes=dataset.num_classes, num_classification_layers=args.dense_layers,
-                              dropout=args.dropout)
+    net = LMClassifier()
     net.embedding = pre_trained_network.embedding
     net.encoder = pre_trained_network.encoder
 
-    net.hybridize(static_alloc=True)
-
-    model_handlers = [TextDataLoaderHandler(model_name=args.model)]
-    return net, dataset, model_handlers
+    return net, vocab
 
 
 @autogluon_method
@@ -109,48 +84,73 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
 
-    if 'bert' in args.model:  # Get bert specific model attributes
-        net, dataset, model_handlers = get_bert_model_attributes(args, batch_size, ctx, resources.num_cpus)
+    if 'bert' in args.model:
+        net, vocab = _get_bert_pre_trained_model(args, ctx)
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
-        net, dataset, model_handlers = get_lm_model_attributes(args, batch_size, ctx, resources.num_cpus)
+        net, vocab = _get_lm_pre_trained_model(args, ctx)
 
     else:
         raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
 
-    # pre_trained_network is a misnomer here. This can be untrained network too.
+    net.classifier = nn.Sequential()
+    with net.classifier.name_scope():
+        net.classifier.add(nn.Dropout(dropout=args.dropout))
+        net.classifier.add(nn.Dense(args.num_classes))
 
-    # fine_tune_lm(pre_trained_network) # TODO
+    if not args.pretrained:
+        net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
+    else:
+        net.classifier.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
+
+    net.collect_params().reset_ctx(ctx)
+    net.hybridize(static_alloc=True)
 
     # do not apply weight decay on LayerNorm and bias terms
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
         v.wd_mult = 0.0
 
-    logger.info('Task ID : {0}, network : {1}'.format(task_id, net))
+    def _get_dataloader():
+        def _init_dataset(dataset, transform_fn):
+            return dataset.transform(args.model)
 
-    # define the initializer :
-    # TODO : This should come from the config
-    initializer = mx.init.Normal(0.02)
-    if args.pretrained is False:
-        net.collect_params().initialize(init=initializer, ctx=ctx)
+        train_dataset = _init_dataset(args.data.train_dataset, args.data.get_transform_train_fn(args.model))
+        val_dataset = _init_dataset(args.data.val_dataset, args.data.get_transform_val_fn(args.model))
 
-    else:
-        net.classifier.initialize(init=initializer, ctx=ctx)
-    net.collect_params().reset_ctx(ctx=ctx)
+        train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
+                                           batch_sampler=args.data.get_batch_sampler(args.model),
+                                           batchify_fn=args.data.get_batchify_fn(args.model))
+
+        val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
+                                         batchify_fn=args.data.get_batchify_fn(args.model),
+                                         num_workers=args.data.num_workers,
+                                         shuffle=False)
+
+    train_data, val_data = _get_dataloader()
+
+    # fine_tune_lm(pre_trained_network) # TODO
+
+    def _get_optimizer_params():
+        optimizer_params = {'learning_rate': args.lr}
+        return optimizer_params
+
+    optimer_params = _get_optimizer_params()
+
+    trainer = gluon.Trainer(net.collect_params(), args.optimizer, optimer_params)
 
     # TODO : Update with search space
-    loss = gluon.loss.SoftmaxCrossEntropyLoss()
+    loss = get_loss_instance(args.loss)
+    metric = get_metric_instance(args.metric)
 
-    trainer = gluon.Trainer(net.collect_params(), args.optimizer, {'learning_rate': args.lr})
-    estimator: Estimator = Estimator(net=net, loss=loss, metrics=[mx.metric.Accuracy()], trainer=trainer, context=ctx)
+    estimator: Estimator = Estimator(net=net, loss=loss, metrics=[metric], trainer=trainer, context=ctx)
 
     early_stopping_handler = EarlyStoppingHandler(monitor=estimator.train_metrics[0], mode='max')
 
     lr_handler = LRHandler(warmup_ratio=0.1,
                            batch_size=batch_size,
                            num_epochs=args.epochs,
-                           train_length=len(dataset.train_dataset))
+                           train_length=len(args.data.train_dataset))
 
-    event_handlers = [early_stopping_handler, lr_handler] + model_handlers
+    event_handlers = [early_stopping_handler, lr_handler, TextDataLoaderHandler(args.model)]
 
-    estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
+    estimator.fit(train_data=train_data, val_data=val_data, epochs=args.epochs,
                   event_handlers=event_handlers)

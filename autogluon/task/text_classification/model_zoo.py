@@ -7,7 +7,7 @@ from mxnet.gluon import Block
 
 from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 
-__all__ = ['get_model_instances', 'get_model', 'models', 'LMClassificationNet', 'BERTClassificationNet']
+__all__ = ['get_model_instances', 'get_model', 'models', 'LMClassifier', 'BERTClassifier']
 
 models = ['standard_lstm_lm_200',
           'standard_lstm_lm_650',
@@ -128,6 +128,7 @@ def awd_lstm_lm_1150(**kwargs):
 def awd_lstm_lm_600(**kwargs):
     pass
 
+
 @autogluon_nets
 def elmo_2x1024_128_2048cnn_1xhighway(**kwargs):
     pass
@@ -141,6 +142,7 @@ def elmo_2x2048_256_2048cnn_1xhighway(**kwargs):
 @autogluon_nets
 def elmo_2x4096_512_2048cnn_2xhighway(**kwargs):
     pass
+
 
 @autogluon_nets
 def bert_12_768_12(**kwargs):
@@ -171,16 +173,16 @@ class MeanPoolingLayer(gluon.Block):
         return agg_state
 
 
-class LMClassificationNet(gluon.Block):
+class LMClassifier(gluon.Block):
     """
     Network for Text Classification which uses a pre-trained language model.
     This works with  standard_lstm_lm_200, standard_lstm_lm_650, standard_lstm_lm_1500, awd_lstm_lm_1150, awd_lstm_lm_600
     """
 
-    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
-        super(LMClassificationNet, self).__init__(prefix=prefix, params=params)
+    def __init__(self, prefix=None, params=None, embedding=None):
+        super(LMClassifier, self).__init__(prefix=prefix, params=params)
         with self.name_scope():
-            self.embedding = None
+            self.embedding = embedding
             self.encoder = None
             self.agg_layer = MeanPoolingLayer()
             self.classifier = None
@@ -192,15 +194,15 @@ class LMClassificationNet(gluon.Block):
         return out
 
 
-class BERTClassificationNet(gluon.Block):
+class BERTClassifier(gluon.Block):
     """
     Network for Text Classification which uses a BERT pre-trained model.
     This works with  bert_12_768_12, bert_24_1024_16
     """
 
-    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
-        super(BERTClassificationNet, self).__init__(prefix=prefix, params=params)
-        self.pre_trained_network = None
+    def __init__(self, prefix=None, params=None, pre_trained_network=None):
+        super(BERTClassifier, self).__init__(prefix=prefix, params=params)
+        self.pre_trained_network = pre_trained_network
         self.classifier = None
 
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
