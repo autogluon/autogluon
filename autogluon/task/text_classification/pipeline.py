@@ -155,7 +155,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net.collect_params().initialize(init=initializer, ctx=ctx)
 
     else:
-        net.output.initialize(init=initializer, ctx=ctx)
+        net.classifier.initialize(init=initializer, ctx=ctx)
     net.collect_params().reset_ctx(ctx=ctx)
 
     # TODO : Update with search space

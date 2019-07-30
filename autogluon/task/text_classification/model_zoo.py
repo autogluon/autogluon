@@ -171,29 +171,6 @@ class MeanPoolingLayer(gluon.Block):
         return agg_state
 
 
-class ClassificationHead(gluon.Block):
-    """
-    Simple Dense layer network which forms the classification head on top of the pre-trained models.
-    """
-
-    def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
-        super(ClassificationHead, self).__init__(prefix=prefix, params=params)
-        self.net = gluon.nn.Sequential()
-
-        with self.net.name_scope():
-            hidden_units = 40  # TODO Make this also a Hyperparam.
-            for i in range(num_classification_layers + 1):
-                self.net.add(gluon.nn.Dropout(rate=dropout))
-                self.net.add(gluon.nn.Dense(int(hidden_units)))
-                hidden_units = hidden_units / 2
-
-            self.net.add(gluon.nn.Dropout(rate=dropout))
-            self.net.add(gluon.nn.Dense(num_classes))
-
-    def forward(self, inputs):
-        return self.net(inputs)
-
-
 class LMClassificationNet(gluon.Block):
     """
     Network for Text Classification which uses a pre-trained language model.
@@ -206,13 +183,12 @@ class LMClassificationNet(gluon.Block):
             self.embedding = None
             self.encoder = None
             self.agg_layer = MeanPoolingLayer()
-            self.output = ClassificationHead(num_classes=num_classes,
-                                             num_classification_layers=num_classification_layers, dropout=dropout)
+            self.classifier = None
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
         encoded = self.encoder(self.embedding(data))
         agg_state = self.agg_layer(encoded, valid_length)
-        out = self.output(agg_state)
+        out = self.classifier(agg_state)
         return out
 
 
@@ -225,9 +201,8 @@ class BERTClassificationNet(gluon.Block):
     def __init__(self, prefix=None, params=None, num_classes=2, num_classification_layers=1, dropout=0.4):
         super(BERTClassificationNet, self).__init__(prefix=prefix, params=params)
         self.pre_trained_network = None
-        self.output = ClassificationHead(num_classes=num_classes, num_classification_layers=num_classification_layers,
-                                         dropout=dropout)
+        self.classifier = None
 
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
         _, pooler_out = self.pre_trained_network(inputs, token_types, valid_length)
-        return self.output(pooler_out)
+        return self.classifier(pooler_out)
