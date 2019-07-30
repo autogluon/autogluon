@@ -1,5 +1,3 @@
-from typing import AnyStr
-
 import gluonnlp as nlp
 import mxnet as mx
 
@@ -11,33 +9,9 @@ from .event_handlers import TextDataLoaderHandler
 from .model_zoo import get_model_instances, LMClassificationNet, BERTClassificationNet
 from .transforms import BERTDataTransform, TextDataTransform
 from ...basic import autogluon_method
-from ...utils.mxboard_handler import MXBoardHandler
 
 __all__ = ['train_text_classification']
 logger = logging.getLogger(__name__)
-
-
-def _init_hparams(args: dict):
-    """
-    Method required to initialize context and batch size based on supplied arguments.
-    :return:
-    """
-    if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
-        batch_size = args.batch_size * max(args.num_gpus, 1)
-        ctx = [mx.gpu(i)
-               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-    else:
-        if hasattr(args, 'num_gpus'):
-            num_gpus = args.num_gpus
-        else:
-            num_gpus = 0
-        if hasattr(args, 'batch_size'):
-            batch_size = args.batch_size * max(num_gpus, 1)
-        else:
-            batch_size = 64 * max(num_gpus, 1)
-        ctx = [mx.gpu(i)
-               for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
-    return batch_size, ctx
 
 
 def get_bert_model_attributes(args: dict, batch_size: int, ctx, num_workers):
@@ -103,18 +77,6 @@ def get_lm_model_attributes(args: dict, batch_size: int, ctx, num_workers):
     return net, dataset, model_handlers
 
 
-def _init_mxboard_handler(checkpoint_dir: AnyStr, task_id: int) -> MXBoardHandler:
-    try:
-        import mxboard
-    except ImportError:
-        return None
-
-    log_dir = os.path.join(checkpoint_dir, 'logs')
-    mxboard_handler = MXBoardHandler(task_id=task_id, log_dir=log_dir, checkpoint_dir=checkpoint_dir)
-
-    return mxboard_handler
-
-
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
     # Set Hyper-params
@@ -146,11 +108,6 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     import psutil, os
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
-
-    if 'log_dir' in args:
-        mxboard_handler = _init_mxboard_handler(args.log_dir, task_id)
-    if mxboard_handler is not None:
-        mxboard_handler.trial_args = args.__dict__
 
     if 'bert' in args.model:  # Get bert specific model attributes
         net, dataset, model_handlers = get_bert_model_attributes(args, batch_size, ctx, resources.num_cpus)
@@ -194,9 +151,6 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                            train_length=len(dataset.train_dataset))
 
     event_handlers = [early_stopping_handler, lr_handler] + model_handlers
-
-    if mxboard_handler is not None:
-        event_handlers.append(mxboard_handler)
 
     estimator.fit(train_data=dataset.train_data_loader, val_data=dataset.val_data_loader, epochs=args.epochs,
                   event_handlers=event_handlers)
