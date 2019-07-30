@@ -183,6 +183,9 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         if last_result is not None:
             searcher.update(task.args['config'], last_result[self._reward_attr])
 
+    def get_best_state(self):
+        raise NotImplemented
+
     def get_best_config(self):
         self.join_tasks()
         return self.searcher.get_best_config()
