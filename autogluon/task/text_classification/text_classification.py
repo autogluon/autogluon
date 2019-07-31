@@ -3,10 +3,12 @@ import multiprocessing
 
 import ConfigSpace as CS
 
+from autogluon.optim import Optimizers
+from .dataset import *
 from .losses import *
 from .metrics import *
 from .model_zoo import *
-from .optims import *
+from .optims import get_optim
 from .pipeline import *
 from .transforms import TextDataTransform, BERTDataTransform
 from .utils import *
@@ -143,6 +145,15 @@ class TextClassification(BaseTask):
             Loads data from a given data path. If a url is passed, it downloads the data in the init method
             :return:
             """
+            if self.train_path is None:
+                # Read dataset from gluonnlp.
+                import os
+                root = os.path.join(os.getcwd(), 'data', self.name)
+                self.train_path = '{}/{}.{}'.format(root, 'train', self.data_format)
+                self.val_path = '{}/{}.{}'.format(root, 'dev', self.data_format)
+
+                get_dataset(self.name, root=root, segment='train')
+                get_dataset(self.name, root=root, segment='dev')
 
             if self.data_format == 'json':
 
@@ -191,10 +202,10 @@ class TextClassification(BaseTask):
         def get_train_data_lengths(self, model_name: AnyStr, dataset):
             with multiprocessing.Pool(self.num_workers) as pool:
                 if 'bert' in model_name:
-                    return self.train_dataset.transform(lambda data, label: int(len(data)), lazy=False)
+                    return dataset.transform(lambda token_id, length, segment_id, label_id: length,
+                                             lazy=False)
                 else:
-                    return self.train_dataset.transform(lambda token_id, length, segment_id, label_id: length,
-                                                        lazy=False)
+                    return dataset.transform(lambda data, label: int(len(data)), lazy=False)
 
         def get_batchify_fn(self, model_name: AnyStr):
             if 'bert' in model_name:
@@ -287,7 +298,8 @@ class TextClassification(BaseTask):
         kwargs['val_path'] = data.val_path
         kwargs['log_dir'] = savedir
 
-        return BaseTask.fit(data=data, nets=nets, optimizers=optimizers, losses=losses, searcher=searcher,
+        return BaseTask.fit(data=data, nets=nets, optimizers=optimizers, metrics=metrics, losses=losses,
+                            searcher=searcher,
                             trial_scheduler=trial_scheduler,
                             resume=resume, savedir=savedir, visualizer=visualizer,
                             stop_criterion=stop_criterion, resources_per_trial=resources_per_trial, backend=backend,

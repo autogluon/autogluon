@@ -27,5 +27,5 @@ def get_dataset(name, **kwargs):
         err_str = '"%s" is not among the following dataset list:\n\t' % (name)
         err_str += '%s' % ('\n\t'.join(sorted(_dataset.keys())))
         raise ValueError(err_str)
-    dataset = _dataset[name](*kwargs)
+    dataset = _dataset[name](**kwargs)
     return dataset

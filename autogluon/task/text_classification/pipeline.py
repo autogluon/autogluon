@@ -78,7 +78,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                    for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
 
-    batch_size, ctx = _init_hparams(args)
+    batch_size, ctx = _init_hparams()
     vars(args).update({'task_id': task_id})
     logger.info('Task ID : {0}, args : {1}, resources:{2}, pid:{3}'.format(task_id, args, resources, os.getpid()))
 
@@ -95,8 +95,8 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     net.classifier = nn.Sequential()
     with net.classifier.name_scope():
-        net.classifier.add(nn.Dropout(dropout=args.dropout))
-        net.classifier.add(nn.Dense(args.num_classes))
+        net.classifier.add(nn.Dropout(args.dropout))
+        net.classifier.add(nn.Dense(args.data.num_classes))
 
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
@@ -114,9 +114,9 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         def _init_dataset(dataset, transform_fn):
             return args.data.transform(dataset, transform_fn)
 
-        train_dataset = _init_dataset(args.data.train_dataset,
+        train_dataset = _init_dataset(args.data.train,
                                       args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
-        val_dataset = _init_dataset(args.data.val_dataset,
+        val_dataset = _init_dataset(args.data.val,
                                     args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
 
         train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
@@ -154,7 +154,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     lr_handler = LRHandler(warmup_ratio=0.1,
                            batch_size=batch_size,
                            num_epochs=args.epochs,
-                           train_length=len(args.data.train_dataset))
+                           train_length=len(args.data.train))
 
     event_handlers = [early_stopping_handler, lr_handler, TextDataLoaderHandler(args.model)]
 
