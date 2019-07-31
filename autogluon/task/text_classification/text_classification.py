@@ -213,8 +213,8 @@ class TextClassification(BaseTask):
                     nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
                     nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
             else:
-                nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
-                                        nlp.data.batchify.Stack(dtype='float32'))
+                return nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
+                                               nlp.data.batchify.Stack(dtype='int32'))
 
         def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
             if 'bert' in model_name:
