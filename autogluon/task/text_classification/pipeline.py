@@ -1,4 +1,5 @@
 import mxnet as mx
+import psutil
 from mxnet.gluon import nn
 
 from autogluon.estimator import *
@@ -80,7 +81,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     batch_size, ctx = _init_hparams(args)
     vars(args).update({'task_id': task_id})
     logger.info('Task ID : {0}, args : {1}, resources:{2}, pid:{3}'.format(task_id, args, resources, os.getpid()))
-    import psutil, os
+
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
 
@@ -111,13 +112,15 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     def _get_dataloader():
         def _init_dataset(dataset, transform_fn):
-            return dataset.transform(args.model)
+            return args.data.transform(dataset, transform_fn)
 
-        train_dataset = _init_dataset(args.data.train_dataset, args.data.get_transform_train_fn(args.model))
-        val_dataset = _init_dataset(args.data.val_dataset, args.data.get_transform_val_fn(args.model))
+        train_dataset = _init_dataset(args.data.train_dataset,
+                                      args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
+        val_dataset = _init_dataset(args.data.val_dataset,
+                                    args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
 
         train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
-                                           batch_sampler=args.data.get_batch_sampler(args.model),
+                                           batch_sampler=args.data.get_batch_sampler(args.model, train_dataset),
                                            batchify_fn=args.data.get_batchify_fn(args.model))
 
         val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
@@ -125,11 +128,14 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                                          num_workers=args.data.num_workers,
                                          shuffle=False)
 
+        return train_data, val_data
+
     train_data, val_data = _get_dataloader()
 
     # fine_tune_lm(pre_trained_network) # TODO
 
     def _get_optimizer_params():
+        # TODO : Add more optimizer params based on the chosen optimizer
         optimizer_params = {'learning_rate': args.lr}
         return optimizer_params
 

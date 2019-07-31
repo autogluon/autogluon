@@ -1,5 +1,5 @@
 import logging
-from typing import AnyStr
+import multiprocessing
 
 import ConfigSpace as CS
 
@@ -8,7 +8,8 @@ from .metrics import *
 from .model_zoo import *
 from .optims import *
 from .pipeline import *
-from .transforms import TextDataTransform
+from .transforms import TextDataTransform, BERTDataTransform
+from .utils import *
 from ..base import BaseTask, Results
 from ...loss import Losses
 from ...metric import Metrics
@@ -56,25 +57,22 @@ class TextClassification(BaseTask):
         pass on the attributes to pipeline.py where actual dataset objects are constructed.
         """
 
-        def __init__(self, name: AnyStr, url: AnyStr = None, train_path: AnyStr = None, val_path: AnyStr = None,
-                     transform: TextDataTransform = None, batch_size: int = 32, data_format='json',
-                     num_workers=4, **kwargs):
-            super(TextClassification.Dataset, self).__init__(name, train_path, val_path)
+        def __init__(self, name: AnyStr, train_path: AnyStr = None, val_path: AnyStr = None,
+                     batch_size: int = 32, num_workers=4,
+                     transform_train_fn=None, transform_val_fn=None, transform_train_list=None, transform_val_list=None,
+                     batchify_train_fn=None, batchify_val_fn=None,
+                     data_format='txt', **kwargs):
 
-            self._transform: TextDataTransform = transform
-            self._train_ds_transformed = None
-            self._val_ds_transformed = None
-            self._train_data_lengths = None
+            super(TextClassification.Dataset, self).__init__(name, train_path, val_path, batch_size, num_workers,
+                                                             transform_train_fn, transform_val_fn,
+                                                             transform_train_list, transform_val_list,
+                                                             batchify_train_fn, batchify_val_fn, **kwargs)
+
             self.data_format = data_format
             self._label_set = set()
             self.class_labels = None
-            self.batch_size = batch_size
-            self._download_dataset(url)
-            self._add_search_space()
             self.train_field_indices = None
             self.val_field_indices = None
-            self.class_labels = None
-            self.num_workers = num_workers
             self.pair = False
 
             if kwargs:
@@ -86,8 +84,14 @@ class TextClassification(BaseTask):
                 else:
                     self.val_field_indices = self.train_field_indices
 
+                if 'class_labels' in kwargs:
+                    self.class_labels = kwargs['class_labels']
+
             if data_format == 'tsv' and self.train_field_indices is None:
                 raise ValueError('Specified tsv, but found the field indices empty.')
+
+            self._read_dataset(**kwargs)
+            self._add_search_space()
 
         def _add_search_space(self):
             cs = CS.ConfigurationSpace()
@@ -98,31 +102,130 @@ class TextClassification(BaseTask):
             cs.add_hyperparameters([data_hyperparams, seq_length_hyperparams])
             self.search_space = cs
 
-        def _download_dataset(self, url) -> None:
-            """
-            This method downloads the datasets and returns the file path where the data was downloaded.
-            :return:
-            """
-            if self.train_path is None:  # We need to download the dataset.
+        def _read_dataset(self, **kwargs):
+            self._load_dataset(**kwargs)
+            self._label_set = self._infer_labels()
+            self.num_classes = len(self._label_set)
 
-                if url is None:
-                    raise ValueError('Cannot download the dataset as the url is None.')
+        def _infer_labels(self):
+            label_set = set()
 
-                root = os.path.join(os.getcwd(), 'data', self.name)
-                train_segment = '{}/{}.{}'.format(root, 'train', self.data_format)
-                val_segment = '{}/{}.{}'.format(root, 'val', self.data_format)
-                segments = [train_segment, val_segment]
+            for elem in self.train:
+                label_set.add(elem[-1])  # Assuming label is at the end.
 
-                for path in segments:
-                    gluon.utils.download(url='{}/{}'.format(url, path.split('/')[-1]), path=path, overwrite=True)
+            lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
+            for elem in self.train:
+                elem[-1] = lbl_dict[elem[-1]]
 
-                self.train_path = train_segment
-                self.val_path = val_segment
-
-            return self.train_path, self.val_path
+            # Also map the labels back to the dataset
+            return label_set
 
         def __repr__(self):
+            # TODO
             return "AutoGluon Dataset %s" % self.name
+
+        @staticmethod
+        def _train_valid_split(dataset: gluon.data.Dataset, valid_ratio=0.20) -> [gluon.data.Dataset,
+                                                                                  gluon.data.Dataset]:
+            """
+            Splits the dataset into training and validation sets.
+
+            :param valid_ratio: float, default 0.20
+                        Proportion of training samples to be split into validation set.
+                        range: [0, 1]
+            :return:
+
+            """
+            return nlp.data.utils.train_valid_split(dataset, valid_ratio)
+
+        def _load_dataset(self, **kwargs):
+            """
+            Loads data from a given data path. If a url is passed, it downloads the data in the init method
+            :return:
+            """
+
+            if self.data_format == 'json':
+
+                if self.val_path is None:
+                    # Read the training data and perform split on it.
+                    dataset = get_dataset_from_json_files(path=self.train_path)
+                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+
+                else:
+                    self.train = get_dataset_from_json_files(path=self.train_path)
+                    self.val = get_dataset_from_json_files(path=self.val_path)
+
+            elif self.data_format == 'tsv':
+
+                if self.val_path is None:
+                    # Read the training data and perform split on it.
+                    dataset = get_dataset_from_tsv_files(path=self.train_path,
+                                                         field_indices=self.train_field_indices)
+                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+
+                else:
+                    self.train = get_dataset_from_tsv_files(path=self.train_path,
+                                                            field_indices=self.train_field_indices)
+                    self.val = get_dataset_from_tsv_files(path=self.val_path,
+                                                          field_indices=self.val_field_indices)
+
+            elif self.data_format == 'txt':
+
+                if self.val_path is None:
+                    dataset = get_dataset_from_txt_files(path=self.train_path)
+                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+
+                else:
+                    self.train = get_dataset_from_txt_files(path=self.train_path)
+                    self.val = get_dataset_from_txt_files(path=self.val_path)
+
+            else:
+                raise NotImplementedError("Error. Different formats are not supported yet")
+            pass
+
+        def transform(self, dataset, transform_fn):
+            # The model type is necessary to pre-process it based on the inputs required to the model.
+            with multiprocessing.Pool(self.num_workers) as pool:
+                return gluon.data.SimpleDataset(pool.map(transform_fn, dataset))
+
+        def get_train_data_lengths(self, model_name: AnyStr, dataset):
+            with multiprocessing.Pool(self.num_workers) as pool:
+                if 'bert' in model_name:
+                    return self.train_dataset.transform(lambda data, label: int(len(data)), lazy=False)
+                else:
+                    return self.train_dataset.transform(lambda token_id, length, segment_id, label_id: length,
+                                                        lazy=False)
+
+        def get_batchify_fn(self, model_name: AnyStr):
+            if 'bert' in model_name:
+                return nlp.data.batchify.Tuple(
+                    nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
+                    nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
+            else:
+                nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
+                                        nlp.data.batchify.Stack(dtype='float32'))
+
+        def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
+            if 'bert' in model_name:
+                class_labels = self.class_labels if self.class_labels else list(self._label_set)
+                dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
+                                                      max_seq_length=max_sequence_length,
+                                                      pair=self.pair, class_labels=class_labels)
+
+            else:
+                dataset_transform = TextDataTransform(vocab, transforms=[
+                    nlp.data.ClipSequence(length=max_sequence_length)],
+                                                      pair=self.pair, max_sequence_length=max_sequence_length)
+            return dataset_transform
+
+        def get_transform_val_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
+            return self.get_transform_train_fn(model_name, vocab, max_sequence_length)
+
+        def get_batch_sampler(self, model_name: AnyStr, train_dataset):
+            train_data_lengths = self.get_train_data_lengths(model_name, train_dataset)
+            return nlp.data.FixedBucketSampler(train_data_lengths, batch_size=self.batch_size,
+                                               shuffle=True,
+                                               num_buckets=10, ratio=0)
 
     @staticmethod
     def fit(data,
