@@ -1,11 +1,11 @@
 import ConfigSpace as CS
 
-from .utils import autogluon_optims, Optimizer
 from ..core import *
 from ..space import *
+from .utils import autogluon_optims, Optimizer
 
 __all__ = ['Optimizers', 'get_optim', 'SGD', 'NAG', 'RMSProp', 'Adam', 'AdaGrad', 'AdaDelta',
-           'Adamax', 'Nadam', 'DCASGD', 'SGLD', 'Signum', 'FTML', 'LBSGD', 'Ftrl', 'BertAdam']
+           'Adamax', 'Nadam', 'DCASGD', 'SGLD', 'Signum', 'FTML', 'LBSGD', 'Ftrl']
 
 
 class Optimizers(BaseAutoObject):
@@ -49,11 +49,11 @@ class Optimizers(BaseAutoObject):
 
     def __repr__(self):
         return "AutoGluon Optimizers %s with %s" % (
-            str(self._get_search_space_strs()), str(self.search_space))
+        str(self._get_search_space_strs()), str(self.search_space))
 
     def __str__(self):
         return "AutoGluon Optimizers %s with %s" % (
-            str(self._get_search_space_strs()), str(self.search_space))
+        str(self._get_search_space_strs()), str(self.search_space))
 
 
 optims = ['sgd',
@@ -69,8 +69,7 @@ optims = ['sgd',
           'signum',
           'ftml',
           'lbsgd',
-          'ftrl',
-          'bertadam']
+          'ftrl']
 
 
 @autogluon_optims
@@ -197,8 +196,3 @@ def LBSGD(**kwargs):
 @autogluon_optims
 def Ftrl(**kwargs):
     return Optimizer('ftrl')
-
-
-@autogluon_optims
-def BertAdam(**kwargs):
-    return Optimizer('bertadam')

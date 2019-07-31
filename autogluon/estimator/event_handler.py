@@ -150,7 +150,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
         self.val_data = val_data
         self.eval_fn = eval_fn
         self.epoch_period = epoch_period
-        self.batch_period = batch_period
+        self.batch_period = 100
         self.val_metrics = val_metrics
         self.current_batch = 0
         self.current_epoch = 0
@@ -167,7 +167,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
     def batch_end(self, estimator, *args, **kwargs):
         self.current_batch += 1
         if self.batch_period and self.current_batch % self.batch_period == 0:
-            self.eval_fn(val_data=self.val_data,
+            self.eval_fn(estimator_ref = estimator, val_data=self.val_data,
                          val_metrics=self.val_metrics)
             msg = '[Epoch %d] ValidationHandler: %d batches reached, ' \
                   % (self.current_epoch, self.current_batch)

@@ -1,11 +1,13 @@
-import logging
-import multiprocessing as mp
+import os
 import pickle
+import logging
 import threading
-
 import numpy as np
+import multiprocessing as mp
 
+from .scheduler import *
 from .fifo import FIFO_Scheduler
+from ..resource import Resources
 from .reporter import StatusReporter
 
 __all__ = ['Hyperband_Scheduler']
@@ -61,7 +63,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
         >>> myscheduler = Hyperband_Scheduler(train_fn, args,
-        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0},
         >>>                                   searcher=searcher, num_trials=20,
         >>>                                   reward_attr='accuracy',
         >>>                                   time_attr='epoch',
@@ -92,8 +94,12 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         logger.debug("Adding A New Task {}".format(task))
         Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
+            task.args['resources'] = task.resources
+            task.args['task_id'] = task.task_id
             self.terminator.on_task_add(task)
             # main process
             tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(
@@ -123,6 +129,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
                 terminator.on_task_complete(task, last_result)
+                reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
@@ -143,6 +150,8 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                 break
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
 
     def state_dict(self, destination=None):
         destination = super(Hyperband_Scheduler, self).state_dict(destination)
