@@ -1,15 +1,17 @@
-import logging
 import warnings
+import logging
 
 import mxnet as mx
-from gluoncv.model_zoo import get_model
-from mxnet import gluon, init, autograd
+
+from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
+from gluoncv.model_zoo import get_model
 from mxnet.gluon.data.vision import transforms
 
+
+from ...basic import autogluon_method
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
-from ...basic import autogluon_method
 
 __all__ = ['train_image_classification']
 
@@ -35,7 +37,6 @@ def train_image_classification(args, reporter):
             if transform_list is not None:
                 dataset = dataset.transform_first(transforms.Compose(transform_list))
             return dataset
-
         train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
                                       args.data.transform_train_list)
         val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
@@ -52,7 +53,6 @@ def train_image_classification(args, reporter):
             shuffle=False,
             num_workers=args.data.num_workers)
         return train_data, val_data
-
     train_data, val_data = _get_dataloader()
 
     # Define Network
@@ -66,7 +66,7 @@ def train_image_classification(args, reporter):
         if hasattr(net, 'output'):
             net.output = nn.Dense(num_classes)
         else:
-            net.fc = nn.Dense(num_classes)  # TODO (cgraywang): deal with resnet v1/2 diff
+            net.fc = nn.Dense(num_classes) #TODO (cgraywang): deal with resnet v1/2 diff
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
     else:
@@ -119,7 +119,7 @@ def train_image_classification(args, reporter):
         return False
 
     def train(epoch):
-        # TODO (cgraywang): change to lr scheduler
+        #TODO (cgraywang): change to lr scheduler
         if hasattr(args, 'lr_step') and hasattr(args, 'lr_factor'):
             if epoch % args.lr_step == 0:
                 trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)

@@ -1,21 +1,20 @@
-import json
-import logging
-import multiprocessing as mp
 import os
 import pickle
+import json
+import logging
 import threading
+import multiprocessing as mp
 from collections import OrderedDict
 
-from .reporter import StatusReporter
 from .scheduler import *
-from ..basic import load, Task, save
 from ..resource import Resources
+from .reporter import StatusReporter
+from ..basic import save, load, Task
 from ..utils import mkdir, try_import_mxboard
 
 __all__ = ['FIFO_Scheduler']
 
 logger = logging.getLogger(__name__)
-
 
 class FIFO_Scheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
@@ -55,7 +54,6 @@ class FIFO_Scheduler(TaskScheduler):
         >>> # run tasks
         >>> myscheduler.run()
     """
-
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none'):
@@ -121,18 +119,20 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
             task.args['task_id'] = task.task_id
             task.args['resources'] = task.resources
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
-                task.fn, task.args, task.resources,
-                FIFO_Scheduler.RESOURCE_MANAGER))
+                            task.fn, task.args, task.resources,
+                            FIFO_Scheduler.RESOURCE_MANAGER))
             checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
             # reporter thread
             rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                                                                   self.searcher, checkpoint_semaphore), daemon=False)
+                                  self.searcher, checkpoint_semaphore), daemon=False)
             tp.start()
             rp.start()
             task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
@@ -158,7 +158,7 @@ class FIFO_Scheduler(TaskScheduler):
                     task_dict = self.scheduled_tasks.pop(i)
                     task_dict['ReporterThread'].join()
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                                'Config': task_dict['Config']})
+                                               'Config': task_dict['Config']})
 
     def _run_checkpoint(self, checkpoint_semaphore):
         self._cleaning_tasks()
@@ -181,6 +181,11 @@ class FIFO_Scheduler(TaskScheduler):
             reporter.move_on()
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
+
+    def get_best_state(self):
+        return self.searcher.get_best_state()
 
     def get_best_config(self):
         self.join_tasks()
@@ -199,7 +204,7 @@ class FIFO_Scheduler(TaskScheduler):
                                         global_step=reported_result['epoch'])
             self.mxboard.add_scalar(tag=self._reward_attr,
                                     value=('task {task_id} {reward_attr}'.format(
-                                        task_id=task_id, reward_attr=self._reward_attr),
+                                           task_id=task_id, reward_attr=self._reward_attr),
                                            reported_result[self._reward_attr]),
                                     global_step=reported_result['epoch'])
         reward = reported_result[self._reward_attr]

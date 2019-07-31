@@ -1,12 +1,14 @@
+import os
+import time
 import json
 import logging
 import multiprocessing as mp
-import time
+
+from ..basic import save, load
 
 logger = logging.getLogger(__name__)
 
-
-class StatusReporter:
+class StatusReporter(object):
     """Report status through the training scheduler.
     Example:
         >>> def train_func(config, reporter):
@@ -14,12 +16,13 @@ class StatusReporter:
         >>>     reporter(timesteps_this_iter=1)
     """
 
-    def __init__(self):  # , result_queue, continue_semaphore):
+    def __init__(self, dict_path=None):#, result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
         self._last_report_time = None
         self._continue_semaphore = mp.Semaphore(0)
         self._last_report_time = time.time()
-        self.current_epoch = 0
+        self._save_dict = False
+        self.dict_path = dict_path
 
     def __call__(self, **kwargs):
         """Report updated training status.
@@ -37,7 +40,7 @@ class StatusReporter:
         self._queue.put(kwargs.copy(), block=True)
         self._continue_semaphore.acquire()
 
-        logger.info('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
+        logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
 
     def fetch(self, block=True):
         kwargs = self._queue.get(block=block)
@@ -50,6 +53,19 @@ class StatusReporter:
         """Adjust the real starting time
         """
         self._last_report_time = time.time()
+
+    def save_dict(self, **state_dict):
+        """Save the serializable state_dict
+        """
+        logger.debug('Saving the task dict to {}'.format(self.dict_path))
+        save(state_dict, self.dict_path)
+
+    def has_dict(self):
+        logger.debug('has_dict {}'.format(os.path.isfile(self.dict_path)))
+        return os.path.isfile(self.dict_path)
+
+    def get_dict(self):
+        return load(self.dict_path)
 
     def __repr__(self):
         reprstr = self.__class__.__name__

@@ -1,8 +1,7 @@
 import copy
 import logging
-import multiprocessing as mp
-
 import numpy as np
+import multiprocessing as mp
 
 from ..searcher import Sample
 
@@ -10,11 +9,9 @@ __all__ = ['autogluon_method', 'gen_config']
 
 logger = logging.getLogger(__name__)
 
-
 class autogluon_method(object):
     SEED = mp.Value('i', 0)
     LOCK = mp.Lock()
-
     def __init__(self, f):
         self.f = f
 
@@ -30,7 +27,6 @@ class autogluon_method(object):
 
     def __repr__(self):
         return repr(self.f)
-
 
 def gen_config(seed, config):
     new_config = copy.deepcopy(config)

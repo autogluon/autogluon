@@ -150,7 +150,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
         self.val_data = val_data
         self.eval_fn = eval_fn
         self.epoch_period = epoch_period
-        self.batch_period = batch_period
+        self.batch_period = 100
         self.val_metrics = val_metrics
         self.current_batch = 0
         self.current_epoch = 0
