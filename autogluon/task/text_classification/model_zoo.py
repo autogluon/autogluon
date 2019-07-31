@@ -63,6 +63,8 @@ def get_model_instances(name: AnyStr,
     if 'bert' in name:
         # Currently the dataset for BERT is book corpus wiki only on gluon model zoo
         dataset_name = 'book_corpus_wiki_en_uncased'
+    if 'elmo' in name:
+        dataset_name = 'gbw'
 
     if name not in models:
         err_str = '{} is not among the following model list: \n\t'.format(name)
@@ -208,3 +210,22 @@ class BERTClassifier(gluon.Block):
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
         _, pooler_out = self.pre_trained_network(inputs, token_types, valid_length)
         return self.classifier(pooler_out)
+
+class ELMOClassifier(gluon.Block):
+    """
+    Network for Text Classification which uses a pre-trained ELMO model.
+    This works with elmo_2x1024_128_2048cnn_1xhighway, elmo_2x2048_256_2048cnn_1xhighway, elmo_2x4096_512_2048cnn_2xhighway
+    """
+
+    def __init__(self, prefix=None, params=None, pre_trained_network=None):
+        super(ELMOClassifier, self).__init__(prefix=prefix, params=params)
+        with self.name_scope():
+            self.pre_trained_network = pre_trained_network
+            self.agg_layer = MeanPoolingLayer()
+            self.classifier = None
+
+    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
+        out = self.pre_trained_network(data, valid_length)
+        out = self.agg_layer(out, valid_length)
+        out = self.classifier(out)
+        return out

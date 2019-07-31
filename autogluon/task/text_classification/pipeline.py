@@ -8,7 +8,7 @@ from autogluon.scheduler.reporter import StatusReporter
 from .event_handlers import TextDataLoaderHandler
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
-from .model_zoo import get_model_instances, LMClassifier, BERTClassifier
+from .model_zoo import get_model_instances, LMClassifier, BERTClassifier, ELMOClassifier
 from ...basic import autogluon_method
 
 __all__ = ['train_text_classification']
@@ -52,6 +52,20 @@ def _get_lm_pre_trained_model(args: dict, ctx):
 
     return net, vocab
 
+def _get_elmo_pre_trained_model(args: dict, ctx):
+    """
+    :param args:
+    :param batch_size:
+    :param ctx:
+    :return: net, dataset, model_handlers
+    """
+    pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
+
+    net = ELMOClassifier()
+    net.pre_trained_network = pre_trained_network
+
+    return net, vocab
+
 
 @autogluon_method
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
@@ -89,7 +103,8 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net, vocab = _get_bert_pre_trained_model(args, ctx)
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
         net, vocab = _get_lm_pre_trained_model(args, ctx)
-
+    elif 'elmo' in args.model:
+        net, vocab = _get_elmo_pre_trained_model(args, ctx)
     else:
         raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
 
@@ -131,6 +146,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         return train_data, val_data
 
     train_data, val_data = _get_dataloader()
+
 
     # fine_tune_lm(pre_trained_network) # TODO
 

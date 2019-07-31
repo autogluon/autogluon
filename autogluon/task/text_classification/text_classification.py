@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import glob
 
 import ConfigSpace as CS
 
@@ -28,12 +29,13 @@ default_nets = Nets([
     #get_model('awd_lstm_lm_600'),
     #get_model('awd_lstm_lm_1150'),
     #get_model('bert_12_768_12'),
-    #get_model('bert_24_1024_16')
+    #get_model('bert_24_1024_16'),
+    #get_model('elmo_2x1024_128_2048cnn_1xhighway')
 ])
 
 default_optimizers = Optimizers([
     #get_optim('adam'),
-    get_optim('sgd'),
+    #get_optim('sgd'),
     get_optim('ftml'),
     #get_optim('bertadam')
 ])
@@ -41,13 +43,13 @@ default_optimizers = Optimizers([
 default_stop_criterion = {
     'time_limits': 1 * 60 * 60,
     'max_metric': 1.0,  # TODO Should be place a bound on metric?
-    'max_trial_count': 2
+    'max_trial_count': 1
 }
 
 default_resources_per_trial = {
     'max_num_gpus': 1,
     'max_num_cpus': 4,
-    'max_training_epochs': 3
+    'max_training_epochs': 5
 }
 
 
@@ -149,8 +151,8 @@ class TextClassification(BaseTask):
                 # Read dataset from gluonnlp.
                 import os
                 root = os.path.join(os.getcwd(), 'data', self.name)
-                self.train_path = '{}/{}.{}'.format(root, 'train', self.data_format)
-                self.val_path = '{}/{}.{}'.format(root, 'dev', self.data_format)
+                self.train_path = glob.glob('{}/{}.{}'.format(root, 'train*', self.data_format))[0]
+                self.val_path = glob.glob('{}/{}.{}'.format(root, 'dev*', self.data_format))[0]
 
                 get_dataset(self.name, root=root, segment='train')
                 get_dataset(self.name, root=root, segment='dev')
@@ -222,7 +224,10 @@ class TextClassification(BaseTask):
                 dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
                                                       max_seq_length=max_sequence_length,
                                                       pair=self.pair, class_labels=class_labels)
-
+            elif 'elmo' in model_name:
+                dataset_transform = TextDataTransform(vocab, tokenizer=nlp.data.SacreMosesTokenizer(),
+                                                      transforms=[nlp.data.ClipSequence(length=max_sequence_length)],
+                                                      pair=self.pair, max_sequence_length=max_sequence_length)
             else:
                 dataset_transform = TextDataTransform(vocab, transforms=[
                     nlp.data.ClipSequence(length=max_sequence_length)],
