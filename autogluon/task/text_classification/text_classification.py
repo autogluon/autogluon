@@ -22,31 +22,31 @@ logger = logging.getLogger(__name__)
 
 default_nets = Nets([
     get_model('standard_lstm_lm_200'),
-    get_model('standard_lstm_lm_650'),
-    get_model('standard_lstm_lm_1500'),
-    get_model('awd_lstm_lm_600'),
-    get_model('awd_lstm_lm_1150'),
-    get_model('bert_12_768_12'),
-    get_model('bert_24_1024_16')
+    #get_model('standard_lstm_lm_650'),
+    #get_model('standard_lstm_lm_1500'),
+    #get_model('awd_lstm_lm_600'),
+    #get_model('awd_lstm_lm_1150'),
+    #get_model('bert_12_768_12'),
+    #get_model('bert_24_1024_16')
 ])
 
 default_optimizers = Optimizers([
-    get_optim('adam'),
+    #get_optim('adam'),
     get_optim('sgd'),
     get_optim('ftml'),
-    get_optim('bertadam')
+    #get_optim('bertadam')
 ])
 
 default_stop_criterion = {
     'time_limits': 1 * 60 * 60,
-    'max_metric': 0.80,  # TODO Should be place a bound on metric?
-    'max_trial_count': 1
+    'max_metric': 1.0,  # TODO Should be place a bound on metric?
+    'max_trial_count': 2
 }
 
 default_resources_per_trial = {
-    'max_num_gpus': 4,
+    'max_num_gpus': 1,
     'max_num_cpus': 4,
-    'max_training_epochs': 5
+    'max_training_epochs': 3
 }
 
 
@@ -93,8 +93,8 @@ class TextClassification(BaseTask):
 
         def _add_search_space(self):
             cs = CS.ConfigurationSpace()
-            data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
-                                           upper_exponent=3).get_hyper_param()
+            data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=5,
+                                           upper_exponent=5).get_hyper_param()
 
             seq_length_hyperparams = List(name='max_sequence_length', choices=[50, 100, 150, 200]).get_hyper_param()
             cs.add_hyperparameters([data_hyperparams, seq_length_hyperparams])

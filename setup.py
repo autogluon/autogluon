@@ -1,100 +1,81 @@
-# To build and upload a new version, follow the steps below.
-# Notes:
-# - this is a "Universal Wheels" package that is pure Python and supports both Python2 and Python3
-# - Twine is a secure PyPi upload package
-# - Make sure you have bumped the version! at mms/version.py
-# $ pip install twine
-# $ pip install wheel
-# $ python setup.py bdist_wheel --universal
-
-# *** TEST YOUR PACKAGE WITH TEST PI ******
-# twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-
-# If this is successful then push it to actual pypi
-
-# $ twine upload dist/*
-
-
-import io
+#!/usr/bin/env python
 import os
-import re
-import sys
-from datetime import date
-from shutil import rmtree
+import shutil
+import subprocess
 
 from setuptools import setup, find_packages
+import setuptools.command.develop
+import setuptools.command.install
 
-pkgs = find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"])  # TODO Refine the excludes list further
+cwd = os.path.dirname(os.path.abspath(__file__))
 
+version = '0.0.1'
+try:
+    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
+        cwd=cwd).decode('ascii').strip()
+    version += '+' + sha[:7]
+except Exception:
+    pass
 
-def pypi_description():
-    """
-    Imports the project description for the project page.
-    :return:
-    """
-    try:
-        import pypandoc
-        long_description = pypandoc.convert('README.md', 'rst')
-    except(IOError, ImportError):
-        long_description = open('README.md').read()
+def create_version_file():
+    global version, cwd
+    print('-- Building version ' + version)
+    version_path = os.path.join(cwd, 'autogluon', 'version.py')
+    with open(version_path, 'w') as f:
+        f.write('"""This is autogluon version file."""\n')
+        f.write("__version__ = '{}'\n".format(version))
 
-    return long_description
+# run test scrip after installation
+class install(setuptools.command.install.install):
+    def run(self):
+        create_version_file()
+        setuptools.command.install.install.run(self)
 
+class develop(setuptools.command.develop.develop):
+    def run(self):
+        create_version_file()
+        setuptools.command.develop.develop.run(self)
 
-def read(*names, **kwargs):
-    with io.open(
-            os.path.join(os.path.dirname(__file__), *names),
-            encoding=kwargs.get("encoding", "utf8")
-    ) as fp:
-        return fp.read()
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
 
+requirements = [
+    'numpy==1.16.0',
+    'scipy',
+    'matplotlib',
+    'requests',
+    'pytest',
+    'dask[complete]',
+    'tornado',
+    'ConfigSpace',
+    'nose',
+    'gluoncv',
+    'gluonnlp',
+]
 
-def detect_auto_gluon_version():
-    """
-    Creates a version for package with either beta tag + date appended or an actual release version
-    :return:
-    """
+setup(
+    # Metadata
+    name='autogluon',
+    version=version,
+    author='AutoGluon Community',
+    url='https://github.com/awslabs/autogluon',
+    description='Gluon AutoML Toolkit',
+    long_description=long_description,
+    license='Apache',
 
-    version_file = read('autogluon', '__init__.py')
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
-    if version_match:
-        if '--release' in sys.argv:
-            return version_match.group(1)
-
-        return version_match.group(1) + 'b' + str(date.today()).replace('-', '')
-
-    raise RuntimeError("Unable to find version string.")
-
-
-def clean_residual_builds():
-    try:
-        pwd = os.path.abspath(os.path.dirname(__file__))
-        if os.path.exists(os.path.join(pwd, 'dist')):
-            rmtree(os.path.join(pwd, 'dist'))
-    except OSError:
-        pass
-
-
-if __name__ == '__main__':
-    version = detect_auto_gluon_version()
-
-    reqs = open('requirements.txt').read()
-
-    setup(
-        name='AutoGluon',
-        version=version,
-        author='AutoGluon team',
-        url='https://github.com/awslabs/AutoGluon',
-        description='MXNet Gluon AutoML Toolkit',  # To be refined
-        long_description=pypi_description(),
-        license='MIT',
-        keywords='MXNet Gluon AutoModel AutoML AutoGluon CV NLP',
-
-        # Package info
-        packages=pkgs,
-        zip_safe=True,
-        include_package_data=True,
-        install_requires=reqs,
-        tests_require=['nose', 'pytest']
-    )
+    # Package info
+    packages=find_packages(exclude=('docs', 'tests', 'scripts')),
+    zip_safe=True,
+    include_package_data=True,
+    install_requires=requirements,
+    package_data={'autogluon': [
+        'LICENSE',
+    ]},
+    cmdclass={
+        'install': install,
+        'develop': develop,
+    },
+)

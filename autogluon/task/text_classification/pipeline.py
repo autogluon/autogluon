@@ -125,8 +125,9 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     ps_p = psutil.Process(os.getpid())
     ps_p.cpu_affinity(resources.cpu_ids)
 
-    if 'log_dir' in args:
-        mxboard_handler = _init_mxboard_handler(args.log_dir, task_id)
+    # if 'log_dir' in args:
+    #     mxboard_handler = _init_mxboard_handler(args.log_dir, task_id)
+    mxboard_handler = None
     if mxboard_handler is not None:
         mxboard_handler.trial_args = args.__dict__
 
