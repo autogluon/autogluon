@@ -213,7 +213,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
     def __init__(self, file_name=None,
                  file_location=None,
                  filemode='a',
-                 verbose=LOG_PER_EPOCH,
+                 verbose=LOG_PER_BATCH,
                  train_metrics=None,
                  val_metrics=None):
         super(LoggingHandler, self).__init__()

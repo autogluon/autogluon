@@ -52,7 +52,7 @@ def _get_lm_pre_trained_model(args: dict, ctx):
 
     return net, vocab
 
-def _get_elmo_pre_trained_model(args: dict, ctx):
+def _get_elmo_pre_trained_model(args: dict, ctx, batch_size):
     """
     :param args:
     :param batch_size:
@@ -61,9 +61,8 @@ def _get_elmo_pre_trained_model(args: dict, ctx):
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
 
-    net = ELMOClassifier()
+    net = ELMOClassifier(batch_size=batch_size, ctx=ctx)
     net.pre_trained_network = pre_trained_network
-
     return net, vocab
 
 
@@ -104,7 +103,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
         net, vocab = _get_lm_pre_trained_model(args, ctx)
     elif 'elmo' in args.model:
-        net, vocab = _get_elmo_pre_trained_model(args, ctx)
+        net, vocab = _get_elmo_pre_trained_model(args, ctx, batch_size)
     else:
         raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
 
@@ -133,20 +132,28 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                                       args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
         val_dataset = _init_dataset(args.data.val,
                                     args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
+        if 'elmo' in args.model:
+            train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
+                                               batch_size=batch_size,
+                                               batchify_fn=args.data.get_batchify_fn(args.model))
 
-        train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
-                                           batch_sampler=args.data.get_batch_sampler(args.model, train_dataset),
-                                           batchify_fn=args.data.get_batchify_fn(args.model))
+            val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
+                                             batchify_fn=args.data.get_batchify_fn(args.model),
+                                             num_workers=args.data.num_workers,
+                                             shuffle=False)
 
-        val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
-                                         batchify_fn=args.data.get_batchify_fn(args.model),
-                                         num_workers=args.data.num_workers,
-                                         shuffle=False)
+        else:
+            train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
+                                               batch_sampler=args.data.get_batch_sampler(args.model, train_dataset),
+                                               batchify_fn=args.data.get_batchify_fn(args.model))
 
+            val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
+                                             batchify_fn=args.data.get_batchify_fn(args.model),
+                                             num_workers=args.data.num_workers,
+                                             shuffle=False)
         return train_data, val_data
 
     train_data, val_data = _get_dataloader()
-
 
     # fine_tune_lm(pre_trained_network) # TODO
 

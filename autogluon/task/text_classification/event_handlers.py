@@ -29,7 +29,8 @@ class TextDataLoaderHandler(DataLoaderHandler):
 
         if 'bert' in self.model_name:
             return self.bert_data_loader(**kwargs)
-
+        elif 'elmo' in self.model_name:
+            return self.elmo_data_loader(**kwargs)
         else:
             return self.lm_data_loader(**kwargs)
 
@@ -72,3 +73,22 @@ class TextDataLoaderHandler(DataLoaderHandler):
             ret_data.append((d.T, length.astype(np.float32)))
 
         return ret_data, label, batch_size
+
+    def elmo_data_loader(self, **kwargs):
+        batch = kwargs['batch']
+        ctx = kwargs['ctx']
+        batch_axis = kwargs['batch_axis'] or 0
+        data = batch[0][0]
+        batch_size = data.shape[0]
+        lengths = batch[0][1]
+        label = batch[1]
+        data = gluon.utils.split_and_load(data, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        lengths = gluon.utils.split_and_load(lengths, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        label = gluon.utils.split_and_load(label, ctx_list=ctx, batch_axis=batch_axis, even_split=False)
+        ret_data = []
+        for d, length in zip(data, lengths):
+            ret_data.append((d, length.astype(np.float32)))
+
+        return ret_data, label, batch_size
+
+

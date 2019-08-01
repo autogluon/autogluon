@@ -4,7 +4,7 @@ import gluonnlp as nlp
 import numpy as np
 from gluonnlp.data import BERTSentenceTransform
 
-__all__ = ['TextDataTransform', 'BERTDataTransform']
+__all__ = ['TextDataTransform', 'BERTDataTransform', 'ELMODataTransform']
 
 
 class TextDataTransform(object):
@@ -199,3 +199,31 @@ class BERTDataTransform(object):
                     self._label_map[key] = self._label_map[self.label_alias[key]]
         self._bert_xform = BERTSentenceTransform(
             self.tokenizer, self.max_seq_length, pad=self.pad, pair=self.pair)
+
+
+class ELMODataTransform(object):
+    """
+    Python class for performing data pre-processing on the text dataset for EMLO models
+    """
+
+    def __init__(self, vocab, tokenizer=nlp.data.SacreMosesTokenizer(),
+                 transforms: List = None, max_sequence_length=100):
+
+        self._vocab = vocab
+        self._tokenizer = tokenizer
+        self._transforms = transforms
+        self._max_sequence_length = max_sequence_length
+
+    def __call__(self, sample):
+        text, label = sample
+        tokens = self._tokenizer(text)
+
+        tokens = ['<bos>'] + tokens + ['<eos>']
+
+        if self._transforms is not None:
+            for rule in self._transforms:
+                tokens = rule(tokens)
+
+        tokens = self._vocab[tokens]
+
+        return tokens, label

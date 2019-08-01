@@ -11,7 +11,7 @@ from .metrics import *
 from .model_zoo import *
 from .optims import get_optim
 from .pipeline import *
-from .transforms import TextDataTransform, BERTDataTransform
+from .transforms import TextDataTransform, BERTDataTransform, ELMODataTransform
 from .utils import *
 from ..base import BaseTask, Results
 from ...loss import Losses
@@ -23,14 +23,14 @@ __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
 
 default_nets = Nets([
-    get_model('standard_lstm_lm_200'),
+    #get_model('standard_lstm_lm_200'),
     #get_model('standard_lstm_lm_650'),
     #get_model('standard_lstm_lm_1500'),
     #get_model('awd_lstm_lm_600'),
     #get_model('awd_lstm_lm_1150'),
     #get_model('bert_12_768_12'),
     #get_model('bert_24_1024_16'),
-    #get_model('elmo_2x1024_128_2048cnn_1xhighway')
+    get_model('elmo_2x1024_128_2048cnn_1xhighway')
 ])
 
 default_optimizers = Optimizers([
@@ -215,7 +215,7 @@ class TextClassification(BaseTask):
                     nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
                     nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
             else:
-                nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
+                return nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
                                         nlp.data.batchify.Stack(dtype='float32'))
 
         def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
@@ -225,9 +225,7 @@ class TextClassification(BaseTask):
                                                       max_seq_length=max_sequence_length,
                                                       pair=self.pair, class_labels=class_labels)
             elif 'elmo' in model_name:
-                dataset_transform = TextDataTransform(vocab, tokenizer=nlp.data.SacreMosesTokenizer(),
-                                                      transforms=[nlp.data.ClipSequence(length=max_sequence_length)],
-                                                      pair=self.pair, max_sequence_length=max_sequence_length)
+                dataset_transform = ELMODataTransform(vocab, max_sequence_length=max_sequence_length)
             else:
                 dataset_transform = TextDataTransform(vocab, transforms=[
                     nlp.data.ClipSequence(length=max_sequence_length)],

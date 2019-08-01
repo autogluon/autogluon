@@ -217,15 +217,22 @@ class ELMOClassifier(gluon.Block):
     This works with elmo_2x1024_128_2048cnn_1xhighway, elmo_2x2048_256_2048cnn_1xhighway, elmo_2x4096_512_2048cnn_2xhighway
     """
 
-    def __init__(self, prefix=None, params=None, pre_trained_network=None):
+    def __init__(self, batch_size, ctx, prefix=None, params=None, pre_trained_network=None):
         super(ELMOClassifier, self).__init__(prefix=prefix, params=params)
-        with self.name_scope():
-            self.pre_trained_network = pre_trained_network
-            self.agg_layer = MeanPoolingLayer()
-            self.classifier = None
+        self.batch_size = batch_size
+        self.ctx = ctx
+        self.pre_trained_network = pre_trained_network
+        self.agg_layer = MeanPoolingLayer()
+        self.classifier = None
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
-        out = self.pre_trained_network(data, valid_length)
-        out = self.agg_layer(out, valid_length)
-        out = self.classifier(out)
+        length = data.shape[1]
+        hidden_state = self.pre_trained_network.begin_state(mx.nd.zeros,
+                                                            batch_size=self.batch_size,
+                                                            ctx=self.ctx[0])
+        mask = mx.nd.arange(length, ctx=self.ctx[0]).expand_dims(0).broadcast_axes(axis=(0,), size=(self.batch_size,))
+        mask = mask < valid_length.expand_dims(1).astype('float32')
+        out, _ = self.pre_trained_network(data, hidden_state, mask)
+        #out = self.agg_layer(out, valid_length)
+        #out = self.classifier(out)
         return out
