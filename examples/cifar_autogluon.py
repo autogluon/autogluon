@@ -12,6 +12,7 @@ from gluoncv.data import transforms as gcv_transforms
 
 import autogluon as ag
 from autogluon import autogluon_method
+from autogluon.utils.mxutils import update_params
 
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
@@ -107,7 +108,14 @@ def train_cifar(args, reporter):
         iteration = 0
         best_val_score = 0
 
-        for epoch in range(epochs):
+        start_epoch = 0
+        if args.resume and reporter.has_dict():
+            state_dict = reporter.get_dict()
+            print('resuming from state_dict:', state_dict.keys())
+            start_epoch = state_dict['epoch']
+            update_params(net, state_dict['params'])
+
+        for epoch in range(start_epoch, epochs):
             tic = time.time()
             train_metric.reset()
             metric.reset()
@@ -135,8 +143,31 @@ def train_cifar(args, reporter):
             name, acc = train_metric.get()
             name, val_acc = test(ctx, val_data)
             reporter(epoch=epoch, accuracy=val_acc)
+            reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     train(args.epochs, context)
+
+def cifar_evaluate(net, args):
+    batch_size = args.batch_size
+    batch_size *= max(1, args.num_gpus)
+
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+    net.collect_params().reset_ctx(ctx)
+    metric = mx.metric.Accuracy()
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+    ])
+    val_data = gluon.data.DataLoader(
+        gluon.data.vision.CIFAR10(train=False).transform_first(transform_test),
+        batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
+
+    for i, batch in enumerate(val_data):
+        data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
+        label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
+        outputs = [net(X) for X in data]
+        metric.update(label, outputs)
+    return metric.get()[1]
 
 if __name__ == '__main__':
     args = parse_args()
@@ -195,3 +226,11 @@ if __name__ == '__main__':
 
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
+
+    if args.scheduler == 'fifo' or args.scheduler == 'hyberband':
+        # evaluating the best model params
+        best_model = get_model(args.model, classes=10)
+        best_model.initialize(mx.init.Xavier(), ctx=mx.cpu(0))
+        state_dict = myscheduler.get_best_state()
+        update_params(best_model, state_dict['params'])
+        print('Evaluating the best model and the best accuracy is {}'.format(cifar_evaluate(best_model, args)))

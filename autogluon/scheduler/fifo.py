@@ -119,7 +119,9 @@ class FIFO_Scheduler(TaskScheduler):
         logger.debug("Adding A New Task {}".format(task))
         FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
         with self.LOCK:
-            reporter = StatusReporter()
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
@@ -177,6 +179,11 @@ class FIFO_Scheduler(TaskScheduler):
             reporter.move_on()
             last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
+
+    def get_best_state(self):
+        return self.searcher.get_best_state()
 
     def get_best_config(self):
         self.join_tasks()

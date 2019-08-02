@@ -1,8 +1,11 @@
+import os
 import json
 import pickle
 import copy
 import logging
 from collections import OrderedDict
+
+from ..basic import load
 
 __all__ = ['BaseSearcher', 'RandomSampling']
 
@@ -19,7 +22,7 @@ class BaseSearcher(object):
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
-        self._best_model_params = None
+        self._best_state_path = None
 
     def get_config(self):
         """Function to sample a new configuration
@@ -47,6 +50,23 @@ class BaseSearcher(object):
     def get_best_config(self):
         config = max(self._results, key=self._results.get)
         return pickle.loads(config)
+
+    def is_best(self, config):
+        best_config = max(self._results, key=self._results.get)
+        return json.dumps(config) == best_config
+
+    def get_best_state_path(self):
+        assert os.path.isfile(self._best_state_path), \
+            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+        return self._best_state_path
+
+    def get_best_state(self):
+        assert os.path.isfile(self._best_state_path), \
+            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+        return load(self._best_state_path)
+
+    def update_best_state(self, filepath):
+        self._best_state_path = filepath
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -86,7 +106,7 @@ class RandomSampling(BaseSearcher):
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[pickle.dumps(new_config)] = None
+        self._results[json.dumps(new_config)] = 0
         return new_config
 
     def update(self, *args, **kwargs):

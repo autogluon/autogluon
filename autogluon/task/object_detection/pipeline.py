@@ -129,8 +129,9 @@ def train_object_detection(args, reporter):
     metric = get_metric_instance(args.metric, 0.5, args.data.val.classes)
 
     def _demo_early_stopping(batch_id):
-        if batch_id == 1:
-            return True
+        if 'demo' in vars(args):
+            if args.demo and batch_id == 3:
+                return True
         return False
 
     def train(epoch):
@@ -155,7 +156,7 @@ def train_object_detection(args, reporter):
                 autograd.backward(sum_loss)
             trainer.step(1)
 
-            if args.demo and _demo_early_stopping(i):
+            if _demo_early_stopping(i):
                 break
         mx.nd.waitall()
 
@@ -184,7 +185,7 @@ def train_object_detection(args, reporter):
                 gt_difficults.append(
                     y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None)
             metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults)
-            if args.demo and _demo_early_stopping(i):
+            if _demo_early_stopping(i):
                 break
         map_name, mean_ap = metric.get()
         # TODO (cgraywang): add ray

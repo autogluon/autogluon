@@ -131,7 +131,7 @@ class BaseTask(ABC):
                 for k, v in obj.items():
                     if hasattr(v, 'search_space'):
                         BaseTask._set_range(v, cs)
-            elif obj is None:
+            elif obj is None and name == 'data':
                 BaseTask._assert_fit_error(obj, name)
         args = BaseTask._init_args(cs, metadata)
         return cs, args

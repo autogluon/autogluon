@@ -1,6 +1,8 @@
-
 import copy
+import logging
 import multiprocessing as mp
+
+logger = logging.getLogger(__name__)
 
 __all__ = ['Task']
 
