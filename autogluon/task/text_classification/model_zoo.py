@@ -211,6 +211,7 @@ class BERTClassifier(gluon.Block):
         _, pooler_out = self.pre_trained_network(inputs, token_types, valid_length)
         return self.classifier(pooler_out)
 
+
 class ELMOClassifier(gluon.Block):
     """
     Network for Text Classification which uses a pre-trained ELMO model.
@@ -232,7 +233,9 @@ class ELMOClassifier(gluon.Block):
                                                             ctx=self.ctx[0])
         mask = mx.nd.arange(length, ctx=self.ctx[0]).expand_dims(0).broadcast_axes(axis=(0,), size=(self.batch_size,))
         mask = mask < valid_length.expand_dims(1).astype('float32')
+
         out, _ = self.pre_trained_network(data, hidden_state, mask)
-        #out = self.agg_layer(out, valid_length)
-        #out = self.classifier(out)
+        out = mx.nd.transpose(mx.nd.concat(out[0], out[1], out[2], dim=2), axes=(1,0,2))
+        out = self.agg_layer(out, valid_length)
+        out = self.classifier(out)
         return out

@@ -118,7 +118,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net.classifier.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
 
     net.collect_params().reset_ctx(ctx)
-    net.hybridize(static_alloc=True)
+    #net.hybridize()
 
     # do not apply weight decay on LayerNorm and bias terms
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
@@ -135,12 +135,14 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         if 'elmo' in args.model:
             train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
                                                batch_size=batch_size,
-                                               batchify_fn=args.data.get_batchify_fn(args.model))
+                                               batchify_fn=args.data.get_batchify_fn(args.model),
+                                               last_batch='discard')
 
             val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
                                              batchify_fn=args.data.get_batchify_fn(args.model),
                                              num_workers=args.data.num_workers,
-                                             shuffle=False)
+                                             shuffle=False,
+                                             last_batch='discard')
 
         else:
             train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
@@ -158,8 +160,8 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     # fine_tune_lm(pre_trained_network) # TODO
 
     def _get_optimizer_params():
-        # TODO : Add more optimizer params based on the chosen optimizer
-        optimizer_params = {'learning_rate': args.lr}
+        # TODO : remove hardcode lr
+        optimizer_params = {'learning_rate': 0.001}
         return optimizer_params
 
     optimer_params = _get_optimizer_params()
