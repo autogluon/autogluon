@@ -235,7 +235,9 @@ class ELMOClassifier(gluon.Block):
         mask = mask < valid_length.expand_dims(1).astype('float32')
 
         out, _ = self.pre_trained_network(data, hidden_state, mask)
-        out = mx.nd.transpose(mx.nd.concat(out[0], out[1], out[2], dim=2), axes=(1,0,2))
-        out = self.agg_layer(out, valid_length)
+        out0 = self.agg_layer(mx.nd.transpose(out[0], axes=(1,0,2)), valid_length)
+        out1 = self.agg_layer(mx.nd.transpose(out[1], axes=(1, 0, 2)), valid_length)
+        out2 = self.agg_layer(mx.nd.transpose(out[2], axes=(1, 0, 2)), valid_length)
+        out = (out0 + out1 + out2) / 3.0
         out = self.classifier(out)
         return out
