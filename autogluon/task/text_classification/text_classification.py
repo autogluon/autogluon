@@ -119,6 +119,10 @@ class TextClassification(BaseTask):
             for elem in self.train:
                 elem[-1] = lbl_dict[elem[-1]]
 
+            if self.val:
+                for elem in self.val:
+                    elem[-1] = lbl_dict[elem[-1]]
+
             # Also map the labels back to the dataset
             return label_set
 
