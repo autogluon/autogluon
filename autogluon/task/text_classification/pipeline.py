@@ -109,6 +109,8 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     net.classifier = nn.Sequential()
     with net.classifier.name_scope():
+        if 'elmo' in args.model:
+            net.classifier.add(nn.Dense(256))
         net.classifier.add(nn.Dropout(args.dropout))
         net.classifier.add(nn.Dense(args.data.num_classes))
 
@@ -118,7 +120,8 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net.classifier.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
 
     net.collect_params().reset_ctx(ctx)
-    #net.hybridize()
+    if 'elmo' not in args.model:
+        net.hybridize()
 
     # do not apply weight decay on LayerNorm and bias terms
     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
@@ -160,8 +163,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     # fine_tune_lm(pre_trained_network) # TODO
 
     def _get_optimizer_params():
-        # TODO : remove hardcode lr
-        optimizer_params = {'learning_rate': 0.001}
+        optimizer_params = {'learning_rate': args.lr}
         return optimizer_params
 
     optimer_params = _get_optimizer_params()
