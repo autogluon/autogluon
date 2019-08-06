@@ -89,8 +89,13 @@ print(nets)
 #                             ag.optim.get_optim('adam')])
 
 # method 2 (easy and less flexiable): specify the optim_list using get_model
-optimizers = ag.Optimizers(['sgd', 'adam'])
+# optimizers = ag.Optimizers(['sgd', 'adam'])
 
+adamopt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
+                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+sgdopt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
+                       wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+optimizers = ag.Optimizers([adamopt, sgdopt])
 print(optimizers)
 
 

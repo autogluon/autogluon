@@ -9,11 +9,4 @@ Model Zoo
 
         Classify images.
 
-    .. card::
-        :title: Object Detection
-        :link: object_detection/index.html
-
-        Detect objects in images.
-
 image_classification/index
-object_detection/index
