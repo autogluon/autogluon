@@ -16,3 +16,10 @@ def test_image_classification():
         model = ag.task.image_classification.get_model(name)
         print(model.name)
     logger.debug('Finished.')
+
+
+@pytest.mark.serial
+def test_text_classification():
+    # TODO
+    raise NotImplementedError
+
