@@ -177,7 +177,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     early_stopping_handler = EarlyStoppingHandler(monitor=estimator.train_metrics[0], mode='max')
 
     lr_handler = LRHandler(warmup_ratio=0.1,
-                           batch_size=batch_size,
+                           batch_size=int(batch_size/len(ctx)),
                            num_epochs=args.epochs,
                            train_length=len(args.data.train))
 
