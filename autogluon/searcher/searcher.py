@@ -53,7 +53,7 @@ class BaseSearcher(object):
 
     def is_best(self, config):
         best_config = max(self._results, key=self._results.get)
-        return json.dumps(config) == best_config
+        return pickle.dumps(config) == best_config
 
     def get_best_state_path(self):
         assert os.path.isfile(self._best_state_path), \
@@ -106,7 +106,7 @@ class RandomSampling(BaseSearcher):
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[json.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = 0
         return new_config
 
     def update(self, *args, **kwargs):

@@ -70,7 +70,7 @@ class DistStatusReporter(object):
             kwargs['time_this_iter'] = report_time - self._last_report_time
         self._last_report_time = report_time
 
-        #logger.debug('Reporting {}'.format(json.dumps(kwargs)))
+        #print('Reporting {}'.format(json.dumps(kwargs)))
         self._queue.put(kwargs.copy())
         self._continue_semaphore.acquire()
 

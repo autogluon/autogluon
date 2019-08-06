@@ -76,7 +76,7 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                  reward_attr="accuracy",
                  max_t=100, grace_period=10,
                  reduction_factor=4, brackets=1,
-                 visualizer='tensorboard'):
+                 visualizer='none'):
         super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
                                                   checkpoint, resume, num_trials,
                                                   time_attr, reward_attr, visualizer)

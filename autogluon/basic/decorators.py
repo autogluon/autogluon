@@ -52,7 +52,9 @@ def autogluon_register_args(**kwvars):
         args_dict = vars(args)
         for k, v in kwvars.items():
             if isinstance(v, Space):
-                cs.add_hyperparameter(get_config_space(k, v)) 
+                hp = get_config_space(k, v)
+                cs.add_hyperparameter(hp)
+                args_dict.update({k: hp.default_value})
             else:
                 args_dict.update({k: v})
         wrapper_call.cs = cs

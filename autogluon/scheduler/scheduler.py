@@ -49,6 +49,7 @@ class TaskScheduler(object):
     def _run_task(fn, args, resources, resource_manager):
         """Executing the task
         """
+        logger.debug('Scheduling A Task: {}'.format(args))
         if resources.num_gpus > 0:
             os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str,resources.gpu_ids))
         try:

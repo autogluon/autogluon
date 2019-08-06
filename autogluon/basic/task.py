@@ -1,5 +1,6 @@
 import copy
 import logging
+import argparse
 import multiprocessing as mp
 
 logger = logging.getLogger(__name__)
@@ -25,12 +26,16 @@ class Task(object):
     LOCK = mp.Lock()
     def __init__(self, fn, args, resources):
         self.fn = fn
-        self.args = copy.deepcopy(args)
+        self.args = {}
+        #self.args[] #copy.deepcopy(args)
         self.resources = resources
         with Task.LOCK:
             self.task_id = Task.TASK_ID.value
-            if 'args' in self.args:
+            if 'args' in args:
+                self.args['args'] = argparse.Namespace(**vars(args['args']))
                 vars(self.args['args']).update({'task_id': self.task_id})
+            if 'config' in args:
+                self.args['config'] = copy.deepcopy(args['config'])
             Task.TASK_ID.value += 1
 
     @classmethod

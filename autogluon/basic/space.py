@@ -1,6 +1,7 @@
 import ConfigSpace.hyperparameters as CSH
 
-__all__ = ['Space', 'ListSpace', 'LinearSpace', 'LogLinearSpace', 'get_config_space']
+__all__ = ['Space', 'ListSpace', 'LinearSpace', 'LogLinearSpace', 'IntSpace',
+           'BoolSpace', 'get_config_space']
 
 class Space(object):
     pass
