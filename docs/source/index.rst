@@ -5,11 +5,11 @@
 AutoGluon Documentation
 =======================
 
-An AutoML Toolkit.
+An AutoML Toolkit with MXNet Gluon.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Get Started
+   :caption: Installation
 
    install
 
@@ -17,12 +17,15 @@ An AutoML Toolkit.
    :maxdepth: 2
    :caption: Tutorials
 
-   tutorials/build/backend/index
+   tutorials/build/task/index
+   tutorials/build/data/index
+   tutorials/build/searcher/index
 
 .. toctree::
    :maxdepth: 1
    :caption: Package Reference
 
+   frontend
    backend
 
 Indices and tables

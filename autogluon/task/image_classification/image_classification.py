@@ -103,9 +103,8 @@ class ImageClassification(BaseTask):
     @staticmethod
     def fit(data,
             nets=Nets([
-                get_model('cifar_resnet20_v1'),
-                get_model('cifar_resnet56_v1'),
-                get_model('cifar_resnet110_v1')]),
+                get_model('resnet18_v1'),
+                get_model('resnet34_v1')]),
             optimizers=Optimizers([
                 get_optim('sgd'),
                 get_optim('adam')]),

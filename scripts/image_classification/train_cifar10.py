@@ -8,8 +8,8 @@ from autogluon import image_classification as task
 parser = argparse.ArgumentParser(description='AutoGluon CIFAR10')
 parser.add_argument('--data', default='CIFAR10', type=str,
                     help='options are: cifar10 or mnist')
-parser.add_argument('--nets', default='cifar_resnet20_v1', type=str,
-                    help='list of nets to run (default: cifar_resnet20_v1)')
+parser.add_argument('--nets', default='resnet18_v1,resnet34_v1', type=str,
+                    help='list of nets to run (default: resnet18_v1,resnet34_v1)')
 parser.add_argument('--optims', default='sgd,adam,nag', type=str,
                     help='list of optims to run, (default: sgd,adam,nag)')
 parser.add_argument('--searcher', type=str, default='random',

@@ -55,7 +55,8 @@ class DataAnalyzer(object):
     def check_dataset(a, b):
         DataAnalyzer.check_dataset_label_num(a, b)
         DataAnalyzer.check_dataset_label_KStest(a, b)
-        DataAnalyzer.check_dataset_label_histogram(a, b)
+        # TODO (cgraywang): remove now for simplicity
+        # DataAnalyzer.check_dataset_label_histogram(a, b)
 
     @staticmethod
     def stat_dataset(a):
