@@ -51,11 +51,12 @@ extensions = [
 sphinx_gallery_conf = {
     # path to your examples scripts
     'examples_dirs': [
-        'tutorials/backend'
+        #'tutorials/backend',
+        'tutorials/task'
     ],
     # path where to save gallery generated examples
     'gallery_dirs': [
-        'tutorials/build/backend',],
+        'tutorials/build/task',],
     'filename_pattern': '.py',
     'ignore_pattern': 'im2rec.py',
     'within_subsection_order': ExampleTitleSortKey,

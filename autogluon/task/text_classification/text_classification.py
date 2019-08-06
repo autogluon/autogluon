@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import glob
 
 import ConfigSpace as CS
 
@@ -10,7 +11,7 @@ from .metrics import *
 from .model_zoo import *
 from .optims import get_optim
 from .pipeline import *
-from .transforms import TextDataTransform, BERTDataTransform
+from .transforms import TextDataTransform, BERTDataTransform, ELMODataTransform
 from .utils import *
 from ..base import BaseTask, Results
 from ...loss import Losses
@@ -22,25 +23,26 @@ __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
 
 default_nets = Nets([
-    get_model('standard_lstm_lm_200'),
-    get_model('standard_lstm_lm_650'),
-    get_model('standard_lstm_lm_1500'),
-    get_model('awd_lstm_lm_600'),
-    get_model('awd_lstm_lm_1150'),
-    get_model('bert_12_768_12'),
-    get_model('bert_24_1024_16')
+    #get_model('standard_lstm_lm_200'),
+    #get_model('standard_lstm_lm_650'),
+    #get_model('standard_lstm_lm_1500'),
+    #get_model('awd_lstm_lm_600'),
+    #get_model('awd_lstm_lm_1150'),
+    #get_model('bert_12_768_12'),
+    #get_model('bert_24_1024_16'),
+    get_model('elmo_2x1024_128_2048cnn_1xhighway')
 ])
 
 default_optimizers = Optimizers([
     get_optim('adam'),
-    get_optim('sgd'),
-    get_optim('ftml'),
-    get_optim('bertadam')
+    #get_optim('sgd'),
+    #get_optim('ftml'),
+    #get_optim('bertadam')
 ])
 
 default_stop_criterion = {
     'time_limits': 1 * 60 * 60,
-    'max_metric': 0.80,  # TODO Should be place a bound on metric?
+    'max_metric': 1.0,  # TODO Should be place a bound on metric?
     'max_trial_count': 1
 }
 
@@ -97,8 +99,8 @@ class TextClassification(BaseTask):
 
         def _add_search_space(self):
             cs = CS.ConfigurationSpace()
-            data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
-                                           upper_exponent=3).get_hyper_param()
+            data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=5,
+                                           upper_exponent=5).get_hyper_param()
 
             seq_length_hyperparams = List(name='max_sequence_length', choices=[50, 100, 150, 200]).get_hyper_param()
             cs.add_hyperparameters([data_hyperparams, seq_length_hyperparams])
@@ -117,6 +119,8 @@ class TextClassification(BaseTask):
 
             lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
             for elem in self.train:
+                elem[-1] = lbl_dict[elem[-1]]
+            for elem in self.val:
                 elem[-1] = lbl_dict[elem[-1]]
 
             if self.val:
@@ -153,8 +157,8 @@ class TextClassification(BaseTask):
                 # Read dataset from gluonnlp.
                 import os
                 root = os.path.join(os.getcwd(), 'data', self.name)
-                self.train_path = '{}/{}.{}'.format(root, 'train', self.data_format)
-                self.val_path = '{}/{}.{}'.format(root, 'dev', self.data_format)
+                self.train_path = glob.glob('{}/{}.{}'.format(root, 'train*', self.data_format))[0]
+                self.val_path = glob.glob('{}/{}.{}'.format(root, 'dev*', self.data_format))[0]
 
                 get_dataset(self.name, root=root, segment='train')
                 get_dataset(self.name, root=root, segment='dev')
@@ -226,7 +230,8 @@ class TextClassification(BaseTask):
                 dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
                                                       max_seq_length=max_sequence_length,
                                                       pair=self.pair, class_labels=class_labels)
-
+            elif 'elmo' in model_name:
+                dataset_transform = ELMODataTransform(vocab, max_sequence_length=max_sequence_length)
             else:
                 dataset_transform = TextDataTransform(vocab, transforms=[
                     nlp.data.ClipSequence(length=max_sequence_length)],

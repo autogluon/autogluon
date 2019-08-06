@@ -150,7 +150,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
         self.val_data = val_data
         self.eval_fn = eval_fn
         self.epoch_period = epoch_period
-        self.batch_period = 100
+        self.batch_period = batch_period
         self.val_metrics = val_metrics
         self.current_batch = 0
         self.current_epoch = 0
@@ -282,7 +282,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
         if self.verbose == self.LOG_PER_BATCH:
             batch_time = time.time() - self.batch_start
             msg = '[Epoch %d][Batch %d]' % (self.current_epoch, self.batch_index)
-            self.processed_samples += kwargs['batch'][0].shape[0]
+            self.processed_samples += kwargs['batch'][0][0].shape[0]
             msg += '[Samples %s] ' % (self.processed_samples)
             msg += 'time/batch: %.3fs ' % batch_time
             for metric in self.train_metrics:
@@ -753,4 +753,6 @@ class LRHandler(TrainBegin, BatchBegin):
             offset = ((self.step_num - self.num_warmup_steps) * self.init_lr /
                       (self.num_train_steps - self.num_warmup_steps))
             new_lr = self.init_lr - offset
+        if new_lr <= 0:
+            raise ValueError('New LR = {} which is less than 0. Please ensure correct values are passed to the LRHandler'.format(new_lr))
         estimator.trainer.set_learning_rate(new_lr)

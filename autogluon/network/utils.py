@@ -13,8 +13,8 @@ def autogluon_nets(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
-        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param(),
-                                      List('pretrained_base', [True, False]).get_hyper_param(),
+        setattr(net, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
+                                      List('pretrained_base', [True]).get_hyper_param(),
                                       List('norm_layer', ['BatchNorm']).get_hyper_param(),
                                       Linear('dense_layers', lower=1, upper=3).get_hyper_param(),
                                       Linear('dropout', lower=0.0, upper=0.50).get_hyper_param()])
