@@ -1,7 +1,11 @@
+import json
 import logging
 import multiprocessing
+from typing import AnyStr
 
 import ConfigSpace as CS
+import gluonnlp as nlp
+from mxnet import gluon
 
 from autogluon.optim import Optimizers
 from .dataset import *
@@ -11,7 +15,6 @@ from .model_zoo import *
 from .optims import get_optim
 from .pipeline import *
 from .transforms import TextDataTransform, BERTDataTransform
-from .utils import *
 from ..base import BaseTask, Results
 from ...loss import Losses
 from ...metric import Metrics
@@ -148,36 +151,37 @@ class TextClassification(BaseTask):
 
                 if self.val_path is None:
                     # Read the training data and perform split on it.
-                    dataset = get_dataset_from_json_files(path=self.train_path)
+                    dataset = TextClassification._Dataset(path=self.train_path, data_format=self.data_format)
                     self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
-                    self.train = get_dataset_from_json_files(path=self.train_path)
-                    self.val = get_dataset_from_json_files(path=self.val_path)
+                    self.train = TextClassification._Dataset(path=self.train_path, data_format=self.data_format)
+                    self.val = TextClassification._Dataset(path=self.val_path, data_format=self.data_format)
 
             elif self.data_format == 'tsv':
 
                 if self.val_path is None:
                     # Read the training data and perform split on it.
-                    dataset = get_dataset_from_tsv_files(path=self.train_path,
-                                                         field_indices=self.train_field_indices)
+                    dataset = nlp.data.TSVDataset(filename=self.train_path, num_discard_samples=1,
+                                                  field_indices=self.train_field_indices)
+
                     self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
-                    self.train = get_dataset_from_tsv_files(path=self.train_path,
-                                                            field_indices=self.train_field_indices)
-                    self.val = get_dataset_from_tsv_files(path=self.val_path,
-                                                          field_indices=self.val_field_indices)
+                    self.train = nlp.data.TSVDataset(filename=self.train_path, num_discard_samples=1,
+                                                     field_indices=self.train_field_indices)
+                    self.val = nlp.data.TSVDataset(filename=self.val_path, num_discard_samples=1,
+                                                   field_indices=self.val_field_indices)
 
             elif self.data_format == 'txt':
 
                 if self.val_path is None:
-                    dataset = get_dataset_from_txt_files(path=self.train_path)
+                    dataset = TextClassification._Dataset(path=self.train_path, data_format=self.data_format)
                     self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
-                    self.train = get_dataset_from_txt_files(path=self.train_path)
-                    self.val = get_dataset_from_txt_files(path=self.val_path)
+                    self.train = TextClassification._Dataset(path=self.train_path, data_format=self.data_format)
+                    self.val = TextClassification._Dataset(path=self.val_path, data_format=self.data_format)
 
             else:
                 raise NotImplementedError("Error. Different formats are not supported yet")
@@ -226,6 +230,32 @@ class TextClassification(BaseTask):
             return nlp.data.FixedBucketSampler(train_data_lengths, batch_size=self.batch_size,
                                                shuffle=True,
                                                num_buckets=10, ratio=0)
+
+    class _Dataset(nlp.data.TextLineDataset):
+        """
+        Internal class needed to read the files into a Dataset object.
+        This wraps over gluon nlp functions.
+        """
+
+        def __init__(self, path, data_format):
+            self.path = path
+            self.data_format = data_format
+            self._data = None
+
+            if self.data_format == 'json':
+                self._read_dataset()
+            elif self.data_format == 'txt':
+                super().__init__(filename=path)
+
+            if self.data_format == 'txt':
+                # Need to convert the data into desired format of [TEXT, LABEL] pair.
+                # It is input as [LABEL, TEXT] pair.
+                self._data = self.transform(lambda line: line.lower().strip().split(' ', 1), lazy=False)
+                self._data = self.transform(lambda line: [line[1], line[0]], lazy=False)
+
+        def _read_dataset(self):
+            with open(self.path) as f:
+                self._data = json.load(f)
 
     @staticmethod
     def fit(data,
