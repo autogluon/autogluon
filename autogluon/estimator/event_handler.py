@@ -753,4 +753,6 @@ class LRHandler(TrainBegin, BatchBegin):
             offset = ((self.step_num - self.num_warmup_steps) * self.init_lr /
                       (self.num_train_steps - self.num_warmup_steps))
             new_lr = self.init_lr - offset
+        if new_lr <= 0:
+            raise ValueError('New LR = {} which is less than 0. Please ensure correct values are passed to the LRHandler'.format(new_lr))
         estimator.trainer.set_learning_rate(new_lr)

@@ -220,20 +220,16 @@ class ELMOClassifier(gluon.Block):
 
     def __init__(self, batch_size, ctx, prefix=None, params=None, pre_trained_network=None):
         super(ELMOClassifier, self).__init__(prefix=prefix, params=params)
-        self.batch_size = batch_size
-        self.ctx = ctx
+        self.batch_size = int(batch_size / len(ctx))
         self.pre_trained_network = pre_trained_network
         self.agg_layer = MeanPoolingLayer()
         self.classifier = None
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
         length = data.shape[1]
-        hidden_state = self.pre_trained_network.begin_state(mx.nd.zeros,
-                                                            batch_size=self.batch_size,
-                                                            ctx=self.ctx[0])
-        mask = mx.nd.arange(length, ctx=self.ctx[0]).expand_dims(0).broadcast_axes(axis=(0,), size=(self.batch_size,))
+        hidden_state = self.pre_trained_network.begin_state(mx.nd.zeros, batch_size=self.batch_size, ctx=data.context)
+        mask = mx.nd.arange(length, ctx=data.context).expand_dims(0).broadcast_axes(axis=(0,), size=(self.batch_size,))
         mask = mask < valid_length.expand_dims(1).astype('float32')
-
         out, _ = self.pre_trained_network(data, hidden_state, mask)
         out0 = self.agg_layer(mx.nd.transpose(out[0], axes=(1, 0, 2)), valid_length)
         out1 = self.agg_layer(mx.nd.transpose(out[1], axes=(1, 0, 2)), valid_length)

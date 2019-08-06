@@ -47,7 +47,7 @@ default_stop_criterion = {
 }
 
 default_resources_per_trial = {
-    'max_num_gpus': 1,
+    'max_num_gpus': 4,
     'max_num_cpus': 4,
     'max_training_epochs': 5
 }
@@ -119,6 +119,8 @@ class TextClassification(BaseTask):
 
             lbl_dict = dict([(y, x) for x, y in enumerate(label_set)])
             for elem in self.train:
+                elem[-1] = lbl_dict[elem[-1]]
+            for elem in self.val:
                 elem[-1] = lbl_dict[elem[-1]]
 
             # Also map the labels back to the dataset

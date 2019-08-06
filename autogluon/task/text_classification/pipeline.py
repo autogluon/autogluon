@@ -54,10 +54,8 @@ def _get_lm_pre_trained_model(args: dict, ctx):
 
 def _get_elmo_pre_trained_model(args: dict, ctx, batch_size):
     """
-    :param args:
-    :param batch_size:
-    :param ctx:
-    :return: net, dataset, model_handlers
+    Utility method which defines a ELMO BiLM for classification and also initializes
+    dataset object compatible with the model.
     """
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx)
 
