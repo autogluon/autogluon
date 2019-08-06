@@ -1,17 +1,16 @@
 """Task Scheduler"""
-import logging
-import multiprocessing as mp
 import os
 import pickle
-from collections import OrderedDict
-
-from ..basic import Task
+import logging
+import argparse
+import multiprocessing as mp
+from collections import namedtuple, OrderedDict
 from ..resource import ResourceManager
+from ..basic import Task
 
 __all__ = ['TaskScheduler']
 
 logger = logging.getLogger(__name__)
-
 
 class TaskScheduler(object):
     """Basic Task Scheduler
@@ -26,7 +25,6 @@ class TaskScheduler(object):
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = ResourceManager()
-
     def __init__(self):
         self.scheduled_tasks = []
         self.finished_tasks = []
@@ -40,8 +38,8 @@ class TaskScheduler(object):
         logger.debug("\nAdding A New Task {}".format(task))
         TaskScheduler.RESOURCE_MANAGER._request(task.resources)
         p = mp.Process(target=TaskScheduler._run_task, args=(
-            task.fn, task.args, task.resources,
-            TaskScheduler.RESOURCE_MANAGER))
+                       task.fn, task.args, task.resources,
+                       TaskScheduler.RESOURCE_MANAGER))
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Args': task.args,
@@ -52,7 +50,7 @@ class TaskScheduler(object):
         """Executing the task
         """
         if resources.num_gpus > 0:
-            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, resources.gpu_ids))
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str,resources.gpu_ids))
         try:
             fn(**args)
         except Exception as e:
@@ -67,7 +65,7 @@ class TaskScheduler(object):
                 if not task_dick['Process'].is_alive():
                     task_dict = self.scheduled_tasks.pop(i)
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                                'Args': task_dict['Args']})
+                                               'Args': task_dict['Args']})
 
     def join_tasks(self):
         self._cleaning_tasks()

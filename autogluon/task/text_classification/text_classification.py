@@ -123,6 +123,10 @@ class TextClassification(BaseTask):
             for elem in self.val:
                 elem[-1] = lbl_dict[elem[-1]]
 
+            if self.val:
+                for elem in self.val:
+                    elem[-1] = lbl_dict[elem[-1]]
+
             # Also map the labels back to the dataset
             return label_set
 
@@ -218,7 +222,7 @@ class TextClassification(BaseTask):
                     nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
             else:
                 return nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
-                                        nlp.data.batchify.Stack(dtype='float32'))
+                                               nlp.data.batchify.Stack(dtype='int32'))
 
         def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
             if 'bert' in model_name:
