@@ -16,7 +16,7 @@ from ..base import BaseTask, Results
 from ...loss import Losses
 from ...metric import Metrics
 from ...network import Nets
-from ...space import List, Exponential
+from ...space import List
 
 __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
@@ -97,8 +97,7 @@ class TextClassification(BaseTask):
 
         def _add_search_space(self):
             cs = CS.ConfigurationSpace()
-            data_hyperparams = Exponential(name='batch_size', base=2, lower_exponent=3,
-                                           upper_exponent=3).get_hyper_param()
+            data_hyperparams = List(name='batch_size', choices=[8, 16, 32, 64]).get_hyper_param()
 
             seq_length_hyperparams = List(name='max_sequence_length', choices=[50, 100, 150, 200]).get_hyper_param()
             cs.add_hyperparameters([data_hyperparams, seq_length_hyperparams])
