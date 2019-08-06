@@ -140,7 +140,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                            num_epochs=args.epochs,
                            train_length=len(args.data.train))
 
-    event_handlers = [early_stopping_handler, lr_handler, TextDataLoaderHandler(args.model)]
+    event_handlers = [early_stopping_handler, lr_handler, TextDataLoaderHandler(args.model), ReporterHandler(reporter)]
 
     estimator.fit(train_data=train_data, val_data=val_data, epochs=args.epochs,
                   event_handlers=event_handlers)

@@ -11,6 +11,8 @@ import numpy as np
 from mxnet import gluon
 from mxnet.metric import EvalMetric, Loss
 
+from autogluon.scheduler.reporter import StatusReporter
+
 
 class TrainBegin(object):
     def train_begin(self, estimator, *args, **kwargs):
@@ -167,7 +169,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
     def batch_end(self, estimator, *args, **kwargs):
         self.current_batch += 1
         if self.batch_period and self.current_batch % self.batch_period == 0:
-            self.eval_fn(estimator_ref = estimator, val_data=self.val_data,
+            self.eval_fn(estimator_ref=estimator, val_data=self.val_data,
                          val_metrics=self.val_metrics)
             msg = '[Epoch %d] ValidationHandler: %d batches reached, ' \
                   % (self.current_epoch, self.current_batch)
@@ -716,6 +718,7 @@ class DataLoaderHandler(BatchBegin):
 
         return data, label, batch_size
 
+
 class LRHandler(TrainBegin, BatchBegin):
     """Learning rate scheduler (with warmup)
     Parameters
@@ -754,3 +757,14 @@ class LRHandler(TrainBegin, BatchBegin):
                       (self.num_train_steps - self.num_warmup_steps))
             new_lr = self.init_lr - offset
         estimator.trainer.set_learning_rate(new_lr)
+
+
+class ReporterHandler(EpochEnd):
+    def __init__(self, reporter: StatusReporter):
+        self.reporter = reporter
+        self.current_epoch = 0
+
+    def epoch_end(self, estimator, *args, **kwargs):
+        self.current_epoch += 1
+        self.reporter(epoch=self.current_epoch, accuracy=estimator.val_metrics[0].get()[1],
+                      loss=estimator.val_metrics[1].get()[1])
