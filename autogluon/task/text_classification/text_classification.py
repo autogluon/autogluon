@@ -130,20 +130,6 @@ class TextClassification(BaseTask):
             # TODO
             return "AutoGluon Dataset %s" % self.name
 
-        @staticmethod
-        def _train_valid_split(dataset: gluon.data.Dataset, valid_ratio=0.20) -> [gluon.data.Dataset,
-                                                                                  gluon.data.Dataset]:
-            """
-            Splits the dataset into training and validation sets.
-
-            :param valid_ratio: float, default 0.20
-                        Proportion of training samples to be split into validation set.
-                        range: [0, 1]
-            :return:
-
-            """
-            return nlp.data.utils.train_valid_split(dataset, valid_ratio)
-
         def _load_dataset(self, **kwargs):
             """
             Loads data from a given data path. If a url is passed, it downloads the data in the init method
@@ -164,7 +150,7 @@ class TextClassification(BaseTask):
                 if self.val_path is None:
                     # Read the training data and perform split on it.
                     dataset = get_dataset_from_json_files(path=self.train_path)
-                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+                    self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
                     self.train = get_dataset_from_json_files(path=self.train_path)
@@ -176,7 +162,7 @@ class TextClassification(BaseTask):
                     # Read the training data and perform split on it.
                     dataset = get_dataset_from_tsv_files(path=self.train_path,
                                                          field_indices=self.train_field_indices)
-                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+                    self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
                     self.train = get_dataset_from_tsv_files(path=self.train_path,
@@ -188,7 +174,7 @@ class TextClassification(BaseTask):
 
                 if self.val_path is None:
                     dataset = get_dataset_from_txt_files(path=self.train_path)
-                    self.train, self.val = TextClassification.Dataset._train_valid_split(dataset, valid_ratio=0.2)
+                    self.train, self.val = nlp.data.utils.train_valid_split(dataset, valid_ratio=0.2)
 
                 else:
                     self.train = get_dataset_from_txt_files(path=self.train_path)

@@ -57,25 +57,9 @@ def _get_lm_pre_trained_model(args: dict, ctx):
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
     # Set Hyper-params
     def _init_hparams():
-        """
-        Method required to initialize context and batch size based on supplied arguments.
-        :return:
-        """
-        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
-            batch_size = args.batch_size * max(args.num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        else:
-            if hasattr(args, 'num_gpus'):
-                num_gpus = args.num_gpus
-            else:
-                num_gpus = 0
-            if hasattr(args, 'batch_size'):
-                batch_size = args.batch_size * max(num_gpus, 1)
-            else:
-                batch_size = 64 * max(num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        batch_size = args.data.batch_size * max(args.num_gpus, 1)
+        ctx = [mx.gpu(i)
+               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
 
     batch_size, ctx = _init_hparams()
