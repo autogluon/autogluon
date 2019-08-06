@@ -1,5 +1,5 @@
 __all__ = ['List', 'Linear', 'Log']
-from typing import AnyStr
+
 import ConfigSpace.hyperparameters as CSH
 
 
@@ -77,20 +77,21 @@ class Log(object):
     def get_hyper_param(self):
         return self.hyper_param
 
+
     def __repr__(self):
         if isinstance(self.lower, int) and isinstance(self.upper, int):
             return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
-                                                                   self.lower,
-                                                                   self.upper)
+                                                                      self.lower,
+                                                                      self.upper)
         return "AutoGluon Log Space %s: lower %f, upper %f" % (self.name,
-                                                               self.lower,
-                                                               self.upper)
+                                                                  self.lower,
+                                                                  self.upper)
 
     def __str__(self):
         if isinstance(self.lower, int) and isinstance(self.upper, int):
             return "AutoGluon Log Space %s: lower %d, upper %d" % (self.name,
-                                                                   self.lower,
-                                                                   self.upper)
+                                                                      self.lower,
+                                                                      self.upper)
         return "AutoGluon Log Space %s: lower %f, upper %f" % (self.name,
-                                                               self.lower,
-                                                               self.upper)
+                                                                  self.lower,
+                                                                  self.upper)
