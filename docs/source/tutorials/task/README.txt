@@ -1,2 +1,2 @@
-Text Classification - Quick start
-=================================
+Text Classification
+===================

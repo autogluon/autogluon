@@ -743,7 +743,7 @@ class LRHandler(TrainBegin, BatchBegin):
         self.step_num = 0
 
     def train_begin(self, estimator, *args, **kwargs):
-        self.num_train_steps = int(self.train_length / self.batch_size * self.num_epochs)
+        self.num_train_steps = int(self.train_length / self.batch_size * self.num_epochs) + 1
         self.num_warmup_steps = int(self.num_train_steps * self.warmup_ratio)
         self.init_lr = estimator.trainer.learning_rate
 
