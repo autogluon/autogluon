@@ -29,8 +29,7 @@ def _get_bert_pre_trained_model(args: dict, ctx):
 
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
 
-    net = BERTClassifier()
-    net.pre_trained_network = pre_trained_network
+    net = BERTClassifier(bert=pre_trained_network, num_classes=args.data.num_classes, dropout=args.dropout)
 
     return net, vocab
 
@@ -74,14 +73,13 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net, vocab = _get_bert_pre_trained_model(args, ctx)
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
         net, vocab = _get_lm_pre_trained_model(args, ctx)
+        net.classifier = nn.Sequential()
+        with net.classifier.name_scope():
+            net.classifier.add(nn.Dropout(args.dropout))
+            net.classifier.add(nn.Dense(args.data.num_classes))
 
     else:
         raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
-
-    net.classifier = nn.Sequential()
-    with net.classifier.name_scope():
-        net.classifier.add(nn.Dropout(args.dropout))
-        net.classifier.add(nn.Dense(args.data.num_classes))
 
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
