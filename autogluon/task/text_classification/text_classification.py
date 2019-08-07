@@ -185,22 +185,6 @@ class TextClassification(BaseTask):
                 raise NotImplementedError("Error. Different formats are not supported yet")
             pass
 
-        def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
-            if 'bert' in model_name:
-                class_labels = self.class_labels if self.class_labels else list(self._label_set)
-                dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
-                                                      max_seq_length=max_sequence_length,
-                                                      pair=self.pair, class_labels=class_labels)
-
-            else:
-                dataset_transform = TextDataTransform(vocab, transforms=[
-                    nlp.data.ClipSequence(length=max_sequence_length)],
-                                                      pair=self.pair, max_sequence_length=max_sequence_length)
-            return dataset_transform
-
-        def get_transform_val_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
-            return self.get_transform_train_fn(model_name, vocab, max_sequence_length)
-
     class _Dataset(nlp.data.TextLineDataset):
         """
         Internal class needed to read the files into a Dataset object.

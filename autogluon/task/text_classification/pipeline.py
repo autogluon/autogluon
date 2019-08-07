@@ -99,10 +99,14 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         def _init_dataset(dataset, transform_fn):
             return transform(dataset, transform_fn, args.data.num_workers)
 
+        class_labels = args.data.class_labels if args.data.class_labels else list(args.data._label_set)
+
         train_dataset = _init_dataset(args.data.train,
-                                      args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
+                                      get_transform_train_fn(args.model, vocab, args.max_sequence_length,
+                                                             args.data.pair, class_labels))
         val_dataset = _init_dataset(args.data.val,
-                                    args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
+                                    get_transform_val_fn(args.model, vocab, args.max_sequence_length, args.data.pair,
+                                                         class_labels))
 
         train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
                                            batch_sampler=get_batch_sampler(args.model, train_dataset, batch_size,

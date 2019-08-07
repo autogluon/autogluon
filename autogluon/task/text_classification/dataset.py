@@ -4,7 +4,10 @@ from typing import AnyStr
 import gluonnlp as nlp
 from mxnet import gluon
 
-__all__ = ['get_dataset', 'transform', 'get_train_data_lengths', 'get_batchify_fn', 'get_batch_sampler']
+from .transforms import TextDataTransform, BERTDataTransform
+
+__all__ = ['get_dataset', 'transform', 'get_train_data_lengths', 'get_batchify_fn', 'get_batch_sampler',
+           'get_transform_train_fn', 'get_transform_val_fn']
 
 _dataset = {'sst_2': nlp.data.SST_2,
             'glue_sst': nlp.data.GlueSST2,
@@ -65,3 +68,20 @@ def get_batch_sampler(model_name: AnyStr, train_dataset, batch_size, num_workers
     return nlp.data.FixedBucketSampler(train_data_lengths, batch_size=batch_size,
                                        shuffle=True,
                                        num_buckets=10, ratio=0)
+
+
+def get_transform_train_fn(model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length, is_pair, class_labels=None):
+    if 'bert' in model_name:
+        dataset_transform = BERTDataTransform(tokenizer=nlp.data.BERTTokenizer(vocab=vocab, lower=True),
+                                              max_seq_length=max_sequence_length,
+                                              pair=is_pair, class_labels=class_labels)
+
+    else:
+        dataset_transform = TextDataTransform(vocab, transforms=[
+            nlp.data.ClipSequence(length=max_sequence_length)],
+                                              pair=is_pair, max_sequence_length=max_sequence_length)
+    return dataset_transform
+
+
+def get_transform_val_fn(model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length, is_pair, class_labels=None):
+    return get_transform_train_fn(model_name, vocab, max_sequence_length, is_pair, class_labels)
