@@ -1,4 +1,4 @@
-Resources# adapt from http://zh.d2l.ai/chapter_convolutional-neural-networks/lenet.html
+# adapt from http://zh.d2l.ai/chapter_convolutional-neural-networks/lenet.html
 from __future__ import print_function
 import argparse
 import numpy as np
