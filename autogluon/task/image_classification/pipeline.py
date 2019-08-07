@@ -56,7 +56,7 @@ def train_image_classification(args, reporter):
     train_data, val_data = _get_dataloader()
 
     # Define Network
-    net = get_model(args.model, pretrained=args.pretrained)
+    net = get_model(args.model, pretrained=True)
     with net.name_scope():
         num_classes = args.data.num_classes
         if hasattr(args, 'classes'):
@@ -84,7 +84,7 @@ def train_image_classification(args, reporter):
         if args.optimizer == 'sgd' or args.optimizer == 'nag':
             optimizer_params = {
                 'learning_rate': args.lr,
-                'momentum': args.momentum,
+                'momentum': 0.9,
                 'wd': args.wd
             }
         elif args.optimizer == 'adam':

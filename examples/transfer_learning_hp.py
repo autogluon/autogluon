@@ -85,7 +85,7 @@ def test(net, val_data, ctx, batch_fn):
     return metric.get()
 
 def get_network(num_classes, ctx):
-    finetune_net = get_model('densenet169', pretrained=True)
+    finetune_net = get_model('densenet169', pretrained=False)
     finetune_net.collect_params().load('densenet169-0000.params')
     with finetune_net.name_scope():
         finetune_net.output = gluon.nn.Dense(num_classes)

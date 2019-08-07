@@ -23,20 +23,21 @@ logger = logging.getLogger(__name__)
 
 class ImageClassification(BaseTask):
     class Dataset(BaseTask.Dataset):
-        def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=4,
+        def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=16,
                      transform_train_fn=None, transform_val_fn=None,
                      transform_train_list=[
-                         gcv_transforms.RandomCrop(32, pad=4),
+                         transforms.RandomResizedCrop(224),
                          transforms.RandomFlipLeftRight(),
+                         transforms.RandomColorJitter(brightness=0.4, contrast=0.4,
+                                                      saturation=0.4),
+                         transforms.RandomLighting(0.1),
                          transforms.ToTensor(),
-                         transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                              [0.2023, 0.1994, 0.2010])
-                     ],
+                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
                      transform_val_list=[
+                         transforms.Resize(256),
+                         transforms.CenterCrop(224),
                          transforms.ToTensor(),
-                         transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                              [0.2023, 0.1994, 0.2010])
-                     ],
+                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
                      batchify_train_fn=None, batchify_val_fn=None,
                      **kwargs):
             super(ImageClassification.Dataset, self).__init__(name, train_path, val_path, batch_size, num_workers,
@@ -103,9 +104,8 @@ class ImageClassification(BaseTask):
     @staticmethod
     def fit(data,
             nets=Nets([
-                get_model('cifar_resnet20_v1'),
-                get_model('cifar_resnet56_v1'),
-                get_model('cifar_resnet110_v1')]),
+                get_model('ResNet18_v1b'),
+                get_model('ResNet50_v1b')]),
             optimizers=Optimizers([
                 get_optim('sgd'),
                 get_optim('adam')]),
@@ -117,7 +117,7 @@ class ImageClassification(BaseTask):
             trial_scheduler=None,
             resume=False,
             savedir='checkpoint/exp1.ag',
-            visualizer='tensorboard',
+            visualizer='none',
             stop_criterion={
                 'time_limits': 1 * 60 * 60,
                 'max_metric': 1.0,

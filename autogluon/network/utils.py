@@ -17,7 +17,7 @@ def autogluon_nets(func):
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
         #TODO (cgraywang): add more hparams
-        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param(),
+        setattr(net, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
                                       List('pretrained_base', [True, False]).get_hyper_param(),
                                       List('norm_layer', ['BatchNorm']).get_hyper_param()])
         return net
@@ -28,7 +28,7 @@ def autogluon_net_instances(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
-        net.hyper_params = [List('pretrained', [True, False]).get_hyper_param()]
+        net.hyper_params = [List('pretrained', [True]).get_hyper_param()]
         net.get_hyper_params = types.MethodType(get_hyper_params, net)
         return net
     return wrapper_decorator
