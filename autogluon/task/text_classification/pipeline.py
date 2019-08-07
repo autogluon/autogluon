@@ -5,6 +5,7 @@ from mxnet.gluon import nn
 from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
+from .dataset import *
 from .event_handlers import TextDataLoaderHandler
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
@@ -96,7 +97,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     def _get_dataloader():
         def _init_dataset(dataset, transform_fn):
-            return args.data.transform(dataset, transform_fn)
+            return transform(dataset, transform_fn, args.data.num_workers)
 
         train_dataset = _init_dataset(args.data.train,
                                       args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
@@ -104,11 +105,12 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
                                     args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
 
         train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
-                                           batch_sampler=args.data.get_batch_sampler(args.model, train_dataset),
-                                           batchify_fn=args.data.get_batchify_fn(args.model))
+                                           batch_sampler=get_batch_sampler(args.model, train_dataset, batch_size,
+                                                                           args.data.num_workers),
+                                           batchify_fn=get_batchify_fn(args.model))
 
         val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
-                                         batchify_fn=args.data.get_batchify_fn(args.model),
+                                         batchify_fn=get_batchify_fn(args.model),
                                          num_workers=args.data.num_workers,
                                          shuffle=False)
 

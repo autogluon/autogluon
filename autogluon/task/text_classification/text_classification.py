@@ -1,11 +1,9 @@
 import json
 import logging
-import multiprocessing
 from typing import AnyStr
 
 import ConfigSpace as CS
 import gluonnlp as nlp
-from mxnet import gluon
 
 from autogluon.optim import Optimizers
 from .dataset import *
@@ -187,28 +185,6 @@ class TextClassification(BaseTask):
                 raise NotImplementedError("Error. Different formats are not supported yet")
             pass
 
-        def transform(self, dataset, transform_fn):
-            # The model type is necessary to pre-process it based on the inputs required to the model.
-            with multiprocessing.Pool(self.num_workers) as pool:
-                return gluon.data.SimpleDataset(pool.map(transform_fn, dataset))
-
-        def get_train_data_lengths(self, model_name: AnyStr, dataset):
-            with multiprocessing.Pool(self.num_workers) as pool:
-                if 'bert' in model_name:
-                    return dataset.transform(lambda token_id, length, segment_id, label_id: length,
-                                             lazy=False)
-                else:
-                    return dataset.transform(lambda data, label: int(len(data)), lazy=False)
-
-        def get_batchify_fn(self, model_name: AnyStr):
-            if 'bert' in model_name:
-                return nlp.data.batchify.Tuple(
-                    nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(),
-                    nlp.data.batchify.Pad(axis=0), nlp.data.batchify.Stack(dtype='int32'))
-            else:
-                return nlp.data.batchify.Tuple(nlp.data.batchify.Pad(axis=0, ret_length=True),
-                                               nlp.data.batchify.Stack(dtype='int32'))
-
         def get_transform_train_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
             if 'bert' in model_name:
                 class_labels = self.class_labels if self.class_labels else list(self._label_set)
@@ -225,12 +201,6 @@ class TextClassification(BaseTask):
         def get_transform_val_fn(self, model_name: AnyStr, vocab: nlp.Vocab, max_sequence_length):
             return self.get_transform_train_fn(model_name, vocab, max_sequence_length)
 
-        def get_batch_sampler(self, model_name: AnyStr, train_dataset):
-            train_data_lengths = self.get_train_data_lengths(model_name, train_dataset)
-            return nlp.data.FixedBucketSampler(train_data_lengths, batch_size=self.batch_size,
-                                               shuffle=True,
-                                               num_buckets=10, ratio=0)
-
     class _Dataset(nlp.data.TextLineDataset):
         """
         Internal class needed to read the files into a Dataset object.
@@ -243,7 +213,9 @@ class TextClassification(BaseTask):
             self._data = None
 
             if self.data_format == 'json':
-                self._read_dataset()
+                with open(self.path) as f:
+                    self._data = json.load(f)
+
             elif self.data_format == 'txt':
                 super().__init__(filename=path)
 
@@ -252,10 +224,6 @@ class TextClassification(BaseTask):
                 # It is input as [LABEL, TEXT] pair.
                 self._data = self.transform(lambda line: line.lower().strip().split(' ', 1), lazy=False)
                 self._data = self.transform(lambda line: [line[1], line[0]], lazy=False)
-
-        def _read_dataset(self):
-            with open(self.path) as f:
-                self._data = json.load(f)
 
     @staticmethod
     def fit(data,
