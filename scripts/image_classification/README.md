@@ -151,3 +151,25 @@ $ python train_shopeeiet.py --data ~/data/shopeeiet/ --nets resnet152_v1d --max_
 #### Fig. [10]
 
 <img src="../img/cifar_accuracy_curves_10.svg" width="400" height="400" />
+
+
+### Compare random search vs Bayesian optimization (skopt) on CIFAR10 with default autogluon settings from train_cifar10.py
+#### Note: results have high variance across different runs, but searcher = 'bayesopt' appears to be always superior to searcher = 'random'
+
+```shell
+Com. [11]
+$ python train_cifar10.py 
+
+Com. [12]
+$ python train_cifar10.py --searcher bayesopt
+
+Com. [13]
+$ python train_cifar10_search_bayesopt_vs_random.py
+```
+
+|                        | Random Search |                   | BayesOpt Search      |          |       
+|------------------------|------------|------------|------------|------------|
+|          Model         | Val acc    | Time (s) |     Val acc  |    Time (s) |
+| cifar_resnet20_v1      | 0.955    | 177   |    0.977     |     174    | 
+| Command                |  Com. [11]    |              |     Com. [12]     |          |
+

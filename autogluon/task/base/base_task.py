@@ -140,6 +140,8 @@ class BaseTask(ABC):
     def _run_backend(cs, args, metadata):
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
+        elif metadata['searcher'] == 'bayesopt':
+            searcher = ag.searcher.SKoptSearcher(cs)
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
@@ -221,7 +223,9 @@ class BaseTask(ABC):
             e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
             assigned unless you specify them here.
         savedir (str): Local dir to save training results to.
-        searcher: Search Algorithm.
+        searcher (str): Search Algorithm to employ, should be one of: 
+            'random' (random search), 'bayesopt' (Bayesian optimization using skopt).
+            If = None, defaults to 'random'.
         trial_scheduler: Scheduler for executing
             the experiment. Choose among FIFO (default) and HyperBand.
         resume (bool): If checkpoint exists, the experiment will
