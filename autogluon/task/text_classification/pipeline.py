@@ -5,6 +5,7 @@ from mxnet.gluon import nn
 from autogluon.estimator import *
 from autogluon.estimator import Estimator
 from autogluon.scheduler.reporter import StatusReporter
+from .dataset import *
 from .event_handlers import TextDataLoaderHandler
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
@@ -27,10 +28,7 @@ def _get_bert_pre_trained_model(args: dict, ctx):
               'use_classifier': False}
 
     pre_trained_network, vocab = get_model_instances(name=args.model, pretrained=args.pretrained, ctx=ctx, **kwargs)
-
-    net = BERTClassifier()
-    net.pre_trained_network = pre_trained_network
-
+    net = BERTClassifier(bert=pre_trained_network, num_classes=args.data.num_classes, dropout=args.dropout)
     return net, vocab
 
 
@@ -52,6 +50,7 @@ def _get_lm_pre_trained_model(args: dict, ctx):
 
     return net, vocab
 
+
 def _get_elmo_pre_trained_model(args: dict, ctx, batch_size):
     """
     Utility method which defines a ELMO BiLM for classification and also initializes
@@ -68,25 +67,9 @@ def _get_elmo_pre_trained_model(args: dict, ctx, batch_size):
 def train_text_classification(args: dict, reporter: StatusReporter, task_id: int, resources=None) -> None:
     # Set Hyper-params
     def _init_hparams():
-        """
-        Method required to initialize context and batch size based on supplied arguments.
-        :return:
-        """
-        if hasattr(args, 'batch_size') and hasattr(args, 'num_gpus'):
-            batch_size = args.batch_size * max(args.num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        else:
-            if hasattr(args, 'num_gpus'):
-                num_gpus = args.num_gpus
-            else:
-                num_gpus = 0
-            if hasattr(args, 'batch_size'):
-                batch_size = args.batch_size * max(num_gpus, 1)
-            else:
-                batch_size = 64 * max(num_gpus, 1)
-            ctx = [mx.gpu(i)
-                   for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu()]
+        batch_size = args.data.batch_size * max(args.num_gpus, 1)
+        ctx = [mx.gpu(i)
+               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
         return batch_size, ctx
 
     batch_size, ctx = _init_hparams()
@@ -118,6 +101,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net.classifier.initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
 
     net.collect_params().reset_ctx(ctx)
+
     if 'elmo' not in args.model:
         net.hybridize()
 
@@ -127,12 +111,17 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
     def _get_dataloader():
         def _init_dataset(dataset, transform_fn):
-            return args.data.transform(dataset, transform_fn)
+            return transform(dataset, transform_fn, args.data.num_workers)
+
+        class_labels = args.data.class_labels if args.data.class_labels else list(args.data._label_set)
 
         train_dataset = _init_dataset(args.data.train,
-                                      args.data.get_transform_train_fn(args.model, vocab, args.max_sequence_length))
+                                      get_transform_train_fn(args.model, vocab, args.max_sequence_length,
+                                                             args.data.pair, class_labels))
         val_dataset = _init_dataset(args.data.val,
-                                    args.data.get_transform_val_fn(args.model, vocab, args.max_sequence_length))
+                                    get_transform_val_fn(args.model, vocab, args.max_sequence_length, args.data.pair,
+                                                         class_labels))
+
         if 'elmo' in args.model:
             train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
                                                batch_size=batch_size,
@@ -147,11 +136,12 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
 
         else:
             train_data = gluon.data.DataLoader(dataset=train_dataset, num_workers=args.data.num_workers,
-                                               batch_sampler=args.data.get_batch_sampler(args.model, train_dataset),
-                                               batchify_fn=args.data.get_batchify_fn(args.model))
+                                               batch_sampler=get_batch_sampler(args.model, train_dataset, batch_size,
+                                                                               args.data.num_workers),
+                                               batchify_fn=get_batchify_fn(args.model))
 
             val_data = gluon.data.DataLoader(dataset=val_dataset, batch_size=batch_size,
-                                             batchify_fn=args.data.get_batchify_fn(args.model),
+                                             batchify_fn=get_batchify_fn(args.model),
                                              num_workers=args.data.num_workers,
                                              shuffle=False)
         return train_data, val_data
@@ -161,6 +151,7 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
     # fine_tune_lm(pre_trained_network) # TODO
 
     def _get_optimizer_params():
+        # TODO : Add more optimizer params based on the chosen optimizer
         optimizer_params = {'learning_rate': args.lr}
         return optimizer_params
 

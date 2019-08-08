@@ -156,25 +156,6 @@ def bert_24_1024_16(**kwargs):
     pass
 
 
-# Network architectures that work with these above models
-class MeanPoolingLayer(gluon.Block):
-    """
-    A block for mean pooling of encoder features.
-    This is used with the LMClassificationNet
-    """
-
-    def __init__(self, prefix=None, params=None):
-        super(MeanPoolingLayer, self).__init__(prefix=prefix, params=params)
-
-    def forward(self, data, valid_length):  # pylint: disable=arguments-differ
-        masked_encoded = mx.ndarray.SequenceMask(data, sequence_length=valid_length, use_sequence_length=True)
-
-        agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
-                                             mx.ndarray.expand_dims(valid_length, axis=1))
-
-        return agg_state
-
-
 class LMClassifier(gluon.Block):
     """
     Network for Text Classification which uses a pre-trained language model.
@@ -186,12 +167,14 @@ class LMClassifier(gluon.Block):
         with self.name_scope():
             self.embedding = embedding
             self.encoder = None
-            self.agg_layer = MeanPoolingLayer()
             self.classifier = None
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
         encoded = self.encoder(self.embedding(data))
-        agg_state = self.agg_layer(encoded, valid_length)
+        # Add mean pooling to the output of the LSTM Layers
+        masked_encoded = mx.ndarray.SequenceMask(encoded, sequence_length=valid_length, use_sequence_length=True)
+        agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
+                                             mx.ndarray.expand_dims(valid_length, axis=1))
         out = self.classifier(agg_state)
         return out
 
@@ -199,16 +182,21 @@ class LMClassifier(gluon.Block):
 class BERTClassifier(gluon.Block):
     """
     Network for Text Classification which uses a BERT pre-trained model.
-    This works with  bert_12_768_12, bert_24_1024_16
+    This works with  bert_12_768_12, bert_24_1024_16.
+    Adapted from https://github.com/dmlc/gluon-nlp/blob/master/scripts/bert/model/classification.py#L76
     """
 
-    def __init__(self, prefix=None, params=None, pre_trained_network=None):
+    def __init__(self, bert, num_classes=2, dropout=0.0, prefix=None, params=None):
         super(BERTClassifier, self).__init__(prefix=prefix, params=params)
-        self.pre_trained_network = pre_trained_network
-        self.classifier = None
+        self.bert = bert
+        with self.name_scope():
+            self.classifier = gluon.nn.HybridSequential(prefix=prefix)
+            if dropout:
+                self.classifier.add(gluon.nn.Dropout(rate=dropout))
+            self.classifier.add(gluon.nn.Dense(units=num_classes))
 
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
-        _, pooler_out = self.pre_trained_network(inputs, token_types, valid_length)
+        _, pooler_out = self.bert(inputs, token_types, valid_length)
         return self.classifier(pooler_out)
 
 
@@ -222,8 +210,13 @@ class ELMOClassifier(gluon.Block):
         super(ELMOClassifier, self).__init__(prefix=prefix, params=params)
         self.batch_size_per_context = int(batch_size / len(ctx))
         self.pre_trained_network = pre_trained_network
-        self.agg_layer = MeanPoolingLayer()
         self.classifier = None
+
+    def mean_pooling(self, data, valid_length):
+        masked_encoded = mx.ndarray.SequenceMask(data, sequence_length=valid_length, use_sequence_length=True)
+        agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
+                                             mx.ndarray.expand_dims(valid_length, axis=1))
+        return agg_state
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
         length = data.shape[1]
@@ -234,9 +227,9 @@ class ELMOClassifier(gluon.Block):
                                                                                     size=(self.batch_size_per_context,))
         mask = mask < valid_length.expand_dims(1).astype('float32')
         out, _ = self.pre_trained_network(data, hidden_state, mask)
-        out0 = self.agg_layer(mx.nd.transpose(out[0], axes=(1, 0, 2)), valid_length)
-        out1 = self.agg_layer(mx.nd.transpose(out[1], axes=(1, 0, 2)), valid_length)
-        out2 = self.agg_layer(mx.nd.transpose(out[2], axes=(1, 0, 2)), valid_length)
+        out0 = self.mean_pooling(mx.nd.transpose(out[0], axes=(1, 0, 2)), valid_length)
+        out1 = self.mean_pooling(mx.nd.transpose(out[1], axes=(1, 0, 2)), valid_length)
+        out2 = self.mean_pooling(mx.nd.transpose(out[2], axes=(1, 0, 2)), valid_length)
         out = (out0 + out1 + out2) / 3.0
         out = self.classifier(out)
         return out

@@ -169,7 +169,7 @@ class ValidationHandler(TrainBegin, BatchEnd, EpochEnd):
     def batch_end(self, estimator, *args, **kwargs):
         self.current_batch += 1
         if self.batch_period and self.current_batch % self.batch_period == 0:
-            self.eval_fn(estimator_ref = estimator, val_data=self.val_data,
+            self.eval_fn(estimator_ref=estimator, val_data=self.val_data,
                          val_metrics=self.val_metrics)
             msg = '[Epoch %d] ValidationHandler: %d batches reached, ' \
                   % (self.current_epoch, self.current_batch)
@@ -717,6 +717,7 @@ class DataLoaderHandler(BatchBegin):
         batch_size = data.shape[0]
 
         return data, label, batch_size
+
 
 class LRHandler(TrainBegin, BatchBegin):
     """Learning rate scheduler (with warmup)

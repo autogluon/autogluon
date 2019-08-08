@@ -98,8 +98,9 @@ class Hyperband_Scheduler(FIFO_Scheduler):
                                            'task{}_state_dict.ag'.format(task.task_id))
             reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
-            task.args['resources'] = task.resources
             task.args['task_id'] = task.task_id
+            task.args['resources'] = task.resources
+
             self.terminator.on_task_add(task)
             # main process
             tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(

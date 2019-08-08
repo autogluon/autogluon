@@ -203,7 +203,7 @@ class BERTDataTransform(object):
 
 class ELMODataTransform(object):
     """
-    Python class for performing data pre-processing on the text dataset for EMLO models
+    Python class for performing data pre-processing on the text dataset for ELMO models
     """
 
     def __init__(self, vocab, tokenizer=nlp.data.SacreMosesTokenizer(),

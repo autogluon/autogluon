@@ -90,5 +90,3 @@ class TextDataLoaderHandler(DataLoaderHandler):
             ret_data.append((d, length.astype(np.float32)))
 
         return ret_data, label, batch_size
-
-
