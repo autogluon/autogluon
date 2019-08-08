@@ -25,3 +25,4 @@ def test_text_classification():
         model = ag.task.text_classification.get_model(name)
         print(model.name)
     logger.debug('Finished.')
+

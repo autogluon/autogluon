@@ -14,10 +14,10 @@ An AutoML Toolkit.
    install
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Tutorials
 
-   tutorials/build/task/index
+   tutorials/build/backend/index
 
 .. toctree::
    :maxdepth: 1
