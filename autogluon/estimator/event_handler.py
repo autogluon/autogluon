@@ -284,6 +284,7 @@ class LoggingHandler(TrainBegin, TrainEnd, EpochBegin, EpochEnd, BatchBegin, Bat
         if self.verbose == self.LOG_PER_BATCH:
             batch_time = time.time() - self.batch_start
             msg = '[Epoch %d][Batch %d]' % (self.current_epoch, self.batch_index)
+            # assumes last element in batch are labels
             self.processed_samples += kwargs['batch'][-1].shape[0]
             msg += '[Samples %s] ' % (self.processed_samples)
             msg += 'time/batch: %.3fs ' % batch_time

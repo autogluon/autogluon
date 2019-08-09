@@ -31,7 +31,9 @@ default_nets = Nets([
     get_model('awd_lstm_lm_1150'),
     get_model('bert_12_768_12'),
     get_model('bert_24_1024_16'),
-    get_model('elmo_2x2048_256_2048cnn_1xhighway')
+    get_model('elmo_2x1024_128_2048cnn_1xhighway'),
+    get_model('elmo_2x2048_256_2048cnn_1xhighway'),
+    get_model('elmo_2x4096_512_2048cnn_2xhighway')
 ])
 
 default_optimizers = Optimizers([
