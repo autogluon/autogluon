@@ -1,5 +1,12 @@
-"""1. Image Classification - Data Preparation
-==============================================
+#TODO: change it to an end to end example including
+# 1, download kaggle dataset (remove two kaggle images)
+# 2, split the data into training, valididation, test, using validation to select the model, and report the accuracy on test data
+# 3, using default fit function to generate the results
+# 4, submit model to the kaggle and get the results
+# make sure the links are working
+
+"""2. Image Classification - A Kaggle Dataset Example
+=======================================================
 
 We show how to get custom data and prepare it in the format required by AutoGluon.
 
@@ -81,14 +88,6 @@ Now we have the following structure under `~/data/shopeeiet/images`:
 Example image of some classes are:
 
 .. image:: ../../../_static/img/shopeeiet_example.png
-
-
-Example 2: Amazon Internal Image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We can also access `Amazon Image assist <https://image-assist.amazon.com>`__
-and search the images using ASINs.
-
 
 
 Step 2: Convert Data Source into Required Format

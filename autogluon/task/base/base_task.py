@@ -106,8 +106,8 @@ class BaseTask(ABC):
         args = argparse.Namespace()
         vars(args).update({'data': metadata['data']})
         vars(args).update({'backend': metadata['backend']})
-        vars(args).update({'epochs': metadata['resources_per_trial']['max_training_epochs']})
-        vars(args).update({'num_gpus': metadata['resources_per_trial']['max_num_gpus']})
+        vars(args).update({'epochs': metadata['resources_per_trial']['num_training_epochs']})
+        vars(args).update({'num_gpus': metadata['resources_per_trial']['num_gpus']})
         for k, v in metadata['kwargs'].items():
             vars(args).update({k: v})
         for hparam in cs.get_hyperparameters():
@@ -147,16 +147,16 @@ class BaseTask(ABC):
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': int(metadata['resources_per_trial']['max_num_cpus']),
-                 'num_gpus': int(metadata['resources_per_trial']['max_num_gpus'])},
+                 'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
                 searcher,
                 checkpoint=metadata['savedir'],
                 resume=metadata['resume'],
                 time_attr='epoch',
                 reward_attr=metadata['kwargs']['reward_attr'],
                 max_t=metadata['resources_per_trial'][
-                    'max_training_epochs'],
+                    'num_training_epochs'],
                 grace_period=metadata['resources_per_trial'][
-                                 'max_training_epochs'] // 4,
+                                 'num_training_epochs'] // 4,
                 visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
@@ -164,7 +164,7 @@ class BaseTask(ABC):
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': int(metadata['resources_per_trial']['max_num_cpus']),
-                 'num_gpus': int(metadata['resources_per_trial']['max_num_gpus'])},
+                 'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
                 searcher,
                 checkpoint=metadata['savedir'],
                 resume=metadata['resume'],
@@ -197,9 +197,9 @@ class BaseTask(ABC):
                 'max_trial_count': 2
             },
             resources_per_trial={
-                'max_num_gpus': 0,
+                'num_gpus': 0,
                 'max_num_cpus': 4,
-                'max_training_epochs': 3
+                'num_training_epochs': 3
             },
             backend='default',
             **kwargs):
@@ -218,7 +218,7 @@ class BaseTask(ABC):
             the return result of 'train()', whichever is reached first.
             Defaults to empty dict.
         resources_per_trial (dict): Machine resources to allocate per trial,
-            e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
+            e.g. ``{"max_num_cpus": 64, "num_gpus": 8}``. Note that GPUs will not be
             assigned unless you specify them here.
         savedir (str): Local dir to save training results to.
         searcher: Search Algorithm.

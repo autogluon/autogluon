@@ -1,6 +1,9 @@
 import logging
 import argparse
 import os
+import random
+import numpy as np
+import mxnet as mx
 
 import autogluon as ag
 from autogluon import object_detection as task
@@ -49,9 +52,14 @@ parser.add_argument('--demo', action='store_true', default=False,
                     help='demo if needed')
 parser.add_argument('--debug', action='store_true', default=False,
                     help='debug if needed')
+parser.add_argument('--seed', default=100, type=int,
+                    help='random seed')
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    mx.random.seed(args.seed)
 
     logger = logging.getLogger(__name__)
     logging_handlers = [logging.StreamHandler()]

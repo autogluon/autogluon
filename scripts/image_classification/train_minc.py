@@ -1,6 +1,9 @@
 import logging
 import argparse
 import os
+import random
+import numpy as np
+import mxnet as mx
 
 from mxnet.gluon.data.vision import transforms
 
@@ -44,9 +47,15 @@ parser.add_argument('--lr_step', default=20, type=int,
                     help='list of learning rate decay epochs as in str')
 parser.add_argument('--debug', action='store_true', default=False,
                     help='debug if needed')
+parser.add_argument('--seed', default=100, type=int,
+                    help='random seed')
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    mx.random.seed(args.seed)
+
     logger = logging.getLogger(__name__)
     logging_handlers = [logging.StreamHandler()]
     logdir = os.path.join(os.path.splitext(args.savedir)[0], 'logs')

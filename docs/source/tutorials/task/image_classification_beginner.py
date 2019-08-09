@@ -1,10 +1,11 @@
-"""1. AutoGluon Image Classification - Quick Start
+"""1. Image Classification - Quick Start
 ====================================================
 
 In the following\ *, we use Image Classification as a running example*
 to illustrate the usage of AutoGluon’s main APIs.
 """
 
+# TODO: remove the warnings
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -22,21 +23,26 @@ logging.basicConfig(level=logging.INFO)
 # Create AutoGluon Dataset
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# We use CIFAR10 for image classfication for demo purpose.
+# We use a small subset of `Shopee-IET dataset<https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data>`__ from Kaggle for image classfication.
+# Please click `link<http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip>`__ to download the subset.
 
-dataset = task.Dataset(name='CIFAR10') # case insentive
+# TODO: finalize data link
+import subprocess
+get_dataset = 'wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip && unzip data.zip'
+subprocess.run(get_dataset.split())
+
+################################################################
+# We then construct the dataset using the downloaded dataset.
+
+dataset = task.Dataset(name='shopeeiet', train_path='data/train', val_path='data/val') # case insentive
 
 print(dataset) # show a quick summary of the dataset, e.g. #example for train, #classes
 
-################################################################
-# The constructed dataset contains the CIFAR10 training and validation
-# datasets.
-
-
-# dataset.train[0] # access the first example
-# dataset.val[-2:] # access the last 2 validation examples
 
 ################################################################
+# Create AutoGluon Fit
+# ~~~~~~~~~~~~~~~~~~~~~~~~
+#
 # Then we will use the default configuration of the image classification
 # to generate: \* Best result of the search in terms of accuracy \*
 # According best configuration regarding to the best result
@@ -44,33 +50,40 @@ print(dataset) # show a quick summary of the dataset, e.g. #example for train, #
 # To acheive this, we are using ``fit`` function to generate the above
 # results based on the datasets.
 #
-# The default configruation is based on ``max_trial_count=2`` and
-# ``max_training_epochs=3``. If running on no GPU environment, please set
-# ``demo=True`` in the ``fit``. The process would approximately cost one
-# and half minutes. If want to watch the ``fit``, we default provide
-# Tensorboad to visualize the process. Please type
-# ``tensorboard --logdir=./checkpoint/exp1/logs --host=127.0.0.1 --port=8888``
-# in the command.
+# Let's first set the resources would be used per trial based on the situation we have one GPU.
+# We are using ``demo = True`` to quickly achieve the results.
 
+#TODO: use num_gpus, remove max_num_cpus, use num_training_epochs, remove demo
 max_num_gpus = 1
 max_num_cpus = 4
 max_training_epochs = 2
 demo = True
 
+#TODO: only task.fit now resources_per_trial in the fit
 resources_per_trial = {
     'max_num_gpus': max_num_gpus, # set this to more than 1 if you have GPU machine to run more efficiently.
     'max_num_cpus': max_num_cpus,
     'max_training_epochs': max_training_epochs
 }
 
-results = task.fit(dataset,
-                   resources_per_trial=resources_per_trial, demo=demo)
+results = task.fit(dataset)
+
+#TODO: only show results.metric (but specify the top-1 accuracy)
 
 ################################################################
-# The best accuracy is:
+# The best Top-1 accuracy is:
 
 
 print('%.2f acc' % (results.metric * 100))
+
+
+################################################################
+# An example visulization using MXBoard:
+# .. image:: ../../../_static/img/shopee_accuracy_curves_1.svg
+#TODO: add evaluation task.predict() (have a default image, or upload an image)
+
+#TODO: put the results.metadata, config, time in the decription at the end.
+
 
 ################################################################
 # The associated best configuration is:
@@ -84,3 +97,8 @@ print(results.config)
 
 print('%.2f s' % results.time)
 
+################################################################
+# The search space is:
+
+
+print(results.metadata)

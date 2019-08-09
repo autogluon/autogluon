@@ -120,12 +120,12 @@ class ImageClassification(BaseTask):
             stop_criterion={
                 'time_limits': 1 * 60 * 60,
                 'max_metric': 1.0,
-                'max_trial_count': 2
+                'max_trial_count': 100
             },
             resources_per_trial={
-                'max_num_gpus': 0,
+                'max_num_gpus': 1,
                 'max_num_cpus': 4,
-                'max_training_epochs': 3
+                'max_training_epochs': 100
             },
             backend='default',
             **kwargs):

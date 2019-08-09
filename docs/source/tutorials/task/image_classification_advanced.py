@@ -1,8 +1,13 @@
-"""2. AutoGluon Image Classification - Advanced
+# TODO: add cross validation, final fit and predict, example running results
+
+
+"""2. Image Classification - Advanced
 ============================================
 
 In the following\ *, we use Image Classification as a running example*
 to illustrate the usage of AutoGluon’s main APIs.
+Different from the last demo, we focus how to customize autogluon ``Dataset``,
+``Nets``, ``Optimizers``, ``Searcher`` and ``Scheduler``.
 """
 
 import warnings
@@ -32,19 +37,55 @@ logging.basicConfig(level=logging.INFO)
 
 import autogluon as ag
 
+################################################################
 # Create AutoGluon Dataset
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# We use CIFAR10 for image classfication for demo purpose.
+# We use a small subset of `Shopee-IET` dataset prepared in the data preparation section.
 
 
-dataset = task.Dataset(name='CIFAR10') # case insentive
+dataset = task.Dataset(name='shopeeiet', train_path='data/train', val_path='data/val')
 
 ################################################################
 # We then will use ``autogluon.Nets`` and ``autogluon.Optimizers`` as
 # examples to show the usage of auto objects. The remainining auto objects
 # are using default value.
+################################################################
+# Before that, let's first understand the `Space` object in AutoGluon.
 #
+# Create AutoGluon Space
+# ~~~~~~~~~~~~~~~~~~~~~~
+#
+# ``autogluon.space`` is a search space containing a set of configuration
+# candidates. We provide three basic space types.
+#
+# -  Categorical Space
+
+
+list_space = ag.space.List('listspace', ['0', '1', '2'])
+print(list_space)
+
+################################################################
+# -  Linear Space
+
+
+linear_space = ag.space.Linear('linspace', 0, 10)
+print(linear_space)
+
+################################################################
+# -  Log Space
+
+
+log_space = ag.space.Log('logspace', 10**-10, 10**-1)
+print(log_space)
+
+################################################################
+# -  An Example of Random Sample from the Combined Space
+
+
+print(ag.space.sample_configuration([list_space, linear_space, log_space]))
+
+################################################################
 # Create AutoGluon Nets
 # ~~~~~~~~~~~~~~~~~~~~~
 #
@@ -55,14 +96,6 @@ dataset = task.Dataset(name='CIFAR10') # case insentive
 # -  by choosing the best architecture regarding to each auto net.
 #
 
-
-# type of net_list is ag.space.List
-
-# method 1 (complex but flexiable): specify the net_list using get_model
-# net_list = [task.model_zoo.get_model('resnet18_v1'), # TODO: pretrained and pretrained_dataset would be supported
-#             task.model_zoo.get_model('resnet34_v1')]
-
-# method 2 (easy and less flexiable): specify the net_list using model name
 net_list = ['resnet18_v1',
             'resnet34_v1']
 
@@ -84,32 +117,57 @@ print(nets)
 #    optimizer
 #
 
-# method 1 (complex but flexiable): specify the optim_list using get_optim
-# optimizers = ag.Optimizers([ag.optim.get_optim('sgd'),
-#                             ag.optim.get_optim('adam')])
+# method 1: using the task-specific default optimizer configuration.
+optimizers_default = ag.Optimizers(['sgd', 'adam'])
 
-# method 2 (easy and less flexiable): specify the optim_list using get_model
-# optimizers = ag.Optimizers(['sgd', 'adam'])
+# method 2: customize the hyperparamters of optimizer in the search space.
+adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                          wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                        momentum=ag.space.Linear('momentum', 0.85, 0.95),
+                        wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
-adamopt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
-                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-sgdopt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
-                       wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-optimizers = ag.Optimizers([adamopt, sgdopt])
 print(optimizers)
 
+################################################################
+# Use Search Algorithm
+# ~~~~~~~~~~~~~~~~~~~~
+#
+# ``autogluon.searcher`` will support both basic and SOTA searchers for
+# both hyper-parameter optimization and architecture search. We now
+# support random search. The default searcher is random searcher.
+# We can simply use string name to specify the searcher:
+
+searcher = 'random'
+
+
+################################################################
+# Use Trial Scheduler
+# ~~~~~~~~~~~~~~~~~~~
+#
+# ``ag.scheduler`` supports scheduling trials in serial order and with
+# early stopping.
+#
+# We support basic FIFO scheduler and early stopping scheduler: Hyperband.
+# We can simply use string name to specify the scheduler:
+
+trial_scheduler = 'fifo'
+
+################################################################
+# We use the resume and checkpoint dir in the scheduler.
+
+savedir = 'checkpoint/demo.ag'
+resume = False
 
 ################################################################
 # Create AutoGluon Fit - Put all together
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Let's first set the customized stop criterion.
 
 time_limits = 1*60*60
 max_metric = 1.0
 max_trial_count = 4
-max_num_gpus = 1
-max_num_cpus = 4
-max_training_epochs = 2
-demo = True
 
 stop_criterion = {
     'time_limits': time_limits,
@@ -117,8 +175,17 @@ stop_criterion = {
     'max_trial_count': max_trial_count
 }
 
+################################################################
+# Let's then set the customized resources per trial.
+# We use `demo = True` for showing results faster.
+
+max_num_gpus = 1
+max_num_cpus = 4
+max_training_epochs = 2
+demo = True
+
 resources_per_trial = {
-    'max_num_gpus': max_num_gpus, # set this to more than 1 if you have GPU machine to run more efficiently.
+    'max_num_gpus': max_num_gpus,
     'max_num_cpus': max_num_cpus,
     'max_training_epochs': max_training_epochs
 }
@@ -126,9 +193,19 @@ resources_per_trial = {
 results = task.fit(dataset,
                    nets,
                    optimizers,
+                   searcher=searcher,
+                   trial_scheduler=trial_scheduler,
+                   resume=resume,
+                   savedir=savedir,
                    stop_criterion=stop_criterion,
                    resources_per_trial=resources_per_trial,
-                   demo=demo) # demo=True is recommened when running on no GPU machine
+                   demo=demo)
+
+################################################################
+# The search space is:
+
+
+print(results.metadata)
 
 ################################################################
 # The best accuracy is:
@@ -147,180 +224,6 @@ print(results.config)
 
 print('%.2f s' % results.time)
 
-################################################################
-# Use Search Algorithm
-# ~~~~~~~~~~~~~~~~~~~~
-#
-# ``autogluon.searcher`` will support both basic and SOTA searchers for
-# both hyper-parameter optimization and architecture search. We now
-# support random search. The default is using searcher is random searcher.
-
-
-# cs is CS.ConfigurationSpace() where import ConfigSpace as CS, this is just example code;
-# in practice, this is in fit function, and cs should not be None
-cs = None
-searcher = ag.searcher.RandomSampling(cs)
-
-print(searcher)
-
-################################################################
-# Or simply use string name:
-#
-
-searcher = 'random'
-
-print(searcher)
-
-################################################################
-# Use Trial Scheduler
-# ~~~~~~~~~~~~~~~~~~~
-#
-# ``ag.scheduler`` supports scheduling trials in serial order and with
-# early stopping.
-#
-# We support basic FIFO scheduler.
-#
-
-
-# this is just example code; in practice, this is in fit function
-savedir = 'checkpoint/demo.ag'
-
-# trial_scheduler = ag.scheduler.FIFO_Scheduler(
-#                 task.pipeline.train_image_classification,
-#                 None,
-#                 {
-#                     'num_cpus': 4,
-#                     'num_gpus': 0,
-#                 },
-#                 searcher,
-#                 checkpoint=savedir)
-#
-# print(trial_scheduler)
-
-################################################################
-# We also support Hyperband which is an early stopping mechanism.
-
-
-# this is just example code; in practice, this is in fit function
-# trial_scheduler = ag.scheduler.Hyperband_Scheduler(
-#                 task.pipeline.train_image_classification,
-#                 None,
-#                 {
-#                     'num_cpus': 4,
-#                     'num_gpus': 1,
-#                 },
-#                 searcher,
-#                 time_attr='epoch',
-#                 reward_attr='accuracy',
-#                 max_t=10,
-#                 grace_period=1,
-#                 checkpoint=savedir)
-#
-# print(trial_scheduler)
-
-################################################################
-# Resume Fit and Checkpointer
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# We use the resume and checkpoint dir in the scheduler.
-
-
-savedir = 'checkpoint/demo.ag'
-resume = False
-
-
-# trial_scheduler = ag.scheduler.Hyperband_Scheduler(
-#                 task.pipeline.train_image_classification,
-#                 None,
-#                 {
-#                     'num_cpus': 4,
-#                     'num_gpus': 1,
-#                 },
-#                 searcher,
-#                 checkpoint=savedir,
-#                 resume=resume,
-#                 time_attr='epoch',
-#                 reward_attr='accuracy',
-#                 max_t=10,
-#                 grace_period=1)
-#
-# print(trial_scheduler)
-
-################################################################
-# Or simply specify the trial scheduler with the string name:
-
-trial_scheduler = 'hyperband'
-
-################################################################
-# Visualize Using Tensor/MXBoard
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# We could visualize the traing curve using Tensorboad or MXboard. To
-# start the Tensorboard or MXboard, please use:
-#
-# ``tensorboard --logdir=./checkpoint/demo/logs --host=127.0.0.1 --port=8889``
-#
-# An example is shown below.
-#
-# Create Stop Criterion
-# ~~~~~~~~~~~~~~~~~~~~~
-#
-# ``autogluon`` supports overall automatic constraints in
-# ``stop_criterion``.
-#
-max_metric = 0.80
-
-stop_criterion = {
-    'time_limits': time_limits,
-    'max_metric': max_metric, #if you know, otherwise use the default 1.0
-    'max_trial_count': max_trial_count
-}
-
-################################################################
-# Create Resources Per Trial
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# ``autogluon`` supports constraints for each trial
-# ``in resource_per_trial``.
-#
-
-max_training_epochs = 1
-
-resources_per_trial = {
-    'max_num_gpus': max_num_gpus,
-    'max_num_cpus': max_num_cpus,
-    'max_training_epochs': max_training_epochs
-}
-
-################################################################
-# Create AutoGluon Fit with Full Capacity
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-results = task.fit(dataset,
-                  nets,
-                  optimizers,
-                  searcher=searcher,
-                  trial_scheduler='fifo',
-                  resume=resume,
-                  savedir=savedir,
-                  stop_criterion=stop_criterion,
-                  resources_per_trial=resources_per_trial,
-                  demo=True) # only set demo=True when running on no GPU machine
-
-################################################################
-# The best accuracy is
-
-print('%.2f acc' % (results.metric * 100))
-
-################################################################
-# The associated best configuration is:
-
-
-print(results.config)
-
-################################################################
-# The total time cost is:
-
-print('%.2f s' % results.time)
 
 ################################################################
 # Resume AutoGluon Fit
@@ -330,12 +233,11 @@ print('%.2f s' % results.time)
 # results. Similarly, we could also increase ``max_trial_count`` for
 # better results.
 #
-# Here we increase the ``max_training_epochs`` from 1 to 3,
+# Here we increase the ``max_training_epochs`` from 2 to 3,
 # ``max_trial_count`` from 2 to 3, and set ``resume = True`` which will
 # load the checking point in the savedir.
 
 max_trial_count = 3
-
 stop_criterion = {
     'time_limits': time_limits,
     'max_metric': max_metric,
@@ -343,7 +245,6 @@ stop_criterion = {
 }
 
 max_training_epochs = 3
-
 resources_per_trial = {
     'max_num_gpus': max_num_gpus,
     'max_num_cpus': max_num_cpus,
@@ -353,15 +254,21 @@ resources_per_trial = {
 resume = True
 
 results = task.fit(dataset,
-                  nets,
-                  optimizers,
-                  searcher=searcher,
-                  trial_scheduler='fifo',
-                  resume=resume,
-                  savedir=savedir,
-                  stop_criterion=stop_criterion,
-                  resources_per_trial=resources_per_trial,
-                  demo=True)
+                   nets,
+                   optimizers,
+                   searcher=searcher,
+                   trial_scheduler=trial_scheduler,
+                   resume=resume,
+                   savedir=savedir,
+                   stop_criterion=stop_criterion,
+                   resources_per_trial=resources_per_trial,
+                   demo=demo)
+
+################################################################
+# The search space is:
+
+
+print(results.metadata)
 
 ################################################################
 # The best accuracy is
