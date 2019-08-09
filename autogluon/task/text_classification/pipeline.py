@@ -83,17 +83,18 @@ def train_text_classification(args: dict, reporter: StatusReporter, task_id: int
         net, vocab = _get_bert_pre_trained_model(args, ctx)
     elif 'lstm_lm' in args.model:  # Get LM specific model attributes
         net, vocab = _get_lm_pre_trained_model(args, ctx)
+        net.classifier = nn.Sequential()
+        with net.classifier.name_scope():
+            net.classifier.add(nn.Dropout(args.dropout))
+            net.classifier.add(nn.Dense(args.data.num_classes))
     elif 'elmo' in args.model:
         net, vocab = _get_elmo_pre_trained_model(args, ctx, batch_size)
-    else:
-        raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
-
-    net.classifier = nn.Sequential()
-    with net.classifier.name_scope():
-        if 'elmo' in args.model:
-            net.classifier.add(nn.Dense(256))
+        net.classifier = nn.Sequential()
+        net.classifier.add(nn.Dense(256))
         net.classifier.add(nn.Dropout(args.dropout))
         net.classifier.add(nn.Dense(args.data.num_classes))
+    else:
+        raise ValueError('Unsupported pre-trained model type. {}  will be supported in the future.'.format(args.model))
 
     if not args.pretrained:
         net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)

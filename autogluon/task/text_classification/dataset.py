@@ -4,7 +4,7 @@ from typing import AnyStr
 import gluonnlp as nlp
 from mxnet import gluon
 
-from .transforms import TextDataTransform, BERTDataTransform
+from .transforms import TextDataTransform, BERTDataTransform, ELMODataTransform
 
 __all__ = ['get_dataset', 'transform', 'get_train_data_lengths', 'get_batchify_fn', 'get_batch_sampler',
            'get_transform_train_fn', 'get_transform_val_fn']
@@ -76,7 +76,7 @@ def get_transform_train_fn(model_name: AnyStr, vocab: nlp.Vocab, max_sequence_le
                                               max_seq_length=max_sequence_length,
                                               pair=is_pair, class_labels=class_labels)
     elif 'elmo' in model_name:
-        dataset_transform = ELMODataTransform(vocab, max_sequence_length=max_sequence_length)
+        dataset_transform = ELMODataTransform(vocab, pair=is_pair, max_sequence_length=max_sequence_length)
     else:
         dataset_transform = TextDataTransform(vocab, transforms=[
             nlp.data.ClipSequence(length=max_sequence_length)],
