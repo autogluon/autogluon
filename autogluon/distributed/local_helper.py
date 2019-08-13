@@ -17,7 +17,10 @@ class AsyncLineReader(threading.Thread):
 
     def run(self):
         while True:
-            line = self.fd.readline()
+            try:
+                line = self.fd.readline()
+            except Exception:
+                break
             if len(line) > 0:
                 line = line.rstrip().decode("utf-8") 
                 if self.err:
@@ -27,7 +30,7 @@ class AsyncLineReader(threading.Thread):
                     msg = "[ {name} local] : {output}". \
                         format(name=self.name, output=line)
                 print(msg)
-                self.outputQueue.put(msg)
+                #self.outputQueue.put(msg)
             else:
                 time.sleep(0.1)
 

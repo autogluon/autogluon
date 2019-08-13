@@ -73,17 +73,22 @@ class DaskLocalService(object):
             while True:
                 for process in all_processes:
                     while not process["stdoutReader"].eof():
-                        stdout = process["stdout_queue"].get()
-                        print(stdout)
+                        try:
+                            stdout = process["stdout_queue"].get()
+                            print(stdout)
+                        except Exception:
+                            break
                     while not process["stderrReader"].eof():
-                        stderr = process["stderr_queue"].get()
-                        print(stderr)
+                        try:
+                            stderr = process["stderr_queue"].get()
+                            print(stderr)
+                        except Exception:
+                            break
                 # Kill some time and free up CPU
                 time.sleep(0.1)
 
         except KeyboardInterrupt:
             self.shutdown()
-            pass  # Return execution to the calling process
 
     def shutdown(self):
         os.killpg(os.getpgid(self.worker['Process'].pid), signal.SIGTERM)
@@ -151,7 +156,6 @@ class DaskRemoteService(object):
 
         except KeyboardInterrupt:
             self.shutdown()
-            pass  # Return execution to the calling process
 
     def shutdown(self):
         all_processes = [self.scheduler, self.worker]
