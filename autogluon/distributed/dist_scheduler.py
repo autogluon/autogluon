@@ -2,6 +2,7 @@
 import os
 import pickle
 import logging
+import subprocess
 from threading import Thread
 import multiprocessing as mp
 from collections import namedtuple, OrderedDict
@@ -50,6 +51,10 @@ class DistributedTaskScheduler(object):
         with self.LOCK:
             remotes = DistributedTaskScheduler.REMOTE_MANAGER.add_remote_nodes(ip_addrs)
             DistributedTaskScheduler.RESOURCE_MANAGER.add_remote(remotes)
+
+    @classmethod
+    def upload_files(cls, files, **kwargs):
+        cls.REMOTE_MANAGER.upload_files(files, **kwargs)
 
     def add_task(self, task):
         """Adding a training task to the scheduler.
@@ -108,7 +113,9 @@ class DistributedTaskScheduler(object):
                         p.join()
                     else:
                         logger.warning('Please use python 3.7 for distributed early stopping.')
-                        p.terminate()
+                        #p.terminate()
+                        subprocess.run(['kill', '-9', str(p.pid)])
+                        p.join()
             else:
                 p.join()
         except Exception as e:

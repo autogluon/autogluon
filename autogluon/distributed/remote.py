@@ -30,6 +30,10 @@ class Remote(Client):
             self.remote_id = Remote.REMOTE_ID.value
             Remote.REMOTE_ID.value += 1
 
+    def upload_files(self, files, **kwargs):
+        for filename in files:
+            self.upload_file(filename, **kwargs)
+
     def shutdown(self):
         self.close()
         self.service.shutdown()

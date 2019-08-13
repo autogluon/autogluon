@@ -42,6 +42,13 @@ class RemoteManager(object):
         return list(cls.NODES.values())
 
     @classmethod
+    def upload_files(cls, files, **kwargs):
+        if isinstance(files, str):
+            files = [files]
+        for node in cls.NODES.values():
+            node.upload_files(files, **kwargs)
+
+    @classmethod
     def add_remote_nodes(cls, ip_addrs):
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         remotes = []
