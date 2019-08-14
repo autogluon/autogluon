@@ -11,7 +11,7 @@ from gluoncv.utils import LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
 import autogluon as ag
-from autogluon import autogluon_method, autogluon_register_args
+from autogluon import autogluon_register_args
 
 @autogluon_register_args(
         batch_size=64,

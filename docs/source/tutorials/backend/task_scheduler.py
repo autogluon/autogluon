@@ -3,42 +3,16 @@
 
 This is a quick tutorial for understanding fit backend.
 """
-from autogluon import Task
+
+################################################################
+# Schedule Tasks with Different Configurations
+# ____________________________________________
+
+import autogluon as ag
+from autogluon import autogluon_method, Task
 from autogluon.resource import Resources
 from autogluon.scheduler import TaskScheduler
 import time
-
-################################################################
-# Understanding Task, Resource and Scheduler
-# __________________________________________
-# 
-# .. image:: ../../../_static/img/scheduler.png
-#
-# Resources contains number of cpus and gpus. Task includes execute function, args
-# and its resource. TaskScheduler automatically request resource for tasks and execut
-# it as soon as its resource is ready.
-#
-# **Define Custimized Task Function**
-
-def my_task():
-    print('running, my_task')
-    time.sleep(3.0)
-
-################################################################
-# **Create Scheduler**
-scheduler = TaskScheduler()
-
-for i in range(5):
-    resource = Resources(num_cpus=2, num_gpus=0)
-    task = Task(my_task, {}, resource)
-    scheduler.add_task(task)
-
-################################################################
-# Launch Task with Different Configurations
-# _________________________________________
-
-import autogluon as ag
-from autogluon import autogluon_method
 
 ################################################################
 # **Configuration handled by `autogluon_method`**
@@ -96,7 +70,8 @@ cs.add_hyperparameter(lr)
 searcher = ag.searcher.RandomSampling(cs)
 
 ################################################################
-# ** Use Hyperband Scheduler or FIFO scheduler**
+# **Use Hyperband Scheduler or FIFO scheduler**
+#
 # Scheduler monitors the training progress of each task and apply early termination if needed.
 #
 
@@ -110,7 +85,7 @@ myscheduler = ag.scheduler.Hyperband_Scheduler(train_fn, args,
 myscheduler.run()
 
 ################################################################
-# ** Join Tasks and Plot Results**
+# **Join Tasks and Plot Results**
 #
 
 myscheduler.join_tasks()

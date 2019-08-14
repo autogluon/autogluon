@@ -1,3 +1,4 @@
 sphinx
+sphinx_gallery
 sphinxcontrib-googleanalytics
 -e git://github.com/snide/sphinx_rtd_theme.git#egg=sphinx_rtd_theme

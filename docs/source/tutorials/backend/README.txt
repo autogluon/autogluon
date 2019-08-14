@@ -1,2 +1,2 @@
-Searcher and Scheduler
-=======================
+Advanced Usage
+==============

@@ -38,7 +38,7 @@ class autogluon_method(object):
         else:
             args.update(spec_config)
         self.f(args, **kwargs)
-        if 'reporter' in kwargs:
+        if 'reporter' in kwargs and kwargs['reporter'] is not None:
             logger.debug('Reporter Done!')
             kwargs['reporter'](done=True)
 

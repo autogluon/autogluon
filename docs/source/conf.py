@@ -55,7 +55,8 @@ sphinx_gallery_conf = {
     ],
     # path where to save gallery generated examples
     'gallery_dirs': [
-        'tutorials/build/backend',],
+        'tutorials/build/backend',
+        ],
     'filename_pattern': '.py',
     'ignore_pattern': 'im2rec.py',
     'within_subsection_order': ExampleTitleSortKey,

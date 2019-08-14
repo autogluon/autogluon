@@ -54,6 +54,8 @@ class DistributedTaskScheduler(object):
 
     @classmethod
     def upload_files(cls, files, **kwargs):
+        """Upload files to remote machines, so that they are accessible by import or load. 
+        """
         cls.REMOTE_MANAGER.upload_files(files, **kwargs)
 
     def add_task(self, task):
