@@ -27,14 +27,16 @@ logging.basicConfig(level=logging.INFO)
 # Please click `link<http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip>`__ to download the subset.
 
 # TODO: finalize data link
-import subprocess
-get_dataset = 'wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip && unzip data.zip'
-subprocess.run(get_dataset.split())
-
-################################################################
-# We then construct the dataset using the downloaded dataset.
-
+# import subprocess
+# get_dataset = 'wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip && unzip data.zip'
+# subprocess.run(get_dataset.split())
+#
+# ################################################################
+# # We then construct the dataset using the downloaded dataset.
+#
 dataset = task.Dataset(name='shopeeiet', train_path='data/train', val_path='data/val') # case insentive
+
+# dataset = task.Dataset(name='cifar10')
 
 print(dataset) # show a quick summary of the dataset, e.g. #example for train, #classes
 
@@ -53,18 +55,18 @@ print(dataset) # show a quick summary of the dataset, e.g. #example for train, #
 # Let's first set the resources would be used per trial based on the situation we have one GPU.
 # We are using ``demo = True`` to quickly achieve the results.
 
-#TODO: use num_gpus, remove max_num_cpus, use num_training_epochs, remove demo
-max_num_gpus = 1
-max_num_cpus = 4
-max_training_epochs = 2
-demo = True
-
-#TODO: only task.fit now resources_per_trial in the fit
-resources_per_trial = {
-    'max_num_gpus': max_num_gpus, # set this to more than 1 if you have GPU machine to run more efficiently.
-    'max_num_cpus': max_num_cpus,
-    'max_training_epochs': max_training_epochs
-}
+# #TODO: use num_gpus, remove max_num_cpus, use num_training_epochs, remove demo
+# max_num_gpus = 1
+# max_num_cpus = 4
+# max_training_epochs = 2
+# demo = True
+#
+# #TODO: only task.fit now resources_per_trial in the fit
+# resources_per_trial = {
+#     'max_num_gpus': max_num_gpus, # set this to more than 1 if you have GPU machine to run more efficiently.
+#     'max_num_cpus': max_num_cpus,
+#     'max_training_epochs': max_training_epochs
+# }
 
 results = task.fit(dataset)
 
@@ -73,8 +75,15 @@ results = task.fit(dataset)
 ################################################################
 # The best Top-1 accuracy is:
 
-
 print('%.2f acc' % (results.metric * 100))
+
+test_acc, test_loss = task.evaluate()
+print('test data %.2f acc, %.2f loss' % (test_acc * 100, test_loss))
+
+image = 'https://raw.githubusercontent.com/dmlc/web-data/master/gluoncv/classification/plane-draw.jpeg'
+ind, prob = task.predict(image)
+print('The input picture is classified as %d, with probability %.3f.' %
+      (ind.asscalar(), prob.asscalar()))
 
 
 ################################################################
@@ -87,18 +96,13 @@ print('%.2f acc' % (results.metric * 100))
 
 ################################################################
 # The associated best configuration is:
+# print(results.config)
 
-
-print(results.config)
-
-################################################################
+# ###############################################################
 # Total time cost is:
-
 
 print('%.2f s' % results.time)
 
 ################################################################
 # The search space is:
-
-
-print(results.metadata)
+#print(results.metadata)

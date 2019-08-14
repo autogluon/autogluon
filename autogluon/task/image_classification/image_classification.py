@@ -1,4 +1,6 @@
+
 import logging
+import numpy as np
 
 from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
@@ -26,17 +28,20 @@ class ImageClassification(BaseTask):
         def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=4,
                      transform_train_fn=None, transform_val_fn=None,
                      transform_train_list=[
-                         gcv_transforms.RandomCrop(32, pad=4),
+                         transforms.Resize(480),
+                         transforms.RandomResizedCrop(224),
                          transforms.RandomFlipLeftRight(),
+                         transforms.RandomColorJitter(brightness=0.4,
+                                                      contrast=0.4,
+                                                      saturation=0.4),
+                         transforms.RandomLighting(0.1),
                          transforms.ToTensor(),
-                         transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                              [0.2023, 0.1994, 0.2010])
-                     ],
+                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
                      transform_val_list=[
+                         transforms.Resize(256),
+                         transforms.CenterCrop(224),
                          transforms.ToTensor(),
-                         transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                              [0.2023, 0.1994, 0.2010])
-                     ],
+                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
                      batchify_train_fn=None, batchify_val_fn=None,
                      **kwargs):
             super(ImageClassification.Dataset, self).__init__(name, train_path, val_path, batch_size, num_workers,
@@ -47,17 +52,74 @@ class ImageClassification(BaseTask):
             # TODO (cgraywang): add search space, handle batch_size, num_workers
             self._add_search_space()
 
+        #TODO: fix
+        def _cross_validation_split(self):
+            split = np.random.choice(range(1, 10), 1)[0]
+            split = 1
+            try:
+                train_val = get_dataset(self.name, train=True)
+                split_len = int(len(train_val) / 10)
+                if split == 1:
+                    train = gluon.data.dataset.ArrayDataset(train_val[split * split_len:][0],
+                                                            train_val[split * split_len:][1])
+                else:
+                    train = gluon.data.dataset.ArrayDataset(
+                        nd.concat(train_val[:(split - 1) * split_len][0],
+                                  train_val[split * split_len:][0], dim=0),
+                        np.concatenate((train_val[:(split - 1) * split_len][1],
+                                        train_val[split * split_len:][1]), axis=0))
+                val = gluon.data.dataset.ArrayDataset(
+                    train_val[(split - 1) * split_len:split * split_len][0],
+                    train_val[(split - 1) * split_len:split * split_len][1])
+            except ValueError:
+                train_val = gluon.data.vision.ImageFolderDataset(self.train_path)
+                train = train_val
+                # train_val = train_val.transform_first(transforms.Compose(self.transform_train_list))
+                # split_len = int(len(train_val) / 10)
+                # if split == 1:
+                #     data = [train_val[i][0].expand_dims(0) for i in range(split * split_len, len(train_val))]
+                #     label = [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
+                # else:
+                #     data = [train_val[i][0].expand_dims(0) for i in range((split - 1) * split_len)] + \
+                #            [train_val[i][0].expand_dims(0) for i in range(split * split_len, len(train_val))]
+                #     label = [np.array([train_val[i][1]]) for i in range((split - 1) * split_len)] + \
+                #            [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
+                # train = gluon.data.dataset.ArrayDataset(
+                #     nd.concat(*data, dim=0),
+                #     np.concatenate(tuple(label), axis=0))
+                # print(np.concatenate(tuple(label), axis=0))
+                # print(type(np.concatenate(tuple(label), axis=0)))
+                # import time
+                # time.sleep(10)
+                # val_data = [train_val[i][0].expand_dims(0) for i in
+                #         range((split - 1) * split_len, split * split_len)]
+                # val_label = [np.array([train_val[i][1]]) for i in
+                #          range((split - 1) * split_len, split * split_len)]
+                # val = gluon.data.dataset.ArrayDataset(
+                #     nd.concat(*val_data, dim=0),
+                #     np.concatenate(tuple(val_label), axis=0))
+                # print('load train val')
+                # print(train)
+                # print(val)
+                # import time
+                # time.sleep(10)
+            return train, None
+
         def _read_dataset(self, **kwargs):
             # TODO (cgraywang): put transform in the search space
             try:
-                self.train = get_dataset(self.name, train=True)
-                self.val = get_dataset(self.name, train=False)
-                self.num_classes = DataAnalyzer.stat_dataset(self.train)[0]
-                DataAnalyzer.check_dataset(self.train, self.val)
+                #TODO: fix
+                # self.train = get_dataset(self.name, train=True)
+                # self.val = get_dataset(self.name, train=False)
+                self.train, self.val = self._cross_validation_split()
+                self.test = get_dataset(self.name, train=False)
+                self.num_classes = 10
+                # self.num_classes = DataAnalyzer.stat_dataset(self.train)[0]
+                # DataAnalyzer.check_dataset(self.train, self.val)
             except ValueError:
-                self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
-                self.val = gluon.data.vision.ImageFolderDataset(self.val_path)
-                self.num_classes = kwargs['num_classes']
+                self.train, self.val = self._cross_validation_split()
+                self.test = gluon.data.vision.ImageFolderDataset(self.val_path)
+                self.num_classes = 18
 
         def _add_search_space(self):
             pass
@@ -118,14 +180,13 @@ class ImageClassification(BaseTask):
             savedir='checkpoint/exp1.ag',
             visualizer='tensorboard',
             stop_criterion={
-                'time_limits': 1 * 60 * 60,
+                'time_limits': 10*60,
                 'max_metric': 1.0,
-                'max_trial_count': 100
+                'num_trials': 8
             },
             resources_per_trial={
-                'max_num_gpus': 1,
-                'max_num_cpus': 4,
-                'max_training_epochs': 100
+                'num_gpus': 1,
+                'num_training_epochs': 5
             },
             backend='default',
             **kwargs):

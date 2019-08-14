@@ -3,13 +3,22 @@ import shutil
 import logging
 import argparse
 import time
+from abc import ABC
+import matplotlib.pyplot as plt
 import ConfigSpace as CS
 
-from abc import ABC
+import mxnet as mx
+from mxnet.gluon import nn
+from mxnet.gluon.data.vision import transforms
+from gluoncv import utils
+from gluoncv.model_zoo import get_model
 
 import autogluon as ag
 from ...optim import Optimizers, get_optim
+from ...utils.mxutils import update_params
 from ... import dataset
+from ..image_classification.losses import *
+from ..image_classification.metrics import *
 
 __all__ = ['BaseTask']
 
@@ -88,7 +97,17 @@ class BaseTask(ABC):
             pass
 
     def __init__(self):
+        self._result = None
         super(BaseTask, self).__init__()
+
+    @property
+    def result(self):
+        return self._result
+
+    @result.setter
+    def result(self, val):
+        self._result = val
+
 
     @staticmethod
     def _set_range(obj, cs):
@@ -137,7 +156,7 @@ class BaseTask(ABC):
         return cs, args
 
     @staticmethod
-    def _run_backend(cs, args, metadata):
+    def _run_backend(cs, args, metadata, start_time):
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         else:
@@ -146,7 +165,7 @@ class BaseTask(ABC):
             trial_scheduler = ag.scheduler.Hyperband_Scheduler(
                 metadata['kwargs']['train_func'],
                 args,
-                {'num_cpus': int(metadata['resources_per_trial']['max_num_cpus']),
+                {'num_cpus': 1,
                  'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
                 searcher,
                 checkpoint=metadata['savedir'],
@@ -163,7 +182,7 @@ class BaseTask(ABC):
             trial_scheduler = ag.scheduler.FIFO_Scheduler(
                 metadata['kwargs']['train_func'],
                 args,
-                {'num_cpus': int(metadata['resources_per_trial']['max_num_cpus']),
+                {'num_cpus': 1,
                  'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
                 searcher,
                 checkpoint=metadata['savedir'],
@@ -171,12 +190,97 @@ class BaseTask(ABC):
                 time_attr='epoch',
                 reward_attr=metadata['kwargs']['reward_attr'],
                 visualizer=metadata['visualizer'])
-        trial_scheduler.run(num_trials=metadata['stop_criterion']['max_trial_count'])
-        # TODO (cgraywang)
-        final_model = None
+        trial_scheduler.run_with_stop_criterion(start_time, metadata['stop_criterion'])
         final_metric = trial_scheduler.get_best_reward()
         final_config = trial_scheduler.get_best_config()
-        return final_model, final_metric, final_config
+
+        #TODO: fix
+        ctx = [mx.gpu(i) for i in range(metadata['resources_per_trial']['num_gpus'])] \
+            if metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
+
+        net = get_model(final_config['model'], pretrained=final_config['pretrained'])
+        with net.name_scope():
+            num_classes = metadata['data'].num_classes
+            # if hasattr(args, 'classes'):
+            #     warnings.warn('Warning: '
+            #                   'number of class of labels can be inferred.')
+            #     num_classes = args.classes
+            if hasattr(net, 'output'):
+                net.output = nn.Dense(num_classes)
+            else:
+                net.fc = nn.Dense(num_classes)
+        if not final_config['pretrained']:
+            net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
+        else:
+            # TODO (cgraywang): hparams for initializer
+            if hasattr(net, 'output'):
+                net.output.initialize(mx.init.Xavier(), ctx=ctx)
+            else:
+                net.fc.initialize(mx.init.Xavier(), ctx=ctx)
+            net.collect_params().reset_ctx(ctx)
+        net.initialize(mx.init.Xavier(), ctx=ctx)
+        update_params(net, trial_scheduler.get_best_state()['params'])
+        return net, final_metric, final_config
+
+    # TODO: fix
+    @staticmethod
+    def predict(img):
+        logger.info('Start predicting.')
+        ctx = [mx.gpu(i) for i in range(BaseTask.result.metadata['resources_per_trial']['num_gpus'])] \
+            if BaseTask.result.metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
+        # img = utils.download(img)
+        img = mx.image.imread(img)
+        plt.imshow(img.asnumpy())
+        plt.show()
+        transform_fn = transforms.Compose(BaseTask.result.metadata['data'].transform_val_list)
+        img = transform_fn(img)
+        pred = BaseTask.result.model(img.expand_dims(axis=0).as_in_context(ctx[0]))
+        ind = mx.nd.argmax(pred, axis=1).astype('int')
+        logger.info('Finished.')
+        return ind, mx.nd.softmax(pred)[0][ind]
+
+    @staticmethod
+    def evaluate():
+        logger.info('Start evaluating.')
+        L = get_loss_instance(BaseTask.result.metadata['losses'].loss_list[0].name)
+        metric = get_metric_instance(BaseTask.result.metadata['metrics'].metric_list[0].name)
+        ctx = [mx.gpu(i) for i in range(BaseTask.result.metadata['resources_per_trial']['num_gpus'])] \
+            if BaseTask.result.metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
+
+        def _init_dataset(dataset, transform_fn, transform_list):
+            if transform_fn is not None:
+                dataset = dataset.transform(transform_fn)
+            if transform_list is not None:
+                dataset = dataset.transform_first(transforms.Compose(transform_list))
+            return dataset
+
+        test_dataset = _init_dataset(BaseTask.result.metadata['data'].test,
+                                     BaseTask.result.metadata['data'].transform_val_fn,
+                                     BaseTask.result.metadata['data'].transform_val_list)
+        test_data = mx.gluon.data.DataLoader(
+            test_dataset,
+            batch_size=BaseTask.result.metadata['data'].batch_size,
+            shuffle=False,
+            num_workers=BaseTask.result.metadata['data'].num_workers)
+        test_loss = 0
+        for i, batch in enumerate(test_data):
+            data = mx.gluon.utils.split_and_load(batch[0],
+                                              ctx_list=ctx,
+                                              batch_axis=0,
+                                              even_split=False)
+            label = mx.gluon.utils.split_and_load(batch[1],
+                                               ctx_list=ctx,
+                                               batch_axis=0,
+                                               even_split=False)
+            outputs = [BaseTask.result.model(X) for X in data]
+            loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
+
+            test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
+            metric.update(label, outputs)
+        _, test_acc = metric.get()
+        test_loss /= len(test_data)
+        logger.info('Finished.')
+        return test_acc, test_loss
 
     @staticmethod
     def fit(data,
@@ -192,14 +296,13 @@ class BaseTask(ABC):
             savedir='checkpoint/exp1.ag',
             visualizer='tensorboard',
             stop_criterion={
-                'time_limits': 1 * 60 * 60,
+                'time_limits': 10*60,
                 'max_metric': 1.0,
-                'max_trial_count': 2
+                'num_trials': 40
             },
             resources_per_trial={
-                'num_gpus': 0,
-                'max_num_cpus': 4,
-                'num_training_epochs': 3
+                'num_gpus': 1,
+                'num_training_epochs': 10
             },
             backend='default',
             **kwargs):
@@ -247,9 +350,12 @@ class BaseTask(ABC):
 
         logger.info('Start running trials')
         BaseTask._reset_checkpoint(metadata)
-        final_model, final_metric, final_config = BaseTask._run_backend(cs, args, metadata)
+        final_model, final_metric, final_config = BaseTask._run_backend(cs, args, metadata,
+                                                                        start_fit_time)
         logger.info('Finished.')
 
         logger.info('Finished.')
-        return Results(final_model, final_metric, final_config, time.time() - start_fit_time,
-                       metadata)
+        BaseTask.result = Results(final_model, final_metric, final_config,
+                                  time.time() - start_fit_time,
+                                  metadata)
+        return BaseTask.result

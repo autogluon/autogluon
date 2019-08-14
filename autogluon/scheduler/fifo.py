@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import multiprocessing as mp
+import time
 from collections import OrderedDict
 
 from .scheduler import *
@@ -92,6 +93,24 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         for i in range(self.num_finished_tasks, self.num_trials):
+            self.schedule_next()
+
+    def run_with_stop_criterion(self, start_time, stop_criterion, type='soft'):
+        """Run multiple number of trials with stop criterion
+        """
+        self.num_trials = stop_criterion['num_trials'] if stop_criterion[
+            'num_trials'] else self.num_trials
+        logger.info('Starting Experiments')
+        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
+        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
+        for i in range(self.num_finished_tasks, self.num_trials):
+            if self.num_finished_tasks > 0:
+                if type == 'soft':
+                    if time.time() - start_time >= stop_criterion['time_limits'] \
+                            or self.get_best_reward() >= stop_criterion['max_metric']:
+                        break
+                else:
+                    raise NotImplementedError
             self.schedule_next()
 
     def save(self, checkpoint=None):

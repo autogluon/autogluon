@@ -1,6 +1,6 @@
 import warnings
 import logging
-
+import numpy as np
 import mxnet as mx
 
 from mxnet import gluon, init, autograd, nd
@@ -31,16 +31,40 @@ def train_image_classification(args, reporter):
 
     # Define DataLoader
     def _get_dataloader():
-        def _init_dataset(dataset, transform_fn, transform_list):
-            if transform_fn is not None:
-                dataset = dataset.transform(transform_fn)
-            if transform_list is not None:
-                dataset = dataset.transform_first(transforms.Compose(transform_list))
-            return dataset
-        train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
-                                      args.data.transform_train_list)
-        val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
-                                    args.data.transform_val_list)
+        # def _init_dataset(dataset, transform_fn, transform_list):
+        #     if transform_fn is not None:
+        #         dataset = dataset.transform(transform_fn)
+        #     if transform_list is not None:
+        #         dataset = dataset.transform_first(transforms.Compose(transform_list))
+        #     return dataset
+        # train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
+        #                               args.data.transform_train_list)
+        # val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
+        #                             args.data.transform_val_list)
+        split = 2
+        train_val = args.data.train
+        train_val = train_val.transform_first(transforms.Compose(args.data.transform_train_list))
+        split_len = int(len(train_val) / 10)
+        if split == 1:
+            data = [train_val[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_val))]
+            label = [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
+        else:
+            data = [train_val[i][0].expand_dims(0) for i in range((split - 1) * split_len)] + \
+                   [train_val[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_val))]
+            label = [np.array([train_val[i][1]]) for i in range((split - 1) * split_len)] + \
+                    [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
+        train_dataset = gluon.data.dataset.ArrayDataset(
+            nd.concat(*data, dim=0),
+            np.concatenate(tuple(label), axis=0))
+        val_data = [train_val[i][0].expand_dims(0) for i in
+                    range((split - 1) * split_len, split * split_len)]
+        val_label = [np.array([train_val[i][1]]) for i in
+                     range((split - 1) * split_len, split * split_len)]
+        val_dataset = gluon.data.dataset.ArrayDataset(
+            nd.concat(*val_data, dim=0),
+            np.concatenate(tuple(val_label), axis=0))
         train_data = gluon.data.DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -143,6 +167,7 @@ def train_image_classification(args, reporter):
             if _demo_early_stopping(i):
                 break
         mx.nd.waitall()
+        reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     def test(epoch):
         test_loss = 0
