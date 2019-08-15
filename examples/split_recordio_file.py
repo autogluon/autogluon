@@ -32,10 +32,11 @@ def train_val_split(rec_train, rec_train_idx, rec_train_split, rec_train_split_i
             break
 
 if __name__ == '__main__':
-    dataset_name = 'weapons'
-    _, rec_train, rec_train_idx, _, _ = get_dataset_meta(dataset_name, './', final_fit=True)
-    _, rec_train_split, rec_train_split_idx, rec_val_split, rec_val_split_idx = \
-            get_dataset_meta(dataset_name, './', final_fit=False)
-    train_val_split(rec_train, rec_train_idx, rec_train_split, rec_train_split_idx,
-                    rec_val_split, rec_val_split_idx)
+    datasets = ['apparel', 'footwear', 'landmarks', 'weapons']
 
+    for dataset_name in datasets:
+        _, rec_train, rec_train_idx, _, _ = get_dataset_meta(dataset_name, './', final_fit=True)
+        _, rec_train_split, rec_train_split_idx, rec_val_split, rec_val_split_idx = \
+                get_dataset_meta(dataset_name, './', final_fit=False)
+        train_val_split(rec_train, rec_train_idx, rec_train_split, rec_train_split_idx,
+                        rec_val_split, rec_val_split_idx)
