@@ -94,33 +94,62 @@ def get_network(num_classes, ctx):
     finetune_net.hybridize()
     return finetune_net
 
-def get_dataset_meta(dataset, basedir='./datasets'):
-    if dataset.lower() == 'apparel':
-        num_classes = 18
-        rec_train = os.path.join(basedir, 'Apparel_train.rec')
-        rec_train_idx = os.path.join(basedir, 'Apparel_train.idx')
-        rec_val = os.path.join(basedir, 'Apparel_test.rec')
-        rec_val_idx = os.path.join(basedir, 'Apparel_test.idx')
-    elif dataset.lower() == 'footwear':
-        num_classes = 19
-        rec_train = os.path.join(basedir, 'Footwear_train.rec')
-        rec_train_idx = os.path.join(basedir, 'Footwear_train.idx')
-        rec_val = os.path.join(basedir, 'Footwear_test.rec')
-        rec_val_idx = os.path.join(basedir, 'Footwear_test.idx')
-    elif dataset.lower() == 'landmarks':
-        num_classes = 20
-        rec_train = os.path.join(basedir, 'Landmarks_train.rec')
-        rec_train_idx = os.path.join(basedir, 'Landmarks_train.idx')
-        rec_val = os.path.join(basedir, 'Landmarks_test.rec')
-        rec_val_idx = os.path.join(basedir, 'Landmarks_test.idx')
-    elif dataset.lower() == 'weapons':
-        num_classes = 11
-        rec_train = os.path.join(basedir, 'Weapons_train.rec')
-        rec_train_idx = os.path.join(basedir, 'Weapons_train.idx')
-        rec_val = os.path.join(basedir, 'Weapons_test.rec')
-        rec_val_idx = os.path.join(basedir, 'Weapons_test.idx')
+def get_dataset_meta(dataset, basedir='./datasets', final_fit=False):
+    if final_fit:
+        if dataset.lower() == 'apparel':
+            num_classes = 18
+            rec_train = os.path.join(basedir, 'Apparel_train.rec')
+            rec_train_idx = os.path.join(basedir, 'Apparel_train.idx')
+            rec_val = os.path.join(basedir, 'Apparel_test.rec')
+            rec_val_idx = os.path.join(basedir, 'Apparel_test.idx')
+        elif dataset.lower() == 'footwear':
+            num_classes = 19
+            rec_train = os.path.join(basedir, 'Footwear_train.rec')
+            rec_train_idx = os.path.join(basedir, 'Footwear_train.idx')
+            rec_val = os.path.join(basedir, 'Footwear_test.rec')
+            rec_val_idx = os.path.join(basedir, 'Footwear_test.idx')
+        elif dataset.lower() == 'landmarks':
+            num_classes = 20
+            rec_train = os.path.join(basedir, 'Landmarks_train.rec')
+            rec_train_idx = os.path.join(basedir, 'Landmarks_train.idx')
+            rec_val = os.path.join(basedir, 'Landmarks_test.rec')
+            rec_val_idx = os.path.join(basedir, 'Landmarks_test.idx')
+        elif dataset.lower() == 'weapons':
+            num_classes = 11
+            rec_train = os.path.join(basedir, 'Weapons_train.rec')
+            rec_train_idx = os.path.join(basedir, 'Weapons_train.idx')
+            rec_val = os.path.join(basedir, 'Weapons_test.rec')
+            rec_val_idx = os.path.join(basedir, 'Weapons_test.idx')
+        else:
+            raise NotImplemented
     else:
-        raise NotImplemented
+        if dataset.lower() == 'apparel':
+            num_classes = 18
+            rec_train = os.path.join(basedir, 'Apparel_train_split.rec')
+            rec_train_idx = os.path.join(basedir, 'Apparel_train_split.idx')
+            rec_val = os.path.join(basedir, 'Apparel_val_split.rec')
+            rec_val_idx = os.path.join(basedir, 'Apparel_val_split.idx')
+        elif dataset.lower() == 'footwear':
+            num_classes = 19
+            rec_train = os.path.join(basedir, 'Footwear_train_split.rec')
+            rec_train_idx = os.path.join(basedir, 'Footwear_train_split.idx')
+            rec_val = os.path.join(basedir, 'Footwear_val_split.rec')
+            rec_val_idx = os.path.join(basedir, 'Footwear_val_split.idx')
+        elif dataset.lower() == 'landmarks':
+            num_classes = 20
+            rec_train = os.path.join(basedir, 'Landmarks_train_split.rec')
+            rec_train_idx = os.path.join(basedir, 'Landmarks_train_split.idx')
+            rec_val = os.path.join(basedir, 'Landmarks_val_split.rec')
+            rec_val_idx = os.path.join(basedir, 'Landmarks_val_split.idx')
+        elif dataset.lower() == 'weapons':
+            num_classes = 11
+            rec_train = os.path.join(basedir, 'Weapons_train_split.rec')
+            rec_train_idx = os.path.join(basedir, 'Weapons_train_split.idx')
+            rec_val = os.path.join(basedir, 'Weapons_val_split.rec')
+            rec_val_idx = os.path.join(basedir, 'Weapons_val_split.idx')
+        else:
+            raise NotImplemented
+        
     return num_classes, rec_train, rec_train_idx, rec_val, rec_val_idx
 
 if __name__ == '__main__':
@@ -128,7 +157,11 @@ if __name__ == '__main__':
     args = train_finetune.args
     args.dataset = 'apparel'
     """
-    train_finetune(args, {}, reporter=None)
+    # if you want to launch single training, do it like this:
+    best_config = {'epochs': 40, 'input_size': 256, 'jitter_param': 0.293152307944186,
+                   'lr': 0.005240915838601111, 'lr_factor': 0.9343588751671241,
+                   'max_rotate_angle': 4, 'wd': 2.886850482040357e-05, 'final_fit':True}
+    train_finetune(args, best_config, reporter=None)
     """
     logging.basicConfig(level=logging.DEBUG)
     # create searcher and scheduler
@@ -137,7 +170,7 @@ if __name__ == '__main__':
                                                                resource={'num_cpus': 16, 'num_gpus': args.num_gpus},
                                                                searcher=searcher,
                                                                checkpoint='./{}/checkerpoint.ag'.format(args.dataset),
-                                                               num_trials=300,
+                                                               num_trials=64,
                                                                resume=args.resume,
                                                                time_attr='epoch',
                                                                reward_attr="accuracy",
@@ -146,6 +179,13 @@ if __name__ == '__main__':
     myscheduler.run()
     myscheduler.join_tasks()
     myscheduler.get_training_curves('{}.png'.format(args.dataset))
+
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
     print('Costed time: {}'.format(time.time() - start_time))
+
+    best_config = myscheduler.get_best_config()
+    best_config['final_fit'] = True
+    train_finetune(args, best_config, reporter=None)
+
+    myscheduler.shutdown()
