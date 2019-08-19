@@ -18,7 +18,10 @@ class Communicator(threading.Thread):
 
     def run(self):
         while self.process.is_alive():
-            reported_result = self.local_reporter.fetch()
+            try:
+                reported_result = self.local_reporter.fetch()
+            except BrokenPipeError:
+                break
             self.dist_reporter(**reported_result)
             self.local_reporter.move_on()
             if 'done' in reported_result and reported_result['done'] is True:
