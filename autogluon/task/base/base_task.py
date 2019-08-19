@@ -10,20 +10,18 @@ import ConfigSpace as CS
 import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.data.vision import transforms
-from gluoncv import utils
 from gluoncv.model_zoo import get_model
 
 import autogluon as ag
 from ...optim import Optimizers, get_optim
-from ...utils.mxutils import update_params
 from ... import dataset
 from ..image_classification.losses import *
 from ..image_classification.metrics import *
+from ...searcher import BaseSearcher
 
 __all__ = ['BaseTask']
 
 logger = logging.getLogger(__name__)
-
 
 class Results(object):
     def __init__(self, model, metric, config, time, metadata):
@@ -159,6 +157,8 @@ class BaseTask(ABC):
     def _run_backend(cs, args, metadata, start_time):
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
+        elif isinstance(metadata['searcher'], BaseSearcher):
+            searcher = metadata['searcher']
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
@@ -194,17 +194,13 @@ class BaseTask(ABC):
         final_metric = trial_scheduler.get_best_reward()
         final_config = trial_scheduler.get_best_config()
 
-        #TODO: fix
+        BaseTask.final_fit(args, final_config, metadata)
         ctx = [mx.gpu(i) for i in range(metadata['resources_per_trial']['num_gpus'])] \
             if metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
 
         net = get_model(final_config['model'], pretrained=final_config['pretrained'])
         with net.name_scope():
             num_classes = metadata['data'].num_classes
-            # if hasattr(args, 'classes'):
-            #     warnings.warn('Warning: '
-            #                   'number of class of labels can be inferred.')
-            #     num_classes = args.classes
             if hasattr(net, 'output'):
                 net.output = nn.Dense(num_classes)
             else:
@@ -212,14 +208,13 @@ class BaseTask(ABC):
         if not final_config['pretrained']:
             net.collect_params().initialize(mx.init.Xavier(magnitude=2.24), ctx=ctx)
         else:
-            # TODO (cgraywang): hparams for initializer
             if hasattr(net, 'output'):
                 net.output.initialize(mx.init.Xavier(), ctx=ctx)
             else:
                 net.fc.initialize(mx.init.Xavier(), ctx=ctx)
             net.collect_params().reset_ctx(ctx)
-        net.initialize(mx.init.Xavier(), ctx=ctx)
-        update_params(net, trial_scheduler.get_best_state()['params'])
+        net_path = os.path.join(os.path.splitext(args.savedir)[0], 'net.params')
+        net.load_parameters(net_path, ctx=ctx)
         return net, final_metric, final_config
 
     # TODO: fix
@@ -246,7 +241,6 @@ class BaseTask(ABC):
         metric = get_metric_instance(BaseTask.result.metadata['metrics'].metric_list[0].name)
         ctx = [mx.gpu(i) for i in range(BaseTask.result.metadata['resources_per_trial']['num_gpus'])] \
             if BaseTask.result.metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
-
         def _init_dataset(dataset, transform_fn, transform_list):
             if transform_fn is not None:
                 dataset = dataset.transform(transform_fn)
@@ -280,7 +274,19 @@ class BaseTask(ABC):
         _, test_acc = metric.get()
         test_loss /= len(test_data)
         logger.info('Finished.')
-        return test_acc, test_loss
+        return test_acc
+
+    @staticmethod
+    def final_fit(args, config, metadata):
+        logger.info('Start final fitting.')
+        def _metadata_args():
+            vars(args).update({'savedir': metadata['savedir']})
+            for k, v in config.items():
+                vars(args).update({k: v})
+            return args
+        args = _metadata_args()
+        args.data.split = 0
+        args.train_func(args, config, reporter=None)
 
     @staticmethod
     def fit(data,

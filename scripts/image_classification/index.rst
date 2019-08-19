@@ -19,13 +19,13 @@ extracted to ``~/data/minc-2500``.
 .. editing URL for the following table: https://tinyurl.com/yyt64zbk
 
 +----------------------------+--------+----------+-----------------+---------------------------+----------+----------+----------+
-|                            | Trials | Searcher | Trial scheduler | Validation accuracy (%)   | Time (h) | Command  | MXBoard  |
+|                            | Trials | Searcher | Trial scheduler | Test accuracy (%)         | Time (h) | Command  | MXBoard  |
 +============================+========+==========+=================+===========================+==========+==========+==========+
 | Transfer learning SOTA [1] | 1      | -        | -               | 77.6(finetune)/81.3(sota) | -        | -        | -        |
 +----------------------------+--------+----------+-----------------+---------------------------+----------+----------+----------+
-| AutoGluon                  | 400    | Random   | FIFO            | 80.3                      | 90.2     | Com. [1] | Fig. [1] |
+| AutoGluon                  | 400    | Random   | FIFO            | 80.3                      | 48       | Com. [1] | Fig. [1] |
 +----------------------------+--------+----------+-----------------+---------------------------+----------+----------+----------+
-|                            | 400    | Random   | Hyperband       | 80.0                      | 44.7     | Com. [2] | Fig. [2] |
+|                            | 400    | Random   | Hyperband       | 80.0                      | 48       | Com. [2] | Fig. [2] |
 +----------------------------+--------+----------+-----------------+---------------------------+----------+----------+----------+
 
 Com. [1]:
@@ -33,9 +33,10 @@ Com. [1]:
 .. code-block:: console
 
     $ python prepare_minc.py --data ~/data/minc-2500 --split 1
-    $ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --max_trial_count 400
-    --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 1
-    --max_num_cpus 8
+    $ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b
+        --num_trials 400 --num_training_epochs 100 --batch_size 32
+        --lr_factor 0.1 --lr_step 20 --num_gpus 2 --savedir checkpoint1/exp1.ag
+        --time_limits 172800
 
 Fig. [1]:
 
@@ -46,9 +47,9 @@ Com. [2]:
 .. code-block:: console
 
     $ python prepare_minc.py --data ~/data/minc-2500 --split 1
-    $ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --max_trial_count 400
-        --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 1
-        --max_num_cpus 8 --trial_scheduler hyperband
+    $ python train_minc.py --data ~/data/minc-2500/ --nets resnet50_v1b --num_trials 400
+        --num_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --num_gpus 2
+        --trial_scheduler hyperband --savedir checkpoint1/exp1.ag --time_limits 172800
 
 Fig. [2]:
 
@@ -65,7 +66,7 @@ The training/test sets are images provided by Shopee, which are classified into 
 .. editing URL for the following table: https://tinyurl.com/y3fmn64g
 
 +--------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
-|                    | Trials | Searcher | Trial scheduler | Validation accuracy (%)  | Time (h) | Command  | MXBoard  |
+|                    | Trials | Searcher | Trial scheduler | Test accuracy (%)        | Time (h) | Command  | MXBoard  |
 +====================+========+==========+=================+==========================+==========+==========+==========+
 | Leadboard SOTA [2] | 1      | -        | -               | 86.7                     | -        | -        | -        |
 +--------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
@@ -81,8 +82,9 @@ Com. [3]:
     $ sh download_shopeeiet.sh
     $ python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
     $ python train_shopeeiet.py --data ~/data/shopeeiet/
-        --nets resnet152_v1d --max_trial_count 400 --max_training_epochs 100 --batch_size 32
-        --lr_factor 0.1 --lr_step 20 --max_num_gpus 1 --max_num_cpus 8
+        --nets resnet152_v1d --num_trials 400 --num_training_epochs 100
+        --batch_size 32 --lr_factor 0.1 --lr_step 20 --num_gpus 2
+        --savedir checkpoint2/exp1.ag --time_limits 172800
 
 Fig. [3]:
 
@@ -94,9 +96,10 @@ Com. [4]:
 
     $ sh download_shopeeiet.sh
     $ python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
-    $ python train_shopeeiet.py --data ~/data/shopeeiet/ --nets resnet152_v1d --max_trial_count 400
-        --max_training_epochs 100 --batch_size 32 --lr_factor 0.1 --lr_step 20 --max_num_gpus 2
-        --max_num_cpus 16 --trial_scheduler hyperband
+    $ python train_shopeeiet.py --data ~/data/shopeeiet/ --nets resnet152_v1d
+        --num_trials 400 --num_training_epochs 100 --batch_size 32
+        --lr_factor 0.1 --lr_step 20 --num_gpus 2 --trial_scheduler hyperband
+        --savedir checkpoint2/exp1.ag --time_limits 172800
 
 Fig. [4]:
 
@@ -113,22 +116,22 @@ computer vision research.
 .. editing URL for the following table: https://tinyurl.com/y64fq9m7
 
 +--------------------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
-|                                | Trials | Searcher | Trial scheduler | Validation accuracy (%)  | Time (h) | Command  | MXBoard  |
+|                                | Trials | Searcher | Trial scheduler | Test accuracy (%)        | Time (h) | Command  | MXBoard  |
 +================================+========+==========+=================+==========================+==========+==========+==========+
 | Training from scratch SOTA [3] | 1      | -        | -               | 96.3                     | -        | -        | -        |
 +--------------------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
-| AutoGluon                      | 200    | Random   | FIFO            | 84.1                     | -        | Com. [5] | Fig. [5] |
+| AutoGluon                      | 200    | Random   | FIFO            | 99.18                    | 48       | Com. [5] | Fig. [5] |
 +--------------------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
-|                                | 200    | Random   | Hyperband       | 84.5                     | -        | Com. [6] | Fig. [6] |
+|                                | 200    | Random   | Hyperband       | 99.16                    | 48       | Com. [6] | Fig. [6] |
 +--------------------------------+--------+----------+-----------------+--------------------------+----------+----------+----------+
 
 Com. [5]:
 
 .. code-block:: console
 
-    $ python train_cifar10.py
-        --nets ResNet18_v1b,ResNet34_v1b,ResNet50_v1d,ResNet101_v1d,ResNet152_v1d
-        --max_trial_count 200 --max_training_epochs 300 --batch_size 32 --max_num_gpus 4
+    $ python train_cifar10.py --nets CIFAR_ResNeXt29_16x64d --num_trials 200
+        --num_training_epochs 300 --batch_size 32 --num_gpus 4
+        --savedir checkpoint1/exp1.ag --time_limits 172800
 
 Fig. [5]:
 
@@ -138,10 +141,9 @@ Com. [6]:
 
 .. code-block:: console
 
-    $ python train_cifar10.py
-        --nets ResNet18_v1b,ResNet34_v1b,ResNet50_v1d,ResNet101_v1d,ResNet152_v1d
-        --max_trial_count 200 --max_training_epochs 300 --batch_size 32 --max_num_gpus 4
-        --trial_scheduler hyperband
+    $ python train_cifar10.py --nets CIFAR_ResNeXt29_16x64d --num_trials 200
+        --num_training_epochs 300 --batch_size 32 --num_gpus 4
+        --trial_scheduler hyperband --savedir checkpoint2/exp1.ag --time_limits 172800
 
 Fig. [6]:
 

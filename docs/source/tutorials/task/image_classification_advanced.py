@@ -1,6 +1,3 @@
-# TODO: add cross validation, final fit and predict, example running results
-
-
 """2. Image Classification - Advanced
 ============================================
 
@@ -9,10 +6,6 @@ to illustrate the usage of AutoGluon’s main APIs.
 Different from the last demo, we focus how to customize autogluon ``Dataset``,
 ``Nets``, ``Optimizers``, ``Searcher`` and ``Scheduler``.
 """
-
-import warnings
-warnings.filterwarnings("ignore")
-
 from autogluon import image_classification as task
 
 import logging
@@ -165,29 +158,25 @@ resume = False
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Let's first set the customized stop criterion.
 
-time_limits = 1*60*60
+time_limits = 3*60
 max_metric = 1.0
-max_trial_count = 4
+num_trials = 4
 
 stop_criterion = {
     'time_limits': time_limits,
     'max_metric': max_metric,
-    'max_trial_count': max_trial_count
+    'num_trials': num_trials
 }
 
 ################################################################
 # Let's then set the customized resources per trial.
-# We use `demo = True` for showing results faster.
 
-max_num_gpus = 1
-max_num_cpus = 4
-max_training_epochs = 2
-demo = True
+num_gpus = 1
+num_training_epochs = 2
 
 resources_per_trial = {
-    'max_num_gpus': max_num_gpus,
-    'max_num_cpus': max_num_cpus,
-    'max_training_epochs': max_training_epochs
+    'num_gpus': num_gpus,
+    'num_training_epochs': num_training_epochs
 }
 
 results = task.fit(dataset,
@@ -198,31 +187,26 @@ results = task.fit(dataset,
                    resume=resume,
                    savedir=savedir,
                    stop_criterion=stop_criterion,
-                   resources_per_trial=resources_per_trial,
-                   demo=demo)
+                   resources_per_trial=resources_per_trial)
 
 ################################################################
-# The search space is:
+# The best Top-1 accuracy on the validation set is:
 
+print('Top-1 acc: %.3f' % results.metric)
 
-print(results.metadata)
+###############################################################################
+# We could test the model results on the test data.
 
-################################################################
-# The best accuracy is:
+test_acc = task.evaluate()
+print('Top-1 test acc: %.3f' % test_acc)
 
+###############################################################################
+# We could select an example image to predict the label and probability.
 
-print('%.2f acc' % (results.metric * 100))
-
-################################################################
-# The best associated configuration is:
-
-print(results.config)
-
-################################################################
-# Total time cost is:
-
-
-print('%.2f s' % results.time)
+image = './data/val/BabyBibs/BabyBibs_1084.jpg'
+ind, prob = task.predict(image)
+print('The input picture is classified as [%s], with probability %.2f.' %
+      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
 
 
 ################################################################
@@ -230,29 +214,27 @@ print('%.2f s' % results.time)
 # ~~~~~~~~~~~~~~~~~~~~
 #
 # We could resume the previous training for more epochs to achieve better
-# results. Similarly, we could also increase ``max_trial_count`` for
+# results. Similarly, we could also increase ``num_trials`` for
 # better results.
 #
-# Here we increase the ``max_training_epochs`` from 2 to 3,
-# ``max_trial_count`` from 2 to 3, and set ``resume = True`` which will
+# Here we increase the ``num_training_epochs`` from 2 to 3,
+# ``num_trials`` from 2 to 3, and set ``resume = True`` which will
 # load the checking point in the savedir.
 
-max_trial_count = 3
+num_trials = 3
 stop_criterion = {
     'time_limits': time_limits,
     'max_metric': max_metric,
-    'max_trial_count': max_trial_count
+    'num_trials': num_trials
 }
 
-max_training_epochs = 3
+num_training_epochs = 3
 resources_per_trial = {
-    'max_num_gpus': max_num_gpus,
-    'max_num_cpus': max_num_cpus,
-    'max_training_epochs': max_training_epochs
+    'num_gpus': num_gpus,
+    'num_training_epochs': num_training_epochs
 }
 
 resume = True
-
 results = task.fit(dataset,
                    nets,
                    optimizers,
@@ -261,29 +243,23 @@ results = task.fit(dataset,
                    resume=resume,
                    savedir=savedir,
                    stop_criterion=stop_criterion,
-                   resources_per_trial=resources_per_trial,
-                   demo=demo)
+                   resources_per_trial=resources_per_trial)
 
 ################################################################
-# The search space is:
+# The best Top-1 accuracy on the validation set is:
 
+print('Top-1 acc: %.3f' % results.metric)
 
-print(results.metadata)
+###############################################################################
+# We could test the model results on the test data.
 
-################################################################
-# The best accuracy is
+test_acc = task.evaluate()
+print('Top-1 test acc: %.3f' % test_acc)
 
+###############################################################################
+# We could select an example image to predict the label and probability.
 
-print('%.2f acc' % (results.metric * 100))
-
-################################################################
-# The associated best configuration is:
-
-
-print(results.config)
-
-################################################################
-# The total time cost is:
-
-
-print('%.2f s' % results.time)
+image = './data/val/BabyBibs/BabyBibs_1084.jpg'
+ind, prob = task.predict(image)
+print('The input picture is classified as [%s], with probability %.2f.' %
+      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))

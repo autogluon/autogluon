@@ -52,13 +52,11 @@ sphinx_gallery_conf = {
     # path to your examples scripts
     'examples_dirs': [
         'tutorials/task',
-        'tutorials/data',
         'tutorials/searcher',
     ],
     # path where to save gallery generated examples
     'gallery_dirs': [
         'tutorials/build/task',
-        'tutorials/build/data',
         'tutorials/build/searcher',],
     'filename_pattern': '.py',
     'ignore_pattern': 'im2rec.py',

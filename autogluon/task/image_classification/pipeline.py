@@ -1,5 +1,6 @@
 import warnings
 import logging
+import os
 import numpy as np
 import mxnet as mx
 
@@ -12,6 +13,7 @@ from mxnet.gluon.data.vision import transforms
 from ...basic import autogluon_method
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
+import time
 
 __all__ = ['train_image_classification']
 
@@ -29,48 +31,60 @@ def train_image_classification(args, reporter):
 
     batch_size, ctx = _init_hparams()
 
-    # Define DataLoader
-    def _get_dataloader():
-        # def _init_dataset(dataset, transform_fn, transform_list):
-        #     if transform_fn is not None:
-        #         dataset = dataset.transform(transform_fn)
-        #     if transform_list is not None:
-        #         dataset = dataset.transform_first(transforms.Compose(transform_list))
-        #     return dataset
-        # train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
-        #                               args.data.transform_train_list)
-        # val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
-        #                             args.data.transform_val_list)
-        split = 2
-        train_val = args.data.train
-        train_val = train_val.transform_first(transforms.Compose(args.data.transform_train_list))
-        split_len = int(len(train_val) / 10)
+    def _train_val_split(train_dataset):
+        split = args.data.split
+        if split == 0:
+            return train_dataset, None
+        split_len = int(len(train_dataset) / 10)
         if split == 1:
-            data = [train_val[i][0].expand_dims(0) for i in
-                    range(split * split_len, len(train_val))]
-            label = [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
+            data = [train_dataset[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_dataset))]
+            label = [np.array([train_dataset[i][1]]) for i in
+                     range(split * split_len, len(train_dataset))]
         else:
-            data = [train_val[i][0].expand_dims(0) for i in range((split - 1) * split_len)] + \
-                   [train_val[i][0].expand_dims(0) for i in
-                    range(split * split_len, len(train_val))]
-            label = [np.array([train_val[i][1]]) for i in range((split - 1) * split_len)] + \
-                    [np.array([train_val[i][1]]) for i in range(split * split_len, len(train_val))]
-        train_dataset = gluon.data.dataset.ArrayDataset(
+            data = [train_dataset[i][0].expand_dims(0) for i in
+                    range((split - 1) * split_len)] + \
+                   [train_dataset[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_dataset))]
+            label = [np.array([train_dataset[i][1]]) for i in range((split - 1) * split_len)] + \
+                    [np.array([train_dataset[i][1]]) for i in
+                     range(split * split_len, len(train_dataset))]
+        train = gluon.data.dataset.ArrayDataset(
             nd.concat(*data, dim=0),
             np.concatenate(tuple(label), axis=0))
-        val_data = [train_val[i][0].expand_dims(0) for i in
+        val_data = [train_dataset[i][0].expand_dims(0) for i in
                     range((split - 1) * split_len, split * split_len)]
-        val_label = [np.array([train_val[i][1]]) for i in
+        val_label = [np.array([train_dataset[i][1]]) for i in
                      range((split - 1) * split_len, split * split_len)]
-        val_dataset = gluon.data.dataset.ArrayDataset(
+        val = gluon.data.dataset.ArrayDataset(
             nd.concat(*val_data, dim=0),
             np.concatenate(tuple(val_label), axis=0))
+        return train, val
+
+    # Define DataLoader
+    def _get_dataloader():
+        def _init_dataset(dataset, transform_fn, transform_list):
+            if dataset is None:
+                return dataset
+            if transform_fn is not None:
+                dataset = dataset.transform(transform_fn)
+            if transform_list is not None:
+                dataset = dataset.transform_first(transforms.Compose(transform_list))
+            return dataset
+        train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
+                                      args.data.transform_train_list)
+        val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,
+                                    args.data.transform_val_list)
+        if val_dataset is None:
+            train_dataset, val_dataset = _train_val_split(train_dataset)
         train_data = gluon.data.DataLoader(
             train_dataset,
             batch_size=batch_size,
             shuffle=True,
             last_batch="discard",
             num_workers=args.data.num_workers)
+        if val_dataset is None:
+            return train_data, None
         val_data = gluon.data.DataLoader(
             val_dataset,
             batch_size=batch_size,
@@ -167,7 +181,9 @@ def train_image_classification(args, reporter):
             if _demo_early_stopping(i):
                 break
         mx.nd.waitall()
-        reporter.save_dict(epoch=epoch, params=net.collect_params())
+        #TODO: fix mutli gpu bug
+        # if reporter is not None:
+        #     reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     def test(epoch):
         test_loss = 0
@@ -194,4 +210,8 @@ def train_image_classification(args, reporter):
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
-        test(epoch)
+        if val_data is not None:
+            test(epoch)
+    if val_data is None:
+        net_path = os.path.join(os.path.splitext(args.savedir)[0], 'net.params')
+        net.save_parameters(net_path)
