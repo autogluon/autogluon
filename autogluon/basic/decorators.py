@@ -45,6 +45,31 @@ class autogluon_method(object):
     def __repr__(self):
         return repr(self.f)
 
+def autogluon_kwargs(**kwvars):
+    """
+    """
+    def registered_func(func):
+        @functools.wraps(func)
+        def wrapper_call(**kwargs):
+            for k, w in kwargs.items():
+                if k in kwvars.keys():
+                    
+            return func(**kwvars)
+        return wrapper_call
+    return registered_func
+
+def autogluon_object(**kwvars):
+    """Register args or searchable spaces to the class init method.
+    """
+    def registered_class(cls):
+        init_method = cls.__dict__['__init__']
+        @autogluon_kwargs(**kwvars)
+        def wrapper_call(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper_call
+    return registered_class
+
+
 def autogluon_register_args(**kwvars):
     """Register default args or searchable spaces to the 'autogluon_method'
     """
