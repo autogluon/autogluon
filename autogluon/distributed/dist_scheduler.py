@@ -129,7 +129,7 @@ class DistributedTaskScheduler(object):
                 if not task_dick['Process'].is_alive():
                     task_dict = self.scheduled_tasks.pop(i)
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                               'Args': task_dict['Args']})
+                                                'Args': task_dict['Args']})
 
     def join_tasks(self):
         self._cleaning_tasks()
