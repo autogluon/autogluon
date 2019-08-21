@@ -150,7 +150,10 @@ class DaskRemoteService(object):
             while True:
                 for process in all_processes:
                     while not process["output_queue"].empty():
-                        print(process["output_queue"].get())
+                        try:
+                            print(process["output_queue"].get())
+                        except Exception:
+                            break
                 # Kill some time and free up CPU
                 time.sleep(0.1)
 
