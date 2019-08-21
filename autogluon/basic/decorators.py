@@ -28,36 +28,27 @@ class autogluon_method(object):
     def __call__(self, args, config, **kwargs):
         new_config = copy.deepcopy(config)
         self._rand_seed()
-        #print('autogluon_method', autogluon_method)
-        #print('args: ', args)
-        #print('config: ', config)
         striped_keys = [k.split('.')[0] for k in new_config.keys()]
         for k, v in args.items():
             # handle different type of configurations
             if k in striped_keys:
                 if isinstance(v, AutoGluonObject):
                     sub_config = strip_cofing_space(new_config, prefix=k)
-                    print('AutoGluonObject, sub_config: {}'.format(sub_config))
                     args[k] = v._lazy_init(**sub_config)
                 elif isinstance(v, ListSpace):
                     sub_config = strip_cofing_space(new_config, prefix=k)
-                    print('ListSpace, sub_config: {}'.format(sub_config))
                     if len(sub_config) == 1:
                         args[k] = sub_config.pop(k)
                     else:
                         # nested space: List of AutoGluonobject
                         choice = sub_config.pop(k)
                         sub_config = strip_cofing_space(sub_config, prefix=str(choice))
-                        print('nested space, choice :{}, sub_config: {}'.format(choice, sub_config))
                         args[k] = v[choice]._lazy_init(**sub_config)
                 elif isinstance(new_config[k], Sample):
-                    print('Sample method may be deprecated')
                     args[k] = new_config[k]()
                 else:
                     if '.' in k:
-                        print('Prefix detected, skipping {}'.format(k))
                         continue
-                    print('fall back default type ', k)
                     args[k] = new_config[k]
 
         self.f(args, **kwargs)
@@ -140,8 +131,6 @@ def autogluon_function(**kwvars):
                 self.func = func
                 self.args = args
                 self.kwargs = kwargs
-                #print('creating cls._args', self.args)
-                #print('creating cls._kwargs', self.kwargs)
 
             def _lazy_init(self, **kwvars):
                 # lazy initialization for passing config files
@@ -169,24 +158,6 @@ def autogluon_object(**kwvars):
                 self.args = args
                 self.kwargs = kwargs
                 self._inited = False
-                #print('creating cls._args', self.args)
-                #print('creating cls._kwargs', self.kwargs)
-
-            #def __getattribute__(self, s):
-            #    try:
-            #        # try class method first
-            #        x = Cls.__getattribute__(self, s)
-            #    except AttributeError:
-            #        pass
-            #    else:
-            #        return x
-            #    if not self._inited:
-            #        self._inited = True
-            #        print('self._args', self.args)
-            #        print('self._kwargs', self.kwargs)
-            #        self._instance = Cls(*self.args, **self.kwargs)
-            #    x = self._instance.__getattribute__(s)
-            #    return x
 
             def _lazy_init(self, **kwvars):
                 # lazy initialization for passing config files
