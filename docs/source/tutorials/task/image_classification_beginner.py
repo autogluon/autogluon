@@ -19,6 +19,10 @@ logging.basicConfig(level=logging.INFO)
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # We use a small subset of `Shopee-IET dataset <https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data>`__ from Kaggle for image classfication.
+# Please download the data subset via `data link <http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com>`__ .
+# Then unzip it via:
+# ::
+#   unzip data.zip
 
 dataset = task.Dataset(name='shopeeiet', train_path='data/train', val_path='data/val') # case insentive
 

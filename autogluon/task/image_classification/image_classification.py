@@ -74,7 +74,8 @@ class ImageClassification(BaseTask):
                 if '.rec' not in self.train_path:
                     self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
                     self.val = None
-                    self.test = gluon.data.vision.ImageFolderDataset(self.val_path)
+                    if 'test_path' in kwargs:
+                        self.test = gluon.data.vision.ImageFolderDataset(kwargs['test_path'])
                     self.num_classes = len(np.unique([e[1] for e in self.train]))
                 elif '.rec' in self.train_path:
                     self.train = gluon.data.vision.ImageRecordDataset(self.train_path)
@@ -145,50 +146,74 @@ class ImageClassification(BaseTask):
             savedir='checkpoint/exp1.ag',
             visualizer='tensorboard',
             stop_criterion={
-                'time_limits': 30,
+                'time_limits': 24*60*60,
                 'max_metric': 1.0,
-                'num_trials': 2
+                'num_trials': 100
             },
             resources_per_trial={
                 'num_gpus': 1,
-                'num_training_epochs': 1
+                'num_training_epochs': 100
             },
             backend='default',
             **kwargs):
-        r"""
+        """
         Fit networks on dataset
 
-        Parameters
-        ----------
-        data: Input data. It could be:
-            autogluon.Datasets
-            task.Datasets
-        nets: autogluon.Nets
-        optimizers: autogluon.Optimizers
-        metrics: autogluon.Metrics
-        losses: autogluon.Losses
-        stop_criterion (dict): The stopping criteria. The keys may be any field in
-            the return result of 'train()', whichever is reached first.
-            Defaults to empty dict.
-        resources_per_trial (dict): Machine resources to allocate per trial,
-            e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
-            assigned unless you specify them here.
-        savedir (str): Local dir to save training results to.
-        searcher: Search Algorithm.
-        trial_scheduler: Scheduler for executing
-            the experiment. Choose among FIFO (default) and HyperBand.
-        resume (bool): If checkpoint exists, the experiment will
-            resume from there.
-        backend: support autogluon default backend, ray. (Will support SageMaker)
-        **kwargs: Used for backwards compatibility.
+        Args:
+            data: Input data. task.Datasets
+            nets: autogluon.Nets
+            optimizers: autogluon.Optimizers
+            metrics: autogluon.Metrics
+            losses: autogluon.Losses
+            stop_criterion (dict): The stopping criteria.
+            resources_per_trial (dict): Machine resources to allocate per trial.
+            savedir (str): Local dir to save training results to.
+            searcher: Search Algorithm.
+            trial_scheduler: Scheduler for executing
+                the experiment. Choose among FIFO (default) and HyperBand.
+            resume (bool): If checkpoint exists, the experiment will
+                resume from there.
+            backend: support autogluon default backend.
+            **kwargs: Used for backwards compatibility.
 
-        Returns
-        ----------
-        results:
-            model: the parameters associated with the best model. (TODO:)
-            val_accuracy: validation set accuracy
-            config: best configuration
-            time: total time cost
+        Example:
+            >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
+            >>>             test_path='data/test')
+            >>> net_list = ['resnet18_v1', 'resnet34_v1']
+            >>> nets = ag.Nets(net_list)
+            >>> adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+            >>>              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>> sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+            >>>        momentum=ag.space.Linear('momentum', 0.85, 0.95),
+            >>>            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>> optimizers = ag.Optimizers([adam_opt, sgd_opt])
+            >>> searcher = 'random'
+            >>> trial_scheduler = 'fifo'
+            >>> savedir = 'checkpoint/demo.ag'
+            >>> resume = False
+            >>> time_limits = 3*60
+            >>> max_metric = 1.0
+            >>> num_trials = 4
+            >>> stop_criterion = {
+            >>>       'time_limits': time_limits,
+            >>>        'max_metric': max_metric,
+            >>>        'num_trials': num_trials
+            >>> }
+            >>> num_gpus = 1
+            >>> num_training_epochs = 2
+            >>> resources_per_trial = {
+            >>> 'num_gpus': num_gpus,
+            >>> 'num_training_epochs': num_training_epochs
+            >>> }
+            >>> results = task.fit(dataset,
+            >>>       nets,
+            >>>       optimizers,
+            >>>       searcher=searcher,
+            >>>       trial_scheduler=trial_scheduler,
+            >>>       resume=resume,
+            >>>       savedir=savedir,
+            >>>       stop_criterion=stop_criterion,
+            >>>       resources_per_trial=resources_per_trial)
         """
         return BaseTask.fit(data, nets, optimizers, metrics, losses, searcher, trial_scheduler,
                             resume, savedir, visualizer, stop_criterion, resources_per_trial,

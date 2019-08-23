@@ -1,9 +1,9 @@
-"""2. Image Classification - Advanced
+"""3. Image Classification - Advanced
 ============================================
 
 In the following\ *, we use Image Classification as a running example*
 to illustrate the usage of AutoGluon’s main APIs.
-Different from the last demo, we focus how to customize autogluon ``Dataset``,
+We focus on how to customize autogluon ``Dataset``,
 ``Nets``, ``Optimizers``, ``Searcher`` and ``Scheduler``.
 """
 from autogluon import image_classification as task
@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.INFO)
 
 ################################################################
 # We first introduce the basic configuration ``autogluon.space``, which is
-# used to represent the search space of each task components, we will then
-# go throught each components, including
+# used to represent the search space of each task component, we will then
+# go through each component, including
 #
 # -  ``autogluon.Dataset``
 # -  ``autogluon.Nets``
@@ -22,39 +22,19 @@ logging.basicConfig(level=logging.INFO)
 # -  ``autogluon.Losses``
 # -  ``autogluon.Metrics``
 #
-# and finally put all together to ``fit`` to generate best results.
-#
-# Import AutoGluon
-# ~~~~~~~~~~~~~~~~
-
-
-import autogluon as ag
+# and finally put all together to ``fit`` to generate the best result.
 
 ################################################################
-# Create AutoGluon Dataset
-# ~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# We use a small subset of `Shopee-IET` dataset prepared in the data preparation section.
-
-
-dataset = task.Dataset(name='shopeeiet', train_path='data/train', val_path='data/val')
-
-################################################################
-# We then will use ``autogluon.Nets`` and ``autogluon.Optimizers`` as
-# examples to show the usage of auto objects. The remainining auto objects
-# are using default value.
-################################################################
-# Before that, let's first understand the `Space` object in AutoGluon.
-#
 # Create AutoGluon Space
-# ~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~
+# Let's first understand the `Space` object in AutoGluon.
 #
 # ``autogluon.space`` is a search space containing a set of configuration
 # candidates. We provide three basic space types.
 #
 # -  Categorical Space
 
-
+import autogluon as ag
 list_space = ag.space.List('listspace', ['0', '1', '2'])
 print(list_space)
 
@@ -79,15 +59,26 @@ print(log_space)
 print(ag.space.sample_configuration([list_space, linear_space, log_space]))
 
 ################################################################
+# Create AutoGluon Dataset
+# ~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# We use a small subset of `Shopee-IET` dataset prepared in the data preparation section.
+
+
+dataset = task.Dataset(name='shopeeiet', train_path='data/train', test_path='data/test')
+
+################################################################
+# We then will use ``autogluon.Nets`` and ``autogluon.Optimizers`` as
+# examples to show the usage of auto objects. The remaining auto objects
+# are using default value.
+
+################################################################
 # Create AutoGluon Nets
 # ~~~~~~~~~~~~~~~~~~~~~
 #
-# ``autogluon.Nets`` is a list of auto networks, and allows search for the
-# best net
-#
-# -  from a list of provided (or default) networks
-# -  by choosing the best architecture regarding to each auto net.
-#
+# ``autogluon.Nets`` is a list of networks, and allows search for the
+# best network from a list of provided (or default) networks by choosing
+# the best architecture regarding to each network.
 
 net_list = ['resnet18_v1',
             'resnet34_v1']
@@ -103,17 +94,14 @@ print(nets)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # ``autogluon.Optimizers`` defines a list of optimization algorithms that
-# allows search for the best optimization algorithm
-#
-# -  from a list of provided (or default) optimizers
-# -  by choosing the best hyper-parameters regarding to each auto
-#    optimizer
-#
+# allows search for the best optimization algorithm from a list of provided
+# (or default) optimizers by choosing the best hyper-parameters regarding to each
+# optimizer.
 
 # method 1: using the task-specific default optimizer configuration.
 optimizers_default = ag.Optimizers(['sgd', 'adam'])
 
-# method 2: customize the hyperparamters of optimizer in the search space.
+# method 2: customize the hyper-parameters of optimizer in the search space.
 adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
                           wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
 sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
@@ -139,7 +127,7 @@ searcher = 'random'
 # Use Trial Scheduler
 # ~~~~~~~~~~~~~~~~~~~
 #
-# ``ag.scheduler`` supports scheduling trials in serial order and with
+# ``autogluon.scheduler`` supports scheduling trials in serial order and with
 # early stopping.
 #
 # We support basic FIFO scheduler and early stopping scheduler: Hyperband.
@@ -158,10 +146,9 @@ resume = False
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Let's first set the customized stop criterion.
 
-time_limits = 3*60
+time_limits = 5*60
 max_metric = 1.0
-num_trials = 4
-
+num_trials = 8
 stop_criterion = {
     'time_limits': time_limits,
     'max_metric': max_metric,
@@ -172,8 +159,7 @@ stop_criterion = {
 # Let's then set the customized resources per trial.
 
 num_gpus = 1
-num_training_epochs = 2
-
+num_training_epochs = 10
 resources_per_trial = {
     'num_gpus': num_gpus,
     'num_training_epochs': num_training_epochs
@@ -203,7 +189,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 ###############################################################################
 # We could select an example image to predict the label and probability.
 
-image = './data/val/BabyBibs/BabyBibs_1084.jpg'
+image = './data/test/BabyBibs/BabyBibs_1084.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
@@ -217,18 +203,18 @@ print('The input picture is classified as [%s], with probability %.2f.' %
 # results. Similarly, we could also increase ``num_trials`` for
 # better results.
 #
-# Here we increase the ``num_training_epochs`` from 2 to 3,
-# ``num_trials`` from 2 to 3, and set ``resume = True`` which will
+# Here we increase the ``num_training_epochs`` from 10 to 12,
+# ``num_trials`` from 8 to 10, and set ``resume = True`` which will
 # load the checking point in the savedir.
 
-num_trials = 3
+num_trials = 10
 stop_criterion = {
     'time_limits': time_limits,
     'max_metric': max_metric,
     'num_trials': num_trials
 }
 
-num_training_epochs = 3
+num_training_epochs = 12
 resources_per_trial = {
     'num_gpus': num_gpus,
     'num_training_epochs': num_training_epochs
@@ -259,7 +245,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 ###############################################################################
 # We could select an example image to predict the label and probability.
 
-image = './data/val/BabyBibs/BabyBibs_1084.jpg'
+image = './data/test/BabyBibs/BabyBibs_1084.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.train.synsets[ind.asscalar()], prob.asscalar()))

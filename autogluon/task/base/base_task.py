@@ -125,6 +125,7 @@ class BaseTask(ABC):
         vars(args).update({'backend': metadata['backend']})
         vars(args).update({'epochs': metadata['resources_per_trial']['num_training_epochs']})
         vars(args).update({'num_gpus': metadata['resources_per_trial']['num_gpus']})
+        vars(args).update({'savedir': metadata['savedir']})
         for k, v in metadata['kwargs'].items():
             vars(args).update({k: v})
         for hparam in cs.get_hyperparameters():
@@ -232,6 +233,7 @@ class BaseTask(ABC):
         pred = BaseTask.result.model(img.expand_dims(axis=0).as_in_context(ctx[0]))
         ind = mx.nd.argmax(pred, axis=1).astype('int')
         logger.info('Finished.')
+        mx.nd.waitall()
         return ind, mx.nd.softmax(pred)[0][ind]
 
     @staticmethod
@@ -274,6 +276,7 @@ class BaseTask(ABC):
         _, test_acc = metric.get()
         test_loss /= len(test_data)
         logger.info('Finished.')
+        mx.nd.waitall()
         return test_acc
 
     @staticmethod
@@ -287,6 +290,7 @@ class BaseTask(ABC):
         args = _metadata_args()
         args.data.split = 0
         args.train_func(args, config, reporter=None)
+        mx.nd.waitall()
 
     @staticmethod
     def fit(data,
@@ -312,39 +316,64 @@ class BaseTask(ABC):
             },
             backend='default',
             **kwargs):
-        r"""
+        """
         Fit networks on dataset
 
-        Parameters
-        ----------
-        data: Input data. It could be:
-            task.Datasets
-        nets: autogluon.Nets
-        optimizers: autogluon.Optimizers
-        metrics: autogluon.Metrics
-        losses: autogluon.Losses
-        stop_criterion (dict): The stopping criteria. The keys may be any field in
-            the return result of 'train()', whichever is reached first.
-            Defaults to empty dict.
-        resources_per_trial (dict): Machine resources to allocate per trial,
-            e.g. ``{"max_num_cpus": 64, "num_gpus": 8}``. Note that GPUs will not be
-            assigned unless you specify them here.
-        savedir (str): Local dir to save training results to.
-        searcher: Search Algorithm.
-        trial_scheduler: Scheduler for executing
-            the experiment. Choose among FIFO (default) and HyperBand.
-        resume (bool): If checkpoint exists, the experiment will
-            resume from there.
-        backend: support autogluon default backend
-        **kwargs: Used for backwards compatibility.
+        Args:
+            data: Input data. task.Datasets
+            nets: autogluon.Nets
+            optimizers: autogluon.Optimizers
+            metrics: autogluon.Metrics
+            losses: autogluon.Losses
+            stop_criterion (dict): The stopping criteria.
+            resources_per_trial (dict): Machine resources to allocate per trial.
+            savedir (str): Local dir to save training results to.
+            searcher: Search Algorithm.
+            trial_scheduler: Scheduler for executing
+                the experiment. Choose among FIFO (default) and HyperBand.
+            resume (bool): If checkpoint exists, the experiment will
+                resume from there.
+            backend: support autogluon default backend.
+            **kwargs: Used for backwards compatibility.
 
-        Returns
-        ----------
-        results:
-            model: the parameters associated with the best model. (TODO:)
-            val_accuracy: validation set accuracy
-            config: best configuration
-            time: total time cost
+        Example:
+            >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
+            >>>             test_path='data/test')
+            >>> net_list = ['resnet18_v1', 'resnet34_v1']
+            >>> nets = ag.Nets(net_list)
+            >>> adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+            >>>              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>> sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+            >>>        momentum=ag.space.Linear('momentum', 0.85, 0.95),
+            >>>            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>> optimizers = ag.Optimizers([adam_opt, sgd_opt])
+            >>> searcher = 'random'
+            >>> trial_scheduler = 'fifo'
+            >>> savedir = 'checkpoint/demo.ag'
+            >>> resume = False
+            >>> time_limits = 3*60
+            >>> max_metric = 1.0
+            >>> num_trials = 4
+            >>> stop_criterion = {
+            >>>       'time_limits': time_limits,
+            >>>        'max_metric': max_metric,
+            >>>        'num_trials': num_trials
+            >>> }
+            >>> num_gpus = 1
+            >>> num_training_epochs = 2
+            >>> resources_per_trial = {
+            >>> 'num_gpus': num_gpus,
+            >>> 'num_training_epochs': num_training_epochs
+            >>> }
+            >>> results = task.fit(dataset,
+            >>>       nets,
+            >>>       optimizers,
+            >>>       searcher=searcher,
+            >>>       trial_scheduler=trial_scheduler,
+            >>>       resume=resume,
+            >>>       savedir=savedir,
+            >>>       stop_criterion=stop_criterion,
+            >>>       resources_per_trial=resources_per_trial)
         """
         logger.info('Start fitting')
         start_fit_time = time.time()
@@ -364,4 +393,5 @@ class BaseTask(ABC):
         BaseTask.result = Results(final_model, final_metric, final_config,
                                   time.time() - start_fit_time,
                                   metadata)
+        mx.nd.waitall()
         return BaseTask.result
