@@ -1,7 +1,4 @@
 import functools
-import types
-
-from mxnet import gluon
 
 from ..space import *
 
@@ -16,11 +13,13 @@ def autogluon_nets(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
-        #TODO (cgraywang): add more hparams
-        setattr(net, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
+        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param(),
                                       List('pretrained_base', [True, False]).get_hyper_param(),
-                                      List('norm_layer', ['BatchNorm']).get_hyper_param()])
+                                      List('norm_layer', ['BatchNorm']).get_hyper_param(),
+                                      Linear('dense_layers', lower=1, upper=3).get_hyper_param(),
+                                      Linear('dropout', lower=0.0, upper=0.50).get_hyper_param()])
         return net
+
     return wrapper_decorator
 
 
@@ -28,13 +27,15 @@ def autogluon_net_instances(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
-        net.hyper_params = [List('pretrained', [True]).get_hyper_param()]
-        net.get_hyper_params = types.MethodType(get_hyper_params, net)
+        # TODO (ghaipiyu) : This was causing an exception. Should this hyperparam be here?
+        # net.hyper_params = [List('pretrained', [True, False]).get_hyper_param()]
+        # net.get_hyper_params = types.MethodType(get_hyper_params, net)
         return net
+
     return wrapper_decorator
 
 
-#TODO(cgraywang): consider organize as a class decorator?
+# TODO(cgraywang): consider organize as a class decorator?
 class Net(object):
     def __init__(self, name):
         self.name = name

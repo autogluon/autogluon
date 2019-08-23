@@ -89,5 +89,4 @@ def strip_cofing_space(config, prefix):
     for k, v in config.items():
         if k.startswith(prefix):
             new_config[k[len(prefix)+1:]] = v
-            #config.pop(k)
     return new_config
