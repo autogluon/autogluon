@@ -4,115 +4,32 @@ from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
 
-from .model_zoo import *
 from .losses import *
 from .metrics import *
-from ...network import Nets
-from ...optim import Optimizers, get_optim
-from ...loss import Losses
-from ...metric import Metrics
+from ...optim import *#Optimizers, get_optim
 from ...utils.data_analyzer import DataAnalyzer
 from ..base import *
 from .dataset import *
 from .pipeline import *
+from ...basic.space import *
 
 __all__ = ['ImageClassification']
 
 logger = logging.getLogger(__name__)
 
-
 class ImageClassification(BaseTask):
-    class Dataset(BaseTask.Dataset):
-        def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=16,
-                     transform_train_fn=None, transform_val_fn=None,
-                     transform_train_list=[
-                         transforms.RandomResizedCrop(224),
-                         transforms.RandomFlipLeftRight(),
-                         transforms.RandomColorJitter(brightness=0.4, contrast=0.4,
-                                                      saturation=0.4),
-                         transforms.RandomLighting(0.1),
-                         transforms.ToTensor(),
-                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
-                     transform_val_list=[
-                         transforms.Resize(256),
-                         transforms.CenterCrop(224),
-                         transforms.ToTensor(),
-                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])],
-                     batchify_train_fn=None, batchify_val_fn=None,
-                     **kwargs):
-            super(ImageClassification.Dataset, self).__init__(name, train_path, val_path, batch_size, num_workers,
-                                          transform_train_fn, transform_val_fn,
-                                          transform_train_list, transform_val_list,
-                                          batchify_train_fn, batchify_val_fn, **kwargs)
-            self._read_dataset(**kwargs)
-            # TODO (cgraywang): add search space, handle batch_size, num_workers
-            self._add_search_space()
-
-        def _read_dataset(self, **kwargs):
-            # TODO (cgraywang): put transform in the search space
-            try:
-                self.train = get_dataset(self.name, train=True)
-                self.val = get_dataset(self.name, train=False)
-                self.num_classes = DataAnalyzer.stat_dataset(self.train)[0]
-                DataAnalyzer.check_dataset(self.train, self.val)
-            except ValueError:
-                self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
-                self.val = gluon.data.vision.ImageFolderDataset(self.val_path)
-                self.num_classes = kwargs['num_classes']
-
-        def _add_search_space(self):
-            pass
-
-        def _get_search_space_strs(self):
-            pass
-
-        def __repr__(self):
-            try:
-                train_stats = DataAnalyzer.stat_dataset(self.train)
-                val_stats = DataAnalyzer.stat_dataset(self.val)
-                repr_str = "AutoGluon Dataset: " \
-                           "\n ======== " \
-                           "\n name = %s" \
-                           "\n ======== " \
-                           "\n Train data statistic " \
-                           "\n number of classes = %d" \
-                           "\n number of samples = %d" \
-                           "\n mean (label) = %.2f" \
-                           "\n std (label) = %.2f" \
-                           "\n var (label) = %.2f" \
-                           "\n ======== " \
-                           "\n Val data statistic " \
-                           "\n number of classes = %d" \
-                           "\n number of samples = %d" \
-                           "\n mean (label) = %.2f" \
-                           "\n std (label) = %.2f" \
-                           "\n var (label) = %.2f" % (self.name,
-                                                      train_stats[0], train_stats[1],
-                                                      train_stats[2], train_stats[3],
-                                                      train_stats[4],
-                                                      val_stats[0], val_stats[1],
-                                                      val_stats[2], val_stats[3],
-                                                      val_stats[4])
-            except AttributeError:
-                # TODO: add more info for folder dataset
-                repr_str = "AutoGluon Dataset: " \
-                           "\n ======== " \
-                           "\n name = %s" \
-                           "\n ======== " % self.name
-            return repr_str
-
     @staticmethod
     def fit(data,
-            nets=Nets([
-                get_model('ResNet18_v1b'),
-                get_model('ResNet50_v1b')]),
-            optimizers=Optimizers([
-                get_optim('sgd'),
-                get_optim('adam')]),
-            metrics=Metrics([
-                get_metric('Accuracy')]),
-            losses=Losses([
-                get_loss('SoftmaxCrossEntropyLoss')]),
+            net=ListSpace('resnet50v1b', 'ResNet50_v1d'),
+        optimizer=ListSpace(
+            SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
+                momentum=0.9,
+                wd=LogLinearSpace(1e-5, 1e-3)),
+            NAG(learning_rate=LogLinearSpace(1e-4, 1e-2),
+                momentum=0.9,
+                wd=LogLinearSpace(1e-5, 1e-3))),
+            metrics='Accuracy',
+            losses=gluon.loss.SoftmaxCrossEntropyLoss,
             searcher=None,
             trial_scheduler=None,
             resume=False,
