@@ -13,12 +13,23 @@ def get_hyper_params(self):
 
 
 def autogluon_nets(func):
+    """The auto net decorator.
+
+    Args:
+        args: args for the network.
+        kwargs: kwargs for the network.
+
+    Example:
+        >>> @autogluon_nets
+        >>> def resnet18_v1(**kwargs):
+        >>>     pass
+    """
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         net = func(*args, **kwargs)
         #TODO (cgraywang): add more hparams
-        setattr(net, 'hyper_params', [List('pretrained', [True, False]).get_hyper_param(),
-                                      List('pretrained_base', [True, False]).get_hyper_param(),
+        setattr(net, 'hyper_params', [List('pretrained', [True]).get_hyper_param(),
+                                      List('pretrained_base', [True]).get_hyper_param(),
                                       List('norm_layer', ['BatchNorm']).get_hyper_param()])
         return net
     return wrapper_decorator
@@ -36,6 +47,15 @@ def autogluon_net_instances(func):
 
 #TODO(cgraywang): consider organize as a class decorator?
 class Net(object):
+    """The net with the search space.
+
+    Args:
+        name: the network's name
+        hyper_params: the hyper-parameters for the network
+
+    Example:
+        >>> net = Net('resnet18_v1')
+    """
     def __init__(self, name):
         self.name = name
         self.hyper_params = None

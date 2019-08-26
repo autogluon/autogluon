@@ -8,6 +8,14 @@ __all__ = ['Nets']
 
 
 class Nets(BaseAutoObject):
+    """The auto networks.
+
+    Args:
+        net_list: a list of networks.
+
+    Example:
+        >>> nets = Nets(['resnet18_v1', 'resnet34_v1'])
+    """
     def __init__(self, net_list):
         #TODO (cgraywang): add net user config
         #TODO(cgraywang): add model instance, for now, use a list of model names

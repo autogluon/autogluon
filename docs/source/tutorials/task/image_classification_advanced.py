@@ -1,7 +1,12 @@
 """3. Image Classification - Advanced
 ============================================
 
-In the following\ *, we use Image Classification as a running example*
+In the [first tutorial](), we introduce the basic usage of AutoGluon.
+In this tutorial, we want to illustrate the advanced usage of AutoGluon, such as configuring
+the search space of the hyper-parameters, searchers and trial schedulers.
+By leveraging the advanced functionalies of AutoGluon, we should be able to achieve better
+image classification results.
+In the following, we use Image Classification as a running example
 to illustrate the usage of AutoGluon’s main APIs.
 We focus on how to customize autogluon ``Dataset``,
 ``Nets``, ``Optimizers``, ``Searcher`` and ``Scheduler``.
@@ -62,7 +67,7 @@ print(ag.space.sample_configuration([list_space, linear_space, log_space]))
 # Create AutoGluon Dataset
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# We use a small subset of `Shopee-IET` dataset prepared in the data preparation section.
+# We use a small subset of `Shopee-IET` dataset.
 
 
 dataset = task.Dataset(name='shopeeiet', train_path='data/train', test_path='data/test')
@@ -165,62 +170,6 @@ resources_per_trial = {
     'num_training_epochs': num_training_epochs
 }
 
-results = task.fit(dataset,
-                   nets,
-                   optimizers,
-                   searcher=searcher,
-                   trial_scheduler=trial_scheduler,
-                   resume=resume,
-                   savedir=savedir,
-                   stop_criterion=stop_criterion,
-                   resources_per_trial=resources_per_trial)
-
-################################################################
-# The best Top-1 accuracy on the validation set is:
-
-print('Top-1 acc: %.3f' % results.metric)
-
-###############################################################################
-# We could test the model results on the test data.
-
-test_acc = task.evaluate()
-print('Top-1 test acc: %.3f' % test_acc)
-
-###############################################################################
-# We could select an example image to predict the label and probability.
-
-image = './data/test/BabyBibs/BabyBibs_1084.jpg'
-ind, prob = task.predict(image)
-print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
-
-
-################################################################
-# Resume AutoGluon Fit
-# ~~~~~~~~~~~~~~~~~~~~
-#
-# We could resume the previous training for more epochs to achieve better
-# results. Similarly, we could also increase ``num_trials`` for
-# better results.
-#
-# Here we increase the ``num_training_epochs`` from 10 to 12,
-# ``num_trials`` from 8 to 10, and set ``resume = True`` which will
-# load the checking point in the savedir.
-
-num_trials = 10
-stop_criterion = {
-    'time_limits': time_limits,
-    'max_metric': max_metric,
-    'num_trials': num_trials
-}
-
-num_training_epochs = 12
-resources_per_trial = {
-    'num_gpus': num_gpus,
-    'num_training_epochs': num_training_epochs
-}
-
-resume = True
 results = task.fit(dataset,
                    nets,
                    optimizers,

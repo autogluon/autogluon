@@ -9,6 +9,14 @@ __all__ = ['Optimizers', 'get_optim', 'SGD', 'NAG', 'RMSProp', 'Adam', 'AdaGrad'
 
 
 class Optimizers(BaseAutoObject):
+    """The auto optimizers.
+
+    Args:
+        optim_list: a list of optimizers.
+
+    Example:
+        >>> optims = Optimizers(['sgd', 'adam'])
+    """
     # TODO (cgraywang): add optimizer hparams config
     def __init__(self, optim_list):
         assert isinstance(optim_list, list), type(optim_list)

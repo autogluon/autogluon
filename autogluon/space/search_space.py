@@ -4,6 +4,15 @@ import ConfigSpace.hyperparameters as CSH
 
 
 class List(object):
+    """Categorical search space.
+
+    Args:
+        name: the name of the search space
+        choices: the value candidates
+
+    Example:
+        >>> list_space = List('listspace', ['0', '1', '2'])
+    """
     def __init__(self, name, choices):
         self.name = name
         self.choices = choices
@@ -21,6 +30,16 @@ class List(object):
 
 
 class Linear(object):
+    """linear search space.
+
+    Args:
+        name: the name of the search space
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> linear_space = Linear('linspace', 0, 10)
+    """
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
@@ -59,6 +78,16 @@ class Linear(object):
 
 
 class Log(object):
+    """loglinear search space.
+
+    Args:
+        name: the name of the search space
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> log_space = Log('logspace', 0, 10)
+    """
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower

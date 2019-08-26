@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 @autogluon_method
 def train_image_classification(args, reporter):
+    """The training script for image classification.
+
+     Args:
+        args: the argument parser.
+        reporter: the reporter (StatusReporter)
+    """
     # Set Hyper-params
     def _init_hparams():
         batch_size = args.data.batch_size * max(args.num_gpus, 1)
@@ -212,5 +218,6 @@ def train_image_classification(args, reporter):
         train(epoch)
         if val_data is not None:
             test(epoch)
-    net_path = os.path.join(os.path.splitext(args.savedir)[0], 'net.params')
-    net.save_parameters(net_path)
+    if val_data is None:
+        net_path = os.path.join(os.path.splitext(args.savedir)[0], 'net.params')
+        net.save_parameters(net_path)

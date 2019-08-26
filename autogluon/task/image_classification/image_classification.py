@@ -25,6 +25,21 @@ logger = logging.getLogger(__name__)
 
 class ImageClassification(BaseTask):
     class Dataset(BaseTask.Dataset):
+        """The image classification dataset.
+
+        Args:
+            name: the dataset name.
+            train_path: the training data location
+            val_path: the validation data location.
+            batch_size: the batch size.
+            num_workers: the number of workers used in DataLoader.
+            transform_train_fn: the transformation function for training data.
+            transform_val_fn: the transformation function for validation data.
+            transform_train_list: the compose list of Transformations for training data.
+            transform_val_list: the compose list of Transformations for validation data.
+            batchify_train_fn: the batchify function defined for training data.
+            batchify_val_fn: the batchify function defined for validation data.
+        """
         def __init__(self, name=None, train_path=None, val_path=None, batch_size=64, num_workers=4,
                      transform_train_fn=None, transform_val_fn=None,
                      transform_train_list=[
@@ -72,11 +87,12 @@ class ImageClassification(BaseTask):
                 # DataAnalyzer.check_dataset(self.train, self.val)
             except ValueError:
                 if '.rec' not in self.train_path:
-                    self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
+                    if self.train_path is not None:
+                        self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
+                        self.num_classes = len(np.unique([e[1] for e in self.train]))
                     self.val = None
                     if 'test_path' in kwargs:
                         self.test = gluon.data.vision.ImageFolderDataset(kwargs['test_path'])
-                    self.num_classes = len(np.unique([e[1] for e in self.train]))
                 elif '.rec' in self.train_path:
                     self.train = gluon.data.vision.ImageRecordDataset(self.train_path)
                     self.val = None
@@ -178,14 +194,14 @@ class ImageClassification(BaseTask):
 
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
-            >>>             test_path='data/test')
+            >>>                         test_path='data/test')
             >>> net_list = ['resnet18_v1', 'resnet34_v1']
             >>> nets = ag.Nets(net_list)
             >>> adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-            >>>              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>>                           wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
             >>> sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-            >>>        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-            >>>            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>>                         momentum=ag.space.Linear('momentum', 0.85, 0.95),
+            >>>                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
             >>> optimizers = ag.Optimizers([adam_opt, sgd_opt])
             >>> searcher = 'random'
             >>> trial_scheduler = 'fifo'
@@ -196,24 +212,24 @@ class ImageClassification(BaseTask):
             >>> num_trials = 4
             >>> stop_criterion = {
             >>>       'time_limits': time_limits,
-            >>>        'max_metric': max_metric,
-            >>>        'num_trials': num_trials
+            >>>       'max_metric': max_metric,
+            >>>       'num_trials': num_trials
             >>> }
             >>> num_gpus = 1
             >>> num_training_epochs = 2
             >>> resources_per_trial = {
-            >>> 'num_gpus': num_gpus,
-            >>> 'num_training_epochs': num_training_epochs
+            >>>       'num_gpus': num_gpus,
+            >>>       'num_training_epochs': num_training_epochs
             >>> }
             >>> results = task.fit(dataset,
-            >>>       nets,
-            >>>       optimizers,
-            >>>       searcher=searcher,
-            >>>       trial_scheduler=trial_scheduler,
-            >>>       resume=resume,
-            >>>       savedir=savedir,
-            >>>       stop_criterion=stop_criterion,
-            >>>       resources_per_trial=resources_per_trial)
+            >>>                     nets,
+            >>>                     optimizers,
+            >>>                     searcher=searcher,
+            >>>                     trial_scheduler=trial_scheduler,
+            >>>                     resume=resume,
+            >>>                     savedir=savedir,
+            >>>                     stop_criterion=stop_criterion,
+            >>>                     resources_per_trial=resources_per_trial)
         """
         return BaseTask.fit(data, nets, optimizers, metrics, losses, searcher, trial_scheduler,
                             resume, savedir, visualizer, stop_criterion, resources_per_trial,

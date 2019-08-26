@@ -24,6 +24,18 @@ __all__ = ['BaseTask']
 logger = logging.getLogger(__name__)
 
 class Results(object):
+    """the output structure of the fit function.
+
+    Args:
+        model: the final model with parameters.
+        metric: the best result regarding to the provided evaluation metric.
+        config: the best config regarding to the metric.
+        time: the total time cost of the fit procedure.
+        metadata: all the search space information.
+
+    Example:
+        >>> results = Results(model, metric, config, time, metadata)
+    """
     def __init__(self, model, metric, config, time, metadata):
         self._model = model
         self._metric = metric
@@ -74,6 +86,21 @@ class Results(object):
 
 class BaseTask(ABC):
     class Dataset(dataset.Dataset):
+        """The base dataset.
+
+        Args:
+            name: the dataset name.
+            train_path: the training data location
+            val_path: the validation data location.
+            batch_size: the batch size.
+            num_workers: the number of workers used in DataLoader.
+            transform_train_fn: the transformation function for training data.
+            transform_val_fn: the transformation function for validation data.
+            transform_train_list: the compose list of Transformations for training data.
+            transform_val_list: the compose list of Transformations for validation data.
+            batchify_train_fn: the batchify function defined for training data.
+            batchify_val_fn: the batchify function defined for validation data.
+        """
         def __init__(self, name=None, train_path=None, val_path=None, batch_size=None,
                      num_workers=None,
                      transform_train_fn=None, transform_val_fn=None,
@@ -120,6 +147,12 @@ class BaseTask(ABC):
 
     @staticmethod
     def _init_args(cs, metadata):
+        """Initialize arguments using configuration space and metadata.
+
+         Args:
+            cs: configuration space.
+            metadata: metadata including the search space
+        """
         args = argparse.Namespace()
         vars(args).update({'data': metadata['data']})
         vars(args).update({'backend': metadata['backend']})
@@ -141,6 +174,11 @@ class BaseTask(ABC):
 
     @staticmethod
     def _construct_search_space(metadata):
+        """Construct search space using metadata.
+
+         Args:
+            metadata: metadata including the search space
+        """
         cs = CS.ConfigurationSpace()
         for name, obj in metadata.items():
             if hasattr(obj, 'search_space'):
@@ -155,7 +193,28 @@ class BaseTask(ABC):
         return cs, args
 
     @staticmethod
+    def _reinitialize_stop_resources(metadata):
+        for k, _ in metadata['stop_criterion'].items():
+            if k in metadata['kwargs']:
+                metadata['stop_criterion'][k] = metadata['kwargs'][k]
+        for k, _ in metadata['resources_per_trial'].items():
+            if k in metadata['kwargs']:
+                metadata['resources_per_trial'][k] = metadata['kwargs'][k]
+
+    @staticmethod
     def _run_backend(cs, args, metadata, start_time):
+        """Construct search space using metadata.
+
+         Args:
+            cs: configuration space.
+            args: the argument parser.
+            metadata: the metadata including the search space.
+            start_time: the start time of the fit function.
+        """
+        print(metadata['resources_per_trial'])
+        print(metadata['stop_criterion'])
+        time.sleep(10)
+
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         elif isinstance(metadata['searcher'], BaseSearcher):
@@ -221,6 +280,14 @@ class BaseTask(ABC):
     # TODO: fix
     @staticmethod
     def predict(img):
+        """The task predict function given an input.
+
+         Args:
+            img: the input
+
+         Example:
+            >>> ind, prob = task.predict('example.jpg')
+        """
         logger.info('Start predicting.')
         ctx = [mx.gpu(i) for i in range(BaseTask.result.metadata['resources_per_trial']['num_gpus'])] \
             if BaseTask.result.metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
@@ -237,7 +304,15 @@ class BaseTask(ABC):
         return ind, mx.nd.softmax(pred)[0][ind]
 
     @staticmethod
-    def evaluate():
+    def evaluate(data):
+        """The task evaluation function given the test data.
+
+         Args:
+            data: test data
+
+         Example:
+            >>> test_acc = task.evaluate(data)
+        """
         logger.info('Start evaluating.')
         L = get_loss_instance(BaseTask.result.metadata['losses'].loss_list[0].name)
         metric = get_metric_instance(BaseTask.result.metadata['metrics'].metric_list[0].name)
@@ -250,14 +325,14 @@ class BaseTask(ABC):
                 dataset = dataset.transform_first(transforms.Compose(transform_list))
             return dataset
 
-        test_dataset = _init_dataset(BaseTask.result.metadata['data'].test,
-                                     BaseTask.result.metadata['data'].transform_val_fn,
-                                     BaseTask.result.metadata['data'].transform_val_list)
+        test_dataset = _init_dataset(data.test,
+                                     data.transform_val_fn,
+                                     data.transform_val_list)
         test_data = mx.gluon.data.DataLoader(
             test_dataset,
-            batch_size=BaseTask.result.metadata['data'].batch_size,
+            batch_size=data.batch_size,
             shuffle=False,
-            num_workers=BaseTask.result.metadata['data'].num_workers)
+            num_workers=data.num_workers)
         test_loss = 0
         for i, batch in enumerate(test_data):
             data = mx.gluon.utils.split_and_load(batch[0],
@@ -338,14 +413,14 @@ class BaseTask(ABC):
 
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
-            >>>             test_path='data/test')
+            >>>                         test_path='data/test')
             >>> net_list = ['resnet18_v1', 'resnet34_v1']
             >>> nets = ag.Nets(net_list)
             >>> adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-            >>>              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>>                           wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
             >>> sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-            >>>        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-            >>>            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+            >>>                         momentum=ag.space.Linear('momentum', 0.85, 0.95),
+            >>>                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
             >>> optimizers = ag.Optimizers([adam_opt, sgd_opt])
             >>> searcher = 'random'
             >>> trial_scheduler = 'fifo'
@@ -356,30 +431,31 @@ class BaseTask(ABC):
             >>> num_trials = 4
             >>> stop_criterion = {
             >>>       'time_limits': time_limits,
-            >>>        'max_metric': max_metric,
-            >>>        'num_trials': num_trials
+            >>>       'max_metric': max_metric,
+            >>>       'num_trials': num_trials
             >>> }
             >>> num_gpus = 1
             >>> num_training_epochs = 2
             >>> resources_per_trial = {
-            >>> 'num_gpus': num_gpus,
-            >>> 'num_training_epochs': num_training_epochs
+            >>>       'num_gpus': num_gpus,
+            >>>       'num_training_epochs': num_training_epochs
             >>> }
             >>> results = task.fit(dataset,
-            >>>       nets,
-            >>>       optimizers,
-            >>>       searcher=searcher,
-            >>>       trial_scheduler=trial_scheduler,
-            >>>       resume=resume,
-            >>>       savedir=savedir,
-            >>>       stop_criterion=stop_criterion,
-            >>>       resources_per_trial=resources_per_trial)
+            >>>                     nets,
+            >>>                     optimizers,
+            >>>                     searcher=searcher,
+            >>>                     trial_scheduler=trial_scheduler,
+            >>>                     resume=resume,
+            >>>                     savedir=savedir,
+            >>>                     stop_criterion=stop_criterion,
+            >>>                     resources_per_trial=resources_per_trial)
         """
         logger.info('Start fitting')
         start_fit_time = time.time()
 
         logger.info('Start constructing search space')
         metadata = locals()
+        BaseTask._reinitialize_stop_resources(metadata)
         cs, args = BaseTask._construct_search_space(metadata)
         logger.info('Finished.')
 

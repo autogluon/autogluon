@@ -7,6 +7,17 @@ __all__ = ['autogluon_optims', 'Optimizer']
 
 
 def autogluon_optims(func):
+    """The auto optimizer decorator.
+
+        Args:
+            args: args for the optimizer.
+            kwargs: kwargs for the optimizer.
+
+        Example:
+            >>> @autogluon_optims
+            >>> def SGD(**kwargs):
+            >>>     return Optimizer('sgd')
+        """
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         optim = func(*args, **kwargs)
@@ -39,6 +50,15 @@ def autogluon_optims(func):
 
 
 class Optimizer(object):
+    """The optimizer with the search space.
+
+    Args:
+        name: the optimizer name
+        hyper_params: the hyper-parameters for the optmizer
+
+    Example:
+        >>> sgd = Optimizer('sgd')
+    """
     def __init__(self, name):
         self.name = name
         self.hyper_params = None

@@ -8,6 +8,14 @@ __all__ = ['Metrics']
 
 
 class Metrics(BaseAutoObject):
+    """The auto metric.
+
+    Args:
+        metric_list: a list of metrics.
+
+    Example:
+        >>> losses = Metrics(['Accuracy'])
+    """
     def __init__(self, metric_list):
         # TODO(cgraywang): add instance, for now, use a list
         # TODO(cgraywang): use all option

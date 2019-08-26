@@ -47,8 +47,10 @@ sample_val_path = os.path.join(path, 'val_sample')
 os.makedirs(sample_train_path)
 os.makedirs(sample_val_path)
 
-
+selected_classes = ['BabyPants', 'BabyShirt', 'womencasualshoes', 'womenchiffontop']
 for l in labels:
+    if l not in selected_classes:
+        continue
     os.makedirs(os.path.join(sample_train_path, l))
     os.makedirs(os.path.join(sample_val_path, l))
 
@@ -56,9 +58,11 @@ print(labels)
 
 # Copy files to corresponding directory
 for label in labels:
+    if label not in selected_classes:
+        continue
     count = 0
     for img in os.listdir(os.path.join(src_train_path, label)):
-        if count == 100:
+        if count == 200:
             break
         shutil.copy(os.path.join(src_train_path, label, img),
                     os.path.join(sample_train_path, label, img))
@@ -66,9 +70,11 @@ for label in labels:
 
 # Copy files to corresponding directory
 for label in labels:
+    if label not in selected_classes:
+        continue
     count = 0
     for img in os.listdir(os.path.join(src_val_path, label)):
-        if count == 10:
+        if count == 20:
             break
         shutil.copy(os.path.join(src_val_path, label, img),
                     os.path.join(sample_val_path, label, img))
