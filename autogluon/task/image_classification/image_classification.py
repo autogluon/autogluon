@@ -86,18 +86,24 @@ class ImageClassification(BaseTask):
                 # self.num_classes = DataAnalyzer.stat_dataset(self.train)[0]
                 # DataAnalyzer.check_dataset(self.train, self.val)
             except ValueError:
-                if '.rec' not in self.train_path:
-                    if self.train_path is not None:
+                if self.train_path is not None:
+                    if '.rec' not in self.train_path:
                         self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
+                        self.val = None
+                        if 'test_path' in kwargs:
+                            self.test = gluon.data.vision.ImageFolderDataset(kwargs['test_path'])
                         self.num_classes = len(np.unique([e[1] for e in self.train]))
-                    self.val = None
-                    if 'test_path' in kwargs:
+                    elif '.rec' in self.train_path:
+                        self.train = gluon.data.vision.ImageRecordDataset(self.train_path)
+                        self.val = None
+                        if 'test_path' in kwargs:
+                            self.test = gluon.data.vision.ImageRecordDataset(kwargs['test_path'])
+                        self.num_classes = len(np.unique([e[1] for e in self.train]))
+                elif 'test_path' in kwargs:
+                    if '.rec' not in kwargs['test_path']:
                         self.test = gluon.data.vision.ImageFolderDataset(kwargs['test_path'])
-                elif '.rec' in self.train_path:
-                    self.train = gluon.data.vision.ImageRecordDataset(self.train_path)
-                    self.val = None
-                    self.test = gluon.data.vision.ImageRecordDataset(self.val_path)
-                    self.num_classes = len(np.unique([e[1] for e in self.train]))
+                    elif '.rec' in kwargs['test_path']:
+                        self.test = gluon.data.vision.ImageRecordDataset(kwargs['test_path'])
                 else:
                     raise NotImplementedError
             self.split = np.random.choice(range(1, 10), 1)[0]
