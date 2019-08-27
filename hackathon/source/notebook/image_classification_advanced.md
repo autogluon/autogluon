@@ -1,15 +1,12 @@
 # Image Classification - Advanced
 
-In the [first tutorial](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/build/task/image_classification_beginner.html),
-we introduce the basic usage of AutoGluon.
-In this tutorial, we want to illustrate the advanced usage of AutoGluon, such as configuring
-the search space of the hyper-parameters, searchers and trial schedulers.
-By leveraging the advanced functionalies of AutoGluon, we should be able to achieve better
-image classification results.
+While the [beginner tutorial](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/build/task/image_classification_beginner.html) introduced basic usage of AutoGluon `fit` and `predict` with default options, this tutorial dives into the various options that you can specify for more advanced control over the model-building process.
 
-We would first import autogluon.
+These options include: defining the search space of model hyperparameter values to consider, specifying how to actually search through this hyperparameter space, and how to schedule the jobs which actually train a network under a particular hyperparameter configuration.
+The advanced functionalities of AutoGluon allow you to leverage your external knowledge about your particular prediction problem and computing infrastructure to guide the model-building process. If properly utilized, you may be able to achieve superior performance within less training time.
 
 
+We again begin by letting AutoGluon know that `image_classification` is the task of interest: 
 
 ```python
 from autogluon import image_classification as task
@@ -20,35 +17,24 @@ logging.basicConfig(level=logging.INFO)
 
 ## Create AutoGluon Dataset
 
-Let's first create the dataset using the same sampled `Shopee-IET` dataset.
-We only specify the `train_path`, then the train/validation split based on 9/1 would
-be automatically performed.
-
-
-
+Let's first create the dataset using the same subset of the `Shopee-IET` dataset as before.
+Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```python
 dataset = task.Dataset(name='shopeeiet', train_path='data/train')
 ```
 
-## Create AutoGluon Fit Using Default Configurations
+## Understanding default settings of AutoGluon's fit()
 
-For demo purpose, we expect each `fit` procedure can be finished within 5min,
-and each trials last for 10 epochs.
-
-
-
+To ensure this demo runs quickly, we expect each call to `fit` can be finished within 5min,
+and individual training runs (also referred to as "trials") each last for 10 epochs.
 
 ```python
 time_limits = 5*60
 num_training_epochs = 10
 ```
 
-We then use the default configurations of `fit` function
-to produce results based on the train data.
-
-
-
+We first again use the default arguments of the `fit` function to train a model:
 
 ```python
 results = task.fit(dataset,
@@ -58,9 +44,6 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-
-
-
 ```python
 print('Top-1 val acc: %.3f' % results.metric)
 test_dataset = task.Dataset(name='shopeeiet', test_path='data/test')
@@ -68,53 +51,41 @@ test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Let's dive a little bit deeper to take a look at the default
-configuration of the `fit`.
-First, we could obtain the default model candidates
-for the image classification task.
+Let's now dive deeper into the default settings of `fit` that an advanced user may wish to alter.
 
-
-
+Recall that rather than training an image classification neural network from scratch, AutoGluon by default first loads a network that has already been pretrained on another image dataset and then continues training this network on your provided dataset (after appropriately modifying the output layer for the current task).  Let's inspect which pretrained neural network candidates AutoGluon tries to build off of by default for image classification tasks:
 
 ```python
 print('Default models:')
 print(results.metadata['nets'])
 ```
 
-We can also look up the default optimizers used in the `fit`.
-
-
-
-
+We can also look up the default optimizers used by `fit` to train each neural network (ie. to update the weight parameters based on mini-batches of training data):
+ 
 ```python
 print('Default optimizers:')
 print(results.metadata['optimizers'])
 ```
 
-The default searcher used in the `fit` is:
-
-
-
+Beyond which pretrained model and which optimizer to use, deep learning in general involves tons of other design choices, which we collectively refer to as "hyperparameters". Given possible values of the hyperparameters to try out, we require a smart strategy to efficiently find those hyperparameter values which will produce the best classifier. Strategies might include techniques such as grid/random-search, hyperband, Bayesian optimization, etc. In AutoGluon, which hyperparameter-search strategy to use is specified by a `Searcher` object.
+The default searcher used in `fit` for image classification is:
 
 ```python
 print('Default searcher:')
 print(results.metadata['searcher'])
 ```
 
-The default trial scheduler used in the `fit` is:
-
-
-
+When the Searcher returns a particular hyperparameter configuration to try out, we must train a neural network under the specified configuration settings, a process referred to as a "trial". In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
+The default trial scheduler used in `fit` for image classification is:
 
 ```python
 print('Default trial scheduler:')
 print(results.metadata['trial_scheduler'])
 ```
 
-We could also retrieve the used stop criterion and resources used for each trial using:
+When we have already trained many networks under many hyperparameter configurations and see that a current trial is performing very poorly in comparison, it may be wise to infer this is not the best hyperparameter configuration and to simply terminate the trial right away. This way, these compute resources are freed up to explore more promising hyperparameter configurations.  
 
-
-
+We can retrieve AutoGluon's default stop-criterion and resources used for each trial using:
 
 ```python
 print('Used stop criterion:')
@@ -124,33 +95,29 @@ print('Used resources for each trial:')
 print(results.metadata['resources_per_trial'])
 ```
 
-For more details of `fit`,
-please refer to the [fit API](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.task.image_classification.ImageClassification.fit).
+TODO: add code snippet showing how to specify max_gpu max_cpu per trial.
 
 
-
-We could expect fair results using the default configurations in `fit`.
-However, in order to achieve better image classification results,
-we could configure the search space based on prior knowledge or existing literature.
+In general, we can expect fairly strong predictive performance using the default settings in `fit`, if given enough computing resources and runtime.
+In order to achieve superior performance with limited compute, we can manually specify different settings in `fit` based on prior knowledge or recent research papers.
+One important aspect of this involves defining the space of hyperparameter values to search over.
 We will use `autogluon.Nets` and `autogluon.Optimizers` as
-examples to show how to configure the corresponding search space, as well as
-how to put the configured search space into the `fit` function.
+examples to show how to specify a custom hyperparameter search space, and ensure it is used by the `fit` function.
 
 
 
-## Create AutoGluon Fit with AutoGluon Nets
+## Specify which pretrained networks to try
 
-We start with configuring the network candidates.
+We start with specifying the pretrained neural network candidates.
 In AutoGluon, the network candidates are represented as [autogluon.Nets](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.network.Nets),
-which is a list of networks, and allows search for the
-best network from a list of provided (or default) networks by choosing
-the best architecture regarding to each network.
-The search space is categorical. For more information regarding to the categorical search space, please
+which is simply a list of networks.  
+Given such a list, AutoGluon will try training different networks from this list to identify the best-performing candidate.
+This is an example of a "categorical" search space, in which there are a limited number of values to choose from.
+
+For more information regarding categorical search spaces, please
 refer to the [search space API](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.List).
-Compare to default network candidates, we add `resnet50` to the search space.
 
-
-
+In addition to the default network candidates, let's also add `resnet50` to the search space:
 
 ```python
 import autogluon as ag
@@ -165,10 +132,7 @@ nets = ag.Nets(net_list)
 print(nets)
 ```
 
-Let's then create `fit` using the configured network candidates, and evaluate on validation and test data.
-
-
-
+Let's then call `fit` using these manually-specified network candidates, and evaluate on validation and test data.
 
 ```python
 results = task.fit(dataset,
@@ -179,47 +143,29 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-
-
-
 ```python
 print('Top-1 val acc: %.3f' % results.metric)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-## Create AutoGluon Fit with AutoGluon Optimizers
+## Specify which optimizers to try
 
-Similarly, we could additionally configure the hyper-parameters of optimizer candidates.\
-to further improve the results.
-In AutoGluon, [autogluon.Optimizers](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.optim.Optimizers),
-defines a list of optimization algorithms that
-allows search for the best optimization algorithm from a list of provided
-(or default) optimizers by choosing the best hyper-parameters regarding to each
-optimizer.
+Similarly, we can manually specify which of optimizer candidates to try, in order to further improve the results.
+In AutoGluon, [autogluon.Optimizers](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.optim.Optimizers) 
+defines a list of optimization algorithms, from which we can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter settings for this optimizer).
 
-
-
-Similar to network search space,
-we could use the task-specific default optimizer configuration to construct the optimizer search
-space, where the search space is [categorical](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.List).
-
-
-
+Like `autogluon.Nets`, the choice of which optimizer to use again corresponds to a [categorical](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.List) search space:
 
 ```python
 optimizers_default = ag.Optimizers(['sgd', 'adam'])
 ```
 
-Besides, we could customize the hyper-parameters of the optimizer in the search space.
-For example, we configure the learning rate and weight decay in log linear search space for both `Adam` and `SGD`,
-where the two numbers are lower and upper bound of the space.
-Please refer to [log search space](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.Log) for more information.
-Additionally, the momentum in `SGD` is configured as linear search space, where the
+Additionally, we can customize the optimizer-specific hyperparameters as another search space.
+As an example for both `Adam` and `SGD`, we can configure the learning rate and weight decay in a continuous-valued search space.
+Below, we specify that this space should be searched on a log-linear scale, providing two numbers to lower and upper bound the space of values to try.  
+Additionally, the momentum in `SGD` is configured as another continuous search space (searched on a linear scale), where the
 two numbers are also the lower and upper bounds of the space.
-Please refer to [linear search space](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.Linear) for details.
-
-
 
 
 ```python
@@ -233,10 +179,9 @@ optimizers = ag.Optimizers([adam_opt, sgd_opt])
 print(optimizers)
 ```
 
-We then put the configured network and optimizer search space together in the `fit` to expect better results.
+Please refer to [log search space](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.Log) and [linear search space](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.Linear) for more details.
 
-
-
+We then put the new network and optimizer search space together in the call to `fit` and might expect better results if we have made smart choices:
 
 ```python
 results = task.fit(dataset,
@@ -248,51 +193,39 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-
-
-
 ```python
 print('Top-1 val acc: %.3f' % results.metric)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-## Create AutoGluon Fit with Search Algorithm and Trial Scheduler
+## Specify a hyperparameter search strategy and how to schedule trials
 
 [autogluon.searcher](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-searcher)
 will support both basic and advanced search algorithms for
-both hyper-parameter optimization and architecture search. We now
-support random search. More search algorithms, such as Bayes Optimization and BOHB, are coming soon.
-The easiest way to use the random search is to specify the string name.
-
-
-
+both hyperparameter optimization and architecture search.  
+Advanced search algorithms, such as Bayesian Optimization, Population-Based Training, and BOHB, are coming soon.  
+We currently support Hyperband and random search. Although these are simple techinques, they can be surprisingly powerful when parallelized, which easily enabled in AutoGluon.
+The easiest way to specify random search is via the string name:
 
 ```python
 searcher = 'random'
 ```
 
-In AutoGluon, [autogluon.scheduler](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler)
-supports scheduling trials in serial order and with
-early stopping.
+In AutoGluon, [autogluon.scheduler](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler) orchestrates how individual training runs are scheduled. Separating the logic of the individual training code that constitutes a trial from the scheduling of trials is most useful in parallel/distributed settings.
 
-We support [FIFO scheduler](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.FIFO_Scheduler) (in serial order)
-and early stopping scheduler: [Hyperband](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.Hyperband_Scheduler).
-We can simply use string name to specify the scheduler:
-
-
-
+AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
+We support a serial [FIFO scheduler](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.FIFO_Scheduler)
+and an early stopping scheduler: [Hyperband](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.Hyperband_Scheduler).
+Which scheduler to use is easily specified via the string name:
 
 ```python
 trial_scheduler_fifo = 'fifo'
 trial_scheduler = 'hyperband'
 ```
 
-Let's then put the above mentioned configurations in the `fit`,
-and test the results on both validation and test datasets.
-
-
-
+Let's call `fit` with the Searcher and Scheduler specified above, 
+and evaluate the resulting model on both validation and test datasets:
 
 ```python
 results = task.fit(dataset,
@@ -306,20 +239,15 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-
-
-
 ```python
 print('Top-1 val acc: %.3f' % results.metric)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Let's use the same image as used in [first tutorial](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/build/task/image_classification_beginner.html).
-to generate the predicted label and the corresponding probability.
 
-
-
+Let's now use the same image as used in our [beginner tutorial](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/build/task/image_classification_beginner.html) to generate a predicted label and the corresponding confidence.
+Note that even though we called `fit` with non-default settings, we can still use the `predict` function just as before:
 
 ```python
 image = './data/test/BabyShirt/BabyShirt_323.jpg'
@@ -328,5 +256,6 @@ print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
 ```
 
-For more usage and configurations of the `fit`, 
-please refer to the [fit API](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.task.image_classification.ImageClassification.fit).
+
+Beyond what we described here, there are many other aspects of `fit` that an advanced user can control.  
+Please refer to the [fit API](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.task.image_classification.ImageClassification.fit).
