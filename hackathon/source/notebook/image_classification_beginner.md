@@ -43,7 +43,7 @@ In the above call, a train/validation data split is automatically constructed ba
 
 
 
-## Create AutoGluon Fit
+## Use AutoGluon to fit models
 
 Now, we train a neural network classifier using AutoGluon.  
 While we stick with mostly default settings in this Beginner tutorial, the Advanced tutorial will cover various options that you can specify for greater control over the training process.  
