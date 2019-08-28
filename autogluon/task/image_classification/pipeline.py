@@ -9,46 +9,37 @@ from gluoncv.model_zoo import get_model
 from mxnet.gluon.data.vision import transforms
 
 
-#from .losses import get_loss_instance
 from .metrics import get_metric_instance
 
 from ...optim import SGD, NAG
 from ...basic import autogluon_register_args
-from ...network import get_finetune_network
-from ...dataset import get_built_in_dataset
+from ...network import get_built_in_network
+from .dataset import get_built_in_dataset
 from ...basic.space import *
 
 __all__ = ['train_image_classification']
 
 logger = logging.getLogger(__name__)
 
-
-@autogluon_register_args(
-    train_dataset=get_built_in_dataset('cifar', train=True, crop_size=ListSpace(32, 48)),
-    val_dataset=get_built_in_dataset('cifar', train=True, crop_size=224),
-    net=ListSpace('resnet50v1b', 'ResNet50_v1d'),
-    optimizer=ListSpace(
-        SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
-            momentum=0.9,
-            wd=LogLinearSpace(1e-5, 1e-3)),
-        NAG(learning_rate=LogLinearSpace(1e-4, 1e-2),
-            momentum=0.9,
-            wd=LogLinearSpace(1e-5, 1e-3)),
-        ),
-    metric='Accuracy',
-    num_workers=4,
-    num_gpus=0,
-    batch_size=64,
-    epochs=20,
-    )
+# Flexible:
+#    - Even do need to tell which parameters are searchable
+#    - Reusing script from gluoncv or gluonnlp
+@autogluon_register_args()
 def train_image_classification(args, reporter):
+    print('pipeline args:', args)
+
     batch_size = args.batch_size * max(args.num_gpus, 1)
-    ctx = [mx.gpu(i)
-           for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-    if type(net) == str:
-        net = get_finetune_network(args.net, ctx)
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+    if type(args.net) == str:
+        net = get_built_in_network(args.net, ctx)._lazy_init()
     else:
         net = args.net
+        net.initialize(ctx=ctx)
+
+    if isinstance(args.train_dataset, str):
+        print('Using built-in datasets')
+        args.train_dataset = get_built_in_dataset(args.train_dataset)._lazy_init()
+        args.val_dataset = get_built_in_dataset(args.val_dataset, train=False)._lazy_init()
 
     train_data = gluon.data.DataLoader(
         args.train_dataset,
@@ -64,19 +55,10 @@ def train_image_classification(args, reporter):
 
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
 
-    def _print_debug_info(args):
-        logger.debug('Print debug info:')
-        for k, v in vars(args).items():
-            logger.debug('%s:%s' % (k, v))
-
-    _print_debug_info(args)
-
-    # TODO (cgraywang): update with search space
-    L = get_loss_instance(args.loss)
+    L = args.loss
     metric = get_metric_instance(args.metric)
 
     def train(epoch):
-        #TODO (cgraywang): change to lr scheduler
         if hasattr(args, 'lr_step') and hasattr(args, 'lr_factor'):
             if epoch % args.lr_step == 0:
                 trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
@@ -107,7 +89,10 @@ def train_image_classification(args, reporter):
 
         _, test_acc = metric.get()
         test_loss /= len(val_data)
-        reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
+        if reporter:
+            reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
+        print('epoch: {epoch}, acc: {accuracy}, loss: {loss}'. \
+            format(epoch=epoch, accuracy=test_acc, loss=test_loss))
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)

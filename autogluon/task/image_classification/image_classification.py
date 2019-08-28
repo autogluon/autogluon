@@ -4,87 +4,84 @@ from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
 
-from .losses import *
-from .metrics import *
-from ...optim import *#Optimizers, get_optim
-from ...utils.data_analyzer import DataAnalyzer
-from ..base import *
-from .dataset import *
-from .pipeline import *
+#from ...utils.data_analyzer import DataAnalyzer
+from ...optim import *
 from ...basic.space import *
+
+from ...searcher import *
+from ...distributed import *
+
+from ...network import *
+from .dataset import get_built_in_dataset
+from .pipeline import train_image_classification
+
+from ...utils import EasyDict as ezdict
 
 __all__ = ['ImageClassification']
 
 logger = logging.getLogger(__name__)
 
-class ImageClassification(BaseTask):
+class ImageClassification(object):
     @staticmethod
-    def fit(data,
-            net=ListSpace('resnet50v1b', 'ResNet50_v1d'),
-        optimizer=ListSpace(
-            SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
-                momentum=0.9,
-                wd=LogLinearSpace(1e-5, 1e-3)),
-            NAG(learning_rate=LogLinearSpace(1e-4, 1e-2),
-                momentum=0.9,
-                wd=LogLinearSpace(1e-5, 1e-3))),
-            metrics='Accuracy',
-            losses=gluon.loss.SoftmaxCrossEntropyLoss,
-            searcher=None,
-            trial_scheduler=None,
+    def fit(train_dataset='cifar10',
+            val_dataset='cifar10',
+            net=ListSpace('CIFAR_ResNet20_v1', 'CIFAR_ResNet20_v2'),
+            # training hps
+            optimizer= SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
+                           momentum=LogLinearSpace(0.85, 0.95),
+                           wd=LogLinearSpace(1e-5, 1e-3)),
+            loss=gluon.loss.SoftmaxCrossEntropyLoss(),
+            batch_size=64,
+            epochs=20,
+            metric='accuracy',
+            num_workers=4,
+            num_cpus=4,
+            num_gpus=0,
+            # searcher and scheduler options
+            searcher=RandomSampling,
+            scheduler=DistributedFIFOScheduler,
             resume=False,
-            savedir='checkpoint/exp1.ag',
+            checkpoint='checkpoint/exp1.ag',
             visualizer='none',
-            stop_criterion={
-                'time_limits': 1 * 60 * 60,
-                'max_metric': 1.0,
-                'max_trial_count': 2
-            },
-            resources_per_trial={
-                'max_num_gpus': 0,
-                'max_num_cpus': 4,
-                'max_training_epochs': 3
-            },
-            backend='default',
-            **kwargs):
-        r"""
-        Fit networks on dataset
+            num_trials=2,
+            dist_ip_addrs=[],
+            grace_period=None):
 
-        Parameters
-        ----------
-        data: Input data. It could be:
-            autogluon.Datasets
-            task.Datasets
-        nets: autogluon.Nets
-        optimizers: autogluon.Optimizers
-        metrics: autogluon.Metrics
-        losses: autogluon.Losses
-        stop_criterion (dict): The stopping criteria. The keys may be any field in
-            the return result of 'train()', whichever is reached first.
-            Defaults to empty dict.
-        resources_per_trial (dict): Machine resources to allocate per trial,
-            e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
-            assigned unless you specify them here.
-        savedir (str): Local dir to save training results to.
-        searcher: Search Algorithm.
-        trial_scheduler: Scheduler for executing
-            the experiment. Choose among FIFO (default) and HyperBand.
-        resume (bool): If checkpoint exists, the experiment will
-            resume from there.
-        backend: support autogluon default backend, ray. (Will support SageMaker)
-        **kwargs: Used for backwards compatibility.
+        # Any strategy can be injected here, for example: automatic suggest some hps
+        # based on the data layout
+        train_image_classification.update(
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            net=net,
+            optimizer=optimizer,
+            loss=loss,
+            metric=metric,
+            num_workers=num_workers,
+            num_gpus=num_gpus,
+            batch_size=batch_size,
+            epochs=epochs)
 
-        Returns
-        ----------
-        results:
-            model: the parameters associated with the best model. (TODO:)
-            val_accuracy: validation set accuracy
-            config: best configuration
-            time: total time cost
-        """
-        return BaseTask.fit(data, nets, optimizers, metrics, losses, searcher, trial_scheduler,
-                            resume, savedir, visualizer, stop_criterion, resources_per_trial,
-                            backend,
-                            reward_attr='accuracy',
-                            train_func=train_image_classification,
-                            **kwargs)
+        args = train_image_classification.args
+        cs = train_image_classification.cs
+
+        searcher_inst = searcher(cs)
+
+        scheduler_inst = scheduler(train_image_classification, args,
+                                   resource={'num_cpus': num_cpus, 'num_gpus': num_gpus},
+                                   searcher=searcher_inst,
+                                   checkpoint=checkpoint,
+                                   num_trials=num_trials,
+                                   resume=resume,
+                                   time_attr='epoch',
+                                   reward_attr=metric,
+                                   dist_ip_addrs=dist_ip_addrs,
+                                   max_t=args.epochs,
+                                   grace_period=grace_period if grace_period else args.epochs//4)
+        scheduler_inst.run()
+        scheduler_inst.join_tasks()
+        ImageClassification.scheduler = scheduler_inst
+        return ezdict({'best_config':scheduler_inst.get_best_config(),
+                       'best_reward':scheduler_inst.get_best_reward()})
+
+    def shut_down(self):
+        ImageClassification.scheduler.shutdown()

@@ -1,4 +1,3 @@
-from . import base
 from . import image_classification
 #from . import object_detection
 #from . import text_classification

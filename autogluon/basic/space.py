@@ -32,16 +32,11 @@ class ListSpace(Space):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
             return CS.ConfigurationSpace()
-        if not isinstance(self.data[0], AutoGluonObject):
-            hp = CSH.CategoricalHyperparameter(name=name, choices=self.data)
-            cs.add_hyperparameter(hp)
-        else:
-            choices = []
-            for i, x in enumerate(self.data):
-                choices.append(i)
+        hp = CSH.CategoricalHyperparameter(name=name, choices=range(len(self.data)))
+        cs.add_hyperparameter(hp)
+        for i, x in enumerate(self.data):
+            if isinstance(x, AutoGluonObject):
                 cs.add_configuration_space(str(i), x.cs, '.')
-            hp = CSH.CategoricalHyperparameter(name=name, choices=choices)
-            cs.add_hyperparameter(hp)
         return cs
 
     def __call__(self, *args, **kwargs):

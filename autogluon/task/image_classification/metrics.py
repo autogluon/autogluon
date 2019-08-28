@@ -5,19 +5,16 @@ import gluoncv
 
 __all__ = ['get_metric_instance']
 
-#TODO(cgraywang): abstract general metric shared across tasks
-metrics = {'Accuracy': mxnet.metric.Accuracy,
-           'TopKAccuracy': mxnet.metric.TopKAccuracy,
-           'F1': mxnet.metric.F1,
-           'MCC': mxnet.metric.MCC,
-           'Perplexity': mxnet.metric.Perplexity,
-           'MAE': mxnet.metric.MAE,
-           'MSE': mxnet.metric.MSE,
-           'RMSE': mxnet.metric.RMSE,
-           'CrossEntropy': mxnet.metric.CrossEntropy,
-           'PearsonCorrelation': mxnet.metric.PearsonCorrelation}
-
-
+metrics = {'accuracy': mxnet.metric.Accuracy,
+           'topkaccuracy': mxnet.metric.TopKAccuracy,
+           'f1': mxnet.metric.F1,
+           'mcc': mxnet.metric.MCC,
+           'perplexity': mxnet.metric.Perplexity,
+           'mae': mxnet.metric.MAE,
+           'mse': mxnet.metric.MSE,
+           'rmse': mxnet.metric.RMSE,
+           'crossentropy': mxnet.metric.CrossEntropy,
+           'pearsoncorrelation': mxnet.metric.PearsonCorrelation}
 
 def get_metric_instance(name, **kwargs):
     """Returns a metric instance by name
@@ -32,80 +29,10 @@ def get_metric_instance(name, **kwargs):
     metric
         The metric instance.
     """
-    if name not in metrics and name.lower() not in metrics:
+    name = name.lower()
+    if name not in metrics:
         err_str = '"%s" is not among the following metric list:\n\t' % (name)
         err_str += '%s' % ('\n\t'.join(sorted(metrics.keys())))
         raise ValueError(err_str)
     metric = metrics[name]()
     return metric
-
-#@autogluon_metrics
-#def get_metric(name, **kwargs):
-#    """Returns a metric with search space by name
-#
-#    Parameters
-#    ----------
-#    name : str
-#        Name of the metric.
-#
-#    Returns
-#    -------
-#    metric
-#        The metric with search space.
-#    """
-#    if name not in metrics and name.lower() not in metrics:
-#        err_str = '"%s" is not among the following metric list:\n\t' % (name)
-#        err_str += '%s' % ('\n\t'.join(sorted(metrics.keys())))
-#        raise ValueError(err_str)
-#    metric = Metric(name)
-#    return metric
-
-
-#@autogluon_metrics
-#def Accuracy(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def TopKAccuracy(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def F1(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def MCC(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def Perplexity(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def MAE(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def MSE(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def RMSE(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def CrossEntropy(**kwargs):
-#    pass
-#
-#
-#@autogluon_metrics
-#def PearsonCorrelation(**kwargs):
-#    pass

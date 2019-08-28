@@ -57,7 +57,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
-                 visualizer='none', dist_ip_addrs=[]):
+                 visualizer='none', dist_ip_addrs=[], **kwargs):
         super(DistributedFIFOScheduler,self).__init__(dist_ip_addrs)
         self.train_fn = train_fn
         self.args = args

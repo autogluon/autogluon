@@ -14,16 +14,16 @@ import autogluon as ag
 from autogluon import autogluon_register_args
 
 @autogluon_register_args(
-        batch_size=64,
-        num_gpus=1,
-        net=ag.ListSpace(get_model('CIFAR_ResNet20_v1'),
-                         get_model('CIFAR_ResNet20_v2')),
-        num_workers=4,
-        lr=ag.LogLinearSpace(1e-3, 1e-1),
-        momentum=0.9,
-        wd=0.0001,
-        epochs=20,
-        )
+    batch_size=64,
+    num_gpus=1,
+    net=ag.ListSpace(get_model('CIFAR_ResNet20_v1'),
+                     get_model('CIFAR_ResNet20_v2')),
+    num_workers=4,
+    lr=ag.LogLinearSpace(1e-3, 1e-1),
+    momentum=0.9,
+    wd=0.0001,
+    epochs=20,
+    )
 def train_cifar(args, reporter):
     net = args.net
     batch_size = args.batch_size
