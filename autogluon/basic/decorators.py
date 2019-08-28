@@ -182,15 +182,14 @@ def autogluon_function(**kwvars):
                 self.func = func
                 self.args = args
                 self.kwargs = kwargs
-                #self._initialized = False
+                self._inited = False
 
-            #def __getattribute__(self, name):
-            #    #if not AutoGluonObject._initialized:
-            #    if not AutoGluonObject.__getattribute__(self, '_initialized'):
-            #        self._initialized = True
-            #        config = self.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self._instance.__getattribute__(name)
+            def __call__(self, *args, **kwargs):
+                if not self._inited:
+                    self._inited = True
+                    config = self.cs.sample_configuration().get_dictionary()
+                    self._lazy_init(**config)
+                return self._instance.__call__(*args, **kwargs)
 
             def _lazy_init(self, **kwvars):
                 # lazy initialization for passing config files
@@ -202,7 +201,6 @@ def autogluon_function(**kwvars):
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
             agobj.cs = agobj.__init__.cs
-            #agobj._initialized = False
             return agobj
         return wrapper_call
     return registered_func
@@ -212,26 +210,30 @@ def autogluon_object(**kwvars):
     AutoGluon object is a lazy init object, which allows distributed training.
     """
     def registered_class(Cls):
-        class autogluonobject(AutoGluonObject):
+        class autogluonobject(AutoGluonObject, Cls):
             @autogluon_kwargs(**kwvars)
             def __init__(self, *args, **kwargs):
-                self.args = args
-                self.kwargs = kwargs
-                self._initialized = False
+                self._args = args
+                self._kwargs = kwargs
+                self._inited = False
 
-            #def __getattribute__(self, name):
-            #    if not Cls._initialized:
-            #        self._initialized = True
-            #        config = self.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self._instance.__getattribute__(name)
+            def __call__(self, *args, **kwargs):
+                if not self._inited:
+                    self._inited = True
+                    config = autogluonobject.cs.sample_configuration().get_dictionary()
+                    self._lazy_init(**config)
+                return self.__call__(*args, **kwargs)
 
             def _lazy_init(self, **kwvars):
-                # lazy initialization for passing config files
-                self.kwargs.update(kwvars)
-                self._instance = Cls.__new__(Cls, *self.args, **self.kwargs)#Cls(*self.args, **self.kwargs)#
-                self._instance.__init__(*self.args, **self.kwargs)
-                return self._instance
+                self.__class__ = Cls
+                kwargs = self._kwargs
+                kwargs.update(kwvars)
+                args = self._args
+                del self._args
+                del self._kwargs
+                self.__init__(*args, **kwargs)
+
+                return self
 
             def __repr__(self):
                 return Cls.__repr__(self)
