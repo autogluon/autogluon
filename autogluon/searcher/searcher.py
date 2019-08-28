@@ -35,9 +35,11 @@ class BaseSearcher(object):
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
-    def update(self, config, reward):
+    def update(self, config, reward, model_params=None):
         """Update the searcher with the newest metric report
         """
+        #if model_params is not None and reward > self.get_best_reward():
+        #    self._best_model_params = model_params
         self._results[pickle.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
 

@@ -26,7 +26,10 @@ def cudaInit():
     #
     fn = _cudaGetFunctionPointer("nvmlInit_v2")
     ret = fn()
-    _cudaCheckReturn(ret)
+    try:
+        _cudaCheckReturn(ret)
+    except NVMLError:
+        return False
    
     # Atomically update refcount
     global _cudaLib_refcount
