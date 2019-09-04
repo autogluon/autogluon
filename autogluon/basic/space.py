@@ -28,6 +28,9 @@ class ListSpace(Space):
     def __setitem__(self, index, data):
         self.data[index] = data
 
+    def __len__(self):
+        return len(self.data)
+
     def get_config_space(self, name):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
