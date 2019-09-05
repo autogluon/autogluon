@@ -72,8 +72,8 @@ class BaseSearcher(object):
         reprstr = self.__class__.__name__ + '(' +  \
             'ConfigSpace: {}.'.format(str(self.configspace)) + \
             'Number of Trials: {}.'.format(len(self._results)) + \
-            'Best Config: {}'.format(self.get_best_config()) \ +
-            'Best Reward: {}'.format(self.get_best_reward()) \ +
+            'Best Config: {}'.format(self.get_best_config()) + \
+            'Best Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
 
