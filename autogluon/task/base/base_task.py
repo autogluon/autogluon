@@ -13,7 +13,7 @@ from mxnet.gluon.data.vision import transforms
 from gluoncv.model_zoo import get_model
 
 import autogluon as ag
-from ...optim import Optimizers, get_optim
+from ...optimizer import Optimizers, get_optim
 from ... import dataset
 from ..image_classification.losses import *
 from ..image_classification.metrics import *
@@ -211,9 +211,6 @@ class BaseTask(ABC):
             metadata: the metadata including the search space.
             start_time: the start time of the fit function.
         """
-        print(metadata['resources_per_trial'])
-        print(metadata['stop_criterion'])
-        time.sleep(10)
 
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
@@ -222,7 +219,7 @@ class BaseTask(ABC):
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
-            trial_scheduler = ag.scheduler.Hyperband_Scheduler(
+            trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': 1,
@@ -239,7 +236,7 @@ class BaseTask(ABC):
                 visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
-            trial_scheduler = ag.scheduler.FIFO_Scheduler(
+            trial_scheduler = ag.distributed.DistributedFIFOScheduler(
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': 1,
@@ -395,21 +392,18 @@ class BaseTask(ABC):
         Fit networks on dataset
 
         Args:
-            data: Input data. task.Datasets
-            nets: autogluon.Nets
-            optimizers: autogluon.Optimizers
-            metrics: autogluon.Metrics
-            losses: autogluon.Losses
+            data: Input data. task.Datasets.
+            nets: autogluon.Nets.
+            optimizers: autogluon.Optimizers.
+            metrics: autogluon.Metrics.
+            losses: autogluon.Losses.
             stop_criterion (dict): The stopping criteria.
             resources_per_trial (dict): Machine resources to allocate per trial.
             savedir (str): Local dir to save training results to.
             searcher: Search Algorithm.
-            trial_scheduler: Scheduler for executing
-                the experiment. Choose among FIFO (default) and HyperBand.
-            resume (bool): If checkpoint exists, the experiment will
-                resume from there.
+            trial_scheduler: Scheduler for executing the experiment. Choose among FIFO (default) and HyperBand.
+            resume (bool): If checkpoint exists, the experiment will resume from there.
             backend: support autogluon default backend.
-            **kwargs: Used for backwards compatibility.
 
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',

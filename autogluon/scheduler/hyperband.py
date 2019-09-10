@@ -24,28 +24,16 @@ class Hyperband_Scheduler(FIFO_Scheduler):
     See https://arxiv.org/abs/1810.05934
 
     Args:
-        train_fn (callable): A task launch function for training.
-            Note: please add the `@autogluon_method` decorater to the original function.
+        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
         args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources.
-            For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher.
-            For example, autogluon.searcher.RandomSampling
-        time_attr (str): A training result attr to use for comparing time.
-            Note that you can pass in something non-temporal such as
-            `training_epoch` as a measure of progress, the only requirement
-            is that the attribute should increase monotonically.
-        reward_attr (str): The training result objective value attribute. As
-            with `time_attr`, this may refer to any objective value. Stopping
-            procedures will use this attribute.
-        max_t (float): max time units per task. Trials will be stopped after
-            max_t time units (determined by time_attr) have passed.
-        grace_period (float): Only stop tasks at least this old in time.
-            The units are the same as the attribute named by `time_attr`.
-        reduction_factor (float): Used to set halving rate and amount. This
-            is simply a unit-less scalar.
-        brackets (int): Number of brackets. Each bracket has a different
-            halving rate, specified by the reduction factor.
+        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
+        time_attr (str): A training result attr to use for comparing time. Note that you can pass in something non-temporal such as `training_epoch` as a measure of progress, the only requirement is that the attribute should increase monotonically.
+        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
+        max_t (float): max time units per task. Trials will be stopped after max_t time units (determined by time_attr) have passed.
+        grace_period (float): Only stop tasks at least this old in time. The units are the same as the attribute named by `time_attr`.
+        reduction_factor (float): Used to set halving rate and amount. This is simply a unit-less scalar.
+        brackets (int): Number of brackets. Each bracket has a different halving rate, specified by the reduction factor.
 
     Example:
         >>> @autogluon_method

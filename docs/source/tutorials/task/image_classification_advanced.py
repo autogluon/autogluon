@@ -107,11 +107,11 @@ print(nets)
 optimizers_default = ag.Optimizers(['sgd', 'adam'])
 
 # method 2: customize the hyper-parameters of optimizer in the search space.
-adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                          wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-                        wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+adam_opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+sgd_opt = ag.optimizers.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                            momentum=ag.space.Linear('momentum', 0.85, 0.95),
+                            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
 optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
 print(optimizers)

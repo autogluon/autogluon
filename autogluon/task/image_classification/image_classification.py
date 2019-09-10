@@ -10,7 +10,7 @@ from .model_zoo import *
 from .losses import *
 from .metrics import *
 from ...network import Nets
-from ...optim import Optimizers, get_optim
+from ...optimizer import Optimizers, get_optim
 from ...loss import Losses
 from ...metric import Metrics
 from ...utils.data_analyzer import DataAnalyzer
@@ -182,21 +182,18 @@ class ImageClassification(BaseTask):
         Fit networks on dataset
 
         Args:
-            data: Input data. task.Datasets
-            nets: autogluon.Nets
-            optimizers: autogluon.Optimizers
-            metrics: autogluon.Metrics
-            losses: autogluon.Losses
+            data: Input data. task.Datasets.
+            nets: autogluon.Nets.
+            optimizers: autogluon.Optimizers.
+            metrics: autogluon.Metrics.
+            losses: autogluon.Losses.
             stop_criterion (dict): The stopping criteria.
             resources_per_trial (dict): Machine resources to allocate per trial.
             savedir (str): Local dir to save training results to.
             searcher: Search Algorithm.
-            trial_scheduler: Scheduler for executing
-                the experiment. Choose among FIFO (default) and HyperBand.
-            resume (bool): If checkpoint exists, the experiment will
-                resume from there.
+            trial_scheduler: Scheduler for executing the experiment. Choose among FIFO (default) and HyperBand.
+            resume (bool): If checkpoint exists, the experiment will resume from there.
             backend: support autogluon default backend.
-            **kwargs: Used for backwards compatibility.
 
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',

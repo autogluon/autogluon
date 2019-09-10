@@ -39,12 +39,13 @@ dataset = task.Dataset(name='shopeeiet', train_path='data/train')
 # to generate best result of the search in terms of accuracy
 # according to best configuration.
 #
-# To achieve this, we are using ``fit`` function to generate the above
+# To achieve this, we are using TODO `fit` function to generate the above
 # results based on the datasets.
 # Due to the time limitation for demo purpose,
 # we specify the `time_limits`, `num_training_epochs` to small values.
 
-time_limits = 5*60
+#TODO
+time_limits = 30
 num_training_epochs = 10
 results = task.fit(dataset,
                    time_limits=time_limits,

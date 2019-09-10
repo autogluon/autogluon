@@ -29,7 +29,8 @@ dataset = task.Dataset(name='shopeeiet', train_path='data/train')
 # For demo purpose, we expect each `fit` procedure can be finished within 5min,
 # and each trials last for 10 epochs.
 
-time_limits = 5 * 60
+#TODO
+time_limits = 30
 num_training_epochs = 10
 
 ################################################################
@@ -164,11 +165,11 @@ optimizers_default = ag.Optimizers(['sgd', 'adam'])
 # two numbers are also the lower and upper bounds of the space.
 # Please refer to [linear search space](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/frontend.html#autogluon.space.Linear) for details.
 
-adam_opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                          wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-sgd_opt = ag.optims.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-                        wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+adam_opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                              wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+sgd_opt = ag.optimizers.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
+                            momentum=ag.space.Linear('momentum', 0.85, 0.95),
+                            wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
 optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
 print(optimizers)
@@ -210,7 +211,7 @@ searcher = 'random'
 #
 # We support [FIFO scheduler](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.FIFO_Scheduler) (in serial order)
 # and early stopping scheduler: [Hyperband](http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/backend.html#autogluon-scheduler.Hyperband_Scheduler).
-# We can simply use string name to specify the scheduler:
+# TODO We can simply use string name to specify the schedulers:
 
 trial_scheduler_fifo = 'fifo'
 trial_scheduler = 'hyperband'
