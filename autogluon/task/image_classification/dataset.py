@@ -83,7 +83,6 @@ def get_data_rec(input_size, crop_ratio, rec_train, rec_train_idx,
         preprocess_threads  = num_workers,
         shuffle             = False,
         batch_size          = batch_size,
-
         resize              = resize,
         data_shape          = (3, input_size, input_size),
         mean_r              = mean_rgb[0],

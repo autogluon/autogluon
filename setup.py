@@ -43,7 +43,8 @@ except(IOError, ImportError):
     long_description = open('README.md').read()
 
 requirements = [
-    'numpy==1.16.0',
+    'tqdm',
+    'numpy==1.17.0',
     'scipy',
     'matplotlib',
     'requests',

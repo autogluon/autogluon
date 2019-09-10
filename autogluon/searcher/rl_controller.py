@@ -7,7 +7,7 @@ from .searcher import BaseSearcher
 from ..utils import keydefaultdict, update_params
 from collections import OrderedDict
 
-__all__ = ['RLSearcher', 'RLController']
+__all__ = ['RLSearcher', 'LSTMController']
 
 class RLSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
@@ -25,7 +25,7 @@ class RLSearcher(BaseSearcher):
         self._results = OrderedDict()
         self._best_state_path = None
         if controller_type == 'rl':
-            self.controller = RLController(kwspaces, ctx=ctx)
+            self.controller = LSTMController(kwspaces, ctx=ctx)
         else:
             raise NotImplemented
 
@@ -36,6 +36,9 @@ class RLSearcher(BaseSearcher):
             'Best Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
+
+    def get_config(self):
+        return self.controller.sample()[0]
 
     def state_dict(self, destination=None):
         if destination is None:
@@ -51,7 +54,7 @@ class RLSearcher(BaseSearcher):
 
 
 # Reference: https://github.com/carpedm20/ENAS-pytorch/
-class RLController(mx.gluon.Block):
+class LSTMController(mx.gluon.Block):
     def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
                  ctx=mx.cpu()):
         super().__init__()
@@ -68,22 +71,20 @@ class RLController(mx.gluon.Block):
         num_total_tokens = sum(self.num_tokens)
 
         # controller lstm
-        self.encoder = nn.Embedding(num_total_tokens,
-                                    hidden_size)
-        self.lstm = mx.gluon.rnn.LSTMCell(input_size=hidden_size,
-                                          hidden_size=hidden_size)
+        self.encoder = nn.Embedding(num_total_tokens, hidden_size)
+        self.lstm = mx.gluon.rnn.LSTMCell(input_size=hidden_size, hidden_size=hidden_size)
         self.decoders = nn.Sequential()
         for idx, size in enumerate(self.num_tokens):
             decoder = nn.Dense(in_units=hidden_size, units=size)
             self.decoders.add(decoder)
 
         def _init_hidden(batch_size):
-            print('batch_size, hidden_size', batch_size, hidden_size)
+            #print('batch_size, hidden_size', batch_size, hidden_size)
             zeros = mx.nd.zeros((batch_size, hidden_size), ctx=self.context)
             return zeros, zeros.copy()
 
         def _get_default_hidden(key):
-            print('key, hidden_size', key, hidden_size)
+            #print('key, hidden_size', key, hidden_size)
             return mx.nd.zeros((key, hidden_size), ctx=self.context)
         
         self.static_init_hidden = keydefaultdict(_init_hidden)
@@ -118,17 +119,16 @@ class RLController(mx.gluon.Block):
         log_probs = []
 
         for block_idx in range(len(self.num_tokens)):
-            logits, hidden = self.forward(inputs,
-                                          hidden,
-                                          block_idx,
-                                          is_embed=(block_idx==0))
+            logits, hidden = self.forward(inputs, hidden,
+                                          block_idx, is_embed=(block_idx==0))
 
             probs = F.softmax(logits, axis=-1)
             log_prob = F.log_softmax(logits, axis=-1)
             entropy = -(log_prob * probs).sum(1, keepdims=False)
 
             action = mx.random.multinomial(probs, 1)
-            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context), action.astype('float32'))
+            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
+                              action.astype('float32'))
             selected_log_prob = F.gather_nd(log_prob, ind)
 
             actions.append(action[:, 0])
@@ -136,7 +136,7 @@ class RLController(mx.gluon.Block):
             log_probs.append(selected_log_prob)
 
             # why add some constant?
-            inputs = action[:, 0] + sum(self.num_tokens[:block_idx])
+            inputs = action[:, 0] #+ sum(self.num_tokens[:block_idx])
             inputs.detach()
 
         configs = []

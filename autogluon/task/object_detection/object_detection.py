@@ -4,7 +4,7 @@ from .model_zoo import *
 from .losses import *
 from .metrics import *
 from ...network import Nets
-from ...optim import Optimizers, get_optim
+from ...optimizer import Optimizers, get_optim
 from ...loss import Losses
 from ...metric import Metrics
 from ...utils.data_analyzer import DataAnalyzer

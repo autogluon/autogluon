@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class DistributedResourceManager(object):
     LOCK = mp.Lock()
     REQUESTING_STACK = []
-    REQUESTING_SEMAPHORE = mp.Semaphore(0)
+    #REQUESTING_SEMAPHORE = mp.Semaphore(0)
     MAX_CPU_COUNT = 0
     MAX_GPU_COUNT = 0
     NODE_RESOURCE_MANAGER = {}
@@ -67,8 +67,11 @@ class DistributedResourceManager(object):
                 cls.NODE_RESOURCE_MANAGER[node]._request(node, resource)
                 return
 
-        cls.REQUESTING_STACK.append(resource)
-        cls.REQUESTING_SEMAPHORE.acquire()
+        logger.debug('Appending {} to Request Stack'.format(resource))
+        request_semaphore = mp.Semaphore(0)
+        with cls.LOCK:
+            cls.REQUESTING_STACK.append((resource, request_semaphore))
+        request_semaphore.acquire()
         return
 
     @classmethod
@@ -79,16 +82,20 @@ class DistributedResourceManager(object):
 
     @classmethod
     def _evoke_request(cls):
-        success = False
-        if len(cls.REQUESTING_STACK) > 0:
-            with cls.LOCK:
-                resource = cls.REQUESTING_STACK.pop()
+        succeed = False
+        with cls.LOCK:
+            if len(cls.REQUESTING_STACK) > 0:
+                resource, request_semaphore = cls.REQUESTING_STACK.pop()
                 node = cls.check_availability(resource)
                 if node is not None:
                     cls.NODE_RESOURCE_MANAGER[node]._request(node, resource)
-                    cls.REQUESTING_SEMAPHORE.release()
-                    success = True
-        if success:
+                    logger.debug('\nEvoking requesting resource {}'.format(resource))
+                    request_semaphore.release()
+                    succeed = True
+                else:
+                    cls.REQUESTING_STACK.append((resource, request_semaphore))
+                    return
+        if succeed:
             cls._evoke_request()
 
     @classmethod

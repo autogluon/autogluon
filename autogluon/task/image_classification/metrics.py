@@ -19,15 +19,9 @@ metrics = {'accuracy': mxnet.metric.Accuracy,
 def get_metric_instance(name, **kwargs):
     """Returns a metric instance by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the metric.
-
-    Returns
-    -------
-    metric
-        The metric instance.
+    Args:
+        name : str
+            Name of the metric.
     """
     name = name.lower()
     if name not in metrics:
