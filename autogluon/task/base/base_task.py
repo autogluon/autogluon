@@ -226,6 +226,7 @@ class BaseTask(ABC):
         searcher (str): Search Algorithm to employ, should be one of: 
             'random' (random search), 'bayesopt' (Bayesian optimization using skopt).
             If = None, defaults to 'random'.
+            # TODO: do not want to rely on string flag to select searcher, need to be able to pass kwargs to searcher.
         trial_scheduler: Scheduler for executing
             the experiment. Choose among FIFO (default) and HyperBand.
         resume (bool): If checkpoint exists, the experiment will

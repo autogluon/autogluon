@@ -20,15 +20,23 @@ logger = logging.getLogger(__name__)
 
 class SKoptSearcher(BaseSearcher):
     """SKopt Searcher for ConfigSpace. Requires that 'scikit-optimize' package is installed.
-
+    
     Args:
         configspace: ConfigSpace.ConfigurationSpace
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
-        kwargs: Optional arguments passed to skopt Optimizer class. 
-            Can be used to specify which surrogate model Bayesian optimization should rely on,
-            which acquisition function to use, how to optimize the acquisition function, etc.        
-
+        kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
+                please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
+            These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
+            which acquisition function to use, how to optimize the acquisition function, etc.
+            The skopt library provides very comprehensive Bayesian optimization functionality,
+            popular non-default kwargs options here might include: 
+            - base_estimator = 'GP' or 'RF' or 'ET' or 'GBRT' (to specify different surrogate models like Gaussian Processes, Random Forests, etc)
+            - acq_func = 'LCB' or 'EI' or 'PI' or 'gp_hedge' (to specify different acquisition functions like Lower Confidence Bound, Expected Improvement, etc)
+            For example, we can tell our Searcher to perform Bayesian optimization with a Random Forest surrogate model
+            and use the Expected Improvement acquisition function by invoking the following kwargs:
+            SKoptSearcher(cs, base_estimator='RF', acq_func='EI').
+    
     Example:
         >>> import ConfigSpace as CS
         >>> import ConfigSpace.hyperparameters as CSH
@@ -41,6 +49,17 @@ class SKoptSearcher(BaseSearcher):
         >>> next_config = searcher.get_config()
         >>> next_reward = 10.0 # made-up value.
         >>> searcher.update(next_config, next_reward)
+        
+    Notes on SKopt behavior:
+    
+    - get_config() cannot ensure valid configurations for conditional spaces since skopt 
+    does not contain this functionality like ConfigSpace does. 
+    Currently SKoptSearcher.get_config() will catc these Exceptions and revert to random_config() in this case
+    
+    - get_config(max_tries) uses skopt batch BayesOpt functionality to query at most 
+    max_tries number of configs to try out.
+    If all of these have configus have already been scheduled to try (might happen in asynchronous setting), 
+    then get_config simply reverts to random search via random_config().
     """
     
     def __init__(self, configspace, **kwargs):
@@ -156,19 +175,3 @@ class SKoptSearcher(BaseSearcher):
             hp = self.hp_ordering[i]
             config[hp] = point[i]
         return config
-
-"""
-TODOs:
-
-- get_config() cannot ensure valid configurations for conditional spaces since skopt 
-does not contain this functionality like ConfigSpace does. 
-Currently SKoptSearcher.get_config() will catch Exception and default to random_config() in this case
-
-- get_config(max_tries) uses skopt batch BayesOpt functionality to query at most 
-max_tries number of configs to try.  If all of these have already been scheduled to try 
-(e.g. in asynchronous setting), then get_config simply reverts to random search.
-
-- get_config() may become stuck in infinite while loop. There is no termination condition to handle 
-the case where all possible configs have already been tried 
-(should be inherited from BaseSearcher or Scheduler should automatically terminate)
-"""
