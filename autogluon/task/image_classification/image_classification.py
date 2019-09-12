@@ -162,8 +162,8 @@ class ImageClassification(BaseTask):
                 get_metric('Accuracy')]),
             losses=Losses([
                 get_loss('SoftmaxCrossEntropyLoss')]),
-            searcher=None,
-            trial_scheduler=None,
+            searcher='random',
+            trial_scheduler='fifo',
             resume=False,
             savedir='checkpoint/exp1.ag',
             visualizer='tensorboard',

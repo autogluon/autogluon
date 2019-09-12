@@ -1,8 +1,10 @@
 import os
+import copy
 import shutil
 import logging
 import argparse
 import time
+import json
 from abc import ABC
 import matplotlib.pyplot as plt
 import ConfigSpace as CS
@@ -123,6 +125,7 @@ class BaseTask(ABC):
 
     def __init__(self):
         self._result = None
+        self._trial_scheduler = None
         super(BaseTask, self).__init__()
 
     @property
@@ -132,6 +135,14 @@ class BaseTask(ABC):
     @result.setter
     def result(self, val):
         self._result = val
+
+    @property
+    def trial_scheduler (self):
+        return self._trial_scheduler
+
+    @trial_scheduler.setter
+    def trial_scheduler (self, val):
+        self._trial_scheduler = val
 
 
     @staticmethod
@@ -219,7 +230,7 @@ class BaseTask(ABC):
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
-            trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
+            BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': 1,
@@ -236,7 +247,7 @@ class BaseTask(ABC):
                 visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
-            trial_scheduler = ag.distributed.DistributedFIFOScheduler(
+            BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
                 metadata['kwargs']['train_func'],
                 args,
                 {'num_cpus': 1,
@@ -247,11 +258,13 @@ class BaseTask(ABC):
                 time_attr='epoch',
                 reward_attr=metadata['kwargs']['reward_attr'],
                 visualizer=metadata['visualizer'])
-        trial_scheduler.run_with_stop_criterion(start_time, metadata['stop_criterion'])
-        final_metric = trial_scheduler.get_best_reward()
-        final_config = trial_scheduler.get_best_config()
 
-        BaseTask.final_fit(args, final_config, metadata)
+        BaseTask.trial_scheduler.run_with_stop_criterion(start_time, metadata['stop_criterion'])
+        BaseTask.trial_scheduler.join_tasks()
+        final_metric = BaseTask.trial_scheduler.searcher.get_best_reward()
+        final_config = BaseTask.trial_scheduler.searcher.get_best_config()
+
+        BaseTask.final_fit(args, final_config, metadata)#metadata
         ctx = [mx.gpu(i) for i in range(metadata['resources_per_trial']['num_gpus'])] \
             if metadata['resources_per_trial']['num_gpus'] > 0 else [mx.cpu()]
 
@@ -353,13 +366,9 @@ class BaseTask(ABC):
 
     @staticmethod
     def final_fit(args, config, metadata):
+        args = copy.deepcopy(args)
         logger.info('Start final fitting.')
-        def _metadata_args():
-            vars(args).update({'savedir': metadata['savedir']})
-            for k, v in config.items():
-                vars(args).update({k: v})
-            return args
-        args = _metadata_args()
+        vars(args).update({'savedir': metadata['savedir']})
         args.data.split = 0
         args.train_func(args, config, reporter=None)
         mx.nd.waitall()
@@ -460,8 +469,10 @@ class BaseTask(ABC):
         logger.info('Finished.')
 
         logger.info('Finished.')
-        BaseTask.result = Results(final_model, final_metric, final_config,
-                                  time.time() - start_fit_time,
-                                  metadata)
+        BaseTask.result = Results(copy.deepcopy(final_model), copy.deepcopy(final_metric),
+                                  copy.deepcopy(final_config),
+                                  copy.deepcopy(time.time() - start_fit_time),
+                                  copy.deepcopy(metadata))
+        BaseTask.trial_scheduler.shutdown()
         mx.nd.waitall()
         return BaseTask.result
