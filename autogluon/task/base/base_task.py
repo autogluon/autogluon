@@ -473,6 +473,6 @@ class BaseTask(ABC):
                                   copy.deepcopy(final_config),
                                   copy.deepcopy(time.time() - start_fit_time),
                                   copy.deepcopy(metadata))
-        BaseTask.trial_scheduler.shutdown()
+        # BaseTask.trial_scheduler.shutdown()
         mx.nd.waitall()
         return BaseTask.result
