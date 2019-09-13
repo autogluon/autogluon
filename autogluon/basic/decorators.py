@@ -2,6 +2,7 @@ import copy
 import logging
 import argparse
 import functools
+import collections
 import numpy as np
 import multiprocessing as mp
 import ConfigSpace as CS
@@ -90,6 +91,22 @@ class autogluon_method(object):
                 _rm_hp(self.cs, k)
                 self.args.update({k: v})
 
+    def get_kwspaces(self):
+        self.kwspaces = collections.OrderedDict()
+        for k, v in self.kwvars.items():
+            if isinstance(v, ListSpace):
+                self.kwspaces[k] = v
+            elif isinstance(v, AutoGluonObject):
+                for sub_k, sub_v in v.kwspaces.items():
+                    new_k = '{}.{}'.format(k, sub_k)
+                    if isinstance(sub_v, ListSpace):
+                        self.kwspaces[new_k] = sub_v
+                    else:
+                        logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+            elif isinstance(v, Space):
+                logger.warning('Unspported HP type {} for {}'.format(v, k))
+        return self.kwspaces
+
     def _rand_seed(self):
         autogluon_method.SEED.value += 1
         np.random.seed(autogluon_method.SEED.value)
@@ -150,17 +167,18 @@ def autogluon_kwargs(**kwvars):
     """
     def registered_func(func):
         cs = CS.ConfigurationSpace()
+        kwspaces = collections.OrderedDict()
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
                 if isinstance(v, ListSpace):
                     kwargs[k] = v
-                    if k not in cs.get_hyperparameter_names():
-                        sub_cs = v.get_config_space(name=k)
-                        _add_cs(cs, sub_cs, '', '')
+                    kwspaces[k] = v
+                    sub_cs = v.get_config_space(name=k)
+                    _add_cs(cs, sub_cs, '', '')
                 elif isinstance(v, Space):
-                    #if k not in cs.get_hyperparameter_names():
+                    kwspaces[k] = v
                     hp = v.get_config_space(name=k)
                     _add_hp(cs, hp)
                     kwargs[k] = hp.default_value
@@ -171,6 +189,7 @@ def autogluon_kwargs(**kwvars):
                     kwargs[k] = v
             return func(*args, **kwargs)
         wrapper_call.cs = cs
+        wrapper_call.kwspaces = kwspaces
         return wrapper_call
     return registered_func
 
@@ -201,6 +220,7 @@ def autogluon_function(**kwvars):
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
             agobj.cs = agobj.__init__.cs
+            agobj.kwspaces = agobj.__init__.kwspaces
             return agobj
         return wrapper_call
     return registered_func
@@ -239,6 +259,7 @@ def autogluon_object(**kwvars):
                 return Cls.__repr__(self)
 
         autogluonobject.cs = autogluonobject.__init__.cs
+        autogluonobject.kwspaces = autogluonobject.__init__.kwspaces
         return autogluonobject
 
     return registered_class

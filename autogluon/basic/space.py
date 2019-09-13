@@ -45,6 +45,10 @@ class ListSpace(Space):
     def __call__(self, *args, **kwargs):
         self._instance(*args, **kwargs)
 
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + str(self.data)
+        return reprstr
+
 class LinearSpace(Space):
     def __init__(self, lower, upper):
         self.lower = lower

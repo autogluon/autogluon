@@ -31,6 +31,22 @@ class DistributedResourceManager(object):
         cls._refresh_resource()
 
     @classmethod
+    def reserve_resource(cls, remote, resource):
+        node_manager = cls.NODE_RESOURCE_MANAGER[remote]
+        with cls.LOCK:
+            if not node_manager.check_availability(resource):
+                return False
+            node_manager._request(remote, resource)
+        logger.info('Reserved {} in {}'.format(resource, remote))
+        return True
+
+    @classmethod
+    def release_reserved_resource(cls, remote, resource):
+        node_manager = cls.NODE_RESOURCE_MANAGER[remote]
+        node_manager._release(resource)
+        cls._evoke_request()
+
+    @classmethod
     def _refresh_resource(cls):
         cls.MAX_CPU_COUNT = max([x.get_all_resources()[0] for x in cls.NODE_RESOURCE_MANAGER.values()])
         cls.MAX_GPU_COUNT = max([x.get_all_resources()[1] for x in cls.NODE_RESOURCE_MANAGER.values()])

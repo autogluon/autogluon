@@ -44,12 +44,24 @@ class BaseSearcher(object):
         logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
 
     def get_best_reward(self):
-        config = max(self._results, key=self._results.get)
-        return self._results[config]
+        if len(self._results) > 0:
+            config = max(self._results, key=self._results.get)
+            return self._results[config]
+        return 0.0
+
+    def get_reward(self, config):
+        k = pickle.dumps(config)
+        print('k', k)
+        print('config', config)
+        assert k in self._results
+        return self._results[k]
 
     def get_best_config(self):
-        config = max(self._results, key=self._results.get)
-        return pickle.loads(config)
+        if len(self._results) > 0:
+            config = max(self._results, key=self._results.get)
+            return pickle.loads(config)
+        else:
+            return {}
 
     def is_best(self, config):
         best_config = max(self._results, key=self._results.get)
@@ -70,10 +82,10 @@ class BaseSearcher(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
-            'ConfigSpace: {}.'.format(str(self.configspace)) + \
-            'Number of Trials: {}.'.format(len(self._results)) + \
-            'Best Config: {}'.format(self.get_best_config()) + \
-            'Best Reward: {}'.format(self.get_best_reward()) + \
+            '\nConfigSpace: {}.'.format(str(self.configspace)) + \
+            '\nNumber of Trials: {}.'.format(len(self._results)) + \
+            '\nBest Config: {}'.format(self.get_best_config()) + \
+            '\nBest Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
 

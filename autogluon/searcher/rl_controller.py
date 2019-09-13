@@ -4,6 +4,7 @@ import mxnet.ndarray as F
 from ..basic.space import *
 from .searcher import BaseSearcher
 from ..utils import keydefaultdict
+import collections
 
 __all__ = ['RLSearcher', 'Controller']
 
@@ -19,113 +20,16 @@ class RLSearcher(BaseSearcher):
         >>> searcher = RLSearcher(cs)
         >>> searcher.get_config()
     """
-    def __init__(self, **kwspaces):
+    def __init__(self, kwspaces, ctx=mx.cpu()):
         #self.configspace = configspace
-        self._results = OrderedDict()
+        self._results = collections.OrderedDict()
         self._best_state_path = None
-        self.controller = Controller(kwspaces)
-
-    def get_config(self):
-        """Function to sample a new configuration
-        This function is called inside Hyperband to query a new configuration
-
-        Args:
-            returns: (config, info_dict)
-                must return a valid configuration and a (possibly empty) info dict
-        """
-        while pickle.dumps(new_config) in self._results.keys():
-            pass
+        self.controller = Controller(kwspaces, ctx=ctx)
 
     def update(self, *args, **kwargs):
         """Update the searcher with the newest metric report
         """
         super(RLSearcher, self).update(*args, **kwargs)
-
-    #def train_controller(self):
-    #    model = self.controller
-
-    #    avg_reward_base = None
-    #    baseline = None
-    #    adv_history = []
-    #    entropy_history = []
-    #    reward_history = []
-
-    #    hidden = self.shared.init_hidden(self.args.batch_size)
-    #    total_loss = 0
-    #    valid_idx = 0
-    #    for step in range(self.args.controller_max_step):
-    #        # sample models
-    #        dags, log_probs, entropies = self.controller.sample(
-    #            with_details=True)
-
-    #        # calculate reward
-    #        np_entropies = entropies.data.cpu().numpy()
-    #        # NOTE(brendan): No gradients should be backpropagated to the
-    #        # shared model during controller training, obviously.
-    #        with _get_no_grad_ctx_mgr():
-    #            rewards, hidden = self.get_reward(dags,
-    #                                              np_entropies,
-    #                                              hidden,
-    #                                              valid_idx)
-
-    #        # discount
-    #        if 1 > self.args.discount > 0:
-    #            rewards = discount(rewards, self.args.discount)
-
-    #        reward_history.extend(rewards)
-    #        entropy_history.extend(np_entropies)
-
-    #        # moving average baseline
-    #        if baseline is None:
-    #            baseline = rewards
-    #        else:
-    #            decay = self.args.ema_baseline_decay
-    #            baseline = decay * baseline + (1 - decay) * rewards
-
-    #        adv = rewards - baseline
-    #        adv_history.extend(adv)
-
-    #        # policy loss
-    #        loss = -log_probs*utils.get_variable(adv,
-    #                                             self.cuda,
-    #                                             requires_grad=False)
-    #        if self.args.entropy_mode == 'regularizer':
-    #            loss -= self.args.entropy_coeff * entropies
-
-    #        loss = loss.sum()  # or loss.mean()
-
-    #        # update
-    #        self.controller_optim.zero_grad()
-    #        loss.backward()
-
-    #        if self.args.controller_grad_clip > 0:
-    #            torch.nn.utils.clip_grad_norm(model.parameters(),
-    #                                          self.args.controller_grad_clip)
-    #        self.controller_optim.step()
-
-    #        total_loss += utils.to_item(loss.data)
-
-    #        if ((step % self.args.log_step) == 0) and (step > 0):
-    #            self._summarize_controller_train(total_loss,
-    #                                             adv_history,
-    #                                             entropy_history,
-    #                                             reward_history,
-    #                                             avg_reward_base,
-    #                                             dags)
-
-    #            reward_history, adv_history, entropy_history = [], [], []
-    #            total_loss = 0
-
-    #        self.controller_step += 1
-
-    #        prev_valid_idx = valid_idx
-    #        valid_idx = ((valid_idx + self.max_length) %
-    #                     (self.valid_data.size(0) - 1))
-    #        # NOTE(brendan): Whenever we wrap around to the beginning of the
-    #        # validation data, we reset the hidden states.
-    #        if prev_valid_idx > valid_idx:
-    #            hidden = self.shared.init_hidden(self.args.batch_size)
-
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -137,15 +41,15 @@ class RLSearcher(BaseSearcher):
 
 # Reference: https://github.com/carpedm20/ENAS-pytorch/
 class Controller(mx.gluon.Block):
-    def __init__(self, kwspaces, softmax_temperature=1, controller_hid=100,
+    def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
                  ctx=mx.cpu()):
         super().__init__()
         self.softmax_temperature = softmax_temperature
         self.spaces = list(kwspaces.items())
-        self.controller_hid = controller_hid
+        self.hidden_size = hidden_size
         self.context = ctx
 
-        # only support discrete space for now
+        # only support List space for now
         self.num_tokens = []
         for _, space in self.spaces:
             assert isinstance(space, ListSpace)
@@ -154,23 +58,29 @@ class Controller(mx.gluon.Block):
 
         # controller lstm
         self.encoder = nn.Embedding(num_total_tokens,
-                                    controller_hid)
-        self.lstm = mx.gluon.rnn.LSTMCell(input_size=controller_hid,
-                                          hidden_size=controller_hid)
+                                    hidden_size)
+        self.lstm = mx.gluon.rnn.LSTMCell(input_size=hidden_size,
+                                          hidden_size=hidden_size)
         self.decoders = nn.Sequential()
         for idx, size in enumerate(self.num_tokens):
-            decoder = nn.Dense(in_units=controller_hid, units=size)
+            decoder = nn.Dense(in_units=hidden_size, units=size)
             self.decoders.add(decoder)
 
         def _init_hidden(batch_size):
-            zeros = mx.nd.zeros((batch_size, controller_hid), ctx=self.context)
+            print('batch_size, hidden_size', batch_size, hidden_size)
+            zeros = mx.nd.zeros((batch_size, hidden_size), ctx=self.context)
             return zeros, zeros.copy()
 
         def _get_default_hidden(key):
-            return mx.nd.zeros((key, controller_hid), ctx=self.context)
+            print('key, hidden_size', key, hidden_size)
+            return mx.nd.zeros((key, hidden_size), ctx=self.context)
         
         self.static_init_hidden = keydefaultdict(_init_hidden)
         self.static_inputs = keydefaultdict(_get_default_hidden)
+
+    def initialize(self, ctx=[mx.cpu()], *args, **kwargs):
+        self.context = ctx[0]
+        super().initialize(ctx=ctx, *args, **kwargs)
 
     def forward(self, inputs, hidden, block_idx, is_embed):
         if not is_embed:
@@ -182,7 +92,7 @@ class Controller(mx.gluon.Block):
         _, (hx, cx) = self.lstm(embed, hidden)
 
         logits = self.decoders[block_idx](hx)
-        logits /= self.softmax_temperature
+        logits = logits / self.softmax_temperature
 
         return logits, (hx, cx)
 
@@ -229,7 +139,18 @@ class Controller(mx.gluon.Block):
                 config[k] = space[choice]
             configs.append(config)
 
+        #print('sampled configs', configs)
+        #print('sampled log_probs', log_probs)
         if with_details:
-            return configs, F.concat(*log_probs, dim=0), F.concat(*entropies, dim=0)
+            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+            #F.concat(*log_probs, dim=0), F.concat(*entropies, dim=0)
         else:
             return configs
+
+    def __getstate__(self):
+        """Override pickling behavior."""
+        d = dict(self.__dict__)
+        return d
+
+    def __setstate__(self, d):
+        self.__dict__ = d
