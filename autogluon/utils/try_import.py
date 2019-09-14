@@ -1,4 +1,4 @@
-__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2']
+__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2', 'try_import_skopt']
 
 def try_import_mxboard():
     try:
@@ -41,3 +41,11 @@ def try_import_cv2():
         raise ImportError(
             "Unable to import dependency cv2. "
             "A quick tip is to install via `pip install opencv-python`. ")
+
+def try_import_skopt():
+    try:
+        import skopt
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency skopt. "
+            "A quick tip is to install via `pip install scikit-optimize`. ")
