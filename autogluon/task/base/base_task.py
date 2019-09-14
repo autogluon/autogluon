@@ -225,6 +225,8 @@ class BaseTask(ABC):
 
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
+        elif metadata['searcher'] == 'bayesopt':
+            searcher = ag.searcher.SKoptSearcher(cs)
         elif isinstance(metadata['searcher'], BaseSearcher):
             searcher = metadata['searcher']
         else:
