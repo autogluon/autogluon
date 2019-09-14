@@ -56,22 +56,22 @@ net_list = ['resnet18_v1',
 # if net_list is provided
 nets = ag.Nets(net_list)
 
-print(nets)
-
-results = task.fit(dataset,
-                   nets,
-                   time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
-
-print('Top-1 val acc: %.3f' % results.metric)
-test_acc = task.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-
-# task.trial_scheduler.shutdown()
-print('2 fit finished!')
-
-
-optimizers_default = ag.Optimizers(['sgd', 'adam'])
+# print(nets)
+#
+# results = task.fit(dataset,
+#                    nets,
+#                    time_limits=time_limits,
+#                    num_training_epochs=num_training_epochs)
+#
+# print('Top-1 val acc: %.3f' % results.metric)
+# test_acc = task.evaluate(test_dataset)
+# print('Top-1 test acc: %.3f' % test_acc)
+#
+# # task.trial_scheduler.shutdown()
+# print('2 fit finished!')
+#
+#
+# optimizers_default = ag.Optimizers(['sgd', 'adam'])
 
 adam_opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
                           wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
@@ -80,20 +80,20 @@ sgd_opt = ag.optimizers.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
 optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
-print(optimizers)
-
-results = task.fit(dataset,
-                   nets,
-                   optimizers,
-                   time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
-
-print('Top-1 val acc: %.3f' % results.metric)
-test_acc = task.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-
-# task.trial_scheduler.shutdown()
-print('3 fit finished!')
+# print(optimizers)
+#
+# results = task.fit(dataset,
+#                    nets,
+#                    optimizers,
+#                    time_limits=time_limits,
+#                    num_training_epochs=num_training_epochs)
+#
+# print('Top-1 val acc: %.3f' % results.metric)
+# test_acc = task.evaluate(test_dataset)
+# print('Top-1 test acc: %.3f' % test_acc)
+#
+# # task.trial_scheduler.shutdown()
+# print('3 fit finished!')
 
 searcher = 'random'
 

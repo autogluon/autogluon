@@ -230,6 +230,8 @@ class BaseTask(ABC):
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
+            print('hyperband!!!')
+            time.sleep(10)
             BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
                 metadata['kwargs']['train_func'],
                 args,
@@ -247,6 +249,8 @@ class BaseTask(ABC):
                 visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
+            print('fifo!!!')
+            time.sleep(10)
             BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
                 metadata['kwargs']['train_func'],
                 args,
