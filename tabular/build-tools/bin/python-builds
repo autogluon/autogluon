@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# This helper variable will contain the python interpreter type without the
+# version part, e.g. CPython, Jython, PyPy
+type=${1%%[0-9]*}
+
+# This helper variable will contain the python interpreter XY version number,
+# e.g CPython27 -> 27
+version=${1##$type}
+
+# By default, this script will build for every version of Python enabled in your
+# versionset.
+
+# Uncomment any desired lines below, or add your own logic to filter any
+# interpreters you don't want to build for.
+
+# Filter a specific interpreter type:
+# [[ $type == CPython ]] && exit 1
+# [[ $type == Jython ]] && exit 1
+# [[ $type == PyPy ]] && exit 1
+
+# Filter everything except a specific interpreter type:
+# [[ $type == CPython ]] || exit 1
+# [[ $type == Jython ]] || exit 1
+# [[ $type == PyPy ]] || exit 1
+
+# Version requirements, test by string:
+# [[ $version == 2* ]] || exit 1  # 2 only
+
+# Comment out this line to allow your package to build for Python 2.7
+# Read this first: https://pythonclock.org/
+[[ $version == 3* ]] || exit 1  # 3 only
+
+# Version requirements, test by number:
+#   hint: numeric tests: -lt (<), -le (<=), -eq (==), -ge (>=), -gt (>)
+# [[ $version -gt 35 ]] || exit 1  # > 35
+# [[ $version -eq 27 || $version -ge 35 ]] || exit 1  # 27 or >=35
+# [[ $version -gt 32 && $version -le 36 ]] || exit 1  # >32 and <=36
+
+# Any interpreter not filtered by an above rule will be built for.
+exit 0
