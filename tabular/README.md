@@ -17,7 +17,9 @@ brew install libomp
 python3 -m venv ~/virtual/TabularAutoGluon
 source ~/virtual/TabularAutoGluon/bin/activate
 
-# Install Python packages
+# First need to install autogluon 
+
+# Next install **tabular** module + dependencies
 pip install -r requirements_local.txt
 pip install -r requirements.txt
 python setup.py install
