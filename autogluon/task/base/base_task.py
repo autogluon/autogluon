@@ -228,12 +228,10 @@ class BaseTask(ABC):
         elif metadata['searcher'] == 'bayesopt':
             searcher = ag.searcher.SKoptSearcher(cs)
         elif isinstance(metadata['searcher'], BaseSearcher):
-            searcher = metadata['searcher']
+            searcher = metadata['searcher'](cs)
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
-            print('hyperband!!!')
-            time.sleep(10)
             BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
                 metadata['kwargs']['train_func'],
                 args,
@@ -251,8 +249,6 @@ class BaseTask(ABC):
                 visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
-            print('fifo!!!')
-            time.sleep(10)
             BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
                 metadata['kwargs']['train_func'],
                 args,

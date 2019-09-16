@@ -11,6 +11,7 @@ from ..resource import DistributedResourceManager
 from ..basic import Task
 from .dist_reporter import Communicator, DistSemaphore
 from ..scheduler.reporter import StatusReporter
+import subprocess
 
 logger = logging.getLogger(__name__)
 

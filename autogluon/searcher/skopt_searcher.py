@@ -120,7 +120,7 @@ class SKoptSearcher(BaseSearcher):
                     return new_config
                 i += 1
         except ValueError:
-            warnings.warn("skopt failed to produce new config, using random search instead")
+            logger.info("skopt is used in this trial")
         return self.random_config()
     
     def default_config(self):

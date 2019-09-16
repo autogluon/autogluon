@@ -11,8 +11,10 @@ dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
 time_limits = 1*60
 num_training_epochs = 10
+searcher = 'bayesopt'
 
 results = task.fit(dataset,
+                   searcher=searcher,
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
 
