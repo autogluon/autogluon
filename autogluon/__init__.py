@@ -19,6 +19,9 @@ from .space import *
 from .utils import *
 from .task.image_classification import ImageClassification as image_classification
 from .task.object_detection import ObjectDetection as object_detection
+from .task.predict_table_column import PredictTableColumn as predict_table_column
+
+
 from .basic import *
 from . import scheduler, searcher, distributed, resource
 
