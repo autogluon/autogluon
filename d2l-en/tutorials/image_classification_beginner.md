@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 
 ## Create AutoGluon Dataset
 
-Our image classfication task is based on a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle. Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
+Our image classification task is based on a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle. Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
 Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`. Note that we only use a small subset of the data to ensure quick runtimes in this tutorial; to obtain models that perform competitively will require using the full original dataset, we will cover this in the next tutorial.  
 
 We download the data subset from this [link](../data.zip)
