@@ -137,17 +137,18 @@ class BaseTask(ABC):
         self._result = val
 
     @property
-    def trial_scheduler (self):
+    def trial_scheduler(self):
         return self._trial_scheduler
 
     @trial_scheduler.setter
-    def trial_scheduler (self, val):
+    def trial_scheduler(self, val):
         self._trial_scheduler = val
 
 
     @staticmethod
     def _set_range(obj, cs):
         if obj.search_space is not None:
+            print(obj.search_space)
             cs.add_configuration_space(prefix='',
                                        delimiter='',
                                        configuration_space=obj.search_space)

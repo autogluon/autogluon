@@ -27,7 +27,7 @@ dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
 ## Understanding default configurations of AutoGluon's fit
 
-To ensure this demo runs quickly, we expect each call to `fit` can be finished within 5min,
+To ensure this demo runs quickly, we expect each call to `fit` can be finished within minutes,
 and individual training runs (also referred to as `trials`) each last for 10 epochs.
 
 ```{.python .input}

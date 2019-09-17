@@ -20,6 +20,11 @@ __all__ = ['train_image_classification']
 logger = logging.getLogger(__name__)
 
 
+lr_schedulers = {
+    'mx.lr_scheduler.PolyScheduler': mx.lr_scheduler.PolyScheduler,
+    'mx.lr_scheduler.CosineScheduler': mx.lr_scheduler.CosineScheduler
+}
+
 @autogluon_method
 def train_image_classification(args, reporter):
     """The training script for image classification.
@@ -28,6 +33,9 @@ def train_image_classification(args, reporter):
         args: the argument parser.
         reporter: the reporter (StatusReporter)
     """
+    print('args!!!')
+    print(args)
+    time.sleep(10)
     # Set Hyper-params
     def _init_hparams():
         batch_size = args.data.batch_size * max(args.num_gpus, 1)
@@ -126,16 +134,29 @@ def train_image_classification(args, reporter):
     def _set_optimizer_params(args):
         # TODO (cgraywang): a better way?
         if args.optimizer == 'sgd' or args.optimizer == 'nag':
-            optimizer_params = {
-                'learning_rate': args.lr,
-                'momentum': args.momentum,
-                'wd': args.wd
-            }
+            if 'lr_scheduler' not in vars(args):
+                optimizer_params = {
+                    'learning_rate': args.lr,
+                    'momentum': args.momentum,
+                    'wd': args.wd
+                }
+            else:
+                optimizer_params = {
+                    'lr_scheduler': lr_schedulers[args.lr_scheduler](len(train_data), base_lr=args.lr),
+                    'momentum': args.momentum,
+                    'wd': args.wd
+                }
         elif args.optimizer == 'adam':
-            optimizer_params = {
-                'learning_rate': args.lr,
-                'wd': args.wd
-            }
+            if 'lr_scheduler' not in vars(args):
+                optimizer_params = {
+                    'learning_rate': args.lr,
+                    'wd': args.wd
+                }
+            else:
+                optimizer_params = {
+                    'lr_scheduler': lr_schedulers[args.lr_scheduler](len(train_data), base_lr=args.lr),
+                    'wd': args.wd
+                }
         else:
             raise NotImplementedError
         return optimizer_params

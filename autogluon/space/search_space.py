@@ -1,5 +1,6 @@
 __all__ = ['List', 'Linear', 'Log']
 
+import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
@@ -15,9 +16,13 @@ class List(object):
     """
     def __init__(self, name, choices):
         self.name = name
+        choices = [json.loads(jsonpickle.encode(choice)) for choice in choices]
         self.choices = choices
         self.hyper_param = CSH.CategoricalHyperparameter(name=self.name,
                                                          choices=self.choices)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param
@@ -54,6 +59,9 @@ class Linear(object):
                                                               lower=self.lower,
                                                               upper=self.upper,
                                                               log=False)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param
@@ -102,6 +110,9 @@ class Log(object):
                                                               lower=self.lower,
                                                               upper=self.upper,
                                                               log=True)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param
