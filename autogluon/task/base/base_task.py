@@ -219,16 +219,21 @@ class BaseTask(ABC):
          Args:
             cs: configuration space.
             args: the argument parser.
-            metadata: the metadata including the search space.
+            metadata: various metadata including the search space, and searcher_options dict of keyword arguments to pass to searcher.
             start_time: the start time of the fit function.
         """
 
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         elif metadata['searcher'] == 'bayesopt':
-            searcher = ag.searcher.SKoptSearcher(cs)
+            if 'searcher_options' not in metadata['kwargs']:
+                metadata['kwargs']['searcher_options'] = {}
+            searcher = ag.searcher.SKoptSearcher(cs, **metadata['kwargs']['searcher_options'])
         elif isinstance(metadata['searcher'], BaseSearcher):
-            searcher = metadata['searcher'](cs)
+            if 'searcher_options' not in metadata['kwargs']:
+                searcher = metadata['searcher'](cs)
+            else:
+                searcher = metadata['searcher'](cs, **metadata['kwargs']['searcher_options'])
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
@@ -411,10 +416,14 @@ class BaseTask(ABC):
             stop_criterion (dict): The stopping criteria.
             resources_per_trial (dict): Machine resources to allocate per trial.
             savedir (str): Local dir to save training results to.
-            searcher: Search Algorithm.
+            searcher: Which hyperparameter search procedure to use 
+                      (either object that inherits from BaseSearcher class, or string specifying 'random' or 'bayesopt')
             trial_scheduler: Scheduler for executing the experiment. Choose among FIFO (default) and HyperBand.
             resume (bool): If checkpoint exists, the experiment will resume from there.
             backend: support autogluon default backend.
+
+        Additional keyword arguments can include:
+            searcher_options (dict): contains keyword arguments used by the Searcher.
 
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
