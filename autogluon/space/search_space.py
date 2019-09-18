@@ -16,7 +16,6 @@ class List(object):
     """
     def __init__(self, name, choices):
         self.name = name
-        choices = [json.loads(jsonpickle.encode(choice)) for choice in choices]
         self.choices = choices
         self.hyper_param = CSH.CategoricalHyperparameter(name=self.name,
                                                          choices=self.choices)

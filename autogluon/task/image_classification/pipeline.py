@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 lr_schedulers = {
-    'mx.lr_scheduler.PolyScheduler': mx.lr_scheduler.PolyScheduler,
-    'mx.lr_scheduler.CosineScheduler': mx.lr_scheduler.CosineScheduler
+    'poly': mx.lr_scheduler.PolyScheduler,
+    'cosine': mx.lr_scheduler.CosineScheduler
 }
 
 @autogluon_method
@@ -33,9 +33,6 @@ def train_image_classification(args, reporter):
         args: the argument parser.
         reporter: the reporter (StatusReporter)
     """
-    print('args!!!')
-    print(args)
-    time.sleep(10)
     # Set Hyper-params
     def _init_hparams():
         batch_size = args.data.batch_size * max(args.num_gpus, 1)

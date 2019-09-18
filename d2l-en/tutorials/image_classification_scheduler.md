@@ -72,7 +72,6 @@ print('Top-1 test acc: %.3f' % test_acc)
 We could also create our own trial scheduler. An example of creating the customized scheduler could be found:
 
 ```{.python .input}
-#TODO: hang add more description about each code block
 import collections
 import numpy as np
 import multiprocessing as mp

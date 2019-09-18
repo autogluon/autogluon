@@ -179,12 +179,14 @@ print(optimizers)
 
 Please refer to [log search space](../api/autogluon.space.html#autogluon.space.Log) and [linear search space](../api/autogluon.space.html#autogluon.space.Linear) for more details.
 
-We then put the new network and optimizer search space together in the call to `fit` and might expect better results if we have made smart choices:
+Besides, we could also specify the candidates of learning rate schedulers which are typically leveraged to achieve better results.
+We then put the new network and optimizer search space and the learning rate schedulers together in the call to `fit` and might expect better results if we have made smart choices:
 
 ```{.python .input}
 results = task.fit(dataset,
                    nets,
                    optimizers,
+                   lr_scheduler=ag.space.List('lr_scheduler', ['poly', 'cosine']),
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
 ```
