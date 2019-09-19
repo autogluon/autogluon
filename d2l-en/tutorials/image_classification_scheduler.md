@@ -69,7 +69,8 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 ## Create your own trial scheduler
 
-We could also create our own trial scheduler. An example of creating the customized scheduler could be found:
+We could also create our own trial scheduler. Here is an example of creating the Median Stopping scheduler. It is a simple stopping rule, which stops the trials with the rewards less than the median of the rewards at the same number of iters in the history.
+
 
 ```{.python .input}
 import collections
