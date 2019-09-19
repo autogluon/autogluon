@@ -4,6 +4,7 @@ from .visualizer import *
 from .queue import Queue
 from .try_import import *
 from .ssh_helper import *
+from .file_helper import *
 from . import mxutils
 
 __all__ = data_analyzer.__all__ + visualizer.__all__  + files.__all__ + \

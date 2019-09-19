@@ -77,6 +77,7 @@ class ImageClassification(BaseTask):
             self._split = value
 
         def _read_dataset(self, **kwargs):
+            import time
             # TODO (cgraywang): put transform in the search space
             try:
                 self.train = get_dataset(self.name, train=True)
@@ -89,13 +90,19 @@ class ImageClassification(BaseTask):
                 if self.train_path is not None:
                     if '.rec' not in self.train_path:
                         self.train = gluon.data.vision.ImageFolderDataset(self.train_path)
-                        self.val = None
+                        if self.val_path is not None:
+                            self.val = gluon.data.vision.ImageFolderDataset(self.val_path)
+                        else:
+                            self.val = None
                         if 'test_path' in kwargs:
                             self.test = gluon.data.vision.ImageFolderDataset(kwargs['test_path'])
                         self.num_classes = len(np.unique([e[1] for e in self.train]))
                     elif '.rec' in self.train_path:
                         self.train = gluon.data.vision.ImageRecordDataset(self.train_path)
-                        self.val = None
+                        if self.val_path is not None:
+                            self.val = gluon.data.vision.ImageRecordDataset(self.val_path)
+                        else:
+                            self.val = None
                         if 'test_path' in kwargs:
                             self.test = gluon.data.vision.ImageRecordDataset(kwargs['test_path'])
                         self.num_classes = len(np.unique([e[1] for e in self.train]))

@@ -24,7 +24,7 @@ Under each class, the following image formats are supported when training your m
 - JPEG
 - PNG
 
-In the same dataset, all the images should be in the same format.
+In the same dataset, all the images should be in the same format. Note that in image classification, we do not require all the images with the same resolution.
 
 You will need to organize your dataset into the above directory structure before using AutoGluon.
 Below, we demonstrate how to construct this organization for a Kaggle dataset.
@@ -138,6 +138,14 @@ Now you have a dataset ready used in AutoGluon.
 
 To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
 
+We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
+
+```{.python .input}
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+# os.system('unzip -o data.zip -d ~/')
+```
+
 ```{.python .input}
 # from autogluon import image_classification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
@@ -160,7 +168,7 @@ or if there are specific images that you're sure you want included in a certain 
 If we want to manually specify the Training/Validation split, we could construct by running the command:
 
 ```sh
-# python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 1
+# python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
 ```
 
 where `--split 1` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.
@@ -186,7 +194,7 @@ Then tell AutoGluon where the training and validation data is, which means we di
 
 ```{.python .input}
 # from autogluon import image_classification as task
-# dataset = task.Dataset(name='shopeeiet', train_path='data/shopeeiet/train', val_path='data/shopeeiet/val')
+# dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train', val_path='~/data/shopeeiet/val')
 ```
 
 ## Step 3: Use AutoGluon fit to generate a classification model (Optional)
@@ -216,8 +224,8 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
 ```{.python .input}
-# test_dataset = task.Dataset(test_path='data/shopeeiet/test')
-# inds, probs = task.predict(test_dataset)
+# test_dataset = task.Dataset(test_path='~/data/shopeeiet/test')
+# inds, probs = task.predict_batch(test_dataset)
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.
@@ -235,7 +243,7 @@ Here are the results of AutoGluon's default `fit` and `predict` under different 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 
 ```{.python .input}
-# utils.generate_csv(inds, 'data/shopeeiet/submission.csv')
+# ag.utils.generate_csv(inds, 'data/shopeeiet/submission.csv')
 ```
 
 will produce a submission file located at: `data/shopeeiet/submission.csv`.
