@@ -159,6 +159,10 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
 
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + '(' +  \
+            'terminator: ' + self.terminator
+        return reprstr
 
 class Hyperband_Manager(object):
     """Hyperband Manager

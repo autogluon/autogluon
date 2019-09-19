@@ -25,7 +25,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
     def __init__(self, train_fn, resource, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=3.5e-4, ema_baseline_decay=0.95,
-                 controller_resource={'num_cpus': 2, 'num_gpus': 1},
+                 controller_resource={'num_cpus': 2, 'num_gpus': 0},
                  controller_batch_size=1,
                  dist_ip_addrs=[], **kwargs):
         assert isinstance(train_fn, autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
@@ -52,7 +52,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
         self.controller.initialize(ctx=self.controller_ctx)
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
-                optimizer_params={'learning_rate': controller_lr})
+                optimizer_params={'learning_rate': controller_lr*controller_batch_size})
         self.controller_batch_size = controller_batch_size
 
     def run(self, num_trials=None):
@@ -96,38 +96,85 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
             # update
             loss.backward()
             self.controller_optimizer.step(batch_size)
-            print('controller loss: {}'.format(loss.asscalar()))
+            logger.debug('controller loss: {}'.format(loss.asscalar()))
 
     def schedule_tasks(self, configs):
         rewards = []
+        results = {}
+        def _run_reporter(task, task_thread, reporter):
+            last_result = None
+            config = task.args['config']
+            while task_thread.is_alive():
+                reported_result = reporter.fetch()
+                #print('reported_result', reported_result)
+                if 'done' in reported_result and reported_result['done'] is True:
+                    reporter.move_on()
+                    task_thread.join()
+                    break
+                self.add_training_result(task.task_id, reported_result)
+                reporter.move_on()
+                last_result = reported_result
+            if last_result is not None:
+                self.searcher.update(config, last_result[self._reward_attr])
+            results[pickle.dumps(config)] = last_result[self._reward_attr]
+
         # launch the tasks
+        tasks = []
+        task_threads = []
+        reporter_threads = []
         for config in configs:
+            logger.debug('scheduling config: {}'.format(config))
+            # create task
             task = Task(self.train_fn, {'args': self.args, 'config': config},
                         DistributedResource(**self.resource))
-            print('scheduling config: {}'.format(config))
-            self.add_task(task)
+            tasks.append(task)
+            reporter = DistStatusReporter()
+            task_thread = self.add_task(task, reporter)
+            # run reporter
+            reporter_thread = threading.Thread(target=_run_reporter, args=(task, task_thread, reporter))
+            reporter_thread.start()
+            task_threads.append(task_thread)
+            reporter_threads.append(reporter_thread)
 
-        # join tasks and gather the result
-        self.join_tasks()
+        for p1, p2 in zip(task_threads, reporter_threads):
+            p1.join()
+            p2.join()
+        with self.LOCK:
+            for task in tasks:
+                self.finished_tasks.append({'TASK_ID': task.task_id,
+                                           'Config': task.args['config']})
+        if self._checkpoint is not None:
+            logger.debug('Saving Checkerpoint')
+            self.save()
+
         for config in configs:
-            rewards.append(self.searcher.get_reward(config))
+            rewards.append(results[pickle.dumps(config)])
 
         return rewards
 
-    def join_tasks(self):
-        for i, task_dict in enumerate(self.scheduled_tasks):
-            task_dict['Process'].join()
-            task_dict['ReporterThread'].join()
+    def add_task(self, task, reporter):
+        """Adding a training task to the scheduler.
 
-        for i in range(len(self.scheduled_tasks)):
-            task_dict = self.scheduled_tasks.pop()
-            self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                       'Config': task_dict['Config']})
+        Args:
+            task (:class:`autogluon.scheduler.Task`): a new trianing task
+        """
+        cls = DistributedFIFOScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        task.args['reporter'] = reporter
+        # main process
+        task_thread = threading.Thread(target=cls._start_distributed_task, args=(
+                              task, cls.RESOURCE_MANAGER, self.env_sem))
+        task_thread.start()
+        return task_thread
+
+    def join_tasks(self):
+        pass
 
     def state_dict(self, destination=None):
         destination = super(DistributedFIFOScheduler, self).state_dict(destination)
         # TODO
-        #destination['searcher'] = pickle.dumps(self.searcher)
+        destination['searcher'] = pickle.dumps(self.searcher)
+        destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
@@ -135,7 +182,8 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
     def load_state_dict(self, state_dict):
         super(DistributedFIFOScheduler, self).load_state_dict(state_dict)
         # TODO
-        #self.searcher = pickle.loads(state_dict['searcher'])
+        self.searcher = pickle.loads(state_dict['searcher'])
+        self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))

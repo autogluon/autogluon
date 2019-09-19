@@ -21,7 +21,7 @@ from .task.image_classification import ImageClassification as image_classificati
 from .task.object_detection import ObjectDetection as object_detection
 
 from .basic import *
-from . import scheduler, searcher, distributed, resource
+from . import scheduler, searcher, distributed, resource, nas
 
 __all__ = dataset.__all__ \
           + loss.__all__ \

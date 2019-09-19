@@ -21,15 +21,9 @@ class RLSearcher(BaseSearcher):
         >>> searcher.get_config()
     """
     def __init__(self, kwspaces, ctx=mx.cpu()):
-        #self.configspace = configspace
         self._results = collections.OrderedDict()
         self._best_state_path = None
         self.controller = Controller(kwspaces, ctx=ctx)
-
-    def update(self, *args, **kwargs):
-        """Update the searcher with the newest metric report
-        """
-        super(RLSearcher, self).update(*args, **kwargs)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -87,8 +81,6 @@ class Controller(mx.gluon.Block):
             embed = self.encoder(inputs)
         else:
             embed = inputs
-        print('embed', embed)
-        print('hidden', hidden)
         _, (hx, cx) = self.lstm(embed, hidden)
 
         logits = self.decoders[block_idx](hx)
@@ -136,20 +128,17 @@ class Controller(mx.gluon.Block):
             for i, action in enumerate(actions):
                 choice = action[idx].asscalar()
                 k, space = self.spaces[i]
-                config[k] = space[choice]
+                config[k] = choice#space[choice]
             configs.append(config)
 
-        #print('sampled configs', configs)
-        #print('sampled log_probs', log_probs)
         if with_details:
             return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
-            #F.concat(*log_probs, dim=0), F.concat(*entropies, dim=0)
         else:
             return configs
 
     def __getstate__(self):
         """Override pickling behavior."""
-        d = dict(self.__dict__)
+        d = dict()
         return d
 
     def __setstate__(self, d):

@@ -155,7 +155,7 @@ def get_dataset_meta(dataset, basedir='./datasets', final_fit=False):
 if __name__ == '__main__':
     start_time = time.time()
     args = train_finetune.args
-    args.dataset = 'apparel'
+    args.dataset = 'footwear'
     """
     # if you want to launch single training, do it like this:
     best_config = {'epochs': 40, 'input_size': 256, 'jitter_param': 0.293152307944186,
@@ -174,8 +174,8 @@ if __name__ == '__main__':
                                                                resume=args.resume,
                                                                time_attr='epoch',
                                                                reward_attr="accuracy",
-                                                               max_t=args.epochs,
-                                                               grace_period=args.epochs//4)
+                                                               max_t=120,
+                                                               grace_period=4)
     myscheduler.run()
     myscheduler.join_tasks()
     myscheduler.get_training_curves('{}.png'.format(args.dataset))
