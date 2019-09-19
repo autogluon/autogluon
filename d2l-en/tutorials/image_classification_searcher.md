@@ -46,7 +46,7 @@ Instead of random search, AutoGluon can alternatively utilize the more sophistic
 
 You can specify `task.fit` should find hyperparameters via Bayesian optimization simply by passing the string argument `searcher='bayesopt'`:
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    searcher='bayesopt',
                    time_limits=time_limits,
@@ -55,7 +55,7 @@ results = task.fit(dataset,
 
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `num_training_epochs` constraints) are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.metric)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)

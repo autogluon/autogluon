@@ -2,18 +2,20 @@ from autogluon import image_classification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
+#
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+# os.system('unzip -o data.zip -d ~/')
 
-import os
-os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
-os.system('unzip -o data.zip -d ~/')
+# dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
+dataset = task.Dataset(name='apparel', train_path='/home/ubuntu/data/apparel/Apparel_train.rec')
 
 time_limits = 1*60
 num_training_epochs = 10
 
 results = task.fit(dataset,
-                   searcher='bayesopt',
+                   searcher='random',
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
 
@@ -27,7 +29,7 @@ results = task.fit(dataset,
 #                                                'mx.lr_scheduler.CosineScheduler']))
 #
 print('Top-1 val acc: %.3f' % results.metric)
-test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+test_dataset = task.Dataset(name='shopeeiet', test_path='/home/ubuntu/data/apparel/Apparel_test.rec')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 #

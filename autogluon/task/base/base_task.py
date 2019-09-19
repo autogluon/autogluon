@@ -322,6 +322,34 @@ class BaseTask(ABC):
         return ind, mx.nd.softmax(pred)[0][ind]
 
     @staticmethod
+    def predict_batch(img_folder):
+        """The task predict function given a folder contains images.
+
+         Args:
+            img_folder: the input image folder
+
+         Example:
+            >>> inds, probs = task.predict_batch('~/data/test')
+        """
+        inds = []
+        probs = []
+        import cv2
+        for img in os.listdir(img_folder):
+            img = cv2.imread(os.path.join(img_folder, img))
+            try:
+                tmp = img.shape
+            except AttributeError as e:
+                inds.append(0)
+                probs.append(0)
+                continue
+            cv2.imwrite(os.path.join(img_folder, img))
+            ind, prob = BaseTask.predict(os.path.join(img_folder, img))
+            inds.append(ind)
+            probs.append(prob)
+        return inds, probs
+
+
+    @staticmethod
     def evaluate(data):
         """The task evaluation function given the test data.
 
