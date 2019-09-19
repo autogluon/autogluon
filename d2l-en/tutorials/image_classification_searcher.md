@@ -68,7 +68,7 @@ For those of you familiar with Bayesian optimization, AutoGluon allows you to co
 ```python
 results = task.fit(dataset,
                    searcher='bayesopt', 
-                   searcher_options={'base_estimator'='RF', 'acq_func'='EI'},
+                   searcher_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
 
@@ -118,7 +118,7 @@ We can then use this new searcher inside AutoGluon `fit`:
 ```python
 results = task.fit(dataset,
                    searcher=MyRandomSampling,
-                   searcher_options={'dummy_argument'=1},
+                   searcher_options={'dummy_argument': 1},
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
 
