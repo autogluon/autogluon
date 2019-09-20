@@ -2,17 +2,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from autogluon import image_classification as task
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train', val_path='~/data/shopeeiet/val')
+dataset = task.Dataset(name='shopeeiet', train_path='~/data/train', val_path='~/data/val')
 
 time_limits = 1 * 60 # 10mins
 num_training_epochs = 1
 results = task.fit(dataset, time_limits=time_limits, num_training_epochs=num_training_epochs)
 
 #
-inds, probs = task.predict_batch('/home/ubuntu/data/shopeeiet/test')
+inds, probs = task.predict_batch('/home/ubuntu/data/test')
 
 import autogluon as ag
-ag.utils.generate_csv(inds, '~/data/shopeeiet/submission.csv')
+ag.utils.generate_csv(inds, '~/data/submission.csv')
 
 print('finished!')
 
