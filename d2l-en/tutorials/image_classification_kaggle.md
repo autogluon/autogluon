@@ -249,7 +249,7 @@ If you wish to upload the model's predictions to Kaggle, here is how to convert 
 
 ```{.python .input}
 # import autogluon as ag
-# ag.utils.generate_csv(inds, '~/data/shopeeiet/submission.csv')
+# ag.utils.generate_csv(inds, '/home/ubuntu/data/shopeeiet/submission.csv')
 ```
 
 will produce a submission file located at: `~/data/shopeeiet/submission.csv`.

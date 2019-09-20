@@ -9,7 +9,7 @@ def generate_csv(inds, path):
         writer.writerow(row)
         id = 1
         for ind in inds:
-            row = [id, ind]
+            row = [id, ind.asscalar()]
             writer = csv.writer(csvFile)
             writer.writerow(row)
             id += 1
