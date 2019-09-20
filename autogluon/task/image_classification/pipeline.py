@@ -237,8 +237,8 @@ def train_image_classification(args, reporter):
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
-        if val_data is not None:
+        if reporter is not None:
             test(epoch)
-    if val_data is None:
+    if reporter is None:
         net_path = os.path.join(os.path.splitext(args.savedir)[0], 'net.params')
         net.save_parameters(net_path)

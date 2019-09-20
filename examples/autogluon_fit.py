@@ -9,7 +9,7 @@ num_training_epochs = 1
 results = task.fit(dataset, time_limits=time_limits, num_training_epochs=num_training_epochs)
 
 #
-inds, probs = task.predict_batch('~/data/shopeeiet/test')
+inds, probs = task.predict_batch('/home/ubuntu/data/shopeeiet/test')
 
 import autogluon as ag
 ag.utils.generate_csv(inds, '~/data/shopeeiet/submission.csv')

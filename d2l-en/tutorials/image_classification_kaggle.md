@@ -230,7 +230,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
 ```{.python .input}
-# inds, probs = task.predict_batch('~/data/shopeeiet/test')
+# inds, probs = task.predict_batch('/home/ubuntu/data/shopeeiet/test')
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.
