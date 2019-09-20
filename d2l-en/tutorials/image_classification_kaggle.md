@@ -142,7 +142,7 @@ We have the processed dataset if you don't want to explore new Kaggle dataset, p
 
 ```{.python .input}
 # import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data.zip')
 # os.system('unzip -o data.zip -d ~/')
 ```
 
@@ -224,8 +224,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
 ```{.python .input}
-# test_dataset = task.Dataset(test_path='~/data/shopeeiet/test')
-# inds, probs = task.predict_batch(test_dataset)
+# inds, probs = task.predict_batch('~/data/shopeeiet/test')
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.
@@ -243,6 +242,7 @@ Here are the results of AutoGluon's default `fit` and `predict` under different 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 
 ```{.python .input}
+# import autogluon as ag
 # ag.utils.generate_csv(inds, 'data/shopeeiet/submission.csv')
 ```
 
