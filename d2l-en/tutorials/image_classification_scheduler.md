@@ -166,4 +166,13 @@ class MediamStoppingRule(object):
             len(self._stopped_tasks))
 ```
 
+Then we can use our defined scheduler:
+
+```{.python .input}
+results = task.fit(dataset,
+                   trial_scheduler=MedianStopping_Scheduler,
+                   time_limits=time_limits,
+                   num_training_epochs=num_training_epochs)
+```
+
 For more complete usage of `fit` function, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
