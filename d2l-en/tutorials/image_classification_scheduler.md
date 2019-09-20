@@ -175,4 +175,12 @@ results = task.fit(dataset,
                    num_training_epochs=num_training_epochs)
 ```
 
+Print the result:
+
+```{.python .input}
+print('Top-1 val acc: %.3f' % results.metric)
+test_acc = task.evaluate(test_dataset)
+print('Top-1 test acc: %.3f' % test_acc)
+```
+
 For more complete usage of `fit` function, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
