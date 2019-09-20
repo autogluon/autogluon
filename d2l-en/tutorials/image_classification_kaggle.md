@@ -47,8 +47,10 @@ An example shell script to download the dataset to `~/data/shopeeiet/` can be fo
 
 After downloading this script to your machine, run it with:
 
-```sh
-sh download_shopeeiet.sh
+```{.python .input}
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/download_shopeeiet.sh')
+# os.system('sh download_shopeeiet.sh')
 ```
 
 Now we have the desired directory structure under `~/data/shopeeiet/`, which in this case looks as follows:
@@ -116,8 +118,10 @@ please click the download link of [prepare_shopeeiet.py](../static/prepare_shope
 
 Since AutoGluon provides the automatic Training/Validation split, we can skip the Validation split by running the command:
 
-```sh
-python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 0
+```{.python .input}
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
+# os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 0')
 ```
 
 where `--split 0` would skip the validation split, therefore all the data in `data` directory would be used as `train` data, later on the AutoGluon `Dataset` would automatically split into Training (90% of the data) and Validation (10% of the data).
@@ -167,8 +171,10 @@ or if there are specific images that you're sure you want included in a certain 
 
 If we want to manually specify the Training/Validation split, we could construct by running the command:
 
-```sh
-# python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9
+```{.python .input}
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
+# os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9')
 ```
 
 where `--split 1` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.

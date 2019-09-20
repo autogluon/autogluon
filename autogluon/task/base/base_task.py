@@ -223,14 +223,13 @@ class BaseTask(ABC):
             metadata: various metadata including the search space, and searcher_options dict of keyword arguments to pass to searcher.
             start_time: the start time of the fit function.
         """
-
         if metadata['searcher'] is None or metadata['searcher'] == 'random':
             searcher = ag.searcher.RandomSampling(cs)
         elif metadata['searcher'] == 'bayesopt':
             if 'searcher_options' not in metadata['kwargs']:
                 metadata['kwargs']['searcher_options'] = {}
             searcher = ag.searcher.SKoptSearcher(cs, **metadata['kwargs']['searcher_options'])
-        elif isinstance(metadata['searcher'], BaseSearcher):
+        elif issubclass(metadata['searcher'], BaseSearcher):
             if 'searcher_options' not in metadata['kwargs']:
                 searcher = metadata['searcher'](cs)
             else:
@@ -238,34 +237,64 @@ class BaseTask(ABC):
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
-            BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
-                metadata['kwargs']['train_func'],
-                args,
-                {'num_cpus': 1,
-                 'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
-                searcher,
-                checkpoint=metadata['savedir'],
-                resume=metadata['resume'],
-                time_attr='epoch',
-                reward_attr=metadata['kwargs']['reward_attr'],
-                max_t=metadata['resources_per_trial'][
-                    'num_training_epochs'],
-                grace_period=metadata['resources_per_trial'][
-                                 'num_training_epochs'] // 4,
-                visualizer=metadata['visualizer'])
+            if len(args.data.train) <= 10000:
+                BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
+                    metadata['kwargs']['train_func'],
+                    args,
+                    {'num_cpus': 1,
+                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+                    searcher,
+                    checkpoint=metadata['savedir'],
+                    resume=metadata['resume'],
+                    time_attr='epoch',
+                    reward_attr=metadata['kwargs']['reward_attr'],
+                    max_t=metadata['resources_per_trial'][
+                        'num_training_epochs'],
+                    grace_period=metadata['resources_per_trial'][
+                                     'num_training_epochs'] // 4,
+                    visualizer=metadata['visualizer'])
+            else:
+                BaseTask.trial_scheduler = ag.scheduler.Hyperband_Scheduler(
+                    metadata['kwargs']['train_func'],
+                    args,
+                    {'num_cpus': 1,
+                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+                    searcher,
+                    checkpoint=metadata['savedir'],
+                    resume=metadata['resume'],
+                    time_attr='epoch',
+                    reward_attr=metadata['kwargs']['reward_attr'],
+                    max_t=metadata['resources_per_trial'][
+                        'num_training_epochs'],
+                    grace_period=metadata['resources_per_trial'][
+                                     'num_training_epochs'] // 4,
+                    visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
-            BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
-                metadata['kwargs']['train_func'],
-                args,
-                {'num_cpus': 1,
-                 'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
-                searcher,
-                checkpoint=metadata['savedir'],
-                resume=metadata['resume'],
-                time_attr='epoch',
-                reward_attr=metadata['kwargs']['reward_attr'],
-                visualizer=metadata['visualizer'])
+            if len(args.data.train) <= 10000:
+                BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
+                    metadata['kwargs']['train_func'],
+                    args,
+                    {'num_cpus': 1,
+                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+                    searcher,
+                    checkpoint=metadata['savedir'],
+                    resume=metadata['resume'],
+                    time_attr='epoch',
+                    reward_attr=metadata['kwargs']['reward_attr'],
+                    visualizer=metadata['visualizer'])
+            else:
+                BaseTask.trial_scheduler = ag.scheduler.FIFO_Scheduler(
+                    metadata['kwargs']['train_func'],
+                    args,
+                    {'num_cpus': 1,
+                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+                    searcher,
+                    checkpoint=metadata['savedir'],
+                    resume=metadata['resume'],
+                    time_attr='epoch',
+                    reward_attr=metadata['kwargs']['reward_attr'],
+                    visualizer=metadata['visualizer'])
 
         BaseTask.trial_scheduler.run_with_stop_criterion(start_time, metadata['stop_criterion'])
         BaseTask.trial_scheduler.join_tasks()

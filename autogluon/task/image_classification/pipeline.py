@@ -82,7 +82,9 @@ def train_image_classification(args, reporter):
             if transform_list is not None:
                 dataset = dataset.transform_first(transforms.Compose(transform_list))
             return dataset
-        args.data._read_dataset(**args.data._kwargs)
+        # args.data._read_dataset(**args.data._kwargs)
+        # if reporter == None:
+        #     args.data.split = 0
         train_dataset = _init_dataset(args.data.train, args.data.transform_train_fn,
                                       args.data.transform_train_list)
         val_dataset = _init_dataset(args.data.val, args.data.transform_val_fn,

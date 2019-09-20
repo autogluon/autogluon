@@ -1,33 +1,32 @@
+import logging
+logging.basicConfig(level=logging.INFO)
+
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
 # os.system('unzip -o data_shopeeiet.zip -d ~/')
 
 from autogluon import image_classification as task
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
-
+#
 time_limits = 1*60
 num_training_epochs = 10
-
+#
 results = task.fit(dataset,
                    searcher='random',
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs,
-                   num_gpus=2)
-
+                   num_training_epochs=num_training_epochs)
+#
 inds, probs = task.predict_batch('~/data/shopeeiet/test')
 
 import autogluon as ag
 ag.utils.generate_csv(inds, '~/data/shopeeiet/submission.csv')
 
 
-from autogluon import image_classification as task
+# from autogluon import image_classification as task
 
-import logging
-logging.basicConfig(level=logging.INFO)
-
-import os
-os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
-os.system('unzip -o data.zip -d ~/')
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+# os.system('unzip -o data.zip -d ~/')
 
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
@@ -40,6 +39,7 @@ results = task.fit(dataset,
                    searcher='bayesopt',
                    time_limits=time_limits,
                    num_training_epochs=num_training_epochs)
+print('all finished!')
 #
 # # import autogluon as ag
 # # results = task.fit(dataset,
