@@ -120,7 +120,7 @@ class SKoptSearcher(BaseSearcher):
                     return new_config
                 i += 1
         except ValueError:
-            logger.info("skopt is used in this trial")
+            logger.info("skopt not used this trial")
         return self.random_config()
     
     def default_config(self):
@@ -137,7 +137,7 @@ class SKoptSearcher(BaseSearcher):
     def random_config(self):
         """Function to randomly sample a new configuration which must be valid.
            TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
-
+    
         Args:
             returns: config
         """
@@ -146,14 +146,17 @@ class SKoptSearcher(BaseSearcher):
             new_config = self.configspace.sample_configuration().get_dictionary()
         self._results[json.dumps(new_config)] = 0
         return new_config
-
+    
     def update(self, config, reward, model_params=None):
         """Update the searcher with the newest metric report
         """
         self._results[json.dumps(config)] = reward
-        self.bayes_optimizer.tell(self.config2skopt(config), -reward) # provide negative reward since skopt performs minimization
+        try:
+            self.bayes_optimizer.tell(self.config2skopt(config), -reward) # provide negative reward since skopt performs minimization
+        except ValueError:
+            logger.info("surrogate model not updated this trial")
         logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
-
+    
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).
         Args:
