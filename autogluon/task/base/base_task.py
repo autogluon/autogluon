@@ -371,7 +371,7 @@ class BaseTask(ABC):
                 inds.append(0)
                 probs.append(0)
                 continue
-            cv2.imwrite(os.path.join(img_folder, img))
+            #cv2.imwrite(os.path.join(img_folder, img))
             ind, prob = BaseTask.predict(os.path.join(img_folder, img))
             inds.append(ind)
             probs.append(prob)

@@ -12,7 +12,7 @@ results = task.fit(dataset, time_limits=time_limits, num_training_epochs=num_tra
 inds, probs = task.predict_batch('/home/ubuntu/data/test')
 
 import autogluon as ag
-ag.utils.generate_csv(inds, '~/data/submission.csv')
+ag.utils.generate_csv(inds, '/home/ubuntu/submission.csv')
 
 print('finished!')
 
