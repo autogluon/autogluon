@@ -64,7 +64,8 @@ class ImageClassification(BaseTask):
                                           transform_train_list, transform_val_list,
                                           batchify_train_fn, batchify_val_fn, **kwargs)
             self._split = None
-            self._read_dataset(**kwargs)
+            self._kwargs = kwargs
+            # self._read_dataset(**kwargs)
             # TODO (cgraywang): add search space, handle batch_size, num_workers
             self._add_search_space()
 

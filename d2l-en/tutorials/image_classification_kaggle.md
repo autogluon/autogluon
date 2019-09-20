@@ -142,8 +142,8 @@ We have the processed dataset if you don't want to explore new Kaggle dataset, p
 
 ```{.python .input}
 # import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data.zip')
-# os.system('unzip -o data.zip -d ~/')
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
+# os.system('unzip -o data_shopeeiet.zip -d ~/')
 ```
 
 ```{.python .input}
@@ -243,10 +243,10 @@ If you wish to upload the model's predictions to Kaggle, here is how to convert 
 
 ```{.python .input}
 # import autogluon as ag
-# ag.utils.generate_csv(inds, 'data/shopeeiet/submission.csv')
+# ag.utils.generate_csv(inds, '~/data/shopeeiet/submission.csv')
 ```
 
-will produce a submission file located at: `data/shopeeiet/submission.csv`.
+will produce a submission file located at: `~/data/shopeeiet/submission.csv`.
 
 To see an example submission, check out the file `sample submission.csv` at this link: [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data).
 

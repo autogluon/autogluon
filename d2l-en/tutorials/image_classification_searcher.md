@@ -46,7 +46,7 @@ Instead of random search, AutoGluon can alternatively utilize the more sophistic
 
 You can specify `task.fit` should find hyperparameters via Bayesian optimization simply by passing the string argument `searcher='bayesopt'`:
 
-```python
+```{.python .input}
 results = task.fit(dataset,
                    searcher='bayesopt',
                    time_limits=time_limits,
@@ -55,7 +55,7 @@ results = task.fit(dataset,
 
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `num_training_epochs` constraints) are:
 
-```python
+```{.python .input}
 print('Top-1 val acc: %.3f' % results.metric)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -65,7 +65,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
 
-```python
+```{.python .input}
 results = task.fit(dataset,
                    searcher='bayesopt', 
                    searcher_options={'base_estimator': 'RF', 'acq_func': 'EI'},
@@ -83,7 +83,7 @@ Under the hood, Bayesian optimization in AutoGluon is implemented via the [**sci
 
 We can also create our own searcher entirely from scratch. Below is an example of a new Searcher class that implements the random search strategy. The two functions you must specify are `get_config` which the AutoGluon training-run scheduler (repeatedly) uses to ask the searcher for a new hyperparameter configuration to use for the next trial, and `update` which updates the internal state maintained by the search algorithm with the performance results obtained by various hyperparameter configurations as soon as their trials have been completed.
 
-```python
+```{.python .input}
 from autogluon.searcher import BaseSearcher
 class MyRandomSampling(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
@@ -115,7 +115,7 @@ class MyRandomSampling(BaseSearcher):
 Once again, any special keyword arguments that your own searcher may depend on can be specified via `searcher_options`.
 We can then use this new searcher inside AutoGluon `fit`:
 
-```python
+```{.python .input}
 results = task.fit(dataset,
                    searcher=MyRandomSampling,
                    searcher_options={'dummy_argument': 1},
