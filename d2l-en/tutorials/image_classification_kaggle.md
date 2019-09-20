@@ -142,14 +142,6 @@ Now you have a dataset ready used in AutoGluon.
 
 To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
 
-We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
-# os.system('unzip -o data_shopeeiet.zip -d ~/')
-```
-
 ```{.python .input}
 # from autogluon import image_classification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
@@ -177,7 +169,7 @@ If we want to manually specify the Training/Validation split, we could construct
 # os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9')
 ```
 
-where `--split 1` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.
+where `--split 9` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.
 
 The resulting data should be looking as the following structure:
 
@@ -197,6 +189,14 @@ The resulting data should be looking as the following structure:
 ```
 
 Then tell AutoGluon where the training and validation data is, which means we disable AutoGluon's automatic Training/Validation split functionality, instead, we manually provide the Training/Validation split via:
+
+We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
+
+```{.python .input}
+# import os
+# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
+# os.system('unzip -o data_shopeeiet.zip -d ~/')
+```
 
 ```{.python .input}
 # from autogluon import image_classification as task
