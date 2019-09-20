@@ -363,16 +363,16 @@ class BaseTask(ABC):
         inds = []
         probs = []
         import cv2
-        for img in os.listdir(img_folder):
-            img = cv2.imread(os.path.join(img_folder, img))
+        for img_name in os.listdir(img_folder):
+            img = cv2.imread(os.path.join(img_folder, img_name))
             try:
                 tmp = img.shape
             except AttributeError as e:
                 inds.append(0)
                 probs.append(0)
                 continue
-            #cv2.imwrite(os.path.join(img_folder, img))
-            ind, prob = BaseTask.predict(os.path.join(img_folder, img))
+            #cv2.imwrite(os.path.join(img_folder, img_name))
+            ind, prob = BaseTask.predict(os.path.join(img_folder, img_name))
             inds.append(ind)
             probs.append(prob)
         return inds, probs
