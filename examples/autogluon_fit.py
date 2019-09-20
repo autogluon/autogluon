@@ -1,11 +1,15 @@
 from autogluon import image_classification as task
+dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
-import logging
-logging.basicConfig(level=logging.INFO)
+time_limits = 1 * 60 # 10mins
+num_training_epochs = 1
+results = task.fit(dataset, time_limits=time_limits, num_training_epochs=num_training_epochs)
 
-import os
-os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
-os.system('unzip -o data.zip -d ~/')
+#
+inds, probs = task.predict_batch('/home/ubuntu/data/test/BabyPants/')
+
+import autogluon as ag
+ag.utils.generate_csv(inds, '/home/ubuntu/data/submission.csv')
 
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
