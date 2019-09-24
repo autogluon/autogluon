@@ -54,6 +54,7 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
+    'python-graphviz',
 ]
 
 setup(
