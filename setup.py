@@ -48,12 +48,13 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
-    'dask[complete]',
+    'dask[complete]==2.0.0',
     'tornado',
     'ConfigSpace',
     'nose',
     'gluoncv',
     'gluonnlp',
+    'python-graphviz',
 ]
 
 setup(

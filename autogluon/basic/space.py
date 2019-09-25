@@ -2,10 +2,42 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 __all__ = ['Space', 'ListSpace', 'LinearSpace', 'LogLinearSpace', 'IntSpace',
-           'BoolSpace', 'strip_cofing_space', 'AutoGluonObject']
+           'BoolSpace', 'strip_cofing_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
     pass
+
+class Sequence(object):
+    """A Sequence of AutoGluon Objects
+    """
+    def __init__(self, *args):
+        self.data = [*args]
+
+    def __iter__(self):
+        for elem in self.data:
+            yield elem
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+    def __setitem__(self, index, data):
+        self.data[index] = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_config_space(self):
+        cs = CS.ConfigurationSpace()
+        if len(self.data) == 0: 
+            return CS.ConfigurationSpace()
+        for i, x in enumerate(self.data):
+            if isinstance(x, AutoGluonObject):
+                cs.add_configuration_space(str(i), x.cs, '.')
+        return cs
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + str(self.data)
+        return reprstr
 
 class Space(object):
     def get_config_space(self, name):
@@ -28,6 +60,9 @@ class ListSpace(Space):
     def __setitem__(self, index, data):
         self.data[index] = data
 
+    def __len__(self):
+        return len(self.data)
+
     def get_config_space(self, name):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
@@ -39,8 +74,9 @@ class ListSpace(Space):
                 cs.add_configuration_space(str(i), x.cs, '.')
         return cs
 
-    def __call__(self, *args, **kwargs):
-        self._instance(*args, **kwargs)
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + str(self.data)
+        return reprstr
 
 class LinearSpace(Space):
     def __init__(self, lower, upper):

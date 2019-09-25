@@ -26,6 +26,10 @@ class RemoteManager(object):
         return cls.__instance
 
     @classmethod
+    def get_master_node(cls):
+        return cls.NODES[cls.MASTER_IP]
+
+    @classmethod
     def start_local_node(cls):
         port = cls.get_port_id()
         remote = Remote.create_local_node(cls.MASTER_IP, port)

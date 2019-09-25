@@ -157,3 +157,8 @@ class DistributedHyperbandScheduler(DistributedFIFOScheduler):
         super(DistributedHyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + '(' +  \
+            'terminator: ' + self.terminator
+        return reprstr

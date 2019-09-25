@@ -232,6 +232,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
     def state_dict(self, destination=None):
         destination = super(DistributedFIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
+        destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
@@ -239,6 +240,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
     def load_state_dict(self, state_dict):
         super(DistributedFIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
+        self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))

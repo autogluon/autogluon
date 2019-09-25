@@ -2,6 +2,7 @@ import os
 import time
 import signal
 import logging
+import subprocess
 import concurrent
 from threading import Thread 
 import multiprocessing as mp
@@ -91,8 +92,10 @@ class DaskLocalService(object):
             self.shutdown()
 
     def shutdown(self):
-        os.killpg(os.getpgid(self.worker['Process'].pid), signal.SIGTERM)
-        os.killpg(os.getpgid(self.scheduler['Process'].pid), signal.SIGTERM)
+        #os.killpg(os.getpgid(self.worker['Process'].pid), signal.SIGTERM)
+        #os.killpg(os.getpgid(self.scheduler['Process'].pid), signal.SIGTERM)
+        subprocess.run(['kill', '-9', "$(ps aux | grep '[d]ask' | awk '{print $2}')"])
+        subprocess.run(['kill', '-9', "$(ps aux | grep '[d]ask' | awk '{print $2}')"])
 
     def __enter__(self):
         return self

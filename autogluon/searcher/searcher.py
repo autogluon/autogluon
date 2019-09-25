@@ -4,6 +4,7 @@ import pickle
 import copy
 import logging
 from collections import OrderedDict
+import multiprocessing as mp
 
 from ..basic import load
 
@@ -19,6 +20,7 @@ class BaseSearcher(object):
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
     """
+    LOCK = mp.Lock()
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
@@ -40,16 +42,30 @@ class BaseSearcher(object):
         """
         #if model_params is not None and reward > self.get_best_reward():
         #    self._best_model_params = model_params
-        self._results[pickle.dumps(config)] = reward
+        with self.LOCK:
+            self._results[pickle.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
 
     def get_best_reward(self):
-        config = max(self._results, key=self._results.get)
-        return self._results[config]
+        with self.LOCK:
+            if len(self._results) > 0:
+                config = max(self._results, key=self._results.get)
+                return self._results[config]
+        return 0.0
+
+    def get_reward(self, config):
+        k = pickle.dumps(config)
+        with self.LOCK:
+            assert k in self._results
+            return self._results[k]
 
     def get_best_config(self):
-        config = max(self._results, key=self._results.get)
-        return pickle.loads(config)
+        with self.LOCK:
+            if len(self._results) > 0:
+                config = max(self._results, key=self._results.get)
+                return pickle.loads(config)
+            else:
+                return {}
 
     def is_best(self, config):
         best_config = max(self._results, key=self._results.get)
@@ -70,8 +86,10 @@ class BaseSearcher(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
-            'ConfigSpace: ' + str(self.configspace) + \
-            'Results: ' + str(self._results) + \
+            '\nConfigSpace: {}.'.format(str(self.configspace)) + \
+            '\nNumber of Trials: {}.'.format(len(self._results)) + \
+            '\nBest Config: {}'.format(self.get_best_config()) + \
+            '\nBest Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
 

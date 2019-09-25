@@ -2,6 +2,7 @@ import copy
 import logging
 import argparse
 import functools
+import collections
 import numpy as np
 import multiprocessing as mp
 import ConfigSpace as CS
@@ -27,14 +28,12 @@ class autogluon_method(object):
         self.f = f
 
     def __call__(self, args, config, **kwargs):
-        #print('args', args)
         args = copy.deepcopy(args)
         new_config = copy.deepcopy(config)
         self._rand_seed()
         striped_keys = [k.split('.')[0] for k in new_config.keys()]
         
         if isinstance(args, argparse.Namespace) or isinstance(args, argparse.ArgumentParser):
-            #print('\n\n Using Namespace')
             args_dict = vars(args)
         else:
             args_dict = args
@@ -42,7 +41,14 @@ class autogluon_method(object):
         for k, v in args_dict.items():
             # handle different type of configurations
             if k in striped_keys:
-                if isinstance(v, AutoGluonObject):
+                if isinstance(v, Sequence):
+                    sub_config = strip_cofing_space(new_config, prefix=k)
+                    args_dict[k] = []
+                    for idx, obj in enumerate(v):
+                        min_config = strip_cofing_space(sub_config, prefix=str(idx))
+                        assert isinstance(obj, AutoGluonObject)
+                        args_dict[k].append(obj._lazy_init(**min_config))
+                elif isinstance(v, AutoGluonObject):
                     sub_config = strip_cofing_space(new_config, prefix=k)
                     args_dict[k] = v._lazy_init(**sub_config)
                 elif isinstance(v, ListSpace):
@@ -50,8 +56,8 @@ class autogluon_method(object):
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
                         # nested space: List of AutoGluonobjects
-                        sub_config = strip_cofing_space(sub_config, prefix=str(choice))
-                        args_dict[k] = v[choice]._lazy_init(**sub_config)
+                        min_config = strip_cofing_space(sub_config, prefix=str(choice))
+                        args_dict[k] = v[choice]._lazy_init(**min_config)
                     else:
                         args_dict[k] = v[choice]
                 elif isinstance(new_config[k], Sample):
@@ -73,10 +79,12 @@ class autogluon_method(object):
         self.update(**kwvars)
 
     def update(self, **kwargs):
+        """For searcher support ConfigSpace
+        """
         self.kwvars = kwargs
         for k, v in kwargs.items():
-            if isinstance(v, ListSpace):
-                sub_cs = v.get_config_space(name=k)
+            if isinstance(v, (ListSpace, Sequence)):
+                sub_cs = v.get_config_space()
                 _add_cs(self.cs, sub_cs, k)
                 self.args.update({k: v})
             elif isinstance(v, Space):
@@ -89,6 +97,41 @@ class autogluon_method(object):
             else:
                 _rm_hp(self.cs, k)
                 self.args.update({k: v})
+
+    def get_kwspaces(self):
+        """For RL searcher/controller
+        """
+        self.kwspaces = collections.OrderedDict()
+        for k, v in self.kwvars.items():
+            if isinstance(v, Sequence):
+                for idx, obj in enumerate(v):
+                    assert isinstance(obj, AutoGluonObject)
+                    for sub_k, sub_v in obj.kwspaces.items():
+                        new_k = '{}.{}.{}'.format(k, idx, sub_k)
+                        if isinstance(sub_v, ListSpace):
+                            self.kwspaces[new_k] = sub_v
+                        else:
+                            logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+            elif isinstance(v, ListSpace):
+                self.kwspaces[k] = v
+                for idx, obj in enumerate(v):
+                    if isinstance(obj, AutoGluonObject):
+                        for idx, sub_k, sub_v in enumerate(obj.kwspaces.items()):
+                            new_k = '{}.{}.{}'.format(k, idx, sub_k)
+                            if isinstance(sub_v, ListSpace):
+                                self.kwspaces[new_k] = sub_v
+                            else:
+                                logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+            elif isinstance(v, AutoGluonObject):
+                for sub_k, sub_v in v.kwspaces.items():
+                    new_k = '{}.{}'.format(k, sub_k)
+                    if isinstance(sub_v, ListSpace):
+                        self.kwspaces[new_k] = sub_v
+                    else:
+                        logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+            elif isinstance(v, Space):
+                logger.warning('Unspported HP type {} for {}'.format(v, k))
+        return self.kwspaces
 
     def _rand_seed(self):
         autogluon_method.SEED.value += 1
@@ -110,7 +153,7 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
         # Allow for an empty top-level parameter
         if new_parameter.name == '':
             new_parameter.name = prefix
-        else:
+        elif not prefix == '':
             new_parameter.name = "%s%s%s" % (prefix, '.',
                                              new_parameter.name)
         new_parameters.append(new_parameter)
@@ -150,17 +193,18 @@ def autogluon_kwargs(**kwvars):
     """
     def registered_func(func):
         cs = CS.ConfigurationSpace()
+        kwspaces = collections.OrderedDict()
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
                 if isinstance(v, ListSpace):
                     kwargs[k] = v
-                    if k not in cs.get_hyperparameter_names():
-                        sub_cs = v.get_config_space(name=k)
-                        _add_cs(cs, sub_cs, '', '')
+                    kwspaces[k] = v
+                    sub_cs = v.get_config_space(name=k)
+                    _add_cs(cs, sub_cs, '', '')
                 elif isinstance(v, Space):
-                    #if k not in cs.get_hyperparameter_names():
+                    kwspaces[k] = v
                     hp = v.get_config_space(name=k)
                     _add_hp(cs, hp)
                     kwargs[k] = hp.default_value
@@ -171,6 +215,7 @@ def autogluon_kwargs(**kwvars):
                     kwargs[k] = v
             return func(*args, **kwargs)
         wrapper_call.cs = cs
+        wrapper_call.kwspaces = kwspaces
         return wrapper_call
     return registered_func
 
@@ -182,19 +227,22 @@ def autogluon_function(**kwvars):
                 self.func = func
                 self.args = args
                 self.kwargs = kwargs
-                #self._initialized = False
+                self._inited = False
 
-            #def __getattribute__(self, name):
-            #    #if not AutoGluonObject._initialized:
-            #    if not AutoGluonObject.__getattribute__(self, '_initialized'):
-            #        self._initialized = True
-            #        config = self.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self._instance.__getattribute__(name)
+            def __call__(self, *args, **kwargs):
+                if not self._inited:
+                    self._inited = True
+                    config = self.cs.sample_configuration().get_dictionary()
+                    self._lazy_init(**config)
+                return self._instance.__call__(*args, **kwargs)
 
-            def _lazy_init(self, **kwvars):
+            def _lazy_init(self, **nkwvars):
                 # lazy initialization for passing config files
-                self.kwargs.update(kwvars)
+                self.kwargs.update(nkwvars)
+                for k, v in self.kwargs.items():
+                    if k in self.kwspaces and isinstance(self.kwspaces[k], ListSpace):
+                        self.kwargs[k] = self.kwspaces[k][v]
+                        
                 self._instance = self.func(*self.args, **self.kwargs)
                 return self._instance
 
@@ -202,7 +250,7 @@ def autogluon_function(**kwvars):
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
             agobj.cs = agobj.__init__.cs
-            #agobj._initialized = False
+            agobj.kwspaces = agobj.__init__.kwspaces
             return agobj
         return wrapper_call
     return registered_func
@@ -212,31 +260,39 @@ def autogluon_object(**kwvars):
     AutoGluon object is a lazy init object, which allows distributed training.
     """
     def registered_class(Cls):
-        class autogluonobject(AutoGluonObject):
+        class autogluonobject(AutoGluonObject, Cls):
             @autogluon_kwargs(**kwvars)
             def __init__(self, *args, **kwargs):
-                self.args = args
-                self.kwargs = kwargs
-                self._initialized = False
+                self._args = args
+                self._kwargs = kwargs
+                self._inited = False
 
-            #def __getattribute__(self, name):
-            #    if not Cls._initialized:
-            #        self._initialized = True
-            #        config = self.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self._instance.__getattribute__(name)
+            def __call__(self, *args, **kwargs):
+                if not self._inited:
+                    self._inited = True
+                    config = autogluonobject.cs.sample_configuration().get_dictionary()
+                    self._lazy_init(**config)
+                return self.__call__(*args, **kwargs)
 
-            def _lazy_init(self, **kwvars):
-                # lazy initialization for passing config files
-                self.kwargs.update(kwvars)
-                self._instance = Cls.__new__(Cls, *self.args, **self.kwargs)#Cls(*self.args, **self.kwargs)#
-                self._instance.__init__(*self.args, **self.kwargs)
-                return self._instance
+            def _lazy_init(self, **nkwvars):
+                self.__class__ = Cls
+                kwargs = self._kwargs
+                kwargs.update(nkwvars)
+                for k, v in kwargs.items():
+                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], ListSpace):
+                        kwargs[k] = autogluonobject.kwspaces[k][v]
+                args = self._args
+                del self._args
+                del self._kwargs
+                self.__init__(*args, **kwargs)
+
+                return self
 
             def __repr__(self):
                 return Cls.__repr__(self)
 
         autogluonobject.cs = autogluonobject.__init__.cs
+        autogluonobject.kwspaces = autogluonobject.__init__.kwspaces
         return autogluonobject
 
     return registered_class

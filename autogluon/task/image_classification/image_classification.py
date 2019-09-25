@@ -27,9 +27,9 @@ class ImageClassification(object):
             val_dataset='cifar10',
             net=ListSpace('CIFAR_ResNet20_v1', 'CIFAR_ResNet20_v2'),
             # training hps
-            optimizer= SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
-                           momentum=LogLinearSpace(0.85, 0.95),
-                           wd=LogLinearSpace(1e-5, 1e-3)),
+            optimizer=SGD(learning_rate=LogLinearSpace(1e-4, 1e-2),
+                          momentum=LogLinearSpace(0.85, 0.95),
+                          wd=LogLinearSpace(1e-5, 1e-3)),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
             epochs=20,

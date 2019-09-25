@@ -114,7 +114,6 @@ class DistributedTaskScheduler(object):
                         p.kill()
                         p.join()
                     else:
-                        logger.warning('Please use python 3.7 for distributed early stopping.')
                         subprocess.run(['kill', '-9', str(p.pid)])
                         subprocess.run(['kill', '-9', str(p.pid)])
                         p.join()
