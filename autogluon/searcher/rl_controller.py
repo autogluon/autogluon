@@ -6,7 +6,7 @@ from .searcher import BaseSearcher
 from ..utils import keydefaultdict
 import collections
 
-__all__ = ['RLSearcher', 'Controller']
+__all__ = ['RLSearcher', 'RLController']
 
 class RLSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
@@ -20,10 +20,13 @@ class RLSearcher(BaseSearcher):
         >>> searcher = RLSearcher(cs)
         >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=mx.cpu()):
+    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='rl'):
         self._results = collections.OrderedDict()
         self._best_state_path = None
-        self.controller = Controller(kwspaces, ctx=ctx)
+        if controller_type == 'rl':
+            self.controller = RLController(kwspaces, ctx=ctx)
+        else:
+            raise NotImplemented
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -34,7 +37,7 @@ class RLSearcher(BaseSearcher):
         return reprstr
 
 # Reference: https://github.com/carpedm20/ENAS-pytorch/
-class Controller(mx.gluon.Block):
+class RLController(mx.gluon.Block):
     def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
                  ctx=mx.cpu()):
         super().__init__()

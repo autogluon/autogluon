@@ -1,7 +1,6 @@
 import mxnet as mx
 import numpy as np
 from matplotlib import pyplot
-import tempfile
 try:
     import graphviz
 except ImportError:
@@ -34,9 +33,7 @@ def plot_network(block, shape=(1, 3, 224, 224), savefile=False):
     a = mx.viz.plot_network(sym, shape={'data':shape},
                             node_attrs={'shape':'rect', 'fixedsize':'false'})
     if savefile:
-        a.view(tempfile.mktemp('.gv'))
-    #if isinstance(save_prefix, str):
-    #    a.render(save_prefix)
+        a.view(savefile)
     return a
 
 class Visualizer(object):
