@@ -54,7 +54,8 @@ requirements = [
     'nose',
     'gluoncv',
     'gluonnlp',
-    'python-graphviz',
+    'graphviz',
+    'scikit-optimize',
 ]
 
 setup(
