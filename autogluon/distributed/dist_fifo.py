@@ -77,6 +77,8 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
                 verbose=False)
         self.log_lock = mp.Lock()
         self.training_history = OrderedDict()
+        self.config_history = OrderedDict()
+
         if resume:
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
@@ -177,7 +179,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(task.task_id, reported_result)
+            self.add_training_result(task.task_id, reported_result, task.args['config'])
             reporter.move_on()
             last_result = reported_result
         if last_result is not None:
@@ -194,7 +196,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         self.join_tasks()
         return self.searcher.get_best_reward()
 
-    def add_training_result(self, task_id, reported_result):
+    def add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(tag='loss',
@@ -212,6 +214,8 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
                 self.training_history[task_id].append(reward)
             else:
                 self.training_history[task_id] = [reward]
+                if config:
+                    self.config_history[task_id] = config
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
         if filename is None and not plot:

@@ -35,7 +35,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
         searcher = RLSearcher(train_fn.get_kwspaces())
         super(DistributedRLScheduler,self).__init__(
                 train_fn, train_fn.args, resource, searcher,
-                checkpoint=checkpoint, resume=resume, num_trials=num_trials,
+                checkpoint=checkpoint, resume=False, num_trials=num_trials,
                 time_attr=time_attr, reward_attr=reward_attr,
                 visualizer=visualizer, dist_ip_addrs=dist_ip_addrs, **kwargs)
         # reserve controller computation resource on master node
@@ -54,6 +54,13 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr*controller_batch_size})
         self.controller_batch_size = controller_batch_size
+
+        if resume:
+            if os.path.isfile(checkpoint):
+                self.load_state_dict(load(checkpoint))
+            else:
+                msg = 'checkpoint path {} is not available for resume.'.format(checkpoint)
+                logger.exception(msg)
 
     def run(self, num_trials=None):
         """Run multiple number of trials
@@ -111,7 +118,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
                     reporter.move_on()
                     task_thread.join()
                     break
-                self.add_training_result(task.task_id, reported_result)
+                self.add_training_result(task.task_id, reported_result, task.args['config'])
                 reporter.move_on()
                 last_result = reported_result
             if last_result is not None:
@@ -171,18 +178,22 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
         pass
 
     def state_dict(self, destination=None):
-        destination = super(DistributedFIFOScheduler, self).state_dict(destination)
-        # TODO
-        destination['searcher'] = pickle.dumps(self.searcher)
+        if destination is None:
+            destination = OrderedDict()
+            destination._metadata = OrderedDict()
+        logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
+        destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
+        destination['TASK_ID'] = Task.TASK_ID.value
+        destination['searcher'] = self.searcher.state_dict()
         destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
 
     def load_state_dict(self, state_dict):
-        super(DistributedFIFOScheduler, self).load_state_dict(state_dict)
-        # TODO
-        self.searcher = pickle.loads(state_dict['searcher'])
+        self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
+        Task.set_id(state_dict['TASK_ID'])
+        self.searcher.load_state_dict(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])

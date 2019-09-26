@@ -1,10 +1,11 @@
+import pickle
 import mxnet as mx
 import mxnet.gluon.nn as nn
 import mxnet.ndarray as F
 from ..basic.space import *
 from .searcher import BaseSearcher
-from ..utils import keydefaultdict
-import collections
+from ..utils import keydefaultdict, update_params
+from collections import OrderedDict
 
 __all__ = ['RLSearcher', 'RLController']
 
@@ -21,7 +22,7 @@ class RLSearcher(BaseSearcher):
         >>> searcher.get_config()
     """
     def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='rl'):
-        self._results = collections.OrderedDict()
+        self._results = OrderedDict()
         self._best_state_path = None
         if controller_type == 'rl':
             self.controller = RLController(kwspaces, ctx=ctx)
@@ -35,6 +36,19 @@ class RLSearcher(BaseSearcher):
             'Best Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
+
+    def state_dict(self, destination=None):
+        if destination is None:
+            destination = OrderedDict()
+            destination._metadata = OrderedDict()
+        destination['results'] = pickle.dumps(self._results)
+        destination['controller_params'] = pickle.dumps(self.controller.collect_params())
+        return destination
+
+    def load_state_dict(self, state_dict):
+        self._results=pickle.loads(state_dict['results'])
+        update_params(self.controller, pickle.loads(state_dict['controller_params']))
+
 
 # Reference: https://github.com/carpedm20/ENAS-pytorch/
 class RLController(mx.gluon.Block):
@@ -138,11 +152,3 @@ class RLController(mx.gluon.Block):
             return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
         else:
             return configs
-
-    def __getstate__(self):
-        """Override pickling behavior."""
-        d = dict()
-        return d
-
-    def __setstate__(self, d):
-        self.__dict__ = d

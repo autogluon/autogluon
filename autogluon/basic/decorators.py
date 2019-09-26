@@ -53,7 +53,7 @@ class autogluon_method(object):
                     args_dict[k] = v._lazy_init(**sub_config)
                 elif isinstance(v, ListSpace):
                     sub_config = strip_cofing_space(new_config, prefix=k)
-                    print('k:{}, sub_config:{}'.format(k, sub_config))
+                    #print('k:{}, sub_config:{}'.format(k, sub_config))
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
                         # nested space: List of AutoGluonobjects

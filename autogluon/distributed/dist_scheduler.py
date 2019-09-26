@@ -142,7 +142,7 @@ class DistributedTaskScheduler(object):
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
         """
-        self._cleaning_tasks()
+        #self._cleaning_tasks()
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
