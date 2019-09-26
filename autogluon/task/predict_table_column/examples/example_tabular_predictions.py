@@ -1,19 +1,15 @@
-"""
-Example (advanced) user script for PredictTableColumn task:
-
-Notes to run:
-source ~/virtual/TabularAutoGluon/bin/activate
-
-"""
+""" Example script for PredictTableColumn task """
 
 
 # Clean use-case with mostly defaults:
 
 from autogluon import predict_table_column as task
 
-data_dir = '/Users/jonasmue/Documents/Datasets/AdultIncomeOpenMLTask=7592/'
-train_file_path = data_dir+'train_adultincomedata.csv'
-test_file_path = data_dir+'test_adultincomedata.csv'
+package_dir = 'auto-ml-with-gluon/' # TODO: change this to absolute filepath to auto-ml-with-gluon/ on your computer
+
+data_dir = package_dir+'tabular/datasets/AdultIncomeData/'
+train_file_path = data_dir+'train_data.csv'
+test_file_path = data_dir+'test_data.csv'
 savedir = data_dir+'Output/'
 label_column = 'class' # name of column containing label to predict
 
@@ -33,7 +29,8 @@ y_test = test_data[label_column]
 test_data = test_data.drop(labels=[label_column],axis=1)
 print(test_data.head())
 
-trained_predictor = task.load(savedir) # Grail object
-y_pred = trained_predictor.predict(test_data)
-perf = trained_predictor.evaluate(y_true=y_test, y_pred=y_pred)
+predictor = None  # Load previously-trained predictor from file (unnecessary in this case):
+predictor = task.load(savedir)
+y_pred = predictor.predict(test_data)
+perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
 
