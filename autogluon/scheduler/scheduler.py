@@ -7,7 +7,7 @@ from threading import Thread
 import multiprocessing as mp
 from collections import namedtuple, OrderedDict
 
-from .remote_manager import RemoteManager
+from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..basic import Task
 from .reporter import StatusReporter, Communicator, DistSemaphore

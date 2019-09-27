@@ -7,25 +7,14 @@ from ..basic.decorators import autogluon_object
 
 __all__ = ['Adam', 'NAG', 'SGD']
 
-@autogluon_object(
-    learning_rate=LogLinearSpace(1e-4, 1e-1),
-    wd=LogLinearSpace(1e-6, 1e-2),
-    )
+@autogluon_object()
 class Adam(optim.Adam):
     pass
 
-@autogluon_object(
-    learning_rate=LogLinearSpace(1e-4, 1e-1),
-    wd=LogLinearSpace(1e-6, 1e-2),
-    momentum=LinearSpace(0.85, 0.95),
-    )
+@autogluon_object()
 class NAG(optim.NAG):
     pass
 
-@autogluon_object(
-    learning_rate=LogLinearSpace(1e-4, 1e-1),
-    wd=LogLinearSpace(1e-6, 1e-2),
-    momentum=LinearSpace(0.85, 0.95),
-    )
+@autogluon_object()
 class SGD(optim.SGD):
     pass

@@ -1,8 +1,7 @@
 from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 import gluoncv.data.transforms as gcv_transforms
-from ...basic.decorators import autogluon_function
-from ...basic.space import *
+from ..core import *
 
 @autogluon_function()
 def get_built_in_dataset(name, train=True, crop_size=224):

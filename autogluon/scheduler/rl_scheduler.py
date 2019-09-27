@@ -9,14 +9,14 @@ from collections import OrderedDict
 
 import mxnet as mx
 
-from ..resource import DistributedResource
+from .resource import DistributedResource
 from ..basic import save, load
 from ..utils import mkdir, try_import_mxboard
 from ..basic import Task, autogluon_method
 from ..searcher import RLSearcher
-from .dist_scheduler import DistributedTaskScheduler
-from .dist_fifo import DistributedFIFOScheduler
-from .dist_reporter import DistStatusReporter
+from .scheduler import DistributedTaskScheduler
+from .fifo import DistributedFIFOScheduler
+from .reporter import DistStatusReporter
 
 __all__ = ['DistributedRLScheduler']
 

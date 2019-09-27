@@ -7,7 +7,7 @@ from gluoncv.data import transforms as gcv_transforms
 from ..optimizer import *
 from ..basic.space import *
 from ..searcher import *
-from ..distributed import *
+from ..scheduler import *
 
 from .nets import *
 from .dataset import get_built_in_dataset

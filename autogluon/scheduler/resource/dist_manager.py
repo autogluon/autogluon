@@ -1,7 +1,7 @@
 import logging
 import multiprocessing as mp
 from .resource import *
-from ..utils import Queue
+from ...utils import Queue
 
 __all__ = ['DistributedResourceManager', 'NodeResourceManager']
 

@@ -7,12 +7,12 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
-from ..resource import DistributedResource
+from .resource import DistributedResource
 from ..basic import save, load
 from ..utils import mkdir, try_import_mxboard
 from ..basic import Task
-from .dist_scheduler import DistributedTaskScheduler
-from .dist_reporter import DistStatusReporter
+from .scheduler import DistributedTaskScheduler
+from .reporter import DistStatusReporter
 
 __all__ = ['DistributedFIFOScheduler']
 
