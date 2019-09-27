@@ -4,13 +4,12 @@ from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
 
-#from ...utils.data_analyzer import DataAnalyzer
-from ...optim import *
-from ...basic.space import *
-from ...searcher import *
-from ...distributed import *
+from ..optimizer import *
+from ..basic.space import *
+from ..searcher import *
+from ..distributed import *
 
-from ...network import *
+from .nets import *
 from .dataset import get_built_in_dataset
 from .pipeline import train_image_classification
 
@@ -64,7 +63,6 @@ class ImageClassification(object):
         cs = train_image_classification.cs
 
         searcher_inst = searcher(cs)
-
         scheduler_inst = scheduler(train_image_classification, args,
                                    resource={'num_cpus': num_cpus, 'num_gpus': num_gpus},
                                    searcher=searcher_inst,

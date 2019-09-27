@@ -6,7 +6,7 @@ try:
 except ImportError:
     graphviz = None
 
-__all__ = ['Visualizer', 'plot_network']
+__all__ = ['plot_network']
 
 def plot_network(block, shape=(1, 3, 224, 224), savefile=False):
     """Plot network to visualize internal structures.
@@ -35,16 +35,3 @@ def plot_network(block, shape=(1, 3, 224, 224), savefile=False):
     if savefile:
         a.view(savefile)
     return a
-
-class Visualizer(object):
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def visualize_dataset_label_histogram(a, b):
-        min_len = min(len(a._label), len(b._label))
-        pyplot.hist([a._label[:min_len], b._label[:min_len]],
-                    bins=len(np.unique(a._label)),
-                    label=['a', 'b'])
-        pyplot.legend(loc='upper right')
-        pyplot.savefig('./histogram.png')

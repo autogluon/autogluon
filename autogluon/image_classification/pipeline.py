@@ -11,9 +11,9 @@ from mxnet.gluon.data.vision import transforms
 
 from .metrics import get_metric_instance
 
-from ...optim import SGD, NAG
+from ...optimizer import SGD, NAG
 from ...basic import autogluon_register_args
-from ...network import get_built_in_network
+from .nets import get_built_in_network
 from .dataset import get_built_in_dataset
 from ...basic.space import *
 

@@ -12,7 +12,6 @@ warnings.filterwarnings("ignore", message="The objective has been evaluated at t
 from skopt import Optimizer
 from skopt.space import *
 
-from ..basic import load
 from .searcher import BaseSearcher
 
 __all__ = ['SKoptSearcher']

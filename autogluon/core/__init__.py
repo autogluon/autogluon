@@ -1,3 +1,5 @@
-from .core import *
+from .space import *
+from .task import *
+from .decorators import *
 
-__all__ = core.__all__
+from . import optimizers
