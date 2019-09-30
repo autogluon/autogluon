@@ -54,24 +54,18 @@ def get_model_instances(name, **kwargs):
 def get_model(name, **kwargs):
     """Returns a network with search space by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the model.
-    pretrained : bool or str
-        Boolean value controls whether to load the default pretrained weights for model.
-        String value represents the hashtag for a certain version of pretrained weights.
-    classes : int
-        Number of classes for the output layer.
-    ctx : Context, default CPU
-        The context in which to load the pretrained weights.
-    root : str, default '~/.mxnet/models'
-        Location for keeping the model parameters.
-
-    Returns
-    -------
-    Net
-        The model with search space.
+    Args:
+        name : str
+            Name of the model.
+        pretrained : bool or str
+            Boolean value controls whether to load the default pretrained weights for model.
+            String value represents the hashtag for a certain version of pretrained weights.
+        classes : int
+            Number of classes for the output layer.
+        ctx : Context, default CPU
+            The context in which to load the pretrained weights.
+        root : str, default '~/.mxnet/models'
+            Location for keeping the model parameters.
     """
     name = name.lower()
     if name not in models:

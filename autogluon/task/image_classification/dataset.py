@@ -13,15 +13,9 @@ _dataset = {'mnist': gluon.data.vision.MNIST,
 def get_dataset(name, **kwargs):
     """Returns a dataset by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the model.
-
-    Returns
-    -------
-    Dataset
-        The dataset.
+    Args:
+        name : str
+            Name of the model.
     """
     name = name.lower()
     if name not in _dataset:

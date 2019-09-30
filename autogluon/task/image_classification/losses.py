@@ -27,15 +27,9 @@ losses = {'SoftmaxCrossEntropyLoss': gluon.loss.SoftmaxCrossEntropyLoss,
 def get_loss(name, **kwargs):
     """Returns a loss with search space by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the loss.
-
-    Returns
-    -------
-    Loss
-        The loss with search space.
+    Args:
+        name : str
+            Name of the loss.
     """
     if name not in losses and name.lower() not in losses:
         err_str = '"%s" is not among the following loss list:\n\t' % (name)
@@ -48,15 +42,9 @@ def get_loss(name, **kwargs):
 def get_loss_instance(name, **kwargs):
     """Returns a loss instance by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the loss.
-
-    Returns
-    -------
-    Loss
-        The loss instance.
+    Args:
+        name : str
+            Name of the loss.
     """
     if name not in losses and name.lower() not in losses:
         err_str = '"%s" is not among the following loss list:\n\t' % (name)

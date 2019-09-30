@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import multiprocessing as mp
+import time
 from collections import OrderedDict
 
 from .scheduler import *
@@ -20,16 +21,11 @@ class FIFO_Scheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
 
     Args:
-        train_fn (callable): A task launch function for training.
-            Note: please add the `@autogluon_method` decorater to the original function.
+        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
         args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources.
-            For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher.
-            For example, autogluon.searcher.RandomSampling
-        reward_attr (str): The training result objective value attribute. As
-            with `time_attr`, this may refer to any objective value. Stopping
-            procedures will use this attribute.
+        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
+        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
 
     Example:
         >>> @autogluon_method
@@ -92,6 +88,28 @@ class FIFO_Scheduler(TaskScheduler):
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         for i in range(self.num_finished_tasks, self.num_trials):
+            self.schedule_next()
+
+    def run_with_stop_criterion(self, start_time, stop_criterion, type='soft'):
+        """Run multiple number of trials with stop criterion
+        """
+        self.num_trials = stop_criterion['num_trials'] if stop_criterion[
+            'num_trials'] else self.num_trials
+        logger.info('Starting Experiments')
+        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
+        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
+        from tqdm import trange
+        tbar = trange(self.num_finished_tasks, self.num_trials)
+        for i in tbar:
+            if self.num_finished_tasks > 0:
+                tbar.set_description('Current best reward: {} and best config: {}'
+                                     .format(self.get_best_reward(), json.dumps(self.get_best_config())))
+                if type == 'soft':
+                    if time.time() - start_time >= stop_criterion['time_limits'] \
+                            or self.get_best_reward() >= stop_criterion['max_metric']:
+                        break
+                else:
+                    raise NotImplementedError
             self.schedule_next()
 
     def save(self, checkpoint=None):
@@ -188,11 +206,13 @@ class FIFO_Scheduler(TaskScheduler):
         return self.searcher.get_best_state()
 
     def get_best_config(self):
-        self.join_tasks()
+        # Enable interactive monitoring
+        #self.join_tasks()
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
-        self.join_tasks()
+        # Enable interactive monitoring
+        #self.join_tasks()
         return self.searcher.get_best_reward()
 
     def add_training_result(self, task_id, reported_result):

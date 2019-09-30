@@ -1,6 +1,9 @@
 import logging
 import argparse
 import os
+import random
+import numpy as np
+import mxnet as mx
 
 from mxnet.gluon.data.vision import transforms
 
@@ -30,13 +33,13 @@ parser.add_argument('--time_limits', default=1 * 60 * 60, type=int,
                     help='time limits in seconds')
 parser.add_argument('--max_metric', default=1.0, type=float,
                     help='the max metric that is used to stop the trials')
-parser.add_argument('--max_trial_count', default=6, type=int,
+parser.add_argument('--num_trials', default=6, type=int,
                     help='number of experiment trials')
-parser.add_argument('--max_num_gpus', default=1, type=int,
+parser.add_argument('--num_gpus', default=1, type=int,
                     help='number of gpus per trial')
 parser.add_argument('--max_num_cpus', default=4, type=int,
                     help='number of cpus per trial')
-parser.add_argument('--max_training_epochs', default=10, type=int,
+parser.add_argument('--num_training_epochs', default=10, type=int,
                     help='number of epochs per trial')
 parser.add_argument('--lr_factor', default=0.75, type=float,
                     help='learning rate decay ratio')
@@ -44,21 +47,26 @@ parser.add_argument('--lr_step', default=20, type=int,
                     help='list of learning rate decay epochs as in str')
 parser.add_argument('--debug', action='store_true', default=False,
                     help='debug if needed')
+parser.add_argument('--seed', default=100, type=int,
+                    help='random seed')
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    mx.random.seed(args.seed)
+
     logger = logging.getLogger(__name__)
-    logging_handlers = [logging.StreamHandler()]
-    logdir = os.path.join(os.path.splitext(args.savedir)[0], 'logs')
+    logdir = os.path.join(os.path.splitext(args.savedir)[0].split('/')[0], 'log')
     if not os.path.exists(logdir):
         os.makedirs(logdir)
-    logging_handlers.append(logging.FileHandler(
-        '%s/train_minc.log' % logdir))
 
     if args.debug:
-        logging.basicConfig(level=logging.DEBUG, handlers=logging_handlers)
+        logging.basicConfig(filename='%s/train.log' % logdir,
+                            filemode='a', level=logging.DEBUG)
     else:
-        logging.basicConfig(level=logging.INFO, handlers=logging_handlers)
+        logging.basicConfig(filename='%s/train.log' % logdir,
+                            filemode='a', level=logging.INFO)
 
     jitter_param = 0.4
     lighting_param = 0.1
@@ -93,12 +101,11 @@ if __name__ == '__main__':
     stop_criterion = {
         'time_limits': args.time_limits,
         'max_metric': args.max_metric,
-        'max_trial_count': args.max_trial_count
+        'num_trials': args.num_trials
     }
     resources_per_trial = {
-        'max_num_gpus': args.max_num_gpus,
-        'max_num_cpus': args.max_num_cpus,
-        'max_training_epochs': args.max_training_epochs
+        'num_gpus': args.num_gpus,
+        'num_training_epochs': args.num_training_epochs
     }
     results = task.fit(dataset,
                        nets=ag.Nets(net_list),
@@ -113,13 +120,7 @@ if __name__ == '__main__':
                        lr_factor=args.lr_factor,
                        lr_step=args.lr_step)
 
-    logger.info('Best result:')
-    logger.info(results.metric)
-    logger.info('=========================')
-    logger.info('Best search space:')
-    logger.info(results.config)
-    logger.info('=========================')
-    logger.info('Total time cost:')
-    logger.info(results.time)
-    logger.info('=========================')
-    logger.info('Finished!')
+    logger.info('Top-1 acc: %.2f' % (results.metric * 100))
+    test_acc = task.evaluate()
+    logger.info('Top-1 test acc: %.2f' % (test_acc * 100))
+    logger.info('Time: %.2f s' % results.time)

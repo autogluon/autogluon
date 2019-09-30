@@ -4,6 +4,8 @@ __all__ = ['BaseAutoObject']
 
 
 class BaseAutoObject(ABC):
+    """The abstract auto object containing the search space.
+    """
     def __init__(self):
         super(BaseAutoObject, self).__init__()
         self._search_space = None

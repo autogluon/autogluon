@@ -22,15 +22,9 @@ metrics = {'Accuracy': mxnet.metric.Accuracy,
 def get_metric(name, **kwargs):
     """Returns a metric with search space by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the metric.
-
-    Returns
-    -------
-    metric
-        The metric with search space.
+    Args:
+        name : str
+            Name of the metric.
     """
     if name not in metrics and name.lower() not in metrics:
         err_str = '"%s" is not among the following metric list:\n\t' % (name)
@@ -43,15 +37,9 @@ def get_metric(name, **kwargs):
 def get_metric_instance(name, **kwargs):
     """Returns a metric instance by name
 
-    Parameters
-    ----------
-    name : str
-        Name of the metric.
-
-    Returns
-    -------
-    metric
-        The metric instance.
+    Args:
+        name : str
+            Name of the metric.
     """
     if name not in metrics and name.lower() not in metrics:
         err_str = '"%s" is not among the following metric list:\n\t' % (name)

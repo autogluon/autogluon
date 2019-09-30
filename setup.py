@@ -43,12 +43,15 @@ except(IOError, ImportError):
     long_description = open('README.md').read()
 
 requirements = [
-    'numpy==1.16.0',
+    'tqdm',
+    'numpy==1.17.0',
     'scipy',
     'matplotlib',
     'requests',
     'pytest',
-    'dask[complete]',
+    'scikit-optimize',
+    'dask[complete]==2.0.0',
+    'distributed==2.0.1',
     'tornado',
     'ConfigSpace',
     'nose',
@@ -62,7 +65,7 @@ setup(
     version=version,
     author='AutoGluon Community',
     url='https://github.com/awslabs/autogluon',
-    description='Gluon AutoML Toolkit',
+    description='AutoML Toolkit with MXNet Gluon',
     long_description=long_description,
     license='Apache',
 
