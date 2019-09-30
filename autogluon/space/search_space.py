@@ -1,14 +1,27 @@
 __all__ = ['List', 'Linear', 'Log']
 
+import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
 
 class List(object):
+    """Categorical search space.
+
+    Args:
+        name: the name of the search space
+        choices: the value candidates
+
+    Example:
+        >>> list_space = List('listspace', ['0', '1', '2'])
+    """
     def __init__(self, name, choices):
         self.name = name
         self.choices = choices
         self.hyper_param = CSH.CategoricalHyperparameter(name=self.name,
                                                          choices=self.choices)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param
@@ -21,6 +34,16 @@ class List(object):
 
 
 class Linear(object):
+    """linear search space.
+
+    Args:
+        name: the name of the search space
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> linear_space = Linear('linspace', 0, 10)
+    """
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
@@ -35,6 +58,9 @@ class Linear(object):
                                                               lower=self.lower,
                                                               upper=self.upper,
                                                               log=False)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param
@@ -59,6 +85,16 @@ class Linear(object):
 
 
 class Log(object):
+    """loglinear search space.
+
+    Args:
+        name: the name of the search space
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> log_space = Log('logspace', 0, 10)
+    """
     def __init__(self, name, lower, upper):
         self.name = name
         self.lower = lower
@@ -73,6 +109,9 @@ class Log(object):
                                                               lower=self.lower,
                                                               upper=self.upper,
                                                               log=True)
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hyper_param)
+        self.search_space = cs
 
     def get_hyper_param(self):
         return self.hyper_param

@@ -10,8 +10,8 @@ logging.basicConfig(level=logging.DEBUG)
 @pytest.mark.serial
 def test_optims():
     logger.debug('Start testing optimizers')
-    optims = ag.Optimizers([ag.optim.optims.get_optim('sgd'),
-                            ag.optim.optims.get_optim('adam')])
+    optims = ag.Optimizers([ag.optimizer.optimizers.get_optim('sgd'),
+                            ag.optimizer.optimizers.get_optim('adam')])
     logger.debug('optims:')
     logger.debug(optims)
     logger.debug('search space:')
@@ -39,7 +39,7 @@ def test_optim_strs():
 @pytest.mark.serial
 def test_custom_optim_range():
     logger.debug('Start custom optimizer range')
-    opt = ag.optims.Adam(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
-                         wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+    opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -2, 10 ** -1),
+                             wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
     logger.debug(opt.hyper_params)
     logger.debug('Finished.')

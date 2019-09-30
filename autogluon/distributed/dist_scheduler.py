@@ -11,6 +11,7 @@ from ..resource import DistributedResourceManager
 from ..basic import Task
 from .dist_reporter import Communicator, DistSemaphore
 from ..scheduler.reporter import StatusReporter
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,9 @@ class DistributedTaskScheduler(object):
                         p.join()
                     else:
                         logger.warning('Please use python 3.7 for distributed early stopping.')
-                        p.terminate()
+                        subprocess.run(['kill', '-9', str(p.pid)])
+                        subprocess.run(['kill', '-9', str(p.pid)])
+                        p.join()
             else:
                 p.join()
         except Exception as e:

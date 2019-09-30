@@ -1,2 +1,0 @@
-Searcher and Scheduler
-=======================

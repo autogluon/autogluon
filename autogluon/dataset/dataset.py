@@ -6,6 +6,24 @@ __all__ = ['Dataset']
 
 
 class Dataset(BaseAutoObject):
+    """The auto dataset.
+
+    Args:
+        name: the dataset name.
+        train_path: the training data location
+        val_path: the validation data location.
+        batch_size: the batch size.
+        num_workers: the number of workers used in DataLoader.
+        transform_train_fn: the transformation function for training data.
+        transform_val_fn: the transformation function for validation data.
+        transform_train_list: the compose list of Transformations for training data.
+        transform_val_list: the compose list of Transformations for validation data.
+        batchify_train_fn: the batchify function defined for training data.
+        batchify_val_fn: the batchify function defined for validation data.
+
+    Example:
+        >>> dataset = Dataset(name='cifar10')
+    """
     def __init__(self, name, train_path=None, val_path=None, batch_size=None, num_workers=None,
                  transform_train_fn=None, transform_val_fn=None,
                  transform_train_list=None, transform_val_list=None,

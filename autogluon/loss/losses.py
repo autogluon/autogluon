@@ -8,6 +8,14 @@ __all__ = ['Losses']
 
 
 class Losses(BaseAutoObject):
+    """The auto loss.
+
+    Args:
+        loss_list: a list of losses.
+
+    Example:
+        >>> losses = Losses(['SoftmaxCrossEntropyLoss'])
+    """
     def __init__(self, loss_list):
         # TODO(cgraywang): add instance, for now, use a list
         assert isinstance(loss_list, list), type(loss_list)

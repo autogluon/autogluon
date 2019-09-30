@@ -21,7 +21,7 @@ class autogluon_method(object):
             spec_config = gen_config(autogluon_method.SEED.value, config)
         vars(args).update(spec_config)
         self.f(args, **kwargs)
-        if 'reporter' in kwargs:
+        if 'reporter' in kwargs and kwargs['reporter'] is not None:
             logger.debug('Reporter Done!')
             kwargs['reporter'](done=True)
 

@@ -8,7 +8,8 @@ class sample_from(Sample):
     """Specify that autogluon should sample configuration values from
     this function.  The use of function arguments in configs must be
     disambiguated by wrapped the function in sample_from()
-    Arguments:
+
+    Args:
         func: An callable function to draw a sample from.
     """
 

@@ -13,8 +13,8 @@ from .dataset import *
 from .loss import *
 from .metric import *
 from .network import *
-from .optim import *
-from .optim import optims as optims
+from .optimizer import *
+from .optimizer import optimizers
 from .space import *
 from .basic import *
 from .utils import *
@@ -28,6 +28,6 @@ __all__ = dataset.__all__ \
           + loss.__all__ \
           + metric.__all__ \
           + network.__all__ \
-          + optim.__all__ \
+          + optimizer.__all__ \
           + space.__all__ \
           + core.__all__
