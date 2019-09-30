@@ -12,6 +12,7 @@
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 *.swp
@@ -117,11 +118,3 @@ train/*
 tutorials/checkpoint/*
 tutorials/train/*
 autogluon/version.py
-
-# hackathon
-d2lhackathon
-hackathon
-d2lhackathonback
-d2lhackathonsim
-hackathon
-d2l-sim

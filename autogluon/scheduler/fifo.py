@@ -42,7 +42,7 @@ class FIFO_Scheduler(TaskScheduler):
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
         >>> myscheduler = FIFO_Scheduler(train_fn, args,
-        >>>                              resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                              resource={'num_cpus': 2, 'num_gpus': 0},
         >>>                              searcher=searcher, num_trials=20,
         >>>                              reward_attr='accuracy',
         >>>                              time_attr='epoch',
@@ -141,6 +141,8 @@ class FIFO_Scheduler(TaskScheduler):
                                            'task{}_state_dict.ag'.format(task.task_id))
             reporter = StatusReporter(state_dict_path)
             task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
+            task.args['resources'] = task.resources
             # main process
             tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
                             task.fn, task.args, task.resources,

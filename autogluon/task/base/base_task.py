@@ -21,7 +21,7 @@ from ..image_classification.losses import *
 from ..image_classification.metrics import *
 from ...searcher import BaseSearcher
 
-__all__ = ['BaseTask']
+__all__ = ['BaseTask', 'Results']
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +251,7 @@ class BaseTask(ABC):
                     max_t=metadata['resources_per_trial'][
                         'num_training_epochs'],
                     grace_period=metadata['resources_per_trial'][
-                                     'num_training_epochs'] // 4,
+                                     'num_training_epochs'] // 2,
                     visualizer=metadata['visualizer'])
             else:
                 BaseTask.trial_scheduler = ag.scheduler.Hyperband_Scheduler(
@@ -267,7 +267,7 @@ class BaseTask(ABC):
                     max_t=metadata['resources_per_trial'][
                         'num_training_epochs'],
                     grace_period=metadata['resources_per_trial'][
-                                     'num_training_epochs'] // 4,
+                                     'num_training_epochs'] // 2,
                     visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
@@ -465,6 +465,7 @@ class BaseTask(ABC):
         """
         Fit networks on dataset
 
+<<<<<<< HEAD
         Args:
             data: Input data. task.Datasets.
             nets: autogluon.Nets.
@@ -521,6 +522,41 @@ class BaseTask(ABC):
             >>>                     savedir=savedir,
             >>>                     stop_criterion=stop_criterion,
             >>>                     resources_per_trial=resources_per_trial)
+=======
+        Parameters
+        ----------
+        data: Input data. It could be:
+            task.Datasets
+        nets: autogluon.Nets
+        optimizers: autogluon.Optimizers
+        metrics: autogluon.Metrics
+        losses: autogluon.Losses
+        stop_criterion (dict): The stopping criteria. The keys may be any field in
+            the return result of 'train()', whichever is reached first.
+            Defaults to empty dict.
+        resources_per_trial (dict): Machine resources to allocate per trial,
+            e.g. ``{"max_num_cpus": 64, "max_num_gpus": 8}``. Note that GPUs will not be
+            assigned unless you specify them here.
+        savedir (str): Local dir to save training results to.
+        searcher (str): Search Algorithm to employ, should be one of: 
+            'random' (random search), 'bayesopt' (Bayesian optimization using skopt).
+            If = None, defaults to 'random'.
+            # TODO: do not want to rely on string flag to select searcher, need to be able to pass kwargs to searcher.
+        trial_scheduler: Scheduler for executing
+            the experiment. Choose among FIFO (default) and HyperBand.
+        resume (bool): If checkpoint exists, the experiment will
+            resume from there.
+        backend: support autogluon default backend
+        **kwargs: Used for backwards compatibility.
+
+        Returns
+        ----------
+        results:
+            model: the parameters associated with the best model. (TODO:)
+            val_accuracy: validation set accuracy
+            config: best configuration
+            time: total time cost
+>>>>>>> master
         """
         logger.info('Start fitting')
         start_fit_time = time.time()
