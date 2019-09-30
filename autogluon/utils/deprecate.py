@@ -1,9 +1,19 @@
-def _make_deprecate(meth, old_name):
+import warnings
+from warnings import warn
+
+__all__ = ['AutoGluonWarning', 'make_deprecate', 'DeprecationHelper']
+
+class AutoGluonWarning(DeprecationWarning):
+    pass
+
+warnings.simplefilter('once', AutoGluonWarning)
+
+def make_deprecate(meth, old_name):
     new_name = meth.__name__
 
     def deprecated_init(*args, **kwargs):
-        warnings.warn("autogluon.{} is now deprecated in favor of autogluon.{}."
-                      .format(old_name, new_name), EncodingDeprecationWarning)
+        warn("autogluon.{} is now deprecated in favor of autogluon.{}."
+             .format(old_name, new_name), AutoGluonWarning)
         return meth(*args, **kwargs)
 
     deprecated_init.__doc__ = r"""
@@ -14,3 +24,20 @@ def _make_deprecate(meth, old_name):
         old_name=old_name, new_name=new_name)
     deprecated_init.__name__ = old_name
     return deprecated_init
+
+
+class DeprecationHelper(object):
+    def __init__(self, old_name):
+        self.old_name = old_name
+
+    def _warn(self):
+        new_name = DeprecationHelper.__name__
+        warn("autogluon.{} is now deprecated in favor of autogluon.{}."
+             .format(self.old_name, new_name), AutoGluonWarning)
+
+    def __call__(self, *args, **kwargs):
+        self._warn()
+        return self.old_name(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.old_name, attr)

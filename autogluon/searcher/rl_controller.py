@@ -2,7 +2,7 @@ import pickle
 import mxnet as mx
 import mxnet.gluon.nn as nn
 import mxnet.ndarray as F
-from ..basic.space import *
+from ..core.space import *
 from .searcher import BaseSearcher
 from ..utils import keydefaultdict, update_params
 from collections import OrderedDict
@@ -66,7 +66,7 @@ class LSTMController(mx.gluon.Block):
         # only support List space for now
         self.num_tokens = []
         for _, space in self.spaces:
-            assert isinstance(space, ListSpace)
+            assert isinstance(space, List)
             self.num_tokens.append(len(space))
         num_total_tokens = sum(self.num_tokens)
 

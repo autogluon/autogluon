@@ -10,19 +10,19 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from ..basic import save, load
+from ..utils import save, load
 from ..utils import mkdir, try_import_mxboard
-from ..basic import Task, autogluon_method
+from ..core import Task, autogluon_method
 from ..searcher import RLSearcher
 from .scheduler import DistributedTaskScheduler
-from .fifo import DistributedFIFOScheduler
+from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 
-__all__ = ['DistributedRLScheduler']
+__all__ = ['RLScheduler']
 
 logger = logging.getLogger(__name__)
 
-class DistributedRLScheduler(DistributedFIFOScheduler):
+class RLScheduler(FIFOScheduler):
     def __init__(self, train_fn, resource, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
@@ -35,7 +35,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
         self.sync = sync
         # create RL searcher/controller
         searcher = RLSearcher(train_fn.get_kwspaces())
-        super(DistributedRLScheduler,self).__init__(
+        super(RLScheduler,self).__init__(
                 train_fn, train_fn.args, resource, searcher,
                 checkpoint=checkpoint, resume=False, num_trials=num_trials,
                 time_attr=time_attr, reward_attr=reward_attr,
@@ -242,7 +242,7 @@ class DistributedRLScheduler(DistributedFIFOScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        cls = DistributedRLScheduler
+        cls = RLScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         task.args['reporter'] = reporter
         # main process

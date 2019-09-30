@@ -2,10 +2,7 @@ import ConfigSpace as CS
 import mxnet as mx
 from gluoncv.model_zoo import get_model
 
-from ..core import *
-from ..basic import *
-
-from ..basic.decorators import autogluon_function
+from ...core import *
 
 @autogluon_function()
 def get_built_in_network(name, *args, **kwargs):

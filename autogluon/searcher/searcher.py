@@ -6,9 +6,9 @@ import logging
 from collections import OrderedDict
 import multiprocessing as mp
 
-from ..basic import load
+from ..utils import load, DeprecationHelper
 
-__all__ = ['BaseSearcher', 'RandomSampling']
+__all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class BaseSearcher(object):
         return reprstr
 
 
-class RandomSampling(BaseSearcher):
+class RandomSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
 
     Args:
@@ -110,7 +110,7 @@ class RandomSampling(BaseSearcher):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> # create searcher
-        >>> searcher = RandomSampling(cs)
+        >>> searcher = RandomSearcher(cs)
         >>> searcher.get_config()
     """
     def get_config(self):
@@ -130,4 +130,7 @@ class RandomSampling(BaseSearcher):
     def update(self, *args, **kwargs):
         """Update the searcher with the newest metric report
         """
-        super(RandomSampling, self).update(*args, **kwargs)
+        super(RandomSearcher, self).update(*args, **kwargs)
+
+RandomSampling = DeprecationHelper(RandomSearcher)
+

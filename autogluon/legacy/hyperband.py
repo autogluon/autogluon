@@ -6,10 +6,10 @@ import numpy as np
 import multiprocessing as mp
 
 from .scheduler import *
+from ..scheduler.resource import Resources
+from ..scheduler.reporter import StatusReporter
+from ..scheduler.hyperband import Hyperband_Manager
 from .fifo import FIFO_Scheduler
-from ...resource import Resources
-from ..reporter import StatusReporter
-from ..hyperband import Hyperband_Manager
 
 __all__ = ['Hyperband_Scheduler']
 

@@ -9,14 +9,15 @@ from collections import namedtuple, OrderedDict
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
-from ..basic import Task
+from ..core import Task
 from .reporter import StatusReporter, Communicator, DistSemaphore
+from ..utils import DeprecationHelper
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['DistributedTaskScheduler']
+__all__ = ['TaskScheduler', 'DistributedTaskScheduler']
 
-class DistributedTaskScheduler(object):
+class TaskScheduler(object):
     """Distributed Task Scheduler
 
     Args:
@@ -27,14 +28,14 @@ class DistributedTaskScheduler(object):
         >>>     pass
         >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
         >>> task = Task(my_task, {}, resource)
-        >>> scheduler = DistributedTaskScheduler()
+        >>> scheduler = TaskScheduler()
         >>> scheduler.add_task(task)
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
     REMOTE_MANAGER = None
     def __init__(self, dist_ip_addrs=[]):
-        cls = DistributedTaskScheduler
+        cls = TaskScheduler
         if cls.REMOTE_MANAGER is None:
             cls.REMOTE_MANAGER = RemoteManager()
             cls.RESOURCE_MANAGER.add_remote(
@@ -48,8 +49,8 @@ class DistributedTaskScheduler(object):
     def add_remote(self, ip_addrs):
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         with self.LOCK:
-            remotes = DistributedTaskScheduler.REMOTE_MANAGER.add_remote_nodes(ip_addrs)
-            DistributedTaskScheduler.RESOURCE_MANAGER.add_remote(remotes)
+            remotes = TaskScheduler.REMOTE_MANAGER.add_remote_nodes(ip_addrs)
+            TaskScheduler.RESOURCE_MANAGER.add_remote(remotes)
 
     @classmethod
     def upload_files(cls, files, **kwargs):
@@ -64,7 +65,7 @@ class DistributedTaskScheduler(object):
             task (autogluon.scheduler.Task): a new trianing task
         """
         # adding the task
-        cls = DistributedTaskScheduler
+        cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         p = Thread(target=cls._start_distributed_task, args=(
                    task, cls.RESOURCE_MANAGER, self.env_sem))
@@ -76,7 +77,7 @@ class DistributedTaskScheduler(object):
     @staticmethod
     def _start_distributed_task(task, resource_manager, env_sem):
         logger.debug('\nScheduling {}'.format(task))
-        job = task.resources.node.submit(DistributedTaskScheduler._run_dist_task,
+        job = task.resources.node.submit(TaskScheduler._run_dist_task,
                                          task.fn, task.args, task.resources.gpu_ids,
                                          env_sem)
         job.result()
@@ -163,3 +164,6 @@ class DistributedTaskScheduler(object):
         reprstr = self.__class__.__name__ + '(\n' + \
             str(self.RESOURCE_MANAGER) +')\n'
         return reprstr
+
+DistributedTaskScheduler = DeprecationHelper(TaskScheduler)
+

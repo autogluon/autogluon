@@ -8,7 +8,7 @@ from .utils.try_import import *
 try_import_mxnet()
 try_import_dask()
 
-from .basic import *
 from .utils import *
 from .core import *
-from . import scheduler, searcher, optimizer, image_classification
+from .task import *
+from . import scheduler, searcher, distributed

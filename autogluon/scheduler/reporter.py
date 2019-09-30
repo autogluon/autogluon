@@ -3,7 +3,7 @@ import json
 import logging
 import threading
 import multiprocessing as mp
-from ..basic import save, load
+from ..utils import save, load
 from dask.distributed import Queue
 
 logger = logging.getLogger(__name__)

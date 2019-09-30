@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 class DistributedResourceManager(object):
     LOCK = mp.Lock()
     REQUESTING_STACK = []
-    #REQUESTING_SEMAPHORE = mp.Semaphore(0)
     MAX_CPU_COUNT = 0
     MAX_GPU_COUNT = 0
     NODE_RESOURCE_MANAGER = {}

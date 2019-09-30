@@ -1,5 +1,5 @@
 from .space import *
 from .task import *
-from .decorators import *
+from .decorator import *
 
-from . import optimizers
+from . import optimizer

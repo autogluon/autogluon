@@ -4,16 +4,17 @@ import threading
 import numpy as np
 import multiprocessing as mp
 
-from ..basic import Task
-from .fifo import DistributedFIFOScheduler
+from ..core import Task
+from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter, DistSemaphore
+from ..utils import DeprecationHelper
 
-__all__ = ['DistributedHyperbandScheduler']
+__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler']
 
 logger = logging.getLogger(__name__)
 
 # Async version of Hyperband used in computation heavy tasks such as deep learning
-class DistributedHyperbandScheduler(DistributedFIFOScheduler):
+class HyperbandScheduler(FIFOScheduler):
     """Implements the Async Hyperband
     This should provide similar theoretical performance as HyperBand but
     avoid straggler issues that HyperBand faces. One implementation detail
@@ -47,18 +48,19 @@ class DistributedHyperbandScheduler(DistributedFIFOScheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
-        >>> myscheduler = DistributedHyperbandScheduler(train_fn, args,
-        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0}, 
-        >>>                                   searcher=searcher, num_trials=20,
-        >>>                                   reward_attr='accuracy',
-        >>>                                   time_attr='epoch',
-        >>>                                   grace_period=1)
+        >>> myscheduler = HyperbandScheduler(train_fn, args,
+        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                  searcher=searcher, num_trials=20,
+        >>>                                  reward_attr='accuracy',
+        >>>                                  time_attr='epoch',
+        >>>                                  grace_period=1)
     """
-    def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
+    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
+                 searcher='random', checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr="epoch", reward_attr="accuracy",
                  max_t=100, grace_period=10, reduction_factor=4, brackets=1,
                  visualizer='none', dist_ip_addrs=[]):
-        super(DistributedHyperbandScheduler, self).__init__(
+        super(HyperbandScheduler, self).__init__(
             train_fn, args, resource, searcher, checkpoint, resume, num_trials,
             time_attr, reward_attr, visualizer, dist_ip_addrs)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
@@ -70,7 +72,7 @@ class DistributedHyperbandScheduler(DistributedFIFOScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        cls = DistributedHyperbandScheduler
+        cls = HyperbandScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter and terminator
         reporter = DistStatusReporter()
@@ -136,12 +138,12 @@ class DistributedHyperbandScheduler(DistributedFIFOScheduler):
         searcher.update(task.args['config'], last_result[self._reward_attr])
 
     def state_dict(self, destination=None):
-        destination = super(DistributedHyperbandScheduler, self).state_dict(destination)
+        destination = super(HyperbandScheduler, self).state_dict(destination)
         destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
     def load_state_dict(self, state_dict):
-        super(DistributedHyperbandScheduler, self).load_state_dict(state_dict)
+        super(HyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
 
@@ -282,3 +284,6 @@ class _Bracket():
             for milestone, recorded in self._rungs
         ])
         return "Bracket: " + iters
+
+DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler)
+

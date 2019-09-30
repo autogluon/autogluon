@@ -1,7 +1,7 @@
 from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 import gluoncv.data.transforms as gcv_transforms
-from ..core import *
+from ...core import *
 
 @autogluon_function()
 def get_built_in_dataset(name, train=True, crop_size=224):
@@ -20,10 +20,10 @@ def get_built_in_dataset(name, train=True, crop_size=224):
         raise NotImplemented
 
 @autogluon_function(
-    input_size=ListSpace(224, 256),
+    input_size=List(224, 256),
     crop_ratio=0.875,
-    jitter_param=LinearSpace(0.1, 0.4),
-    max_rotate_angle=IntSpace(0, 10),
+    jitter_param=Linear(0.1, 0.4),
+    max_rotate_angle=Int(0, 10),
     )
 def get_data_rec(input_size, crop_ratio, rec_train, rec_train_idx,
                  rec_val, rec_val_idx, batch_size, num_workers,

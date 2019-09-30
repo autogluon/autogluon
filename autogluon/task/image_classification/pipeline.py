@@ -11,11 +11,10 @@ from mxnet.gluon.data.vision import transforms
 
 from .metrics import get_metric_instance
 
-from ...optimizer import SGD, NAG
-from ...basic import autogluon_register_args
+from ...core.optimizer import SGD, NAG
+from ...core import *
 from .nets import get_built_in_network
 from .dataset import get_built_in_dataset
-from ...basic.space import *
 
 __all__ = ['train_image_classification']
 

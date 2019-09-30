@@ -8,24 +8,30 @@ import multiprocessing as mp
 from collections import OrderedDict
 
 from .resource import DistributedResource
-from ..basic import save, load
-from ..utils import mkdir, try_import_mxboard
-from ..basic import Task
-from .scheduler import DistributedTaskScheduler
+from ..utils import save, load, mkdir, try_import_mxboard
+from ..core import Task, autogluon_method
+from .scheduler import TaskScheduler
+from ..searcher import *
 from .reporter import DistStatusReporter
+from ..utils import DeprecationHelper
 
-__all__ = ['DistributedFIFOScheduler']
+__all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
-class DistributedFIFOScheduler(DistributedTaskScheduler):
+searchers = {
+    'random': RandomSearcher,
+    'bayesian': SKoptSearcher,
+}
+
+class FIFOScheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
 
     Args:
         train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
         args (object): Default arguments for launching train_fn.
         resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
+        searcher (object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
         reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
 
     Example:
@@ -42,23 +48,24 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
-        >>> myscheduler = DistributedFIFOScheduler(train_fn, args,
-        >>>                                        resource={'num_cpus': 2, 'num_gpus': 0},
-        >>>                                        searcher=searcher, num_trials=20,
-        >>>                                        reward_attr='accuracy',
-        >>>                                        time_attr='epoch',
-        >>>                                        grace_period=1)
+        >>> myscheduler = FIFOScheduler(train_fn, args,
+        >>>                             resource={'num_cpus': 2, 'num_gpus': 0},
+        >>>                             searcher=searcher, num_trials=20,
+        >>>                             reward_attr='accuracy',
+        >>>                             time_attr='epoch',
+        >>>                             grace_period=1)
         >>> # run tasks
         >>> myscheduler.run()
     """
-    def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
+    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0}, searcher='random', checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=[], **kwargs):
-        super(DistributedFIFOScheduler,self).__init__(dist_ip_addrs)
+        super(FIFOScheduler,self).__init__(dist_ip_addrs)
         self.train_fn = train_fn
-        self.args = args
+        assert isinstance(train_fn, autogluon_method)
+        self.args = args if args else train_fn.args
         self.resource = resource
-        self.searcher = searcher
+        self.searcher = searchers[searcher](train_fn.cs) if isinstance(searcher, str) else searcher
         self.num_trials = num_trials
         self._checkpoint = checkpoint
         self._time_attr = time_attr
@@ -139,7 +146,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        cls = DistributedFIFOScheduler
+        cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter
         reporter = DistStatusReporter()
@@ -254,7 +261,7 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         if plot: plt.show()
 
     def state_dict(self, destination=None):
-        destination = super(DistributedFIFOScheduler, self).state_dict(destination)
+        destination = super(FIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
         destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
@@ -262,9 +269,12 @@ class DistributedFIFOScheduler(DistributedTaskScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
-        super(DistributedFIFOScheduler, self).load_state_dict(state_dict)
+        super(FIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
+
+DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler)
+

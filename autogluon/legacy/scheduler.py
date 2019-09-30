@@ -5,8 +5,8 @@ import logging
 import argparse
 import multiprocessing as mp
 from collections import namedtuple, OrderedDict
-from ...resource import ResourceManager
-from ...basic import Task
+from ..scheduler.resource import ResourceManager
+from ..core import Task
 
 __all__ = ['TaskScheduler']
 

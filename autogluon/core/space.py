@@ -1,11 +1,15 @@
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
-__all__ = ['Space', 'ListSpace', 'LinearSpace', 'LogLinearSpace', 'IntSpace',
-           'BoolSpace', 'strip_cofing_space', 'AutoGluonObject', 'Sequence']
+__all__ = ['Space', 'List', 'Linear', 'LogLinear', 'Int',
+           'Bool', 'strip_cofing_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
     pass
+
+class Space(object):
+    def get_config_space(self, name):
+        return _get_hp(name, self)
 
 class Sequence(object):
     """A Sequence of AutoGluon Objects
@@ -39,11 +43,7 @@ class Sequence(object):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-class Space(object):
-    def get_config_space(self, name):
-        return _get_hp(name, self)
-
-class ListSpace(Space):
+class List(Space):
     def __init__(self, *args):
         self.data = [*args]
         if len(self.data) > 0 and isinstance(self.data[0], AutoGluonObject):
@@ -78,38 +78,38 @@ class ListSpace(Space):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-class LinearSpace(Space):
+class Linear(Space):
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
-class LogLinearSpace(Space):
+class LogLinear(Space):
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
-class IntSpace(Space):
+class Int(Space):
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
-class BoolSpace(IntSpace):
+class Bool(Int):
     def __init__(self):
-        super(BoolSpace, self).__init__(0, 1)
+        super(Bool, self).__init__(0, 1)
 
-class ConstantSpace(Space):
+class Constant(Space):
     def __init__(self, val):
         self.value = val
 
 def _get_hp(name, space):
     assert isinstance(space, Space)
-    if isinstance(space, LinearSpace):
+    if isinstance(space, Linear):
         return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper)
-    elif isinstance(space, LogLinearSpace):
+    elif isinstance(space, LogLinear):
         return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper, log=True)
-    elif isinstance(space, IntSpace):
+    elif isinstance(space, Int):
         return CSH.UniformIntegerHyperparameter(name=name, lower=space.lower, upper=space.upper)
-    elif isinstance(space, ConstantSpace):
+    elif isinstance(space, Constant):
         return CSH.Constant(name=name, value=space.value)
     else:
         raise NotImplemented

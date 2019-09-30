@@ -2,8 +2,6 @@ import ConfigSpace as CS
 from mxnet import optimizer as optim
 
 from ..core import *
-from ..basic.space import *
-from ..basic.decorators import autogluon_object
 
 __all__ = ['Adam', 'NAG', 'SGD']
 

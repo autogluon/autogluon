@@ -10,7 +10,7 @@ import ConfigSpace as CS
 from ..searcher import Sample
 from .space import *
 from ..utils import EasyDict as ezdict
-from .deprecate import _make_deprecate
+from ..utils.deprecate import make_deprecate
 
 __all__ = ['autogluon_method', 'autogluon_kwargs', 'autogluon_object',
            'autogluon_function', 'autogluon_register_args',
@@ -51,7 +51,7 @@ class autogluon_method(object):
                 elif isinstance(v, AutoGluonObject):
                     sub_config = strip_cofing_space(new_config, prefix=k)
                     args_dict[k] = v._lazy_init(**sub_config)
-                elif isinstance(v, ListSpace):
+                elif isinstance(v, List):
                     sub_config = strip_cofing_space(new_config, prefix=k)
                     #print('k:{}, sub_config:{}'.format(k, sub_config))
                     choice = sub_config.pop(k)
@@ -84,7 +84,7 @@ class autogluon_method(object):
         """
         self.kwvars = kwargs
         for k, v in kwargs.items():
-            if isinstance(v, (ListSpace, Sequence)):
+            if isinstance(v, (List, Sequence)):
                 sub_cs = v.get_config_space(k)
                 _add_cs(self.cs, sub_cs, k)
                 self.args.update({k: v})
@@ -109,25 +109,25 @@ class autogluon_method(object):
                     assert isinstance(obj, AutoGluonObject)
                     for sub_k, sub_v in obj.kwspaces.items():
                         new_k = '{}.{}.{}'.format(k, idx, sub_k)
-                        if isinstance(sub_v, ListSpace):
+                        if isinstance(sub_v, List):
                             self.kwspaces[new_k] = sub_v
                         else:
                             logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
-            elif isinstance(v, ListSpace):
+            elif isinstance(v, List):
                 new_k = '{}.{}'.format(k, k)
                 self.kwspaces[new_k] = v
                 for idx, obj in enumerate(v):
                     if isinstance(obj, AutoGluonObject):
                         for idx, sub_k, sub_v in enumerate(obj.kwspaces.items()):
                             new_k = '{}.{}.{}'.format(k, idx, sub_k)
-                            if isinstance(sub_v, ListSpace):
+                            if isinstance(sub_v, List):
                                 self.kwspaces[new_k] = sub_v
                             else:
                                 logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
             elif isinstance(v, AutoGluonObject):
                 for sub_k, sub_v in v.kwspaces.items():
                     new_k = '{}.{}'.format(k, sub_k)
-                    if isinstance(sub_v, ListSpace):
+                    if isinstance(sub_v, List):
                         self.kwspaces[new_k] = sub_v
                     else:
                         logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
@@ -200,7 +200,7 @@ def autogluon_kwargs(**kwvars):
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
-                if isinstance(v, ListSpace):
+                if isinstance(v, List):
                     kwargs[k] = v
                     kwspaces[k] = v
                     sub_cs = v.get_config_space(name=k)
@@ -242,7 +242,7 @@ def autogluon_function(**kwvars):
                 # lazy initialization for passing config files
                 self.kwargs.update(nkwvars)
                 for k, v in self.kwargs.items():
-                    if k in self.kwspaces and isinstance(self.kwspaces[k], ListSpace):
+                    if k in self.kwspaces and isinstance(self.kwspaces[k], List):
                         self.kwargs[k] = self.kwspaces[k][v]
                         
                 self._instance = self.func(*self.args, **self.kwargs)
@@ -262,7 +262,7 @@ def autogluon_object(**kwvars):
     AutoGluon object is a lazy init object, which allows distributed training.
     """
     def registered_class(Cls):
-        class autogluonobject(AutoGluonObject, Cls):
+        class autogluonobject(AutoGluonObject):#, Cls
             @autogluon_kwargs(**kwvars)
             def __init__(self, *args, **kwargs):
                 self._args = args
@@ -281,7 +281,7 @@ def autogluon_object(**kwvars):
                 kwargs = self._kwargs
                 kwargs.update(nkwvars)
                 for k, v in kwargs.items():
-                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], ListSpace):
+                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], List):
                         kwargs[k] = autogluonobject.kwspaces[k][v]
                 args = self._args
                 del self._args
@@ -299,4 +299,4 @@ def autogluon_object(**kwvars):
 
     return registered_class
 
-autogluon_register_dict = _make_deprecate(autogluon_register_args, 'autogluon_register_dict')
+autogluon_register_dict = make_deprecate(autogluon_register_args, 'autogluon_register_dict')

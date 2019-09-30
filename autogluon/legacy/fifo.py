@@ -6,11 +6,11 @@ import threading
 import multiprocessing as mp
 from collections import OrderedDict
 
-from .scheduler import *
-from ...resource import Resources
-from ..reporter import StatusReporter
-from ...basic import save, load, Task
-from ...utils import mkdir, try_import_mxboard
+from ..scheduler import *
+from ..scheduler.resource import Resources
+from ..scheduler.reporter import StatusReporter
+from ..utils import save, load, mkdir, try_import_mxboard
+from ..core import Task
 
 __all__ = ['FIFO_Scheduler']
 
