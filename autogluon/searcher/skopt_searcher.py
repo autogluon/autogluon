@@ -136,8 +136,7 @@ class SKoptSearcher(BaseSearcher):
 
     def random_config(self):
         """Function to randomly sample a new configuration which must be valid.
-           TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
-
+           TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() )
         Args:
             returns: config
         """
