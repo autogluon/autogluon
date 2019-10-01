@@ -65,7 +65,7 @@ setup(
     version=version,
     author='AutoGluon Community',
     url='https://github.com/awslabs/autogluon',
-    description='Gluon AutoML Toolkit',
+    description='AutoML Toolkit with MXNet Gluon',
     long_description=long_description,
     license='Apache',
 
