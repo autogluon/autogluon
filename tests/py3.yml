@@ -15,6 +15,10 @@ dependencies:
   - matplotlib
   - tqdm
   - pillow
+  - ConfigSpace
+  - dask[complete]=2.0.0
+  - gluoncv
+  - gluonnlp
   - pip:
     - mxnet-cu92mkl==1.6.0b20190808
     - coverage-badge
