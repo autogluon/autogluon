@@ -276,5 +276,5 @@ class FIFOScheduler(TaskScheduler):
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
 
-DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler)
+DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')
 

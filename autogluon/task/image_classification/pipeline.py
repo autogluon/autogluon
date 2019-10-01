@@ -2,15 +2,12 @@ import warnings
 import logging
 
 import mxnet as mx
-
-from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
-from gluoncv.model_zoo import get_model
+from mxnet import gluon, init, autograd, nd
 from mxnet.gluon.data.vision import transforms
-
+from gluoncv.model_zoo import get_model
 
 from .metrics import get_metric_instance
-
 from ...core.optimizer import SGD, NAG
 from ...core import *
 from .nets import get_built_in_network
@@ -35,9 +32,9 @@ def train_image_classification(args, reporter):
         net = args.net
         net.initialize(ctx=ctx)
 
-    if isinstance(args.train_dataset, str):
+    if isinstance(args.dataset, str):
         print('Using built-in datasets')
-        args.train_dataset = get_built_in_dataset(args.train_dataset)._lazy_init()
+        args.train_dataset = get_built_in_dataset(args.dataset)._lazy_init()
         args.val_dataset = get_built_in_dataset(args.val_dataset, train=False)._lazy_init()
 
     train_data = gluon.data.DataLoader(

@@ -12,3 +12,6 @@ from .utils import *
 from .core import *
 from .task import *
 from . import scheduler, searcher, distributed
+
+# legacy modules
+from .legacy import Nets,  Optimizers, Losses

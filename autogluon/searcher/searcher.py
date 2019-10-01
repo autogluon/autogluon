@@ -132,5 +132,5 @@ class RandomSearcher(BaseSearcher):
         """
         super(RandomSearcher, self).update(*args, **kwargs)
 
-RandomSampling = DeprecationHelper(RandomSearcher)
+RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
 

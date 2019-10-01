@@ -285,5 +285,5 @@ class _Bracket():
         ])
         return "Bracket: " + iters
 
-DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler)
+DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler, 'DistributedHyperbandScheduler')
 

@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ImageClassification(BaseTask):
     @staticmethod
-    def fit(train_dataset='cifar10',
-            val_dataset='cifar10',
+    def fit(dataset='cifar10',
             net=List('CIFAR_ResNet20_v1', 'CIFAR_ResNet20_v2'),
             optimizer=SGD(learning_rate=LogLinear(1e-4, 1e-2),
                           momentum=LogLinear(0.85, 0.95),
@@ -50,7 +49,6 @@ class ImageClassification(BaseTask):
 
         train_image_classification.update(
             train_dataset=train_dataset,
-            val_dataset=val_dataset,
             net=net,
             optimizer=optimizer,
             loss=loss,

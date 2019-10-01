@@ -16,6 +16,17 @@ def get_built_in_dataset(name, train=True, crop_size=224):
             transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
         ])
         return gluon.data.vision.CIFAR10(train=train).transform_first(transform_split)
+    elif name == 'cifar100':
+        transform_split = transforms.Compose([
+            gcv_transforms.RandomCrop(32, pad=4),
+            transforms.RandomFlipLeftRight(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ]) if train else transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ])
+        return gluon.data.vision.CIFAR100(train=train).transform_first(transform_split)
     else:
         raise NotImplemented
 

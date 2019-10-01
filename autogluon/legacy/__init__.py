@@ -3,16 +3,14 @@ from .fifo import *
 from .hyperband import *
 
 from ..core import List
+from ..utils import DeprecationHelper
 
 class DeprecatedObject(List):
     def __init__(self, objs):
         super().__init__(*objs)
 
-class Optimizers(DeprecatedObject):
-    pass
+Optimizers = DeprecationHelper(DeprecatedObject, 'Optimizers')
 
-class Nets(DeprecatedObject):
-    pass
+Nets = DeprecationHelper(DeprecatedObject, 'Nets')
 
-class Losses(DeprecatedObject):
-    pass
+Losses = DeprecationHelper(DeprecatedObject, 'Losses')

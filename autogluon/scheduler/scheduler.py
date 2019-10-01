@@ -165,5 +165,5 @@ class TaskScheduler(object):
             str(self.RESOURCE_MANAGER) +')\n'
         return reprstr
 
-DistributedTaskScheduler = DeprecationHelper(TaskScheduler)
+DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')
 
