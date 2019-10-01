@@ -10,7 +10,7 @@ from ...searcher import *
 from ...scheduler import *
 
 from .nets import get_built_in_network
-from .dataset import get_built_in_dataset
+from .dataset import ImageClassificationDataset
 from .pipeline import train_image_classification
 
 from ...utils import EasyDict as ezdict
@@ -21,12 +21,14 @@ __all__ = ['ImageClassification']
 logger = logging.getLogger(__name__)
 
 class ImageClassification(BaseTask):
+    Dataset = ImageClassificationDataset
     @staticmethod
     def fit(dataset='cifar10',
             net=List('CIFAR_ResNet20_v1', 'CIFAR_ResNet20_v2'),
             optimizer=SGD(learning_rate=LogLinear(1e-4, 1e-2),
                           momentum=LogLinear(0.85, 0.95),
                           wd=LogLinear(1e-5, 1e-3)),
+            lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
             epochs=20,
@@ -34,6 +36,7 @@ class ImageClassification(BaseTask):
             num_cpus=4,
             num_gpus=0,
             algorithm='random',
+            time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
@@ -48,9 +51,10 @@ class ImageClassification(BaseTask):
             pass
 
         train_image_classification.update(
-            train_dataset=train_dataset,
+            dataset=dataset,
             net=net,
             optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
             loss=loss,
             metric=metric,
             num_gpus=num_gpus,
@@ -58,14 +62,16 @@ class ImageClassification(BaseTask):
             epochs=epochs,
             num_workers=num_cpus)
 
+        print('train_image_classification.args', train_image_classification.args)
         scheduler_options = {
             'resource': {'num_cpus': num_cpus, 'num_gpus': num_gpus},
             'checkpoint': checkpoint,
             'num_trials': num_trials,
+            'time_out': time_limits,
             'resume': resume,
             'visualizer': visualizer,
             'time_attr': 'epoch',
-            'reward_attr': metric,
+            'reward_attr': 'reward',
             'dist_ip_addrs': dist_ip_addrs,
         }
         if algorithm == 'hyperband':

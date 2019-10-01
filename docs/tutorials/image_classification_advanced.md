@@ -7,10 +7,10 @@ These options include: defining the search space of various hyperparameter value
 The advanced functionalities of AutoGluon allow you to leverage your external knowledge about your particular prediction problem and computing resources to guide the training process. If properly utilized, you may be able to achieve superior performance within less training time.
 
 
-We again begin by letting AutoGluon know that `image_classification` is the task of interest: 
+We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
 
 ```{.python .input}
-from autogluon import image_classification as task
+from autogluon import ImageClassification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ and individual training runs (also referred to as `trials`) each last for 10 epo
 
 ```{.python .input}
 time_limits = 1*60
-num_training_epochs = 2
+epochs = 2
 ```
 
 We first again use the default arguments of the `fit` function to train the neural networks:
@@ -40,7 +40,7 @@ We first again use the default arguments of the `fit` function to train the neur
 ```{.python .input}
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 The validation and test top-1 accuracy are:
@@ -136,7 +136,7 @@ Let's then call `fit` using these manually-specified network candidates, and eva
 results = task.fit(dataset,
                    nets,
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 The validation and test top-1 accuracy are:
@@ -167,11 +167,11 @@ Additionally, the momentum in `SGD` is configured as another continuous search s
 
 
 ```{.python .input}
-adam_opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                          wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-sgd_opt = ag.optimizers.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-                        wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
+adam_opt = ag.optimizer.Adam(lr=ag.Log('lr', 1e-4, 1e-1),
+                             wd=ag.Log('wd', 1e-6, 1e-2))
+sgd_opt = ag.optimizer.SGD(lr=ag.Log('lr', 1e-4, 1e-1),
+                           momentum=ag.Linear('momentum', 0.85, 0.95),
+                           wd=ag.Log('wd', 1e-6, 1e-2))
 optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
 print(optimizers)
@@ -186,9 +186,9 @@ We then put the new network and optimizer search space and the learning rate sch
 results = task.fit(dataset,
                    nets,
                    optimizers,
-                   lr_scheduler=ag.space.List('lr_scheduler', ['poly', 'cosine']),
+                   lr_scheduler=ag.List('lr_scheduler', ['poly', 'cosine']),
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 The validation and test top-1 accuracy are:
@@ -232,7 +232,7 @@ results = task.fit(dataset,
                    searcher=searcher,
                    trial_scheduler=trial_scheduler,
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 The validation and test top-1 accuracy are:

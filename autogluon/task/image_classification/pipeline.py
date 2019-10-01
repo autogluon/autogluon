@@ -1,5 +1,6 @@
 import warnings
 import logging
+import numpy as np
 
 import mxnet as mx
 from mxnet.gluon import nn
@@ -17,9 +18,11 @@ __all__ = ['train_image_classification']
 
 logger = logging.getLogger(__name__)
 
-# Flexible:
-#    - Even do need to tell which parameters are searchable
-#    - Reusing script from gluoncv or gluonnlp
+lr_schedulers = {
+    'poly': mx.lr_scheduler.PolyScheduler,
+    'cosine': mx.lr_scheduler.CosineScheduler
+}
+
 @autogluon_register_args()
 def train_image_classification(args, reporter):
     print('pipeline args:', args)
@@ -33,32 +36,40 @@ def train_image_classification(args, reporter):
         net.initialize(ctx=ctx)
 
     if isinstance(args.dataset, str):
-        print('Using built-in datasets')
-        args.train_dataset = get_built_in_dataset(args.dataset)._lazy_init()
-        args.val_dataset = get_built_in_dataset(args.val_dataset, train=False)._lazy_init()
+        train_dataset = get_built_in_dataset(args.dataset)._lazy_init()
+        val_dataset = get_built_in_dataset(args.dataset, train=False)._lazy_init()
+    else:
+        train_dataset = args.dataset.train
+        val_dataset = args.dataset.val
+    if val_dataset is None:
+        print('train_dataset', train_dataset)
+        split = 1 if args.final_fit else 0
+        train_dataset, val_dataset = _train_val_split(train_dataset, split)
 
     train_data = gluon.data.DataLoader(
-        args.train_dataset,
+        train_dataset,
         batch_size=batch_size,
         shuffle=True,
         last_batch="rollover",
         num_workers=args.num_workers)
-    val_data = gluon.data.DataLoader(
-        args.val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=args.num_workers)
+    if not args.final_fit:
+        val_data = gluon.data.DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=args.num_workers)
 
+    if isinstance(args.lr_scheduler, str):
+        lr_scheduler = lr_schedulers[args.lr_scheduler](len(train_data) * args.epochs, base_lr=args.optimizer.lr)
+    else:
+        lr_scheduler = args.lr_scheduler
+    args.optimizer.lr_scheduler = lr_scheduler
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
 
     L = args.loss
     metric = get_metric_instance(args.metric)
 
     def train(epoch):
-        if hasattr(args, 'lr_step') and hasattr(args, 'lr_factor'):
-            if epoch % args.lr_step == 0:
-                trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
-
         for i, batch in enumerate(train_data):
             data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
             label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
@@ -83,13 +94,44 @@ def train_image_classification(args, reporter):
             test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
             metric.update(label, outputs)
 
-        _, test_acc = metric.get()
+        _, reward = metric.get()
         test_loss /= len(val_data)
         if reporter:
-            reporter(epoch=epoch, accuracy=test_acc, loss=test_loss)
-        print('epoch: {epoch}, acc: {accuracy}, loss: {loss}'. \
-            format(epoch=epoch, accuracy=test_acc, loss=test_loss))
+            reporter(epoch=epoch, reward=reward, loss=test_loss)
+        print('epoch: {epoch}, reward: {reward}, loss: {loss}'. \
+              format(epoch=epoch, reward=reward, loss=test_loss))
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
-        test(epoch)
+        if not args.final_fit:
+            test(epoch)
+
+def _train_val_split(train_dataset, split=1):
+    # temporary solution, need to change using batchify function
+    if split == 0:
+        return train_dataset, None
+    split_len = int(len(train_dataset) / 10)
+    if split == 1:
+        data = [train_dataset[i][0].expand_dims(0) for i in
+                range(split * split_len, len(train_dataset))]
+        label = [np.array([train_dataset[i][1]]) for i in
+                 range(split * split_len, len(train_dataset))]
+    else:
+        data = [train_dataset[i][0].expand_dims(0) for i in
+                range((split - 1) * split_len)] + \
+               [train_dataset[i][0].expand_dims(0) for i in
+                range(split * split_len, len(train_dataset))]
+        label = [np.array([train_dataset[i][1]]) for i in range((split - 1) * split_len)] + \
+                [np.array([train_dataset[i][1]]) for i in
+                 range(split * split_len, len(train_dataset))]
+    train = gluon.data.dataset.ArrayDataset(
+        nd.concat(*data, dim=0),
+        np.concatenate(tuple(label), axis=0))
+    val_data = [train_dataset[i][0].expand_dims(0) for i in
+                range((split - 1) * split_len, split * split_len)]
+    val_label = [np.array([train_dataset[i][1]]) for i in
+                 range((split - 1) * split_len, split * split_len)]
+    val = gluon.data.dataset.ArrayDataset(
+        nd.concat(*val_data, dim=0),
+        np.concatenate(tuple(val_label), axis=0))
+    return train, val

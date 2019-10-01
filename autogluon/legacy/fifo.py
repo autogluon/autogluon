@@ -50,14 +50,15 @@ class FIFO_Scheduler(TaskScheduler):
         >>> myscheduler.run()
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
-                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
-                 visualizer='none'):
+                 resume=False, num_trials=None, time_out=None, time_attr='epoch',
+                 reward_attr='accuracy', visualizer='none'):
         super(FIFO_Scheduler, self).__init__()
         self.train_fn = train_fn
         self.args = args
         self.resource = resource
         self.searcher = searcher
         self.num_trials = num_trials
+        self.time_out = time_out
         self._checkpoint = checkpoint
         self._time_attr = time_attr
         self._reward_attr = reward_attr
@@ -79,36 +80,22 @@ class FIFO_Scheduler(TaskScheduler):
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
-    def run(self, num_trials=None):
+    def run(self, num_trials=None, time_out=None):
         """Run multiple number of trials
         """
+        start_time = time.time()
         self.num_trials = num_trials if num_trials else self.num_trials
+        self.time_out = time_out if time_out else self.time_out
         logger.info('Starting Experiments')
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
-        for i in range(self.num_finished_tasks, self.num_trials):
-            self.schedule_next()
-
-    def run_with_stop_criterion(self, start_time, stop_criterion, type='soft'):
-        """Run multiple number of trials with stop criterion
-        """
-        self.num_trials = stop_criterion['num_trials'] if stop_criterion[
-            'num_trials'] else self.num_trials
-        logger.info('Starting Experiments')
-        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
-        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
-        from tqdm import trange
         tbar = trange(self.num_finished_tasks, self.num_trials)
-        for i in tbar:
-            if self.num_finished_tasks > 0:
-                tbar.set_description('Current best reward: {} and best config: {}'
-                                     .format(self.get_best_reward(), json.dumps(self.get_best_config())))
-                if type == 'soft':
-                    if time.time() - start_time >= stop_criterion['time_limits'] \
-                            or self.get_best_reward() >= stop_criterion['max_metric']:
-                        break
-                else:
-                    raise NotImplementedError
+        for _ in tbar:
+            if time_out and time.time() - start_time >= time_out \
+                    or max_metric and self.get_best_reward() >= max_metric:
+                break
+            tbar.set_description('Current best reward: {} and best config: {}'
+                                 .format(self.get_best_reward(), json.dumps(self.get_best_config())))
             self.schedule_next()
 
     def save(self, checkpoint=None):

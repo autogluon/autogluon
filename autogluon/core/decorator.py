@@ -67,6 +67,10 @@ class autogluon_method(object):
                     if '.' in k:
                         continue
                     args_dict[k] = new_config[k]
+            elif isinstance(v, AutoGluonObject):
+                sub_config = strip_cofing_space(new_config, prefix=k)
+                args_dict[k] = v._lazy_init(**sub_config)
+                
 
         self.f(args, **kwargs)
         if 'reporter' in kwargs and kwargs['reporter'] is not None:
@@ -159,7 +163,7 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
             new_parameter.name = "%s%s%s" % (prefix, '.',
                                              new_parameter.name)
         new_parameters.append(new_parameter)
-    if new_parameters[0].name not in master_cs._hyperparameters:
+    if len(new_parameters) > 0 and new_parameters[0].name not in master_cs._hyperparameters:
         master_cs.add_configuration_space(prefix, sub_cs, delimiter, parent_hyperparameter=parent_hp)
     else:
         for hp in new_parameters:

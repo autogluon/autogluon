@@ -1,10 +1,20 @@
+import math
+import numpy as np
 from mxnet import gluon
 from mxnet.gluon.data.vision import transforms
 import gluoncv.data.transforms as gcv_transforms
 from ...core import *
+from ..base import BaseDataset
+
+__all__ = ['get_built_in_dataset', 'ImageClassificationDataset']
+
+built_in_datasets = [
+    'cifar10',
+    'cifar100',
+]
 
 @autogluon_function()
-def get_built_in_dataset(name, train=True, crop_size=224):
+def get_built_in_dataset(name, train=True):
     if name == 'cifar10':
         transform_split = transforms.Compose([
             gcv_transforms.RandomCrop(32, pad=4),
@@ -30,76 +40,67 @@ def get_built_in_dataset(name, train=True, crop_size=224):
     else:
         raise NotImplemented
 
-@autogluon_function(
-    input_size=List(224, 256),
-    crop_ratio=0.875,
-    jitter_param=Linear(0.1, 0.4),
-    max_rotate_angle=Int(0, 10),
-    )
-def get_data_rec(input_size, crop_ratio, rec_train, rec_train_idx,
-                 rec_val, rec_val_idx, batch_size, num_workers,
-                 jitter_param, max_rotate_angle):
-    import mxnet as mx
-    from mxnet import gluon
-    rec_train = os.path.expanduser(rec_train)
-    rec_train_idx = os.path.expanduser(rec_train_idx)
-    rec_val = os.path.expanduser(rec_val)
-    rec_val_idx = os.path.expanduser(rec_val_idx)
-    
-    lighting_param = 0.1
-    input_size = input_size
-    crop_ratio = crop_ratio if crop_ratio > 0 else 0.875
-    resize = int(math.ceil(input_size / crop_ratio))
-    mean_rgb = [123.68, 116.779, 103.939]
-    std_rgb = [58.393, 57.12, 57.375]
+@autogluon_object()
+class ImageClassificationDataset(object):
+    """The image classification dataset.
+    Args:
+        name: the dataset name.
+        train_path: the training data location
+        val_path: the validation data location.
+        batch_size: the batch size.
+        num_workers: the number of workers used in DataLoader.
+        transform_train_fn: the transformation function for training data.
+        transform_val_fn: the transformation function for validation data.
+        transform_train_list: the compose list of Transformations for training data.
+        transform_val_list: the compose list of Transformations for validation data.
+        batchify_train_fn: the batchify function defined for training data.
+        batchify_val_fn: the batchify function defined for validation data.
+    """
+    def __init__(self, name=None, train_path=None, val_path=None,
+                 input_size=224, crop_ratio=0.875, jitter_param=0.4,
+                 **kwargs):
+        self.name = name
+        self.train_path = train_path
+        self.val_path = val_path
+        resize = int(math.ceil(input_size / crop_ratio))
+        self.transform_train = transforms.Compose([
+                transforms.Resize(resize),
+                transforms.RandomResizedCrop(input_size),
+                transforms.RandomFlipLeftRight(),
+                transforms.RandomColorJitter(brightness=jitter_param,
+                                             contrast=jitter_param,
+                                             saturation=jitter_param),
+                transforms.RandomLighting(0.1),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        self.transform_val = transforms.Compose([
+                transforms.Resize(resize),
+                transforms.CenterCrop(input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        self._read_dataset(**kwargs)
 
-    def batch_fn(batch, ctx):
-        data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
-        label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
-        return data, label
-
-    print('rec_train', rec_train)
-    print('rec_train_idx', rec_train_idx)
-    train_data = mx.io.ImageRecordIter(
-        path_imgrec         = rec_train,
-        path_imgidx         = rec_train_idx,
-        preprocess_threads  = num_workers,
-        shuffle             = True,
-        batch_size          = batch_size,
-
-        data_shape          = (3, input_size, input_size),
-        mean_r              = mean_rgb[0],
-        mean_g              = mean_rgb[1],
-        mean_b              = mean_rgb[2],
-        std_r               = std_rgb[0],
-        std_g               = std_rgb[1],
-        std_b               = std_rgb[2],
-        rand_mirror         = True,
-        random_resized_crop = True,
-        max_aspect_ratio    = 4. / 3.,
-        min_aspect_ratio    = 3. / 4.,
-        max_random_area     = 1,
-        min_random_area     = 0.08,
-        max_rotate_angle    = max_rotate_angle,
-        brightness          = jitter_param,
-        saturation          = jitter_param,
-        contrast            = jitter_param,
-        pca_noise           = lighting_param,
-    )
-    # val_input_size = 320
-    val_data = mx.io.ImageRecordIter(
-        path_imgrec         = rec_val,
-        path_imgidx         = rec_val_idx,
-        preprocess_threads  = num_workers,
-        shuffle             = False,
-        batch_size          = batch_size,
-        resize              = resize,
-        data_shape          = (3, input_size, input_size),
-        mean_r              = mean_rgb[0],
-        mean_g              = mean_rgb[1],
-        mean_b              = mean_rgb[2],
-        std_r               = std_rgb[0],
-        std_g               = std_rgb[1],
-        std_b               = std_rgb[2],
-    )
-    return train_data, val_data, batch_fn
+    def _read_dataset(self, **kwargs):
+        import time
+        if self.name in built_in_datasets:
+            self.train = get_built_in_dataset(self.name, train=True)._lazy_init()
+            self.val = None
+            self.test = get_built_in_dataset(self.name, train=False)._lazy_init()
+            self.num_classes = len(np.unique(self.train._label))
+        else:
+            if self.train_path is not None:
+                dataset_cls = gluon.data.vision.ImageFolderDataset if '.rec' not in self.train_path \
+                        else gluon.data.vision.ImageRecordDataset
+                self.train = dataset_cls(self.train_path).transform_first(self.transform_train)
+                self.val = dataset_cls(self.val_path).transform_first(self.transform_val) if self.val_path else None
+                if 'test_path' in kwargs:
+                    self.test = dataset_cls(kwargs['test_path']).transform_first(self.transform_val)
+                self.num_classes = len(np.unique([e[1] for e in self.train]))
+            elif 'test_path' in kwargs:
+                dataset_cls = gluon.data.vision.ImageFolderDataset if '.rec' not in kwargs['test_path'] \
+                        else gluon.data.vision.ImageRecordDataset
+                self.test = dataset_cls(kwargs['test_path']).transform_first(self.transform_val)
+            else:
+                raise NotImplementedError

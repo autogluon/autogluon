@@ -57,12 +57,13 @@ class HyperbandScheduler(FIFOScheduler):
     """
     def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
                  searcher='random', checkpoint='./exp/checkerpoint.ag',
-                 resume=False, num_trials=None, time_attr="epoch", reward_attr="accuracy",
+                 resume=False, num_trials=None, time_out=None,
+                 time_attr="epoch", reward_attr="accuracy",
                  max_t=100, grace_period=10, reduction_factor=4, brackets=1,
                  visualizer='none', dist_ip_addrs=[]):
         super(HyperbandScheduler, self).__init__(
             train_fn, args, resource, searcher, checkpoint, resume, num_trials,
-            time_attr, reward_attr, visualizer, dist_ip_addrs)
+            time_out, time_attr, reward_attr, visualizer, dist_ip_addrs)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
 

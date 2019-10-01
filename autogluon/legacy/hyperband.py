@@ -59,17 +59,12 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         >>>                                   grace_period=1)
     """
 
-    def __init__(self, train_fn, args, resource, searcher,
-                 checkpoint='./exp/checkerpoint.ag',
-                 resume=False,
-                 num_trials=None,
-                 time_attr="training_epoch",
-                 reward_attr="accuracy",
-                 max_t=100, grace_period=10,
-                 reduction_factor=4, brackets=1,
-                 visualizer='none'):
+    def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
+                 resume=False, num_trials=None, time_out=None, time_attr="training_epoch",
+                 reward_attr="accuracy", max_t=100, grace_period=10,
+                 reduction_factor=4, brackets=1, visualizer='none'):
         super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
-                                                  checkpoint, resume, num_trials,
+                                                  checkpoint, resume, num_trials, time_out,
                                                   time_attr, reward_attr, visualizer)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
