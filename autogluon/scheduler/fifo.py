@@ -4,6 +4,7 @@ import pickle
 import json
 import logging
 import threading
+from tqdm import trange
 import multiprocessing as mp
 from collections import OrderedDict
 
@@ -59,7 +60,7 @@ class FIFOScheduler(TaskScheduler):
     """
     def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0}, searcher='random',
                  checkpoint='./exp/checkerpoint.ag', resume=False, num_trials=None,
-                 time_out=None, time_attr='epoch', reward_attr='accuracy',
+                 time_out=None, max_reward=1.0, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=[], **kwargs):
         super(FIFOScheduler,self).__init__(dist_ip_addrs)
         self.train_fn = train_fn
@@ -67,8 +68,10 @@ class FIFOScheduler(TaskScheduler):
         self.args = args if args else train_fn.args
         self.resource = resource
         self.searcher = searchers[searcher](train_fn.cs) if isinstance(searcher, str) else searcher
+        self.metadata = train_fn.get_kwspaces()
         self.num_trials = num_trials
         self.time_out = time_out
+        self.max_reward = max_reward
         self._checkpoint = checkpoint
         self._time_attr = time_attr
         self._reward_attr = reward_attr
@@ -104,7 +107,7 @@ class FIFOScheduler(TaskScheduler):
         tbar = trange(self.num_finished_tasks, self.num_trials)
         for _ in tbar:
             if time_out and time.time() - start_time >= time_out \
-                    or max_metric and self.get_best_reward() >= max_metric:
+                    or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
             tbar.set_description('Current best reward: {} and best config: {}'
                                  .format(self.get_best_reward(), json.dumps(self.get_best_config())))

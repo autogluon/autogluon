@@ -101,6 +101,7 @@ class TaskScheduler(object):
             if len(gpu_ids) > 0:
                 # handle GPU devices
                 os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+                os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
             # start local progress
             p = mp.Process(target=fn, kwargs=args)
             p.start()
@@ -166,4 +167,3 @@ class TaskScheduler(object):
         return reprstr
 
 DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')
-

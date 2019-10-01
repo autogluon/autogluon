@@ -270,7 +270,7 @@ class RLScheduler(FIFOScheduler):
 
     def load_state_dict(self, state_dict):
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
-        self.baseline = pickle.loads(state_dict['baseline'])
+        #self.baseline = pickle.loads(state_dict['baseline'])
         Task.set_id(state_dict['TASK_ID'])
         self.searcher.load_state_dict(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])

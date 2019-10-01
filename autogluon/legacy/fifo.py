@@ -50,7 +50,7 @@ class FIFO_Scheduler(TaskScheduler):
         >>> myscheduler.run()
     """
     def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
-                 resume=False, num_trials=None, time_out=None, time_attr='epoch',
+                 resume=False, num_trials=None, time_out=None, max_reward=1.0, time_attr='epoch',
                  reward_attr='accuracy', visualizer='none'):
         super(FIFO_Scheduler, self).__init__()
         self.train_fn = train_fn
@@ -59,6 +59,7 @@ class FIFO_Scheduler(TaskScheduler):
         self.searcher = searcher
         self.num_trials = num_trials
         self.time_out = time_out
+        self.max_reward = max_reward
         self._checkpoint = checkpoint
         self._time_attr = time_attr
         self._reward_attr = reward_attr
@@ -92,7 +93,7 @@ class FIFO_Scheduler(TaskScheduler):
         tbar = trange(self.num_finished_tasks, self.num_trials)
         for _ in tbar:
             if time_out and time.time() - start_time >= time_out \
-                    or max_metric and self.get_best_reward() >= max_metric:
+                    or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
             tbar.set_description('Current best reward: {} and best config: {}'
                                  .format(self.get_best_reward(), json.dumps(self.get_best_config())))

@@ -68,14 +68,14 @@ class autogluon_method(object):
                         continue
                     args_dict[k] = new_config[k]
             elif isinstance(v, AutoGluonObject):
-                sub_config = strip_cofing_space(new_config, prefix=k)
-                args_dict[k] = v._lazy_init(**sub_config)
+                args_dict[k] = v._lazy_init()
                 
 
-        self.f(args, **kwargs)
+        output = self.f(args, **kwargs)
         if 'reporter' in kwargs and kwargs['reporter'] is not None:
             logger.debug('Reporter Done!')
             kwargs['reporter'](done=True)
+        return output
  
     def _register_args(self, default, **kwvars):
         self.cs = CS.ConfigurationSpace()
@@ -113,10 +113,7 @@ class autogluon_method(object):
                     assert isinstance(obj, AutoGluonObject)
                     for sub_k, sub_v in obj.kwspaces.items():
                         new_k = '{}.{}.{}'.format(k, idx, sub_k)
-                        if isinstance(sub_v, List):
-                            self.kwspaces[new_k] = sub_v
-                        else:
-                            logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+                        self.kwspaces[new_k] = sub_v
             elif isinstance(v, List):
                 new_k = '{}.{}'.format(k, k)
                 self.kwspaces[new_k] = v
@@ -124,19 +121,13 @@ class autogluon_method(object):
                     if isinstance(obj, AutoGluonObject):
                         for idx, sub_k, sub_v in enumerate(obj.kwspaces.items()):
                             new_k = '{}.{}.{}'.format(k, idx, sub_k)
-                            if isinstance(sub_v, List):
-                                self.kwspaces[new_k] = sub_v
-                            else:
-                                logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+                            self.kwspaces[new_k] = sub_v
             elif isinstance(v, AutoGluonObject):
                 for sub_k, sub_v in v.kwspaces.items():
                     new_k = '{}.{}'.format(k, sub_k)
-                    if isinstance(sub_v, List):
-                        self.kwspaces[new_k] = sub_v
-                    else:
-                        logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
+                    self.kwspaces[new_k] = sub_v
             elif isinstance(v, Space):
-                logger.warning('Unspported HP type {} for {}'.format(v, k))
+                self.kwspaces[k] = v
         return self.kwspaces
 
     def _rand_seed(self):
