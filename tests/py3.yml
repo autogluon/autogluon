@@ -1,0 +1,23 @@
+name: gluon_cv_py3
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.6
+  - perl
+  - sphinx=1.7.2
+  - nose
+  - coverage
+  - scipy
+  - cython
+  - pip=19.1.1
+  - requests
+  - matplotlib
+  - tqdm
+  - pillow
+  - pip:
+    - mxnet-cu92mkl==1.6.0b20190808
+    - coverage-badge
+    - awscli
+    - nose-timer
+    - opencv-python
