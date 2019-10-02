@@ -12,6 +12,10 @@ warnings.filterwarnings("ignore", message="The objective has been evaluated at t
 from skopt import Optimizer
 from skopt.space import *
 
+<<<<<<< HEAD
+=======
+from ..basic import load
+>>>>>>> awslabs/master
 from .searcher import BaseSearcher
 
 __all__ = ['SKoptSearcher']
@@ -132,11 +136,18 @@ class SKoptSearcher(BaseSearcher):
         new_config = new_config_cs.get_dictionary()
         self._results[json.dumps(new_config)] = 0
         return new_config
+<<<<<<< HEAD
         
     def random_config(self):
         """Function to randomly sample a new configuration which must be valid.
            TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
 
+=======
+
+    def random_config(self):
+        """Function to randomly sample a new configuration which must be valid.
+           TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() )
+>>>>>>> awslabs/master
         Args:
             returns: config
         """
@@ -150,8 +161,18 @@ class SKoptSearcher(BaseSearcher):
         """Update the searcher with the newest metric report
         """
         self._results[json.dumps(config)] = reward
+<<<<<<< HEAD
         self.bayes_optimizer.tell(self.config2skopt(config), -reward) # provide negative reward since skopt performs minimization
         logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
+=======
+        try:
+            self.bayes_optimizer.tell(self.config2skopt(config),
+                                      -reward)  # provide negative reward since skopt performs minimization
+        except ValueError:
+            logger.info("surrogate model not updated this trial")
+        logger.info(
+            'Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
+>>>>>>> awslabs/master
 
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).

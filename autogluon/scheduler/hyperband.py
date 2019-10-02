@@ -1,9 +1,14 @@
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> awslabs/master
 import pickle
 import logging
 import threading
 import numpy as np
 import multiprocessing as mp
 
+<<<<<<< HEAD
 from ..core import Task
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter, DistSemaphore
@@ -15,6 +20,20 @@ logger = logging.getLogger(__name__)
 
 # Async version of Hyperband used in computation heavy tasks such as deep learning
 class HyperbandScheduler(FIFOScheduler):
+=======
+from .scheduler import *
+from .fifo import FIFO_Scheduler
+from ..resource import Resources
+from .reporter import StatusReporter
+
+__all__ = ['Hyperband_Scheduler']
+
+logger = logging.getLogger(__name__)
+
+
+# Async version of Hyperband used in computation heavy tasks such as deep learning
+class Hyperband_Scheduler(FIFO_Scheduler):
+>>>>>>> awslabs/master
     """Implements the Async Hyperband
     This should provide similar theoretical performance as HyperBand but
     avoid straggler issues that HyperBand faces. One implementation detail
@@ -48,6 +67,7 @@ class HyperbandScheduler(FIFOScheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
+<<<<<<< HEAD
         >>> myscheduler = HyperbandScheduler(train_fn, args,
         >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
         >>>                                  searcher=searcher, num_trials=20,
@@ -64,6 +84,28 @@ class HyperbandScheduler(FIFOScheduler):
         super(HyperbandScheduler, self).__init__(
             train_fn, args, resource, searcher, checkpoint, resume, num_trials,
             time_out, time_attr, reward_attr, visualizer, dist_ip_addrs)
+=======
+        >>> myscheduler = Hyperband_Scheduler(train_fn, args,
+        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0},
+        >>>                                   searcher=searcher, num_trials=20,
+        >>>                                   reward_attr='accuracy',
+        >>>                                   time_attr='epoch',
+        >>>                                   grace_period=1)
+    """
+
+    def __init__(self, train_fn, args, resource, searcher,
+                 checkpoint='./exp/checkerpoint.ag',
+                 resume=False,
+                 num_trials=None,
+                 time_attr="training_epoch",
+                 reward_attr="accuracy",
+                 max_t=100, grace_period=10,
+                 reduction_factor=4, brackets=1,
+                 visualizer='tensorboard'):
+        super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
+                                                  checkpoint, resume, num_trials,
+                                                  time_attr, reward_attr, visualizer)
+>>>>>>> awslabs/master
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
 
@@ -73,6 +115,7 @@ class HyperbandScheduler(FIFOScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
+<<<<<<< HEAD
         cls = HyperbandScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter and terminator
@@ -111,19 +154,61 @@ class HyperbandScheduler(FIFOScheduler):
 
     def _run_reporter(self, task, task_process, reporter, searcher, terminator,
                       checkpoint_semaphore, terminator_semaphore):
+=======
+        logger.debug("Adding A New Task {}".format(task))
+        Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
+        with self.LOCK:
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
+            task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
+            task.args['resources'] = task.resources
+            
+            self.terminator.on_task_add(task)
+            # main process
+            tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(
+                task.fn, task.args, task.resources,
+                Hyperband_Scheduler.RESOURCE_MANAGER))
+            # reporter thread
+            checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
+            rp = threading.Thread(target=self._run_reporter,
+                                  args=(task, tp, reporter, self.searcher, self.terminator,
+                                        checkpoint_semaphore), daemon=False)
+            tp.start()
+            rp.start()
+            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
+                         'Process': tp, 'ReporterThread': rp}
+            # checkpoint thread
+            if self._checkpoint is not None:
+                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                      daemon=False)
+                sp.start()
+                task_dict['CheckpointThead'] = sp
+            self.scheduled_tasks.append(task_dict)
+
+    def _run_reporter(self, task, task_process, reporter, searcher, terminator,
+                      checkpoint_semaphore):
+>>>>>>> awslabs/master
         last_result = None
         while task_process.is_alive():
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
+<<<<<<< HEAD
                 reporter.move_on()
                 terminator_semaphore.release()
                 terminator.on_task_complete(task, last_result)
+=======
+                terminator.on_task_complete(task, last_result)
+                reporter.move_on()
+>>>>>>> awslabs/master
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
             self.add_training_result(task.task_id, reported_result)
             if terminator.on_task_report(task, reported_result):
+<<<<<<< HEAD
                 last_result = reported_result
                 reporter.move_on()
             else:
@@ -140,10 +225,32 @@ class HyperbandScheduler(FIFOScheduler):
 
     def state_dict(self, destination=None):
         destination = super(HyperbandScheduler, self).state_dict(destination)
+=======
+                reporter.move_on()
+            else:
+                logger.debug('Removing task {} due to low performance'.format(task))
+                last_result = reported_result
+                last_result['terminated'] = True
+                task_process.terminate()
+                terminator.on_task_remove(task)
+                task_process.join()
+                Hyperband_Scheduler.RESOURCE_MANAGER._release(task.resources)
+                if checkpoint_semaphore is not None:
+                    checkpoint_semaphore.release()
+                break
+            last_result = reported_result
+        searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
+
+    def state_dict(self, destination=None):
+        destination = super(Hyperband_Scheduler, self).state_dict(destination)
+>>>>>>> awslabs/master
         destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
     def load_state_dict(self, state_dict):
+<<<<<<< HEAD
         super(HyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
@@ -153,6 +260,12 @@ class HyperbandScheduler(FIFOScheduler):
             'terminator: ' + self.terminator
         return reprstr
 
+=======
+        super(Hyperband_Scheduler, self).load_state_dict(state_dict)
+        self.terminator = pickle.loads(state_dict['terminator'])
+        logger.info('Loading Terminator State {}'.format(self.terminator))
+
+>>>>>>> awslabs/master
 
 class Hyperband_Manager(object):
     """Hyperband Manager
@@ -284,7 +397,11 @@ class _Bracket():
             "Iter {:.3f}: {}".format(milestone, self.cutoff(recorded))
             for milestone, recorded in self._rungs
         ])
+<<<<<<< HEAD
         return "Bracket: " + iters
 
 DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler, 'DistributedHyperbandScheduler')
 
+=======
+        return "Bracket: " + iters
+>>>>>>> awslabs/master

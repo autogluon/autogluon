@@ -1,10 +1,14 @@
 import os
+<<<<<<< HEAD
 import time
 import copy
+=======
+>>>>>>> awslabs/master
 import pickle
 import json
 import logging
 import threading
+<<<<<<< HEAD
 from tqdm import trange
 import multiprocessing as mp
 from collections import OrderedDict
@@ -27,13 +31,34 @@ searchers = {
 }
 
 class FIFOScheduler(TaskScheduler):
+=======
+import multiprocessing as mp
+import time
+from collections import OrderedDict
+
+from .scheduler import *
+from ..resource import Resources
+from .reporter import StatusReporter
+from ..basic import save, load, Task
+from ..utils import mkdir, try_import_mxboard
+
+__all__ = ['FIFO_Scheduler']
+
+logger = logging.getLogger(__name__)
+
+class FIFO_Scheduler(TaskScheduler):
+>>>>>>> awslabs/master
     """Simple scheduler that just runs trials in submission order.
 
     Args:
         train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
         args (object): Default arguments for launching train_fn.
         resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+<<<<<<< HEAD
         searcher (object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
+=======
+        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
+>>>>>>> awslabs/master
         reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
 
     Example:
@@ -50,6 +75,7 @@ class FIFOScheduler(TaskScheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
+<<<<<<< HEAD
         >>> myscheduler = FIFOScheduler(train_fn, args,
         >>>                             resource={'num_cpus': 2, 'num_gpus': 0},
         >>>                             searcher=searcher, num_trials=20,
@@ -84,6 +110,26 @@ class FIFOScheduler(TaskScheduler):
         self.num_trials = num_trials
         self.time_out = time_out
         self.max_reward = max_reward
+=======
+        >>> myscheduler = FIFO_Scheduler(train_fn, args,
+        >>>                              resource={'num_cpus': 2, 'num_gpus': 0},
+        >>>                              searcher=searcher, num_trials=20,
+        >>>                              reward_attr='accuracy',
+        >>>                              time_attr='epoch',
+        >>>                              grace_period=1)
+        >>> # run tasks
+        >>> myscheduler.run()
+    """
+    def __init__(self, train_fn, args, resource, searcher, checkpoint='./exp/checkerpoint.ag',
+                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
+                 visualizer='none'):
+        super(FIFO_Scheduler, self).__init__()
+        self.train_fn = train_fn
+        self.args = args
+        self.resource = resource
+        self.searcher = searcher
+        self.num_trials = num_trials
+>>>>>>> awslabs/master
         self._checkpoint = checkpoint
         self._time_attr = time_attr
         self._reward_attr = reward_attr
@@ -97,8 +143,11 @@ class FIFOScheduler(TaskScheduler):
                 verbose=False)
         self.log_lock = mp.Lock()
         self.training_history = OrderedDict()
+<<<<<<< HEAD
         self.config_history = OrderedDict()
 
+=======
+>>>>>>> awslabs/master
         if resume:
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
@@ -107,6 +156,7 @@ class FIFOScheduler(TaskScheduler):
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
+<<<<<<< HEAD
     def run(self, num_trials=None, time_out=None):
         """Run multiple number of trials
         """
@@ -128,6 +178,41 @@ class FIFOScheduler(TaskScheduler):
     def save(self, checkpoint=None):
         """Save Checkpoint
         """
+=======
+    def run(self, num_trials=None):
+        """Run multiple number of trials
+        """
+        self.num_trials = num_trials if num_trials else self.num_trials
+        logger.info('Starting Experiments')
+        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
+        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
+        for i in range(self.num_finished_tasks, self.num_trials):
+            self.schedule_next()
+
+    def run_with_stop_criterion(self, start_time, stop_criterion, type='soft'):
+        """Run multiple number of trials with stop criterion
+        """
+        self.num_trials = stop_criterion['num_trials'] if stop_criterion[
+            'num_trials'] else self.num_trials
+        logger.info('Starting Experiments')
+        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
+        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
+        from tqdm import trange
+        tbar = trange(self.num_finished_tasks, self.num_trials)
+        for i in tbar:
+            if self.num_finished_tasks > 0:
+                tbar.set_description('Current best reward: {} and best config: {}'
+                                     .format(self.get_best_reward(), json.dumps(self.get_best_config())))
+                if type == 'soft':
+                    if time.time() - start_time >= stop_criterion['time_limits'] \
+                            or self.get_best_reward() >= stop_criterion['max_metric']:
+                        break
+                else:
+                    raise NotImplementedError
+            self.schedule_next()
+
+    def save(self, checkpoint=None):
+>>>>>>> awslabs/master
         if checkpoint is None and self._checkpoint is None:
             msg = 'Please set checkpoint path.'
             logger.exception(msg)
@@ -140,7 +225,11 @@ class FIFOScheduler(TaskScheduler):
         """Schedule next searcher suggested task
         """
         task = Task(self.train_fn, {'args': self.args, 'config': self.searcher.get_config()},
+<<<<<<< HEAD
                     DistributedResource(**self.resource))
+=======
+                    Resources(**self.resource))
+>>>>>>> awslabs/master
         self.add_task(task)
 
     def add_task(self, task):
@@ -149,6 +238,7 @@ class FIFOScheduler(TaskScheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
+<<<<<<< HEAD
         cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter
@@ -173,6 +263,35 @@ class FIFOScheduler(TaskScheduler):
             task_dict['CheckpointThead'] = sp
 
         with self.LOCK:
+=======
+        logger.debug("Adding A New Task {}".format(task))
+        FIFO_Scheduler.RESOURCE_MANAGER._request(task.resources)
+        with self.LOCK:
+            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
+                                           'task{}_state_dict.ag'.format(task.task_id))
+            reporter = StatusReporter(state_dict_path)
+            task.args['reporter'] = reporter
+            task.args['task_id'] = task.task_id
+            task.args['resources'] = task.resources
+            # main process
+            tp = mp.Process(target=FIFO_Scheduler._run_task, args=(
+                            task.fn, task.args, task.resources,
+                            FIFO_Scheduler.RESOURCE_MANAGER))
+            checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
+            # reporter thread
+            rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
+                                  self.searcher, checkpoint_semaphore), daemon=False)
+            tp.start()
+            rp.start()
+            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
+                         'Process': tp, 'ReporterThread': rp}
+            # checkpoint thread
+            if self._checkpoint is not None:
+                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                      daemon=False)
+                sp.start()
+                task_dict['CheckpointThead'] = sp
+>>>>>>> awslabs/master
             self.scheduled_tasks.append(task_dict)
 
     def join_tasks(self):
@@ -207,6 +326,7 @@ class FIFOScheduler(TaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
+<<<<<<< HEAD
             self.add_training_result(task.task_id, reported_result, task.args['config'])
             reporter.move_on()
             last_result = reported_result
@@ -219,14 +339,36 @@ class FIFOScheduler(TaskScheduler):
     def get_best_config(self):
         # Enable interactive monitoring
         # self.join_tasks()
+=======
+            self.add_training_result(task.task_id, reported_result)
+            reporter.move_on()
+            last_result = reported_result
+        searcher.update(task.args['config'], last_result[self._reward_attr])
+        if searcher.is_best(task.args['config']):
+            searcher.update_best_state(reporter.dict_path)
+
+    def get_best_state(self):
+        return self.searcher.get_best_state()
+
+    def get_best_config(self):
+        # Enable interactive monitoring
+        #self.join_tasks()
+>>>>>>> awslabs/master
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
         # Enable interactive monitoring
+<<<<<<< HEAD
         # self.join_tasks()
         return self.searcher.get_best_reward()
 
     def add_training_result(self, task_id, reported_result, config=None):
+=======
+        #self.join_tasks()
+        return self.searcher.get_best_reward()
+
+    def add_training_result(self, task_id, reported_result):
+>>>>>>> awslabs/master
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(tag='loss',
@@ -244,8 +386,11 @@ class FIFOScheduler(TaskScheduler):
                 self.training_history[task_id].append(reward)
             else:
                 self.training_history[task_id] = [reward]
+<<<<<<< HEAD
                 if config:
                     self.config_history[task_id] = config
+=======
+>>>>>>> awslabs/master
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
         if filename is None and not plot:
@@ -264,7 +409,11 @@ class FIFOScheduler(TaskScheduler):
         if plot: plt.show()
 
     def state_dict(self, destination=None):
+<<<<<<< HEAD
         destination = super(FIFOScheduler, self).state_dict(destination)
+=======
+        destination = super(FIFO_Scheduler, self).state_dict(destination)
+>>>>>>> awslabs/master
         destination['searcher'] = pickle.dumps(self.searcher)
         destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
@@ -272,12 +421,19 @@ class FIFOScheduler(TaskScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
+<<<<<<< HEAD
         super(FIFOScheduler, self).load_state_dict(state_dict)
+=======
+        super(FIFO_Scheduler, self).load_state_dict(state_dict)
+>>>>>>> awslabs/master
         self.searcher = pickle.loads(state_dict['searcher'])
         self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
+<<<<<<< HEAD
 
 DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')
 
+=======
+>>>>>>> awslabs/master

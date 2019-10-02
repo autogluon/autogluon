@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Distributed Task Scheduler"""
 import os
 import pickle
@@ -22,16 +23,39 @@ class TaskScheduler(object):
 
     Args:
         dist_ip_addrs (List): list of ip addresses for remote nodes
+=======
+"""Task Scheduler"""
+import os
+import pickle
+import logging
+import argparse
+import multiprocessing as mp
+from collections import namedtuple, OrderedDict
+from ..resource import ResourceManager
+from ..basic import Task
+
+__all__ = ['TaskScheduler']
+
+logger = logging.getLogger(__name__)
+
+class TaskScheduler(object):
+    """Basic Task Scheduler
+>>>>>>> awslabs/master
 
     Example:
         >>> def my_task():
         >>>     pass
+<<<<<<< HEAD
         >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
+=======
+        >>> resource = Resources(num_cpus=2, num_gpus=0)
+>>>>>>> awslabs/master
         >>> task = Task(my_task, {}, resource)
         >>> scheduler = TaskScheduler()
         >>> scheduler.add_task(task)
     """
     LOCK = mp.Lock()
+<<<<<<< HEAD
     RESOURCE_MANAGER = DistributedResourceManager()
     REMOTE_MANAGER = None
     def __init__(self, dist_ip_addrs=[]):
@@ -57,11 +81,18 @@ class TaskScheduler(object):
         """Upload files to remote machines, so that they are accessible by import or load. 
         """
         cls.REMOTE_MANAGER.upload_files(files, **kwargs)
+=======
+    RESOURCE_MANAGER = ResourceManager()
+    def __init__(self):
+        self.scheduled_tasks = []
+        self.finished_tasks = []
+>>>>>>> awslabs/master
 
     def add_task(self, task):
         """Adding a training task to the scheduler.
 
         Args:
+<<<<<<< HEAD
             task (autogluon.scheduler.Task): a new trianing task
         """
         # adding the task
@@ -69,12 +100,22 @@ class TaskScheduler(object):
         cls.RESOURCE_MANAGER._request(task.resources)
         p = Thread(target=cls._start_distributed_task, args=(
                    task, cls.RESOURCE_MANAGER, self.env_sem))
+=======
+            task (:class:`autogluon.scheduler.Task`): a new trianing task
+        """
+        logger.debug("\nAdding A New Task {}".format(task))
+        TaskScheduler.RESOURCE_MANAGER._request(task.resources)
+        p = mp.Process(target=TaskScheduler._run_task, args=(
+                       task.fn, task.args, task.resources,
+                       TaskScheduler.RESOURCE_MANAGER))
+>>>>>>> awslabs/master
         p.start()
         with self.LOCK:
             self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Args': task.args,
                                          'Process': p})
 
     @staticmethod
+<<<<<<< HEAD
     def _start_distributed_task(task, resource_manager, env_sem):
         logger.debug('\nScheduling {}'.format(task))
         job = task.resources.node.submit(TaskScheduler._run_dist_task,
@@ -122,6 +163,20 @@ class TaskScheduler(object):
                 p.join()
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
+=======
+    def _run_task(fn, args, resources, resource_manager):
+        """Executing the task
+        """
+        if resources.num_gpus > 0:
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str,resources.gpu_ids))
+        try:
+            fn(**args)
+        except Exception as e:
+            import traceback
+            logger.error(
+                'Uncaught exception in worker process: {}. {}'.format(e, traceback.print_exc()))
+        resource_manager._release(resources)
+>>>>>>> awslabs/master
 
     def _cleaning_tasks(self):
         with self.LOCK:
@@ -129,13 +184,18 @@ class TaskScheduler(object):
                 if not task_dick['Process'].is_alive():
                     task_dict = self.scheduled_tasks.pop(i)
                     self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
+<<<<<<< HEAD
                                                 'Args': task_dict['Args']})
+=======
+                                               'Args': task_dict['Args']})
+>>>>>>> awslabs/master
 
     def join_tasks(self):
         self._cleaning_tasks()
         for i, task_dic in enumerate(self.scheduled_tasks):
             task_dic['Process'].join()
 
+<<<<<<< HEAD
     def shutdown(self):
         self.join_tasks()
         self.REMOTE_MANAGER.shutdown()
@@ -144,6 +204,12 @@ class TaskScheduler(object):
         """Returns a dictionary containing a whole state of the Scheduler
         """
         #self._cleaning_tasks()
+=======
+    def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+        """
+        self._cleaning_tasks()
+>>>>>>> awslabs/master
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
@@ -160,6 +226,7 @@ class TaskScheduler(object):
     @property
     def num_finished_tasks(self):
         return len(self.finished_tasks)
+<<<<<<< HEAD
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(\n' + \
@@ -167,3 +234,5 @@ class TaskScheduler(object):
         return reprstr
 
 DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')
+=======
+>>>>>>> awslabs/master

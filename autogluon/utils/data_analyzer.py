@@ -5,6 +5,7 @@ import numpy as np
 from scipy.stats import ks_2samp
 from mxnet import gluon
 
+<<<<<<< HEAD
 __all__ = ['Visualizer', 'DataAnalyzer']
 
 
@@ -20,6 +21,12 @@ class Visualizer(object):
                     label=['a', 'b'])
         pyplot.legend(loc='upper right')
         pyplot.savefig('./histogram.png')
+=======
+from .visualizer import Visualizer
+
+__all__ = ['DataAnalyzer']
+
+>>>>>>> awslabs/master
 
 class DataAnalyzer(object):
     def __init__(self):
@@ -66,7 +73,12 @@ class DataAnalyzer(object):
     def check_dataset(a, b):
         DataAnalyzer.check_dataset_label_num(a, b)
         DataAnalyzer.check_dataset_label_KStest(a, b)
+<<<<<<< HEAD
         DataAnalyzer.check_dataset_label_histogram(a, b)
+=======
+        # TODO (cgraywang): remove now for simplicity
+        # DataAnalyzer.check_dataset_label_histogram(a, b)
+>>>>>>> awslabs/master
 
     @staticmethod
     def stat_dataset(a):
