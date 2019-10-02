@@ -7,17 +7,10 @@ These options include: defining the search space of various hyperparameter value
 The advanced functionalities of AutoGluon allow you to leverage your external knowledge about your particular prediction problem and computing resources to guide the training process. If properly utilized, you may be able to achieve superior performance within less training time.
 
 
-<<<<<<< HEAD
 We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
 
 ```{.python .input}
 from autogluon import ImageClassification as task
-=======
-We again begin by letting AutoGluon know that `image_classification` is the task of interest: 
-
-```{.python .input}
-from autogluon import image_classification as task
->>>>>>> awslabs/master
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -39,11 +32,7 @@ and individual training runs (also referred to as `trials`) each last for 10 epo
 
 ```{.python .input}
 time_limits = 1*60
-<<<<<<< HEAD
 epochs = 2
-=======
-num_training_epochs = 2
->>>>>>> awslabs/master
 ```
 
 We first again use the default arguments of the `fit` function to train the neural networks:
@@ -51,21 +40,13 @@ We first again use the default arguments of the `fit` function to train the neur
 ```{.python .input}
 results = task.fit(dataset,
                    time_limits=time_limits,
-<<<<<<< HEAD
                    epochs=epochs)
-=======
-                   num_training_epochs=num_training_epochs)
->>>>>>> awslabs/master
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -77,18 +58,13 @@ Recall that rather than training image classification models from scratch, AutoG
 
 ```{.python .input}
 print('Default models:')
-<<<<<<< HEAD
 print(results.metadata['net'])
-=======
-print(results.metadata['nets'])
->>>>>>> awslabs/master
 ```
 
 We can also look up the default optimizers used by `fit` to train each neural network (ie. to update the weight parameters based on mini-batches of training data):
  
 ```{.python .input}
 print('Default optimizers:')
-<<<<<<< HEAD
 print(results.metadata['optimizer'])
 ```
 
@@ -99,25 +75,6 @@ The default algorithm used in `fit` for image classification is:
 ```{.python .input}
 print('Default algorithm:')
 print(results.metadata['algorithm'])
-=======
-print(results.metadata['optimizers'])
-```
-
-Beyond which pretrained model and which optimizer to use, deep learning in general involves tons of other design choices, which we collectively refer to as `hyperparameters`. Given possible values of the hyperparameters to try out, we require a smart strategy to efficiently find those hyperparameter values which will produce the best classifier. Strategies might include techniques such as grid/random search, Hyperband, Bayesian optimization, etc. In AutoGluon, which hyperparameter search strategy to use is specified by a `Searcher` object.
-The default searcher used in `fit` for image classification is:
-
-```{.python .input}
-print('Default searcher:')
-print(results.metadata['searcher'])
-```
-
-When the Searcher returns a particular hyperparameter configuration to try out, we must train the neural network under the specified configuration settings, a process referred to as a `trial`. In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
-The default trial scheduler used in `fit` for image classification is:
-
-```{.python .input}
-print('Default trial scheduler:')
-print(results.metadata['trial_scheduler'])
->>>>>>> awslabs/master
 ```
 
 When we have already trained many networks under many hyperparameter configurations and see that a current trial is performing very good that satisfies our need in comparison, it may be wise to infer this is the time to simply terminate the trial right away. This way, the final model could be used right away and we don't need to wait until the full fitting procedure completed.  
@@ -172,21 +129,13 @@ Let's then call `fit` using these manually-specified network candidates, and eva
 results = task.fit(dataset,
                    nets,
                    time_limits=time_limits,
-<<<<<<< HEAD
                    epochs=epochs)
-=======
-                   num_training_epochs=num_training_epochs)
->>>>>>> awslabs/master
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -211,19 +160,11 @@ Additionally, the momentum in `SGD` is configured as another continuous search s
 
 
 ```{.python .input}
-<<<<<<< HEAD
 adam_opt = ag.optimizer.Adam(lr=ag.Log('lr', 1e-4, 1e-1),
                              wd=ag.Log('wd', 1e-6, 1e-2))
 sgd_opt = ag.optimizer.SGD(lr=ag.Log('lr', 1e-4, 1e-1),
                            momentum=ag.Linear('momentum', 0.85, 0.95),
                            wd=ag.Log('wd', 1e-6, 1e-2))
-=======
-adam_opt = ag.optimizers.Adam(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                          wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
-sgd_opt = ag.optimizers.SGD(lr=ag.space.Log('lr', 10 ** -4, 10 ** -1),
-                        momentum=ag.space.Linear('momentum', 0.85, 0.95),
-                        wd=ag.space.Log('wd', 10 ** -6, 10 ** -2))
->>>>>>> awslabs/master
 optimizers = ag.Optimizers([adam_opt, sgd_opt])
 
 print(optimizers)
@@ -238,25 +179,15 @@ We then put the new network and optimizer search space and the learning rate sch
 results = task.fit(dataset,
                    nets,
                    optimizers,
-<<<<<<< HEAD
                    lr_scheduler=ag.List(['poly', 'cosine']),
                    time_limits=time_limits,
                    epochs=epochs)
-=======
-                   lr_scheduler=ag.space.List('lr_scheduler', ['poly', 'cosine']),
-                   time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
->>>>>>> awslabs/master
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -268,13 +199,6 @@ will support both basic and advanced search algorithms for both hyperparameter o
 We currently support Hyperband, random search and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 The easiest way to specify random search is via the string name:
 
-<<<<<<< HEAD
-=======
-```{.python .input}
-searcher = 'random'
-```
-
->>>>>>> awslabs/master
 In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrates how individual training jobs are scheduled.
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
@@ -283,12 +207,7 @@ and an early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#aut
 Which scheduler to use is easily specified via the string name:
 
 ```{.python .input}
-<<<<<<< HEAD
 algorithm = 'hyperband'
-=======
-trial_scheduler_fifo = 'fifo'
-trial_scheduler = 'hyperband'
->>>>>>> awslabs/master
 ```
 
 Let's call `fit` with the Searcher and Scheduler specified above, 
@@ -299,25 +218,15 @@ results = task.fit(dataset,
                    nets,
                    optimizers,
                    searcher=searcher,
-<<<<<<< HEAD
                    algorithm=algorithm,
                    time_limits=time_limits,
                    epochs=epochs)
-=======
-                   trial_scheduler=trial_scheduler,
-                   time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
->>>>>>> awslabs/master
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -329,17 +238,9 @@ Let's now use the same image as used in :ref:`sec_imgquick` to generate a predic
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-<<<<<<< HEAD
       (dataset.synsets[ind.asscalar()], prob.asscalar()))
-=======
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
->>>>>>> awslabs/master
 ```
 
 
 Beyond what we described here, there are many other aspects of `fit` that an advanced user can control.
-<<<<<<< HEAD
 For that, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
-=======
-For that, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
->>>>>>> awslabs/master

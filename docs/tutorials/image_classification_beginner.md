@@ -9,11 +9,7 @@ Besides, you could easily specify for greater control over the training process 
 We begin by specifying `image_classification` as our task of interest:
 
 ```{.python .input}
-<<<<<<< HEAD
 from autogluon import ImageClassification as task
-=======
-from autogluon import image_classification as task
->>>>>>> awslabs/master
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -54,23 +50,10 @@ However, neural network training can be quite time-costly. To ensure quick runti
 
 ```{.python .input}
 time_limits = 3*60 # 3mins
-<<<<<<< HEAD
-<<<<<<< HEAD
 epochs = 10
 results = task.fit(dataset,
                    time_limits=time_limits,
                    epochs=epochs)
-=======
-=======
->>>>>>> awslabs/master
-num_training_epochs = 10
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
-<<<<<<< HEAD
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
-=======
->>>>>>> awslabs/master
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
@@ -78,11 +61,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
@@ -101,11 +80,7 @@ Given an example image, we can easily use the final model to `predict` the label
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-<<<<<<< HEAD
       (dataset.synsets[ind.asscalar()], prob.asscalar()))
-=======
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
->>>>>>> awslabs/master
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
@@ -116,8 +91,4 @@ print('The best configuration is:')
 print(results.config)
 ```
 
-<<<<<<< HEAD
 This configuration is used to generate the above results.
-=======
-This configuration is used to generate the above results.
->>>>>>> awslabs/master

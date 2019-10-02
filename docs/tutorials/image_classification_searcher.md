@@ -15,11 +15,7 @@ logging.basicConfig(level=logging.INFO)
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
 time_limits = 2*60
-<<<<<<< HEAD
 epochs = 10
-=======
-num_training_epochs = 10
->>>>>>> awslabs/master
 ```
 
 Recall that our goal in hyperparameter search is to identify the hyperparameter configuration under which the resulting trained model exhibits the best predictive performance on the validation data (ie. *validation accuracy* for our classification task).  AutoGluon employs a [`Searcher`](../api/autogluon.searcher.html) object that controls which hyperparameter-values from the search space should be explored in the next trial (ie. training run). Certain search procedures such as *Bayesian optimization* may base this choice on all the previous trials that have been executed, using observations of how well the previously tested hyperparameter configurations performed to inform which new hyperparameter configuration seems most promising to try next.  [autogluon.searcher](../api/autogluon.searcher.html) supports various search algorithms for both hyperparameter optimization and architecture search. 
@@ -32,7 +28,6 @@ The default searcher employed by AutoGluon is random search, which simply tries 
 results = task.fit(dataset,
                    searcher='random',
                    time_limits=time_limits,
-<<<<<<< HEAD
                    epochs=epochs)
 ```
 
@@ -40,15 +35,6 @@ The resulting validation and test top-1 accuracy obtained through random search 
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-                   num_training_epochs=num_training_epochs)
-```
-
-The resulting validation and test top-1 accuracy obtained through random search within the given `time_limits` and `num_training_epochs` constraints are:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -64,7 +50,6 @@ You can specify `task.fit` should find hyperparameters via Bayesian optimization
 results = task.fit(dataset,
                    searcher='bayesopt',
                    time_limits=time_limits,
-<<<<<<< HEAD
                    epochs=epochs)
 ```
 
@@ -72,15 +57,6 @@ The resulting validation and test top-1 accuracy obtained through Bayesian optim
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-                   num_training_epochs=num_training_epochs)
-```
-
-The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `num_training_epochs` constraints) are:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -94,15 +70,9 @@ results = task.fit(dataset,
                    searcher='bayesopt', 
                    searcher_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                    time_limits=time_limits,
-<<<<<<< HEAD
                    epochs=epochs)
 
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-                   num_training_epochs=num_training_epochs)
-
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> awslabs/master
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
