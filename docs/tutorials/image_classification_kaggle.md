@@ -221,11 +221,7 @@ On your own, please feel free to try running the following commands with small t
 The top-1 accuracy of the best model on the validation set is:
 
 ```{.python .input}
-<<<<<<< HEAD
 # print('Top-1 acc: %.3f' % results.reward)
-=======
-# print('Top-1 acc: %.3f' % results.metric)
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 ###  Using AutoGluon to generate predictions on test images 
@@ -262,8 +258,4 @@ To see an example submission, check out the file `sample submission.csv` at this
 
 To make your own submission, click [Submission](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/submit)
 and then follow the steps in the submission page (upload submission file, describe the submission,
-<<<<<<< HEAD
 and click the `Make Submission` button). Let's see how your model fares in this competition!
-=======
-and click the `Make Submission` button). Let's see how your model fares in this competition!
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc

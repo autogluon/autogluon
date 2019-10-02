@@ -9,11 +9,7 @@ Besides, you could easily specify for greater control over the training process 
 We begin by specifying `image_classification` as our task of interest:
 
 ```{.python .input}
-<<<<<<< HEAD
 from autogluon import ImageClassification as task
-=======
-from autogluon import image_classification as task
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -72,11 +68,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
-=======
-print('Top-1 val acc: %.3f' % results.metric)
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
@@ -95,11 +87,7 @@ Given an example image, we can easily use the final model to `predict` the label
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-<<<<<<< HEAD
       (dataset.synsets[ind.asscalar()], prob.asscalar()))
-=======
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
@@ -110,8 +98,4 @@ print('The best configuration is:')
 print(results.config)
 ```
 
-<<<<<<< HEAD
 This configuration is used to generate the above results.
-=======
-This configuration is used to generate the above results.
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
