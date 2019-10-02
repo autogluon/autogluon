@@ -68,7 +68,6 @@ class autogluon_method(object):
                         continue
                     args_dict[k] = new_config[k]
             elif isinstance(v, AutoGluonObject):
-<<<<<<< HEAD
                 args_dict[k] = v._lazy_init()
                 
 
@@ -77,16 +76,6 @@ class autogluon_method(object):
             logger.debug('Reporter Done!')
             kwargs['reporter'](done=True)
         return output
-=======
-                sub_config = strip_cofing_space(new_config, prefix=k)
-                args_dict[k] = v._lazy_init(**sub_config)
-                
-
-        self.f(args, **kwargs)
-        if 'reporter' in kwargs and kwargs['reporter'] is not None:
-            logger.debug('Reporter Done!')
-            kwargs['reporter'](done=True)
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
  
     def _register_args(self, default, **kwvars):
         self.cs = CS.ConfigurationSpace()
@@ -124,20 +113,12 @@ class autogluon_method(object):
                     assert isinstance(obj, AutoGluonObject)
                     for sub_k, sub_v in obj.kwspaces.items():
                         new_k = '{}.{}.{}'.format(k, idx, sub_k)
-<<<<<<< HEAD
                         self.kwspaces[new_k] = sub_v
-=======
-                        if isinstance(sub_v, List):
-                            self.kwspaces[new_k] = sub_v
-                        else:
-                            logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
             elif isinstance(v, List):
                 new_k = '{}.{}'.format(k, k)
                 self.kwspaces[new_k] = v
                 for idx, obj in enumerate(v):
                     if isinstance(obj, AutoGluonObject):
-<<<<<<< HEAD
                         for idx, (sub_k, sub_v) in enumerate(obj.kwspaces.items()):
                             new_k = '{}.{}.{}'.format(k, idx, sub_k)
                             self.kwspaces[new_k] = sub_v
@@ -147,23 +128,6 @@ class autogluon_method(object):
                     self.kwspaces[new_k] = sub_v
             elif isinstance(v, Space):
                 self.kwspaces[k] = v
-=======
-                        for idx, sub_k, sub_v in enumerate(obj.kwspaces.items()):
-                            new_k = '{}.{}.{}'.format(k, idx, sub_k)
-                            if isinstance(sub_v, List):
-                                self.kwspaces[new_k] = sub_v
-                            else:
-                                logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
-            elif isinstance(v, AutoGluonObject):
-                for sub_k, sub_v in v.kwspaces.items():
-                    new_k = '{}.{}'.format(k, sub_k)
-                    if isinstance(sub_v, List):
-                        self.kwspaces[new_k] = sub_v
-                    else:
-                        logger.warning('Unspported HP type {} for {}'.format(sub_v, new_k))
-            elif isinstance(v, Space):
-                logger.warning('Unspported HP type {} for {}'.format(v, k))
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
         return self.kwspaces
 
     def _rand_seed(self):
@@ -269,7 +233,6 @@ def autogluon_function(**kwvars):
                     self._lazy_init(**config)
                 return self._instance.__call__(*args, **kwargs)
 
-<<<<<<< HEAD
             #def __getattr__(self, name):
             #    if not self._inited:
             #        self._inited = True
@@ -277,8 +240,6 @@ def autogluon_function(**kwvars):
             #        self._lazy_init(**config)
             #    return self._instance.__getattr__(name)
 
-=======
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
             def _lazy_init(self, **nkwvars):
                 # lazy initialization for passing config files
                 self.kwargs.update(nkwvars)
@@ -317,7 +278,6 @@ def autogluon_object(**kwvars):
                     self._lazy_init(**config)
                 return self.__call__(*args, **kwargs)
 
-<<<<<<< HEAD
             #def __getattr__(self, name):
             #    try:
             #        return Cls.__getattr__(self, name)
@@ -329,8 +289,6 @@ def autogluon_object(**kwvars):
             #        self._lazy_init(**config)
             #    return self.__getattr__(name)
 
-=======
->>>>>>> c8b325866201574caeb688c623d02b23799a65fc
             def _lazy_init(self, **nkwvars):
                 self.__class__ = Cls
                 kwargs = self._kwargs
