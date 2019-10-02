@@ -160,12 +160,12 @@ Additionally, the momentum in `SGD` is configured as another continuous search s
 
 
 ```{.python .input}
-adam_opt = ag.optimizer.Adam(lr=ag.Log('lr', 1e-4, 1e-1),
-                             wd=ag.Log('wd', 1e-6, 1e-2))
-sgd_opt = ag.optimizer.SGD(lr=ag.Log('lr', 1e-4, 1e-1),
-                           momentum=ag.Linear('momentum', 0.85, 0.95),
-                           wd=ag.Log('wd', 1e-6, 1e-2))
-optimizers = ag.Optimizers([adam_opt, sgd_opt])
+sgd_opt = ag.optimizer.SGD(learning_rate=ag.LogLinear(1e-4, 1e-1),
+                           momentum=ag.Linear(0.85, 0.95),
+                           wd=ag.LogLinear(1e-6, 1e-2))
+adam_opt = ag.optimizer.Adam(learning_rate=ag.LogLinear(1e-4, 1e-1),
+                             wd=ag.LogLinear(1e-6, 1e-2))
+optimizers = ag.Optimizers([sgd_opt, adam_opt])
 
 print(optimizers)
 ```
@@ -178,8 +178,8 @@ We then put the new network and optimizer search space and the learning rate sch
 ```{.python .input}
 results = task.fit(dataset,
                    nets,
-                   optimizers,
-                   lr_scheduler=ag.List(['poly', 'cosine']),
+                   optimizer=optimizers,
+                   lr_scheduler=ag.List('poly', 'cosine'),
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -217,10 +217,9 @@ and evaluate the resulting model on both validation and test datasets:
 results = task.fit(dataset,
                    nets,
                    optimizers,
-                   searcher=searcher,
                    algorithm=algorithm,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=4)
 ```
 
 The validation and test top-1 accuracy are:
@@ -238,7 +237,7 @@ Let's now use the same image as used in :ref:`sec_imgquick` to generate a predic
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.synsets[ind.asscalar()], prob.asscalar()))
+      (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
 ```
 
 

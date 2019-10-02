@@ -29,7 +29,8 @@ class AsyncLineReader(threading.Thread):
                 else:
                     msg = "[ {name} local] : {output}". \
                         format(name=self.name, output=line)
-                print(msg)
+                if 'distributed.' not in msg:
+                    print(msg)
                 #self.outputQueue.put(msg)
             else:
                 time.sleep(0.1)

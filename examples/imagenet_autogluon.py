@@ -4,10 +4,6 @@ import numpy as np
 import mxnet as mx
 import gluoncv as gcv
 from mxnet import gluon, nd
-<<<<<<< HEAD
-=======
-#from mxnet import autograd as ag
->>>>>>> awslabs/master
 from mxnet.gluon import nn
 from mxnet.gluon.data.vision import transforms
 
@@ -16,15 +12,8 @@ from gluoncv.model_zoo import get_model
 from gluoncv.utils import makedirs, LRSequential, LRScheduler
 
 import autogluon as ag
-<<<<<<< HEAD
 from autogluon import autogluon_register_args
 from autogluon.utils.mxutils import get_data_rec, read_remote_ips
-=======
-from autogluon import autogluon_method
-
-import ConfigSpace as CS
-import ConfigSpace.hyperparameters as CSH
->>>>>>> awslabs/master
 
 # CLI
 def parse_args():
@@ -134,13 +123,9 @@ def parse_args():
     return args
 
 
-<<<<<<< HEAD
 @autogluon_register_args(
     lr=ag.ListSpace(round(0.1*i, 1) for i in range(1, 10)]),
     wd=ag.ListSpace(round(1e-4*i, 4) for i in range(1, 10)]),)
-=======
-@autogluon_method
->>>>>>> awslabs/master
 def imagenet_main(opt, reporter):
     filehandler = logging.FileHandler(opt.logging_file)
     streamhandler = logging.StreamHandler()
@@ -456,19 +441,6 @@ def imagenet_main(opt, reporter):
             teacher.hybridize(static_alloc=True, static_shape=True)
     train(context)
 
-<<<<<<< HEAD
-=======
-def read_remote_ips(filename):
-    ip_addrs = []
-    if filename is None:
-        return ip_addrs
-    with open("remote_ips.txt", "r") as myfile:
-        line = myfile.readline()
-        while line != '':
-            ip_addrs.append(line.rstrip())
-            line = myfile.readline()
-    return ip_addrs
->>>>>>> awslabs/master
 
 if __name__ == '__main__':
     args = parse_args()
@@ -477,16 +449,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO)
     # ceate search spaces
-<<<<<<< HEAD
     searcher = ag.searcher.RandomSampling(imagenet_main.cs)
-=======
-    cs = CS.ConfigurationSpace()
-    lr = CSH.CategoricalHyperparameter('lr', choices=[round(0.1*i, 1) for i in range(1, 10)])
-    wd = CSH.CategoricalHyperparameter('wd', choices=[round(1e-5*i, 5) for i in range(1, 10)] + \
-            [round(1e-4*i, 4) for i in range(1, 10)])
-    cs.add_hyperparameters([lr, wd])
-    searcher = ag.searcher.RandomSampling(cs)
->>>>>>> awslabs/master
 
     # create scheduler and launch the training
     myscheduler = ag.distributed.DistributedFIFOScheduler(imagenet_main, args,

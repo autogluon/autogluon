@@ -3,6 +3,7 @@ from .mxutils import *
 from .deprecate import *
 from .visualizer import *
 from .try_import import *
+from .file_helper import *
 from .edict import EasyDict
 from .serialization import *
 from .data_analyzer import *

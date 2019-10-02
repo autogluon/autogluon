@@ -154,11 +154,14 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
             new_parameter.name = "%s%s%s" % (prefix, '.',
                                              new_parameter.name)
         new_parameters.append(new_parameter)
-    if len(new_parameters) > 0 and new_parameters[0].name not in master_cs._hyperparameters:
-        master_cs.add_configuration_space(prefix, sub_cs, delimiter, parent_hyperparameter=parent_hp)
-    else:
-        for hp in new_parameters:
-            master_cs._hyperparameters[hp.name] = hp
+    #if len(new_parameters) > 0 and new_parameters[0].name not in master_cs._hyperparameters:
+    #    master_cs.add_configuration_space(prefix, sub_cs, delimiter, parent_hyperparameter=parent_hp)
+    #else:
+    #    for hp in new_parameters:
+    #        master_cs._hyperparameters[hp.name] = hp
+    for hp in new_parameters:
+        #master_cs._hyperparameters[hp.name] = hp
+        _add_hp(master_cs, hp)
 
 def _rm_hp(cs, k):
     if k in cs._hyperparameters:
@@ -250,6 +253,9 @@ def autogluon_function(**kwvars):
                 self._instance = self.func(*self.args, **self.kwargs)
                 return self._instance
 
+            def __repr__(self):
+                return 'AutoGluonObject'
+
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
@@ -289,22 +295,25 @@ def autogluon_object(**kwvars):
             #        self._lazy_init(**config)
             #    return self.__getattr__(name)
 
+            def init(self):
+                return self._lazy_init()
+
             def _lazy_init(self, **nkwvars):
-                self.__class__ = Cls
                 kwargs = self._kwargs
                 kwargs.update(nkwvars)
                 for k, v in kwargs.items():
                     if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], List):
                         kwargs[k] = autogluonobject.kwspaces[k][v]
                 args = self._args
-                del self._args
-                del self._kwargs
-                self.__init__(*args, **kwargs)
-
-                return self
+                #self.__class__ = Cls
+                #del self._args
+                #del self._kwargs
+                #self.__init__(*args, **kwargs)
+                #return self
+                return Cls(*args, **kwargs)
 
             def __repr__(self):
-                return Cls.__repr__(self)
+                return 'AutoGluonObject -- ' + Cls.__name__
 
         autogluonobject.cs = autogluonobject.__init__.cs
         autogluonobject.kwspaces = autogluonobject.__init__.kwspaces

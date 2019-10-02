@@ -28,8 +28,8 @@ class ImageClassification(BaseTask):
             net=List('ResNet34_v1b', 'ResNet50_v1b'),
             optimizer=List(
                 SGD(learning_rate=LogLinear(1e-4, 1e-2),
-                          momentum=LogLinear(0.85, 0.95),
-                          wd=LogLinear(1e-5, 1e-3)),
+                    momentum=LogLinear(0.85, 0.95),
+                    wd=LogLinear(1e-5, 1e-3)),
                 Adam(learning_rate=LogLinear(1e-4, 1e-2),
                      wd=LogLinear(1e-5, 1e-3)),
             ),
@@ -81,8 +81,8 @@ class ImageClassification(BaseTask):
         }
         if algorithm == 'hyperband':
             scheduler_options.update({
-                'max_t': args.epochs,
-                'grace_period': grace_period if grace_period else args.epochs//4})
+                'max_t': epochs,
+                'grace_period': grace_period if grace_period else epochs//4})
 
         return BaseTask.run_fit(train_image_classification, algorithm, scheduler_options)
 

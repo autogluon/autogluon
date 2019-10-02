@@ -49,23 +49,14 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
-<<<<<<< HEAD
     'dask[complete]==2.0.0',
-=======
-    'scikit-optimize',
-    'dask[complete]==2.0.0',
-    'distributed==2.0.1',
->>>>>>> awslabs/master
     'tornado',
     'ConfigSpace',
     'nose',
     'gluoncv',
     'gluonnlp',
-<<<<<<< HEAD
     'graphviz',
     'scikit-optimize',
-=======
->>>>>>> awslabs/master
 ]
 
 setup(

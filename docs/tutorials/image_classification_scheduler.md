@@ -90,9 +90,11 @@ class MedianStopping_Scheduler(Hyperband):
                  mode="max",
                  grace_period=1.0,
                  min_samples_required=3):
-        super(MedianStopping_Scheduler, self).__init__(train_fn, args, resource, searcher,
-                                                       checkpoint, resume, num_trials,
-                                                       time_attr, reward_attr, visualizer=visualizer)
+        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, args=args, resource=resource,
+                                                       searcher=searcher, checkpoint=checkpoint,
+                                                       resume=resume, num_trials=num_trials,
+                                                       time_attr=time_attr, reward_attr=reward_attr,
+                                                       visualizer=visualizer)
         self.terminator = MediamStoppingRule(time_attr, reward_attr, mode, grace_period,
                                              min_samples_required)
     def state_dict(self, destination=None):

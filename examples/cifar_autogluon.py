@@ -3,13 +3,7 @@ import numpy as np
 
 import argparse, time, logging
 import mxnet as mx
-<<<<<<< HEAD
 from mxnet import gluon
-=======
-from mxnet import gluon, nd
-from mxnet import autograd
-from mxnet.gluon import nn
->>>>>>> awslabs/master
 from mxnet.gluon.data.vision import transforms
 
 from gluoncv.model_zoo import get_model
@@ -133,11 +127,7 @@ def train_cifar(args, reporter):
                 data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
                 label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
 
-<<<<<<< HEAD
                 with mx.autograd.record():
-=======
-                with autograd.record():
->>>>>>> awslabs/master
                     output = [net(X) for X in data]
                     loss = [loss_fn(yhat, y) for yhat, y in zip(output, label)]
                 for l in loss:
@@ -153,11 +143,7 @@ def train_cifar(args, reporter):
             name, acc = train_metric.get()
             name, val_acc = test(ctx, val_data)
             reporter(epoch=epoch, accuracy=val_acc)
-<<<<<<< HEAD
             #reporter.save_dict(epoch=epoch, params=net.collect_params())
-=======
-            reporter.save_dict(epoch=epoch, params=net.collect_params())
->>>>>>> awslabs/master
 
     train(args.epochs, context)
 
@@ -234,22 +220,13 @@ if __name__ == '__main__':
     myscheduler.run()
     myscheduler.join_tasks()
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
-<<<<<<< HEAD
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
 
-=======
->>>>>>> awslabs/master
     if args.scheduler == 'dist_fifo' or args.scheduler == 'dist_hyperband':
         print('Shutting Down the Scheduler')
         myscheduler.shutdown()
 
-<<<<<<< HEAD
-=======
-    print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
-                                                                   myscheduler.get_best_reward()))
-
->>>>>>> awslabs/master
     if args.scheduler == 'fifo' or args.scheduler == 'hyberband':
         # evaluating the best model params
         best_model = get_model(args.model, classes=10)
