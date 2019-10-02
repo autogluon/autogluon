@@ -4,18 +4,11 @@ import pickle
 import copy
 import logging
 from collections import OrderedDict
-<<<<<<< HEAD
 import multiprocessing as mp
 
 from ..utils import load, DeprecationHelper
 
 __all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
-=======
-
-from ..basic import load
-
-__all__ = ['BaseSearcher', 'RandomSampling']
->>>>>>> awslabs/master
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +20,7 @@ class BaseSearcher(object):
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
     """
-<<<<<<< HEAD
     LOCK = mp.Lock()
-=======
->>>>>>> awslabs/master
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
@@ -52,7 +42,6 @@ class BaseSearcher(object):
         """
         #if model_params is not None and reward > self.get_best_reward():
         #    self._best_model_params = model_params
-<<<<<<< HEAD
         with self.LOCK:
             self._results[pickle.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
@@ -81,22 +70,6 @@ class BaseSearcher(object):
     def is_best(self, config):
         best_config = max(self._results, key=self._results.get)
         return pickle.dumps(config) == best_config
-=======
-        self._results[json.dumps(config)] = reward
-        logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
-
-    def get_best_reward(self):
-        config = max(self._results, key=self._results.get)
-        return self._results[config]
-
-    def get_best_config(self):
-        config = max(self._results, key=self._results.get)
-        return json.loads(config)
-
-    def is_best(self, config):
-        best_config = max(self._results, key=self._results.get)
-        return json.dumps(config) == best_config
->>>>>>> awslabs/master
 
     def get_best_state_path(self):
         assert os.path.isfile(self._best_state_path), \
@@ -113,24 +86,15 @@ class BaseSearcher(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
-<<<<<<< HEAD
             '\nConfigSpace: {}.'.format(str(self.configspace)) + \
             '\nNumber of Trials: {}.'.format(len(self._results)) + \
             '\nBest Config: {}'.format(self.get_best_config()) + \
             '\nBest Reward: {}'.format(self.get_best_reward()) + \
-=======
-            'ConfigSpace: ' + str(self.configspace) + \
-            'Results: ' + str(self._results) + \
->>>>>>> awslabs/master
             ')'
         return reprstr
 
 
-<<<<<<< HEAD
 class RandomSearcher(BaseSearcher):
-=======
-class RandomSampling(BaseSearcher):
->>>>>>> awslabs/master
     """Random sampling Searcher for ConfigSpace
 
     Args:
@@ -146,11 +110,7 @@ class RandomSampling(BaseSearcher):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> # create searcher
-<<<<<<< HEAD
         >>> searcher = RandomSearcher(cs)
-=======
-        >>> searcher = RandomSampling(cs)
->>>>>>> awslabs/master
         >>> searcher.get_config()
     """
     def get_config(self):
@@ -162,25 +122,15 @@ class RandomSampling(BaseSearcher):
                 must return a valid configuration and a (possibly empty) info dict
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
-<<<<<<< HEAD
         while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
         self._results[pickle.dumps(new_config)] = 0
-=======
-        while json.dumps(new_config) in self._results.keys():
-            new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[json.dumps(new_config)] = 0
->>>>>>> awslabs/master
         return new_config
 
     def update(self, *args, **kwargs):
         """Update the searcher with the newest metric report
         """
-<<<<<<< HEAD
         super(RandomSearcher, self).update(*args, **kwargs)
 
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
 
-=======
-        super(RandomSampling, self).update(*args, **kwargs)
->>>>>>> awslabs/master

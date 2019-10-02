@@ -1,19 +1,14 @@
 """MXNet Utils Functions"""
 
-<<<<<<< HEAD
 import os
 import math
 
 __all__ = ['update_params', 'get_data_rec', 'read_remote_ips']
-=======
-__all__ = ['update_params']
->>>>>>> awslabs/master
 
 def update_params(net, params):
     param_dict = net.collect_params()
     for k, v in param_dict.items():
         param_dict[k].set_data(params[k].data())
-<<<<<<< HEAD
 
 
 def get_data_rec(input_size, crop_ratio, rec_train, rec_train_idx,
@@ -96,5 +91,3 @@ def read_remote_ips(filename):
             line = myfile.readline()
     return ip_addrs
 
-=======
->>>>>>> awslabs/master

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import time
 import json
 import logging
@@ -10,17 +9,6 @@ from dask.distributed import Queue
 logger = logging.getLogger(__name__)
 
 __all__ = ['Communicator', 'DistStatusReporter']
-=======
-import os
-import time
-import json
-import logging
-import multiprocessing as mp
-
-from ..basic import save, load
-
-logger = logging.getLogger(__name__)
->>>>>>> awslabs/master
 
 class StatusReporter(object):
     """Report status through the training scheduler.
@@ -84,7 +72,6 @@ class StatusReporter(object):
     def __repr__(self):
         reprstr = self.__class__.__name__
         return reprstr
-<<<<<<< HEAD
 
 class Communicator(threading.Thread):
     def __init__(self, process, local_reporter, dist_reporter):
@@ -193,5 +180,3 @@ class DistSemaphore(object):
     def __repr__(self):
         reprstr = self.__class__.__name__
         return reprstr
-=======
->>>>>>> awslabs/master

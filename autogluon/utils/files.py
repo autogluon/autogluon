@@ -3,18 +3,12 @@ import requests
 import errno
 import shutil
 import hashlib
-<<<<<<< HEAD
 import logging
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['download', 'mkdir', 'check_sha1', 'raise_num_file']
-=======
-from tqdm import tqdm
-
-__all__ = ['download', 'mkdir', 'check_sha1']
->>>>>>> awslabs/master
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
@@ -49,11 +43,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-<<<<<<< HEAD
         logger.info('Downloading %s from %s...'%(fname, url))
-=======
-        print('Downloading %s from %s...'%(fname, url))
->>>>>>> awslabs/master
         r = requests.get(url, stream=True)
         if r.status_code != 200:
             raise RuntimeError("Failed downloading url %s"%url)
@@ -113,7 +103,6 @@ def mkdir(path):
         else:
             raise
 
-<<<<<<< HEAD
 def raise_num_file(nofile_atleast=4096):
     """
     sets nofile soft limit to at least 4096, useful for running matlplotlib/seaborn on
@@ -151,5 +140,3 @@ def raise_num_file(nofile_atleast=4096):
     return soft,hard
 
 raise_num_file()
-=======
->>>>>>> awslabs/master
