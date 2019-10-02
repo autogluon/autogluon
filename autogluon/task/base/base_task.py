@@ -25,7 +25,11 @@ class BaseTask(object):
     def run_fit(cls, train_fn, algorithm, scheduler_options):
         start_time = time.time()
         # create scheduler and schedule tasks
-        scheduler = schedulers[algorithm.lower()]
+        if isinstance(algorithm, str):
+            scheduler = schedulers[algorithm.lower()]
+        else:
+            assert callable(algorithm)
+            scheduler = algorithm
         cls.scheduler = scheduler(train_fn, **scheduler_options)
         cls.scheduler.run()
         cls.scheduler.join_tasks()
@@ -34,6 +38,8 @@ class BaseTask(object):
         best_config = cls.scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
+        #config = cls.scheduler.searcher.get_config()
+        #model = train_fn(args, config, reporter=None)
         model = train_fn(args, best_config, reporter=None)
         total_time = time.time() - start_time
         cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)

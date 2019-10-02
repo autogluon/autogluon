@@ -11,6 +11,15 @@ class Space(object):
     def get_config_space(self, name):
         return _get_hp(name, self)
 
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        if hasattr(self, 'lower') and hasattr(self, 'upper'):
+            reprstr += ': lower={}, upper={}'.format(self.lower, self.upper)
+        if hasattr(self, 'value'):
+            
+            reprstr += ': value={}'.format(self.value)
+        return reprstr
+
 class Sequence(object):
     """A Sequence of AutoGluon Objects
     """

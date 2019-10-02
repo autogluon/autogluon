@@ -80,7 +80,7 @@ Given an example image, we can easily use the final model to `predict` the label
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
+      (dataset.synsets[ind.asscalar()], prob.asscalar()))
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.

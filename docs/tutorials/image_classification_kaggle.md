@@ -221,7 +221,7 @@ On your own, please feel free to try running the following commands with small t
 The top-1 accuracy of the best model on the validation set is:
 
 ```{.python .input}
-# print('Top-1 acc: %.3f' % results.metric)
+# print('Top-1 acc: %.3f' % results.reward)
 ```
 
 ###  Using AutoGluon to generate predictions on test images 

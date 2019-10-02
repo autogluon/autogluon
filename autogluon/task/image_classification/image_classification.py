@@ -26,16 +26,20 @@ class ImageClassification(BaseTask):
     @staticmethod
     def fit(dataset='cifar10',
             net=List('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=SGD(learning_rate=LogLinear(1e-4, 1e-2),
+            optimizer=List(
+                SGD(learning_rate=LogLinear(1e-4, 1e-2),
                           momentum=LogLinear(0.85, 0.95),
                           wd=LogLinear(1e-5, 1e-3)),
+                Adam(learning_rate=LogLinear(1e-4, 1e-2),
+                     wd=LogLinear(1e-5, 1e-3)),
+            ),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
             epochs=20,
             metric='accuracy',
             num_cpus=4,
-            num_gpus=0,
+            num_gpus=1,
             algorithm='random',
             time_limits=None,
             resume=False,
@@ -97,7 +101,10 @@ class ImageClassification(BaseTask):
         plt.show()
         # model inference
         args = cls.scheduler.train_fn.args
-        transform_fn = args.dataset.transform_val
+        dataset = args.dataset
+        if isinstance(dataset, AutoGluonObject):
+            dataset = dataset._lazy_init()
+        transform_fn = dataset.transform_val
         img = transform_fn(img)
         ctx = mx.gpu(0)if args.num_gpus > 0 else mx.cpu()
         pred = cls.results.model(img.expand_dims(0).as_in_context(ctx))
@@ -108,10 +115,11 @@ class ImageClassification(BaseTask):
 
     @classmethod
     def evaluate(cls, dataset):
-        """The task evaluation function given the test data.
+        """The task evaluation function given the test dataset.
          Args:
             dataset: test dataset
          Example:
+            >>> from autogluon import ImageClassification as task
             >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
             >>> test_reward = task.evaluate(dataset)
         """

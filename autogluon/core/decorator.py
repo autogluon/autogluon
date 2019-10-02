@@ -119,7 +119,7 @@ class autogluon_method(object):
                 self.kwspaces[new_k] = v
                 for idx, obj in enumerate(v):
                     if isinstance(obj, AutoGluonObject):
-                        for idx, sub_k, sub_v in enumerate(obj.kwspaces.items()):
+                        for idx, (sub_k, sub_v) in enumerate(obj.kwspaces.items()):
                             new_k = '{}.{}.{}'.format(k, idx, sub_k)
                             self.kwspaces[new_k] = sub_v
             elif isinstance(v, AutoGluonObject):
@@ -233,6 +233,13 @@ def autogluon_function(**kwvars):
                     self._lazy_init(**config)
                 return self._instance.__call__(*args, **kwargs)
 
+            #def __getattr__(self, name):
+            #    if not self._inited:
+            #        self._inited = True
+            #        config = autogluonobject.cs.sample_configuration().get_dictionary()
+            #        self._lazy_init(**config)
+            #    return self._instance.__getattr__(name)
+
             def _lazy_init(self, **nkwvars):
                 # lazy initialization for passing config files
                 self.kwargs.update(nkwvars)
@@ -270,6 +277,17 @@ def autogluon_object(**kwvars):
                     config = autogluonobject.cs.sample_configuration().get_dictionary()
                     self._lazy_init(**config)
                 return self.__call__(*args, **kwargs)
+
+            #def __getattr__(self, name):
+            #    try:
+            #        return Cls.__getattr__(self, name)
+            #    except Exception:
+            #        pass
+            #    if not self._inited:
+            #        self._inited = True
+            #        config = autogluonobject.cs.sample_configuration().get_dictionary()
+            #        self._lazy_init(**config)
+            #    return self.__getattr__(name)
 
             def _lazy_init(self, **nkwvars):
                 self.__class__ = Cls
