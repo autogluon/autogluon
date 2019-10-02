@@ -1,7 +1,11 @@
 import logging
+<<<<<<< HEAD
 import matplotlib.pyplot as plt
 
 import mxnet as mx
+=======
+
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 from mxnet import gluon, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.data import transforms as gcv_transforms
@@ -10,12 +14,21 @@ from ...core.optimizer import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
+<<<<<<< HEAD
 from ..base import BaseTask
+=======
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
 from .nets import get_built_in_network
 from .dataset import ImageClassificationDataset
 from .pipeline import train_image_classification
+<<<<<<< HEAD
 from .metrics import get_metric_instance
+=======
+
+from ...utils import EasyDict as ezdict
+from ..base import BaseTask
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
 __all__ = ['ImageClassification']
 
@@ -25,6 +38,7 @@ class ImageClassification(BaseTask):
     Dataset = ImageClassificationDataset
     @staticmethod
     def fit(dataset='cifar10',
+<<<<<<< HEAD
             net=List('ResNet34_v1b', 'ResNet50_v1b'),
             optimizer=List(
                 SGD(learning_rate=LogLinear(1e-4, 1e-2),
@@ -33,13 +47,23 @@ class ImageClassification(BaseTask):
                 Adam(learning_rate=LogLinear(1e-4, 1e-2),
                      wd=LogLinear(1e-5, 1e-3)),
             ),
+=======
+            net=List('CIFAR_ResNet20_v1', 'CIFAR_ResNet20_v2'),
+            optimizer=SGD(learning_rate=LogLinear(1e-4, 1e-2),
+                          momentum=LogLinear(0.85, 0.95),
+                          wd=LogLinear(1e-5, 1e-3)),
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
             epochs=20,
             metric='accuracy',
             num_cpus=4,
+<<<<<<< HEAD
             num_gpus=1,
+=======
+            num_gpus=0,
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
             algorithm='random',
             time_limits=None,
             resume=False,
@@ -65,9 +89,15 @@ class ImageClassification(BaseTask):
             num_gpus=num_gpus,
             batch_size=batch_size,
             epochs=epochs,
+<<<<<<< HEAD
             num_workers=num_cpus,
             final_fit=False)
 
+=======
+            num_workers=num_cpus)
+
+        print('train_image_classification.args', train_image_classification.args)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
         scheduler_options = {
             'resource': {'num_cpus': num_cpus, 'num_gpus': num_gpus},
             'checkpoint': checkpoint,
@@ -85,6 +115,7 @@ class ImageClassification(BaseTask):
                 'grace_period': grace_period if grace_period else args.epochs//4})
 
         return BaseTask.run_fit(train_image_classification, algorithm, scheduler_options)
+<<<<<<< HEAD
 
     @classmethod
     def predict(cls, img):
@@ -146,3 +177,5 @@ class ImageClassification(BaseTask):
         _, test_reward = metric.get()
         logger.info('Finished.')
         return test_reward
+=======
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc

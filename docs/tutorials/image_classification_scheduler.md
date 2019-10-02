@@ -22,23 +22,39 @@ In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrate
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
 We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.scheduler.FIFO_Scheduler) as default trial scheduler.
+<<<<<<< HEAD
 The simplest way to specify the serial scheduler to be used is via the string name `scheduler_fifo = 'fifo'`:
+=======
+The simplest way to specify the serial scheduler to be used is via the string name `trial_scheduler_fifo = 'fifo'`:
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
 ```{.python .input}
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
 time_limits = 2*60
+<<<<<<< HEAD
 epochs = 10
 
 results = task.fit(dataset,
                    time_limits=time_limits,
                    epochs=epochs)
+=======
+num_training_epochs = 10
+
+results = task.fit(dataset,
+                   time_limits=time_limits,
+                   num_training_epochs=num_training_epochs)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -46,23 +62,40 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 ## Use an early stopping trial scheduler - Hyperband
 
+<<<<<<< HEAD
 We could easily leverage the early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#autogluon.scheduler.Hyperband) make the fit procedure more efficient.
+=======
+We could easily leverage the early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#autogluon.scheduler.Hyperband_Scheduler) make the fit procedure more efficient.
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 HyperBandScheduler early stops trials using the HyperBand optimization algorithm. It divides trials into brackets of varying sizes, and periodically early stops low-performing trials within each bracket.
 We could simply specify Hyperband via string name and use it in the `fit` function:
 
 ```{.python .input}
+<<<<<<< HEAD
 scheduler = 'hyperband'
 
 results = task.fit(dataset,
                    scheduler=scheduler,
                    time_limits=time_limits,
                    epochs=epochs)
+=======
+trial_scheduler = 'hyperband'
+
+results = task.fit(dataset,
+                   trial_scheduler=trial_scheduler,
+                   time_limits=time_limits,
+                   num_training_epochs=num_training_epochs)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -76,10 +109,17 @@ We could also create our own trial scheduler. Here is an example of creating the
 import collections
 import numpy as np
 import multiprocessing as mp
+<<<<<<< HEAD
 from autogluon.scheduler import Hyperband
 
 
 class MedianStopping_Scheduler(Hyperband):
+=======
+from autogluon.scheduler import Hyperband_Scheduler
+
+
+class MedianStopping_Scheduler(Hyperband_Scheduler):
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
     def __init__(self, train_fn, args, resource, searcher,
                  checkpoint='./exp/checkerpoint.ag', 
                  resume=False,
@@ -170,15 +210,25 @@ Then we can use our defined scheduler:
 
 ```{.python .input}
 results = task.fit(dataset,
+<<<<<<< HEAD
                    algorithm=MedianStopping_Scheduler,
                    time_limits=time_limits,
                    epochs=epochs)
+=======
+                   trial_scheduler=MedianStopping_Scheduler,
+                   time_limits=time_limits,
+                   num_training_epochs=num_training_epochs)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 Print the result:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

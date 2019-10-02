@@ -25,12 +25,20 @@ lr_schedulers = {
 
 @autogluon_register_args()
 def train_image_classification(args, reporter):
+<<<<<<< HEAD
     logger.debug('pipeline args: {}'.format(args))
+=======
+    print('pipeline args:', args)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
     if type(args.net) == str:
+<<<<<<< HEAD
         net = get_built_in_network(args.net, args.dataset.num_classes, ctx)._lazy_init()
+=======
+        net = get_built_in_network(args.net, ctx)._lazy_init()
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
     else:
         net = args.net
         net.initialize(ctx=ctx)
@@ -42,7 +50,12 @@ def train_image_classification(args, reporter):
         train_dataset = args.dataset.train
         val_dataset = args.dataset.val
     if val_dataset is None:
+<<<<<<< HEAD
         split = 2 if not args.final_fit else 0
+=======
+        print('train_dataset', train_dataset)
+        split = 1 if args.final_fit else 0
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
         train_dataset, val_dataset = _train_val_split(train_dataset, split)
 
     train_data = gluon.data.DataLoader(
@@ -97,20 +110,32 @@ def train_image_classification(args, reporter):
         test_loss /= len(val_data)
         if reporter:
             reporter(epoch=epoch, reward=reward, loss=test_loss)
+<<<<<<< HEAD
+=======
+        print('epoch: {epoch}, reward: {reward}, loss: {loss}'. \
+              format(epoch=epoch, reward=reward, loss=test_loss))
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
         if not args.final_fit:
             test(epoch)
 
+<<<<<<< HEAD
     if args.final_fit:
         return net
 
+=======
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 def _train_val_split(train_dataset, split=1):
     # temporary solution, need to change using batchify function
     if split == 0:
         return train_dataset, None
+<<<<<<< HEAD
     split_len = len(train_dataset) // 10
+=======
+    split_len = int(len(train_dataset) / 10)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
     if split == 1:
         data = [train_dataset[i][0].expand_dims(0) for i in
                 range(split * split_len, len(train_dataset))]

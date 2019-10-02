@@ -93,9 +93,13 @@ class ImageClassificationDataset(object):
             if self.train_path is not None:
                 dataset_cls = gluon.data.vision.ImageFolderDataset if '.rec' not in self.train_path \
                         else gluon.data.vision.ImageRecordDataset
+<<<<<<< HEAD
                 train_set = dataset_cls(self.train_path)
                 self.synsets = train_set.synsets
                 self.train = train_set.transform_first(self.transform_train)
+=======
+                self.train = dataset_cls(self.train_path).transform_first(self.transform_train)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
                 self.val = dataset_cls(self.val_path).transform_first(self.transform_val) if self.val_path else None
                 if 'test_path' in kwargs:
                     self.test = dataset_cls(kwargs['test_path']).transform_first(self.transform_val)

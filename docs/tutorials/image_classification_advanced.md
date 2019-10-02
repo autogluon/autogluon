@@ -46,7 +46,11 @@ results = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -58,13 +62,18 @@ Recall that rather than training image classification models from scratch, AutoG
 
 ```{.python .input}
 print('Default models:')
+<<<<<<< HEAD
 print(results.metadata['net'])
+=======
+print(results.metadata['nets'])
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 We can also look up the default optimizers used by `fit` to train each neural network (ie. to update the weight parameters based on mini-batches of training data):
  
 ```{.python .input}
 print('Default optimizers:')
+<<<<<<< HEAD
 print(results.metadata['optimizer'])
 ```
 
@@ -75,6 +84,25 @@ The default algorithm used in `fit` for image classification is:
 ```{.python .input}
 print('Default algorithm:')
 print(results.metadata['algorithm'])
+=======
+print(results.metadata['optimizers'])
+```
+
+Beyond which pretrained model and which optimizer to use, deep learning in general involves tons of other design choices, which we collectively refer to as `hyperparameters`. Given possible values of the hyperparameters to try out, we require a smart strategy to efficiently find those hyperparameter values which will produce the best classifier. Strategies might include techniques such as grid/random search, Hyperband, Bayesian optimization, etc. In AutoGluon, which hyperparameter search strategy to use is specified by a `Searcher` object.
+The default searcher used in `fit` for image classification is:
+
+```{.python .input}
+print('Default searcher:')
+print(results.metadata['searcher'])
+```
+
+When the Searcher returns a particular hyperparameter configuration to try out, we must train the neural network under the specified configuration settings, a process referred to as a `trial`. In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
+The default trial scheduler used in `fit` for image classification is:
+
+```{.python .input}
+print('Default trial scheduler:')
+print(results.metadata['trial_scheduler'])
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 When we have already trained many networks under many hyperparameter configurations and see that a current trial is performing very good that satisfies our need in comparison, it may be wise to infer this is the time to simply terminate the trial right away. This way, the final model could be used right away and we don't need to wait until the full fitting procedure completed.  
@@ -135,7 +163,11 @@ results = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -179,7 +211,11 @@ We then put the new network and optimizer search space and the learning rate sch
 results = task.fit(dataset,
                    nets,
                    optimizers,
+<<<<<<< HEAD
                    lr_scheduler=ag.List(['poly', 'cosine']),
+=======
+                   lr_scheduler=ag.List('lr_scheduler', ['poly', 'cosine']),
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -187,7 +223,11 @@ results = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -199,6 +239,13 @@ will support both basic and advanced search algorithms for both hyperparameter o
 We currently support Hyperband, random search and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 The easiest way to specify random search is via the string name:
 
+<<<<<<< HEAD
+=======
+```{.python .input}
+searcher = 'random'
+```
+
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrates how individual training jobs are scheduled.
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
@@ -207,7 +254,12 @@ and an early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#aut
 Which scheduler to use is easily specified via the string name:
 
 ```{.python .input}
+<<<<<<< HEAD
 algorithm = 'hyperband'
+=======
+trial_scheduler_fifo = 'fifo'
+trial_scheduler = 'hyperband'
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 Let's call `fit` with the Searcher and Scheduler specified above, 
@@ -218,7 +270,11 @@ results = task.fit(dataset,
                    nets,
                    optimizers,
                    searcher=searcher,
+<<<<<<< HEAD
                    algorithm=algorithm,
+=======
+                   trial_scheduler=trial_scheduler,
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -226,7 +282,11 @@ results = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
+<<<<<<< HEAD
 print('Top-1 val acc: %.3f' % results.reward)
+=======
+print('Top-1 val acc: %.3f' % results.metric)
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -238,7 +298,11 @@ Let's now use the same image as used in :ref:`sec_imgquick` to generate a predic
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
+<<<<<<< HEAD
       (dataset.synsets[ind.asscalar()], prob.asscalar()))
+=======
+      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
+>>>>>>> c8b325866201574caeb688c623d02b23799a65fc
 ```
 
 
