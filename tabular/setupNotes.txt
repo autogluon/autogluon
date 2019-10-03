@@ -1,0 +1,17 @@
+# Current Notes for setting up autogluon with tabular prediction (on Mac):
+
+cd ~/Documents/AutoGluon/githubAutogluon/auto-ml-with-gluon/
+source ~/virtual/TabularAutoGluon/bin/activate
+
+pip install --upgrade pip
+pip install dask --upgrade
+pip install mxnet
+pip install scikit-optimize mxboard
+
+brew install libomp  # Optional
+
+
+python setup.py develop # install autogluon
+cd tabular/
+python setup.py install # install tabular module
+

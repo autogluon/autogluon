@@ -29,8 +29,9 @@ y_test = test_data[label_column]
 test_data = test_data.drop(labels=[label_column],axis=1)
 print(test_data.head())
 
-predictor = None  # Load previously-trained predictor from file (unnecessary in this case):
+predictor = None  # We delete predictor here to demonstrate how to load previously-trained predictor from file:
 predictor = task.load(savedir)
+
 y_pred = predictor.predict(test_data)
 perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
 
