@@ -1,3 +1,11 @@
+import lightgbm as lgb
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import (RandomForestClassifier, ExtraTreesClassifier, RandomForestRegressor)
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import Perceptron
+from sklearn.dummy import DummyClassifier, DummyRegressor
+
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
 from tabular.ml.models.nn_nlp_classification_model import NNNLPClassificationModel
 from tabular.ml.models.nn_nlp_lm_model import NNNLPLanguageModel
@@ -8,14 +16,7 @@ from tabular.ml.models.rf_model import RFModel
 from tabular.sandbox.models.lgb.parameters import get_param_baseline as lgb_get_param_baseline
 from tabular.sandbox.models.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline
 
-import lightgbm as lgb
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import (RandomForestClassifier, ExtraTreesClassifier, RandomForestRegressor)
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import Perceptron
-from sklearn.dummy import DummyClassifier, DummyRegressor
-
+from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
 def get_preset_models(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     if problem_type == BINARY:
@@ -42,7 +43,8 @@ def get_preset_models_binary(path, problem_type, objective_func, num_boost_round
         # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # RFModel(path=path, name='LGBMClassifier', model=lgb.LGBMClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         LGBModel(path=path, name='LGBMClassifierCustom', params=lgb_get_param_baseline(problem_type, num_classes=num_classes), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
-        NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func),
+        TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func),
+        NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func) # OG fast.ai model. TODO: remove!
         # NNNLPClassificationModel(path=path, name='NNNLPClassificationModel-FWD', params=get_nlp_param_baseline(), problem_type=problem_type, objective_func=objective_func),
         # NNNLPClassificationModel(path=path, name='NNNLPClassificationModel-BWD', params=get_nlp_param_baseline(), problem_type=problem_type, objective_func=objective_func, train_backwards=True),
     ]

@@ -6,6 +6,8 @@ import pandas as pd
 import mxnet as mx
 from mxnet import nd, autograd, gluon
 
+from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+
 
 class TabularNNDataset:
     """ Class for preprocessing & storing/feeding data batches used by tabular data neural networks. Assumes entire dataset can be loaded into numpy arrays.
@@ -17,25 +19,31 @@ class TabularNNDataset:
                                                 All vector-valued (continuous & one-hot) features are concatenated together into a single index of the dataset.
             data_desc (list[str]): Describes the data type of each index of dataset (options: 'vector','embed_<featname>', 'language_<featname>')
             dataloader (mxnet.gluon.data.DataLoader): Loads batches of data from dataset for neural net training and inference.
-            
+            embed_indices (list): which columns in dataset correspond to embed features (order matters!)
+            language_indices (list): which columns in dataset correspond to language features (order matters!)
             vecfeature_col_map (dict): maps vector_feature_name ->  columns of dataset._data[vector] array that contain the data for this feature
             feature_dataindex_map (dict): maps feature_name -> i such that dataset._data[i] = data array for this feature. Cannot be used for vector-valued features, instead use vecfeature_col_map
             feature_groups (dict): maps feature_type (ie. 'vector' or 'embed' or 'language') to list of feature names of this type (empty list if there are no features of this type)
             vectordata_index (int): describes which element of the dataset._data list holds the vector data matrix (access via self.dataset._data[self.vectordata_index]); None if no vector features
             label_index (int): describing which element of the dataset._data list holds labels (access via self.dataset._data[self.label_index]); None if no labels
+            num_categories_per_embedfeature (list): Number of categories for each embedding feature (order matters!)
             num_examples (int): number of examples in this dataset
             num_features (int): number of features (we only consider original variables as features, so num_features may not correspond to dimensionality of the data eg in the case of one-hot encoding)
+            num_classes (int): number of classes (only used for multiclass classification)
     """
     
-    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, labels=None, is_test=True):
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, 
+                 labels=None, is_test=True, problem_type=REGRESSION):
         """ Args:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
                 feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array corresponding to this feature
                 feature_type_map (OrderedDict): Maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
                 params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
+                labels (pd.Series): list of labels (y) if available
         """
         self.params = params
         self.is_test = is_test
+        self.problem_type = problem_type
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map) # number of features (!=dim(processed_array) because some features may be vector-valued, eg one-hot)
         self.batch_size = min(self.num_examples, params['batch_size'])
@@ -72,7 +80,7 @@ class TabularNNDataset:
                     current_last_ind = len(vector_inds) # current last index of the vector datamatrix
                     vector_inds += feature_arraycol_map[feature]
                     new_last_ind = len(vector_inds) # new last index of the vector datamatrix
-                    self.vecfeature_col_map[feature] = list(range(current_ind, new_last_ind))
+                    self.vecfeature_col_map[feature] = list(range(current_last_ind, new_last_ind))
             data_list.append(mx.nd.array(processed_array[:,vector_inds], dtype='float32')) # Matrix of data from all vector features
             self.data_desc.append("vector")
             self.vectordata_index = len(data_list) - 1
@@ -97,13 +105,20 @@ class TabularNNDataset:
             data_list.append(np.array(labels))
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1
+            self.num_classes = None
+            if self.problem_type in [BINARY, MULTICLASS]:
+                self.num_classes = len(set(labels))
         
+        self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
+        self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
+        self.num_categories_per_embed_feature = None
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list) # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
         self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not is_test, 
                                 last_batch = 'keep' if is_test else 'rollover',
                                 num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
+        if not is_test: 
+            self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
         
-    
     """
     # OLD!
     def __init__(self, params, vector_data=[], vector_features=[], embed_data=[], embed_features=[], embed_numcategories=[], language_data=[],
@@ -160,6 +175,36 @@ class TabularNNDataset:
         self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not self.is_test, num_workers=self.params['num_dataloading_workers'])            
     """
     
+    def has_vector_features(self):
+        """ Returns boolean indicating whether this dataset contains vector features """
+        return self.vectordata_index is not None
+    
+    def num_embed_features(self):
+        """ Returns number of embed features in this dataset """
+        return len(self.feature_groups['embed'])
+    
+    def num_language_features(self):
+        """ Returns number of language features in this dataset """
+        return len(self.feature_groups['language'])
+    
+    def getNumCategoriesEmbeddings(self):
+        """ Returns number of categories for each embedding feature.
+            Should only be applied to training data.
+            If training data feature contains unique levels 1,...,n-1, there are actually n categories,
+            since category n is reserved for unknown test-time categories.
+        """
+        if self.num_categories_per_embed_feature is not None:
+            return self.num_categories_per_embedfeature
+        else:
+            num_embed_feats = self.num_embed_features()
+            num_categories_per_embedfeature = [0] * num_embed_feats
+            for i in range(num_embed_feats):
+                feat_i = self.feature_groups['embed'][i]
+                feat_i_data = self.get_feature_data(feat_i).flatten().tolist()
+                num_categories_i = len(set(feat_i_data)) # number of categories for ith feature
+                num_categories_per_embedfeature[i] = num_categories_i + 1 # to account for unknown test-time categories
+            return num_categories_per_embedfeature
+    
     def get_feature_data(self, feature, asnumpy=True):
         """ Returns all data for this feature. 
             Args:
@@ -205,29 +250,32 @@ class TabularNNDataset:
         else:
             return feature_data
     
-    def format_batch_data(self, feature, data_batch):
-        """ Returns part of this batch corresponding to data from a single feature 
+    def format_batch_data(self, data_batch, ctx):
+        """ Partitions data from this batch into different data types.
             Args:
                 data_batch (nd.array): the batch of data as provided by self.dataloader 
             Returns:
-                formatted_batch (dict): {'vector': array of vector_datamatrix, 'embed': list of embedding features' batch data, 'language': list of language features batch data, 'label': array of labels}
-                                         where each key in dict may be missing.
+                formatted_batch (dict): {'vector': array of vector_datamatrix, 
+                                         'embed': list of embedding features' batch data, 
+                                         'language': list of language features batch data, 
+                                         'label': array of labels}
+                                        where each key in dict may be missing.
         """
+        if not isinstance(data_batch, list):
+            data_batch = [data_batch] # Need to convert to list if dimension was dropped during batching
         formatted_batch = {}
-        if self.vectordata_index: # None if there is no vector data
-            formatted_batch['vector'] = data_batch[self.vectordata_index]
-        if self.label_index: # None if there are no labels
-            formatted_batch['label'] = data_batch[self.label_index]
-        if len(self.feature_groups['embed']) > 0:
+        if self.has_vector_features(): # None if there is no vector data
+            formatted_batch['vector'] = data_batch[self.vectordata_index].as_in_context(ctx)
+        if self.num_embed_features() > 0:
             formatted_batch['embed'] = []
-            for i in range(len(self.feature_groups['embed'])):
-                feature_i = self.feature_groups['embed'][i]
-                formatted_batch['embed'].append(self.get_feature_batch(feature_i, data_batch))
-        if len(self.feature_groups['language']) > 0:
+            for i in self.embed_indices:
+                formatted_batch['embed'].append(data_batch[i].as_in_context(ctx))
+        if self.num_language_features() > 0:
             formatted_batch['language'] = []
-            for i in range(len(self.feature_groups['language'])):
-                feature_i = self.feature_groups['language'][i]
-                formatted_batch['language'].append(self.get_feature_batch(feature_i, data_batch))
+            for i in self.language_indices:
+                formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
+        if self.label_index: # None if there are no labels
+            formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
         return formatted_batch
     
     def mask_features_batch(self, features, mask_value, data_batch):
@@ -240,11 +288,10 @@ class TabularNNDataset:
                 new_batch (nd.array): batch of masked data in same format as data_batch
         """
         return None # TODO
-        
-     
+    
     def load(file_path):
         return None # TODO save Dataset for reuse during hyperparameter search.
-        
+    
     def save(self, file_path):
         return None
 

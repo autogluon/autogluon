@@ -17,6 +17,11 @@ class AbstractModel:
     model_file_name = 'model.pkl'
 
     def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy_score, features=None, debug=0):
+        """ Creates a new model. 
+            Args:
+                path (str): directory where to store all outputs
+                name (str): name of subdirectory inside path where model will be saved
+        """
         self.name = name
         self.path = self.create_contexts(path + name + '/')
         self.model = model
