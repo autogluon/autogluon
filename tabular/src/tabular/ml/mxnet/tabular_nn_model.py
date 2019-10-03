@@ -20,18 +20,17 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, PowerTransformer, QuantileTransformer, FunctionTransformer
-# from category_encoders.ordinal import OrdinalEncoder
 
 from f3_grail_data_frame_utilities.loaders import load_pkl
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-# TODO should these files should be moved:
+# TODO these files should be moved eventually:
 from tabular.ml.mxnet.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
 from tabular.ml.mxnet.embednet import EmbedNet
 
-@contextlib.contextmanager
+@contextlib.contextmanager # TODO: keep this?
 def make_temp_directory():
     temp_dir = tempfile.mkdtemp()
     try:
@@ -90,10 +89,10 @@ class TabularNeuralNetModel(AbstractModel):
         # Configuration-options that we never search over in HPO but user can specify:
         self._use_default_value('num_dataloading_workers', 1) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
-        self._use_default_value('max_epochs', 100)  # TODO! debug # maximum number of epochs for training NN
+        self._use_default_value('max_epochs', 100)  # maximum number of epochs for training NN
         
         # For data processing:
-        self._use_default_value('proc.embed_min_categories', 2)  # TODO! debug  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        self._use_default_value('proc.embed_min_categories', 4)  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
         # Default search space: 3,4,10, 100, 1000
         self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
         # Default search space: ['median', 'mean', 'most_frequent']
