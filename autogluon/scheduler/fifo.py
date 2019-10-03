@@ -68,7 +68,6 @@ class FIFOScheduler(TaskScheduler):
         assert isinstance(train_fn, autogluon_method)
         self.args = args if args else train_fn.args
         self.resource = resource
-        print('Training function cs: {}'.format(train_fn.cs))
         self.searcher = searchers[searcher](train_fn.cs) if isinstance(searcher, str) else searcher
         # meta data
         self.metadata = train_fn.get_kwspaces()

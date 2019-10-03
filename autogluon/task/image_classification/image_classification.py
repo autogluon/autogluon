@@ -22,6 +22,8 @@ __all__ = ['ImageClassification']
 logger = logging.getLogger(__name__)
 
 class ImageClassification(BaseTask):
+    """AutoGluon ImageClassification Task
+    """
     Dataset = ImageClassificationDataset
     @staticmethod
     def fit(dataset='cifar10',
@@ -50,6 +52,32 @@ class ImageClassification(BaseTask):
             grace_period=None,
             auto_search=True):
 
+        """
+        Fit networks on dataset
+
+        Args:
+            dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
+            net (str, autogluon.AutoGluonObject, or ag.List of AutoGluonObject): Network candidates.
+            optimizer (str, autogluon.AutoGluonObject, or ag.List of AutoGluonObject): optimizer candidates.
+            metric (str or object): observation metric.
+            loss (object): training loss function.
+            num_trials (int): number of trials in the experiment.
+            time_limits (int): training time limits in seconds.
+            resources_per_trial (dict): Machine resources to allocate per trial.
+            savedir (str): Local dir to save training results to.
+            algorithm (str): Search Algorithms ('random', 'bayesian' and 'hyperband')
+            resume (bool): If checkpoint exists, the experiment will resume from there.
+
+
+        Example:
+            >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
+            >>>                         test_path='data/test')
+            >>> results = task.fit(dataset,
+            >>>                    nets=ag.List['resnet18_v1', 'resnet34_v1'],
+            >>>                    time_limits=time_limits,
+            >>>                    num_gpus=1,
+            >>>                    num_trials = 4)
+        """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics

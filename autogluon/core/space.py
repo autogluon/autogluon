@@ -22,6 +22,16 @@ class Space(object):
 
 class Sequence(object):
     """A Sequence of AutoGluon Objects
+
+    Args:
+        args: a list of search spaces.
+
+    Example:
+        >>> sequence = ag.Sequence(
+        >>>     ag.List('conv3x3', 'conv5x5', 'conv7x7'),
+        >>>     ag.List('BatchNorm', 'InstanceNorm'),
+        >>>     ag.List('relu', 'sigmoid'),
+        >>> )
     """
     def __init__(self, *args):
         self.data = [*args]
@@ -53,11 +63,16 @@ class Sequence(object):
         return reprstr
 
 class List(Space):
-    def __init__(self, *args):
-        self.data = [*args]
-        if len(self.data) > 0 and isinstance(self.data[0], AutoGluonObject):
-            for x in self.data:
-                assert(isinstance(x, AutoGluonObject))
+    """List Search Space
+
+    Args:
+        data: the choice candidates
+
+    Example:
+        >>> net = ag.List('resnet50', 'resnet101')
+    """
+    def __init__(self, *data):
+        self.data = [*data]
 
     def __iter__(self):
         for elem in self.data:
@@ -88,25 +103,62 @@ class List(Space):
         return reprstr
 
 class Linear(Space):
+    """linear search space.
+
+    Args:
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> learning_rate = ag.Linear(0.01, 0.1)
+    """
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
 class LogLinear(Space):
+    """log linear search space.
+
+    Args:
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> learning_rate = ag.LogLinear(0.01, 0.1)
+    """
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
 class Int(Space):
+    """integer search space.
+
+    Args:
+        lower: the lower bound of the search space
+        upper: the upper bound of the search space
+
+    Example:
+        >>> learning_rate = ag.Int(0, 100)
+    """
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
 
 class Bool(Int):
+    """Bool Search Space
+
+    Example:
+        >>> pretrained = ag.Bool()
+    """
     def __init__(self):
         super(Bool, self).__init__(0, 1)
 
 class Constant(Space):
+    """Constant Space (Non-searchable)
+
+    Example:
+        >>> pretrained = ag.Constant(True)
+    """
     def __init__(self, val):
         self.value = val
 

@@ -13,33 +13,6 @@ built_in_datasets = [
     'cifar100',
 ]
 
-@autogluon_function()
-def get_built_in_dataset(name, train=True):
-    if name == 'cifar10':
-        transform_split = transforms.Compose([
-            gcv_transforms.RandomCrop(32, pad=4),
-            transforms.RandomFlipLeftRight(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
-        ]) if train else transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
-        ])
-        return gluon.data.vision.CIFAR10(train=train).transform_first(transform_split)
-    elif name == 'cifar100':
-        transform_split = transforms.Compose([
-            gcv_transforms.RandomCrop(32, pad=4),
-            transforms.RandomFlipLeftRight(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
-        ]) if train else transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
-        ])
-        return gluon.data.vision.CIFAR100(train=train).transform_first(transform_split)
-    else:
-        raise NotImplemented
-
 @autogluon_object()
 class ImageClassificationDataset(object):
     """The image classification dataset.
@@ -106,3 +79,30 @@ class ImageClassificationDataset(object):
                 self.test = dataset_cls(kwargs['test_path']).transform_first(self.transform_val)
             else:
                 raise NotImplementedError
+
+@autogluon_function()
+def get_built_in_dataset(name, train=True):
+    if name == 'cifar10':
+        transform_split = transforms.Compose([
+            gcv_transforms.RandomCrop(32, pad=4),
+            transforms.RandomFlipLeftRight(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ]) if train else transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ])
+        return gluon.data.vision.CIFAR10(train=train).transform_first(transform_split)
+    elif name == 'cifar100':
+        transform_split = transforms.Compose([
+            gcv_transforms.RandomCrop(32, pad=4),
+            transforms.RandomFlipLeftRight(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ]) if train else transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
+        ])
+        return gluon.data.vision.CIFAR100(train=train).transform_first(transform_split)
+    else:
+        raise NotImplemented

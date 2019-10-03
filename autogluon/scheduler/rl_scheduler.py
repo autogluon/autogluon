@@ -23,6 +23,41 @@ __all__ = ['RLScheduler']
 logger = logging.getLogger(__name__)
 
 class RLScheduler(FIFOScheduler):
+    """Reinforcement Scheduler, which automatically creates LSTM controller based on the search spaces.
+
+    Args:
+        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_register_args` decorater to the original function.
+        args (object): Default arguments for launching train_fn.
+        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
+        time_attr (str): A training result attr to use for comparing time. Note that you can pass in something non-temporal such as `training_epoch` as a measure of progress, the only requirement is that the attribute should increase monotonically.
+        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
+        max_t (float): max time units per task. Trials will be stopped after max_t time units (determined by time_attr) have passed.
+        grace_period (float): Only stop tasks at least this old in time. The units are the same as the attribute named by `time_attr`.
+        reduction_factor (float): Used to set halving rate and amount. This is simply a unit-less scalar.
+        brackets (int): Number of brackets. Each bracket has a different halving rate, specified by the reduction factor.
+
+    Example:
+        >>> @autogluon_method
+        >>> def train_fn(args, reporter):
+        >>>     for e in range(10):
+        >>>         # forward, backward, optimizer step and evaluation metric
+        >>>         # generate fake top1_accuracy
+        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+        >>>         reporter(epoch=e, accuracy=top1_accuracy)
+        >>> import ConfigSpace as CS
+        >>> import ConfigSpace.hyperparameters as CSH
+        >>> cs = CS.ConfigurationSpace()
+        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
+        >>> cs.add_hyperparameter(lr)
+        >>> searcher = RandomSampling(cs)
+        >>> myscheduler = HyperbandScheduler(train_fn, args,
+        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                  searcher=searcher, num_trials=20,
+        >>>                                  reward_attr='accuracy',
+        >>>                                  time_attr='epoch',
+        >>>                                  grace_period=1)
+    """
     def __init__(self, train_fn, resource, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
@@ -30,7 +65,7 @@ class RLScheduler(FIFOScheduler):
                  controller_batch_size=1,
                  dist_ip_addrs=[], sync=True, **kwargs):
         assert isinstance(train_fn, autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
-            'to decorate your training script.'
+                'to decorate your training script.'
         self.ema_baseline_decay = ema_baseline_decay
         self.sync = sync
         # create RL searcher/controller

@@ -19,8 +19,6 @@ __all__ = ['autogluon_method', 'autogluon_kwargs', 'autogluon_object',
 logger = logging.getLogger(__name__)
 
 class autogluon_method(object):
-    """Enable searcher to update default function args.
-    """
     SEED = mp.Value('i', 0)
     LOCK = mp.Lock()
     def __init__(self, f):
@@ -159,7 +157,6 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
     #    for hp in new_parameters:
     #        master_cs._hyperparameters[hp.name] = hp
     for hp in new_parameters:
-        #master_cs._hyperparameters[hp.name] = hp
         _add_hp(master_cs, hp)
 
 def _rm_hp(cs, k):
@@ -170,7 +167,13 @@ def _rm_hp(cs, k):
             cs._hyperparameters.pop(hp.name)
 
 def autogluon_register_args(default={}, **kwvars):
-    """Register default args or searchable spaces to the 'autogluon_method'
+    """Register args or searchable spaces to the decorated function
+
+    Example:
+        >>> @autogluon_register_args(batch_size=10, lr=ag.Linear(0.01, 0.1))
+        >>> def my_train(args):
+        >>>     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
+
     """
     kwvars['default_config'] = default
     def registered_func(func):
@@ -188,8 +191,6 @@ def autogluon_register_args(default={}, **kwvars):
     return registered_func
 
 def autogluon_kwargs(**kwvars):
-    """Decorating function and gather configspaces
-    """
     def registered_func(func):
         cs = CS.ConfigurationSpace()
         kwspaces = collections.OrderedDict()
@@ -219,6 +220,18 @@ def autogluon_kwargs(**kwvars):
     return registered_func
 
 def autogluon_function(**kwvars):
+    """Register args or searchable spaces to the functions.
+
+    Return:
+        AutoGluonobject: a lazy init object, which allows distributed training.
+
+    Example:
+        >>> from gluoncv.model_zoo import get_model
+        >>> 
+        >>> @ag.autogluon_function(pretrained=ag.List(True, False))
+        >>> def cifar_resnet(pretrained):
+        >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
+    """
     def registered_func(func):
         class autogluonobject(AutoGluonObject):
             @autogluon_kwargs(**kwvars)
@@ -234,13 +247,6 @@ def autogluon_function(**kwvars):
                     config = self.cs.sample_configuration().get_dictionary()
                     self._lazy_init(**config)
                 return self._instance.__call__(*args, **kwargs)
-
-            #def __getattr__(self, name):
-            #    if not self._inited:
-            #        self._inited = True
-            #        config = autogluonobject.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self._instance.__getattr__(name)
 
             def _lazy_init(self, **nkwvars):
                 # lazy initialization for passing config files
@@ -266,7 +272,24 @@ def autogluon_function(**kwvars):
 
 def autogluon_object(**kwvars):
     """Register args or searchable spaces to the class.
-    AutoGluon object is a lazy init object, which allows distributed training.
+
+    Return:
+        AutoGluonobject: a lazy init object, which allows distributed training.
+
+    Example:
+        >>> from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
+        >>>
+        >>> @ag.autogluon_object(
+        >>>     nstage1=ag.Int(2, 10),
+        >>>     nstage2=ag.Int(2, 10),
+        >>>     nstage3=ag.List(5, 1),
+        >>> )
+        >>> class MyCifarResNet(CIFARResNetV1):
+        >>>     def __init__(self, nstage1, nstage2, nstage3):
+        >>>         print('Initializing MyCifarResNet')
+        >>>         layers = [nstage1, nstage2, nstage3]
+        >>>         channels = [16, 16, 32, 64]
+        >>>         super().__init__(CIFARBasicBlockV1, layers, channels)
     """
     def registered_class(Cls):
         class autogluonobject(AutoGluonObject):#, Cls
@@ -283,17 +306,6 @@ def autogluon_object(**kwvars):
                     self._lazy_init(**config)
                 return self.__call__(*args, **kwargs)
 
-            #def __getattr__(self, name):
-            #    try:
-            #        return Cls.__getattr__(self, name)
-            #    except Exception:
-            #        pass
-            #    if not self._inited:
-            #        self._inited = True
-            #        config = autogluonobject.cs.sample_configuration().get_dictionary()
-            #        self._lazy_init(**config)
-            #    return self.__getattr__(name)
-
             def init(self):
                 return self._lazy_init()
 
@@ -304,11 +316,6 @@ def autogluon_object(**kwvars):
                     if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], List):
                         kwargs[k] = autogluonobject.kwspaces[k][v]
                 args = self._args
-                #self.__class__ = Cls
-                #del self._args
-                #del self._kwargs
-                #self.__init__(*args, **kwargs)
-                #return self
                 return Cls(*args, **kwargs)
 
             def __repr__(self):

@@ -2,7 +2,7 @@
 
 ```eval_rst
 
-.. automodule:: autogluon.task.image_classification
+.. automodule:: autogluon.task.ImageClassification
    :members:
    :imported-members:
 ```

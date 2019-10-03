@@ -20,6 +20,8 @@ class BaseDataset(mx.gluon.data.Dataset):
     pass
 
 class BaseTask(object):
+    """BaseTask for AutoGluon applications
+    """
     Dataset = BaseDataset
     @classmethod
     def run_fit(cls, train_fn, algorithm, scheduler_options):
@@ -59,4 +61,22 @@ class BaseTask(object):
     @classmethod
     @abstractmethod
     def predict(cls, inputs):
+        """The task predict function given an input.
+         Args:
+            img: the input
+         Example:
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def evaluate(cls, dataset):
+        """The task evaluation function given the test dataset.
+         Args:
+            dataset: test dataset
+         Example:
+            >>> from autogluon import ImageClassification as task
+            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+            >>> test_reward = task.evaluate(dataset)
+        """
         pass
