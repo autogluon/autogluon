@@ -118,62 +118,7 @@ class TabularNNDataset:
                                 num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
         if not is_test: 
             self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
-        
-    """
-    # OLD!
-    def __init__(self, params, vector_data=[], vector_features=[], embed_data=[], embed_features=[], embed_numcategories=[], language_data=[],
-                 language_features=[], language_processor=None, labels=None, is_test=True):
-        "" Args:
-                df (DataFrame): contains raw data of all features as columns
-                vector_data (list): each element of this list is a 2D numpy array corresponding to data from single vector-valued feature (ie. numeric or one-hot data).
-                vector_features (list): feature names for each element of vector_data
-                embed_data (list): each element of this list is 2D numpy array of ints representing levels of one categorical feature which should be passed to a Embedding layer
-                embed_features (list): feature names for each element of embed_data
-                embed_numcategories (list): number of possible categories for each feature passed to an Embedding layer (determines size of Embedding layer)
-                language_data (list): each element of this list is NLP-formatted array representing one text field which should be passed to a NLP layer
-                language_features (list): feature names for each element of language_data
-                language_processor (obj): object for processing raw text data
-                labels (1D numpy array): labels for each example (required when is_test = False) 
-        ""
-        self.is_test = is_test # TODO needed?
-        self.params = params
-        self.num_examples, self.num_features = df.shape # TODO: where to get these for verification?
-        self.batch_size = min(self.num_examples, params['batch_size'])
-        self.embed_numcategories = embed_numcategories
-        self.language_processor = language_processor
-        self.feature_groups = {'vector': vector_features, 'embed': embed_features, 'language': language_features}
-        self.vector_feature_inds = {} # vector_feature_inds['featname'] returns the column-indices of self.dataset._data[vector] that correspond to featname (may be multiple columns eg for one-hot feature)
-        # Not needed for embed/language features because ith index of data list 
-        self.feature_names = vector_features + embed_features + language_features # features must be added to data-list in this order
-        
-        if len(vector_data) + len(embed_data) + len(language_data) != self.num_features:
-            raise ValueError("Dataset() requires data from at least one type of feature")
-        if not self.is_test and not labels:
-            raise ValueError("labels must be provided when is_test = False")
-        if labels is not None and len(labels) != self.num_examples:
-            raise ValueError("number of labels and training examples do not match")
-        if (len(vector_data) != len(vector_features) or len(embed_data) != len(embed_features) or len(embed_data) != len(embed_numcategories)
-            or len(language_data) != len(language_features)):
-            raise ValueError("feature names and data-columns must be of equal length for each feature type")
-        
-        data_list = [] # stores all data of each feature-type in list used to construct MXNet dataset
-        self.data_desc = [] # describes feature-type of each index of data_list
-        if len(vector_data) > 0:
-            vector_datamatrix = np.hstack([vector_data[i] for i in range(len(vector_data))])
-            data_list.append(mx.nd.array(vector_datamatrix, dtype='float32')) # Matrix of data from all vector features
-            self.data_desc.append("vector")
-        for feat_index in range(len(embed_data)):
-            data_list.append(embed_data[feat_index]) # may need to convert to dtype= int32
-            self.data_desc.append("embed_"+embed_features[feat_index])
-        for feat_index in range(len(language_data)):
-            data_list.append(language_data[feat_index])
-            self.data_desc.append("language_"+)
-        if labels is not None :
-            data_list.append(labels)
-            self.data_desc.append("label")       
-        self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list) # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
-        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not self.is_test, num_workers=self.params['num_dataloading_workers'])            
-    """
+    
     
     def has_vector_features(self):
         """ Returns boolean indicating whether this dataset contains vector features """
