@@ -38,12 +38,14 @@ class BaseTask(object):
         best_config = cls.scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
-        #config = cls.scheduler.searcher.get_config()
-        #model = train_fn(args, config, reporter=None)
         model = train_fn(args, best_config, reporter=None)
         total_time = time.time() - start_time
         cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
         return cls.results
+
+    @classmethod
+    def get_training_curves(cls, filename=None, plot=False, use_legend=True):
+        cls.scheduler.get_training_curves(filename=None, plot=False, use_legend=True)
 
     @classmethod
     def shut_down(cls):

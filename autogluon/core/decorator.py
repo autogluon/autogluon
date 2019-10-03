@@ -53,7 +53,6 @@ class autogluon_method(object):
                     args_dict[k] = v._lazy_init(**sub_config)
                 elif isinstance(v, List):
                     sub_config = strip_cofing_space(new_config, prefix=k)
-                    #print('k:{}, sub_config:{}'.format(k, sub_config))
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
                         # nested space: List of AutoGluonobjects
@@ -167,7 +166,7 @@ def _rm_hp(cs, k):
     if k in cs._hyperparameters:
         cs._hyperparameters.pop(k)
     for hp in cs.get_hyperparameters():
-        if "%s."%(k) in hp.name:
+        if  hp.name.startswith("%s."%(k)):
             cs._hyperparameters.pop(hp.name)
 
 def autogluon_register_args(default={}, **kwvars):

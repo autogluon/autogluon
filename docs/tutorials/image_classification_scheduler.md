@@ -6,7 +6,7 @@ This tutorial dives into how to configure and create your own trial scheduler, s
 We again begin by letting AutoGluon know that `image_classification` is the task of interest: 
 
 ```{.python .input}
-from autogluon import image_classification as task
+from autogluon import ImageClassification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -51,10 +51,10 @@ HyperBandScheduler early stops trials using the HyperBand optimization algorithm
 We could simply specify Hyperband via string name and use it in the `fit` function:
 
 ```{.python .input}
-scheduler = 'hyperband'
+algorithm = 'hyperband'
 
 results = task.fit(dataset,
-                   scheduler=scheduler,
+                   algorithm=algorithm,
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -76,25 +76,26 @@ We could also create our own trial scheduler. Here is an example of creating the
 import collections
 import numpy as np
 import multiprocessing as mp
-from autogluon.scheduler import Hyperband
+from autogluon.scheduler import HyperbandScheduler
 
 
-class MedianStopping_Scheduler(Hyperband):
-    def __init__(self, train_fn, args, resource, searcher,
+class MedianStopping_Scheduler(HyperbandScheduler):
+    def __init__(self, train_fn, resource,
                  checkpoint='./exp/checkerpoint.ag', 
                  resume=False,
                  num_trials=None,
+                 time_out=None,
                  time_attr="training_epoch",
                  reward_attr="accuracy",
                  visualizer='tensorboard',
                  mode="max",
                  grace_period=1.0,
-                 min_samples_required=3):
-        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, args=args, resource=resource,
-                                                       searcher=searcher, checkpoint=checkpoint,
-                                                       resume=resume, num_trials=num_trials,
+                 min_samples_required=3,
+                 dist_ip_addrs=[]):
+        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource, checkpoint=checkpoint,
+                                                       resume=resume, num_trials=num_trials, time_out=time_out,
                                                        time_attr=time_attr, reward_attr=reward_attr,
-                                                       visualizer=visualizer)
+                                                       visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)
         self.terminator = MediamStoppingRule(time_attr, reward_attr, mode, grace_period,
                                              min_samples_required)
     def state_dict(self, destination=None):

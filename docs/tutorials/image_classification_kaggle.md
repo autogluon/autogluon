@@ -143,7 +143,7 @@ Now you have a dataset ready used in AutoGluon.
 To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
 
 ```{.python .input}
-# from autogluon import image_classification as task
+# from autogluon import ImageClassification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
 ```
 
@@ -199,7 +199,7 @@ We have the processed dataset if you don't want to explore new Kaggle dataset, p
 ```
 
 ```{.python .input}
-# from autogluon import image_classification as task
+# from autogluon import ImageClassification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train', val_path='~/data/shopeeiet/val')
 ```
 

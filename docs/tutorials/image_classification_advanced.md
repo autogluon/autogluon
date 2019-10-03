@@ -210,13 +210,14 @@ Which scheduler to use is easily specified via the string name:
 algorithm = 'hyperband'
 ```
 
-Let's call `fit` with the Searcher and Scheduler specified above, 
+Let's call `fit` with the Searcher and Scheduler specified above,
 and evaluate the resulting model on both validation and test datasets:
 
 ```{.python .input}
 results = task.fit(dataset,
                    nets,
                    optimizers,
+                   lr_scheduler=ag.List('poly', 'cosine'),
                    algorithm=algorithm,
                    time_limits=time_limits,
                    epochs=4)

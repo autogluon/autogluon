@@ -1,6 +1,7 @@
 from .scheduler import *
 from .fifo import *
 from .hyperband import *
+from .space import *
 
 from ..core import List
 from ..utils import DeprecationHelper
@@ -9,8 +10,10 @@ class DeprecatedObject(List):
     def __init__(self, objs):
         super().__init__(*objs)
 
-Optimizers = DeprecationHelper(DeprecatedObject, 'Optimizers')
+    def __repr__(self):
+        reprstr = 'List' + str(self.data)
+        return reprstr
 
-Nets = DeprecationHelper(DeprecatedObject, 'Nets')
-
-Losses = DeprecationHelper(DeprecatedObject, 'Losses')
+Optimizers = DeprecationHelper(DeprecatedObject, 'List')
+Nets = DeprecationHelper(DeprecatedObject, 'List')
+Losses = DeprecationHelper(DeprecatedObject, 'List')

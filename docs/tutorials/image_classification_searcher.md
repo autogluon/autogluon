@@ -7,7 +7,7 @@ Beyond simply specifying the space of hyperparameter configurations to search ov
 We again begin by informing AutoGluon that `image_classification` is the task of interest, and  use the same subset of the `Shopee-IET` dataset as before (recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed).  To ensure this tutorial runs quickly, we heavily constrain the allowed time-limits and number of training epochs.
 
 ```{.python .input}
-from autogluon import image_classification as task
+from autogluon import ImageClassification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -22,11 +22,11 @@ Recall that our goal in hyperparameter search is to identify the hyperparameter 
 
 ## Random hyperparameter search
 
-The default searcher employed by AutoGluon is random search, which simply tries out new hyperparameter configurations drawn at random from the hyperparameter search space under consideration. You can specify that `task.fit` should employ random hyperparameter search simply by passing the string argument `searcher='random'` (although unnecessary as it is already the default option).
+The default searcher employed by AutoGluon is random search, which simply tries out new hyperparameter configurations drawn at random from the hyperparameter search space under consideration. You can specify that `task.fit` should employ random hyperparameter search simply by passing the string argument `algorithm='random'` (although unnecessary as it is already the default option).
 
 ```{.python .input}
 results = task.fit(dataset,
-                   searcher='random',
+                   algorithm='random',
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -44,11 +44,11 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 Instead of random search, AutoGluon can alternatively utilize the more sophisticated strategy of [Bayesian Optimization](../api/autogluon.searcher.html) to identify good hyperparameters.  Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration. This surrogate model can then be used to infer which hyperparameter configurations could plausibly lead to the best predictive performance (ie. those hyperparameter-values that are similar to the top-performing configurations tried so far, as well as the hyperparameter-values that are very dissimilar to all configurations tried so far, since the surrogate model is highly uncertain about their corresponding performance). Within the same time-limit constraints, Bayesian optimization can often produce a superior model  compared to random search by making smarter decisions about which hyperparameter configuration to explore next. Although updating the surrogate model takes time, these updates are generally negligible compared with the neural network training time required to execute a single trial. 
 
-You can specify `task.fit` should find hyperparameters via Bayesian optimization simply by passing the string argument `searcher='bayesopt'`:
+You can specify `task.fit` should find hyperparameters via Bayesian optimization simply by passing the string argument `algorithm='bayesian'`:
 
 ```{.python .input}
 results = task.fit(dataset,
-                   searcher='bayesopt',
+                   algorithm='bayesian',
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -67,8 +67,7 @@ For those of you familiar with Bayesian optimization, AutoGluon allows you to co
 
 ```{.python .input}
 results = task.fit(dataset,
-                   searcher='bayesopt', 
-                   searcher_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+                   algorithm='bayesian', 
                    time_limits=time_limits,
                    epochs=epochs)
 
@@ -77,6 +76,6 @@ test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `searcher_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `searcher_options` when `searcher='bayesopt'`.
+Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `searcher_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `searcher_options` when `algorithm='bayesian'`.
 
 To understand other aspects of the `fit` function that may be customized, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
