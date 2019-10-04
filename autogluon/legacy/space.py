@@ -3,6 +3,6 @@ from ..core.space import *
 
 __all__ = ['ListSpace', 'IntSpace', 'LogLinearSpace']
 
-ListSpace = DeprecationHelper(List, 'List')
-IntSpace = DeprecationHelper(List, 'Int')
-LogLinearSpace = DeprecationHelper(List, 'LogLinear')
+ListSpace = DeprecationHelper(Choice, 'List')
+IntSpace = DeprecationHelper(Int, 'Int')
+LogLinearSpace = DeprecationHelper(LogLinear, 'LogLinear')

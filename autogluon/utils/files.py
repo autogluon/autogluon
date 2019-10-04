@@ -104,11 +104,6 @@ def mkdir(path):
             raise
 
 def raise_num_file(nofile_atleast=4096):
-    """
-    sets nofile soft limit to at least 4096, useful for running matlplotlib/seaborn on
-    parallel executing plot generators vs. Ubuntu 16.04 default ulimit -n 1024 or OS X El Captian 256
-    temporary setting extinguishing with Python session.
-    """
     try:
         import resource as res
     except ImportError: #Windows

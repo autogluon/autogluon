@@ -167,7 +167,10 @@ def _rm_hp(cs, k):
             cs._hyperparameters.pop(hp.name)
 
 def autogluon_register_args(default={}, **kwvars):
-    """Register args or searchable spaces to the decorated function
+    """Decorator for customized training script, registering arguments or searchable spaces
+    to the decorated function. The arguments should be python objects, autogluon objects
+    (see :function:`autogluon.autogluon_object`_ .), or autogluon search spaces
+    (:class:`autogluon.Int`, :class:`autogluon.Linear` ...).
 
     Example:
         >>> @autogluon_register_args(batch_size=10, lr=ag.Linear(0.01, 0.1))

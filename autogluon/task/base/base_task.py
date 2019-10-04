@@ -10,7 +10,7 @@ Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
     'random': FIFOScheduler,
-    'bayesian': FIFOScheduler,
+    'bayesopt': FIFOScheduler,
     'hyperband': HyperbandScheduler,
     'rl': RLScheduler,
 }

@@ -1,7 +1,8 @@
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
+from ..utils import DeprecationHelper
 
-__all__ = ['Space', 'List', 'Linear', 'LogLinear', 'Int',
+__all__ = ['Space', 'Choice', 'List', 'Linear', 'LogLinear', 'Int',
            'Bool', 'strip_cofing_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
@@ -62,14 +63,14 @@ class Sequence(object):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-class List(Space):
+class Choice(Space):
     """List Search Space
 
     Args:
         data: the choice candidates
 
     Example:
-        >>> net = ag.List('resnet50', 'resnet101')
+        >>> net = ag.Choice('resnet50', 'resnet101')
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -101,6 +102,8 @@ class List(Space):
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
+
+List = DeprecationHelper(Choice, 'Choice')
 
 class Linear(Space):
     """linear search space.
@@ -153,15 +156,6 @@ class Bool(Int):
     def __init__(self):
         super(Bool, self).__init__(0, 1)
 
-class Constant(Space):
-    """Constant Space (Non-searchable)
-
-    Example:
-        >>> pretrained = ag.Constant(True)
-    """
-    def __init__(self, val):
-        self.value = val
-
 def _get_hp(name, space):
     assert isinstance(space, Space)
     if isinstance(space, Linear):
@@ -170,8 +164,6 @@ def _get_hp(name, space):
         return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper, log=True)
     elif isinstance(space, Int):
         return CSH.UniformIntegerHyperparameter(name=name, lower=space.lower, upper=space.upper)
-    elif isinstance(space, Constant):
-        return CSH.Constant(name=name, value=space.value)
     else:
         raise NotImplemented
 

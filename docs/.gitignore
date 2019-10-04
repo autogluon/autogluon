@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 _build
 build
 checkpoint
@@ -6,3 +7,8 @@ source/tutorials/task/train
 *.lock
 *.dirlock
 *exp/
+=======
+data/
+build/
+_build
+>>>>>>> awslabs/master

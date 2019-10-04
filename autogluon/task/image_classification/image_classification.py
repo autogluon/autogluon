@@ -43,6 +43,7 @@ class ImageClassification(BaseTask):
             num_cpus=4,
             num_gpus=1,
             algorithm='random',
+            algorithm_options={},
             time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
@@ -65,7 +66,7 @@ class ImageClassification(BaseTask):
             time_limits (int): training time limits in seconds.
             resources_per_trial (dict): Machine resources to allocate per trial.
             savedir (str): Local dir to save training results to.
-            algorithm (str): Search Algorithms ('random', 'bayesian' and 'hyperband')
+            algorithm (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
             resume (bool): If checkpoint exists, the experiment will resume from there.
 
 
@@ -106,6 +107,7 @@ class ImageClassification(BaseTask):
             'time_attr': 'epoch',
             'reward_attr': 'reward',
             'dist_ip_addrs': dist_ip_addrs,
+            'algorithm_options': algorithm_options,
         }
         if algorithm == 'hyperband':
             scheduler_options.update({

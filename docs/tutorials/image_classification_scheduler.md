@@ -96,12 +96,12 @@ class MedianStopping_Scheduler(HyperbandScheduler):
                                                        resume=resume, num_trials=num_trials, time_out=time_out,
                                                        time_attr=time_attr, reward_attr=reward_attr,
                                                        visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)
-        self.terminator = MediamStoppingRule(time_attr, reward_attr, mode, grace_period,
+        self.terminator = MedianStoppingRule(time_attr, reward_attr, mode, grace_period,
                                              min_samples_required)
     def state_dict(self, destination=None):
         pass
 
-class MediamStoppingRule(object):
+class MedianStoppingRule(object):
     LOCK = mp.Lock()
     def __init__(self,
                  time_attr="training_epoch",

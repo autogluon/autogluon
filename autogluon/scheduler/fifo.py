@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 searchers = {
     'random': RandomSearcher,
-    'bayesian': SKoptSearcher,
+    'bayesopt': SKoptSearcher,
 }
 
 class FIFOScheduler(TaskScheduler):
@@ -59,8 +59,9 @@ class FIFOScheduler(TaskScheduler):
         >>> # run tasks
         >>> myscheduler.run()
     """
-    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0}, searcher='random',
-                 checkpoint='./exp/checkerpoint.ag', resume=False, num_trials=None,
+    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
+                 searcher='random', searcher_options={}, checkpoint='./exp/checkerpoint.ag',
+                 resume=False, num_trials=None,
                  time_out=None, max_reward=1.0, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=[], **kwargs):
         super(FIFOScheduler,self).__init__(dist_ip_addrs)
