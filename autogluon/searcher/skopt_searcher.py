@@ -150,7 +150,13 @@ class SKoptSearcher(BaseSearcher):
         """Update the searcher with the newest metric report
         """
         self._results[json.dumps(config)] = reward
-        self.bayes_optimizer.tell(self.config2skopt(config), -reward) # provide negative reward since skopt performs minimization
+        try:
+            self.bayes_optimizer.tell(self.config2skopt(config),
+                                      -reward)  # provide negative reward since skopt performs minimization
+        except ValueError:
+            logger.info("surrogate model not updated this trial")
+        logger.info(
+            'Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
         logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
 
     def config2skopt(self, config):
