@@ -1,0 +1,401 @@
+
+from pandas import DataFrame, Series
+import pandas as pd
+from collections import defaultdict
+from tabular.utils.savers import save_pkl
+from pandas.api.types import CategoricalDtype
+import copy
+from tabular.utils.decorators import calculate_time
+import re
+import numpy as np
+import sys
+
+
+class AbstractFeatureGenerator:
+    def __init__(self):
+        self.features_init = []
+        self.features_to_remove = []
+        self.features_to_remove_post = []
+        self.features_to_keep_raw = []
+        self.features_object = []
+        self.feature_types = defaultdict(list)
+        self.feature_type_family = defaultdict(list)
+        self.features_bool = []
+        self.features_nlp = []
+        self.features_datetime = []
+        self.features_categorical = []
+        self.features_categorical_final = []
+        self.features_categorical_final_mapping = defaultdict()
+        self.features_binned = []
+        self.features_binned_mapping = defaultdict()
+        self.features = []
+        self.banned_features = []
+        self.fit = False
+
+    @property
+    def feature_types_metadata(self):
+        return {'nlp': self.features_nlp, **self.feature_type_family}
+
+    @staticmethod
+    def train_vectorizer(text_list, vectorizer):
+        print('fitting vectorizer...')
+        results = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        # x = results.toarray()
+        names = vectorizer.get_feature_names()
+
+        # z = pd.DataFrame((results).toarray())
+        # z.columns = [str(x) for x in names]
+        #
+        # ngram_counts = z.sum(axis=0)
+        # print(z)
+
+        print('vectorizer fit!')
+        return vectorizer, results
+
+    def preprocess(self, X: DataFrame):
+        return X
+
+    @calculate_time
+    def fit_transform(self, X: DataFrame, banned_features=None, fix_categoricals=False, drop_duplicates=True):
+        self.fit = False
+        X_len = len(X)
+        if banned_features:
+            self.banned_features = banned_features
+            self.features_to_remove += self.banned_features
+        X_index = copy.deepcopy(X.index)
+        self.get_feature_types(X)
+        X = X.drop(self.features_to_remove, axis=1, errors='ignore')
+        X.reset_index(drop=True, inplace=True)
+        X_features = self.generate_features(X)
+        for column in X_features:
+            unique_value_count = len(X_features[column].unique())
+            if unique_value_count == 1:
+                self.features_to_remove_post.append(column)
+            print(column, unique_value_count)
+        self.features_binned = set(self.features_binned) - set(self.features_to_remove_post)
+        self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
+        for column in self.features_binned:
+            X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+            # print(X_features[column].value_counts().sort_index())
+        self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
+        if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
+            X_features = self.fix_categoricals_for_sklearn(X_features=X_features)
+        for column in self.features_categorical_final:
+            self.features_categorical_final_mapping[column] = X_features[column].cat.categories  # dict(enumerate(X_features[column].cat.categories))
+        X_features = X_features.drop(self.features_to_remove_post, axis=1)
+        if drop_duplicates:
+            X_features = self.drop_duplicate_features(X_features)
+        X_features.index = X_index
+        self.features = list(X_features.columns)
+        self.fit = True
+        print('fit', X_len, 'data points with', len(self.features), 'features')
+        return X_features
+
+    @calculate_time
+    def transform(self, X: DataFrame):
+        if not self.fit:
+            raise Exception('FeatureGenerator not fit!')
+        X_index = copy.deepcopy(X.index)
+        X = X.drop(self.features_to_remove, axis=1, errors='ignore')
+        X.reset_index(drop=True, inplace=True)
+        X_features = self.generate_features(X)
+        for column in self.features_binned:
+            X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+        X_features = X_features[self.features]
+        for column in self.features_categorical_final:
+            X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
+        X_features.index = X_index
+        return X_features
+
+    @staticmethod
+    def bin_column(series, mapping):
+        series_out = pd.cut(series, mapping)
+        series_out.cat.categories = [str(g) for g in series_out.cat.categories]  # LightGBM crashes at end of training without this
+        return series_out
+
+    # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
+    @staticmethod
+    def generate_bins(X_features: DataFrame, features_to_bin):
+        X_len = len(X_features)
+        ideal_cats = 10
+        starting_cats = 1000
+        bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
+        bin_epsilon = 0.000000001
+        bin_mapping = defaultdict()
+        max_iterations = 20
+        for column in features_to_bin:
+            num_cats_initial = starting_cats
+            bins_value_counts = X_features[column].value_counts(ascending=False, normalize=True)
+            max_bins = len(bins_value_counts)
+
+            if max_bins <= ideal_cats:
+                bins = pd.Series(data=sorted(X_features[column].unique()))
+                num_cats_initial = max_bins
+                cur_len = max_bins
+                bin_index = range(num_cats_initial)
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
+            else:
+                cur_len = X_len
+                bins = X_features[column].sort_values(ascending=True)
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
+
+            max_desired_bins = min(ideal_cats, max_bins)
+            min_desired_bins = min(ideal_cats, max_bins)
+
+            if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
+                is_satisfied = True
+            else:
+                is_satisfied = False
+
+            num_cats_current = num_cats_initial
+            # print(column, min_desired_bins, max_desired_bins)
+            cur_iteration = 0
+            while not is_satisfied:
+                if len(interval_index) > max_desired_bins:
+                    pass
+                elif len(interval_index) < min_desired_bins:
+                    pass
+                ratio_reduction = max_desired_bins / len(interval_index)
+                num_cats_current = int(np.floor(num_cats_current * ratio_reduction))
+                bin_index = [np.floor(cur_len * (num + 1) / num_cats_current) for num in range(num_cats_current - 1)]
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
+
+                if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
+                    is_satisfied = True
+                    # print('satisfied', column, len(interval_index))
+                cur_iteration += 1
+                if cur_iteration >= max_iterations:
+                    is_satisfied = True
+                    # print('max_iterations met, stopping prior to satisfaction!', column, len(interval_index))
+
+            bin_mapping[column] = interval_index
+        return bin_mapping
+
+    # TODO: Clean code
+    # bins is a sorted int/float series, ascending=True
+    @staticmethod
+    def get_bins(bins: Series, bin_index, bin_epsilon):
+        max_val = bins.max()
+        bins_2 = bins.iloc[bin_index]
+        bins_3 = list(bins_2.values)
+        bins_unique = sorted(list(set(bins_3)))
+        bins_with_epsilon_max = set([i for i in bins_unique] + [i - bin_epsilon for i in bins_unique if i == max_val])
+        removal_bins = set([bins_unique[index-1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
+        bins_4 = sorted(list(bins_with_epsilon_max - removal_bins))
+        bins_5 = [np.inf if (x == max_val) else x for x in bins_4]
+        bins_6 = sorted(list(set([-np.inf] + bins_5 + [np.inf])))
+        bins_7 = [(bins_6[i], bins_6[i + 1]) for i in range(len(bins_6) - 1)]
+        interval_index = pd.IntervalIndex.from_tuples(bins_7)
+        return interval_index
+
+    def get_feature_types(self, X: DataFrame):
+        self.features_init = list(X.columns)
+        self.features_init = [feature for feature in self.features_init if feature not in self.features_to_remove]
+        for column in self.features_init:
+            mark_for_removal = False
+            col_val = X[column]
+            dtype = col_val.dtype
+            num_unique = len(col_val.unique())
+            unique_counts = col_val.value_counts()
+            num_unique_duplicates = len(unique_counts[unique_counts > 100])
+            num_rows = len(col_val)
+            unique_ratio = num_unique / float(num_rows)
+            # print(column)
+            # print(num_unique)
+            # # print(num_rows)
+            # # print(unique_ratio)
+            # print(dtype)
+            type_family = self.get_type_family(dtype)
+            print(num_unique, '\t', num_unique_duplicates, '\t', unique_ratio, '\t', type_family, '\t', column,)
+
+            if num_unique == 1:
+                mark_for_removal = True
+
+            if num_unique == num_rows:
+                print('fully unique!')
+            if unique_ratio > 0.5:
+                print('fairly unique!')
+            # print(col_val.value_counts())
+
+            # print()
+            if self.check_if_datetime_feature(col_val):
+                type_family = 'datetime'  # TODO: Verify
+                dtype = 'datetime'
+                self.features_datetime.append(column)
+                print('date:', column)
+                print(unique_counts.head(5))
+            elif self.check_if_nlp_feature(col_val):
+                self.features_nlp.append(column)
+                print('nlp:', column)
+                print(unique_counts.head(5))
+            # print(is_nlp, '\t', column)
+
+            if mark_for_removal:
+                self.features_to_remove.append(column)
+            else:
+                self.feature_type_family[type_family].append(column)
+                if type_family == 'object':
+                    self.features_categorical.append(column)
+                elif type_family != 'datetime':
+                    self.features_to_keep_raw.append(column)
+                self.feature_types[dtype].append(column)
+
+        pass
+
+    def generate_features(self, X: DataFrame):
+        raise NotImplementedError()
+
+    # TODO: Expand to int64 -> date features (milli from epoch etc)
+    def check_if_datetime_feature(self, X: Series):
+        type_family = self.get_type_family(X.dtype)
+        if X.isnull().all():
+            return False
+        if type_family != 'object':
+            return False
+        try:
+            X.apply(pd.to_datetime)
+            return True
+        except:
+            return False
+
+    def check_if_nlp_feature(self, X: Series):
+        type_family = self.get_type_family(X.dtype)
+        if type_family != 'object':
+            return False
+        X_unique = X.unique()
+        num_unique = len(X_unique)
+        num_rows = len(X)
+        unique_ratio = num_unique / num_rows
+        # print(X_unique)
+        if unique_ratio <= 0.01:
+            return False
+        avg_words = np.mean([len(re.sub(' +', ' ', value).split(' ')) if type(value) is str else 0 for value in X_unique])
+        # print(avg_words)
+        if avg_words < 3:
+            return False
+
+        print('found an nlp feature!')
+        return True
+
+    def generate_text_features(self, X: Series, feature: str) -> DataFrame:
+        X: DataFrame = X.to_frame(name=feature)
+        X[feature + '.char_count'] = [self.char_count(value) for value in X[feature].values]
+        X[feature + '.word_count'] = [self.word_count(value) for value in X[feature].values]
+        X[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X[feature].values]
+        X[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X[feature].values]
+        X[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X[feature].values]
+        X[feature + '.special_ratio'] = [self.special_ratio(value) for value in X[feature].values]
+
+        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
+        # symbols = []
+
+        for symbol in symbols:
+            X[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X[feature].values]
+            X[feature + '.symbol_ratio.' + symbol] = X[feature + '.symbol_count.' + symbol] / X[feature + '.char_count']
+            X[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
+
+        X = X.drop(feature, axis=1)
+        return X
+    
+    def generate_datetime_features(self, X: Series, feature: str) -> DataFrame:
+        # TODO: implement special date-time features based on: https://www.kdnuggets.com/2018/03/feature-engineering-dates-fastai.html
+        return None
+
+    def fix_categoricals_for_sklearn(self, X_features):
+        for column in self.features_categorical_final:
+            rank = X_features[column].value_counts().sort_values(ascending=True)
+            rank = rank[rank >= 3]
+            rank = rank.reset_index()
+            val_list = list(rank['index'].values)
+            if len(val_list) == 1:
+                self.features_to_remove_post.append(column)
+                self.features_categorical_final = [feature for feature in self.features_categorical_final if feature != column]
+                print('dropping', column)
+            else:
+                X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
+        return X_features
+
+    @staticmethod
+    def get_type_family(type):
+        if type.name in ['int', 'int64', 'int32', 'int16', 'int8', 'int_', 'uint', 'uint8', 'uint16', 'uint32', 'uint64']:
+            return 'int'
+        elif type.name in ['float', 'float_', 'float16', 'float32', 'float64']:
+            return 'float'
+        elif type.name in ['bool', 'bool_']:
+            return 'bool'
+        elif type.name in ['str', 'string', 'object']:
+            return 'object'
+        else:
+            return type.name
+
+    @staticmethod
+    def word_count(string):
+        return len(string.split())
+
+    @staticmethod
+    def char_count(string):
+        return len(string)
+
+    @staticmethod
+    def special_ratio(string):
+        string = string.replace(' ', '')
+        if len(string) == 0:
+            return 0
+        prev_len = len(string)
+        # print(string)
+        new_str = re.sub('[\w]+', '', string)
+        new_len = len(new_str)
+
+        # print(new_str)
+
+        return new_len / prev_len
+
+    @staticmethod
+    def digit_ratio(string):
+        string = string.replace(' ', '')
+        if len(string) == 0:
+            return 0
+        return sum(c.isdigit() for c in string)/len(string)
+
+    @staticmethod
+    def lower_ratio(string):
+        string = string.replace(' ', '')
+        if len(string) == 0:
+            return 0
+        return sum(c.islower() for c in string) / len(string)
+
+    @staticmethod
+    def capital_ratio(string):
+        string = string.replace(' ', '')
+        if len(string) == 0:
+            return 0
+        return sum(1 for c in string if c.isupper())/len(string)
+
+    @staticmethod
+    def symbol_in_string_count(string, character):
+        if len(string) == 0:
+            return 0
+        return sum(1 for c in string if c == character)
+
+    # TODO: optimize by not considering columns with unique sums/means
+    # TODO: Multithread?
+    @staticmethod
+    def drop_duplicate_features(X):
+        X_without_dups = X.T.drop_duplicates().T
+
+        print(X_without_dups.shape)
+
+        columns_orig = X.columns.values
+        columns_new = X_without_dups.columns.values
+        columns_removed = [column for column in columns_orig if column not in columns_new]
+
+        del X_without_dups
+
+        print('COLUMNS REMOVED')
+        print(columns_removed)
+        print('removed', len(columns_removed), 'duplicate columns...')
+
+        return X[columns_new]
+
+    def save_self(self, path):
+        save_pkl.save(path=path, object=self)
