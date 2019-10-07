@@ -37,11 +37,9 @@ class BaseSearcher(object):
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
-    def update(self, config, reward, model_params=None):
+    def update(self, config, reward):
         """Update the searcher with the newest metric report
         """
-        #if model_params is not None and reward > self.get_best_reward():
-        #    self._best_model_params = model_params
         with self.LOCK:
             self._results[pickle.dumps(config)] = reward
         logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
@@ -73,12 +71,12 @@ class BaseSearcher(object):
 
     def get_best_state_path(self):
         assert os.path.isfile(self._best_state_path), \
-            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+            'Please use reporter.save_dict(model_params) during the training.'
         return self._best_state_path
 
     def get_best_state(self):
         assert os.path.isfile(self._best_state_path), \
-            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+            'Please use reporter.save_dict(model_params) during the training.'
         return load(self._best_state_path)
 
     def update_best_state(self, filepath):

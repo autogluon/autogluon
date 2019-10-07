@@ -8,7 +8,7 @@
 - Automatic Hyper-parameter Optimization.
 - Automatically leverage state-of-the-art deep learning techniques.
 - Easy customization for advanced usage.
-- Easily use distributed computation.
+- Easily setup using distributed computations.
 
 ## Installation
 

@@ -9,8 +9,9 @@ class AutoGluonWarning(DeprecationWarning):
 warnings.simplefilter('once', AutoGluonWarning)
 
 def make_deprecate(meth, old_name):
+    """TODO Add Docs
+    """
     new_name = meth.__name__
-
     def deprecated_init(*args, **kwargs):
         warn("autogluon.{} is now deprecated in favor of autogluon.{}."
              .format(old_name, new_name), AutoGluonWarning)
