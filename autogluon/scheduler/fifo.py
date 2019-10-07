@@ -60,7 +60,7 @@ class FIFOScheduler(TaskScheduler):
         >>> myscheduler.run()
     """
     def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
-                 searcher='random', searcher_options={}, checkpoint='./exp/checkerpoint.ag',
+                 searcher='random', algorithm_options={}, checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None,
                  time_out=None, max_reward=1.0, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=[], **kwargs):
@@ -69,7 +69,7 @@ class FIFOScheduler(TaskScheduler):
         assert isinstance(train_fn, autogluon_method)
         self.args = args if args else train_fn.args
         self.resource = resource
-        self.searcher = searchers[searcher](train_fn.cs) if isinstance(searcher, str) else searcher
+        self.searcher = searchers[searcher](train_fn.cs, **algorithm_options) if isinstance(searcher, str) else searcher
         # meta data
         self.metadata = train_fn.get_kwspaces()
         keys = copy.deepcopy(list(self.metadata.keys()))
