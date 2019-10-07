@@ -27,8 +27,8 @@ class ImageClassification(BaseTask):
     Dataset = ImageClassificationDataset
     @staticmethod
     def fit(dataset='cifar10',
-            net=List('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=List(
+            net=Choice('ResNet34_v1b', 'ResNet50_v1b'),
+            optimizer=Choice(
                 SGD(learning_rate=LogLinear(1e-4, 1e-2),
                     momentum=LogLinear(0.85, 0.95),
                     wd=LogLinear(1e-5, 1e-3)),
@@ -58,8 +58,8 @@ class ImageClassification(BaseTask):
 
         Args:
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.List of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.List of AutoGluonObject): optimizer candidates.
+            net (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): Network candidates.
+            optimizer (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): optimizer candidates.
             metric (str or object): observation metric.
             loss (object): training loss function.
             num_trials (int): number of trials in the experiment.
@@ -74,7 +74,7 @@ class ImageClassification(BaseTask):
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
             >>>                         test_path='data/test')
             >>> results = task.fit(dataset,
-            >>>                    nets=ag.List['resnet18_v1', 'resnet34_v1'],
+            >>>                    nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
             >>>                    time_limits=time_limits,
             >>>                    num_gpus=1,
             >>>                    num_trials = 4)

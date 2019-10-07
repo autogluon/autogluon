@@ -103,7 +103,7 @@ class Choice(Space):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-List = DeprecationHelper(Choice, 'Choice')
+List = DeprecationHelper(Choice, 'List')
 
 class Linear(Space):
     """linear search space.
