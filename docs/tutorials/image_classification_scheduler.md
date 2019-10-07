@@ -46,14 +46,14 @@ print('Top-1 test acc: %.3f' % test_acc)
 ## Use an early stopping trial scheduler - Hyperband
 
 We could easily leverage the early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#autogluon.scheduler.Hyperband) make the fit procedure more efficient.
-HyperBandScheduler early stops trials using the HyperBand optimization algorithm. It divides trials into brackets of varying sizes, and periodically early stops low-performing trials within each bracket.
+HyperBandScheduler early stops trials using the HyperBand optimization search_strategy. It divides trials into brackets of varying sizes, and periodically early stops low-performing trials within each bracket.
 We could simply specify Hyperband via string name and use it in the `fit` function:
 
 ```{.python .input}
-algorithm = 'hyperband'
+search_strategy = 'hyperband'
 
 results = task.fit(dataset,
-                   algorithm=algorithm,
+                   search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=epochs)
 ```
@@ -80,7 +80,8 @@ from autogluon.scheduler import HyperbandScheduler
 
 class MedianStopping_Scheduler(HyperbandScheduler):
     def __init__(self, train_fn, resource,
-                 algorithm_options={},
+                 searcher='random',
+                 search_options={},
                  checkpoint='./exp/checkerpoint.ag', 
                  resume=False,
                  num_trials=None,
@@ -92,9 +93,8 @@ class MedianStopping_Scheduler(HyperbandScheduler):
                  grace_period=1.0,
                  min_samples_required=3,
                  dist_ip_addrs=[]):
-        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource,
-                                                       algorithm_options=algorithm_options,
-                                                       checkpoint=checkpoint,
+        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource, searcher=searcher,
+                                                       search_options=search_options, checkpoint=checkpoint,
                                                        resume=resume, num_trials=num_trials, time_out=time_out,
                                                        time_attr=time_attr, reward_attr=reward_attr,
                                                        visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)
@@ -175,7 +175,7 @@ Then we can use our defined scheduler:
 
 ```{.python .input}
 results = task.fit(dataset,
-                   algorithm=MedianStopping_Scheduler,
+                   search_strategy=MedianStopping_Scheduler,
                    time_limits=time_limits,
                    epochs=epochs)
 ```

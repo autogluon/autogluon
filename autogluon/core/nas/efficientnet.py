@@ -15,8 +15,8 @@ MBConvBlockArgs = collections.namedtuple('MBConvBlockArgs', [
     'kernel', 'num_repeat', 'channels', 'expand_ratio',
     'stride', 'se_ratio', 'in_channels'])
 
-@autogluon_function(se_ratio=0.25)
-def mobilenet_block_args(kernel, num_repeat, channels, expand_ratio, stride, se_ratio, in_channels=0):
+@autogluon_function()
+def mobilenet_block_args(kernel, num_repeat, channels, expand_ratio, stride, se_ratio=0.25, in_channels=0):
     return MBConvBlockArgs(kernel=kernel, num_repeat=num_repeat,
                           channels=channels, expand_ratio=expand_ratio,
                           stride=stride, se_ratio=se_ratio, in_channels=in_channels)

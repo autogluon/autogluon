@@ -42,8 +42,8 @@ class ImageClassification(BaseTask):
             metric='accuracy',
             num_cpus=4,
             num_gpus=1,
-            algorithm='random',
-            algorithm_options={},
+            search_strategy='random',
+            search_options={},
             time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
@@ -66,7 +66,7 @@ class ImageClassification(BaseTask):
             time_limits (int): training time limits in seconds.
             resources_per_trial (dict): Machine resources to allocate per trial.
             savedir (str): Local dir to save training results to.
-            algorithm (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
+            search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
             resume (bool): If checkpoint exists, the experiment will resume from there.
 
 
@@ -107,15 +107,15 @@ class ImageClassification(BaseTask):
             'time_attr': 'epoch',
             'reward_attr': 'reward',
             'dist_ip_addrs': dist_ip_addrs,
-            'searcher': algorithm,
-            'algorithm_options': algorithm_options,
+            'searcher': search_strategy,
+            'search_options': search_options,
         }
-        if algorithm == 'hyperband':
+        if search_strategy == 'hyperband':
             scheduler_options.update({
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        return BaseTask.run_fit(train_image_classification, algorithm, scheduler_options)
+        return BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
 
     @classmethod
     def predict(cls, img):

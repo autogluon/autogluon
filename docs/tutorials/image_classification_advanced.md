@@ -70,11 +70,11 @@ print(results.metadata['optimizer'])
 
 Beyond which pretrained model and which optimizer to use, deep learning in general involves tons of other design choices, which we collectively refer to as `hyperparameters`. Given possible values of the hyperparameters to try out, we require a smart strategy to efficiently find those hyperparameter values which will produce the best classifier. Strategies might include techniques such as grid/random search, Hyperband, Bayesian optimization, etc. In AutoGluon, which hyperparameter search strategy to use is specified by a `Searcher` object.
 When the Searcher returns a particular hyperparameter configuration to try out, we must train the neural network under the specified configuration settings, a process referred to as a `trial`. In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
-The default algorithm used in `fit` for image classification is:
+The default search_strategy used in `fit` for image classification is:
 
 ```{.python .input}
-print('Default algorithm:')
-print(results.metadata['algorithm'])
+print('Default search_strategy:')
+print(results.metadata['search_strategy'])
 ```
 
 When we have already trained many networks under many hyperparameter configurations and see that a current trial is performing very good that satisfies our need in comparison, it may be wise to infer this is the time to simply terminate the trial right away. This way, the final model could be used right away and we don't need to wait until the full fitting procedure completed.  
@@ -144,7 +144,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 Similarly, we can manually specify which of optimizer candidates to try, in order to further improve the results.
 In AutoGluon, [autogluon.Optimizers](../api/autogluon.optimizer.html) 
-defines a list of optimization algorithms, from which we can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
+defines a list of optimization search_strategys, from which we can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
 
 Like `autogluon.Nets`, the choice of which optimizer to use again corresponds to a [categorical](../api/autogluon.space.html#autogluon.space.List) search space:
 
@@ -195,7 +195,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 ## Specify a hyperparameter search strategy and how to schedule trials
 
 [autogluon.searcher](../api/autogluon.searcher.html)
-will support both basic and advanced search algorithms for both hyperparameter optimization and architecture search. Advanced search algorithms, such as Population-Based Training, and BOHB, are coming soon.  
+will support both basic and advanced search search_strategys for both hyperparameter optimization and architecture search. Advanced search search_strategys, such as Population-Based Training, and BOHB, are coming soon.  
 We currently support Hyperband, random search and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 The easiest way to specify random search is via the string name:
 
@@ -207,7 +207,7 @@ and an early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#aut
 Which scheduler to use is easily specified via the string name:
 
 ```{.python .input}
-algorithm = 'hyperband'
+search_strategy = 'hyperband'
 ```
 
 Let's call `fit` with the Searcher and Scheduler specified above,
@@ -218,7 +218,7 @@ results = task.fit(dataset,
                    nets,
                    optimizers,
                    lr_scheduler=ag.List('poly', 'cosine'),
-                   algorithm=algorithm,
+                   search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=4)
 ```

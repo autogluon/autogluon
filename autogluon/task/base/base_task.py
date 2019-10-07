@@ -24,14 +24,15 @@ class BaseTask(object):
     """
     Dataset = BaseDataset
     @classmethod
-    def run_fit(cls, train_fn, algorithm, scheduler_options):
+    def run_fit(cls, train_fn, search_strategy, scheduler_options):
         start_time = time.time()
         # create scheduler and schedule tasks
-        if isinstance(algorithm, str):
-            scheduler = schedulers[algorithm.lower()]
+        if isinstance(search_strategy, str):
+            scheduler = schedulers[search_strategy.lower()]
         else:
-            assert callable(algorithm)
-            scheduler = algorithm
+            assert callable(search_strategy)
+            scheduler = search_strategy
+            scheduler_options['searcher'] = 'random'
         cls.scheduler = scheduler(train_fn, **scheduler_options)
         cls.scheduler.run()
         cls.scheduler.join_tasks()
