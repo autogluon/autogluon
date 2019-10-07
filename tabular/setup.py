@@ -20,7 +20,7 @@ setup(
 
     # include data files
     data_files=data_files,
-
+    include_package_data=True, # Reads in datasets listed in MANIFEST.in
     # declare your scripts
     # If you want to create any Python executables in bin/, define them here.
     # This is a three-step process:
@@ -62,7 +62,5 @@ setup(
     # Use custom sphinx command which adds an index.html that's compatible with
     # code.amazon.com links.
     doc_command='amazon_doc_utils_build_sphinx',
-
-
-
+    
 )

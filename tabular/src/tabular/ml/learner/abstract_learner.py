@@ -116,15 +116,36 @@ class AbstractLearner:
 
     @staticmethod
     def get_problem_type(y: Series):
+        """ Identifies which type of prediction problem we are interested in (if user has not specified).
+            Ie. binary classification, multi-class classification, or regression. 
+        """
+        if len(y) == 0:
+            raise ValueError("provided labels cannot have length = 0")
         unique_vals = y.unique()
+        REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
         if len(unique_vals) == 2:
-            return BINARY
+            problem_type =  BINARY
+            reason = "only two unique label-values observed"
         elif unique_vals.dtype == 'float':
-            return REGRESSION
-        elif (unique_vals.dtype == 'object') or (unique_vals.dtype == 'int'):
-            return MULTICLASS
+            problem_type = REGRESSION
+            reason = "dtype of label-column == float"
+        elif unique_vals.dtype == 'object':
+            problem_type = MULTICLASS
+            reason = "dtype of label-column == object"
+        elif unique_vals.dtype == 'int':
+            unique_ratio = len(unique_vals)/float(len(y))
+            if unique_ratio > REGRESS_THRESHOLD:
+                problem_type = REGRESSION
+                reason = "dtype of label-column == int and many unique label-values observed"
+            else:
+                problem_type = MULTICLASS
+                reason = "dtype of label-column == int, but few unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
+        print("\n AutoGluon infers your prediction problem is: %s, because %s " % (problem_type, reason))
+        print("To specify a different prediction problem instead, use `problem_type` argument in fit(). You can specify problem_type = one of ['%s', '%s', '%s'] \n\n" % (BINARY, MULTICLASS, REGRESSION))
+        return problem_type
+
 
     def save(self):
         save_pkl.save(path=self.save_path, object=self)

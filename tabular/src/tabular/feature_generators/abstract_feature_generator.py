@@ -199,7 +199,7 @@ class AbstractFeatureGenerator:
             unique_counts = col_val.value_counts()
             num_unique_duplicates = len(unique_counts[unique_counts > 100])
             num_rows = len(col_val)
-            unique_ratio = num_unique / num_rows
+            unique_ratio = num_unique / float(num_rows)
             # print(column)
             # print(num_unique)
             # # print(num_rows)
