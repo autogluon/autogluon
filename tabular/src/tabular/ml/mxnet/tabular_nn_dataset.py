@@ -104,7 +104,7 @@ class TabularNNDataset:
         if labels is not None:
             data_list.append(np.array(labels))
             self.data_desc.append("label")
-            self.label_index = len(data_list) - 1
+            self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
             if self.problem_type in [BINARY, MULTICLASS]:
                 self.num_classes = len(set(labels))

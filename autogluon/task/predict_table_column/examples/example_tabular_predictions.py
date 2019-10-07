@@ -19,7 +19,7 @@ train_data = task.load_data(train_file_path) # returns Pandas object, if user al
 train_data = train_data.head(1000) # subsample for faster demo
 print(train_data.head())
 
-predictor = task.fit(train_data=train_data, label=label_column, savedir=savedir, hyperparameter_tune=False) # val=None automatically determines train/val split, otherwise we check to ensure train/val match
+predictor = task.fit(train_data=train_data, label=label_column, savedir=savedir) # val=None automatically determines train/val split, otherwise we check to ensure train/val match
 print(predictor.load_trainer().__dict__) # summary of training processes
 
 

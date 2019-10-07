@@ -19,7 +19,7 @@ from mxboard import SummaryWriter
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, PowerTransformer, QuantileTransformer, FunctionTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, QuantileTransformer, FunctionTransformer # PowerTransformer
 
 from f3_grail_data_frame_utilities.loaders import load_pkl
 from tabular.ml.models.abstract_model import AbstractModel
@@ -87,26 +87,28 @@ class TabularNeuralNetModel(AbstractModel):
         """ Specifies hyperparameter values to use by default """
         
         # Configuration-options that we never search over in HPO but user can specify:
-        self._use_default_value('num_dataloading_workers', 1) # not searched... depends on num_cpus provided by trial manager
+        self._use_default_value('num_dataloading_workers', 2) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
-        self._use_default_value('max_epochs', 100)  # maximum number of epochs for training NN
+        self._use_default_value('max_epochs', 100)  # TODO! debug # maximum number of epochs for training NN
         
         # For data processing:
-        self._use_default_value('proc.embed_min_categories', 4)  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        self._use_default_value('proc.embed_min_categories', 2)  # TODO! debug  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
         # Default search space: 3,4,10, 100, 1000
         self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
         # Default search space: ['median', 'mean', 'most_frequent']
-        self._use_default_value('proc.max_category_levels', 500) # maximum number of allowed levels per categorical feature
+        self._use_default_value('proc.max_category_levels', 10000) # maximum number of allowed levels per categorical feature
         # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        self._use_default_value('proc.power_transform_method', 'yeo-johnson') # method argument of PowerTransformer (can alternatively be 'box-cox' but this will fail for features with negative values)
+        # Not used, we use QuantileTransformer instead for skewed features: self._use_default_value('proc.power_transform_method', 'yeo-johnson') # method argument of PowerTransformer (can alternatively be 'box-cox' but this will fail for features with negative values)
         # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        self._use_default_value('proc.skew_threshold', 0.5) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-        # Default search space: np.linspace(0.1, 1, 10)
+        self._use_default_value('proc.skew_threshold', 0.9) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        # Default search space: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
         
         # Hyperparameters for neural net architecture:
-        self._use_default_value('layers', None) # List of widths (num_units) for each hidden layer
+        self._use_default_value('network_type', 'widedeep') # Type of neural net used to produce predictions
+        #  Search space: ['widedeep', 'feedforward']
+        self._use_default_value('layers', [100]) # None) # TODO: debug! # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers!)
         # Default search space: List of lists that are manually created
-        self._use_default_value('numeric_embed_dim', None) # Size of joint embedding for all numeric+one-hot features.
+        self._use_default_value('numeric_embed_dim', 200) # None) # TODO: debug! # Size of joint embedding for all numeric+one-hot features.
         # Default search space: TBD
         self._use_default_value('activation', 'relu')
         # Default search space: ['relu', 'elu', 'tanh']
@@ -117,18 +119,25 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('embed_exponent', 0.56)
          # Does not need to be searched by default!
         self._use_default_value('max_embedding_dim', 500)
+        self._use_default_value('use_batchnorm', True) # whether or not to utilize Batch-normalization
+        self._use_default_value('dropout_prob', 0.1) # 0 turns off Dropout!
+        
+        # Regression-specific hyperparameters:
+        self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
+        # If None, inferred based on training labels. Note: MUST be None for classification tasks!
+        self._use_default_value('y_range_extend', 0.1) # Only used to extend size of inferred y_range when y_range = None.
         
         # Hyperparameters for neural net training:
-        self._use_default_value('batch_size', 64) # batch-size used for NN training
-        # Default search space: [16, 32, 64, 128. 256, 512]
+        self._use_default_value('batch_size', 2048) # batch-size used for NN training
+        # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
         self._use_default_value('loss_function', None) # Loss function used for training
         self._use_default_value('optimizer', 'adam')
         self._use_default_value('learning_rate', 3e-4) # learning rate used for NN training
-        self._use_default_value('weight_decay', 1e-8)
-        self._use_default_value('clip_gradient', 10.0)
+        self._use_default_value('weight_decay', 1e-2)
+        self._use_default_value('clip_gradient', 1000.0)
         self._use_default_value('momentum', 0.9) # only for SGD
         self._use_default_value('epochs_wo_improve', max(5, int(self.params['max_epochs']/5.0))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
-    
+        # Default params for original NNTabularModel: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
     
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
@@ -137,6 +146,21 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_net_outputs = self.num_classes
         elif self.problem_type == REGRESSION:
             self.num_net_outputs = 1
+            if self.params['y_range'] is None: # Infer default y-range
+                y_vals = train_dataset.dataset._data[train_dataset.label_index]
+                min_y = min(y_vals)
+                max_y = max(y_vals)
+                std_y = np.std(y_vals)
+                y_ext = self.params['y_range_extend']*std_y
+                if min_y >= 0: # infer y must be nonnegative
+                    min_y = max(0, min_y-y_ext)
+                else:
+                    min_y = min_y-y_ext
+                if max_y <= 0: # infer y must be non-positive
+                    max_y = min(0, max_y+y_ext)
+                else:
+                    max_y = max_y+y_ext
+                self.params['y_range'] = (min_y, max_y)
         elif self.problem_type == BINARY:
             self.num_classes = 2
             self.num_net_outputs = 2
@@ -202,7 +226,7 @@ class TabularNeuralNetModel(AbstractModel):
                 model.path = original_path\
         """
     
-    def get_net(self, train_dataset, initialize=True, setup_trainer=True):
+    def get_net(self, train_dataset):
         """ Creates a Gluon neural net and context for this dataset.
             Also sets up trainer/optimizer as necessary.
         """
@@ -217,7 +241,10 @@ class TabularNeuralNetModel(AbstractModel):
     
     def train_net(self, train_dataset, test_dataset=None, 
                   initialize=True, setup_trainer=True):
-        """ Trains neural net on given train dataset, early stops based on test_dataset """
+        """ Trains neural net on given train dataset, early stops based on test_dataset.
+            To continue training of a previously trained model, set initialize = False.
+            To reuse the same trainer as previously, set: setup_trainer = False.
+        """
         if initialize:
             self.model.collect_params().initialize(ctx=self.ctx)
             self.model.hybridize()
@@ -520,7 +547,8 @@ class TabularNeuralNetModel(AbstractModel):
         if len(skewed_features) > 0:
             power_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy=self.params['proc.impute_strategy'])),
-                ('power', PowerTransformer(method=self.params['proc.power_transform_method'])) ])
+                ('quantile', QuantileTransformer(output_distribution='normal')) ]) # Or output_distribution = 'uniform'
+                # TODO: remove old code: ('power', PowerTransformer(method=self.params['proc.power_transform_method'])) ])
             transformers.append( ('skewed', power_transformer, skewed_features) )
         if len(onehot_features) > 0:
             onehot_transformer = Pipeline(steps=[
@@ -585,8 +613,12 @@ TODO: enable seeds?
 
 TODO: test regression + multiclassification
 
-TODO: benchmark against fastAI
+TODO: benchmark against h2o
 
 TODO: issue: embedding layers learn much slower than Dense layers. Need to carefully initialize
+
+TODO: residual connection
+
+TODO: automatically decrease batch-size if memory issue arises
 
 """
