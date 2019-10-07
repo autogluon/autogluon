@@ -49,11 +49,11 @@ class autogluon_method(object):
                 elif isinstance(v, AutoGluonObject):
                     sub_config = strip_cofing_space(new_config, prefix=k)
                     args_dict[k] = v._lazy_init(**sub_config)
-                elif isinstance(v, List):
+                elif isinstance(v, Choice):
                     sub_config = strip_cofing_space(new_config, prefix=k)
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
-                        # nested space: List of AutoGluonobjects
+                        # nested space: Choice of AutoGluonobjects
                         min_config = strip_cofing_space(sub_config, prefix=str(choice))
                         args_dict[k] = v[choice]._lazy_init(**min_config)
                     else:
@@ -85,7 +85,7 @@ class autogluon_method(object):
         """
         self.kwvars = kwargs
         for k, v in kwargs.items():
-            if isinstance(v, (List, Sequence)):
+            if isinstance(v, (Choice, Sequence)):
                 sub_cs = v.get_config_space(k)
                 _add_cs(self.cs, sub_cs, k)
                 self.args.update({k: v})
@@ -111,7 +111,7 @@ class autogluon_method(object):
                     for sub_k, sub_v in obj.kwspaces.items():
                         new_k = '{}.{}.{}'.format(k, idx, sub_k)
                         self.kwspaces[new_k] = sub_v
-            elif isinstance(v, List):
+            elif isinstance(v, Choice):
                 new_k = '{}.{}'.format(k, k)
                 self.kwspaces[new_k] = v
                 for idx, obj in enumerate(v):
@@ -201,7 +201,7 @@ def autogluon_kwargs(**kwvars):
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
-                if isinstance(v, List):
+                if isinstance(v, Choice):
                     kwargs[k] = v
                     kwspaces[k] = v
                     sub_cs = v.get_config_space(name=k)
@@ -231,7 +231,7 @@ def autogluon_function(**kwvars):
     Example:
         >>> from gluoncv.model_zoo import get_model
         >>> 
-        >>> @ag.autogluon_function(pretrained=ag.List(True, False))
+        >>> @ag.autogluon_function(pretrained=ag.Choice(True, False))
         >>> def cifar_resnet(pretrained):
         >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
@@ -255,7 +255,7 @@ def autogluon_function(**kwvars):
                 # lazy initialization for passing config files
                 self.kwargs.update(nkwvars)
                 for k, v in self.kwargs.items():
-                    if k in self.kwspaces and isinstance(self.kwspaces[k], List):
+                    if k in self.kwspaces and isinstance(self.kwspaces[k], Choice):
                         self.kwargs[k] = self.kwspaces[k][v]
                         
                 self._instance = self.func(*self.args, **self.kwargs)
@@ -285,7 +285,7 @@ def autogluon_object(**kwvars):
         >>> @ag.autogluon_object(
         >>>     nstage1=ag.Int(2, 10),
         >>>     nstage2=ag.Int(2, 10),
-        >>>     nstage3=ag.List(5, 1),
+        >>>     nstage3=ag.Choice(5, 1),
         >>> )
         >>> class MyCifarResNet(CIFARResNetV1):
         >>>     def __init__(self, nstage1, nstage2, nstage3):
@@ -316,7 +316,7 @@ def autogluon_object(**kwvars):
                 kwargs = self._kwargs
                 kwargs.update(nkwvars)
                 for k, v in kwargs.items():
-                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], List):
+                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], Choice):
                         kwargs[k] = autogluonobject.kwspaces[k][v]
                 args = self._args
                 return Cls(*args, **kwargs)
