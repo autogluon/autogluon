@@ -1,7 +1,10 @@
-
-from pandas import DataFrame, Series
-import datetime
+from collections import OrderedDict 
+import datetime, json
 import pandas as pd
+from pandas import DataFrame, Series
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
+from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error, max_error
+from numpy import corrcoef
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.label_cleaner import LabelCleaner
@@ -78,12 +81,51 @@ class AbstractLearner:
         score = trainer.score(X=X, y=y)
         return score
     
-    def evaluate(self, y_true, y_pred, silent=False):
+    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False):
+        """ Evaluate predictions. 
+            Args:
+                silent (bool): Should we print which metric is being used as well as performance.
+                auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
+            
+            Returns single performance-value if auxiliary_metrics=False.
+            Otherwise returns dict where keys = metrics, values = performance along each metric.
+        """
         perf = self.objective_func(y_true, y_pred)
+        metric = self.objective_func.__name__
         if not silent:
-            metric = self.objective_func.__name__
             print("Evaluation: %s on test data: %f" % (metric, perf))
-        return perf
+        if not auxiliary_metrics:
+            return perf
+        # Otherwise compute auxiliary metrics:
+        perf_dict = OrderedDict({metric: perf})
+        if self.problem_type == REGRESSION: # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation (TODO)
+            pearson_corr = lambda x,y: corrcoef(x,y)[0][1]
+            pearson_corr.__name__ = 'pearson_correlation'
+            regression_metrics = [mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error, max_error]
+            for reg_metric in regression_metrics:
+                metric_name = reg_metric.__name__
+                if metric_name not in perf_dict:
+                    perf_dict[metric_name] = reg_metric(y_true, y_pred)
+        else: # Compute classification metrics
+            classif_metrics = [accuracy_score, balanced_accuracy_score, matthews_corrcoef]
+            if self.problem_type == BINARY: # binary-specific metrics
+                # def auc_score(y_true, y_pred): # TODO: this requires y_pred to be probability-scores
+                #     fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label)
+                #   return auc(fpr, tpr)
+                f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
+                f1micro_score.__name__ = f1_score.__name__
+                classif_metrics += [f1micro_score] # TODO: add auc?
+            elif self.problem_type == MULTICLASS: # multiclass metrics
+                classif_metrics += [] # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
+            classif_metrics += [classification_report] # Final metric to report
+            for cl_metric in classif_metrics:
+                metric_name = cl_metric.__name__
+                if metric_name not in perf_dict:
+                    perf_dict[metric_name] = cl_metric(y_true, y_pred)
+        if not silent:
+            print("Evaluations on test data:")
+            print(json.dumps(perf_dict, indent=4))
+        return perf_dict
     
     def extract_label(self, X):
         y = self.label_cleaner.transform(X[self.label])
@@ -142,8 +184,8 @@ class AbstractLearner:
                 reason = "dtype of label-column == int, but few unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
-        print("\n AutoGluon infers your prediction problem is: %s, because %s " % (problem_type, reason))
-        print("To specify a different prediction problem instead, use `problem_type` argument in fit(). You can specify problem_type = one of ['%s', '%s', '%s'] \n\n" % (BINARY, MULTICLASS, REGRESSION))
+        print("\n AutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
+        print("If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s']) \n\n" % (BINARY, MULTICLASS, REGRESSION))
         return problem_type
 
 
