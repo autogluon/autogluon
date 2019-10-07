@@ -27,6 +27,8 @@ def make_deprecate(meth, old_name):
 
 
 class DeprecationHelper(object):
+    """TODO Add Docs
+    """
     def __init__(self, old_class, new_name):
         self.old_class = old_class
         self.old_name = old_class.__name__

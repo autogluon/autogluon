@@ -82,7 +82,7 @@ class SKoptSearcher(BaseSearcher):
             else:
                 raise ValueError("unknown hyperparameter type: %s" % hp)
             skopt_hpspace.append(hp_dimension)
-        self.bayes_optimizer = Optimizer(dimensions = skopt_hpspace, **kwargs)
+        self.bayes_optimizer = Optimizer(dimensions=skopt_hpspace, **kwargs)
     
     def get_config(self, max_tries=1e2):
         """Function to sample a new configuration

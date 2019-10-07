@@ -22,6 +22,7 @@ __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 logger = logging.getLogger(__name__)
 
 searchers = {
+    'hyperband': RandomSearcher,
     'random': RandomSearcher,
     'bayesopt': SKoptSearcher,
 }
@@ -33,7 +34,7 @@ class FIFOScheduler(TaskScheduler):
         train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
         args (object): Default arguments for launching train_fn.
         resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
+        searcher (str or object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
         reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
 
     Example:

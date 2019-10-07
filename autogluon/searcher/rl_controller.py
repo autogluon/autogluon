@@ -10,7 +10,7 @@ from collections import OrderedDict
 __all__ = ['RLSearcher', 'LSTMController']
 
 class RLSearcher(BaseSearcher):
-    """Random sampling Searcher for ConfigSpace
+    """Reinforcement Learning Searcher for ConfigSpace
 
     Args:
         configspace: ConfigSpace.ConfigurationSpace

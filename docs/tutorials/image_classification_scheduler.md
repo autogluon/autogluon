@@ -80,6 +80,7 @@ from autogluon.scheduler import HyperbandScheduler
 
 class MedianStopping_Scheduler(HyperbandScheduler):
     def __init__(self, train_fn, resource,
+                 algorithm_options={},
                  checkpoint='./exp/checkerpoint.ag', 
                  resume=False,
                  num_trials=None,
@@ -91,7 +92,9 @@ class MedianStopping_Scheduler(HyperbandScheduler):
                  grace_period=1.0,
                  min_samples_required=3,
                  dist_ip_addrs=[]):
-        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource, checkpoint=checkpoint,
+        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource,
+                                                       algorithm_options=algorithm_options,
+                                                       checkpoint=checkpoint,
                                                        resume=resume, num_trials=num_trials, time_out=time_out,
                                                        time_attr=time_attr, reward_attr=reward_attr,
                                                        visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)

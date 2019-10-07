@@ -3,7 +3,7 @@
 
 This is a quick tutorial for setting up AutoGluon with Distributed Training.
 AutoGluon automatically schedule tasks onto remote machines, just like local one.
-AutoGluon handles the communications and provides literally the same experience of
+AutoGluon handles the communications and provides the same experience of
 a big machine with many GPUs.
 
 System Implementation Logics
@@ -15,7 +15,7 @@ AutoGluon distributed schedulers monitors the training process and gather the re
 Any files (such as python scripts and dataset) beyond the main training script need to
 be made accessible. We recommand the following practice:
 
-- Use ``scheudler.upload_files(files_list)`` to upload individual python scripts or small datasets to the excecution folder, so that the main script can import or load.
+- Use ``scheduler.upload_files(files_list)`` to upload individual python scripts or small datasets to the excecution folder, so that the main script can import or load.
 
 - Make a python library for many files in the same folder and install it manually on different machine.
 

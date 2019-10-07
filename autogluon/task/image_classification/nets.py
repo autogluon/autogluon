@@ -23,7 +23,7 @@ def get_built_in_network(name, *args, **kwargs):
         finetune_net.hybridize()
         return finetune_net
 
-    def _get_cifar_netwrok(name, num_classes, ctx=mx.cpu(), *args, **kwargs):
+    def _get_cifar_network(name, num_classes, ctx=mx.cpu(), *args, **kwargs):
         name = name.lower()
         assert 'cifar' in name
         net = get_model(name, *args, **kwargs)
@@ -32,6 +32,6 @@ def get_built_in_network(name, *args, **kwargs):
 
     name = name.lower()
     if 'cifar' in name:
-        return _get_cifar_netwrok(name, *args, **kwargs)
+        return _get_cifar_network(name, *args, **kwargs)
     else:
         return _get_finetune_network(name, *args, **kwargs)

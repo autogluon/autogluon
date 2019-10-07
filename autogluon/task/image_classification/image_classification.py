@@ -107,6 +107,7 @@ class ImageClassification(BaseTask):
             'time_attr': 'epoch',
             'reward_attr': 'reward',
             'dist_ip_addrs': dist_ip_addrs,
+            'searcher': algorithm,
             'algorithm_options': algorithm_options,
         }
         if algorithm == 'hyperband':
