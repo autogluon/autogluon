@@ -22,7 +22,6 @@ In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrate
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
 We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.scheduler.FIFO_Scheduler) as default trial scheduler.
-The simplest way to specify the serial scheduler to be used is via the string name `scheduler_fifo = 'fifo'`:
 
 ```{.python .input}
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')

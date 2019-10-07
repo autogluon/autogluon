@@ -1,16 +1,16 @@
-from ..core import List
+from ..core import Choice
 from ..utils import DeprecationHelper
 
 __all__ = ['Optimizers', 'Nets', 'Losses']
 
-class DeprecatedObject(List):
+class DeprecatedObject(Choice):
     def __init__(self, objs):
         super().__init__(*objs)
 
     def __repr__(self):
-        reprstr = 'List' + str(self.data)
+        reprstr = 'Choice' + str(self.data)
         return reprstr
 
-Optimizers = DeprecationHelper(DeprecatedObject, 'List')
-Nets = DeprecationHelper(DeprecatedObject, 'List')
-Losses = DeprecationHelper(DeprecatedObject, 'List')
+Optimizers = DeprecationHelper(DeprecatedObject, 'Choice')
+Nets = DeprecationHelper(DeprecatedObject, 'Choice')
+Losses = DeprecationHelper(DeprecatedObject, 'Choice')

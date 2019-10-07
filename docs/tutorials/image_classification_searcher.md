@@ -68,7 +68,7 @@ For those of you familiar with Bayesian optimization, AutoGluon allows you to co
 ```{.python .input}
 results = task.fit(dataset,
                    algorithm='bayesopt', 
-                   searcher_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+                   algorithm_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                    time_limits=time_limits,
                    epochs=epochs)
 
@@ -77,6 +77,6 @@ test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `searcher_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `searcher_options` when `algorithm='bayesopt'`.
+Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `algorithm_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `algorithm_options` when `algorithm='bayesopt'`.
 
 To understand other aspects of the `fit` function that may be customized, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).

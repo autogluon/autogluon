@@ -21,7 +21,7 @@ class Space(object):
             reprstr += ': value={}'.format(self.value)
         return reprstr
 
-class Sequence(object):
+class Sequence(Space):
     """A Sequence of AutoGluon Objects
 
     Args:
