@@ -1,9 +1,9 @@
-from autogluon.optim import optims
-from autogluon.optim.utils import autogluon_optims, Optimizer
+from autogluon.optimizer import optimizers
+from autogluon.optimizer.utils import autogluon_optims, Optimizer
 
 __all__ = ['BertAdam', 'get_optim']
 
-optims = ['bertadam'] + optims.optims  # TODO segregate the task specific optimizers
+optims = ['bertadam'] + optimizers.optims  # TODO segregate the task specific optimizers
 
 
 @autogluon_optims
