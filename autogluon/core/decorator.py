@@ -40,21 +40,21 @@ class autogluon_method(object):
             # handle different type of configurations
             if k in striped_keys:
                 if isinstance(v, Sequence):
-                    sub_config = strip_cofing_space(new_config, prefix=k)
+                    sub_config = strip_config_space(new_config, prefix=k)
                     args_dict[k] = []
                     for idx, obj in enumerate(v):
-                        min_config = strip_cofing_space(sub_config, prefix=str(idx))
+                        min_config = strip_config_space(sub_config, prefix=str(idx))
                         assert isinstance(obj, AutoGluonObject)
                         args_dict[k].append(obj._lazy_init(**min_config))
                 elif isinstance(v, AutoGluonObject):
-                    sub_config = strip_cofing_space(new_config, prefix=k)
+                    sub_config = strip_config_space(new_config, prefix=k)
                     args_dict[k] = v._lazy_init(**sub_config)
                 elif isinstance(v, Choice):
-                    sub_config = strip_cofing_space(new_config, prefix=k)
+                    sub_config = strip_config_space(new_config, prefix=k)
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
                         # nested space: Choice of AutoGluonobjects
-                        min_config = strip_cofing_space(sub_config, prefix=str(choice))
+                        min_config = strip_config_space(sub_config, prefix=str(choice))
                         args_dict[k] = v[choice]._lazy_init(**min_config)
                     else:
                         args_dict[k] = v[choice]

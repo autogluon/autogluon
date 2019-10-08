@@ -3,7 +3,7 @@ import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper
 
 __all__ = ['Space', 'Choice', 'List', 'Linear', 'LogLinear', 'Int',
-           'Bool', 'strip_cofing_space', 'AutoGluonObject', 'Sequence']
+           'Bool', 'strip_config_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
     pass
@@ -167,7 +167,7 @@ def _get_hp(name, space):
     else:
         raise NotImplemented
 
-def strip_cofing_space(config, prefix):
+def strip_config_space(config, prefix):
     # filter out the config with the corresponding prefix
     new_config = {}
     for k, v in config.items():
