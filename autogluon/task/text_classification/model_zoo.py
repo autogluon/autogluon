@@ -14,12 +14,9 @@ models = ['standard_lstm_lm_200',
           'standard_lstm_lm_1500',
           'awd_lstm_lm_1150',
           'awd_lstm_lm_600',
-          'elmo_2x1024_128_2048cnn_1xhighway',
-          'elmo_2x2048_256_2048cnn_1xhighway',
-          'elmo_2x4096_512_2048cnn_2xhighway',
           'bert_12_768_12',
-          'bert_24_1024_16']
-
+          'bert_24_1024_16',
+          'roberta_12_768_12']
 
 @autogluon_net_instances
 def get_model_instances(name: AnyStr,

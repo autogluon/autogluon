@@ -19,6 +19,7 @@ from .space import *
 from .utils import *
 from .task.image_classification import ImageClassification as image_classification
 from .task.object_detection import ObjectDetection as object_detection
+from .task.text_classification import TextClassification as text_classification
 from .basic import *
 from . import scheduler, searcher, distributed, resource
 

@@ -237,7 +237,7 @@ class BaseTask(ABC):
         else:
             raise NotImplementedError
         if metadata['trial_scheduler'] == 'hyperband':
-            if len(args.data.train) <= 10000:
+            # if len(args.data.train) <= 10000:
                 BaseTask.trial_scheduler = ag.distributed.DistributedHyperbandScheduler(
                     metadata['kwargs']['train_func'],
                     args,
@@ -253,25 +253,25 @@ class BaseTask(ABC):
                     grace_period=metadata['resources_per_trial'][
                                      'num_training_epochs'] // 2,
                     visualizer=metadata['visualizer'])
-            else:
-                BaseTask.trial_scheduler = ag.scheduler.Hyperband_Scheduler(
-                    metadata['kwargs']['train_func'],
-                    args,
-                    {'num_cpus': 1,
-                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
-                    searcher,
-                    checkpoint=metadata['savedir'],
-                    resume=metadata['resume'],
-                    time_attr='epoch',
-                    reward_attr=metadata['kwargs']['reward_attr'],
-                    max_t=metadata['resources_per_trial'][
-                        'num_training_epochs'],
-                    grace_period=metadata['resources_per_trial'][
-                                     'num_training_epochs'] // 2,
-                    visualizer=metadata['visualizer'])
+            # else:
+            #     BaseTask.trial_scheduler = ag.scheduler.Hyperband_Scheduler(
+            #         metadata['kwargs']['train_func'],
+            #         args,
+            #         {'num_cpus': 1,
+            #          'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+            #         searcher,
+            #         checkpoint=metadata['savedir'],
+            #         resume=metadata['resume'],
+            #         time_attr='epoch',
+            #         reward_attr=metadata['kwargs']['reward_attr'],
+            #         max_t=metadata['resources_per_trial'][
+            #             'num_training_epochs'],
+            #         grace_period=metadata['resources_per_trial'][
+            #                          'num_training_epochs'] // 2,
+            #         visualizer=metadata['visualizer'])
             # TODO (cgraywang): use empiral val now
         else:
-            if len(args.data.train) <= 10000:
+            # if len(args.data.train) <= 10000:
                 BaseTask.trial_scheduler = ag.distributed.DistributedFIFOScheduler(
                     metadata['kwargs']['train_func'],
                     args,
@@ -283,18 +283,18 @@ class BaseTask(ABC):
                     time_attr='epoch',
                     reward_attr=metadata['kwargs']['reward_attr'],
                     visualizer=metadata['visualizer'])
-            else:
-                BaseTask.trial_scheduler = ag.scheduler.FIFO_Scheduler(
-                    metadata['kwargs']['train_func'],
-                    args,
-                    {'num_cpus': 1,
-                     'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
-                    searcher,
-                    checkpoint=metadata['savedir'],
-                    resume=metadata['resume'],
-                    time_attr='epoch',
-                    reward_attr=metadata['kwargs']['reward_attr'],
-                    visualizer=metadata['visualizer'])
+            # else:
+            #     BaseTask.trial_scheduler = ag.scheduler.FIFO_Scheduler(
+            #         metadata['kwargs']['train_func'],
+            #         args,
+            #         {'num_cpus': 1,
+            #          'num_gpus': int(metadata['resources_per_trial']['num_gpus'])},
+            #         searcher,
+            #         checkpoint=metadata['savedir'],
+            #         resume=metadata['resume'],
+            #         time_attr='epoch',
+            #         reward_attr=metadata['kwargs']['reward_attr'],
+            #         visualizer=metadata['visualizer'])
 
         BaseTask.trial_scheduler.run_with_stop_criterion(start_time, metadata['stop_criterion'])
         BaseTask.trial_scheduler.join_tasks()

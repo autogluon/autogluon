@@ -1,11 +1,12 @@
 # Tutorials
 
-Image classification tutorials
+Tutorials
 
 ```toc
 :numbered:
 :maxdepth: 2
 
+text_classification_beginner
 image_classification_beginner
 image_classification_advanced
 image_classification_searcher
