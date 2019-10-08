@@ -2,7 +2,7 @@
 
 ## Why AutoGluon?
 
-`AutoGluon`, an AutoML toolkit for deep learning with MXNet Gluon:
+`AutoGluon`, an AutoML toolkit for deep learning with MXNet Gluon, which enables easy-to-use and easy-to-extend AutoML with a focus on deep learning, and making AutoML deploy in real-world applications. Features:
 
 - Fast prototyping on deep learning applications.
 - Automatic Hyper-parameter Optimization.
@@ -37,5 +37,6 @@ api/index
 
 ## More Resources
 
+- [Gluon Crush Course](https://beta.mxnet.io/guide/getting-started/crash-course/index.html)
 - [MXNet Tutorials](https://mxnet.apache.org/api/python/docs/tutorials/).
 - [MXNet API](https://mxnet.io/).

@@ -282,17 +282,13 @@ def autogluon_object(**kwvars):
     Example:
         >>> from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
         >>>
-        >>> @ag.autogluon_object(
-        >>>     nstage1=ag.Int(2, 10),
-        >>>     nstage2=ag.Int(2, 10),
-        >>>     nstage3=ag.Choice(5, 1),
+        >>> @autogluon_object(
+        >>>     learning_rate=ag.LogLinear(1e-4, 1e-1),
+        >>>     wd=ag.Linear(1e-4, 1e-1),
         >>> )
-        >>> class MyCifarResNet(CIFARResNetV1):
-        >>>     def __init__(self, nstage1, nstage2, nstage3):
-        >>>         print('Initializing MyCifarResNet')
-        >>>         layers = [nstage1, nstage2, nstage3]
-        >>>         channels = [16, 16, 32, 64]
-        >>>         super().__init__(CIFARBasicBlockV1, layers, channels)
+        >>> class Adam(optim.Adam):
+        >>>     pass
+
     """
     def registered_class(Cls):
         class autogluonobject(AutoGluonObject):#, Cls

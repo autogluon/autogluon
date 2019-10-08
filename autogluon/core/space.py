@@ -2,7 +2,7 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper
 
-__all__ = ['Space', 'Choice', 'List', 'Linear', 'LogLinear', 'Int',
+__all__ = ['Space', 'List', 'Choice', 'Linear', 'LogLinear', 'Int',
            'Bool', 'strip_config_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
@@ -29,9 +29,9 @@ class Sequence(Space):
 
     Example:
         >>> sequence = ag.Sequence(
-        >>>     ag.List('conv3x3', 'conv5x5', 'conv7x7'),
-        >>>     ag.List('BatchNorm', 'InstanceNorm'),
-        >>>     ag.List('relu', 'sigmoid'),
+        >>>     ag.Choice('conv3x3', 'conv5x5', 'conv7x7'),
+        >>>     ag.Choice('BatchNorm', 'InstanceNorm'),
+        >>>     ag.Choice('relu', 'sigmoid'),
         >>> )
     """
     def __init__(self, *args):
