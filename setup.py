@@ -49,14 +49,14 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
-    'scikit-optimize',
     'dask[complete]==2.0.0',
-    'distributed==2.0.1',
     'tornado',
     'ConfigSpace',
     'nose',
     'gluoncv',
     'gluonnlp',
+    'graphviz',
+    'scikit-optimize',
 ]
 
 setup(
