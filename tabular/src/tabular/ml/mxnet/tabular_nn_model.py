@@ -92,7 +92,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Configuration-options that we never search over in HPO but user can specify:
         self._use_default_value('num_dataloading_workers', 2) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
-        self._use_default_value('max_epochs', 200)  # TODO! debug # maximum number of epochs for training NN
+        self._use_default_value('max_epochs', 30)  # TODO! debug # maximum number of epochs for training NN
         
         # For data processing:
         self._use_default_value('proc.embed_min_categories', 2)  # TODO! debug  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers

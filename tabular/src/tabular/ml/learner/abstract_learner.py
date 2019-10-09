@@ -81,12 +81,12 @@ class AbstractLearner:
         score = trainer.score(X=X, y=y)
         return score
     
-    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False):
+    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
         """ Evaluate predictions. 
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
-            
+                detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True) 
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
@@ -98,7 +98,7 @@ class AbstractLearner:
             return perf
         # Otherwise compute auxiliary metrics:
         perf_dict = OrderedDict({metric: perf})
-        if self.problem_type == REGRESSION: # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation (TODO)
+        if self.problem_type == REGRESSION: # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation
             pearson_corr = lambda x,y: corrcoef(x,y)[0][1]
             pearson_corr.__name__ = 'pearson_correlation'
             regression_metrics = [mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error, max_error]
@@ -117,7 +117,6 @@ class AbstractLearner:
                 classif_metrics += [f1micro_score] # TODO: add auc?
             elif self.problem_type == MULTICLASS: # multiclass metrics
                 classif_metrics += [] # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
-            classif_metrics += [classification_report] # Final metric to report
             for cl_metric in classif_metrics:
                 metric_name = cl_metric.__name__
                 if metric_name not in perf_dict:
@@ -125,6 +124,15 @@ class AbstractLearner:
         if not silent:
             print("Evaluations on test data:")
             print(json.dumps(perf_dict, indent=4))
+        if detailed_report and (self.problem_type != REGRESSION):
+            # One final set of metrics to report
+            cl_metric = lambda y_true,y_pred: classification_report(y_true,y_pred, output_dict=True)
+            metric_name = cl_metric.__name__
+            if metric_name not in perf_dict:
+                perf_dict[metric_name] = cl_metric(y_true, y_pred)
+                if not silent:
+                    print("Detailed (per-class) classification report:")
+                    print(json.dumps(perf_dict[metric_name], indent=4))
         return perf_dict
     
     def extract_label(self, X):
