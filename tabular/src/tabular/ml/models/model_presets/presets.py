@@ -20,9 +20,9 @@ from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
 def get_preset_models(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     if problem_type == BINARY:
-        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
+        return get_preset_models_classification(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
     elif problem_type == MULTICLASS:
-        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, num_classes=num_classes)
+        return get_preset_models_classification(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
     elif problem_type == LANGUAGE_MODEL:
@@ -31,7 +31,7 @@ def get_preset_models(path, problem_type, objective_func, num_boost_round=None, 
         raise NotImplementedError
 
 
-def get_preset_models_binary(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
+def get_preset_models_classification(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     models = [
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
@@ -42,7 +42,7 @@ def get_preset_models_binary(path, problem_type, objective_func, num_boost_round
         # RFModel(path=path, name='ExtraTreesClassifier', model=ExtraTreesClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # RFModel(path=path, name='LGBMClassifier', model=lgb.LGBMClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
-        # LGBModel(path=path, name='LGBMClassifierCustom', params=lgb_get_param_baseline(problem_type, num_classes=num_classes), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
+        LGBModel(path=path, name='LGBMClassifierCustom', params=lgb_get_param_baseline(problem_type, num_classes=num_classes), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
         TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func),
         # NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func) # OG fast.ai model. TODO: remove!
         # NNNLPClassificationModel(path=path, name='NNNLPClassificationModel-FWD', params=get_nlp_param_baseline(), problem_type=problem_type, objective_func=objective_func),
@@ -60,10 +60,11 @@ def get_preset_models_language(path):
 
 def get_preset_models_regression(path, problem_type, objective_func, num_boost_round=None):
     models = [
-        SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
+        # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
         RFModel(path=path, name='RandomForestRegressor', model=RandomForestRegressor(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LGBMRegressor', model=lgb.LGBMRegressor(n_jobs=-1, verbose=2, silent=False), problem_type=problem_type, objective_func=objective_func),
-        LGBModel(path=path, name='LGBMRegressorCustom', params=lgb_get_param_baseline(problem_type), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
-        NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func),
+        # LGBModel(path=path, name='LGBMRegressorCustom', params=lgb_get_param_baseline(problem_type), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
+        TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func),
+        # NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func),
     ]
     return models

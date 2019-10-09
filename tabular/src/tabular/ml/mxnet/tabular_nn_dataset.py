@@ -30,10 +30,12 @@ class TabularNNDataset:
             num_examples (int): number of examples in this dataset
             num_features (int): number of features (we only consider original variables as features, so num_features may not correspond to dimensionality of the data eg in the case of one-hot encoding)
             num_classes (int): number of classes (only used for multiclass classification)
+        
+        Note: Default numerical data-type is converted to float32 (as well as labels in regression).
     """
     
-    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, 
-                 labels=None, is_test=True, problem_type=REGRESSION):
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, problem_type,
+                 labels=None, is_test=True):
         """ Args:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
                 feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array corresponding to this feature
@@ -102,7 +104,10 @@ class TabularNNDataset:
                     self.feature_dataindex_map[feature]  = len(data_list)-1
         
         if labels is not None:
-            data_list.append(np.array(labels))
+            labels = np.array(labels)
+            if self.problem_type == REGRESSION and labels.dtype != np.float32:
+                labels = labels.astype('float32') # Convert to proper float-type if not already
+            data_list.append(labels)
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
@@ -118,7 +123,6 @@ class TabularNNDataset:
                                 num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
         if not is_test: 
             self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
-    
     
     def has_vector_features(self):
         """ Returns boolean indicating whether this dataset contains vector features """

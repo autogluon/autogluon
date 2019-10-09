@@ -9,7 +9,7 @@ class Cleaner:
         if problem_type == BINARY:
             return CleanerDummy()
         elif problem_type == MULTICLASS:
-            return CleanerMulticlass(label=label, threshold=threshold)
+            return CleanerDummy() # CleanerMulticlass(label=label, threshold=threshold) # Do not want to remove classes!
         elif problem_type == REGRESSION:
             return CleanerDummy()
         elif problem_type == LANGUAGE_MODEL:
