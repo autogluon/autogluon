@@ -8,9 +8,9 @@
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
 
-import contextlib, shutil, tempfile, math, random, warnings, os
+import contextlib, shutil, tempfile, math, random, warnings, os, json
 from pathlib import Path
-from collections import OrderedDict 
+from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import mxnet as mx
@@ -38,6 +38,8 @@ def make_temp_directory():
     finally:
         shutil.rmtree(temp_dir)
 
+EPS = 10e-8
+
 class TabularNeuralNetModel(AbstractModel):
     
     """ Class for neural network models that operate on tabular data. These networks use different types of input layers to process different types of data in various columns.
@@ -53,7 +55,8 @@ class TabularNeuralNetModel(AbstractModel):
     # Constants used throughout this class:
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
-    metric_map = {REGRESSION: 'MSE', BINARY: 'error_rate', MULTICLASS: 'error_rate'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
+    metric_map = {REGRESSION: 'MAE', BINARY: 'error_rate', MULTICLASS: 'error_rate'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
+    # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
     model_file_name = 'tabularNN.pkl'
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # stores temporary network parameters (eg. during the course of training)
@@ -106,7 +109,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Hyperparameters for neural net architecture:
         self._use_default_value('network_type', 'widedeep') # Type of neural net used to produce predictions
         #  Search space: ['widedeep', 'feedforward']
-        self._use_default_value('layers', [100]) # None) # TODO: debug! # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers!)
+        self._use_default_value('layers', None) # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers. These numbers are not absolute, they will also be scaled based on number of training examples and problem type)
         # Default search space: List of lists that are manually created
         self._use_default_value('numeric_embed_dim', 200) # None) # TODO: debug! # Size of joint embedding for all numeric+one-hot features.
         # Default search space: TBD
@@ -167,14 +170,14 @@ class TabularNeuralNetModel(AbstractModel):
         
         if self.params['layers'] is None: # Use default choices for MLP architecture
             if self.problem_type == REGRESSION:
-                default_layer_sizes = [256] # overall network will have 3 layers. Input layer, 256-unit hidden layer, output layer.
+                default_layer_sizes = [256, 128] # overall network will have 3 layers. Input layer, 256-unit hidden layer, output layer.
             elif self.problem_type == BINARY or self.problem_type == MULTICLASS:
-                default_sizes = [256] # will be scaled adaptively
+                default_sizes = [256, 128] # will be scaled adaptively
                 base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
                 default_layer_sizes = [defaultsize*base_size for defaultsize in default_sizes]
-            layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on training examples...
+            layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
             max_layer_width = self.params['max_layer_width']
-            self.params['layers'] = [min(max_layer_width, int(layer_expansion_factor*defaultsize)) 
+            self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize)) 
                                      for defaultsize in default_layer_sizes]
         
         if train_dataset.has_vector_features() and self.params['numeric_embed_dim'] is None:
@@ -256,6 +259,12 @@ class TabularNeuralNetModel(AbstractModel):
         best_train_epoch = 0 # epoch with best training loss so far
         best_train_loss = np.inf # smaller = better
         max_epochs = self.params['max_epochs']
+        loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
+        if self.problem_type == REGRESSION: 
+            if self.metric_map[REGRESSION] == 'MAE':
+                loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # std-dev of labels
+            elif self.metric_map[REGRESSION] == 'MSE':
+                loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # variance of labels
         for e in range(max_epochs):
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
@@ -263,7 +272,7 @@ class TabularNeuralNetModel(AbstractModel):
                 with autograd.record():
                     output = self.model(data_batch)
                     labels = data_batch['label']
-                    loss = self.loss_func(output, labels)
+                    loss = self.loss_func(output, labels) / loss_scaling_factor
                     # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
@@ -286,7 +295,7 @@ class TabularNeuralNetModel(AbstractModel):
             # TODO: callback / logger here!!
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
-            if e == 0: # speical actions during first epoch:
+            if e == 0: # special actions during first epoch:
                 print(self.model)  # TODO: remove?
         self.model.load_parameters(self.net_filename) # Revert back to best model
         if test_dataset is None: # evaluate one final time:
@@ -297,14 +306,17 @@ class TabularNeuralNetModel(AbstractModel):
                   (best_val_epoch, self.metric_map[self.problem_type], final_val_metric))
         return
     
-    def evaluate_metric(self, dataset):
-        """ Evaluates metric on the given dataset (TabularNNDataset object). 
-            Returns error-rate in the case of classification, MSE for regression.
+    def evaluate_metric(self, dataset, mx_metric=None):
+        """ Evaluates metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
+            If provided, mx_metric must be a function that follows the mxnet.metric API.
+            By default, returns error-rate in the case of classification, MSE for regression.
         """
-        if self.problem_type == REGRESSION:
-            mx_metric = mx.metric.MSE()
-        else:
-            mx_metric = mx.metric.Accuracy()
+        if mx_metric is None:
+            if self.problem_type == REGRESSION:
+                mx_metric = mx.metric.MAE()
+            else:
+                mx_metric = mx.metric.Accuracy()
+        
         for batch_idx, data_batch in enumerate(dataset.dataloader):
             data_batch = dataset.format_batch_data(data_batch, self.ctx)
             preds = self.model(data_batch)
@@ -378,14 +390,15 @@ class TabularNeuralNetModel(AbstractModel):
         if (self.processor is None or self.types_of_features is None 
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
+        df = self.ensure_onehot_object(df)
         processed_array = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, self.params, labels=labels, is_test=True,
-                                problem_type = self.problem_type)
+        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, 
+                                self.params, self.problem_type, labels=labels, is_test=True)
     
     def process_train_data(self, df, labels):
         """ Preprocess training data and create self.processor object that can be used to process future data.
             This method should only be used once per TabularNeuralNetModel object, otherwise will produce Warning.
-             
+        
         # TODO no label processing for now
         # TODO: language features are ignored for now
         # TODO: how to add new features such as time features and remember to do the same for test data?
@@ -407,14 +420,18 @@ class TabularNeuralNetModel(AbstractModel):
         if labels is None:
             raise ValueError("Attempting process training data without labels")
         self.types_of_features = self._get_types_of_features(df) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
-        print("Feature types: ", self.types_of_features)
+        print("AutoGluon infers your features are of the following types:")
+        print(json.dumps(self.types_of_features, indent=4))
+        print("\n\n")
+        df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor()
         processed_array = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in processed_array corresponding to this feature
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, self.params, labels=labels, is_test=False)
+        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map,
+                                self.params, self.problem_type, labels=labels, is_test=False)
     
     def setup_trainer(self):
         """ Set up stuff needed for training: 
@@ -440,6 +457,16 @@ class TabularNeuralNetModel(AbstractModel):
         return
     
     # Helper functions for tabular NN:
+    
+    def ensure_onehot_object(self, df):
+        """ Converts all numerical one-hot columns to object-dtype. 
+            Note: self.types_of_features must already exist! 
+        """
+        new_df = df.copy() # To avoid SettingWithCopyWarning
+        for feature in self.types_of_features['onehot']:
+            if df[feature].dtype != 'object':
+                new_df.loc[:,feature] = df.loc[:,feature].astype(str)
+        return new_df
     
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
@@ -603,7 +630,7 @@ Currently, our code uses category_encoders package (BSD license) instead: https:
 Once PR is merged into sklearn, may want to switch: category_encoders.Ordinal -> sklearn.preprocessing.OrdinalEncoder in preprocess_train_data()
 
 
-TODO: how to save preprocessed data so that we can do HPO of neural net hyperparameters more efficiently, while also doing HPO of preprocessing hyperparameters?
+TODO: Save preprocessed data so that we can do HPO of neural net hyperparameters more efficiently, while also doing HPO of preprocessing hyperparameters?
       Naive full HPO method requires redoing preprocessing in each trial even if we did not change preprocessing hyperparameters.
       Alternative is we save each proprocessed dataset & corresponding TabularNeuralNetModel object with its unique param names in the file. Then when we try a new HP-config, we first try loading from file if one exists.
 
@@ -611,14 +638,14 @@ TODO: feature_types_metadata must be set outside of model class in trainer.
 
 TODO: enable seeds?
 
-TODO: test regression + multiclassification
+TODO: test multiclassification
 
-TODO: benchmark against h2o
+TODO: benchmark 
 
 TODO: issue: embedding layers learn much slower than Dense layers. Need to carefully initialize
 
-TODO: residual connection
-
 TODO: automatically decrease batch-size if memory issue arises
+
+TODO: retrain NN on full dataset (train+val)
 
 """
