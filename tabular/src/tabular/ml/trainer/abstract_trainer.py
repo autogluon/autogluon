@@ -268,7 +268,8 @@ class AbstractTrainer:
                 #     y_pred_ensemble = np.argmax(final_prediction, axis=1)
                 # acc = accuracy_score(y_test, y_pred_ensemble)
                 # print(acc)
-                if final_prediction.shape[1] != len(set(y_test)): # Need to provide lablels since y_test does not contain all classes.
+                if (self.problem_type == MULTICLASS) and (final_prediction.shape[1] != len(set(y_test))):
+                    # Need to provide lablels since y_test does not contain all classes.
                     log_loss_val = log_loss(y_test, final_prediction, labels=range(max(final_prediction.shape[1], len(set(y_test)))))
                 else:
                     log_loss_val = log_loss(y_test, final_prediction)
