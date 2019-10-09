@@ -5,7 +5,6 @@
 
 autogluon.core
 autogluon.legacy
-autogluon.space
 autogluon.searcher
 autogluon.scheduler
 autogluon.task
