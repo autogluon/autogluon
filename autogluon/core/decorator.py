@@ -43,12 +43,12 @@ class autogluon_method(object):
                     sub_config = strip_config_space(new_config, prefix=k)
                     args_dict[k] = []
                     for idx, obj in enumerate(v):
-                        min_config = strip_config_space(sub_config, prefix=str(idx))
                         assert isinstance(obj, AutoGluonObject)
+                        min_config = strip_config_space(sub_config, prefix=str(idx))
                         args_dict[k].append(obj._lazy_init(**min_config))
                 elif isinstance(v, AutoGluonObject):
-                    sub_config = strip_config_space(new_config, prefix=k)
-                    args_dict[k] = v._lazy_init(**sub_config)
+                    min_config = strip_config_space(new_config, prefix=k)
+                    args_dict[k] = v._lazy_init(**min_config)
                 elif isinstance(v, Choice):
                     sub_config = strip_config_space(new_config, prefix=k)
                     choice = sub_config.pop(k)
@@ -148,14 +148,8 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
         if new_parameter.name == '':
             new_parameter.name = prefix
         elif not prefix == '':
-            new_parameter.name = "%s%s%s" % (prefix, '.',
-                                             new_parameter.name)
+            new_parameter.name = "%s%s%s" % (prefix, '.', new_parameter.name)
         new_parameters.append(new_parameter)
-    #if len(new_parameters) > 0 and new_parameters[0].name not in master_cs._hyperparameters:
-    #    master_cs.add_configuration_space(prefix, sub_cs, delimiter, parent_hyperparameter=parent_hp)
-    #else:
-    #    for hp in new_parameters:
-    #        master_cs._hyperparameters[hp.name] = hp
     for hp in new_parameters:
         _add_hp(master_cs, hp)
 

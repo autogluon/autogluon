@@ -30,7 +30,7 @@ def train_image_classification(args, reporter):
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
     if type(args.net) == str:
-        net = get_built_in_network(args.net, args.dataset.num_classes, ctx)._lazy_init()
+        net = get_built_in_network(args.net, args.dataset.num_classes, ctx)
     else:
         net = args.net
         net.initialize(ctx=ctx)
@@ -46,17 +46,12 @@ def train_image_classification(args, reporter):
         train_dataset, val_dataset = _train_val_split(train_dataset, split)
 
     train_data = gluon.data.DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        last_batch="rollover",
-        num_workers=args.num_workers)
+        train_dataset, batch_size=batch_size, shuffle=True,
+        last_batch="rollover", num_workers=args.num_workers)
     if not args.final_fit:
         val_data = gluon.data.DataLoader(
-            val_dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=args.num_workers)
+            val_dataset, batch_size=batch_size,
+            shuffle=False, num_workers=args.num_workers)
 
     if isinstance(args.lr_scheduler, str):
         lr_scheduler = lr_schedulers[args.lr_scheduler](len(train_data) * args.epochs, base_lr=args.optimizer.lr)

@@ -12,7 +12,6 @@ from ...searcher import *
 from ...scheduler import *
 from ..base import BaseTask
 
-from .nets import get_built_in_network
 from .dataset import ImageClassificationDataset
 from .pipeline import train_image_classification
 from .metrics import get_metric_instance

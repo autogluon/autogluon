@@ -11,7 +11,8 @@ try_import_dask()
 from .utils import *
 from .core import *
 from .task import *
-from . import scheduler, searcher, distributed
+from . import scheduler, searcher, distributed, nas
+from .nas.model_zoo import get_model
 
 # legacy modules
 from .legacy import Nets,  Optimizers, Losses

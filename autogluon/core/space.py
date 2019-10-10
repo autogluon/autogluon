@@ -50,7 +50,7 @@ class Sequence(Space):
     def __len__(self):
         return len(self.data)
 
-    def get_config_space(self):
+    def get_config_space(self, name):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
             return CS.ConfigurationSpace()
