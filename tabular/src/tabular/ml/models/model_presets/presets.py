@@ -61,9 +61,9 @@ def get_preset_models_language(path):
 def get_preset_models_regression(path, problem_type, objective_func, num_boost_round=None):
     models = [
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
-        RFModel(path=path, name='RandomForestRegressor', model=RandomForestRegressor(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
+        # RFModel(path=path, name='RandomForestRegressor', model=RandomForestRegressor(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LGBMRegressor', model=lgb.LGBMRegressor(n_jobs=-1, verbose=2, silent=False), problem_type=problem_type, objective_func=objective_func),
-        # LGBModel(path=path, name='LGBMRegressorCustom', params=lgb_get_param_baseline(problem_type), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
+        LGBModel(path=path, name='LGBMRegressorCustom', params=lgb_get_param_baseline(problem_type), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
         TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func),
         # NNTabularModel(path=path, name='NNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func),
     ]

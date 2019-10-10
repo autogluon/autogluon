@@ -36,7 +36,7 @@ class PredictTableColumn(BaseTask):
     
     @staticmethod
     def fit(train_data, label, val_data=None, savedir='', problem_type=None, objective_func=None, 
-            submission_columns=[], feature_generator=AutoMLFeatureGenerator(), threshold=100, 
+            submission_columns=[], feature_generator=None, threshold=100, 
             hyperparameter_tune=False, feature_prune=False, searcher=None, scheduler=None):
         """
         train_data: DataFrame of training data containing both features and label as columns
@@ -46,7 +46,7 @@ class PredictTableColumn(BaseTask):
         problem_type (str): is this classification or regression problem (TODO: options). If = None, will be inferred based on target LABEL column in dataset.
         objective_func (function): metric by which performance will be evaluated on test data (for examples see: sklearn.metrics). If = None, automatically chosen based on problem_type
         submission_columns (list): banned subset of column names that model may not use as predictive features (eg. contains label). DataFrame of just these columns may be submitted in ML competition.
-        feature_generator: which feature engineering protocol to follow
+        feature_generator: which feature engineering protocol to follow. Default is AutoMLFeatureGenerator.
         threshold: TODO: describe
         stratified_split: whether to stratify training/validation data split based on labels (ignored when val_data is provided). TODO: not implemented at the moment! 
         model_list: List of models to try, will replace get_preset_models() in auto_trainer.py.  TODO: not implemented
@@ -59,7 +59,8 @@ class PredictTableColumn(BaseTask):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if val_data and np.any(train_data.columns != val_data.columns):
             raise ValueError("Column names must match between training and validation data")
-        
+        if feature_generator is None:
+            feature_generator = AutoMLFeatureGenerator()
         learner = Learner(path_context=savedir, label=label, problem_type=problem_type, objective_func=objective_func, 
                           submission_columns=submission_columns, feature_generator=feature_generator, threshold=threshold)
         learner.fit(X=train_data, X_test=val_data, searcher=searcher, scheduler=scheduler)
