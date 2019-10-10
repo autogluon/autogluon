@@ -26,7 +26,7 @@ print(predictor.load_trainer().__dict__) # summary of training processes
 # Inference time:
 test_data = task.load_data(test_file_path) # Pandas object
 y_test = test_data[label_column]
-test_data = test_data.drop(labels=[label_column],axis=1)
+test_data = test_data.drop(labels=[label_column],axis=1) # Delete labels from test data since we wouldn't have them in practice
 print(test_data.head())
 
 predictor = None  # We delete predictor here to demonstrate how to load previously-trained predictor from file:
