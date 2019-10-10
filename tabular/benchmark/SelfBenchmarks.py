@@ -2,6 +2,23 @@
     Run this benchmark to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
+    
+    # TODO: we want to assess that Autogluon has correctly inferred the type of each feature (continuous vs categorical vs text)
+    
+    # TODO: suppress internal AutoGluon print statements, so that only benchmark-info is printed
+    
+    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
+    
+    # TODO: We'd like to add extra benchmark datasets with the following properties:
+    - one-dimensional features
+    - extreme-multiclass classification
+    - high-dimensional features + low-sample size
+    - missing labels in training data
+    - parquet file format
+    - extreme levels of missingness
+    - classification severe class imbalance
+    - regression with severely skewed Y-values (eg. predicting count data)
+    - trivial prediction problem where y = simple deterministic function of x
 """
 
 import numpy as np
@@ -12,12 +29,10 @@ import warnings
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon import predict_table_column as task
 
-
 # Benchmark options:
 fast_benchmark = False # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
 subsample_size = 1000
-perf_threshold = 1.5 # How much worse can performance on this dataset be vs previous performance without warning.
-
+perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 
 # Each train/test dataset must be located in single directory with the given names.
 train_file = 'train_data.csv'
@@ -31,13 +46,13 @@ binary_dataset = {'folder': '/Users/jonasmue/WorkDocs/AutoGluon/githubAutogluon/
                   'name': 'AdultIncomeBinary',
                   'problem_type': BINARY,
                   'label_column': 'class',
-                  'performance_val': 0.176}
+                  'performance_val': 0.176} # mixed types of features
 
 multi_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
                   'name': 'CoverTypeMulticlass',
                   'problem_type': MULTICLASS,
                   'label_column': 'Cover_Type',
-                  'performance_val': 0.304}
+                  'performance_val': 0.304} # 7 classes, all features are numeric
 
 regression_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/AmesHousingPriceRegression/',
                    'name': 'AmesHousingRegression',
@@ -110,7 +125,7 @@ print("Average performance: %s" % avg_perf)
 print("Median performance: %s" % median_perf)
 print("Worst performance: %s" % worst_perf)
 
-# List all warnings:
+# List all warnings again to make sure they are seen:
 print("\n\n WARNINGS:")
 for w in caught_warnings:
     warnings.warn(w.message)
