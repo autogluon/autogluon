@@ -95,7 +95,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('max_epochs', 30)  # TODO! debug # maximum number of epochs for training NN
         
         # For data processing:
-        self._use_default_value('proc.embed_min_categories', 2)  # TODO! debug  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        self._use_default_value('proc.embed_min_categories', 3) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
         # Default search space: 3,4,10, 100, 1000
         self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
         # Default search space: ['median', 'mean', 'most_frequent']
@@ -111,7 +111,7 @@ class TabularNeuralNetModel(AbstractModel):
         #  Search space: ['widedeep', 'feedforward']
         self._use_default_value('layers', None) # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers. These numbers are not absolute, they will also be scaled based on number of training examples and problem type)
         # Default search space: List of lists that are manually created
-        self._use_default_value('numeric_embed_dim', 200) # None) # TODO: debug! # Size of joint embedding for all numeric+one-hot features.
+        self._use_default_value('numeric_embed_dim', None) # Size of joint embedding for all numeric+one-hot features.
         # Default search space: TBD
         self._use_default_value('activation', 'relu')
         # Default search space: ['relu', 'elu', 'tanh']
@@ -183,10 +183,11 @@ class TabularNeuralNetModel(AbstractModel):
         if train_dataset.has_vector_features() and self.params['numeric_embed_dim'] is None:
             # Use default choices for numeric embedding size
             vector_dim = train_dataset.dataset._data[train_dataset.vectordata_index].shape[1]  # total dimensionality of vector features
-            min_numeric_embed_dim = 16
+            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features) # Fraction of features that are numeric 
+            min_numeric_embed_dim = 32
             max_numeric_embed_dim = self.params['max_layer_width']
             self.params['numeric_embed_dim'] = int(min(max_numeric_embed_dim, max(min_numeric_embed_dim,
-                                                    self.params['layers'][0]*np.log10(vector_dim+0.01) )))
+                                                    self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+0.01) )))
         return
     
     def fit(self, X_train, Y_train, X_test=None, Y_test=None):
@@ -494,7 +495,7 @@ class TabularNeuralNetModel(AbstractModel):
         for feature in self.features:
             feature_data = df[feature] # pd.Series
             num_unique_vals = len(feature_data.unique())
-            if num_unique_vals == 2: # will be onehot encoded
+            if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
                 types_of_features['onehot'].append(feature)
             elif feature in continuous_featnames:
                 if np.abs(feature_data.skew()) > self.params['proc.skew_threshold']:

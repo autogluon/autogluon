@@ -136,6 +136,10 @@ class TabularNNDataset:
         """ Returns number of language features in this dataset """
         return len(self.feature_groups['language'])
     
+    def num_vector_features(self):
+        """ Number of vector features (each onehot feature counts = 1, regardless of how many categories) """
+        return len(self.feature_groups['vector'])
+    
     def getNumCategoriesEmbeddings(self):
         """ Returns number of categories for each embedding feature.
             Should only be applied to training data.
