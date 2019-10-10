@@ -31,6 +31,7 @@ from autogluon import predict_table_column as task
 
 # Benchmark options:
 fast_benchmark = False # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
+                       # Please disregard performance_value warnings when fast_benchmark = True.
 subsample_size = 1000
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 
@@ -46,19 +47,19 @@ binary_dataset = {'folder': '/Users/jonasmue/WorkDocs/AutoGluon/githubAutogluon/
                   'name': 'AdultIncomeBinary',
                   'problem_type': BINARY,
                   'label_column': 'class',
-                  'performance_val': 0.176} # mixed types of features
+                  'performance_val': 0.129} # mixed types of features
 
 multi_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
                   'name': 'CoverTypeMulticlass',
                   'problem_type': MULTICLASS,
                   'label_column': 'Cover_Type',
-                  'performance_val': 0.304} # 7 classes, all features are numeric
+                  'performance_val': 0.032} # 7 classes, all features are numeric
 
 regression_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/AmesHousingPriceRegression/',
                    'name': 'AmesHousingRegression',
                   'problem_type': REGRESSION,
                   'label_column': 'SalePrice',
-                  'performance_val': 0.097}
+                  'performance_val': 0.076}
 
  # List containing dicts of information on each dataset
 datasets = [binary_dataset, multi_dataset, regression_dataset]
