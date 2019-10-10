@@ -105,7 +105,7 @@ def train_text_classification(args, reporter=None):
     random.seed(args.seed)
     mx.random.seed(args.seed)
 
-    ctx = mx.cpu() if args.gpu is None else mx.gpu(args.gpu)
+    ctx = mx.cpu() if args.gpu is None else mx.gpu(0) # TODO: simple fix
 
     task = tasks[task_name]
 
@@ -477,7 +477,8 @@ def train_text_classification(args, reporter=None):
                 if args.early_stop is not None:
                     patience -= 1
             metric_history.append((epoch_id, metric_nm, metric_val))
-            reporter(epoch=epoch_id, accuracy=metric_val)
+            if reporter is not None:
+            	reporter(epoch=epoch_id, accuracy=metric_val)
 
         if not only_inference:
             # save params

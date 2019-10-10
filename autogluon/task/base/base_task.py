@@ -148,7 +148,6 @@ class BaseTask(ABC):
     @staticmethod
     def _set_range(obj, cs):
         if obj.search_space is not None:
-            print(obj.search_space)
             cs.add_configuration_space(prefix='',
                                        delimiter='',
                                        configuration_space=obj.search_space)

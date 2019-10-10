@@ -9,7 +9,7 @@ from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 
 from .transforms import TextDataTransform, BERTDatasetTransform
 
-__all__ = ['get_dataset', 'transform', 'get_train_data_lengths', 'get_batchify_fn',
+__all__ = ['transform', 'get_train_data_lengths', 'get_batchify_fn',
            'get_batch_sampler', 'get_transform_train_fn', 'get_transform_val_fn'] \
           + ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
              'WNLITask', 'SSTTask']
@@ -197,8 +197,8 @@ class SSTTask(GlueTask):
     def __init__(self):
         is_pair = False
         class_labels = ['0', '1']
-        metric = Accuracy()
-        super(SSTTask, self).__init__(class_labels, metric, is_pair)
+        self.metric = Accuracy()
+        super(SSTTask, self).__init__(class_labels, self.metric, is_pair)
 
     def get_dataset(self, segment='train'):
         """Get the corresponding dataset for SST

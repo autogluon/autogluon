@@ -96,15 +96,17 @@ class TextClassification(BaseTask):
             # if data_format == 'tsv' and self.train_field_indices is None:
             #     raise ValueError('Specified tsv, but found the field indices empty.')
             #
-            self._read_dataset(**kwargs)
-            self._add_search_space()
+            # self._read_dataset(**kwargs)
+            # self._add_search_space()
+            pass
 
         def _read_dataset(self, **kwargs):
             try:
-                self.train = get_dataset(self.name, train=True)
-                self.val = None
-                self.test = get_dataset(self.name, train=False)
-                self.num_classes = len(np.unique(self.train._label))
+                # self.train = get_dataset(self.name, train=True)
+                # self.val = None
+                # self.test = get_dataset(self.name, train=False)
+                # self.num_classes = len(np.unique(self.train._label))
+                pass
             except ValueError:
                 if self.train_path is not None:
                     if '.tsv' or '.csv' in self.train_path:
