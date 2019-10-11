@@ -22,9 +22,9 @@ __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 logger = logging.getLogger(__name__)
 
 searchers = {
-    'hyperband': RandomSearcher,
+    'hyperband': RandomSearcher,  # ?? Hyperband is a scheduler, not a searcher
     'random': RandomSearcher,
-    'bayesopt': SKoptSearcher,
+    'skopt': SKoptSearcher,  # May have other BO solutions in the future...
 }
 
 class FIFOScheduler(TaskScheduler):
@@ -60,17 +60,27 @@ class FIFOScheduler(TaskScheduler):
         >>> # run tasks
         >>> myscheduler.run()
     """
-    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
-                 searcher='random', search_options={}, checkpoint='./exp/checkerpoint.ag',
+    def __init__(self, train_fn, args=None, resource=None,
+                 searcher='random', search_options=None,
+                 checkpoint='./exp/checkerpoint.ag',
                  resume=False, num_trials=None,
-                 time_out=None, max_reward=1.0, time_attr='epoch', reward_attr='accuracy',
-                 visualizer='none', dist_ip_addrs=[], **kwargs):
+                 time_out=None, max_reward=1.0, time_attr='epoch',
+                 reward_attr='accuracy',
+                 visualizer='none', dist_ip_addrs=None):
         super(FIFOScheduler,self).__init__(dist_ip_addrs)
-        self.train_fn = train_fn
+        if resource is None:
+            resource = {'num_cpus': 1, 'num_gpus': 0}
+        if search_options is None:
+            search_options = dict()
         assert isinstance(train_fn, autogluon_method)
+        self.train_fn = train_fn
         self.args = args if args else train_fn.args
         self.resource = resource
-        self.searcher = searchers[searcher](train_fn.cs, **search_options) if isinstance(searcher, str) else searcher
+        if isinstance(searcher, str):
+            self.searcher = searchers[searcher](train_fn.cs, **search_options)
+        else:
+            assert isinstance(searcher, BaseSearcher)
+            self.searcher = searcher
         # meta data
         self.metadata = train_fn.get_kwspaces()
         keys = copy.deepcopy(list(self.metadata.keys()))
@@ -109,18 +119,18 @@ class FIFOScheduler(TaskScheduler):
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
-    def run(self, num_trials=None, time_out=None):
+    def run(self, **kwargs):
         """Run multiple number of trials
         """
         start_time = time.time()
-        self.num_trials = num_trials if num_trials else self.num_trials
-        self.time_out = time_out if time_out else self.time_out
+        self.num_trials = kwargs.get('num_trials', self.num_trials)
+        self.time_out = kwargs.get('time_out', self.time_out)
         logger.info('Starting Experiments')
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         tbar = trange(self.num_finished_tasks, self.num_trials)
         for _ in tbar:
-            if time_out and time.time() - start_time >= time_out \
+            if self.time_out and time.time() - start_time >= self.time_out \
                     or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
             tbar.set_description('Current best reward: {} and best config: {}'
@@ -130,22 +140,41 @@ class FIFOScheduler(TaskScheduler):
     def save(self, checkpoint=None):
         """Save Checkpoint
         """
-        if checkpoint is None and self._checkpoint is None:
-            msg = 'Please set checkpoint path.'
-            logger.exception(msg)
-            raise RuntimeError(msg)
-        checkname = checkpoint if checkpoint else self._checkpoint
-        mkdir(os.path.dirname(checkname))
-        save(self.state_dict(), checkname)
+        if checkpoint is None:
+            if self._checkpoint is None:
+                logger.warning("Checkpointing is disabled")
+            else:
+                checkpoint = self._checkpoint
+        if checkpoint is not None:
+            mkdir(os.path.dirname(checkpoint))
+            save(self.state_dict(), checkpoint)
 
     def schedule_next(self):
         """Schedule next searcher suggested task
         """
-        task = Task(self.train_fn, {'args': self.args, 'config': self.searcher.get_config()},
+        # Allow for the promotion of a previously chosen config. Also,
+        # extra_kwargs contains extra info passed to both add_task and to
+        # get_config (if no config is promoted)
+        config, extra_kwargs = self._promote_config()
+        if config is None:
+            # No config to promote: Query next config to evaluate from searcher
+            config = self.searcher.get_config(**extra_kwargs)
+            extra_kwargs['new_config'] = True
+        else:
+            # This is not a new config, but a paused one which is now promoted
+            extra_kwargs['new_config'] = False
+        task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
-        self.add_task(task)
+        self.add_task(task, **extra_kwargs)
 
-    def add_task(self, task):
+    def _dict_from_task(self, task):
+        if isinstance(task, Task):
+            return {'TASK_ID': task.task_id, 'Config': task.args['config']}
+        else:
+            assert isinstance(task, dict)
+            return {'TASK_ID': task['TASK_ID'], 'Config': task['Config']}
+
+    def add_task(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -156,6 +185,8 @@ class FIFOScheduler(TaskScheduler):
         # reporter
         reporter = DistStatusReporter()
         task.args['reporter'] = reporter
+        # Register pending evaluation
+        self.searcher.register_pending(task.args['config'])
         # main process
         tp = threading.Thread(target=cls._start_distributed_task, args=(
                               task, cls.RESOURCE_MANAGER, self.env_sem))
@@ -165,8 +196,8 @@ class FIFOScheduler(TaskScheduler):
                               self.searcher, checkpoint_semaphore), daemon=False)
         tp.start()
         rp.start()
-        task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'], 'Task': task,
-                     'Process': tp, 'ReporterThread': rp}
+        task_dict = self._dict_from_task(task)
+        task_dict.update({'Task': task, 'Process': tp, 'ReporterThread': rp})
         # checkpoint thread
         if self._checkpoint is not None:
             sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
@@ -177,20 +208,8 @@ class FIFOScheduler(TaskScheduler):
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
-    def join_tasks(self):
-        self._cleaning_tasks()
-        for i, task_dict in enumerate(self.scheduled_tasks):
-            task_dict['Process'].join()
-            task_dict['ReporterThread'].join()
-
-    def _cleaning_tasks(self):
-        with self.LOCK:
-            for i, task_dict in enumerate(self.scheduled_tasks):
-                if not task_dict['Process'].is_alive():
-                    task_dict = self.scheduled_tasks.pop(i)
-                    task_dict['ReporterThread'].join()
-                    self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                               'Config': task_dict['Config']})
+    def _clean_task_internal(self, task_dict):
+        task_dict['ReporterThread'].join()
 
     def _run_checkpoint(self, checkpoint_semaphore):
         self._cleaning_tasks()
@@ -203,17 +222,31 @@ class FIFOScheduler(TaskScheduler):
         last_result = None
         while task_process.is_alive():
             reported_result = reporter.fetch()
-            if 'done' in reported_result and reported_result['done'] is True:
+            if reported_result.get('done', False):
                 reporter.move_on()
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(task.task_id, reported_result, task.args['config'])
+            self.add_training_result(
+                task.task_id, reported_result, config=task.args['config'])
             reporter.move_on()
             last_result = reported_result
         if last_result is not None:
-            searcher.update(task.args['config'], last_result[self._reward_attr])
+            searcher.update(
+                config=task.args['config'],
+                reward=last_result[self._reward_attr], **last_result)
+
+    def _promote_config(self):
+        """
+        Provides a hook in schedule_next, which allows to promote a config
+        which has been selected and partially evaluated previously.
+
+        :return: config, extra_args
+        """
+        config = None
+        extra_args = dict()
+        return config, extra_args
 
     def get_best_state(self):
         raise NotImplemented
@@ -240,12 +273,13 @@ class FIFOScheduler(TaskScheduler):
                                            task_id=task_id, reward_attr=self._reward_attr),
                                            reported_result[self._reward_attr]),
                                     global_step=reported_result['epoch'])
-        reward = reported_result[self._reward_attr]
         with self.log_lock:
+            # Note: We store all of reported_result in training_history[task_id],
+            # not just the reward value.
             if task_id in self.training_history:
-                self.training_history[task_id].append(reward)
+                self.training_history[task_id].append(reported_result)
             else:
-                self.training_history[task_id] = [reward]
+                self.training_history[task_id] = [reported_result]
                 if config:
                     self.config_history[task_id] = config
 
@@ -256,8 +290,9 @@ class FIFOScheduler(TaskScheduler):
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
         for task_id, task_res in self.training_history.items():
+            rewards = [x[self._reward_attr] for x in task_res]
             x = list(range(len(task_res)))
-            plt.plot(x, task_res, label='task {}'.format(task_id))
+            plt.plot(x, rewards, label='task {}'.format(task_id))
         if use_legend:
             plt.legend(loc='best')
         if filename is not None:
@@ -280,6 +315,7 @@ class FIFOScheduler(TaskScheduler):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
+
 
 DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')
 
