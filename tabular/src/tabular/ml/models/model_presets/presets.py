@@ -1,20 +1,8 @@
-import lightgbm as lgb
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import (RandomForestClassifier, ExtraTreesClassifier, RandomForestRegressor)
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import Perceptron
-from sklearn.dummy import DummyClassifier, DummyRegressor
-
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
-from tabular.ml.models.nn_nlp_classification_model import NNNLPClassificationModel
 from tabular.ml.models.nn_nlp_lm_model import NNNLPLanguageModel
-from tabular.ml.models.nn_tab_model import NNTabularModel
-from tabular.ml.models.sklearn_model import SKLearnModel
 from tabular.ml.models.lgb_model import LGBModel
-from tabular.ml.models.rf_model import RFModel
-from tabular.sandbox.models.lgb.parameters import get_param_baseline as lgb_get_param_baseline
-from tabular.sandbox.models.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline
+from tabular.ml.tuning.hyperparameters.defaults.lgbm.parameters import get_param_baseline as lgb_get_param_baseline
+from tabular.ml.tuning.hyperparameters.defaults.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline
 
 from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
