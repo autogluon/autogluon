@@ -1,9 +1,9 @@
 
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
-from tabular.sandbox.techops.vectorizers import vectorizer_auto_ml_default
+from tabular.ml.vectorizers import vectorizer_auto_ml_default
 import copy
 
 
