@@ -478,7 +478,7 @@ def train_text_classification(args, reporter=None):
                     patience -= 1
             metric_history.append((epoch_id, metric_nm, metric_val))
             if reporter is not None:
-            	reporter(epoch=epoch_id, accuracy=metric_val)
+                reporter(epoch=epoch_id, accuracy=metric_val[0])
 
         if not only_inference:
             # save params

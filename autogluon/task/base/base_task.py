@@ -144,13 +144,18 @@ class BaseTask(ABC):
     def trial_scheduler(self, val):
         self._trial_scheduler = val
 
-
     @staticmethod
     def _set_range(obj, cs):
+        parent_hp_names = cs.get_hyperparameter_names()
         if obj.search_space is not None:
-            cs.add_configuration_space(prefix='',
-                                       delimiter='',
-                                       configuration_space=obj.search_space)
+            obj_hps = obj.search_space.get_hyperparameters()
+            for obj_hp in obj_hps:
+                if obj_hp.name in parent_hp_names:
+                    cs.add_hyperparameter(obj_hp)
+            # cs.add_configuration_space(prefix='',
+            #                            delimiter='',
+            #                            configuration_space=obj.search_space)
+        # cs = cs_new
 
     @staticmethod
     def _assert_fit_error(obj, name):
