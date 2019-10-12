@@ -13,7 +13,7 @@ from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGe
 # feature_generator_kwargs [Optional] specify params to feature generator
 # sample [Optional] allows for training on only sample # of rows, for prototyping
 # returns the learner model context (used to load learner back with DefaultLearner.load(model_context), and the learner itself
-def train(data, label: str, X_test=None, learner_context: str = None, submission_columns: list = None, feature_generator_kwargs: dict = None, problem_type: str = None, objective_func=None, sample: int = None):
+def train(data, label: str, X_test=None, learner_context: str = None, submission_columns: list = None, feature_generator_kwargs: dict = None, problem_type: str = None, objective_func=None, sample: int = None, compute_feature_importance=False):
     if type(data) == str:
         data = load_pd.load(data, encoding='latin1')
     if X_test is not None:
@@ -31,7 +31,7 @@ def train(data, label: str, X_test=None, learner_context: str = None, submission
         }
 
     feature_generator = AutoMLFeatureGenerator(**feature_generator_kwargs)
-    learner = DefaultLearner(path_context=learner_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator, problem_type=problem_type, objective_func=objective_func)
+    learner = DefaultLearner(path_context=learner_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator, problem_type=problem_type, objective_func=objective_func, compute_feature_importance=compute_feature_importance)
     learner.fit(X=data, X_test=X_test, sample=sample)
 
     return learner.path_context, learner

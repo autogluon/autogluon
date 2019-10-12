@@ -14,9 +14,14 @@ class LGBMSpaces(AbstractSpaces):
                 Real(0.25, 0.9, name='feature_fraction'),
                 Categorical(
                     [
-                        'gbdt',
-                        'dart',
-                    ], name='boosting_type'),
+                        True,
+                        False
+                    ], name='is_unbalance'),  # TODO: This could be auto-selected based on optimization function, perhaps do this as a first check in multi-round hyperparameter optimization
+                # Categorical(
+                #     [
+                #         'gbdt',
+                #         'dart',
+                #     ], name='boosting_type'),
             ],
             [
                 Real(0.0, 2.0, name='lambda_l1'),
@@ -34,11 +39,11 @@ class LGBMSpaces(AbstractSpaces):
                 Integer(64, 256, name='num_leaves'),
                 Integer(1, 2, name='min_data_in_leaf'),
                 Real(0.8, 1, name='feature_fraction'),
-                Categorical(
-                    [
-                        'gbdt',
-                        'dart',
-                    ], name='boosting_type'),
+                # Categorical(
+                #     [
+                #         'gbdt',
+                #         'dart',
+                #     ], name='boosting_type'),
             ],
             [
                 Real(0.0, 2.0, name='lambda_l1'),

@@ -5,6 +5,7 @@ from tabular.callbacks.lgb.callbacks import record_evaluation_custom, early_stop
 from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.tuning.hyperparameters.lgbm_spaces import LGBMSpaces
+from tabular.ml.models.utils import lgb_utils
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -21,9 +22,10 @@ class LGBModel(AbstractModel):
         model = None
         super().__init__(path=path, name=name, model=model, problem_type=problem_type, objective_func=objective_func, features=features, debug=debug)
         self.params = params
-        self.objective = self.params['objective']
         self.metric_types = self.params['metric'].split(',')
-        if 'binary_error' in self.metric_types:
+        if self.objective_func in lgb_utils.supported_metrics:
+            self.eval_metric = lgb_utils.get_eval_metric(self.objective_func)
+        elif 'binary_error' in self.metric_types:
             self.eval_metric = 'binary_error'
         elif 'multi_error' in self.metric_types:
             self.eval_metric = 'multi_error'
@@ -31,6 +33,12 @@ class LGBModel(AbstractModel):
             self.eval_metric = 'l2'
         else:
             self.eval_metric = self.metric_types[-1]
+
+        if type(self.eval_metric) == str:
+            self.eval_metric_name = self.eval_metric
+            self.is_higher_better = False  # TODO: Find actual way to calculate instead of assuming
+        else:
+            self.eval_metric_name, _, self.is_higher_better = self.eval_metric([0], lgb_utils.DummyData())
 
         self.num_boost_round = num_boost_round
         self.best_iteration = None
@@ -53,7 +61,7 @@ class LGBModel(AbstractModel):
         valid_sets = [dataset_train]
         if dataset_val is not None:
             callbacks += [
-                early_stopping_custom(100, metrics_to_use=[('valid_set', self.eval_metric)], max_diff=None, ignore_dart_warning=True, verbose=False, manual_stop_file=self.path + 'stop.txt'),
+                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, ignore_dart_warning=True, verbose=False, manual_stop_file=self.path + 'stop.txt'),
             ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
@@ -71,11 +79,18 @@ class LGBModel(AbstractModel):
         # alpha = 0.1
         print('TRAINING', self.num_boost_round, ' boosting rounds')
         print(self.params)
-        self.model = lgb.train(params=self.params, train_set=dataset_train, num_boost_round=self.num_boost_round, valid_sets=valid_sets, valid_names=valid_names,
-                          evals_result=self.eval_results,
-                          callbacks=callbacks,
-                          # keep_training_booster=True
-                          )
+        train_params = {
+            'params': self.params,
+            'train_set': dataset_train,
+            'num_boost_round': self.num_boost_round,
+            'valid_sets': valid_sets,
+            'valid_names': valid_names,
+            'evals_result': self.eval_results,
+            'callbacks': callbacks,
+        }
+        if type(self.eval_metric) != str:
+            train_params['feval'] = self.eval_metric
+        self.model = lgb.train(**train_params)
 
         # del dataset_train
         # del dataset_val
@@ -118,6 +133,41 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
+    def cv(self, X=None, y=None, k_fold=5, dataset_train=None):
+        if dataset_train is None:
+            dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
+        gc.collect()
+
+        params = copy.deepcopy(self.params)
+
+        # TODO: Either edit lgb.cv to return models / oof preds or make custom implementation!
+        cv_params = {
+            'params': params,
+            'train_set': dataset_train,
+            'num_boost_round': self.num_boost_round,
+            'nfold': k_fold,
+            'early_stopping_rounds': 150,
+            'verbose_eval': 10,
+            'seed': 0,
+        }
+        if type(self.eval_metric) != str:
+            cv_params['feval'] = self.eval_metric
+            cv_params['params']['metric'] = 'None'
+        else:
+            cv_params['params']['metric'] = self.eval_metric
+        if self.problem_type == REGRESSION:
+            cv_params['stratified'] = False
+
+        print('Current parameters:\n', params)
+        eval_hist = lgb.cv(**cv_params)  # TODO: Try to use customer early stopper to enable dart
+
+        best_score = eval_hist[self.eval_metric_name + '-mean'][-1]
+
+        print('Best num_boost_round:', len(eval_hist[self.eval_metric_name + '-mean']))
+        print('Best CV score:', best_score)
+        
+        return best_score
+
     def convert_to_weight(self, X: DataFrame):
         print(X)
         w = X['count']
@@ -148,19 +198,13 @@ class LGBModel(AbstractModel):
             spaces = LGBMSpaces(problem_type=self.problem_type, objective_func=self.objective_func, num_classes=None).get_hyperparam_spaces_baseline()
 
         X = self.preprocess(X)
-        kfolds = AbstractTrainer.generate_kfold(X=X, n_splits=5) # TODO: should depend on dataset size...
-
-        kfolds_datasets = []
-        for train_index, test_index in kfolds:
-            dataset_train, dataset_val = self.generate_datasets(X_train=X.iloc[train_index], Y_train=y.iloc[train_index], X_test=X.iloc[test_index], Y_test=y.iloc[test_index])
-            kfolds_datasets.append([dataset_train, dataset_val])
+        dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
 
         print('starting skopt')
         space = spaces[0]
 
         param_baseline = self.params
 
-        # TODO: Make CV splits prior, don't redo
         @use_named_args(space)
         def objective(**params):
             print(params)
@@ -169,18 +213,14 @@ class LGBModel(AbstractModel):
             for param in params:
                 new_params[param] = params[param]
 
-            # TODO: Fix early_stopping_rounds, not stopping on best acc
+            new_model = copy.deepcopy(self)
+            new_model.params = new_params
+            score = new_model.cv(dataset_train=dataset_train)
 
-            scores = []
-            for dataset_train, dataset_val in kfolds_datasets:
-                new_model = copy.deepcopy(self)
-                new_model.params = new_params
-                new_model.fit(dataset_train=dataset_train, dataset_val=dataset_val)
-                model_score = new_model.eval_results['valid_set'][new_model.eval_metric][new_model.best_iteration-1]
-                scores.append(model_score)
-
-            score = np.mean(scores)
             print(score)
+            if self.is_higher_better:
+                score = -score
+
             return score
 
         reg_gp = gp_minimize(objective, space, verbose=True, n_jobs=1, n_calls=15)
