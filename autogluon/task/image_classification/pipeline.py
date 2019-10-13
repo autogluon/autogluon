@@ -36,6 +36,7 @@ lr_schedulers = {
     metric='accuracy',
     num_cpus=get_cpu_count(),
     num_gpus=get_gpu_count(),
+    hybridize=True,
     final_fit=False)
 def train_image_classification(args, reporter):
     logger.debug('pipeline args: {}'.format(args))
@@ -47,6 +48,9 @@ def train_image_classification(args, reporter):
     else:
         net = args.net
         net.initialize(ctx=ctx)
+
+    if args.hybridize:
+        net.hybridize(static_alloc=True, static_shape=True)
 
     args.input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
     if isinstance(args.dataset, str):
@@ -108,8 +112,7 @@ def train_image_classification(args, reporter):
                 l.backward()
 
             trainer.step(batch_size)
-
-        mx.nd.waitall()
+            mx.nd.waitall()
 
     def test(epoch):
         test_loss = 0

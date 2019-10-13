@@ -30,18 +30,18 @@ def make_deprecate(meth, old_name):
 class DeprecationHelper(object):
     """TODO Add Docs
     """
-    def __init__(self, old_class, new_name):
-        self.old_class = old_class
-        self.old_name = old_class.__name__
-        self.new_name = new_name
+    def __init__(self, new_class, new_name):
+        self.new_class = new_class
+        self.new_name = new_class.__name__
+        self.old_name = new_name
 
     def _warn(self):
         warn("autogluon.{} is now deprecated in favor of autogluon.{}." \
-             .format(self.old_name, self.new_name), AutoGluonWarning)
+             .format(self.new_name, self.old_name), AutoGluonWarning)
 
     def __call__(self, *args, **kwargs):
         self._warn()
-        return self.old_class(*args, **kwargs)
+        return self.new_class(*args, **kwargs)
 
     def __getattr__(self, attr):
-        return getattr(self.old_class, attr)
+        return getattr(self.new_class, attr)

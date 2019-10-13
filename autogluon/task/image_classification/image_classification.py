@@ -42,8 +42,9 @@ class ImageClassification(BaseTask):
             input_size=224,
             epochs=20,
             metric='accuracy',
-            num_cpus=4,
+            num_cpus=get_cpu_count(),
             num_gpus=get_gpu_count(),
+            hybridize=True,
             search_strategy='random',
             search_options={},
             time_limits=None,
@@ -101,6 +102,7 @@ class ImageClassification(BaseTask):
             input_size=input_size,
             epochs=epochs,
             num_workers=num_cpus,
+            hybridize=hybridize,
             final_fit=False)
 
         scheduler_options = {

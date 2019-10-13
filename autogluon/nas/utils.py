@@ -68,25 +68,25 @@ class SamePadding(HybridBlock):
                         self.pad_h//2, self.pad_h - self.pad_h//2)
     
 
-class swish(mx.autograd.Function):
-    def __init__(self, beta):
-        super().__init__()
-        self.beta = beta
-
-    def forward(self, x):
-        y = x * self.beta
-        y1 = y.sigmoid()
-        y = x * y1
-        self.save_for_backward(x, y1)
-        return y
-
-    def backward(self, dy):
-        x, y1 = self.saved_tensors
-        return dy * (- self.beta * x * y1 * (1 - y1) + y1)
-
-    def __repr__(self):
-        return '{} (beta={})'.format(self.__class__.__name__, self.beta)
-
+#class swish(mx.autograd.Function):
+#    def __init__(self, beta):
+#        super().__init__()
+#        self.beta = beta
+#
+#    def forward(self, x):
+#        y = x * self.beta
+#        y1 = y.sigmoid()
+#        y = x * y1
+#        self.save_for_backward(x, y1)
+#        return y
+#
+#    def backward(self, dy):
+#        x, y1 = self.saved_tensors
+#        return dy * (- self.beta * x * y1 * (1 - y1) + y1)
+#
+#    def __repr__(self):
+#        return '{} (beta={})'.format(self.__class__.__name__, self.beta)
+#
 
 class Swish(HybridBlock):
     def __init__(self, beta=1.0, **kwargs):
@@ -94,8 +94,8 @@ class Swish(HybridBlock):
         self._beta = beta
 
     def hybrid_forward(self, F, x):
-        #return x * F.sigmoid(self._beta * x)
-        return swish(self._beta)(x)
+        return x * F.sigmoid(self._beta * x)
+        #return swish(self._beta)(x)
 
     def __repr__(self):
         return '{} (beta={})'.format(self.__class__.__name__, self._beta)

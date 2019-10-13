@@ -43,6 +43,8 @@ class BaseTask(object):
         args = train_fn.args
         args.final_fit = True
         model = train_fn(args, best_config, reporter=None)
+        #best_config = cls.scheduler.searcher.get_config()
+        #model = train_fn(train_fn.args, best_config, reporter=None)
         total_time = time.time() - start_time
         cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
         return cls.results
