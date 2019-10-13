@@ -40,6 +40,7 @@ This tutorial section is ...
 
    tutorials/index
    api/index
+   model_zoo
 
 More Resources
 --------------

@@ -49,11 +49,11 @@ class autogluon_method(object):
                 elif isinstance(v, AutoGluonObject):
                     min_config = strip_config_space(new_config, prefix=k)
                     args_dict[k] = v._lazy_init(**min_config)
-                elif isinstance(v, Choice):
+                elif isinstance(v, Categorical):
                     sub_config = strip_config_space(new_config, prefix=k)
                     choice = sub_config.pop(k)
                     if isinstance(v[choice], AutoGluonObject):
-                        # nested space: Choice of AutoGluonobjects
+                        # nested space: Categorical of AutoGluonobjects
                         min_config = strip_config_space(sub_config, prefix=str(choice))
                         args_dict[k] = v[choice]._lazy_init(**min_config)
                     else:
@@ -75,7 +75,6 @@ class autogluon_method(object):
         return output
  
     def _register_args(self, default, **kwvars):
-        self.cs = CS.ConfigurationSpace()
         self.args = ezdict()
         self.args.update(default)
         self.update(**kwvars)
@@ -83,9 +82,10 @@ class autogluon_method(object):
     def update(self, **kwargs):
         """For searcher support ConfigSpace
         """
+        self.cs = CS.ConfigurationSpace()
         self.kwvars = kwargs
         for k, v in kwargs.items():
-            if isinstance(v, (Choice, Sequence)):
+            if isinstance(v, (Categorical, Sequence)):
                 sub_cs = v.get_config_space(k)
                 _add_cs(self.cs, sub_cs, k)
                 self.args.update({k: v})
@@ -111,7 +111,7 @@ class autogluon_method(object):
                     for sub_k, sub_v in obj.kwspaces.items():
                         new_k = '{}.{}.{}'.format(k, idx, sub_k)
                         self.kwspaces[new_k] = sub_v
-            elif isinstance(v, Choice):
+            elif isinstance(v, Categorical):
                 new_k = '{}.{}'.format(k, k)
                 self.kwspaces[new_k] = v
                 for idx, obj in enumerate(v):
@@ -195,7 +195,7 @@ def autogluon_kwargs(**kwvars):
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
-                if isinstance(v, Choice):
+                if isinstance(v, Categorical):
                     kwargs[k] = v
                     kwspaces[k] = v
                     sub_cs = v.get_config_space(name=k)
@@ -225,7 +225,7 @@ def autogluon_function(**kwvars):
     Example:
         >>> from gluoncv.model_zoo import get_model
         >>> 
-        >>> @ag.autogluon_function(pretrained=ag.Choice(True, False))
+        >>> @ag.autogluon_function(pretrained=ag.Categorical(True, False))
         >>> def cifar_resnet(pretrained):
         >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
@@ -245,11 +245,14 @@ def autogluon_function(**kwvars):
                     self._lazy_init(**config)
                 return self._instance.__call__(*args, **kwargs)
 
+            def init(self):
+                return self._lazy_init()
+
             def _lazy_init(self, **nkwvars):
                 # lazy initialization for passing config files
                 self.kwargs.update(nkwvars)
                 for k, v in self.kwargs.items():
-                    if k in self.kwspaces and isinstance(self.kwspaces[k], Choice):
+                    if k in self.kwspaces and isinstance(self.kwspaces[k], Categorical):
                         self.kwargs[k] = self.kwspaces[k][v]
                         
                 self._instance = self.func(*self.args, **self.kwargs)
@@ -306,8 +309,15 @@ def autogluon_object(**kwvars):
                 kwargs = self._kwargs
                 kwargs.update(nkwvars)
                 for k, v in kwargs.items():
-                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], Choice):
+                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], Categorical):
                         kwargs[k] = autogluonobject.kwspaces[k][v]
+                    elif isinstance(v, Sequence):
+                        sub_config = strip_config_space(new_config, prefix=k)
+                        kwargs[k] = []
+                        for idx, obj in enumerate(v):
+                            assert isinstance(obj, AutoGluonObject)
+                            min_config = strip_config_space(sub_config, prefix=str(idx))
+                            kwargs[k].append(obj._lazy_init(**min_config))
                 args = self._args
                 return Cls(*args, **kwargs)
 

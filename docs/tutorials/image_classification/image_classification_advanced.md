@@ -22,7 +22,7 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
+dataset = task.Dataset(train_path='~/data/train')
 ```
 
 ## Understanding default configurations of AutoGluon's fit
@@ -47,7 +47,7 @@ The validation and test top-1 accuracy are:
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % results.reward)
-test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+test_dataset = task.Dataset(test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

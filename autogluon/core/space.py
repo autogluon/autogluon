@@ -2,7 +2,7 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper
 
-__all__ = ['Space', 'List', 'Choice', 'Linear', 'LogLinear', 'Int',
+__all__ = ['Space', 'List', 'Categorical', 'Choice', 'Linear', 'LogLinear', 'Int',
            'Bool', 'strip_config_space', 'AutoGluonObject', 'Sequence']
 
 class AutoGluonObject:
@@ -29,9 +29,9 @@ class Sequence(Space):
 
     Example:
         >>> sequence = ag.Sequence(
-        >>>     ag.Choice('conv3x3', 'conv5x5', 'conv7x7'),
-        >>>     ag.Choice('BatchNorm', 'InstanceNorm'),
-        >>>     ag.Choice('relu', 'sigmoid'),
+        >>>     ag.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
+        >>>     ag.Categorical('BatchNorm', 'InstanceNorm'),
+        >>>     ag.Categorical('relu', 'sigmoid'),
         >>> )
     """
     def __init__(self, *args):
@@ -63,14 +63,14 @@ class Sequence(Space):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-class Choice(Space):
+class Categorical(Space):
     """List Search Space
 
     Args:
         data: the choice candidates
 
     Example:
-        >>> net = ag.Choice('resnet50', 'resnet101')
+        >>> net = ag.Categorical('resnet50', 'resnet101')
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -103,9 +103,10 @@ class Choice(Space):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-List = DeprecationHelper(Choice, 'List')
+List = DeprecationHelper(Categorical, 'List')
+Choice = DeprecationHelper(Categorical, 'Choice')
 
-class Linear(Space):
+class Real(Space):
     """linear search space.
 
     Args:
@@ -113,11 +114,13 @@ class Linear(Space):
         upper: the upper bound of the search space
 
     Example:
-        >>> learning_rate = ag.Linear(0.01, 0.1)
+        >>> learning_rate = ag.Real(0.01, 0.1)
     """
     def __init__(self, lower, upper):
         self.lower = lower
         self.upper = upper
+
+Linear = DeprecationHelper(Real, 'Linear')
 
 class LogLinear(Space):
     """log linear search space.

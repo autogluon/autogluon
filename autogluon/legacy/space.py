@@ -5,12 +5,12 @@ import ConfigSpace.hyperparameters as CSH
 __all__ = ['List', 'Linear', 'Log', 'ListSpace',
            'IntSpace', 'LogLinearSpace']
 
-class List(Choice):
+class List(Categorical):
     def __init__(self, objs):
         super().__init__(*objs)
 
     def __repr__(self):
-        reprstr = 'Choice' + str(self.data)
+        reprstr = 'Categorical' + str(self.data)
         return reprstr
 
 class Linear(Space):
@@ -41,6 +41,6 @@ class Log(Space):
                 name=name, lower=self.lower, upper=self.upper, log=True)
         return self.hyper_param
 
-ListSpace = DeprecationHelper(Choice, 'List')
+ListSpace = DeprecationHelper(Categorical, 'List')
 IntSpace = DeprecationHelper(Int, 'Int')
 LogLinearSpace = DeprecationHelper(LogLinear, 'LogLinear')

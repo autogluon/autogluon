@@ -6,18 +6,19 @@ from mxnet.gluon.block import HybridBlock
 from .utils import *
 from .mbconv import *
 
-__all__ = ['EfficientNet', 'get_efficientnet_param', 'get_efficientnet',
+__all__ = ['EfficientNet', 'get_efficientnet_blockargs', 'get_efficientnet',
            'get_efficientnet_b0', 'get_efficientnet_b1', 'get_efficientnet_b2',
            'get_efficientnet_b3', 'get_efficientnet_b4', 'get_efficientnet_b5',
            'get_efficientnet_b6', 'get_efficientnet_b7']
 
 class EfficientNet(HybridBlock):
-    def __init__(self, blocks_args, dropout_rate, num_classes, width_coefficient,
-                 depth_coefficient, depth_divisor, min_depth, drop_connect_rate,
-                 input_size, **kwargs):
+    def __init__(self, blocks_args=None, dropout_rate=0.2, num_classes=1000, width_coefficient=1.0,
+                 depth_coefficient=1.0, depth_divisor=8, min_depth=None, drop_connect_rate=0.2,
+                 input_size=224, **kwargs):
         r"""EfficientNet model from the
             `"EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks"
             <https://arxiv.org/abs/1905.11946>`_ paper.
+
             Parameters
             ----------
             blocks_args: nametuple, it concludes the hyperparameters of the MBConvBlock block.
@@ -31,8 +32,11 @@ class EfficientNet(HybridBlock):
             drop_connect_rate: used for dropout.
         """
         super(EfficientNet, self).__init__(**kwargs)
-        assert isinstance(blocks_args, list), 'blocks_args should be a list'
-        assert len(blocks_args) > 0, 'block args must be greater than 0'
+        if blocks_args is None:
+            blocks_args = get_efficientnet_blockargs()
+        else:
+            assert isinstance(blocks_args, list), 'blocks_args should be a list'
+            assert len(blocks_args) > 0, 'block args must be greater than 0'
         self._blocks_args = blocks_args
         self.input_size = input_size
         with self.name_scope():
@@ -97,7 +101,7 @@ class EfficientNet(HybridBlock):
         return x
 
 
-def get_efficientnet_param():
+def get_efficientnet_blockargs():
     """ Creates a predefined efficientnet model, which searched by original paper. """
     blocks_args = [
         MBConvBlockArgs(kernel=3, num_repeat=1, channels=16, expand_ratio=1, stride=1, se_ratio=0.25, in_channels=32),
@@ -113,7 +117,7 @@ def get_efficientnet_param():
 def get_efficientnet(dropout_rate=None, num_classes=None, width_coefficient=None, depth_coefficient=None,
                      depth_divisor=None, min_depth=None, drop_connect_rate=None, input_size=224, **kwargs):
 
-    blocks_args = get_efficientnet_param()
+    blocks_args = get_efficientnet_blockargs()
     model = EfficientNet(blocks_args, dropout_rate, num_classes, width_coefficient,
                          depth_coefficient, depth_divisor, min_depth, drop_connect_rate,
                          input_size, **kwargs)

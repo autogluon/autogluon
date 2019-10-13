@@ -33,7 +33,7 @@ os.system('unzip -o data.zip -d ~/')
 Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
 ```{.python .input}
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
+dataset = task.Dataset(train_path='~/data/train')
 ```
 
 In the above call, a train/validation data split is automatically constructed based on the provided data, where 90% of the images are used for training and 10% held-out for validation. AutoGluon will automatically tune various hyperparameters of our neural network models in order to maximize classification performance on the validation data.  
@@ -69,7 +69,7 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
 ```{.python .input}
-test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+test_dataset = task.Dataset(test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

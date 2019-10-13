@@ -1,10 +1,13 @@
 """Model store which provides pretrained models."""
 from __future__ import print_function
+
 __all__ = ['get_model_file', 'purge']
+
 import os
 import zipfile
 
 from ..utils import download, check_sha1
+
 
 _model_sha1 = {name: checksum for checksum, name in [
     ('dd74519f956bc608912e413316a7eaa7fac4b365', 'efficientnet_b0'),

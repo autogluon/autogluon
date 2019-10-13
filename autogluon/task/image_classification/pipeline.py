@@ -11,6 +11,7 @@ from gluoncv.model_zoo import get_model
 from .metrics import get_metric_instance
 from ...core.optimizer import SGD, NAG
 from ...core import *
+from ...scheduler.resource import get_cpu_count, get_gpu_count
 from .nets import get_built_in_network
 from .dataset import get_built_in_dataset
 
@@ -23,7 +24,19 @@ lr_schedulers = {
     'cosine': mx.lr_scheduler.CosineScheduler
 }
 
-@autogluon_register_args()
+@autogluon_register_args(
+    net=Choice('ResNet18_v1b', 'ResNet50_v1b'),
+    optimizer= SGD(learning_rate=LogLinear(1e-4, 1e-2),
+                   momentum=0.9, wd=1e-4),
+    lr_scheduler='cosine',
+    loss=gluon.loss.SoftmaxCrossEntropyLoss(),
+    batch_size=64,
+    input_size=224,
+    epochs=20,
+    metric='accuracy',
+    num_cpus=get_cpu_count(),
+    num_gpus=get_gpu_count(),
+    final_fit=False)
 def train_image_classification(args, reporter):
     logger.debug('pipeline args: {}'.format(args))
 
@@ -35,9 +48,16 @@ def train_image_classification(args, reporter):
         net = args.net
         net.initialize(ctx=ctx)
 
+    args.input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
     if isinstance(args.dataset, str):
-        train_dataset = get_built_in_dataset(args.dataset)._lazy_init()
-        val_dataset = get_built_in_dataset(args.dataset, train=False)._lazy_init()
+        train_dataset = get_built_in_dataset(args.dataset, train=True,
+                                             input_size=args.input_size,
+                                             batch_size=batch_size,
+                                             num_workers=args.num_workers)._lazy_init()
+        val_dataset = get_built_in_dataset(args.dataset, train=False,
+                                           input_size=args.input_size,
+                                           batch_size=batch_size,
+                                           num_workers=args.num_workers)._lazy_init()
     else:
         train_dataset = args.dataset.train
         val_dataset = args.dataset.val
@@ -45,16 +65,26 @@ def train_image_classification(args, reporter):
         split = 2 if not args.final_fit else 0
         train_dataset, val_dataset = _train_val_split(train_dataset, split)
 
-    train_data = gluon.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
-        last_batch="rollover", num_workers=args.num_workers)
-    if not args.final_fit:
-        val_data = gluon.data.DataLoader(
-            val_dataset, batch_size=batch_size,
-            shuffle=False, num_workers=args.num_workers)
+    if isinstance(args.dataset, str) and args.dataset.lower() == 'imagenet':
+        train_data = train_dataset
+        if not args.final_fit:
+            val_data = val_dataset
+    else:
+        train_data = gluon.data.DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True,
+            last_batch="rollover", num_workers=args.num_workers)
+        if not args.final_fit:
+            val_data = gluon.data.DataLoader(
+                val_dataset, batch_size=batch_size,
+                shuffle=False, num_workers=args.num_workers)
 
     if isinstance(args.lr_scheduler, str):
-        lr_scheduler = lr_schedulers[args.lr_scheduler](len(train_data) * args.epochs, base_lr=args.optimizer.lr)
+        if args.dataset == 'imagenet':
+            imagenet_samples = 1281167
+            num_batches = imagenet_samples // batch_size
+        else:
+            num_batches = len(train_data)
+        lr_scheduler = lr_schedulers[args.lr_scheduler](num_batches * args.epochs, base_lr=args.optimizer.lr)
     else:
         lr_scheduler = args.lr_scheduler
     args.optimizer.lr_scheduler = lr_scheduler
@@ -65,8 +95,12 @@ def train_image_classification(args, reporter):
 
     def train(epoch):
         for i, batch in enumerate(train_data):
-            data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
-            label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+            if isinstance(train_data, gluon.data.DataLoader):
+                data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
+                label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+            else:
+                data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
+                label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
             with autograd.record():
                 outputs = [net(X) for X in data]
                 loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
@@ -80,8 +114,12 @@ def train_image_classification(args, reporter):
     def test(epoch):
         test_loss = 0
         for i, batch in enumerate(val_data):
-            data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
-            label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+            if isinstance(val_data, gluon.data.DataLoader):
+                data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
+                label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+            else:
+                data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
+                label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
             outputs = [net(X) for X in data]
             loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
 

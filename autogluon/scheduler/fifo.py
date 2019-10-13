@@ -25,6 +25,7 @@ searchers = {
     'hyperband': RandomSearcher,
     'random': RandomSearcher,
     'bayesopt': SKoptSearcher,
+    'grid': GridSearcher,
 }
 
 class FIFOScheduler(TaskScheduler):
@@ -71,6 +72,7 @@ class FIFOScheduler(TaskScheduler):
         self.args = args if args else train_fn.args
         self.resource = resource
         self.searcher = searchers[searcher](train_fn.cs, **search_options) if isinstance(searcher, str) else searcher
+        num_trials = len(self.searcher) if searcher == 'grid' else num_trials# and len(self.searcher) < num_trials else num_trials
         # meta data
         self.metadata = train_fn.get_kwspaces()
         keys = copy.deepcopy(list(self.metadata.keys()))

@@ -5,12 +5,14 @@ from mxnet.gluon.data.vision import transforms
 import gluoncv.data.transforms as gcv_transforms
 from ...core import *
 from ..base import BaseDataset
+from ...utils import get_data_rec
 
 __all__ = ['get_built_in_dataset', 'ImageClassificationDataset']
 
 built_in_datasets = [
     'cifar10',
     'cifar100',
+    'imagenet',
 ]
 
 @autogluon_object()
@@ -35,6 +37,7 @@ class ImageClassificationDataset(object):
         self.name = name
         self.train_path = train_path
         self.val_path = val_path
+        self.input_size = input_size
         resize = int(math.ceil(input_size / crop_ratio))
         self.transform_train = transforms.Compose([
                 transforms.Resize(resize),
@@ -58,9 +61,9 @@ class ImageClassificationDataset(object):
     def _read_dataset(self, **kwargs):
         import time
         if self.name in built_in_datasets:
-            self.train = get_built_in_dataset(self.name, train=True)._lazy_init()
+            self.train = get_built_in_dataset(self.name, train=True, input_size=self.input_size)._lazy_init()
             self.val = None
-            self.test = get_built_in_dataset(self.name, train=False)._lazy_init()
+            self.test = get_built_in_dataset(self.name, train=False, input_size=self.input_size)._lazy_init()
             self.num_classes = len(np.unique(self.train._label))
         else:
             if self.train_path is not None:
@@ -81,7 +84,9 @@ class ImageClassificationDataset(object):
                 raise NotImplementedError
 
 @autogluon_function()
-def get_built_in_dataset(name, train=True):
+def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32, **kwargs):
+    """AutoGluonFunction
+    """
     if name == 'cifar10':
         transform_split = transforms.Compose([
             gcv_transforms.RandomCrop(32, pad=4),
@@ -104,5 +109,16 @@ def get_built_in_dataset(name, train=True):
             transforms.Normalize([0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010])
         ])
         return gluon.data.vision.CIFAR100(train=train).transform_first(transform_split)
+    elif name == 'imagenet':
+        # Please setup the ImageNet dataset following the tutorial from GluonCV
+        if train:
+            rec_file = '/media/ramdisk/rec/train.rec'
+            rec_file_idx = '/media/ramdisk/rec/train.idx'
+        else:
+            rec_file = '/media/ramdisk/rec/val.rec'
+            rec_file_idx = '/media/ramdisk/rec/val.idx'
+        data_loader = get_data_rec(input_size, 0.875, rec_file, rec_file_idx,
+                                   batch_size, num_workers, train, **kwargs)
+        return data_loader
     else:
         raise NotImplemented

@@ -9,6 +9,7 @@ __all__ = ['BaseDataset', 'BaseTask']
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
+    'grid': FIFOScheduler,
     'random': FIFOScheduler,
     'bayesopt': FIFOScheduler,
     'hyperband': HyperbandScheduler,

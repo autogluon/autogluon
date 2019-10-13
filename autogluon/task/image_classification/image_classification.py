@@ -1,4 +1,5 @@
 import logging
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import mxnet as mx
@@ -10,9 +11,10 @@ from ...core.optimizer import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
+from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 
-from .dataset import ImageClassificationDataset
+from .dataset import ImageClassificationDataset, get_built_in_dataset
 from .pipeline import train_image_classification
 from .metrics import get_metric_instance
 
@@ -25,9 +27,9 @@ class ImageClassification(BaseTask):
     """
     Dataset = ImageClassificationDataset
     @staticmethod
-    def fit(dataset='cifar10',
-            net=Choice('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=Choice(
+    def fit(dataset,
+            net=Categorical('ResNet34_v1b', 'ResNet50_v1b'),
+            optimizer=Categorical(
                 SGD(learning_rate=LogLinear(1e-4, 1e-2),
                     momentum=LogLinear(0.85, 0.95),
                     wd=LogLinear(1e-5, 1e-3)),
@@ -37,10 +39,11 @@ class ImageClassification(BaseTask):
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
+            input_size=224,
             epochs=20,
             metric='accuracy',
             num_cpus=4,
-            num_gpus=1,
+            num_gpus=get_gpu_count(),
             search_strategy='random',
             search_options={},
             time_limits=None,
@@ -53,12 +56,12 @@ class ImageClassification(BaseTask):
             auto_search=True):
 
         """
-        Fit networks on dataset
+        Auto fit on image classification dataset
 
         Args:
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): optimizer candidates.
+            net (str, autogluon.AutoGluonObject, or ag.Categorical of AutoGluonObject): Network candidates.
+            optimizer (str, autogluon.AutoGluonObject, or ag.Categorical of AutoGluonObject): optimizer candidates.
             metric (str or object): observation metric.
             loss (object): training loss function.
             num_trials (int): number of trials in the experiment.
@@ -70,10 +73,10 @@ class ImageClassification(BaseTask):
 
 
         Example:
-            >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
-            >>>                         test_path='data/test')
+            >>> dataset = task.Dataset(train_path='~/data/train',
+            >>>                        test_path='data/test')
             >>> results = task.fit(dataset,
-            >>>                    nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
+            >>>                    nets=ag.Categorical['resnet18_v1', 'resnet34_v1'],
             >>>                    time_limits=time_limits,
             >>>                    num_gpus=1,
             >>>                    num_trials = 4)
@@ -82,6 +85,9 @@ class ImageClassification(BaseTask):
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics
             pass
+
+        num_cpus = get_cpu_count() if num_cpus > get_cpu_count() else num_cpus
+        num_gpus = get_gpu_count() if num_gpus > get_gpu_count() else num_gpus
 
         train_image_classification.update(
             dataset=dataset,
@@ -92,6 +98,7 @@ class ImageClassification(BaseTask):
             metric=metric,
             num_gpus=num_gpus,
             batch_size=batch_size,
+            input_size=input_size,
             epochs=epochs,
             num_workers=num_cpus,
             final_fit=False)
@@ -124,7 +131,6 @@ class ImageClassification(BaseTask):
          Example:
             >>> ind, prob = task.predict('example.jpg')
         """
-        logger.info('Start predicting.')
         # load and display the image
         img = mx.image.imread(img)
         plt.imshow(img.asnumpy())
@@ -139,12 +145,11 @@ class ImageClassification(BaseTask):
         ctx = mx.gpu(0)if args.num_gpus > 0 else mx.cpu()
         pred = cls.results.model(img.expand_dims(0).as_in_context(ctx))
         ind = mx.nd.argmax(pred, axis=1).astype('int')
-        logger.info('Finished.')
         mx.nd.waitall()
         return ind, mx.nd.softmax(pred)[0][ind]
 
     @classmethod
-    def evaluate(cls, dataset):
+    def evaluate(cls, dataset, model=None, input_size=224):
         """The task evaluation function given the test dataset.
          Args:
             dataset: test dataset
@@ -153,26 +158,47 @@ class ImageClassification(BaseTask):
             >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
             >>> test_reward = task.evaluate(dataset)
         """
-        logger.info('Start evaluating.')
-        args = cls.scheduler.train_fn.args
+        args = cls.scheduler.train_fn.args if hasattr(cls, 'scheduler') else train_image_classification.args
         batch_size = args.batch_size * max(args.num_gpus, 1)
 
         metric = get_metric_instance(args.metric)
         ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        cls.results.model.collect_params().reset_ctx(ctx)
+        if isinstance(model, str):
+            from ...nas.model_zoo import get_model
+            model = get_model(model, pretrained=True, ctx=ctx)
+        if model:
+            model.collect_params().reset_ctx(ctx)
+        else:
+            cls.results.model.collect_params().reset_ctx(ctx)
 
         if isinstance(dataset, AutoGluonObject):
-            dataset = dataset._lazy_init()
-        test_data = gluon.data.DataLoader(
-            dataset.test, batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
+            dataset = dataset.init()
+        elif isinstance(dataset, str):
+            dataset = get_built_in_dataset(dataset, train=False, input_size=input_size,
+                                           batch_size=args.batch_size,
+                                           num_workers=args.num_cpus).init()
 
-        for i, batch in enumerate(test_data):
-            data = mx.gluon.utils.split_and_load(batch[0], ctx_list=ctx,
-                                                 batch_axis=0, even_split=False)
-            label = mx.gluon.utils.split_and_load(batch[1], ctx_list=ctx,
-                                                  batch_axis=0, even_split=False)
-            outputs = [cls.results.model(X) for X in data]
+        if isinstance(dataset, ImageClassificationDataset):
+            test_data = gluon.data.DataLoader(
+                dataset.test, batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
+        elif isinstance(dataset, gluon.data.Dataset):
+            test_data = gluon.data.DataLoader(
+                dataset, batch_size=batch_size,
+                shuffle=False, num_workers=args.num_workers)
+        else:
+            test_data = dataset
+
+        tbar = tqdm(enumerate(test_data))
+        for i, batch in tbar:
+            if isinstance(test_data, gluon.data.DataLoader):
+                data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
+                label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+            else:
+                data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
+                label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
+            outputs = [model(X) for X in data]
             metric.update(label, outputs)
+            _, test_reward = metric.get()
+            tbar.set_description('{}: {}'.format(args.metric, test_reward))
         _, test_reward = metric.get()
-        logger.info('Finished.')
         return test_reward
