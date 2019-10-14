@@ -108,7 +108,7 @@ def _add_conv(out, channels=1, kernel=1, stride=1, pad=0,
     if batchnorm:
         out.add(nn.BatchNorm(scale=True, momentum=0.99, epsilon=1e-3))
     if activation == 'relu':
-        out.add(Swish())
+        out.add(nn.Activation('relu'))
     elif activation == 'swish':
         out.add(Swish())
 

@@ -25,7 +25,7 @@ lr_schedulers = {
 }
 
 @autogluon_register_args(
-    net=Choice('ResNet18_v1b', 'ResNet50_v1b'),
+    net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
     optimizer= SGD(learning_rate=LogLinear(1e-4, 1e-2),
                    momentum=0.9, wd=1e-4),
     lr_scheduler='cosine',
@@ -115,7 +115,6 @@ def train_image_classification(args, reporter):
             mx.nd.waitall()
 
     def test(epoch):
-        test_loss = 0
         for i, batch in enumerate(val_data):
             if isinstance(val_data, gluon.data.DataLoader):
                 data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
@@ -124,15 +123,11 @@ def train_image_classification(args, reporter):
                 data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
                 label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
             outputs = [net(X) for X in data]
-            loss = [L(yhat, y) for yhat, y in zip(outputs, label)]
-
-            test_loss += sum([l.mean().asscalar() for l in loss]) / len(loss)
             metric.update(label, outputs)
 
         _, reward = metric.get()
-        test_loss /= len(val_data)
         if reporter:
-            reporter(epoch=epoch, reward=reward, loss=test_loss)
+            reporter(epoch=epoch, reward=reward)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
