@@ -10,9 +10,6 @@ We begin by specifying `image_classification` as our task of interest:
 
 ```{.python .input}
 from autogluon import ImageClassification as task
-
-import logging
-logging.basicConfig(level=logging.INFO)
 ```
 
 
@@ -53,7 +50,8 @@ time_limits = 3*60 # 3mins
 epochs = 10
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  

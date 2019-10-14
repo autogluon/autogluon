@@ -125,8 +125,7 @@ class FIFOScheduler(TaskScheduler):
             if time_out and time.time() - start_time >= time_out \
                     or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
-            tbar.set_description('Current best reward: {} and best config: {}'
-                                 .format(self.get_best_reward(), json.dumps(self.get_best_config())))
+            tbar.set_description('Current best reward: {} '.format(self.get_best_reward()))
             self.schedule_next()
 
     def save(self, checkpoint=None):

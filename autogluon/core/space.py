@@ -161,7 +161,7 @@ class Bool(Int):
 
 def _get_hp(name, space):
     assert isinstance(space, Space)
-    if isinstance(space, Linear):
+    if isinstance(space, Real):
         return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper)
     elif isinstance(space, LogLinear):
         return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper, log=True)

@@ -52,7 +52,7 @@ requirements = [
     'pytest',
     'dask[complete]==2.0.0',
     'tornado',
-    'ConfigSpace=0.4.10',
+    'ConfigSpace==0.4.10',
     'nose',
     'gluoncv',
     'gluonnlp',

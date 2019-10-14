@@ -28,6 +28,7 @@ class BaseTask(object):
     def run_fit(cls, train_fn, search_strategy, scheduler_options):
         start_time = time.time()
         # create scheduler and schedule tasks
+        debug = scheduler_options.pop('debug')
         if isinstance(search_strategy, str):
             scheduler = schedulers[search_strategy.lower()]
         else:
@@ -35,16 +36,19 @@ class BaseTask(object):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         cls.scheduler = scheduler(train_fn, **scheduler_options)
-        cls.scheduler.run()
-        cls.scheduler.join_tasks()
-        # final fit
-        best_reward = cls.scheduler.get_best_reward()
-        best_config = cls.scheduler.get_best_config()
-        args = train_fn.args
-        args.final_fit = True
-        model = train_fn(args, best_config, reporter=None)
-        #best_config = cls.scheduler.searcher.get_config()
-        #model = train_fn(train_fn.args, best_config, reporter=None)
+        if debug:
+            best_config = cls.scheduler.searcher.get_config()
+            best_reward = 0
+            model = train_fn(train_fn.args, best_config, reporter=None)
+        else:
+            cls.scheduler.run()
+            cls.scheduler.join_tasks()
+            best_reward = cls.scheduler.get_best_reward()
+            best_config = cls.scheduler.get_best_config()
+            args = train_fn.args
+            args.final_fit = True
+            # final fit
+            model = train_fn(args, best_config, reporter=None)
         total_time = time.time() - start_time
         cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
         return cls.results

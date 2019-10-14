@@ -215,7 +215,8 @@ On your own, please feel free to try running the following commands with small t
 
 ```{.python .input}
 # time_limits = 10 * 60 # 10mins
-# results = task.fit(dataset, time_limits=time_limits)
+# results = task.fit(dataset, time_limits=time_limits,
+#                    num_gpus=1)
 ```
 
 The top-1 accuracy of the best model on the validation set is:

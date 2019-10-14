@@ -54,7 +54,8 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True):
+            auto_search=True,
+            debug=False):
 
         """
         Auto fit on image classification dataset
@@ -117,6 +118,7 @@ class ImageClassification(BaseTask):
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
+            'debug': debug,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
@@ -168,10 +170,10 @@ class ImageClassification(BaseTask):
         if isinstance(model, str):
             from ...nas.model_zoo import get_model
             model = get_model(model, pretrained=True, ctx=ctx)
-        if model:
             model.collect_params().reset_ctx(ctx)
         else:
             cls.results.model.collect_params().reset_ctx(ctx)
+            model = cls.results.model
 
         if isinstance(dataset, AutoGluonObject):
             dataset = dataset.init()
@@ -180,13 +182,14 @@ class ImageClassification(BaseTask):
                                            batch_size=args.batch_size,
                                            num_workers=args.num_cpus).init()
 
-        if isinstance(dataset, ImageClassificationDataset):
-            test_data = gluon.data.DataLoader(
-                dataset.test, batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
-        elif isinstance(dataset, gluon.data.Dataset):
+        if isinstance(dataset, gluon.data.Dataset):
             test_data = gluon.data.DataLoader(
                 dataset, batch_size=batch_size,
                 shuffle=False, num_workers=args.num_workers)
+        elif hasattr(dataset, 'test'):
+            test_data = gluon.data.DataLoader(
+                dataset.test, batch_size=batch_size, shuffle=False,
+                num_workers=args.num_workers)
         else:
             test_data = dataset
 

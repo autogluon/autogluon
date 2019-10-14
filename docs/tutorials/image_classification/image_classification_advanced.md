@@ -40,7 +40,8 @@ We first again use the default arguments of the `fit` function to train the neur
 ```{.python .input}
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -129,7 +130,8 @@ Let's then call `fit` using these manually-specified network candidates, and eva
 results = task.fit(dataset,
                    nets,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -181,7 +183,8 @@ results = task.fit(dataset,
                    optimizer=optimizers,
                    lr_scheduler=ag.List('poly', 'cosine'),
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -220,7 +223,8 @@ results = task.fit(dataset,
                    lr_scheduler=ag.List('poly', 'cosine'),
                    search_strategy=search_strategy,
                    time_limits=time_limits,
-                   epochs=4)
+                   epochs=4,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:

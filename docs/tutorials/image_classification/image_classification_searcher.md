@@ -28,7 +28,8 @@ The default searcher employed by AutoGluon is random search, which simply tries 
 results = task.fit(dataset,
                    search_strategy='random',
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The resulting validation and test top-1 accuracy obtained through random search within the given `time_limits` and `epochs` constraints are:
@@ -50,7 +51,8 @@ You can specify `task.fit` should find hyperparameters via Bayesian optimization
 results = task.fit(dataset,
                    search_strategy='bayesopt',
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `epochs` constraints) are:
@@ -70,7 +72,8 @@ results = task.fit(dataset,
                    search_strategy='bayesopt', 
                    search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)

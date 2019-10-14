@@ -31,7 +31,8 @@ epochs = 10
 
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -55,7 +56,8 @@ search_strategy = 'hyperband'
 results = task.fit(dataset,
                    search_strategy=search_strategy,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -177,7 +179,8 @@ Then we can use our defined scheduler:
 results = task.fit(dataset,
                    search_strategy=MedianStopping_Scheduler,
                    time_limits=time_limits,
-                   epochs=epochs)
+                   epochs=epochs,
+                   num_gpus=1)
 ```
 
 Print the result:
