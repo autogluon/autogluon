@@ -235,6 +235,36 @@ def train_text_classification(args, reporter=None):
     train_data, dev_data_list, test_data_list, num_train_examples = preprocess_data(
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary, args.pad)
 
+    def _train_val_split(train_dataset):
+        split = args.data.split
+        if split == 0:
+            return train_dataset, None
+        split_len = int(len(train_dataset) / 10)
+        if split == 1:
+            data = [train_dataset[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_dataset))]
+            label = [np.array([train_dataset[i][1]]) for i in
+                     range(split * split_len, len(train_dataset))]
+        else:
+            data = [train_dataset[i][0].expand_dims(0) for i in
+                    range((split - 1) * split_len)] + \
+                   [train_dataset[i][0].expand_dims(0) for i in
+                    range(split * split_len, len(train_dataset))]
+            label = [np.array([train_dataset[i][1]]) for i in range((split - 1) * split_len)] + \
+                    [np.array([train_dataset[i][1]]) for i in
+                     range(split * split_len, len(train_dataset))]
+        train = gluon.data.dataset.ArrayDataset(
+            nd.concat(*data, dim=0),
+            np.concatenate(tuple(label), axis=0))
+        val_data = [train_dataset[i][0].expand_dims(0) for i in
+                    range((split - 1) * split_len, split * split_len)]
+        val_label = [np.array([train_dataset[i][1]]) for i in
+                     range((split - 1) * split_len, split * split_len)]
+        val = gluon.data.dataset.ArrayDataset(
+            nd.concat(*val_data, dim=0),
+            np.concatenate(tuple(val_label), axis=0))
+        return train, val
+
     def test(loader_test, segment):
         """Inference function on the test dataset."""
         logging.info('Now we are doing testing on %s with %s.', segment, ctx)
