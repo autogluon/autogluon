@@ -59,7 +59,7 @@ class NNTabularModel(AbstractModel):
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None):
-        X_train = self.preprocess(X_train)  # TODO: Handle cases where features have been removed due to tuning, currently crashes!
+        X_train = self.preprocess(X_train)
         if X_test is not None:
             X_test = self.preprocess(X_test)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train, X_test, Y_test)

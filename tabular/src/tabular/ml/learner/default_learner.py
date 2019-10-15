@@ -4,10 +4,9 @@ import pandas as pd
 import copy
 
 from tabular.ml.learner.abstract_learner import AbstractLearner
-from tabular.ml.constants import LANGUAGE_MODEL, REGRESSION
+from tabular.ml.constants import REGRESSION
 from tabular.ml.cleaner import Cleaner
 from tabular.ml.label_cleaner import LabelCleaner
-from tabular.ml.trainer.lm_trainer import LMTrainer
 from tabular.ml.trainer.auto_trainer import AutoTrainer
 
 
@@ -44,12 +43,6 @@ class DefaultLearner(AbstractLearner):
         if self.objective_func is None:
             self.objective_func = trainer.objective_func
 
-        ##########
-        # Uncomment below and comment original fit transform to test categorical feature data leakage in unseen data
-        # X_train = self.feature_generator.fit_transform(X_train, banned_features=self.submission_columns)
-        # X_test = self.feature_generator.transform(X_test)
-        ##########
-
         self.save()
 
         trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
@@ -68,14 +61,9 @@ class DefaultLearner(AbstractLearner):
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
         X = self.cleaner.clean(X)
 
-        ##########
-        # Enable below for local testing
         if sample is not None:
             X = X.sample(n=sample, random_state=self.random_state).reset_index(drop=True)
             X = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold).clean(X=X)
-            # if X_test is not None:
-            #     X_test = X_test.head(sample)
-        ##########
 
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label])
 

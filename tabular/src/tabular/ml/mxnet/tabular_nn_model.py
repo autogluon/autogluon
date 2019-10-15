@@ -198,7 +198,7 @@ class TabularNeuralNetModel(AbstractModel):
         """
         if self.feature_types_metadata is None:
             raise ValueError("Trainer class must set feature_types_metadata for this model")
-        X_train = self.preprocess(X_train)  # TODO from grail: Handle cases where features have been removed due to tuning, currently crashes.
+        X_train = self.preprocess(X_train)
         if self.features is None:
             self.features = list(X_train.columns)
         print('features: ', self.features)
