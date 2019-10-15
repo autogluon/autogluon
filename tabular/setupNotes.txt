@@ -1,5 +1,7 @@
 # Current Notes for setting up autogluon with tabular prediction (on Mac):
 
+# Create virtualenv: python3 -m venv TabularAutoGluon
+
 cd ~/Documents/AutoGluon/githubAutogluon/auto-ml-with-gluon/
 source ~/virtual/TabularAutoGluon/bin/activate
 
