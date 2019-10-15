@@ -9,14 +9,17 @@ import copy
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, enable_nlp_vectorizer_features=True, enable_nlp_ratio_features=True, enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
-                 vectorizer=vectorizer_auto_ml_default()):
+                 vectorizer=None):
         super().__init__()
         self.enable_nlp_features = enable_nlp_vectorizer_features
         self.enable_nlp_ratio_features = enable_nlp_ratio_features
         self.enable_categorical_features = enable_categorical_features
         self.enable_raw_features = enable_raw_features
         self.enable_datetime_features = enable_datetime_features
-        self.vectorizer_default_raw = vectorizer
+        if vectorizer is None:
+            self.vectorizer_default_raw = vectorizer_auto_ml_default()
+        else:
+            self.vectorizer_default_raw = vectorizer
         self.vectorizers = []
 
     # TODO: Parallelize with decorator!
