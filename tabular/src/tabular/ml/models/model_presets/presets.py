@@ -7,6 +7,7 @@ from tabular.ml.tuning.hyperparameters.defaults.nn.parameters import get_param_b
 
 from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
+# TODO: Don't pass in num_boost_round, have it be defined in hyperparmeters?
 def get_preset_models(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     if problem_type == BINARY:
         return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)

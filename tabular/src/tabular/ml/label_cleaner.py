@@ -44,6 +44,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         return cat_mappings_dependent_var
 
 
+# TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
     def __init__(self, y: Series):
         self.num_classes = None
