@@ -4,10 +4,11 @@ import pickle
 import copy
 import logging
 from collections import OrderedDict
+import multiprocessing as mp
 
-from ..basic import load
+from ..utils import load, DeprecationHelper
 
-__all__ = ['BaseSearcher', 'RandomSampling']
+__all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class BaseSearcher(object):
             The configuration space to sample from. It contains the full
             specification of the Hyperparameters with their priors
     """
+    LOCK = mp.Lock()
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
@@ -35,34 +37,46 @@ class BaseSearcher(object):
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
-    def update(self, config, reward, model_params=None):
+    def update(self, config, reward):
         """Update the searcher with the newest metric report
         """
-        #if model_params is not None and reward > self.get_best_reward():
-        #    self._best_model_params = model_params
-        self._results[json.dumps(config)] = reward
-        logger.info('Finished Task with config: {} and reward: {}'.format(json.dumps(config), reward))
+        with self.LOCK:
+            self._results[pickle.dumps(config)] = reward
+        logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
 
     def get_best_reward(self):
-        config = max(self._results, key=self._results.get)
-        return self._results[config]
+        with self.LOCK:
+            if len(self._results) > 0:
+                config = max(self._results, key=self._results.get)
+                return self._results[config]
+        return 0.0
+
+    def get_reward(self, config):
+        k = pickle.dumps(config)
+        with self.LOCK:
+            assert k in self._results
+            return self._results[k]
 
     def get_best_config(self):
-        config = max(self._results, key=self._results.get)
-        return json.loads(config)
+        with self.LOCK:
+            if len(self._results) > 0:
+                config = max(self._results, key=self._results.get)
+                return pickle.loads(config)
+            else:
+                return {}
 
     def is_best(self, config):
         best_config = max(self._results, key=self._results.get)
-        return json.dumps(config) == best_config
+        return pickle.dumps(config) == best_config
 
     def get_best_state_path(self):
         assert os.path.isfile(self._best_state_path), \
-            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+            'Please use reporter.save_dict(model_params) during the training.'
         return self._best_state_path
 
     def get_best_state(self):
         assert os.path.isfile(self._best_state_path), \
-            'Please use report_best_state_pather.save_dict(model_params) during the training.'
+            'Please use reporter.save_dict(model_params) during the training.'
         return load(self._best_state_path)
 
     def update_best_state(self, filepath):
@@ -70,13 +84,15 @@ class BaseSearcher(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
-            'ConfigSpace: ' + str(self.configspace) + \
-            'Results: ' + str(self._results) + \
+            '\nConfigSpace: {}.'.format(str(self.configspace)) + \
+            '\nNumber of Trials: {}.'.format(len(self._results)) + \
+            '\nBest Config: {}'.format(self.get_best_config()) + \
+            '\nBest Reward: {}'.format(self.get_best_reward()) + \
             ')'
         return reprstr
 
 
-class RandomSampling(BaseSearcher):
+class RandomSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
 
     Args:
@@ -92,7 +108,7 @@ class RandomSampling(BaseSearcher):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> # create searcher
-        >>> searcher = RandomSampling(cs)
+        >>> searcher = RandomSearcher(cs)
         >>> searcher.get_config()
     """
     def get_config(self):
@@ -104,12 +120,15 @@ class RandomSampling(BaseSearcher):
                 must return a valid configuration and a (possibly empty) info dict
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
-        while json.dumps(new_config) in self._results.keys():
+        while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[json.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = 0
         return new_config
 
     def update(self, *args, **kwargs):
         """Update the searcher with the newest metric report
         """
-        super(RandomSampling, self).update(*args, **kwargs)
+        super(RandomSearcher, self).update(*args, **kwargs)
+
+RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
+

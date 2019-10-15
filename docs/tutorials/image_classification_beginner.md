@@ -9,7 +9,7 @@ Besides, you could easily specify for greater control over the training process 
 We begin by specifying `image_classification` as our task of interest:
 
 ```{.python .input}
-from autogluon import image_classification as task
+from autogluon import ImageClassification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -50,10 +50,10 @@ However, neural network training can be quite time-costly. To ensure quick runti
 
 ```{.python .input}
 time_limits = 3*60 # 3mins
-num_training_epochs = 10
+epochs = 10
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
@@ -61,7 +61,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.metric)
+print('Top-1 val acc: %.3f' % results.reward)
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
@@ -80,7 +80,7 @@ Given an example image, we can easily use the final model to `predict` the label
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
+      (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.

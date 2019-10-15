@@ -159,7 +159,6 @@ def train_object_detection(args, reporter):
             if _demo_early_stopping(i):
                 break
         mx.nd.waitall()
-        reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     def test(epoch):
         metric.reset()

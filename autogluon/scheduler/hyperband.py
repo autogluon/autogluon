@@ -1,22 +1,20 @@
-import os
 import pickle
 import logging
 import threading
 import numpy as np
 import multiprocessing as mp
 
-from .scheduler import *
-from .fifo import FIFO_Scheduler
-from ..resource import Resources
-from .reporter import StatusReporter
+from ..core import Task
+from .fifo import FIFOScheduler
+from .reporter import DistStatusReporter, DistSemaphore
+from ..utils import DeprecationHelper
 
-__all__ = ['Hyperband_Scheduler']
+__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler']
 
 logger = logging.getLogger(__name__)
 
-
 # Async version of Hyperband used in computation heavy tasks such as deep learning
-class Hyperband_Scheduler(FIFO_Scheduler):
+class HyperbandScheduler(FIFOScheduler):
     """Implements the Async Hyperband
     This should provide similar theoretical performance as HyperBand but
     avoid straggler issues that HyperBand faces. One implementation detail
@@ -50,26 +48,23 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
         >>> cs.add_hyperparameter(lr)
         >>> searcher = RandomSampling(cs)
-        >>> myscheduler = Hyperband_Scheduler(train_fn, args,
-        >>>                                   resource={'num_cpus': 2, 'num_gpus': 0},
-        >>>                                   searcher=searcher, num_trials=20,
-        >>>                                   reward_attr='accuracy',
-        >>>                                   time_attr='epoch',
-        >>>                                   grace_period=1)
+        >>> myscheduler = HyperbandScheduler(train_fn, args,
+        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
+        >>>                                  searcher=searcher, num_trials=20,
+        >>>                                  reward_attr='accuracy',
+        >>>                                  time_attr='epoch',
+        >>>                                  grace_period=1)
     """
-
-    def __init__(self, train_fn, args, resource, searcher,
-                 checkpoint='./exp/checkerpoint.ag',
-                 resume=False,
-                 num_trials=None,
-                 time_attr="training_epoch",
-                 reward_attr="accuracy",
-                 max_t=100, grace_period=10,
-                 reduction_factor=4, brackets=1,
-                 visualizer='tensorboard'):
-        super(Hyperband_Scheduler, self).__init__(train_fn, args, resource, searcher,
-                                                  checkpoint, resume, num_trials,
-                                                  time_attr, reward_attr, visualizer)
+    def __init__(self, train_fn, args=None, resource={'num_cpus': 1, 'num_gpus': 0},
+                 searcher='random', search_options={}, checkpoint='./exp/checkerpoint.ag',
+                 resume=False, num_trials=None, time_out=None, max_reward=1.0,
+                 time_attr="epoch", reward_attr="accuracy", max_t=100, grace_period=10,
+                 reduction_factor=4, brackets=1, visualizer='none', dist_ip_addrs=[]):
+        super(HyperbandScheduler, self).__init__(
+            train_fn=train_fn, args=args, resource=resource, searcher=searcher,
+            search_options=search_options, checkpoint=checkpoint, resume=resume,
+            num_trials=num_trials, time_out=time_out, max_reward=max_reward, time_attr=time_attr,
+            reward_attr=reward_attr, visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)
         self.terminator = Hyperband_Manager(time_attr, reward_attr, max_t, grace_period,
                                             reduction_factor, brackets)
 
@@ -79,78 +74,85 @@ class Hyperband_Scheduler(FIFO_Scheduler):
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
         """
-        logger.debug("Adding A New Task {}".format(task))
-        Hyperband_Scheduler.RESOURCE_MANAGER._request(task.resources)
+        cls = HyperbandScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        # reporter and terminator
+        reporter = DistStatusReporter()
+        terminator_semaphore = DistSemaphore(0)
+        task.args['reporter'] = reporter
+        task.args['terminator_semaphore'] = terminator_semaphore
+        self.terminator.on_task_add(task)
+        # main process
+        tp = threading.Thread(target=cls._start_distributed_task, args=(
+                              task, cls.RESOURCE_MANAGER, self.env_sem))
+        # reporter thread
+        checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
+        rp = threading.Thread(target=self._run_reporter,
+                              args=(task, tp, reporter, self.searcher, self.terminator,
+                                    checkpoint_semaphore, terminator_semaphore), daemon=False)
+        tp.start()
+        rp.start()
+        task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'], 'Task': task,
+                     'Process': tp, 'ReporterThread': rp}
+        # checkpoint thread
+        if self._checkpoint is not None:
+            sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
+                                  daemon=False)
+            sp.start()
+            task_dict['CheckpointThead'] = sp
+
         with self.LOCK:
-            state_dict_path = os.path.join(os.path.dirname(self._checkpoint),
-                                           'task{}_state_dict.ag'.format(task.task_id))
-            reporter = StatusReporter(state_dict_path)
-            task.args['reporter'] = reporter
-            task.args['task_id'] = task.task_id
-            task.args['resources'] = task.resources
-            
-            self.terminator.on_task_add(task)
-            # main process
-            tp = mp.Process(target=Hyperband_Scheduler._run_task, args=(
-                task.fn, task.args, task.resources,
-                Hyperband_Scheduler.RESOURCE_MANAGER))
-            # reporter thread
-            checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
-            rp = threading.Thread(target=self._run_reporter,
-                                  args=(task, tp, reporter, self.searcher, self.terminator,
-                                        checkpoint_semaphore), daemon=False)
-            tp.start()
-            rp.start()
-            task_dict = {'TASK_ID': task.task_id, 'Config': task.args['config'],
-                         'Process': tp, 'ReporterThread': rp}
-            # checkpoint thread
-            if self._checkpoint is not None:
-                sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
-                                      daemon=False)
-                sp.start()
-                task_dict['CheckpointThead'] = sp
             self.scheduled_tasks.append(task_dict)
 
+    def _run_checkpoint(self, checkpoint_semaphore):
+        self._cleaning_tasks()
+        checkpoint_semaphore.acquire()
+        logger.debug('Saving Checkerpoint')
+        self.save()
+
     def _run_reporter(self, task, task_process, reporter, searcher, terminator,
-                      checkpoint_semaphore):
+                      checkpoint_semaphore, terminator_semaphore):
         last_result = None
         while task_process.is_alive():
             reported_result = reporter.fetch()
             if 'done' in reported_result and reported_result['done'] is True:
-                terminator.on_task_complete(task, last_result)
                 reporter.move_on()
+                terminator_semaphore.release()
+                terminator.on_task_complete(task, last_result)
                 task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
             self.add_training_result(task.task_id, reported_result)
             if terminator.on_task_report(task, reported_result):
+                last_result = reported_result
                 reporter.move_on()
             else:
-                logger.debug('Removing task {} due to low performance'.format(task))
                 last_result = reported_result
                 last_result['terminated'] = True
-                task_process.terminate()
+                logger.debug('Removing task with ID {} due to low performance'.format(task.task_id))
+                terminator_semaphore.release()
                 terminator.on_task_remove(task)
                 task_process.join()
-                Hyperband_Scheduler.RESOURCE_MANAGER._release(task.resources)
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            last_result = reported_result
         searcher.update(task.args['config'], last_result[self._reward_attr])
-        if searcher.is_best(task.args['config']):
-            searcher.update_best_state(reporter.dict_path)
 
     def state_dict(self, destination=None):
-        destination = super(Hyperband_Scheduler, self).state_dict(destination)
+        destination = super(HyperbandScheduler, self).state_dict(destination)
         destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
     def load_state_dict(self, state_dict):
-        super(Hyperband_Scheduler, self).load_state_dict(state_dict)
+        super(HyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
+
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + '(' +  \
+            'terminator: ' + self.terminator
+        return reprstr
 
 
 class Hyperband_Manager(object):
@@ -284,3 +286,5 @@ class _Bracket():
             for milestone, recorded in self._rungs
         ])
         return "Bracket: " + iters
+
+DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler, 'DistributedHyperbandScheduler')

@@ -3,9 +3,12 @@ import requests
 import errno
 import shutil
 import hashlib
+import logging
 from tqdm import tqdm
 
-__all__ = ['download', 'mkdir', 'check_sha1']
+logger = logging.getLogger(__name__)
+
+__all__ = ['download', 'mkdir', 'check_sha1', 'raise_num_file']
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
@@ -40,7 +43,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        print('Downloading %s from %s...'%(fname, url))
+        logger.info('Downloading %s from %s...'%(fname, url))
         r = requests.get(url, stream=True)
         if r.status_code != 200:
             raise RuntimeError("Failed downloading url %s"%url)
@@ -100,3 +103,35 @@ def mkdir(path):
         else:
             raise
 
+def raise_num_file(nofile_atleast=4096):
+    try:
+        import resource as res
+    except ImportError: #Windows
+        res = None
+    if res is None:
+        return (None,)*2
+    # what is current ulimit -n setting?
+    soft,ohard = res.getrlimit(res.RLIMIT_NOFILE)
+    hard = ohard
+    # increase limit (soft and even hard) if needed
+    if soft < nofile_atleast:
+        soft = nofile_atleast
+
+        if hard<soft:
+            hard = soft
+
+        #logger.warning('setting soft & hard ulimit -n {} {}'.format(soft,hard))
+        try:
+            res.setrlimit(res.RLIMIT_NOFILE,(soft,hard))
+        except (ValueError,res.error):
+            try:
+               hard = soft
+               logger.warning('trouble with max limit, retrying with soft,hard {},{}'.format(soft,hard))
+               res.setrlimit(res.RLIMIT_NOFILE,(soft,hard))
+            except Exception:
+               logger.warning('failed to set ulimit')
+               soft,hard = res.getrlimit(res.RLIMIT_NOFILE)
+
+    return soft,hard
+
+raise_num_file()
