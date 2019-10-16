@@ -53,7 +53,7 @@ class DefaultLearner(AbstractLearner):
         X = copy.deepcopy(X)
         # if self.problem_type != REGRESSION:
         #     X[self.label] = X[self.label].fillna('')
-        # TODO (Nick): from original Grail code (it had an error for Regression tasks). I have replaced this by dropping all examples will missing labels below.  If this is no longer needed, delete.
+        # TODO(Nick): from original Grail code (it had an error for Regression tasks). I have replaced this by dropping all examples will missing labels below.  If this is no longer needed, delete.
         
         # Remove all examples with missing labels from this dataset:
         n = len(X)
