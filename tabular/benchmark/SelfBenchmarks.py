@@ -3,22 +3,22 @@
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
     
-    # TODO: we want to assess that Autogluon has correctly inferred the type of each feature (continuous vs categorical vs text)
+    # TODO: assess that Autogluon has correctly inferred the type of each feature (continuous vs categorical vs text)
     
     # TODO: suppress internal AutoGluon print statements, so that only benchmark-info is printed
     
     # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
     
     # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - one-dimensional features
-    - extreme-multiclass classification
+    - test dataset with just one data point
+    - test dataset where order of columns different than in training data (same column names)
+    - extreme-multiclass classification (500+ classes)
     - high-dimensional features + low-sample size
-    - missing labels in training data
     - parquet file format
-    - extreme levels of missingness
-    - classification severe class imbalance
+    - high levels of missingness in test data only, no missingness in train data
+    - classification w severe class imbalance
     - regression with severely skewed Y-values (eg. predicting count data)
-    - trivial prediction problem where y = simple deterministic function of x
+    - text features in dataset
 """
 
 import numpy as np
@@ -43,26 +43,45 @@ EPS = 1e-10
 
 # Information about each dataset in benchmark is stored in dict.
 # performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
-binary_dataset = {'folder': '/Users/jonasmue/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-gluon/tabular/datasets/AdultIncomeData/',
+binary_dataset = {'folder': '~/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-gluon/tabular/datasets/AdultIncomeData/',
                   'name': 'AdultIncomeBinary',
                   'problem_type': BINARY,
                   'label_column': 'class',
-                  'performance_val': 0.129} # mixed types of features
+                  'performance_val': 0.129} # Mixed types of features.
 
-multi_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
+multi_dataset = {'folder': '~/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
                   'name': 'CoverTypeMulticlass',
                   'problem_type': MULTICLASS,
                   'label_column': 'Cover_Type',
-                  'performance_val': 0.032} # 7 classes, all features are numeric
+                  'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
-regression_dataset = {'folder': '/Users/jonasmue/WorkDocs/Datasets/AmesHousingPriceRegression/',
+regression_dataset = {'folder': '~/WorkDocs/Datasets/AmesHousingPriceRegression/',
                    'name': 'AmesHousingRegression',
                   'problem_type': REGRESSION,
                   'label_column': 'SalePrice',
-                  'performance_val': 0.076}
+                  'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
 
- # List containing dicts of information on each dataset
-datasets = [binary_dataset, multi_dataset, regression_dataset]
+toyregres_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyRegression/', 
+                     'name': 'ToyRegression',
+                     'problem_type': REGRESSION, 
+                    'label_column': 'y', 
+                    'performance_val': 0.183}
+# 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
+
+toyclassif_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyClassification/', 
+                     'name': 'ToyClassification',
+                     'problem_type': MULTICLASS, 
+                    'label_column': 'y', 
+                    'performance_val': 0.436}
+# 2-D toy noisy, imbalanced 4-class classification task with: feature missingness, out-of-vocabulary feature categories in test data, out-of-vocabulary labels in test data, training column missing from test data, extra distraction columns in test data
+# toyclassif_dataset should produce 3 warnings:
+# UserWarning: These columns from this dataset were not present in the training dataset (AutoGluon will ignore them):  ['distractioncolumn1', 'distractioncolumn2']
+# UserWarning: The columns listed below from the training data are no longer in the given dataset. (AutoGluon will proceed assuming their values are missing, but you should remove these columns from training dataset and train a new model):  ['lostcolumn']
+# UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples.
+
+
+ # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
+datasets = [toyregres_dataset, toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
 
 # Aggregate performance summaries obtained in previous benchmark run:
 prev_perf_vals = [dataset['performance_val'] for dataset in datasets]
@@ -107,6 +126,7 @@ with warnings.catch_warnings(record=True) as caught_warnings:
         if performance_vals[idx] > dataset['performance_val'] * perf_threshold:
             warnings.warn("Performance on dataset %s is %s times worse than previous performance." % (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
 
+# Summarize:
 avg_perf = np.mean(performance_vals)
 median_perf = np.median(performance_vals)
 worst_perf = np.max(performance_vals)
@@ -130,5 +150,6 @@ print("Worst performance: %s" % worst_perf)
 print("\n\n WARNINGS:")
 for w in caught_warnings:
     warnings.warn(w.message)
+
 
 

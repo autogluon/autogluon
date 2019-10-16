@@ -1,9 +1,10 @@
 from collections import OrderedDict 
-import datetime, json
+import datetime, json, copy, warnings
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error, max_error
+import numpy as np
 from numpy import corrcoef
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
@@ -130,6 +131,21 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
+        
+        # Remove missing labels and produce warning if any are found:
+        if self.problem_type == REGRESSION:
+            missing_indicators = [(y is None or np.isnan(y)) for y in y_true]
+        else:
+            missing_indicators = [(y is None or y=='') for y in y_true]
+        missing_inds = [i for i,j in enumerate(missing_indicators) if j]
+        if len(missing_inds) > 0:
+            nonmissing_inds = [i for i,j in enumerate(missing_indicators) if j]
+            y_true = y_true[nonmissing_inds]
+            y_pred = y_pred[nonmissing_inds]
+            warnings.warn("There are %s (out of %s) evaluation datapoints for which the label is missing. " 
+                          "AutoGluon removed these points from the evaluation, which thus may not be entirely representative. " 
+                          "You should carefully study why there are missing labels in your evaluation data." % (len(missing_inds),len(y_true)))
+        
         perf = self.objective_func(y_true, y_pred)
         metric = self.objective_func.__name__
         if not silent:
@@ -211,6 +227,7 @@ class AbstractLearner:
         """
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")
+        y = y.dropna() # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
         REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
         if len(unique_vals) == 2:

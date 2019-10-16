@@ -51,13 +51,21 @@ class DefaultLearner(AbstractLearner):
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
-        if self.problem_type == REGRESSION:
-            X[self.label] = X[self.label].fillna(0)  # TODO: Consider adding dedicated error message if this occurs
-        else:
-            X[self.label] = X[self.label].fillna('')
+        # if self.problem_type != REGRESSION:
+        #     X[self.label] = X[self.label].fillna('')
+        # TODO (Nick): from original Grail code (it had an error for Regression tasks). I have replaced this by dropping all examples will missing labels below.  If this is no longer needed, delete.
+        
+        # Remove all examples with missing labels from this dataset:
+        n = len(X)
+        missinglabel_indicators = X[self.label].isna().tolist()
+        missinglabel_inds = [i for i,j in enumerate(missinglabel_indicators) if j]
+        if len(missinglabel_inds) > 0:
+            print("Dropping %s (out of %s) training examples for which the label value in column '%s' is missing" % (len(missinglabel_inds),n, self.label))
+        X = X.drop(missinglabel_inds, axis=0)
+        
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
-
+        
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
         X = self.cleaner.clean(X)
 

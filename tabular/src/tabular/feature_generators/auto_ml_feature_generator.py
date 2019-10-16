@@ -1,10 +1,12 @@
 
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame, Series
+import numpy as np
+import copy
+
 from tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
 from tabular.ml.vectorizers import vectorizer_auto_ml_default
-import copy
 
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
@@ -29,7 +31,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             if X[column].dtype.name == 'object':
                 X[column].fillna('', inplace=True)
             else:
-                X[column].fillna(-1, inplace=True) # TODO: bad idea
+                X[column].fillna(np.nan, inplace=True)
 
         X_text_features_combined = []
         if self.enable_nlp_ratio_features and self.features_nlp_ratio:
