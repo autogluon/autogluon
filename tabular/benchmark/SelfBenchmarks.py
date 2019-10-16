@@ -47,28 +47,41 @@ binary_dataset = {'folder': '~/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-g
                   'name': 'AdultIncomeBinary',
                   'problem_type': BINARY,
                   'label_column': 'class',
-                  'performance_val': 0.129} # mixed types of features
+                  'performance_val': 0.129} # Mixed types of features.
 
 multi_dataset = {'folder': '~/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
                   'name': 'CoverTypeMulticlass',
                   'problem_type': MULTICLASS,
                   'label_column': 'Cover_Type',
-                  'performance_val': 0.032} # 7 classes, all features are numeric
+                  'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
 regression_dataset = {'folder': '~/WorkDocs/Datasets/AmesHousingPriceRegression/',
                    'name': 'AmesHousingRegression',
                   'problem_type': REGRESSION,
                   'label_column': 'SalePrice',
-                  'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values
+                  'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
 
 toyregres_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyRegression/', 
                      'name': 'ToyRegression',
-                     'problem_type': REGRESSION,
+                     'problem_type': REGRESSION, 
                     'label_column': 'y', 
-                    'performance_val': 0.183} # 1d toy deterministic regression task with heavy label+feature missingness + extra distraction columns in test data
+                    'performance_val': 0.183}
+# 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
+
+toyclassif_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyClassification/', 
+                     'name': 'ToyClassification',
+                     'problem_type': MULTICLASS, 
+                    'label_column': 'y', 
+                    'performance_val': 0.436}
+# 2-D toy noisy, imbalanced 4-class classification task with: feature missingness, out-of-vocabulary feature categories in test data, out-of-vocabulary labels in test data, training column missing from test data, extra distraction columns in test data
+# toyclassif_dataset should produce 3 warnings:
+# UserWarning: These columns from this dataset were not present in the training dataset (AutoGluon will ignore them):  ['distractioncolumn1', 'distractioncolumn2']
+# UserWarning: The columns listed below from the training data are no longer in the given dataset. (AutoGluon will proceed assuming their values are missing, but you should remove these columns from training dataset and train a new model):  ['lostcolumn']
+# UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples.
+
 
  # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-datasets = [toyregres_dataset, binary_dataset, regression_dataset, multi_dataset]
+datasets = [toyregres_dataset, toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
 
 # Aggregate performance summaries obtained in previous benchmark run:
 prev_perf_vals = [dataset['performance_val'] for dataset in datasets]
