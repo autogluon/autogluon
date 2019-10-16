@@ -1,14 +1,12 @@
-
+import copy, sys, re, warnings
 from pandas import DataFrame, Series
 import pandas as pd
-from collections import defaultdict
-from tabular.utils.savers import save_pkl
 from pandas.api.types import CategoricalDtype
-import copy
-from tabular.utils.decorators import calculate_time
-import re
 import numpy as np
-import sys
+from collections import defaultdict
+
+from tabular.utils.decorators import calculate_time
+from tabular.utils.savers import save_pkl
 
 
 class AbstractFeatureGenerator:
@@ -94,9 +92,36 @@ class AbstractFeatureGenerator:
     @calculate_time
     def transform(self, X: DataFrame):
         if not self.fit:
-            raise Exception('FeatureGenerator not fit!')
+            raise Exception('FeatureGenerator has not yet been fit!')
+        if self.features is None:
+            raise Exception('FeatureGenerator.features is None, have you called fit() yet?')
         X_index = copy.deepcopy(X.index)
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
+        # Drop any columns previously unseen in training dataframe:
+        X_columns = X.columns.tolist()
+        cols_todrop = []
+        for col in X_columns:
+            if col not in self.features:
+                cols_todrop.append(col)
+        if len(cols_todrop) > 0:
+            warnings.warn("These columns from this dataset were not present in the training dataset (AutoGluon will ignore them):  %s" 
+                          % cols_todrop)
+            X = X.drop(cols_todrop, axis=1)
+        
+        # Create any columns present in the training dataset that are now missing from this dataframe:
+        missing_cols = []
+        for col in self.features:
+            if col not in X_columns:
+                missing_cols.append(col)
+                if col in self.features_object: # was a dtype==object column in training dataset
+                    X[col] = [None] * len(X)
+                else: # was a dtype==numerical column in training dataset
+                    X[col] = [np.nan] * len(X)
+        if len(missing_cols) > 0:
+            warnings.warn("The columns listed below from the training data are no longer in the given dataset. " 
+                          "(AutoGluon will proceed assuming their values are missing, but you should remove these columns "
+                          "from training dataset and train a new model):  %s" % missing_cols)
+        
         X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
         for column in self.features_binned:
