@@ -4,10 +4,50 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper, EasyDict
 
-__all__ = ['Space', 'List', 'Dict', 'Categorical', 'Choice', 'Linear', 'LogLinear', 'Int',
-           'Bool', 'strip_config_space', 'AutoGluonObject', 'Sequence']
+__all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'Sequence', 'List', 'Dict',
+           'Categorical', 'Choice', 'Real', 'Linear', 'LogLinear', 'Int', 'Bool']
 
-class AutoGluonObject(object):
+class Space(object):
+    """Basic Search Space
+    """
+    pass
+
+class SimpleSpace(Space):
+    """Non-nested Search Space
+    """
+    def __repr__(self):
+        reprstr = self.__class__.__name__
+        if hasattr(self, 'lower') and hasattr(self, 'upper'):
+            reprstr += ': lower={}, upper={}'.format(self.lower, self.upper)
+        if hasattr(self, 'value'):
+            reprstr += ': value={}'.format(self.value)
+        return reprstr
+
+class NestedSpace(Space):
+    """Nested Search Spaces
+    """
+    def sample(self, **config):
+        pass
+
+    @property
+    def cs(self):
+        return None
+
+    @property
+    def kwspaces(self):
+        return None
+
+import weakref
+
+class classproperty(object):
+    def __init__(self, fget):
+        self.fget = fget
+    def __get__(self, owner_self, owner_cls):
+        return self.fget(owner_cls)
+
+class AutoGluonObject(NestedSpace):
+    """Searchable Objects created by '@autogluon_object' or '@autogluon_function' decorators.
+    """
     def __call__(self, *args, **kwargs):
         if not self._inited:
             self._inited = True
@@ -22,18 +62,18 @@ class AutoGluonObject(object):
     def cs(self):
         cs = CS.ConfigurationSpace()
         for k, v in self.kwvars.items():
-            if isinstance(v, Categorical):
-                sub_cs = v.get_config_space()
-                _add_cs(cs, sub_cs, k)
-            elif isinstance(v, Dict):
-                sub_cs = v.get_config_space()
-                _add_cs(cs, sub_cs, k)
+            if isinstance(v, NestedSpace):
+                _add_cs(cs, v.cs, k)
             elif isinstance(v, Space):
-                hp = v.get_config_space(name=k)
+                hp = v.get_hp(name=k)
                 _add_hp(cs, hp)
             else:
                 _rm_hp(cs, k)
         return cs
+
+    @classproperty
+    def kwspaces(cls):
+        return cls.__init__.kwspaces
 
     def sample(self):
         raise NotImplemented
@@ -41,22 +81,8 @@ class AutoGluonObject(object):
     def __repr__(self):
         return 'AutoGluonObject'
 
-class Space(object):
-    def get_config_space(self, name):
-        return _get_hp(name, self)
-
-    def __repr__(self):
-        reprstr = self.__class__.__name__
-        if hasattr(self, 'lower') and hasattr(self, 'upper'):
-            reprstr += ': lower={}, upper={}'.format(self.lower, self.upper)
-        if hasattr(self, 'value'):
-            
-            reprstr += ': value={}'.format(self.value)
-        return reprstr
-
-
-class Sequence(Space):
-    """A Sequence of AutoGluon Objects
+class List(NestedSpace):
+    """A Searchable List (Nested Space)
 
     Args:
         args: a list of search spaces.
@@ -84,75 +110,108 @@ class Sequence(Space):
     def __len__(self):
         return len(self.data)
 
-    def get_config_space(self):
-        cs = CS.ConfigurationSpace()
-        if len(self.data) == 0: 
-            return CS.ConfigurationSpace()
-        for i, x in enumerate(self.data):
-            if isinstance(x, AutoGluonObject):
-                cs.add_configuration_space(str(i), x.cs, '.')
-        return cs
-
     def sample(self, **config):
         ret = []
+        kwspaces = self.kwspaces
+        kwspaces.update(config)
+        striped_keys = [k.split('.')[0] for k in config.keys()]
         for idx, obj in enumerate(self.data):
-            assert isinstance(obj, AutoGluonObject)
-            min_config = strip_config_space(config, prefix=str(idx))
-            ret.append(obj.sample(**min_config))
+            if isinstance(obj, AutoGluonObject):
+                sub_config = _strip_config_space(config, prefix=str(idx))
+                ret.append(obj.sample(**sub_config))
+            else:
+                ret.append(obj)
         return ret
 
     @property
     def cs(self):
-        return self.get_config_space()
+        cs = CS.ConfigurationSpace()
+        for k, v in enumerate(self.data):
+            if isinstance(v, NestedSpace):
+                _add_cs(cs, v.cs, k)
+            elif isinstance(v, Space):
+                hp = v.get_hp(name=k)
+                _add_hp(cs, hp)
+        return cs
 
     @property
     def kwspaces(self):
         kw_spaces = collections.OrderedDict()
         for idx, obj in enumerate(self.data):
-            if isinstance(obj, AutoGluonObject):
+            k = str(idx)
+            if isinstance(obj, NestedSpace):
+                kw_spaces[k] = obj
                 for sub_k, sub_v in obj.kwspaces.items():
-                    new_k = '{}.{}'.format(idx, sub_k)
+                    new_k = '{}.{}'.format(k, sub_k)
                     kw_spaces[new_k] = sub_v
+                    kw_spaces[new_k] = sub_v
+            elif isinstance(obj, Space):
+                kw_spaces[k] = obj
         return kw_spaces
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
+Sequence = DeprecationHelper(List, 'Sequence')
 
-class Dict(EasyDict):
-    """A Dict of Search Spaces
+class Dict(NestedSpace):
+    """A Searchable Dict (Nested Space)
     """
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
- 
-    def get_config_space(self):
-        cs = CS.ConfigurationSpace()
-        for k, v in self.items():
-            if isinstance(v, AutoGluonObject):
-                cs.add_configuration_space(k, v.cs, '.')
-        return cs
+        self.data = kwargs
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def __setitem__(self, key, data):
+        self.data[key] = data
 
     @property
     def cs(self):
-        return self.get_config_space()
+        cs = CS.ConfigurationSpace()
+        for k, v in self.data.items():
+            if hasattr(v, 'cs'):
+                _add_cs(cs, v.cs, k)
+            elif isinstance(v, Space):
+                hp = v.get_hp(name=k)
+                _add_hp(cs, hp)
+        return cs
 
     @property
     def kwspaces(self):
         kw_spaces = collections.OrderedDict()
-        for k, obj in self.items():
-            if isinstance(v, AutoGluonObject):
+        for k, obj in self.data.items():
+            if isinstance(obj, NestedSpace):
+                kw_spaces[k] = obj
                 for sub_k, sub_v in obj.kwspaces.items():
                     new_k = '{}.{}'.format(k, sub_k)
                     kw_spaces[new_k] = sub_v
+                    kw_spaces[new_k] = sub_v
+            elif isinstance(obj, Space):
+                kw_spaces[k] = obj
         return kw_spaces
 
     def sample(self, **config):
-        raise NotImplemented
+        ret = {}
+        kwspaces = self.kwspaces
+        kwspaces.update(config)
+        striped_keys = [k.split('.')[0] for k in config.keys()]
+        for k, v in kwspaces.items():
+            if k in striped_keys:
+                if isinstance(v, (Sequence, Dict, Categorical, AutoGluonObject)):
+                    sub_config = _strip_config_space(config, prefix=k)
+                    ret[k] = v.sample(**sub_config)
+                else:
+                    ret[k] = v
+        return ret
 
+    def __repr__(self):
+        reprstr = self.__class__.__name__ + str(self.data)
+        return reprstr
 
-class Categorical(Space):
-    """Categorical Search Space
+class Categorical(NestedSpace):
+    """Categorical Search Space (Nested Space)
 
     Args:
         data: the choice candidates
@@ -176,26 +235,23 @@ class Categorical(Space):
     def __len__(self):
         return len(self.data)
 
-    def get_config_space(self):
+    @property
+    def cs(self):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
             return CS.ConfigurationSpace()
         hp = CSH.CategoricalHyperparameter(name='choice', choices=range(len(self.data)))
-        cs.add_hyperparameter(hp)
+        _add_hp(cs, hp)
         for i, v in enumerate(self.data):
-            if isinstance(v, AutoGluonObject):
-                cs.add_configuration_space(str(i), v.cs, '.')
+            if isinstance(v, NestedSpace):
+                _add_cs(cs, v.cs, str(i))
         return cs
-
-    @property
-    def cs(self):
-        return self.get_config_space()
 
     def sample(self, **config):
         choice = config.pop('choice')
-        if isinstance(self.data[choice], AutoGluonObject):
+        if isinstance(self.data[choice], NestedSpace):
             # nested space: Categorical of AutoGluonobjects
-            min_config = strip_config_space(config, prefix=str(choice))
+            min_config = _strip_config_space(config, prefix=str(choice))
             return self.data[choice].sample(**min_config)
         else:
             return self.data[choice]
@@ -204,7 +260,7 @@ class Categorical(Space):
     def kwspaces(self):
         kw_spaces = collections.OrderedDict()
         for idx, obj in enumerate(self.data):
-            if isinstance(obj, AutoGluonObject):
+            if isinstance(obj, NestedSpace):
                 for sub_k, sub_v in obj.kwspaces.items():
                     new_k = '{}.{}'.format(idx, sub_k)
                     kw_spaces[new_k] = sub_v
@@ -214,52 +270,61 @@ class Categorical(Space):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-List = DeprecationHelper(Categorical, 'List')
 Choice = DeprecationHelper(Categorical, 'Choice')
 
-class Real(Space):
+class Real(SimpleSpace):
     """linear search space.
 
     Args:
         lower: the lower bound of the search space
         upper: the upper bound of the search space
+        default (optional): default value
+        log (True/False): search space in log scale
 
     Example:
         >>> learning_rate = ag.Real(0.01, 0.1)
     """
-    def __init__(self, lower, upper):
+    def __init__(self, lower, upper, default=None, log=False):
         self.lower = lower
         self.upper = upper
+        self.log = log
+        self.default = default
+
+    def get_hp(self, name):
+        return CSH.UniformFloatHyperparameter(name=name, lower=self.lower, upper=self.upper,
+                                              default_value=self.default, log=self.log)
 
 Linear = DeprecationHelper(Real, 'Linear')
 
-class LogLinear(Space):
-    """log linear search space.
-
-    Args:
-        lower: the lower bound of the search space
-        upper: the upper bound of the search space
-
-    Example:
-        >>> learning_rate = ag.LogLinear(0.01, 0.1)
-    """
-    def __init__(self, lower, upper):
+class LogLinear(Real):
+    r"""LogLinear
+    .. warning::
+        This method is now deprecated in favor of :class:`autogluon.space.Real`. \
+    See :class:`autogluon.space.Real` for details."""
+    def __init__(self, lower, upper, default=None):
         self.lower = lower
         self.upper = upper
+        super().__init__(lower, upper, default, True)
 
-class Int(Space):
+class Int(SimpleSpace):
     """integer search space.
 
     Args:
         lower: the lower bound of the search space
         upper: the upper bound of the search space
+        default (optional): default value
 
     Example:
         >>> learning_rate = ag.Int(0, 100)
     """
-    def __init__(self, lower, upper):
+    def __init__(self, lower, upper, default=None):
         self.lower = lower
         self.upper = upper
+        self.default = default
+
+    def get_hp(self, name):
+        return CSH.UniformIntegerHyperparameter(name=name, lower=self.lower, upper=self.upper,
+                                                default_value=self.default)
 
 class Bool(Int):
     """Bool Search Space
@@ -270,18 +335,7 @@ class Bool(Int):
     def __init__(self):
         super(Bool, self).__init__(0, 1)
 
-def _get_hp(name, space):
-    assert isinstance(space, Space)
-    if isinstance(space, Real):
-        return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper)
-    elif isinstance(space, LogLinear):
-        return CSH.UniformFloatHyperparameter(name=name, lower=space.lower, upper=space.upper, log=True)
-    elif isinstance(space, Int):
-        return CSH.UniformIntegerHyperparameter(name=name, lower=space.lower, upper=space.upper)
-    else:
-        raise NotImplemented
-
-def strip_config_space(config, prefix):
+def _strip_config_space(config, prefix):
     # filter out the config with the corresponding prefix
     new_config = {}
     for k, v in config.items():

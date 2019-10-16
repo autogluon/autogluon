@@ -8,7 +8,7 @@ import multiprocessing as mp
 import ConfigSpace as CS
 
 from .space import *
-from .space import _add_hp, _add_cs, _rm_hp
+from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space
 from ..utils import EasyDict as ezdict
 from ..utils.deprecate import make_deprecate
 
@@ -39,8 +39,8 @@ class _autogluon_method(object):
         for k, v in args_dict.items():
             # handle different type of configurations
             if k in striped_keys:
-                if isinstance(v, (Sequence, Dict, Categorical, AutoGluonObject)):
-                    sub_config = strip_config_space(new_config, prefix=k)
+                if isinstance(v, NestedSpace):
+                    sub_config = _strip_config_space(new_config, prefix=k)
                     args_dict[k] = v.sample(**sub_config)
                 else:
                     if '.' in k: continue
@@ -68,7 +68,7 @@ class _autogluon_method(object):
             if isinstance(v, (AutoGluonObject, Categorical, Sequence, Dict)):
                 self.args.update({k: v})
             elif isinstance(v, Space):
-                hp = v.get_config_space(name=k)
+                hp = v.get_hp(name=k)
                 self.args.update({k: hp.default_value})
             else:
                 self.args.update({k: v})
@@ -80,7 +80,7 @@ class _autogluon_method(object):
             if isinstance(v, (Categorical, Sequence, Dict, AutoGluonObject)):
                 _add_cs(cs, v.cs, k)
             elif isinstance(v, Space):
-                hp = v.get_config_space(name=k)
+                hp = v.get_hp(name=k)
                 _add_hp(cs, hp)
             else:
                 _rm_hp(cs, k)
@@ -174,7 +174,7 @@ def autogluon_function(**kwvars):
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
             agobj.kwvars = agobj.__init__.kwvars
-            agobj.kwspaces = agobj.__init__.kwspaces
+            #agobj.kwspaces = agobj.__init__.kwspaces
             return agobj
         return wrapper_call
     return registered_func
@@ -207,9 +207,10 @@ def autogluon_object(**kwvars):
             def sample(self, **nkwvars):
                 kwargs = self._kwargs
                 kwargs.update(nkwvars)
+                kwspaces = autogluonobject.kwspaces
                 for k, v in kwargs.items():
-                    if k in autogluonobject.kwspaces and isinstance(autogluonobject.kwspaces[k], Categorical):
-                        kwargs[k] = autogluonobject.kwspaces[k][v]
+                    if k in kwspaces and isinstance(kwspaces[k], Categorical):
+                        kwargs[k] = kwspaces[k][v]
 
                 args = self._args
                 return Cls(*args, **kwargs)
@@ -218,7 +219,7 @@ def autogluon_object(**kwvars):
                 return 'AutoGluonObject -- ' + Cls.__name__
 
         autogluonobject.kwvars = autogluonobject.__init__.kwvars
-        autogluonobject.kwspaces = autogluonobject.__init__.kwspaces
+        #autogluonobject.kwspaces = autogluonobject.__init__.kwspaces
         return autogluonobject
 
     return registered_class
@@ -232,14 +233,12 @@ def _autogluon_kwargs(**kwvars):
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
             for k, v in kwvars.items():
-                if isinstance(v, Categorical):
+                if isinstance(v, NestedSpace):
+                    kwspaces[k] = v
                     kwargs[k] = v
-                    kwspaces[k] = v
-                elif isinstance(v, Dict):
-                    kwspaces[k] = v
                 elif isinstance(v, Space):
                     kwspaces[k] = v
-                    hp = v.get_config_space(name=k)
+                    hp = v.get_hp(name=k)
                     kwargs[k] = hp.default_value
                 else:
                     kwargs[k] = v
