@@ -61,9 +61,9 @@ class ImageClassificationDataset(object):
     def _read_dataset(self, **kwargs):
         import time
         if self.name in built_in_datasets:
-            self.train = get_built_in_dataset(self.name, train=True, input_size=self.input_size)._lazy_init()
+            self.train = get_built_in_dataset(self.name, train=True, input_size=self.input_size).init()
             self.val = None
-            self.test = get_built_in_dataset(self.name, train=False, input_size=self.input_size)._lazy_init()
+            self.test = get_built_in_dataset(self.name, train=False, input_size=self.input_size).init()
             self.num_classes = len(np.unique(self.train._label))
         else:
             if self.train_path is not None:

@@ -1,12 +1,45 @@
+import copy
+import collections
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-from ..utils import DeprecationHelper
+from ..utils import DeprecationHelper, EasyDict
 
-__all__ = ['Space', 'List', 'Categorical', 'Choice', 'Linear', 'LogLinear', 'Int',
+__all__ = ['Space', 'List', 'Dict', 'Categorical', 'Choice', 'Linear', 'LogLinear', 'Int',
            'Bool', 'strip_config_space', 'AutoGluonObject', 'Sequence']
 
-class AutoGluonObject:
-    pass
+class AutoGluonObject(object):
+    def __call__(self, *args, **kwargs):
+        if not self._inited:
+            self._inited = True
+            self._instance = self.init()
+        return self._instance.__call__(*args, **kwargs)
+
+    def init(self):
+        config = self.cs.get_default_configuration().get_dictionary()
+        return self.sample(**config)
+
+    @property
+    def cs(self):
+        cs = CS.ConfigurationSpace()
+        for k, v in self.kwvars.items():
+            if isinstance(v, Categorical):
+                sub_cs = v.get_config_space()
+                _add_cs(cs, sub_cs, k)
+            elif isinstance(v, Dict):
+                sub_cs = v.get_config_space()
+                _add_cs(cs, sub_cs, k)
+            elif isinstance(v, Space):
+                hp = v.get_config_space(name=k)
+                _add_hp(cs, hp)
+            else:
+                _rm_hp(cs, k)
+        return cs
+
+    def sample(self):
+        raise NotImplemented
+
+    def __repr__(self):
+        return 'AutoGluonObject'
 
 class Space(object):
     def get_config_space(self, name):
@@ -20,6 +53,7 @@ class Space(object):
             
             reprstr += ': value={}'.format(self.value)
         return reprstr
+
 
 class Sequence(Space):
     """A Sequence of AutoGluon Objects
@@ -50,7 +84,7 @@ class Sequence(Space):
     def __len__(self):
         return len(self.data)
 
-    def get_config_space(self, name):
+    def get_config_space(self):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
             return CS.ConfigurationSpace()
@@ -59,12 +93,66 @@ class Sequence(Space):
                 cs.add_configuration_space(str(i), x.cs, '.')
         return cs
 
+    def sample(self, **config):
+        ret = []
+        for idx, obj in enumerate(self.data):
+            assert isinstance(obj, AutoGluonObject)
+            min_config = strip_config_space(config, prefix=str(idx))
+            ret.append(obj.sample(**min_config))
+        return ret
+
+    @property
+    def cs(self):
+        return self.get_config_space()
+
+    @property
+    def kwspaces(self):
+        kw_spaces = collections.OrderedDict()
+        for idx, obj in enumerate(self.data):
+            if isinstance(obj, AutoGluonObject):
+                for sub_k, sub_v in obj.kwspaces.items():
+                    new_k = '{}.{}'.format(idx, sub_k)
+                    kw_spaces[new_k] = sub_v
+        return kw_spaces
+
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
+
+class Dict(EasyDict):
+    """A Dict of Search Spaces
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+ 
+    def get_config_space(self):
+        cs = CS.ConfigurationSpace()
+        for k, v in self.items():
+            if isinstance(v, AutoGluonObject):
+                cs.add_configuration_space(k, v.cs, '.')
+        return cs
+
+    @property
+    def cs(self):
+        return self.get_config_space()
+
+    @property
+    def kwspaces(self):
+        kw_spaces = collections.OrderedDict()
+        for k, obj in self.items():
+            if isinstance(v, AutoGluonObject):
+                for sub_k, sub_v in obj.kwspaces.items():
+                    new_k = '{}.{}'.format(k, sub_k)
+                    kw_spaces[new_k] = sub_v
+        return kw_spaces
+
+    def sample(self, **config):
+        raise NotImplemented
+
+
 class Categorical(Space):
-    """List Search Space
+    """Categorical Search Space
 
     Args:
         data: the choice candidates
@@ -88,16 +176,39 @@ class Categorical(Space):
     def __len__(self):
         return len(self.data)
 
-    def get_config_space(self, name):
+    def get_config_space(self):
         cs = CS.ConfigurationSpace()
         if len(self.data) == 0: 
             return CS.ConfigurationSpace()
-        hp = CSH.CategoricalHyperparameter(name=name, choices=range(len(self.data)))
+        hp = CSH.CategoricalHyperparameter(name='choice', choices=range(len(self.data)))
         cs.add_hyperparameter(hp)
-        for i, x in enumerate(self.data):
-            if isinstance(x, AutoGluonObject):
-                cs.add_configuration_space(str(i), x.cs, '.')
+        for i, v in enumerate(self.data):
+            if isinstance(v, AutoGluonObject):
+                cs.add_configuration_space(str(i), v.cs, '.')
         return cs
+
+    @property
+    def cs(self):
+        return self.get_config_space()
+
+    def sample(self, **config):
+        choice = config.pop('choice')
+        if isinstance(self.data[choice], AutoGluonObject):
+            # nested space: Categorical of AutoGluonobjects
+            min_config = strip_config_space(config, prefix=str(choice))
+            return self.data[choice].sample(**min_config)
+        else:
+            return self.data[choice]
+
+    @property
+    def kwspaces(self):
+        kw_spaces = collections.OrderedDict()
+        for idx, obj in enumerate(self.data):
+            if isinstance(obj, AutoGluonObject):
+                for sub_k, sub_v in obj.kwspaces.items():
+                    new_k = '{}.{}'.format(idx, sub_k)
+                    kw_spaces[new_k] = sub_v
+        return kw_spaces
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
@@ -177,3 +288,29 @@ def strip_config_space(config, prefix):
         if k.startswith(prefix):
             new_config[k[len(prefix)+1:]] = v
     return new_config
+
+def _add_hp(cs, hp):
+    if hp.name in cs._hyperparameters:
+        cs._hyperparameters[hp.name] = hp
+    else:
+        cs.add_hyperparameter(hp)
+
+def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
+    new_parameters = []
+    for hp in sub_cs.get_hyperparameters():
+        new_parameter = copy.deepcopy(hp)
+        # Allow for an empty top-level parameter
+        if new_parameter.name == '':
+            new_parameter.name = prefix
+        elif not prefix == '':
+            new_parameter.name = "%s%s%s" % (prefix, '.', new_parameter.name)
+        new_parameters.append(new_parameter)
+    for hp in new_parameters:
+        _add_hp(master_cs, hp)
+
+def _rm_hp(cs, k):
+    if k in cs._hyperparameters:
+        cs._hyperparameters.pop(k)
+    for hp in cs.get_hyperparameters():
+        if  hp.name.startswith("%s."%(k)):
+            cs._hyperparameters.pop(hp.name)

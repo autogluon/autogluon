@@ -11,7 +11,8 @@ from collections import OrderedDict
 
 from .resource import DistributedResource
 from ..utils import save, load, mkdir, try_import_mxboard
-from ..core import Task, autogluon_method
+from ..core import Task
+from ..core.decorator import _autogluon_method
 from .scheduler import TaskScheduler
 from ..searcher import *
 from .reporter import DistStatusReporter
@@ -68,13 +69,13 @@ class FIFOScheduler(TaskScheduler):
                  visualizer='none', dist_ip_addrs=[], **kwargs):
         super(FIFOScheduler,self).__init__(dist_ip_addrs)
         self.train_fn = train_fn
-        assert isinstance(train_fn, autogluon_method)
+        assert isinstance(train_fn, _autogluon_method)
         self.args = args if args else train_fn.args
         self.resource = resource
         self.searcher = searchers[searcher](train_fn.cs, **search_options) if isinstance(searcher, str) else searcher
         num_trials = len(self.searcher) if searcher == 'grid' else num_trials# and len(self.searcher) < num_trials else num_trials
         # meta data
-        self.metadata = train_fn.get_kwspaces()
+        self.metadata = train_fn.kwspaces
         keys = copy.deepcopy(list(self.metadata.keys()))
         for k in keys:
             if '.' in k:

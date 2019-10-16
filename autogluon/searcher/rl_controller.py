@@ -63,10 +63,10 @@ class LSTMController(mx.gluon.Block):
         self.hidden_size = hidden_size
         self.context = ctx
 
-        # only support List space for now
+        # only support Categorical space for now
         self.num_tokens = []
         for _, space in self.spaces:
-            assert isinstance(space, List)
+            assert isinstance(space, Categorical)
             self.num_tokens.append(len(space))
         num_total_tokens = sum(self.num_tokens)
 

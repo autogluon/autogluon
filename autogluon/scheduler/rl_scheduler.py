@@ -12,7 +12,8 @@ import mxnet as mx
 from .resource import DistributedResource
 from ..utils import save, load
 from ..utils import mkdir, try_import_mxboard
-from ..core import Task, autogluon_method
+from ..core import Task
+from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
 from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
@@ -60,12 +61,12 @@ class RLScheduler(FIFOScheduler):
                  controller_resource={'num_cpus': 2, 'num_gpus': 0},
                  controller_batch_size=1,
                  dist_ip_addrs=[], sync=True, **kwargs):
-        assert isinstance(train_fn, autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
+        assert isinstance(train_fn, _autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
                 'to decorate your training script.'
         self.ema_baseline_decay = ema_baseline_decay
         self.sync = sync
         # create RL searcher/controller
-        searcher = RLSearcher(train_fn.get_kwspaces())
+        searcher = RLSearcher(train_fn.kwspaces)
         super(RLScheduler,self).__init__(
                 train_fn, train_fn.args, resource, searcher,
                 checkpoint=checkpoint, resume=False, num_trials=num_trials,

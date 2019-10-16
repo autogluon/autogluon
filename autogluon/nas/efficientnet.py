@@ -3,6 +3,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.block import HybridBlock
 
+from ..utils import EasyDict
 from .utils import *
 from .mbconv import *
 
@@ -37,7 +38,6 @@ class EfficientNet(HybridBlock):
         else:
             assert isinstance(blocks_args, list), 'blocks_args should be a list'
             assert len(blocks_args) > 0, 'block args must be greater than 0'
-        self._blocks_args = blocks_args
         self.input_size = input_size
         with self.name_scope():
             self.features = nn.HybridSequential()
@@ -52,7 +52,7 @@ class EfficientNet(HybridBlock):
 
             self._blocks = nn.HybridSequential()
             with self._blocks.name_scope():
-                for block_arg in self._blocks_args:
+                for block_arg in blocks_args:
                     # Update block input and output filters based on depth
                     # multiplier.
                     block_arg = block_arg._replace(
@@ -63,7 +63,6 @@ class EfficientNet(HybridBlock):
                             block_arg.num_repeat, depth_coefficient))
 
                     out_channels=block_arg.channels
-
                     arg_dict = block_arg._asdict()
                     arg_dict['input_size'] = input_size
                     self._blocks.add(MBConvBlock(**arg_dict))
@@ -104,13 +103,13 @@ class EfficientNet(HybridBlock):
 def get_efficientnet_blockargs():
     """ Creates a predefined efficientnet model, which searched by original paper. """
     blocks_args = [
-        MBConvBlockArgs(kernel=3, num_repeat=1, channels=16, expand_ratio=1, stride=1, se_ratio=0.25, in_channels=32),
-        MBConvBlockArgs(kernel=3, num_repeat=2, channels=24, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=16),
-        MBConvBlockArgs(kernel=5, num_repeat=2, channels=40, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=24),
-        MBConvBlockArgs(kernel=3, num_repeat=3, channels=80, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=40),
-        MBConvBlockArgs(kernel=5, num_repeat=3, channels=112, expand_ratio=6, stride=1, se_ratio=0.25, in_channels=80),
-        MBConvBlockArgs(kernel=5, num_repeat=4, channels=192, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=112),
-        MBConvBlockArgs(kernel=3, num_repeat=1, channels=320, expand_ratio=6, stride=1, se_ratio=0.25, in_channels=192),
+        EasyDict(kernel=3, num_repeat=1, channels=16, expand_ratio=1, stride=1, se_ratio=0.25, in_channels=32),
+        EasyDict(kernel=3, num_repeat=2, channels=24, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=16),
+        EasyDict(kernel=5, num_repeat=2, channels=40, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=24),
+        EasyDict(kernel=3, num_repeat=3, channels=80, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=40),
+        EasyDict(kernel=5, num_repeat=3, channels=112, expand_ratio=6, stride=1, se_ratio=0.25, in_channels=80),
+        EasyDict(kernel=5, num_repeat=4, channels=192, expand_ratio=6, stride=2, se_ratio=0.25, in_channels=112),
+        EasyDict(kernel=3, num_repeat=1, channels=320, expand_ratio=6, stride=1, se_ratio=0.25, in_channels=192),
     ]
     return blocks_args
 

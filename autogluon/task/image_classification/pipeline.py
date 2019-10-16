@@ -57,11 +57,11 @@ def train_image_classification(args, reporter):
         train_dataset = get_built_in_dataset(args.dataset, train=True,
                                              input_size=args.input_size,
                                              batch_size=batch_size,
-                                             num_workers=args.num_workers)._lazy_init()
+                                             num_workers=args.num_workers).init()
         val_dataset = get_built_in_dataset(args.dataset, train=False,
                                            input_size=args.input_size,
                                            batch_size=batch_size,
-                                           num_workers=args.num_workers)._lazy_init()
+                                           num_workers=args.num_workers).init()
     else:
         train_dataset = args.dataset.train
         val_dataset = args.dataset.val
