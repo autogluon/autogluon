@@ -10,7 +10,7 @@ from numpy import corrcoef
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.label_cleaner import LabelCleaner
 from tabular.ml.utils import get_pred_from_proba
-from tabular.utils.loaders import load_pkl
+from tabular.utils.loaders import load_pkl, load_pd
 from tabular.utils.savers import save_pkl, save_pd
 from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 
@@ -23,8 +23,8 @@ from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 class AbstractLearner:
     save_file_name = 'learner.pkl'
 
-    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=100, problem_type=None, objective_func=None, is_trainer_present=False):
-        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.save_path = self.create_contexts(path_context)
+    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=100, problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
+        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
         self.label = label
         self.submission_columns = submission_columns
@@ -42,19 +42,23 @@ class AbstractLearner:
         self.trainer_path = None
         self.reset_paths = False
 
+        self.compute_feature_importance = compute_feature_importance
+
     def set_contexts(self, path_context):
-        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.save_path = self.create_contexts(path_context)
+        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
         model_context = path_context + 'models/'
         latest_model_checkpoint = model_context + 'model_checkpoint_latest.pointer'
         eval_result_path = model_context + 'eval_result.pkl'
+        predictions_path = path_context + 'predictions.csv'
         save_path = path_context + self.save_file_name
-        return path_context, model_context, latest_model_checkpoint, eval_result_path, save_path
+        return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_test: DataFrame=None, sample=None):
         raise NotImplementedError
 
+    # TODO: Add pred_proba_cache functionality as in predict()
     def predict_proba(self, X_test: DataFrame, sample=None):
         ##########
         # Enable below for local testing
@@ -68,10 +72,46 @@ class AbstractLearner:
 
         return y_pred_proba
 
-    def predict(self, X_test: DataFrame, sample=None):
-        y_pred_proba = self.predict_proba(X_test=X_test, sample=sample)
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-        y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+    # TODO: Add decorators for cache functionality, return core code to previous state
+    # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
+    # add_to_pred_cache will update pred_cache with new predictions
+    def predict(self, X_test: DataFrame, sample=None, use_pred_cache=False, add_to_pred_cache=False):
+        pred_cache = None
+        if use_pred_cache or add_to_pred_cache:
+            try:
+                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X_test[self.submission_columns].dtypes.to_dict())
+            except Exception:
+                pass
+        if use_pred_cache and (pred_cache is not None):
+            X_id = X_test[self.submission_columns]
+            X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
+            X_test_cache_miss = X_test[~X_test.index.isin(X_in_cache_with_pred.index)]
+            print('found', len(X_in_cache_with_pred), '/', len(X_test), 'rows with cached prediction')
+        else:
+            X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
+            X_test_cache_miss = X_test
+
+        if len(X_test_cache_miss) > 0:
+            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, sample=sample)
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+            y_pred.index = X_test_cache_miss.index
+        else:
+            print('all X_test rows found in cache, no need to load model...')
+            return X_in_cache_with_pred[self.label].values
+            
+        if add_to_pred_cache:
+            X_id_with_y_pred = X_test_cache_miss[self.submission_columns].copy()
+            X_id_with_y_pred[self.label] = y_pred
+            if pred_cache is None:
+                pred_cache = X_id_with_y_pred.drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
+            else:
+                pred_cache = pd.concat([X_id_with_y_pred, pred_cache]).drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
+            save_pd.save(path=self.pred_cache_path, df=pred_cache)
+        
+        if len(X_in_cache_with_pred) > 0:
+            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X_test.index)
+
         return y_pred.values
 
     def score(self, X: DataFrame, y=None):
@@ -213,7 +253,6 @@ class AbstractLearner:
         print("If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s']) \n\n" % (BINARY, MULTICLASS, REGRESSION))
         return problem_type
 
-
     def save(self):
         save_pkl.save(path=self.save_path, object=self)
 
@@ -224,11 +263,12 @@ class AbstractLearner:
         obj = load_pkl.load(path=load_path)
         if reset_paths:
             obj.set_contexts(path_context)
-            obj.trainer_save_path = obj.model_context + cls.save_file_name
+            obj.trainer_path = obj.model_context
             obj.reset_paths = reset_paths
             # TODO: Still have to change paths of models in trainer + trainer object path variables
             return obj
         else:
+            obj.set_contexts(obj.path_context)
             return obj
 
     def save_trainer(self, trainer):

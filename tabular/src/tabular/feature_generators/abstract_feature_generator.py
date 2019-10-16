@@ -9,6 +9,7 @@ from tabular.utils.decorators import calculate_time
 from tabular.utils.savers import save_pkl
 
 
+# TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
 class AbstractFeatureGenerator:
     def __init__(self):
         self.features_init = []
@@ -20,19 +21,25 @@ class AbstractFeatureGenerator:
         self.feature_type_family = defaultdict(list)
         self.features_bool = []
         self.features_nlp = []
+        self.features_nlp_ratio = []
         self.features_datetime = []
         self.features_categorical = []
         self.features_categorical_final = []
         self.features_categorical_final_mapping = defaultdict()
         self.features_binned = []
         self.features_binned_mapping = defaultdict()
+        self.features_vectorizers = []
         self.features = []
         self.banned_features = []
         self.fit = False
 
     @property
     def feature_types_metadata(self):
-        return {'nlp': self.features_nlp, **self.feature_type_family}
+        return {
+            'nlp': self.features_nlp,
+            'vectorizers': self.features_vectorizers,
+            **self.feature_type_family
+        }
 
     @staticmethod
     def train_vectorizer(text_list, vectorizer):
@@ -251,6 +258,7 @@ class AbstractFeatureGenerator:
                 print(unique_counts.head(5))
             elif self.check_if_nlp_feature(col_val):
                 self.features_nlp.append(column)
+                self.features_nlp_ratio.append(column)
                 print('nlp:', column)
                 print(unique_counts.head(5))
             # print(is_nlp, '\t', column)
@@ -275,7 +283,9 @@ class AbstractFeatureGenerator:
         type_family = self.get_type_family(X.dtype)
         if X.isnull().all():
             return False
-        if type_family != 'object':
+        if type_family == 'datetime':
+            return True
+        if type_family != 'object':  # TODO: seconds from epoch support
             return False
         try:
             X.apply(pd.to_datetime)
@@ -320,11 +330,8 @@ class AbstractFeatureGenerator:
             X[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
 
         X = X.drop(feature, axis=1)
+
         return X
-    
-    def generate_datetime_features(self, X: Series, feature: str) -> DataFrame:
-        # TODO: implement special date-time features based on: https://www.kdnuggets.com/2018/03/feature-engineering-dates-fastai.html
-        return None
 
     def fix_categoricals_for_sklearn(self, X_features):
         for column in self.features_categorical_final:
@@ -340,6 +347,7 @@ class AbstractFeatureGenerator:
                 X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
         return X_features
 
+    # TODO: add option for user to specify dtypes on load
     @staticmethod
     def get_type_family(type):
         if type.name in ['int', 'int64', 'int32', 'int16', 'int8', 'int_', 'uint', 'uint8', 'uint16', 'uint32', 'uint64']:
@@ -350,6 +358,8 @@ class AbstractFeatureGenerator:
             return 'bool'
         elif type.name in ['str', 'string', 'object']:
             return 'object'
+        elif 'datetime' in type.name:
+            return 'datetime'
         else:
             return type.name
 

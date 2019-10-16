@@ -48,10 +48,9 @@ def parallelize_df(func):
 
         a = np.array_split(df, num_partitions)
         # del df
-        pool = Pool(num_cores)
-        df = pd.concat(pool.map(func, [a]))
-        pool.close()
-        pool.join()
+        with Pool(num_cores) as pool:
+            df = pd.concat(pool.map(func, [a]))
+
         return df
 
     return inner1
@@ -66,10 +65,9 @@ def parallelize_df_2(func, df):
     # df = func(df)
     a = np.array_split(df, num_partitions)
     del df
-    pool = Pool(num_cores)
-    df = pd.concat(pool.map(func, a))
-    pool.close()
-    pool.join()
+    with Pool(num_cores) as pool:
+        df = pd.concat(pool.map(func, a))
+
     return df
 
 
