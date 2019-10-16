@@ -83,11 +83,13 @@ class AbstractModel:
             y_pred_proba = self.predict_proba(X=X)
             return self.objective_func(y, y_pred_proba)
 
+    # TODO: Add simple generic CV logic
+    def cv(self, X, y, k_fold=5):
+        raise NotImplementedError
+
     def preprocess(self, X):
         if self.features is not None:
             return X[self.features]
-        else:
-            self.features = list(X.columns)
         return X
 
     def save(self):
