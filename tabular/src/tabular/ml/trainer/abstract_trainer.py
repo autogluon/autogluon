@@ -23,8 +23,7 @@ from sklearn.model_selection import KFold
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
-    def __init__(self, path: str, problem_type: str, objective_func=None, num_classes=None, low_memory=False, feature_types_metadata={},
-                 searcher=None, scheduler=None):
+    def __init__(self, path: str, problem_type: str, objective_func=None, num_classes=None, low_memory=False, feature_types_metadata={}, compute_feature_importance=False, searcher=None, scheduler=None):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
@@ -38,6 +37,7 @@ class AbstractTrainer:
             self.objective_func = mean_absolute_error
         self.num_classes = num_classes
         self.low_memory = low_memory
+        self.compute_feature_importance = compute_feature_importance
         self.model_names = []
         self.model_performance = {}
         self.model_paths = {}
@@ -45,6 +45,7 @@ class AbstractTrainer:
         self.models = {}
         self.model_weights = None
         self.reset_paths = False
+        self.feature_importance = {}
         self.searcher = searcher # autogluon.searcher object
         self.scheduler = scheduler
 
@@ -68,6 +69,10 @@ class AbstractTrainer:
         else:
             stratify = y
 
+        # TODO: Enable stratified split when y class would result in 0 samples in test.
+        #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
+        #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
+        #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
         X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
         y_train = pd.Series(y_train, index=X_train.index)
         y_test = pd.Series(y_test, index=X_test.index)
@@ -83,6 +88,7 @@ class AbstractTrainer:
             kfolds.append([train_index, test_index])
         return kfolds
 
+    # Note: This should not be used for time-series data
     @staticmethod
     def get_cv(X, y, n_splits, model: AbstractModel, random_state=0):
         kfolds = AbstractTrainer.generate_kfold(X, n_splits, random_state)
@@ -125,7 +131,7 @@ class AbstractTrainer:
             oof.append(y_pred_proba)
         return oof
 
-    def train(self, X_train, X_test, y_train, y_test):
+    def train(self, X_train, y_train, X_test=None, y_test=None):
         raise NotImplementedError
 
     def train_single(self, X_train, X_test, y_train, y_test, model, objective_func=accuracy_score):
@@ -136,13 +142,24 @@ class AbstractTrainer:
         score = model.score(X=X_test, y=y_test)
 
         print('Score of', model.name, ':', score)
-        # model.debug_feature_gain(X_test_in=X_test, Y_test_in=y_test, model=model)
+
+        if self.compute_feature_importance:
+            self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
+
+    def _compute_model_feature_importance(self, model, X_test, y_test):
+        # Excluding vectorizers features from evaluation because usually there are too many of these
+        vectorizer_cols = [] if 'vectorizers' not in model.feature_types_metadata else model.feature_types_metadata['vectorizers']
+        features_to_use = [col for col in X_test.columns if col not in vectorizer_cols]
+        print(f'Calculating feature importance for the following features: {features_to_use}')
+        feature_importance = model.debug_feature_gain(X_test=X_test, Y_test=y_test, model=model, features_to_use=features_to_use)
+        return feature_importance
 
     def train_single_full(self, X_train, X_test, y_train, y_test, model: AbstractModel, hyperparameter_tune=False, feature_prune=False):
+        model.feature_types_metadata = self.feature_types_metadata
         if hyperparameter_tune:
-            model.hyperparameter_tune(X_train, y_train)
+            model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
         if feature_prune:
-            self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)
+            self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
             pass  # TODO
         self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
@@ -151,6 +168,7 @@ class AbstractTrainer:
         for i, model in enumerate(models):
             self.train_single_full(X_train, X_test, y_train, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
 
+    # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=False, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
 
@@ -176,7 +194,23 @@ class AbstractTrainer:
         print('optimal weights:', self.model_weights)
         ##########
 
+        # TODO: Consider having this be a separate call outside of train, to use on a fitted trainer object
+        if self.compute_feature_importance:
+            self._compute_ensemble_feature_importance()
+            with pd.option_context('display.max_rows', 10000, 'display.max_columns', 10):
+                print('Ensemble feature importance:')
+                print(self.feature_importance['ensemble.optimized'].sort_values(ascending=False))
+
         self.save()
+
+    def _compute_ensemble_feature_importance(self):
+        norm_model_weights = self.model_weights / np.sum(self.model_weights)
+        model_name_to_weight = {name: weight for name, weight in zip(self.model_names, norm_model_weights)}
+        models_feature_importance = pd.DataFrame()
+        for model in self.model_names:
+            models_feature_importance[model] = self.feature_importance[model] * model_name_to_weight[model]
+        models_feature_importance.fillna(0, inplace=True)
+        self.feature_importance['ensemble.optimized'] = models_feature_importance.sum(axis=1)
 
     def train_and_save(self, X_train, X_test, y_train, y_test, model: AbstractModel):
         print('training', model.name)
@@ -212,9 +246,6 @@ class AbstractTrainer:
         return self.predict_proba_voting_ensemble(models=self.model_names, X_test=X, weights=self.model_weights)
 
     def score(self, X, y):
-        print(self.objective_func.__name__)
-        print(len(set(y_pred)))
-        print(len(set(y)))
         y_pred = self.predict(X)
         return self.objective_func(y_true=y, y_pred=y_pred)
 
@@ -300,6 +331,7 @@ class AbstractTrainer:
 
         rerun = False
         rerun_models = []
+        # TODO: Crashes when all model weights are negative. Handle this by returning model which always predicts 0 for regression (or most frequent class in binary/multiclass), or raise this as a dedicated error
         for i, weight in enumerate(best_weights):
             if weight < 0:
                 print('model', i, 'has negative weight, setting to 0 and re-running optimization...')

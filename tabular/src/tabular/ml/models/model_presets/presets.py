@@ -1,28 +1,18 @@
-import lightgbm as lgb
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import (RandomForestClassifier, ExtraTreesClassifier, RandomForestRegressor)
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import Perceptron
-from sklearn.dummy import DummyClassifier, DummyRegressor
-
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
-from tabular.ml.models.nn_nlp_classification_model import NNNLPClassificationModel
 from tabular.ml.models.nn_nlp_lm_model import NNNLPLanguageModel
-from tabular.ml.models.nn_tab_model import NNTabularModel
-from tabular.ml.models.sklearn_model import SKLearnModel
 from tabular.ml.models.lgb_model import LGBModel
-from tabular.ml.models.rf_model import RFModel
-from tabular.sandbox.models.lgb.parameters import get_param_baseline as lgb_get_param_baseline
-from tabular.sandbox.models.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline
+from tabular.ml.models.nn_tab_model import NNTabularModel
+from tabular.ml.tuning.hyperparameters.defaults.lgbm.parameters import get_param_baseline as lgb_get_param_baseline
+from tabular.ml.tuning.hyperparameters.defaults.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline
 
 from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
+# TODO: Don't pass in num_boost_round, have it be defined in hyperparmeters?
 def get_preset_models(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     if problem_type == BINARY:
-        return get_preset_models_classification(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
+        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
     elif problem_type == MULTICLASS:
-        return get_preset_models_classification(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, num_classes=num_classes)
+        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, num_classes=num_classes)  # TODO: consider having separate default models for multi-class instead of re-using binary
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round)
     elif problem_type == LANGUAGE_MODEL:
@@ -31,7 +21,7 @@ def get_preset_models(path, problem_type, objective_func, num_boost_round=None, 
         raise NotImplementedError
 
 
-def get_preset_models_classification(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
+def get_preset_models_binary(path, problem_type, objective_func, num_boost_round=None, num_classes=None):
     models = [
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
