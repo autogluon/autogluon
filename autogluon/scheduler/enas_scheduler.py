@@ -1,5 +1,7 @@
+import pickle
 import logging
 from tqdm import tqdm
+from collections import OrderedDict
 
 import mxnet as mx
 
@@ -21,9 +23,11 @@ class ENAS_Scheduler(object):
     """
     def __init__(self, supernet, train_set='imagenet', val_set=None,
                  train_fn=default_train_fn, eval_fn=default_val_fn,
-                 train_args={}, val_args={}, num_gpus=get_gpu_count(), batch_size=256,
-                 epochs=200, warmup_epochs=5, controller_lr=3.5e-4, controller_batch_size=10,
-                 ema_baseline_decay=0.95, update_arch_frequency=5, **kwargs):
+                 train_args={}, val_args={}, num_gpus=get_gpu_count(),
+                 num_cpu=get_cpu_count(), batch_size=256,
+                 epochs=120, warmup_epochs=5, controller_lr=3.5e-4,
+                 controller_batch_size=10, ema_baseline_decay=0.95,
+                 update_arch_frequency=5, checkname='./enas/checkpoint.ag', **kwargs):
         ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else mx.cpu(0)
         supernet.collect_params().reset_ctx(ctx)
         supernet.hybridize()
@@ -31,17 +35,18 @@ class ENAS_Scheduler(object):
         self.train_fn = train_fn
         self.eval_fn = eval_fn
         dataset_name = train_set
+        self.checkname = checkname
         if isinstance(train_set, str):
-            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size).init()
-            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size).init()
+            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size, shuffle=True).init()
+            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size, shuffle=True).init()
         if isinstance(train_set, gluon.data.Dataset):
             self.train_data = gluon.data.DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,
-                    last_batch="rollover", num_workers=get_cpu_count())
+                    last_batch="rollover", num_workers=num_cpu)
             # very important, make shuffle for training contoller
             self.val_data = gluon.data.DataLoader(
                     val_set, batch_size=batch_size, shuffle=True,
-                    num_workers=get_cpu_count())
+                    num_workers=num_cpu)
         else:
             self.train_data = train_set
             self.val_data = val_set
@@ -85,6 +90,7 @@ class ENAS_Scheduler(object):
                 tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \
                         .format(epoch, i, self.val_acc, self.baseline))
             self.validation()
+            self.save()
 
     def validation(self):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
@@ -129,12 +135,23 @@ class ENAS_Scheduler(object):
         self.controller_optimizer.step(self.controller_batch_size)
         logger.debug('controller loss: {}'.format(loss.asscalar()))
 
+    def load(self, checkname=None):
+        checkname = checkname if checkname else self.checkname
+        state_dict = load(checkname)
+        self.load_state_dict(state_dict)
+
+    def save(self, checkname=None):
+        checkname = checkname if checkname else self.checkname
+        save(self.state_dict(), checkname)
+
     def state_dict(self, destination=None):
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
         destination['supernet_params'] = pickle.dumps(self.supernet.collect_params())
+        destination['controller_params'] = pickle.dumps(self.controller.collect_params())
         return destination
 
     def load_state_dict(self, state_dict):
         update_params(self.supernet, pickle.loads(state_dict['supernet_params']))
+        update_params(self.controller, pickle.loads(state_dict['controller_params']))

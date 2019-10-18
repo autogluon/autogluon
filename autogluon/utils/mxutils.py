@@ -14,6 +14,7 @@ def update_params(net, params):
 def get_data_rec(input_size, crop_ratio,
                  rec_file, rec_file_idx,
                  batch_size, num_workers, train=True,
+                 shuffle=True,
                  jitter_param=0.4, max_rotate_angle=0):
     import mxnet as mx
     from mxnet import gluon

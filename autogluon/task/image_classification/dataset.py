@@ -85,7 +85,8 @@ class ImageClassificationDataset(object):
                 raise NotImplementedError
 
 @autogluon_function()
-def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32, **kwargs):
+def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
+                         shuffle=True, **kwargs):
     """AutoGluonFunction
     """
     print('get_built_in_dataset', name)
@@ -120,7 +121,8 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
             rec_file = '/media/ramdisk/rec/val.rec'
             rec_file_idx = '/media/ramdisk/rec/val.idx'
         data_loader = get_data_rec(input_size, 0.875, rec_file, rec_file_idx,
-                                   batch_size, num_workers, train, **kwargs)
+                                   batch_size, num_workers, train, shuffle=shuffle,
+                                   **kwargs)
         return data_loader
     else:
         raise NotImplemented
