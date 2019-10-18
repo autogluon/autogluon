@@ -50,6 +50,7 @@ requirements = [
     'matplotlib',
     'requests',
     'pytest',
+    'distributed==2.5.1',
     'dask[complete]==2.0.0',
     'tornado',
     'ConfigSpace==0.4.10',

@@ -2,7 +2,7 @@ import copy
 import collections
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-from ..utils import DeprecationHelper, EasyDict
+from ..utils import DeprecationHelper, EasyDict, classproperty
 
 __all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'Sequence', 'List', 'Dict',
            'Categorical', 'Choice', 'Real', 'Linear', 'LogLinear', 'Int', 'Bool']
@@ -37,16 +37,10 @@ class NestedSpace(Space):
     def kwspaces(self):
         return None
 
-import weakref
-
-class classproperty(object):
-    def __init__(self, fget):
-        self.fget = fget
-    def __get__(self, owner_self, owner_cls):
-        return self.fget(owner_cls)
 
 class AutoGluonObject(NestedSpace):
-    """Searchable Objects created by '@autogluon_object' or '@autogluon_function' decorators.
+    r"""Searchable Objects created by decorating user-defined object using
+    :func:`@autogluon.autogluon_object` or :func:`@autogluon.autogluon_function` decorators.
     """
     def __call__(self, *args, **kwargs):
         if not self._inited:
@@ -110,6 +104,16 @@ class List(NestedSpace):
     def __len__(self):
         return len(self.data)
 
+    def __getattribute__(self, s):
+        try:    
+            x = super(Dict, self).__getattribute__(s)
+        except AttributeError:      
+            pass
+        else:
+            return x
+        x = self.data.__getattribute__(s)
+        return x
+
     def sample(self, **config):
         ret = []
         kwspaces = self.kwspaces
@@ -159,13 +163,32 @@ class Dict(NestedSpace):
     """A Searchable Dict (Nested Space)
     """
     def __init__(self, **kwargs):
-        self.data = kwargs
+        self.data = EasyDict(kwargs)
+
+    def __getattribute__(self, s):
+        try:    
+            x = super(Dict, self).__getattribute__(s)
+        except AttributeError:      
+            pass
+        else:
+            return x
+        x = self.data.__getattribute__(s)
+        return x
 
     def __getitem__(self, key):
         return self.data[key]
 
     def __setitem__(self, key, data):
         self.data[key] = data
+
+    #def keys(self):
+    #    return self.data.keys()
+
+    #def values(self):
+    #    return self.data.values()
+
+    #def items(self):
+    #    return self.data.items()
 
     @property
     def cs(self):
@@ -282,7 +305,7 @@ class Real(SimpleSpace):
         log (True/False): search space in log scale
 
     Example:
-        >>> learning_rate = ag.Real(0.01, 0.1)
+        >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
         self.lower = lower

@@ -14,18 +14,18 @@ from autogluon.utils.mxutils import get_data_rec
 @autogluon_register_args(
     dataset='apparel',
     resume=False,
-    epochs=ag.ListSpace(80, 40, 120),
-    lr=ag.LogLinearSpace(1e-4, 1e-2),
-    lr_factor=ag.LogLinearSpace(0.1, 1),
+    epochs=ag.Categorical(80, 40, 120),
+    lr=ag.Real(1e-4, 1e-2, log=True),
+    lr_factor=ag.Real(0.1, 1, log=True),
     batch_size=256,
     momentum=0.9,
-    wd=ag.LogLinearSpace(1e-5, 1e-3),
+    wd=ag.Real(1e-5, 1e-3, log=True),
     num_gpus=8,
     num_workers=30,
-    input_size=ag.ListSpace(224, 256),
+    input_size=ag.Categorical(224, 256),
     crop_ratio=0.875,
-    jitter_param=ag.LinearSpace(0.1, 0.4),
-    max_rotate_angle=ag.IntSpace(0, 10),
+    jitter_param=ag.Real(0.1, 0.4),
+    max_rotate_angle=ag.Int(0, 10),
     remote_file='remote_ips.txt',
 )
 def train_finetune(args, reporter):
@@ -165,10 +165,8 @@ if __name__ == '__main__':
     """
     logging.basicConfig(level=logging.DEBUG)
     # create searcher and scheduler
-    searcher = ag.searcher.RandomSampling(train_finetune.cs)
-    myscheduler = ag.distributed.DistributedHyperbandScheduler(train_finetune, args,
+    myscheduler = ag.distributed.DistributedHyperbandScheduler(train_finetune,
                                                                resource={'num_cpus': 16, 'num_gpus': args.num_gpus},
-                                                               searcher=searcher,
                                                                checkpoint='./{}/checkerpoint.ag'.format(args.dataset),
                                                                num_trials=64,
                                                                resume=args.resume,

@@ -102,11 +102,14 @@ class Swish(HybridBlock):
 
 
 def _add_conv(out, channels=1, kernel=1, stride=1, pad=0,
-              num_group=1, activation='swish', batchnorm=True, input_size=None):
+              num_group=1, activation='swish', batchnorm=True, input_size=None,
+              in_channels=0):
     out.add(SamePadding(kernel, stride, dilation=(1, 1), input_size=input_size))
-    out.add(nn.Conv2D(channels, kernel, stride, pad, groups=num_group, use_bias=False))
+    out.add(nn.Conv2D(channels, kernel, stride, pad, groups=num_group,
+                      use_bias=False, in_channels=in_channels))
     if batchnorm:
-        out.add(nn.BatchNorm(scale=True, momentum=0.99, epsilon=1e-3))
+        out.add(nn.BatchNorm(in_channels=in_channels, scale=True,
+                             momentum=0.99, epsilon=1e-3))
     if activation == 'relu':
         out.add(nn.Activation('relu'))
     elif activation == 'swish':

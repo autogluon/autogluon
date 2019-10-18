@@ -10,6 +10,7 @@ from ...utils import get_data_rec
 __all__ = ['get_built_in_dataset', 'ImageClassificationDataset']
 
 built_in_datasets = [
+    'cifar',
     'cifar10',
     'cifar100',
     'imagenet',
@@ -87,7 +88,8 @@ class ImageClassificationDataset(object):
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32, **kwargs):
     """AutoGluonFunction
     """
-    if name == 'cifar10':
+    print('get_built_in_dataset', name)
+    if name == 'cifar10' or name == 'cifar':
         transform_split = transforms.Compose([
             gcv_transforms.RandomCrop(32, pad=4),
             transforms.RandomFlipLeftRight(),

@@ -55,27 +55,25 @@ class EfficientNet(HybridBlock):
                 for block_arg in blocks_args:
                     # Update block input and output filters based on depth
                     # multiplier.
-                    block_arg = block_arg._replace(
+                    block_arg.update(
                         in_channels=out_channels,
                         channels=round_filters(block_arg.channels, width_coefficient,
                                                depth_divisor, min_depth),
                         num_repeat=round_repeats(
-                            block_arg.num_repeat, depth_coefficient))
+                            block_arg.num_repeat, depth_coefficient),
+                            input_size=input_size)
+                    self._blocks.add(MBConvBlock(**block_arg))
 
                     out_channels=block_arg.channels
-                    arg_dict = block_arg._asdict()
-                    arg_dict['input_size'] = input_size
-                    self._blocks.add(MBConvBlock(**arg_dict))
-
                     input_size = _update_input_size(input_size, block_arg.stride)
-                    if block_arg.num_repeat > 1:
-                        block_arg = block_arg._replace(
-                            in_channels=block_arg.channels, stride=1)
 
-                    arg_dict = block_arg._asdict()
-                    arg_dict['input_size'] = input_size
+                    if block_arg.num_repeat > 1:
+                        block_arg.update(
+                            in_channels=block_arg.channels, stride=1,
+                            input_size=input_size)
+
                     for _ in range(block_arg.num_repeat - 1):
-                        self._blocks.add(MBConvBlock(**arg_dict))
+                        self._blocks.add(MBConvBlock(**block_arg))
 
             # Head
             out_channels = round_filters(1280, width_coefficient,
@@ -90,8 +88,7 @@ class EfficientNet(HybridBlock):
 
     def hybrid_forward(self, F, x):
         x = self.features(x)
-        for block in self._blocks:
-            x = block(x)
+        x = self._blocks(x)
         x = self._conv_head(x)
         x = F.contrib.AdaptiveAvgPooling2D(x, 1)
         if self._dropout:

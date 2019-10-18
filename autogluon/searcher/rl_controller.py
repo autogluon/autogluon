@@ -18,7 +18,7 @@ class RLSearcher(BaseSearcher):
             specification of the Hyperparameters with their priors
 
     Example:
-        >>> searcher = RLSearcher(cs)
+        >>> searcher = RLSearcher(train_fn.kwspaces)
         >>> searcher.get_config()
     """
     def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='rl'):
@@ -28,6 +28,7 @@ class RLSearcher(BaseSearcher):
             self.controller = LSTMController(kwspaces, ctx=ctx)
         else:
             raise NotImplemented
+        self.controller.initialize(ctx=mx.cpu())
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -79,19 +80,17 @@ class LSTMController(mx.gluon.Block):
             self.decoders.add(decoder)
 
         def _init_hidden(batch_size):
-            #print('batch_size, hidden_size', batch_size, hidden_size)
             zeros = mx.nd.zeros((batch_size, hidden_size), ctx=self.context)
             return zeros, zeros.copy()
 
         def _get_default_hidden(key):
-            #print('key, hidden_size', key, hidden_size)
             return mx.nd.zeros((key, hidden_size), ctx=self.context)
         
         self.static_init_hidden = keydefaultdict(_init_hidden)
         self.static_inputs = keydefaultdict(_get_default_hidden)
 
-    def initialize(self, ctx=[mx.cpu()], *args, **kwargs):
-        self.context = ctx[0]
+    def initialize(self, ctx=mx.cpu(), *args, **kwargs):
+        self.context = ctx[0] if isinstance(ctx, (list, tuple)) else ctx
         super().initialize(ctx=ctx, *args, **kwargs)
 
     def forward(self, inputs, hidden, block_idx, is_embed):
@@ -105,6 +104,47 @@ class LSTMController(mx.gluon.Block):
         logits = logits / self.softmax_temperature
 
         return logits, (hx, cx)
+
+    def inference(self):
+        batch_size=1
+        inputs = self.static_inputs[batch_size]
+        hidden = self.static_init_hidden[batch_size]
+
+        actions = []
+        entropies = []
+        log_probs = []
+
+        for block_idx in range(len(self.num_tokens)):
+            logits, hidden = self.forward(inputs, hidden,
+                                          block_idx, is_embed=(block_idx==0))
+
+            probs = F.softmax(logits, axis=-1)
+            log_prob = F.log_softmax(logits, axis=-1)
+            #entropy = -(log_prob * probs).sum(1, keepdims=False)
+
+            action = mx.nd.argmax(probs, 1)#mx.random.multinomial(probs, 1)
+            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
+                              action.astype('float32'))
+            #selected_log_prob = F.gather_nd(log_prob, ind)
+
+            actions.append(action[:, 0])
+            #entropies.append(entropy)
+            #log_probs.append(selected_log_prob)
+
+            # why add some constant?
+            inputs = action[:, 0] #+ sum(self.num_tokens[:block_idx])
+            inputs.detach()
+
+        configs = []
+        for idx in range(batch_size):
+            config = {}
+            for i, action in enumerate(actions):
+                choice = action[idx].asscalar()
+                k, space = self.spaces[i]
+                config[k] = choice#space[choice]
+            configs.append(config)
+
+        return configs
 
     def sample(self, batch_size=1, with_details=False):
         """

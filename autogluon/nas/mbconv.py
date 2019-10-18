@@ -5,14 +5,14 @@ from ..utils import EasyDict
 from ..core import autogluon_function
 from .utils import *
 
-__all__ = ['mobilenet_block_args', 'MBConvBlock']
+__all__ = ['MBConvBlock']
 
-@autogluon_function()
-def mobilenet_block_args(kernel, num_repeat, channels, expand_ratio,
-                         stride, se_ratio=0.25, in_channels=0):
-    return EasyDict(kernel=kernel, num_repeat=num_repeat,
-                    channels=channels, expand_ratio=expand_ratio,
-                    stride=stride, se_ratio=se_ratio, in_channels=in_channels)
+#@autogluon_function()
+#def mobilenet_block_args(kernel, num_repeat, channels, expand_ratio,
+#                         stride, se_ratio=0.25, in_channels=0):
+#    return EasyDict(kernel=kernel, num_repeat=num_repeat,
+#                    channels=channels, expand_ratio=expand_ratio,
+#                    stride=stride, se_ratio=se_ratio, in_channels=in_channels)
 
 class MBConvBlock(HybridBlock):
     def __init__(self, in_channels, channels, expand_ratio, kernel, stride=1, se_ratio=0.25,
@@ -38,26 +38,31 @@ class MBConvBlock(HybridBlock):
 
         self.depth_conv = nn.HybridSequential(prefix='depth_conv_')
         if expand_ratio != 1:
-            _add_conv(self.depth_conv, in_channels * expand_ratio,
-                      activation=activation, batchnorm=True, input_size=input_size)
-        _add_conv(self.depth_conv, in_channels * expand_ratio,
+            _add_conv(self.depth_conv, in_channels*expand_ratio,
+                      activation=activation, batchnorm=True, input_size=input_size,
+                      in_channels=in_channels)
+        _add_conv(self.depth_conv, in_channels*expand_ratio,
             kernel=kernel, stride=stride,
-            num_group=in_channels * expand_ratio,
-            activation=activation, batchnorm=True, input_size=input_size)
+            num_group=in_channels*expand_ratio,
+            activation=activation, batchnorm=True, input_size=input_size,
+            in_channels=in_channels*expand_ratio)
         input_size = _update_input_size(input_size, stride)
 
         if se_ratio:
-            num_squeezed_channels = max(1, int(in_channels * se_ratio))
+            num_squeezed_channels = max(1, int(in_channels*se_ratio))
             self.se_module = nn.HybridSequential(prefix='se_module_')
-            self.se_module.add(nn.Conv2D(num_squeezed_channels, 1, 1, 0, use_bias=True))
+            self.se_module.add(nn.Conv2D(num_squeezed_channels, 1, 1, 0, use_bias=True,
+                                         in_channels=in_channels*expand_ratio))
             if activation == 'relu':
                 self.se_module.add(nn.Activation('relu'))
             elif activation == 'swish':
                 self.se_module.add(Swish())
-            self.se_module.add(nn.Conv2D(in_channels * expand_ratio, 1, 1, 0, use_bias=True))
+            self.se_module.add(nn.Conv2D(in_channels*expand_ratio, 1, 1, 0, use_bias=True,
+                                         in_channels=num_squeezed_channels))
         self.project_conv = nn.HybridSequential(prefix='preject_conv_')
         _add_conv(self.project_conv, channels,
-                  activation=None, batchnorm=True, input_size=input_size)
+                  activation=None, batchnorm=True, input_size=input_size,
+                  in_channels=in_channels*expand_ratio)
         if drop_connect_rate:
             self.drop_out = nn.Dropout(drop_connect_rate)
 

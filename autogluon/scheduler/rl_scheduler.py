@@ -82,7 +82,7 @@ class RLScheduler(FIFOScheduler):
                 controller_resource['num_gpus'] > 0 else [mx.cpu()]
         # controller setup
         self.controller = searcher.controller
-        self.controller.initialize(ctx=self.controller_ctx)
+        self.controller.collect_params().reset_ctx(self.controller_ctx)
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr*controller_batch_size})
