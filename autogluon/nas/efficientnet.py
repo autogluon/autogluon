@@ -53,8 +53,6 @@ class EfficientNet(HybridBlock):
             self._blocks = nn.HybridSequential()
             with self._blocks.name_scope():
                 for block_arg in blocks_args:
-                    # Update block input and output filters based on depth
-                    # multiplier.
                     block_arg.update(
                         in_channels=out_channels,
                         channels=round_filters(block_arg.channels, width_coefficient,
@@ -69,7 +67,7 @@ class EfficientNet(HybridBlock):
 
                     if block_arg.num_repeat > 1:
                         block_arg.update(
-                            in_channels=block_arg.channels, stride=1,
+                            in_channels=out_channels, stride=1,
                             input_size=input_size)
 
                     for _ in range(block_arg.num_repeat - 1):

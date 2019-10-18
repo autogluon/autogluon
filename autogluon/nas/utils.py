@@ -108,7 +108,7 @@ def _add_conv(out, channels=1, kernel=1, stride=1, pad=0,
     out.add(nn.Conv2D(channels, kernel, stride, pad, groups=num_group,
                       use_bias=False, in_channels=in_channels))
     if batchnorm:
-        out.add(nn.BatchNorm(in_channels=in_channels, scale=True,
+        out.add(nn.BatchNorm(in_channels=channels, scale=True,
                              momentum=0.99, epsilon=1e-3))
     if activation == 'relu':
         out.add(nn.Activation('relu'))
