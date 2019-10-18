@@ -1,4 +1,4 @@
-""" TODOs needed to get predictor object working:
+""" TODOs needed to get predictor object working for any task:
 
     - Base Task should implement @classmethod load(output_directory) method which restores a Predictor object from file (previously saved using Predictor.save(output_directory)). task.load(output_directory) can simply: return Predictor.load(output_directory)
     
@@ -6,14 +6,13 @@
     
     - Right before task.fit() returns predictor, it should call: predictor.save(outputdir) so that training progress is not accidentally lost.
     
-    - task.fit() needs to have an output_directory argument where to store all outputs.
+    - task.fit() needs to have an output_directory argument where to store all outputs
     
     - Delete line "Results = collections.namedtuple('Results', 'model reward config time metadata')" from task.fit(), and store all info in self.results dict object defined below instead.
     
     - This code assumes trial_ids are sortable such that lower trial_id indicates trial was scheduled earlier than trial with higher trial_id
     
-    - Base Dataset object needs to have get_labels() method. In general, it's currently unclear what is the difference between a dataset with labels and one for which no labels are avialable (ie. test data).
-      Also to make sure predictors are not cheating, there should be a way to erase all labels from the Dataset object after separately extracting them via get_labels()
+    - task object should have get_labels(Dataset) method
 """
 
 import pickle, json
@@ -41,14 +40,15 @@ class BasePredictor(object):
         >>> output_directory = '~/temp/' # any directory name specifying where to store all results
         >>> predictor = task.fit(train_data=train_data, output_directory=output_directory)
         >>> # To instead specify train/val split, do: predictor = task.fit(train_data=train_data, val_data=task.Dataset(valdata_filepath), output_directory=output_directory)
-        >>> results = predictor.fit_summary() # will also print out summary
+        >>> results = predictor.fit_summary() # will also print out summary and create plots
         # Inference time (may be a new Python session):
         >>> test_data = task.Dataset(testdata_filepath)
-        >>> test_labels = test_data.get_labels() # should also erase labels from test_data object here to make sure they are not used in any way
+        >>> test_labels = task.get_labels(test_data)
         >>> predictor = None  # We delete predictor here just to demonstrate how to load previously-trained predictor from file
         >>> predictor = task.load(output_directory)
         >>> batch_predictions = predictor.predict(test_data)
-        >>> performance = predictor.evaluate(y_true=test_labels, y_pred=batch_predictions)
+        >>> performance = predictor.evaluate_predictions(y_true=test_labels, y_pred=batch_predictions) 
+        # or can instead just use equivalent shorthand: performance = predictor.evaluate(test_data)
         # Can also do inference on just a single test example: x_i = single datapoint, eg. x_i = test_data[i]
         >>> single_prediction = predictor.predict(x_i)
         >>> print((x_i, single_prediction))
@@ -56,7 +56,7 @@ class BasePredictor(object):
     def __init__(self, loss_func, eval_func, model=None, **kwargs):
         self.model = model # MXnet model or list of multiple models / ensemble. Each model should have its own loading/saving functionality.
         self.loss_func = loss_func # Loss function (or string name) minimized during training
-        self.eval_func = eval_func # Evaluation function applied on validation/test data to gauge predictive performance.
+        self.eval_func = eval_func # Evaluation function / metric applied on validation/test data to gauge predictive performance.
         # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
         self.results = self.createResultsDict() # dict object to store all information during task.fit().
     
@@ -111,8 +111,15 @@ class BasePredictor(object):
         pass
         
     @abstractmethod
-    def evaluate(self, y_true, y_pred):
-        """ Evaluate the provided predictions against ground truth labels according to the task-specific evaluation metric. """
+    def evaluate_predictions(self, y_true, y_pred):
+        """ Evaluate the provided list of predictions against list of ground truth labels according to the task-specific evaluation metric (self.eval_func). """
+        pass
+    
+    @abstractmethod
+    def evaluate(self, dataset):
+        """ Use self.model to produce predictions from the given Dataset object, and then compute task-specific evaluation metric (self.eval_func)
+            comparing these predictions against ground truth labels stored in the Dataset object.
+        """
         pass
     
     def fit_summary(self, verbosity = 2, output_directory = None):
