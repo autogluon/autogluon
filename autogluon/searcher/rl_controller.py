@@ -41,6 +41,9 @@ class RLSearcher(BaseSearcher):
     def get_config(self):
         return self.controller.sample()[0]
 
+    def get_best_config(self):
+        return self.controller.inference()
+
     def state_dict(self, destination=None):
         if destination is None:
             destination = OrderedDict()
@@ -106,45 +109,27 @@ class LSTMController(mx.gluon.Block):
         return logits, (hx, cx)
 
     def inference(self):
-        batch_size=1
-        inputs = self.static_inputs[batch_size]
-        hidden = self.static_init_hidden[batch_size]
-
+        inputs = self.static_inputs[1]
+        hidden = self.static_init_hidden[1]
         actions = []
-        entropies = []
-        log_probs = []
-
         for block_idx in range(len(self.num_tokens)):
             logits, hidden = self.forward(inputs, hidden,
                                           block_idx, is_embed=(block_idx==0))
-
             probs = F.softmax(logits, axis=-1)
-            log_prob = F.log_softmax(logits, axis=-1)
-            #entropy = -(log_prob * probs).sum(1, keepdims=False)
-
             action = mx.nd.argmax(probs, 1)#mx.random.multinomial(probs, 1)
-            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
-                              action.astype('float32'))
-            #selected_log_prob = F.gather_nd(log_prob, ind)
-
-            actions.append(action[:, 0])
-            #entropies.append(entropy)
-            #log_probs.append(selected_log_prob)
-
-            # why add some constant?
-            inputs = action[:, 0] #+ sum(self.num_tokens[:block_idx])
+            #print('action.shape', action.shape)
+            #print(mx.random.multinomial(probs, 1).shape)
+            actions.append(action)
+            inputs = action #+ sum(self.num_tokens[:block_idx])
             inputs.detach()
 
-        configs = []
-        for idx in range(batch_size):
-            config = {}
-            for i, action in enumerate(actions):
-                choice = action[idx].asscalar()
-                k, space = self.spaces[i]
-                config[k] = choice#space[choice]
-            configs.append(config)
+        config = {}
+        for i, action in enumerate(actions):
+            choice = action.asscalar()
+            k, space = self.spaces[i]
+            config[k] = choice
 
-        return configs
+        return config
 
     def sample(self, batch_size=1, with_details=False):
         """

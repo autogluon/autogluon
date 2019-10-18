@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 import mxnet as mx
 
-from ..utils import save, load
+from ..utils import save, load, update_params
 from ..searcher import RLSearcher
 from ..task.image_classification.dataset import get_built_in_dataset
 from .resource import get_gpu_count, get_cpu_count
@@ -38,6 +38,7 @@ class ENAS_Scheduler(object):
             self.train_data = gluon.data.DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,
                     last_batch="rollover", num_workers=get_cpu_count())
+            # very important, make shuffle for training contoller
             self.val_data = gluon.data.DataLoader(
                     val_set, batch_size=batch_size, shuffle=True,
                     num_workers=get_cpu_count())
@@ -67,6 +68,7 @@ class ENAS_Scheduler(object):
                 optimizer_params={'learning_rate': controller_lr*controller_batch_size})
         self.update_arch_frequency = update_arch_frequency
         self.controller_batch_size = controller_batch_size
+        self.val_acc = 0
 
     def run(self):
         for epoch in tqdm(range(self.epochs)):
@@ -80,7 +82,22 @@ class ENAS_Scheduler(object):
                 self.train_fn(self.supernet, batch, **self.train_args)
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
-                tbar.set_description('epoch {}, iter {}, avg reward: {}'.format(epoch, i, self.baseline))
+                tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \
+                        .format(epoch, i, self.val_acc, self.baseline))
+            self.validation()
+
+    def validation(self):
+        if hasattr(self.val_data, 'reset'): self.val_data.reset()
+        # update 
+        sum_rewards = 0
+        tbar = tqdm(enumerate(self.val_data))
+        config = self.controller.inference()
+        self.supernet.sample(**config)
+        for i, batch in tbar:
+            reward = self.eval_fn(self.supernet, batch, **self.val_args)
+            sum_rewards += reward
+            tbar.set_description('Acc: {}'.format(sum_rewards/(i+1)))
+        self.val_acc = sum_rewards / (i+1)
 
     def train_controller(self):
         """Run multiple number of trials
@@ -111,3 +128,13 @@ class ENAS_Scheduler(object):
         loss.backward()
         self.controller_optimizer.step(self.controller_batch_size)
         logger.debug('controller loss: {}'.format(loss.asscalar()))
+
+    def state_dict(self, destination=None):
+        if destination is None:
+            destination = OrderedDict()
+            destination._metadata = OrderedDict()
+        destination['supernet_params'] = pickle.dumps(self.supernet.collect_params())
+        return destination
+
+    def load_state_dict(self, state_dict):
+        update_params(self.supernet, pickle.loads(state_dict['supernet_params']))
