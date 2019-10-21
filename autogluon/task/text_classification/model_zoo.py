@@ -19,8 +19,8 @@ models = ['standard_lstm_lm_200',
           'roberta_12_768_12']
 
 @autogluon_net_instances
-def get_model_instances(name: AnyStr,
-                        dataset_name: AnyStr = 'wikitext-2', **kwargs) -> (Block, nlp.vocab):
+def get_model_instances(name,
+                        dataset_name='wikitext-2', **kwargs):
     """
     Parameters
     ----------
@@ -68,7 +68,7 @@ def get_model_instances(name: AnyStr,
 
 
 @autogluon_nets
-def get_model(name: AnyStr, **kwargs) -> Net:
+def get_model(name, **kwargs):
     """Returns a network with search space by name
 
         Parameters
@@ -151,6 +151,8 @@ def bert_24_1024_16(**kwargs):
     pass
 
 
+
+
 class LMClassifier(gluon.Block):
     """
     Network for Text Classification which uses a pre-trained language model.
@@ -163,14 +165,15 @@ class LMClassifier(gluon.Block):
             self.embedding = embedding
             self.encoder = None
             self.classifier = None
+            self.pool_out = None
 
     def forward(self, data, valid_length):  # pylint: disable=arguments-differ
         encoded = self.encoder(self.embedding(data))
         # Add mean pooling to the output of the LSTM Layers
         masked_encoded = mx.ndarray.SequenceMask(encoded, sequence_length=valid_length, use_sequence_length=True)
-        agg_state = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
+        self.pool_out = mx.ndarray.broadcast_div(mx.ndarray.sum(masked_encoded, axis=0),
                                              mx.ndarray.expand_dims(valid_length, axis=1))
-        out = self.classifier(agg_state)
+        out = self.classifier(self.pool_out)
         return out
 
 
@@ -184,6 +187,7 @@ class BERTClassifier(gluon.Block):
     def __init__(self, bert, num_classes=2, dropout=0.0, prefix=None, params=None):
         super(BERTClassifier, self).__init__(prefix=prefix, params=params)
         self.bert = bert
+        self.pool_out = None
         with self.name_scope():
             self.classifier = gluon.nn.HybridSequential(prefix=prefix)
             if dropout:
@@ -191,5 +195,5 @@ class BERTClassifier(gluon.Block):
             self.classifier.add(gluon.nn.Dense(units=num_classes))
 
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
-        _, pooler_out = self.bert(inputs, token_types, valid_length)
-        return self.classifier(pooler_out)
+        _, self.pooler_out = self.bert(inputs, token_types, valid_length)
+        return self.classifier(self.pooler_out)
