@@ -1,7 +1,7 @@
 
 import datetime
 
-from f3_grail_data_frame_utilities.loaders import load_pd
+from tabular.utils.loaders import load_pd
 from tabular.ml.learner.default_learner import DefaultLearner
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
 

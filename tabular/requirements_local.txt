@@ -1,1 +1,0 @@
-git+ssh://git.amazon.com/pkg/F3GrailDataFrameUtilities#egg=F3GrailDataFrameUtilities

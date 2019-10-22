@@ -1,6 +1,6 @@
 
-from f3_grail_data_frame_utilities.loaders import load_pd
-from f3_grail_data_frame_utilities.savers import save_pd
+from tabular.utils.loaders import load_pd
+from tabular.utils.savers import save_pd
 from tabular.ml.learner.default_learner import DefaultLearner
 
 
