@@ -13,18 +13,18 @@ from ...scheduler import *
 from ..base import BaseTask
 
 from .nets import get_built_in_network
-from .dataset import ImageClassificationDataset
-from .pipeline import train_image_classification
+from .dataset import TextClassificationDataset
+from .pipeline import train_text_classification
 from .metrics import get_metric_instance
 
-__all__ = ['ImageClassification']
+__all__ = ['TextClassification']
 
 logger = logging.getLogger(__name__)
 
-class ImageClassification(BaseTask):
+class TextClassification(BaseTask):
     """AutoGluon ImageClassification Task
     """
-    Dataset = ImageClassificationDataset
+    Dataset = TextClassificationDataset
     @staticmethod
     def fit(dataset='cifar10',
             net=Choice('ResNet34_v1b', 'ResNet50_v1b'),
@@ -51,7 +51,8 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True):
+            auto_search=True,
+            **kwargs):
 
         """
         Fit networks on dataset
@@ -84,7 +85,7 @@ class ImageClassification(BaseTask):
             # based on the dataset statistics
             pass
 
-        train_image_classification.update(
+        train_text_classification.update(
             dataset=dataset,
             net=net,
             optimizer=optimizer,
@@ -115,34 +116,17 @@ class ImageClassification(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        return BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
+        return BaseTask.run_fit(train_text_classification, search_strategy, scheduler_options)
 
     @classmethod
-    def predict(cls, img):
+    def predict(cls, sentence):
         """The task predict function given an input.
          Args:
             img: the input
          Example:
-            >>> ind, prob = task.predict('example.jpg')
+            >>> ind, prob = task.predict('this is cool')
         """
-        logger.info('Start predicting.')
-        # load and display the image
-        img = mx.image.imread(img)
-        plt.imshow(img.asnumpy())
-        plt.show()
-        # model inference
-        args = cls.scheduler.train_fn.args
-        dataset = args.dataset
-        if isinstance(dataset, AutoGluonObject):
-            dataset = dataset._lazy_init()
-        transform_fn = dataset.transform_val
-        img = transform_fn(img)
-        ctx = mx.gpu(0)if args.num_gpus > 0 else mx.cpu()
-        pred = cls.results.model(img.expand_dims(0).as_in_context(ctx))
-        ind = mx.nd.argmax(pred, axis=1).astype('int')
-        logger.info('Finished.')
-        mx.nd.waitall()
-        return ind, mx.nd.softmax(pred)[0][ind]
+        pass
 
     @classmethod
     def evaluate(cls, dataset):

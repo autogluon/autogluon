@@ -5,7 +5,7 @@ This tutorial dives into how to configure and create your own trial scheduler, s
 
 We again begin by letting AutoGluon know that `image_classification` is the task of interest: 
 
-```{.python .input}
+```python
 from autogluon import ImageClassification as task
 
 import logging
@@ -23,7 +23,7 @@ In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrate
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
 We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.scheduler.FIFO_Scheduler) as default trial scheduler.
 
-```{.python .input}
+```python
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
 time_limits = 2*60
@@ -36,7 +36,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
@@ -49,7 +49,7 @@ We could easily leverage the early stopping scheduler: [Hyperband](../api/autogl
 HyperBandScheduler early stops trials using the HyperBand optimization search_strategy. It divides trials into brackets of varying sizes, and periodically early stops low-performing trials within each bracket.
 We could simply specify Hyperband via string name and use it in the `fit` function:
 
-```{.python .input}
+```python
 search_strategy = 'hyperband'
 
 results = task.fit(dataset,
@@ -60,7 +60,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -71,7 +71,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 We could also create our own trial scheduler. Here is an example of creating the Median Stopping scheduler. It is a simple stopping rule, which stops the trials with the rewards less than the median of the rewards at the same number of iters in the history.
 
 
-```{.python .input}
+```python
 import collections
 import numpy as np
 import multiprocessing as mp
@@ -173,7 +173,7 @@ class MedianStoppingRule(object):
 
 Then we can use our defined scheduler:
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    search_strategy=MedianStopping_Scheduler,
                    time_limits=time_limits,
@@ -182,7 +182,7 @@ results = task.fit(dataset,
 
 Print the result:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)

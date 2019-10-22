@@ -43,11 +43,11 @@ For example, we find the `Shopee-IET Machine Learning Competition` under the `In
 
 We then navigate to [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) to download the dataset using the Kaggle API.
 
-An example shell script to download the dataset to `~/data/shopeeiet/` can be found here: [download_shopeeiet.sh](../static/download_shopeeiet.sh).
+An example shell script to download the dataset to `~/data/shopeeiet/` can be found here: [download_shopeeiet.sh](../../static/download_shopeeiet.sh).
 
 After downloading this script to your machine, run it with:
 
-```{.python .input}
+```python
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/download_shopeeiet.sh')
 # os.system('sh download_shopeeiet.sh')
@@ -65,7 +65,7 @@ Now we have the desired directory structure under `~/data/shopeeiet/`, which in 
 
 Here are some example images from this data:
 
-![](../img/shopeeiet_example.png)
+![](../../img/shopeeiet_example.png)
 
 
 
@@ -112,13 +112,13 @@ Otherwise, `test` should have the same format as the `data` directory described 
 We show an example below on how to convert data source obtained in Step 1
 to Training/Validation/Test split with the required format.  
 In this example, we provide a script to split the Kaggle data into the required format;
-please click the download link of [prepare_shopeeiet.py](../static/prepare_shopeeiet.py).
+please click the download link of [prepare_shopeeiet.py](../../static/prepare_shopeeiet.py).
 
 ### Automatic training/validation split
 
 Since AutoGluon provides the automatic Training/Validation split, we can skip the Validation split by running the command:
 
-```{.python .input}
+```python
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
 # os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 0')
@@ -142,7 +142,7 @@ Now you have a dataset ready used in AutoGluon.
 
 To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
 
-```{.python .input}
+```python
 # from autogluon import ImageClassification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
 ```
@@ -163,7 +163,7 @@ or if there are specific images that you're sure you want included in a certain 
 
 If we want to manually specify the Training/Validation split, we could construct by running the command:
 
-```{.python .input}
+```python
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
 # os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9')
@@ -192,13 +192,13 @@ Then tell AutoGluon where the training and validation data is, which means we di
 
 We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
 
-```{.python .input}
+```python
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
 # os.system('unzip -o data_shopeeiet.zip -d ~/')
 ```
 
-```{.python .input}
+```python
 # from autogluon import ImageClassification as task
 # dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train', val_path='~/data/shopeeiet/val')
 ```
@@ -213,14 +213,14 @@ we don't recommend directly running `fit` here since it will take a while to exe
 
 On your own, please feel free to try running the following commands with small time limits (just uncomment the code):
 
-```{.python .input}
+```python
 # time_limits = 10 * 60 # 10mins
 # results = task.fit(dataset, time_limits=time_limits)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
 
-```{.python .input}
+```python
 # print('Top-1 acc: %.3f' % results.reward)
 ```
 
@@ -229,7 +229,7 @@ The top-1 accuracy of the best model on the validation set is:
 We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
-```{.python .input}
+```python
 # inds, probs = task.predict_batch('/home/ubuntu/data/shopeeiet/test')
 ```
 
@@ -247,7 +247,7 @@ Here are the results of AutoGluon's default `fit` and `predict` under different 
 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 
-```{.python .input}
+```python
 # import autogluon as ag
 # ag.utils.generate_csv(inds, '/home/ubuntu/data/shopeeiet/submission.csv')
 ```

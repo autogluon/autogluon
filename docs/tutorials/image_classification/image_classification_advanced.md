@@ -9,7 +9,7 @@ The advanced functionalities of AutoGluon allow you to leverage your external kn
 
 We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
 
-```{.python .input}
+```python
 from autogluon import ImageClassification as task
 
 import logging
@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 Let's first create the dataset using the same subset of the `Shopee-IET` dataset as before.
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
-```{.python .input}
+```python
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 ```
 
@@ -30,14 +30,14 @@ dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 To ensure this demo runs quickly, we expect each call to `fit` can be finished within minutes,
 and individual training runs (also referred to as `trials`) each last for 10 epochs.
 
-```{.python .input}
+```python
 time_limits = 1*60
 epochs = 2
 ```
 
 We first again use the default arguments of the `fit` function to train the neural networks:
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    time_limits=time_limits,
                    epochs=epochs)
@@ -45,7 +45,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
@@ -56,14 +56,14 @@ Let's now dive deeper into the default settings of `fit` that an advanced user m
 
 Recall that rather than training image classification models from scratch, AutoGluon by default first loads networks that has already been pretrained on another image dataset and then continues training the networks on your provided dataset (after appropriately modifying the output layer for the current task). Let's inspect which pretrained neural network candidates are by default for image classification tasks:
 
-```{.python .input}
+```python
 print('Default models:')
 print(results.metadata['net'])
 ```
 
 We can also look up the default optimizers used by `fit` to train each neural network (ie. to update the weight parameters based on mini-batches of training data):
  
-```{.python .input}
+```python
 print('Default optimizers:')
 print(results.metadata['optimizer'])
 ```
@@ -72,7 +72,7 @@ Beyond which pretrained model and which optimizer to use, deep learning in gener
 When the Searcher returns a particular hyperparameter configuration to try out, we must train the neural network under the specified configuration settings, a process referred to as a `trial`. In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
 The default search_strategy used in `fit` for image classification is:
 
-```{.python .input}
+```python
 print('Default search_strategy:')
 print(results.metadata['search_strategy'])
 ```
@@ -81,7 +81,7 @@ When we have already trained many networks under many hyperparameter configurati
 
 We can retrieve AutoGluon's default stop criterion and resources used for each trial using:
 
-```{.python .input}
+```python
 print('Stop criterion:')
 print(results.metadata['stop_criterion'])
 
@@ -110,7 +110,7 @@ refer to the [search space API](../api/autogluon.space.html).
 
 In addition to the default network candidates, let's also add `resnet50` to the search space:
 
-```{.python .input}
+```python
 import autogluon as ag
 net_list = ['resnet18_v1',
             'resnet34_v1',
@@ -125,7 +125,7 @@ print(nets)
 
 Let's then call `fit` using these manually-specified network candidates, and evaluate on validation and test data.
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    nets,
                    time_limits=time_limits,
@@ -134,7 +134,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -148,7 +148,7 @@ defines a list of optimization search_strategys, from which we can construct ano
 
 Like `autogluon.Nets`, the choice of which optimizer to use again corresponds to a [categorical](../api/autogluon.space.html#autogluon.space.List) search space:
 
-```{.python .input}
+```python
 optimizers_default = ag.Optimizers(['sgd', 'adam'])
 ```
 
@@ -159,7 +159,7 @@ Below, we specify that this space should be searched on a log-linear scale, prov
 Additionally, the momentum in `SGD` is configured as another continuous search space on a linear scale, where the two numbers are also the lower and upper bounds of the space. Moreover, to achieve better results, we could also configure the learning rate scheduler as a categorical space, where in this example, we enable decay and cosine based learning rate schedulers for SGD optimizer.
 
 
-```{.python .input}
+```python
 sgd_opt = ag.optimizer.SGD(learning_rate=ag.LogLinear(1e-4, 1e-1),
                            momentum=ag.Linear(0.85, 0.95),
                            wd=ag.LogLinear(1e-6, 1e-2))
@@ -175,7 +175,7 @@ Please refer to [log search space](../api/autogluon.space.html#autogluon.space.L
 Besides, we could also specify the candidates of learning rate schedulers which are typically leveraged to achieve better results.
 We then put the new network and optimizer search space and the learning rate schedulers together in the call to `fit` and might expect better results if we have made smart choices:
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    nets,
                    optimizer=optimizers,
@@ -186,7 +186,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -206,14 +206,14 @@ We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.s
 and an early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#autogluon.scheduler.Hyperband_Scheduler).
 Which scheduler to use is easily specified via the string name:
 
-```{.python .input}
+```python
 search_strategy = 'hyperband'
 ```
 
 Let's call `fit` with the Searcher and Scheduler specified above,
 and evaluate the resulting model on both validation and test datasets:
 
-```{.python .input}
+```python
 results = task.fit(dataset,
                    nets,
                    optimizers,
@@ -225,7 +225,7 @@ results = task.fit(dataset,
 
 The validation and test top-1 accuracy are:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -234,7 +234,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 Let's now use the same image as used in :ref:`sec_imgquick` to generate a predicted label and the corresponding confidence.
 
-```{.python .input}
+```python
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %

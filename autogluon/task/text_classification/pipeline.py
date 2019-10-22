@@ -22,12 +22,13 @@ from .losses import get_loss_instance
 from .metrics import get_metric_instance
 from .model_zoo import get_model_instances, LMClassifier, BERTClassifier
 from .transforms import BERTDatasetTransform
-from ...basic import autogluon_method
+from ...core import *
+# from ...basic import autogluon_method
 
 __all__ = ['train_text_classification']
 logger = logging.getLogger(__name__)
 
-@autogluon_method
+@autogluon_register_args()
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function

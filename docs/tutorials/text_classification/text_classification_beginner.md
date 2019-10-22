@@ -1,8 +1,15 @@
 # Text Classification - Quick Start
 :label:`sec_textquick`
 
+
+We adopt the task of Text Classification as a running example to illustrate basic usage of AutoGluon’s NLP capbility.
+
+In this tutorial, we are using sentiment analysis as a text classification example, we will load sentences and the corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models and thousands of different hyperparameter configurations regarding to the training process and return the best model.
+
+We begin by specifying `TextClassification` as our task of interest:
+
 ```python
-from autogluon import text_classification as task
+from autogluon import TextClassification as task
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -10,12 +17,15 @@ logging.basicConfig(level=logging.INFO)
 
 
 ## Create AutoGluon Dataset
+The Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) consists of sentences from movie
+reviews and human annotations of their sentiment. The task is to predict the sentiment of a given
+sentence. We use the two-way (positive/negative) class split.
 
 ```python
-dataset = task.Dataset(name='sst')
+dataset = task.Dataset(name='SST')
 ```
 
-In the above call, we have the proper train/validation/test split of the sst dataset.
+In the above call, we have the proper train/validation/test split of the SST dataset.
 
 
 ## Use AutoGluon to fit models
@@ -28,10 +38,10 @@ However, neural network training can be quite time-costly. To ensure quick runti
 
 ```python
 time_limits = 3*60 # 3mins
-num_training_epochs = 10
+epochs = 10
 results = task.fit(dataset,
                    time_limits=time_limits,
-                   num_training_epochs=num_training_epochs)
+                   epochs=epochs)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
@@ -39,7 +49,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```python
-print('Top-1 val acc: %.3f' % results.metric)
+print('Top-1 val acc: %.3f' % results.reward)
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new text.
@@ -47,17 +57,19 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
 ```python
-test_acc = task.evaluate(dataset)
-print('Top-1 test acc: %.3f' % test_acc)
+#classifier = task.fit(dataset,
+#                      time_limits=time_limits,
+#                      epochs=epochs)
+#test_acc = classifier.evaluate(dataset)
+#print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 Given an example sentence, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```python
 sentence = 'I feel this is awesome!'
-ind, prob = task.predict(sentence)
-print('The input sentence is classified as [%s], with probability %.2f.' %
-      (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
+# ind = classifier.predict(sentence)
+# print('The input sentence is classified as [%d].' % (ind))
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.

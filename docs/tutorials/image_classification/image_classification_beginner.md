@@ -8,7 +8,7 @@ Besides, you could easily specify for greater control over the training process 
 
 We begin by specifying `image_classification` as our task of interest:
 
-```{.python .input}
+```python
 from autogluon import ImageClassification as task
 
 import logging
@@ -24,7 +24,7 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We download the data subset from this [link](../data.zip)
 and unzip it via the following commands:
 
-```{.python .input}
+```python
 import os
 os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
 os.system('unzip -o data.zip -d ~/')
@@ -32,7 +32,7 @@ os.system('unzip -o data.zip -d ~/')
 
 Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
-```{.python .input}
+```python
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 ```
 
@@ -48,7 +48,7 @@ While we stick with mostly default configurations in this Beginner tutorial, the
 
 However, neural network training can be quite time-costly. To ensure quick runtimes, we tell AutoGluon to obey strict limits: `num_training_epochs` specifies how much computational effort can be devoted to training any single network, while `time_limits` in seconds specifies how much time `fit` has to return a model. For demo purposes, we specify only small values for `time_limits`, `num_training_epochs`:
 
-```{.python .input}
+```python
 time_limits = 3*60 # 3mins
 epochs = 10
 results = task.fit(dataset,
@@ -60,7 +60,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 
 The best Top-1 accuracy achieved on the validation set is:
 
-```{.python .input}
+```python
 print('Top-1 val acc: %.3f' % results.reward)
 ```
 
@@ -68,7 +68,7 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
-```{.python .input}
+```python
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = task.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -76,7 +76,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
-```{.python .input}
+```python
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = task.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
@@ -86,7 +86,7 @@ print('The input picture is classified as [%s], with probability %.2f.' %
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
 For example, we can inspect the best hyperparameter configuration corresponding to the final model which achieved the above results:
 
-```{.python .input}
+```python
 print('The best configuration is:')
 print(results.config)
 ```

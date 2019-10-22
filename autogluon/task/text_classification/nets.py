@@ -2,6 +2,8 @@ import mxnet as mx
 from mxnet.gluon import HybridBlock
 from mxnet.gluon import nn
 
+from ...core import *
+
 class Nets(HybridBlock):
     """Model for classification task with pretrained and head models.
     """
@@ -32,3 +34,8 @@ class Nets(HybridBlock):
             return self.head_net(pooler_out)
         except ValueError:
             raise ValueError
+
+@autogluon_function()
+def get_built_in_network(name, *args, **kwargs):
+    pass
+

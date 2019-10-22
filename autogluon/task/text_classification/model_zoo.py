@@ -5,9 +5,9 @@ import mxnet as mx
 from mxnet import gluon
 from mxnet.gluon import Block
 
-from autogluon.network import autogluon_nets, autogluon_net_instances, Net
+# from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 
-__all__ = ['get_model_instances', 'get_model', 'models', 'LMClassifier', 'BERTClassifier']
+__all__ = ['get_model_instances', 'models', 'LMClassifier', 'BERTClassifier']
 
 models = ['standard_lstm_lm_200',
           'standard_lstm_lm_650',
@@ -18,7 +18,7 @@ models = ['standard_lstm_lm_200',
           'bert_24_1024_16',
           'roberta_12_768_12']
 
-@autogluon_net_instances
+# @autogluon_net_instances
 def get_model_instances(name,
                         dataset_name='wikitext-2', **kwargs):
     """
@@ -67,88 +67,88 @@ def get_model_instances(name,
     return nlp.model.get_model(name=name, dataset_name=dataset_name, **kwargs)
 
 
-@autogluon_nets
-def get_model(name, **kwargs):
-    """Returns a network with search space by name
-
-        Parameters
-        ----------
-        name : str
-            Name of the model.
-        pretrained : bool or str
-            Boolean value controls whether to load the default pretrained weights for model.
-            String value represents the hashtag for a certain version of pretrained weights.
-        classes : int
-            Number of classes for the output layer.
-        ctx : Context, default CPU
-            The context in which to load the pretrained weights.
-        root : str, default '~/.mxnet/models'
-            Location for keeping the model parameters.
-
-        Returns
-        -------
-        Net
-            The model with search space.
-        """
-    name = name.lower()
-    if name not in models:
-        err_str = '{} is not among the following model list:\n\t'.format(name)
-        err_str += '%s' % ('\n\t'.join(sorted(models)))
-        raise ValueError(err_str)
-    net = Net(name)
-    return net
+# @autogluon_nets
+# def get_model(name, **kwargs):
+#     """Returns a network with search space by name
+#
+#         Parameters
+#         ----------
+#         name : str
+#             Name of the model.
+#         pretrained : bool or str
+#             Boolean value controls whether to load the default pretrained weights for model.
+#             String value represents the hashtag for a certain version of pretrained weights.
+#         classes : int
+#             Number of classes for the output layer.
+#         ctx : Context, default CPU
+#             The context in which to load the pretrained weights.
+#         root : str, default '~/.mxnet/models'
+#             Location for keeping the model parameters.
+#
+#         Returns
+#         -------
+#         Net
+#             The model with search space.
+#         """
+#     name = name.lower()
+#     if name not in models:
+#         err_str = '{} is not among the following model list:\n\t'.format(name)
+#         err_str += '%s' % ('\n\t'.join(sorted(models)))
+#         raise ValueError(err_str)
+#     net = Net(name)
+#     return net
 
 
 # TODO (ghaipiyu): add more models using method
 
-@autogluon_nets
-def standard_lstm_lm_200(**kwargs):
-    pass
-
-
-@autogluon_nets
-def standard_lstm_lm_650(**kwargs):
-    pass
-
-
-@autogluon_nets
-def standard_lstm_lm_1500(**kwargs):
-    pass
-
-
-@autogluon_nets
-def awd_lstm_lm_1150(**kwargs):
-    pass
-
-
-@autogluon_nets
-def awd_lstm_lm_600(**kwargs):
-    pass
-
-
-@autogluon_nets
-def elmo_2x1024_128_2048cnn_1xhighway(**kwargs):
-    pass
-
-
-@autogluon_nets
-def elmo_2x2048_256_2048cnn_1xhighway(**kwargs):
-    pass
-
-
-@autogluon_nets
-def elmo_2x4096_512_2048cnn_2xhighway(**kwargs):
-    pass
-
-
-@autogluon_nets
-def bert_12_768_12(**kwargs):
-    pass
-
-
-@autogluon_nets
-def bert_24_1024_16(**kwargs):
-    pass
+# @autogluon_nets
+# def standard_lstm_lm_200(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def standard_lstm_lm_650(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def standard_lstm_lm_1500(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def awd_lstm_lm_1150(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def awd_lstm_lm_600(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def elmo_2x1024_128_2048cnn_1xhighway(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def elmo_2x2048_256_2048cnn_1xhighway(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def elmo_2x4096_512_2048cnn_2xhighway(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def bert_12_768_12(**kwargs):
+#     pass
+#
+#
+# @autogluon_nets
+# def bert_24_1024_16(**kwargs):
+#     pass
 
 
 

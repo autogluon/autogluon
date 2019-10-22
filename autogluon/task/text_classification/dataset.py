@@ -6,13 +6,19 @@ from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMet
 import gluonnlp as nlp
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
+from ...core import *
 
-from .transforms import TextDataTransform, BERTDatasetTransform
 
-__all__ = ['transform', 'get_train_data_lengths', 'get_batchify_fn',
-           'get_batch_sampler', 'get_transform_train_fn', 'get_transform_val_fn'] \
-          + ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
+# from .transforms import TextDataTransform, BERTDatasetTransform
+# ['get_train_data_lengths', 'get_batchify_fn',
+#            'get_batch_sampler', 'get_transform_train_fn', 'get_transform_val_fn'] \
+
+__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
              'WNLITask', 'SSTTask']
+
+@autogluon_object()
+class TextClassificationDataset(object):
+    pass
 
 class GlueTask:
     """Abstract GLUE task class.
