@@ -16,11 +16,7 @@
 """
 
 import pickle, json
-try:
-    import matplotlib.pyplot as plt
-    matplotlib_imported = True
-except ImportError:
-    matplotlib_imported = False
+from ...utils import plot_performance_vs_trials, plot_summary_of_models
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +118,7 @@ class BasePredictor(object):
         """
         pass
     
-    def fit_summary(self, verbosity = 2, output_directory = None):
+    def fit_summary(self, output_directory, verbosity = 2):
         """ 
             Returns a summary of the fit process. 
             Args:
@@ -147,21 +143,9 @@ class BasePredictor(object):
                     logger.info("Trial ID: %s" % trial_id)
                     logger.info(json.dumps(self.results['trial_info'][trial_id], indent=2))
             
-            # Create plot summary:
-            if not matplotlib_imported:
-                logger.info("Please install matplotlib to view plot summary of fit")
-            else:
-                ordered_val_perfs = [self.results['trial_info'][trial_id]['validation_perf'] for trial_id in ordered_trials]
-                x = range(len(ordered_trials))
-                y = []
-                for i in x:
-                    y.append(max([ordered_val_perfs[j] for j in range(i)])) # best validation performance in trials up until ith one (assuming higher = better)
-                fig, ax = plt.subplots()
-                ax.plot(x, y)
-                ax.set(xlabel='Completed Trials', ylabel='Best Validation Performance')
-                if output_directory is not None:
-                    fig.savefig(output_directory + "fitsummary.png")
-                plt.show()
+            # Create plot summaries:
+            plot_summary_of_models(results, output_directory)
+            plot_performance_vs_trials(results, output_directory)
         return self.results
     
     def createResults(self):
@@ -183,7 +167,7 @@ class BasePredictor(object):
         # memory = amount of memory required by self.model
         
         results['trial_info'] = {} # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
-        """ Example of what one element of this dict looks like: 
+        """ Example of what one element of this dict must look like: 
         
         results['trial_info'][trial_id] =  {
             'config' : hyperparameter configuration tried in this trial
