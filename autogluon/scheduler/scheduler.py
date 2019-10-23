@@ -5,7 +5,7 @@ import logging
 import subprocess
 from threading import Thread
 import multiprocessing as mp
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
@@ -34,7 +34,9 @@ class TaskScheduler(object):
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
     REMOTE_MANAGER = None
-    def __init__(self, dist_ip_addrs=[]):
+    def __init__(self, dist_ip_addrs=None):
+        if dist_ip_addrs is None:
+            dist_ip_addrs=[]
         cls = TaskScheduler
         if cls.REMOTE_MANAGER is None:
             cls.REMOTE_MANAGER = RemoteManager()
@@ -58,7 +60,14 @@ class TaskScheduler(object):
         """
         cls.REMOTE_MANAGER.upload_files(files, **kwargs)
 
-    def add_task(self, task):
+    def _dict_from_task(self, task):
+        if isinstance(task, Task):
+            return {'TASK_ID': task.task_id, 'Args': task.args}
+        else:
+            assert isinstance(task, dict)
+            return {'TASK_ID': task['TASK_ID'], 'Args': task['Args']}
+
+    def add_task(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -71,8 +80,9 @@ class TaskScheduler(object):
                    task, cls.RESOURCE_MANAGER, self.env_sem))
         p.start()
         with self.LOCK:
-            self.scheduled_tasks.append({'TASK_ID': task.task_id, 'Args': task.args,
-                                         'Process': p})
+            new_dict = self._dict_from_task(task)
+            new_dict['Process'] = p
+            self.scheduled_tasks.append(new_dict)
 
     @staticmethod
     def _start_distributed_task(task, resource_manager, env_sem):
@@ -123,18 +133,27 @@ class TaskScheduler(object):
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
 
+
+    def _clean_task_internal(self, task_dict):
+        pass
+
     def _cleaning_tasks(self):
         with self.LOCK:
-            for i, task_dick in enumerate(self.scheduled_tasks):
-                if not task_dick['Process'].is_alive():
-                    task_dict = self.scheduled_tasks.pop(i)
-                    self.finished_tasks.append({'TASK_ID': task_dict['TASK_ID'],
-                                                'Args': task_dict['Args']})
+            new_scheduled_tasks = []
+            for task_dict in self.scheduled_tasks:
+                if not task_dict['Process'].is_alive():
+                    self._clean_task_internal(task_dict)
+                    self.finished_tasks.append(self._dict_from_task(task_dict))
+                else:
+                    new_scheduled_tasks.append(task_dict)
+            if len(new_scheduled_tasks) < len(self.scheduled_tasks):
+                self.scheduled_tasks = new_scheduled_tasks
 
     def join_tasks(self):
         self._cleaning_tasks()
-        for i, task_dic in enumerate(self.scheduled_tasks):
-            task_dic['Process'].join()
+        for task_dict in self.scheduled_tasks:
+            task_dict['Process'].join()
+            self._clean_task_internal(task_dict)
 
     def shutdown(self):
         self.join_tasks()
@@ -165,5 +184,6 @@ class TaskScheduler(object):
         reprstr = self.__class__.__name__ + '(\n' + \
             str(self.RESOURCE_MANAGER) +')\n'
         return reprstr
+
 
 DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')
