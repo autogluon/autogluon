@@ -18,7 +18,7 @@ from skopt.utils import use_named_args
 import copy
 
 
-from f3_grail_data_frame_utilities.loaders import load_pkl
+from tabular.utils.loaders import load_pkl
 from tabular.ml.constants import REGRESSION, BINARY
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.ml.trainer.abstract_trainer import AbstractTrainer

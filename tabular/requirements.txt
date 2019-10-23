@@ -27,6 +27,7 @@ pandas==0.24.2
 Pillow==6.1.0
 plac==0.9.6
 preshed==2.0.1
+pyarrow==0.15.0
 pynvx==1.0.0
 pyparsing==2.4.0
 pyrsistent==0.15.3

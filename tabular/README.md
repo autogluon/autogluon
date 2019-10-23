@@ -20,7 +20,6 @@ source ~/virtual/TabularAutoGluon/bin/activate
 # First need to install autogluon 
 
 # Next install **tabular** module + dependencies
-pip install -r requirements_local.txt
 pip install -r requirements.txt
 python setup.py install
 

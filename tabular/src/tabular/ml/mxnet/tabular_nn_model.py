@@ -21,7 +21,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, QuantileTransformer, FunctionTransformer # PowerTransformer
 
-from f3_grail_data_frame_utilities.loaders import load_pkl
+from tabular.utils.loaders import load_pkl
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
