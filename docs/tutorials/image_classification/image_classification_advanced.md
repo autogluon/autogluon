@@ -11,9 +11,6 @@ We again begin by letting AutoGluon know that `ImageClassification` is the taskÂ
 
 ```{.python .input}
 from autogluon import ImageClassification as task
-
-import logging
-logging.basicConfig(level=logging.INFO)
 ```
 
 ## Create AutoGluon Dataset
@@ -58,36 +55,8 @@ Let's now dive deeper into the default settings of `fit` that an advanced user m
 Recall that rather than training image classification models from scratch, AutoGluon by default first loads networks that has already been pretrained on another image dataset and then continues training the networks on your provided dataset (after appropriately modifying the output layer for the current task). Let's inspect which pretrained neural network candidates are by default for image classification tasks:
 
 ```{.python .input}
-print('Default models:')
-print(results.metadata['net'])
-```
-
-We can also look up the default optimizers used by `fit` to train each neural network (ie. to update the weight parameters based on mini-batches of training data):
- 
-```{.python .input}
-print('Default optimizers:')
-print(results.metadata['optimizer'])
-```
-
-Beyond which pretrained model and which optimizer to use, deep learning in general involves tons of other design choices, which we collectively refer to as `hyperparameters`. Given possible values of the hyperparameters to try out, we require a smart strategy to efficiently find those hyperparameter values which will produce the best classifier. Strategies might include techniques such as grid/random search, Hyperband, Bayesian optimization, etc. In AutoGluon, which hyperparameter search strategy to use is specified by a `Searcher` object.
-When the Searcher returns a particular hyperparameter configuration to try out, we must train the neural network under the specified configuration settings, a process referred to as a `trial`. In parallel/distributed settings, we may wish to run multiple trials simultaneously in order to try out more hyperparameter configurations in less time. In AutoGluon, how trials are orchestrated is controlled by a `Scheduler` object.
-The default search_strategy used in `fit` for image classification is:
-
-```{.python .input}
-print('Default search_strategy:')
-print(results.metadata['search_strategy'])
-```
-
-When we have already trained many networks under many hyperparameter configurations and see that a current trial is performing very good that satisfies our need in comparison, it may be wise to infer this is the time to simply terminate the trial right away. This way, the final model could be used right away and we don't need to wait until the full fitting procedure completed.  
-
-We can retrieve AutoGluon's default stop criterion and resources used for each trial using:
-
-```{.python .input}
-print('Stop criterion:')
-print(results.metadata['stop_criterion'])
-
-print('Resources used for each trial:')
-print(results.metadata['resources_per_trial'])
+print('Default Search Info:')
+print(results.metadata)
 ```
 
 In general, we can expect fairly strong predictive performance using the default configurations in `fit`, if given enough computing resources and runtime.
@@ -124,35 +93,11 @@ nets = ag.Nets(net_list)
 print(nets)
 ```
 
-Let's then call `fit` using these manually-specified network candidates, and evaluate on validation and test data.
-
-```{.python .input}
-results = task.fit(dataset,
-                   nets,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
-```
-
-The validation and test top-1 accuracy are:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
-
 ## Specify which optimizers to try
 
 Similarly, we can manually specify which of optimizer candidates to try, in order to further improve the results.
 In AutoGluon, [autogluon.Optimizers](../api/autogluon.optimizer.html) 
 defines a list of optimization search_strategys, from which we can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
-
-Like `autogluon.Nets`, the choice of which optimizer to use again corresponds to a [categorical](../api/autogluon.space.html#autogluon.space.List) search space:
-
-```{.python .input}
-optimizers_default = ag.Optimizers(['sgd', 'adam'])
-```
 
 Additionally, we can customize the optimizer-specific hyperparameters as another search space.
 As an example for both `Adam` and `SGD`, we can configure the learning rate and weight decay in a continuous-valued search space.
@@ -177,23 +122,6 @@ Please refer to [log search space](../api/autogluon.space.html#autogluon.space.L
 Besides, we could also specify the candidates of learning rate schedulers which are typically leveraged to achieve better results.
 We then put the new network and optimizer search space and the learning rate schedulers together in the call to `fit` and might expect better results if we have made smart choices:
 
-```{.python .input}
-results = task.fit(dataset,
-                   nets,
-                   optimizer=optimizers,
-                   lr_scheduler=ag.List('poly', 'cosine'),
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
-```
-
-The validation and test top-1 accuracy are:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
 
 ## Specify a hyperparameter search strategy and how to schedule trials
 
@@ -220,7 +148,7 @@ and evaluate the resulting model on both validation and test datasets:
 results = task.fit(dataset,
                    nets,
                    optimizers,
-                   lr_scheduler=ag.List('poly', 'cosine'),
+                   lr_scheduler=ag.Categorical('poly', 'cosine'),
                    search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=4,

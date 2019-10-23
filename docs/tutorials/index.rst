@@ -6,3 +6,4 @@ Tutorial
 
    image_classification/index
    extend/index
+   nas/index

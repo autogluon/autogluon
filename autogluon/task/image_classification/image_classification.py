@@ -143,7 +143,7 @@ class ImageClassification(BaseTask):
         args = cls.scheduler.train_fn.args
         dataset = args.dataset
         if isinstance(dataset, AutoGluonObject):
-            dataset = dataset._lazy_init()
+            dataset = dataset.init()
         transform_fn = dataset.transform_val
         img = transform_fn(img)
         ctx = mx.gpu(0)if args.num_gpus > 0 else mx.cpu()

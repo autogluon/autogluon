@@ -2,7 +2,11 @@ import mxnet as mx
 from mxnet import gluon
 import gluoncv as gcv
 
-from .resource import get_gpu_count
+from ...scheduler.resource import get_gpu_count
+
+def default_reward_fn(metric, net):
+    reward = metric * ((net.avg_latency / net.latency) ** 0.07)
+    return reward
 
 def default_val_fn(net, batch, batch_fn, ctx):
     metric = mx.metric.Accuracy()
@@ -15,7 +19,7 @@ def default_val_fn(net, batch, batch_fn, ctx):
 
 def default_train_fn(net, batch, batch_size, criterion, trainer, batch_fn, ctx):
     data, label = batch_fn(batch, ctx)
-    net.collect_params().zero_grad()
+    #net.collect_params().zero_grad()
     with mx.autograd.record():
         outputs = [net(X) for X in data]
         loss = [criterion(yhat, y) for yhat, y in zip(outputs, label)]
@@ -40,6 +44,6 @@ def imagenet_batch_fn(batch, ctx):
     return data, label
 
 def default_batch_fn(batch, ctx):
-    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
-    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
+    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
     return data, label

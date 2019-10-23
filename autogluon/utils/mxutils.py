@@ -3,13 +3,17 @@
 import os
 import math
 
-__all__ = ['update_params', 'get_data_rec', 'read_remote_ips']
+__all__ = ['update_params', 'collect_params', 'get_data_rec', 'read_remote_ips']
 
 def update_params(net, params):
-    param_dict = net.collect_params()
+    param_dict = net._collect_params_with_prefix()
     for k, v in param_dict.items():
-        param_dict[k].set_data(params[k].data())
+        param_dict[k]._load_init(params[k], ctx=None)
 
+def collect_params(net):
+    params = net._collect_params_with_prefix()
+    param_dict = {key : val._reduce() for key, val in params.items()}
+    return param_dict
 
 def get_data_rec(input_size, crop_ratio,
                  rec_file, rec_file_idx,

@@ -1,5 +1,5 @@
 # Customize Training Script
-:label:`sec_customscrip`
+:label:`sec_customscript`
 
 ## Start with A Fine-tuning Example
 

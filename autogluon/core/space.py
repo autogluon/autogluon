@@ -106,7 +106,7 @@ class List(NestedSpace):
 
     def __getattribute__(self, s):
         try:    
-            x = super(Dict, self).__getattribute__(s)
+            x = super(List, self).__getattribute__(s)
         except AttributeError:      
             pass
         else:
@@ -148,7 +148,6 @@ class List(NestedSpace):
                 for sub_k, sub_v in obj.kwspaces.items():
                     new_k = '{}.{}'.format(k, sub_k)
                     kw_spaces[new_k] = sub_v
-                    kw_spaces[new_k] = sub_v
             elif isinstance(obj, Space):
                 kw_spaces[k] = obj
         return kw_spaces
@@ -180,15 +179,6 @@ class Dict(NestedSpace):
 
     def __setitem__(self, key, data):
         self.data[key] = data
-
-    #def keys(self):
-    #    return self.data.keys()
-
-    #def values(self):
-    #    return self.data.values()
-
-    #def items(self):
-    #    return self.data.items()
 
     @property
     def cs(self):

@@ -21,11 +21,15 @@ class RLSearcher(BaseSearcher):
         >>> searcher = RLSearcher(train_fn.kwspaces)
         >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='rl'):
+    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm'):
         self._results = OrderedDict()
         self._best_state_path = None
-        if controller_type == 'rl':
+        if controller_type == 'lstm':
             self.controller = LSTMController(kwspaces, ctx=ctx)
+        elif controller_type == 'alpha':
+            self.controller = AlphaController(kwspaces, ctx=ctx)
+        elif controller_type == 'atten':
+            self.controller = AttenController(kwspaces, ctx=ctx)
         else:
             raise NotImplemented
         self.controller.initialize(ctx=mx.cpu())
@@ -116,18 +120,16 @@ class LSTMController(mx.gluon.Block):
             logits, hidden = self.forward(inputs, hidden,
                                           block_idx, is_embed=(block_idx==0))
             probs = F.softmax(logits, axis=-1)
-            action = mx.nd.argmax(probs, 1)#mx.random.multinomial(probs, 1)
-            #print('action.shape', action.shape)
-            #print(mx.random.multinomial(probs, 1).shape)
+            action = mx.nd.argmax(probs, 1)
             actions.append(action)
-            inputs = action #+ sum(self.num_tokens[:block_idx])
+            inputs = action + sum(self.num_tokens[:block_idx])
             inputs.detach()
 
         config = {}
         for i, action in enumerate(actions):
             choice = action.asscalar()
             k, space = self.spaces[i]
-            config[k] = choice
+            config[k] = int(choice)
 
         return config
 
@@ -143,9 +145,9 @@ class LSTMController(mx.gluon.Block):
         entropies = []
         log_probs = []
 
-        for block_idx in range(len(self.num_tokens)):
+        for idx in range(len(self.num_tokens)):
             logits, hidden = self.forward(inputs, hidden,
-                                          block_idx, is_embed=(block_idx==0))
+                                          idx, is_embed=(idx==0))
 
             probs = F.softmax(logits, axis=-1)
             log_prob = F.log_softmax(logits, axis=-1)
@@ -160,8 +162,7 @@ class LSTMController(mx.gluon.Block):
             entropies.append(entropy)
             log_probs.append(selected_log_prob)
 
-            # why add some constant?
-            inputs = action[:, 0] #+ sum(self.num_tokens[:block_idx])
+            inputs = action[:, 0] + sum(self.num_tokens[:idx])
             inputs.detach()
 
         configs = []
@@ -170,7 +171,182 @@ class LSTMController(mx.gluon.Block):
             for i, action in enumerate(actions):
                 choice = action[idx].asscalar()
                 k, space = self.spaces[i]
-                config[k] = choice#space[choice]
+                config[k] = int(choice)
+            configs.append(config)
+
+        if with_details:
+            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+        else:
+            return configs
+
+class Alpha(mx.gluon.Block):
+    def __init__(self, shape):
+        super().__init__()
+        self.weight = self.params.get('weight', shape=shape)
+
+    def forward(self, batch_size):
+        return self.weight.data().expand_dims(0).repeat(batch_size, axis=0)
+
+class AttenController(mx.gluon.Block):
+    def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
+                 ctx=mx.cpu()):
+        super().__init__()
+        self.softmax_temperature = softmax_temperature
+        self.spaces = list(kwspaces.items())
+        self.context = ctx
+
+        # only support Categorical space for now
+        self.num_tokens = []
+        for _, space in self.spaces:
+            assert isinstance(space, Categorical)
+            self.num_tokens.append(len(space))
+        self.num_total_tokens = sum(self.num_tokens)
+        self.hidden_size = hidden_size
+
+        self.embedding = Alpha((self.num_total_tokens, hidden_size))
+        self.querry = mx.gluon.nn.Dense(hidden_size, in_units=hidden_size)
+        self.key = mx.gluon.nn.Dense(hidden_size, in_units=hidden_size)
+        self.value = mx.gluon.nn.Dense(1, in_units=hidden_size)
+
+    def inference(self):
+        # self-attention
+        x = self.embedding(1).reshape(-3, 0)#.squeeze() # b x action x h
+        kshape = (1, self.num_total_tokens, self.hidden_size)
+        vshape = (1, self.num_total_tokens, 1)
+        querry = self.querry(x).reshape(*kshape) # b x actions x h
+        key = self.key(x).reshape(*kshape) #b x actions x h
+        value = self.value(x).reshape(*vshape) # b x actions x 1
+        atten = mx.nd.linalg_gemm2(querry, key, transpose_b=True).softmax(axis=1)
+        alphas = mx.nd.linalg_gemm2(atten, value).squeeze(axis=-1)
+
+        actions = []
+        for idx in range(len(self.num_tokens)):
+            i0 = sum(self.num_tokens[:idx])
+            i1 = sum(self.num_tokens[:idx+1])
+            logits = alphas[:, i0: i1]
+            probs = F.softmax(logits, axis=-1)
+            action = mx.random.multinomial(probs, 1)
+            actions.append(action[:, 0])
+
+        config = {}
+        for i, action in enumerate(actions):
+            choice = action.asscalar()
+            k, space = self.spaces[i]
+            config[k] = int(choice)
+
+        return config
+
+    def sample(self, batch_size=1, with_details=False):
+        # self-attention
+        x = self.embedding(batch_size).reshape(-3, 0)#.squeeze() # b x action x h
+        kshape = (batch_size, self.num_total_tokens, self.hidden_size)
+        vshape = (batch_size, self.num_total_tokens, 1)
+        querry = self.querry(x).reshape(*kshape) # b x actions x h
+        key = self.key(x).reshape(*kshape) #b x actions x h
+        value = self.value(x).reshape(*vshape) # b x actions x 1
+        atten = mx.nd.linalg_gemm2(querry, key, transpose_b=True).softmax(axis=1)
+        alphas = mx.nd.linalg_gemm2(atten, value).squeeze(axis=-1)
+
+        actions = []
+        entropies = []
+        log_probs = []
+        for idx in range(len(self.num_tokens)):
+            i0 = sum(self.num_tokens[:idx])
+            i1 = sum(self.num_tokens[:idx+1])
+            logits = alphas[:, i0: i1]
+
+            probs = F.softmax(logits, axis=-1)
+            log_prob = F.log_softmax(logits, axis=-1)
+
+            entropy = -(log_prob * probs).sum(1, keepdims=False)
+
+            action = mx.random.multinomial(probs, 1)
+            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
+                              action.astype('float32'))
+            selected_log_prob = F.gather_nd(log_prob, ind)
+
+            actions.append(action[:, 0])
+            entropies.append(entropy)
+            log_probs.append(selected_log_prob)
+
+        configs = []
+        for idx in range(batch_size):
+            config = {}
+            for i, action in enumerate(actions):
+                choice = action[idx].asscalar()
+                k, space = self.spaces[i]
+                config[k] = int(choice)
+            configs.append(config)
+
+        if with_details:
+            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+        else:
+            return configs
+
+class AlphaController(mx.gluon.Block):
+    def __init__(self, kwspaces, softmax_temperature=1.0, ctx=mx.cpu()):
+        super().__init__()
+        self.softmax_temperature = softmax_temperature
+        self.spaces = list(kwspaces.items())
+        self.context = ctx
+
+        # only support Categorical space for now
+        self.num_tokens = []
+        for _, space in self.spaces:
+            assert isinstance(space, Categorical)
+            self.num_tokens.append(len(space))
+
+        # controller lstm
+        self.decoders = nn.Sequential()
+        for idx, size in enumerate(self.num_tokens):
+            self.decoders.add(Alpha((size,)))
+
+    def inference(self):
+        actions = []
+
+        for idx in range(len(self.num_tokens)):
+            logits = self.decoders[idx](1)
+            probs = F.softmax(logits, axis=-1)
+            action = mx.random.multinomial(probs, 1)
+            actions.append(action[:, 0])
+
+        config = {}
+        for i, action in enumerate(actions):
+            choice = action.asscalar()
+            k, space = self.spaces[i]
+            config[k] = int(choice)
+
+        return config
+
+    def sample(self, batch_size=1, with_details=False):
+        actions = []
+        entropies = []
+        log_probs = []
+
+        for idx in range(len(self.num_tokens)):
+            logits = self.decoders[idx](batch_size)
+
+            probs = F.softmax(logits, axis=-1)
+            log_prob = F.log_softmax(logits, axis=-1)
+
+            entropy = -(log_prob * probs).sum(1, keepdims=False)
+
+            action = mx.random.multinomial(probs, 1)
+            ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
+                              action.astype('float32'))
+            selected_log_prob = F.gather_nd(log_prob, ind)
+
+            actions.append(action[:, 0])
+            entropies.append(entropy)
+            log_probs.append(selected_log_prob)
+
+        configs = []
+        for idx in range(batch_size):
+            config = {}
+            for i, action in enumerate(actions):
+                choice = action[idx].asscalar()
+                k, space = self.spaces[i]
+                config[k] = int(choice)
             configs.append(config)
 
         if with_details:

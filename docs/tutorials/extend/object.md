@@ -1,5 +1,5 @@
 # Customize User Objects
-:label:`sec_customscrip`
+:label:`sec_customobj`
 
 User may want to define some customized objects with search spaces, such as network architectures,
 or specialized optimizers. We provide an API to do that.
@@ -85,9 +85,9 @@ scripts using :function:`autogluon.autogluon_register_args`. We can start fittin
 
 ```{.python .input}
 from autogluon import ImageClassification as task
-results = task.fit('cifar10', net=mynet, optimizer=myoptim, num_gpus=1, epochs=1)
+# results = task.fit('cifar10', net=mynet, optimizer=myoptim, num_gpus=1, epochs=1)
 ```
 
 ```{.python .input}
-print(results)
+# print(results)
 ```

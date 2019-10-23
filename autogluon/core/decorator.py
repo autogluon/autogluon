@@ -65,7 +65,7 @@ class _autogluon_method(object):
         """
         self.kwvars = kwargs
         for k, v in self.kwvars.items():
-            if isinstance(v, (AutoGluonObject, Categorical, Sequence, Dict)):
+            if isinstance(v, (NestedSpace)):
                 self.args.update({k: v})
             elif isinstance(v, Space):
                 hp = v.get_hp(name=k)
