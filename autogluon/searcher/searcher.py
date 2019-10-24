@@ -142,7 +142,7 @@ class RandomSearcher(BaseSearcher):
         >>> searcher = RandomSearcher(cs)
         >>> searcher.get_config()
     """
-    def get_config(self):
+    def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called inside Hyperband to query a new configuration
 
