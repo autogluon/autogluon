@@ -98,7 +98,7 @@ class SKoptSearcher(BaseSearcher):
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
-        max_tries = kwargs.get(1e2)
+        max_tries = kwargs.get('max_tries', 1e2)
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
             return self.default_config()
         try:
