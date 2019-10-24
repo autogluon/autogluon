@@ -54,9 +54,10 @@ class BasePredictor(object):
         self.loss_func = loss_func # Loss function (or string name) minimized during training
         self.eval_func = eval_func # Evaluation function / metric applied on validation/test data to gauge predictive performance.
         # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
-        self.results = self.createResultsDict() # dict object to store all information during task.fit().
+        self.results = self._createResults() # dict object to store all information during task.fit().
     
     @classmethod
+    @abstractmethod
     def load(output_directory):
         """ Load Predictor object from given directory.
             Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
@@ -65,8 +66,9 @@ class BasePredictor(object):
         results_file = output_directory + RESULTS_FILENAME
         predictor = pickle.load(open(filepath,"rb"))
         predictor.results = json.load(open(results_file,'r'))
-        pass
+        pass  # Need to load models and set them = predictor.model
     
+    @abstractmethod
     def save(self, output_directory):
         """ Saves this object to file. Don't forget to save the models and the Results objects if they exist.
             Before returning a Predictor, task.fit() should call predictor.save()
@@ -79,14 +81,14 @@ class BasePredictor(object):
         pickle.dump(self, open(filepath,'wb'))
         logger.info("Predictor saved to file: " % filepath)
     
-    def save_results(self, output_directory):
-        """ Save results in human-readable file JSON format """
+    def _save_results(self, output_directory):
+        """ Internal helper function: Save results in human-readable file JSON format """
         results_file = output_directory + RESULTS_FILENAME
         json.dump(self.results, open(results_file, 'w'))
     
     @abstractmethod
-    def save_model(self, output_directory):
-        """ Save self.model object to file located in output_directory. 
+    def _save_model(self, output_directory):
+        """ Internal helper function: Save self.model object to file located in output_directory. 
             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
         """
         pass
@@ -148,8 +150,8 @@ class BasePredictor(object):
             plot_performance_vs_trials(results, output_directory)
         return self.results
     
-    def createResults(self):
-        """ Dict object to store all relevant information produced during task.fit(). 
+    def _createResults(self):
+        """ Internal helper function: Dict object to store all relevant information produced during task.fit(). 
             Empty for now, but should be updated during task.fit().
             All tasks should adhere to this same template for consistency.
         """
