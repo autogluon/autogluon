@@ -10,6 +10,7 @@
     # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
     
     # TODO: We'd like to add extra benchmark datasets with the following properties:
+    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand 
     - test dataset with just one data point
     - test dataset where order of columns different than in training data (same column names)
     - extreme-multiclass classification (500+ classes)
