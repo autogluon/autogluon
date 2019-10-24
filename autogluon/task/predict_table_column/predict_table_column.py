@@ -8,11 +8,6 @@ from tabular.utils.loaders import load_pd
 from tabular.ml.learner.default_learner import DefaultLearner as Learner
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
 
-from ...network import Nets
-from ...optim import Optimizers, get_optim
-from ...loss import Losses
-from ...metric import Metrics
-from ...utils.data_analyzer import DataAnalyzer
 from ..base import *
 
 
