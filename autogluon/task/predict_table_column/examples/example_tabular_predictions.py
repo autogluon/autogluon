@@ -3,7 +3,7 @@
 
 # Clean use-case with mostly defaults:
 
-from autogluon import predict_table_column as task
+from autogluon import PredictTableColumn as task
 
 package_dir = 'auto-ml-with-gluon/' # TODO: change this to absolute filepath to auto-ml-with-gluon/ on your computer
 

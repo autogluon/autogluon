@@ -10,12 +10,12 @@
     # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
     
     # TODO: We'd like to add extra benchmark datasets with the following properties:
+    - parquet file format
     - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand 
     - test dataset with just one data point
     - test dataset where order of columns different than in training data (same column names)
     - extreme-multiclass classification (500+ classes)
     - high-dimensional features + low-sample size
-    - parquet file format
     - high levels of missingness in test data only, no missingness in train data
     - classification w severe class imbalance
     - regression with severely skewed Y-values (eg. predicting count data)
@@ -28,7 +28,7 @@ from random import seed
 import warnings
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon import predict_table_column as task
+from autogluon import PredictTableColumn as task
 
 # Benchmark options:
 fast_benchmark = False # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
