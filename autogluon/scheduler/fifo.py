@@ -22,9 +22,8 @@ __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 logger = logging.getLogger(__name__)
 
 searchers = {
-    'hyperband': RandomSearcher,  # ?? Hyperband is a scheduler, not a searcher
     'random': RandomSearcher,
-    'skopt': SKoptSearcher,  # May have other BO solutions in the future...
+    'skopt': SKoptSearcher,
 }
 
 class FIFOScheduler(TaskScheduler):
