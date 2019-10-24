@@ -5,6 +5,13 @@ import multiprocessing as mp
 logger = logging.getLogger(__name__)
 
 
+def map_resource_to_index(resource, rf, min_t, max_t):
+    max_rungs = int(np.log(max_t / min_t) / np.log(rf) + 1)
+    index = int(np.round(np.log(resource * max_t / min_t) / np.log(rf)))
+    index = max(min(index, max_rungs - 1), 0)
+    return index
+
+
 class HyperbandStopping_Manager(object):
     """Hyperband Manager
 
@@ -42,6 +49,7 @@ class HyperbandStopping_Manager(object):
         self._task_info = dict()  # task_id -> bracket_id
         self._reduction_factor = reduction_factor
         self._max_t = max_t
+        self._min_t = grace_period
         self._num_stopped = 0
         # Tracks state for new task add
         self._brackets = [
@@ -129,6 +137,10 @@ class HyperbandStopping_Manager(object):
         extra_kwargs['milestone'] = \
             self._brackets[bracket_id].get_first_milestone()
         return None, extra_kwargs
+
+    def _resource_to_index(self, resource):
+        return map_resource_to_index(
+            resource, self._reduction_factor, self._min_t, self._max_t)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

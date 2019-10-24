@@ -4,6 +4,8 @@ import multiprocessing as mp
 import heapq
 import copy
 
+from .hyperband_stopping import map_resource_to_index
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,6 +63,7 @@ class HyperbandPromotion_Manager(object):
         self._task_info = {}  # task_id -> bracket_id
         self._reduction_factor = reduction_factor
         self._max_t = max_t
+        self._min_t = grace_period
         # Tracks state for new task add
         self._brackets = [
             PromotionBracket(
@@ -132,6 +135,10 @@ class HyperbandPromotion_Manager(object):
                 # First milestone the new config will get to
                 extra_kwargs['milestone'] = bracket.get_first_milestone()
             return config, extra_kwargs
+
+    def _resource_to_index(self, resource):
+        return map_resource_to_index(
+            resource, self._reduction_factor, self._min_t, self._max_t)
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

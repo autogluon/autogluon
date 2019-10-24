@@ -281,6 +281,14 @@ class HyperbandScheduler(FIFOScheduler):
         config, extra_kwargs = self.terminator.on_task_schedule()
         return config, extra_kwargs
 
+    def map_resource_to_index(self):
+        def fun(resource):
+            assert 0.0 <= resource <= 1.0, \
+                "resource must be in [0, 1]"
+            return self.terminator._resource_to_index(resource)
+
+        return fun
+
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
             'terminator: ' + str(self.terminator)
