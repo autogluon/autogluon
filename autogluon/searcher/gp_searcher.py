@@ -5,6 +5,7 @@ from ampercore.autogluon.gp_multifidelity_searcher import \
 from ampercore.autogluon.gp_fifo_searcher import \
     GPFIFOSearcher as _GPFIFOSearcher
 from .searcher import BaseSearcher
+from ..scheduler.hyperband import HyperbandScheduler
 
 __all__ = ['GPMultiFidelitySearcher', 'GPFIFOSearcher']
 
@@ -14,6 +15,12 @@ class GPMultiFidelitySearcher(BaseSearcher):
         super(GPMultiFidelitySearcher, self).__init__(
             gp_searcher.hp_ranges.config_space)
         self.gp_searcher = gp_searcher
+
+    def configure_scheduler(self, scheduler):
+        assert isinstance(scheduler, HyperbandScheduler), \
+            "This searcher requires HyperbandScheduler scheduler"
+        self.gp_searcher.set_map_resource_to_index(
+            scheduler.map_resource_to_index())
 
     def get_config(self, **kwargs):
         with self.LOCK:
