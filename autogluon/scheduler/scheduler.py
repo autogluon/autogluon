@@ -90,7 +90,6 @@ class TaskScheduler(object):
                                          task.fn, task.args, task.resources.gpu_ids,
                                          env_sem)
         #job.result()
-        #resource_manager._release(task.resources)
         def _release_resource_callback(fut):
             resource_manager._release(task.resources)
         job.add_done_callback(_release_resource_callback)
@@ -144,7 +143,6 @@ class TaskScheduler(object):
         with self.LOCK:
             new_scheduled_tasks = []
             for task_dict in self.scheduled_tasks:
-                #if not task_dict['Process'].is_alive():
                 if task_dict['Job'].done():
                     self._clean_task_internal(task_dict)
                     self.finished_tasks.append(self._dict_from_task(task_dict))
@@ -167,7 +165,6 @@ class TaskScheduler(object):
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
         """
-        #self._cleaning_tasks()
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()

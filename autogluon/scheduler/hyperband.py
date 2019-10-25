@@ -185,7 +185,6 @@ class HyperbandScheduler(FIFOScheduler):
         rp = threading.Thread(target=self._run_reporter,
                               args=(task, job, reporter, self.searcher, self.terminator,
                                     None, terminator_semaphore), daemon=False)
-        #tp.start()
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
@@ -203,14 +202,12 @@ class HyperbandScheduler(FIFOScheduler):
                       checkpoint_semaphore, terminator_semaphore):
         last_result = None
         last_updated = None
-        #while task_process.is_alive():
         while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
                 terminator_semaphore.release()
                 terminator.on_task_complete(task, last_result)
-                #task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break

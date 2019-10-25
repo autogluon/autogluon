@@ -188,14 +188,10 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        #tp = threading.Thread(target=cls._start_distributed_task, args=(
-        #                      task, cls.RESOURCE_MANAGER, self.env_sem))
         job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
         # reporter thread
-        #checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
         rp = threading.Thread(target=self._run_reporter, args=(task, job, reporter,
                               self.searcher), daemon=False)
-        #tp.start()
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
@@ -212,21 +208,13 @@ class FIFOScheduler(TaskScheduler):
     def _clean_task_internal(self, task_dict):
         task_dict['ReporterThread'].join()
 
-    #def _run_checkpoint(self, checkpoint_semaphore):
-    #    self._cleaning_tasks()
-    #    checkpoint_semaphore.acquire()
-    #    logger.debug('Saving Checkerpoint')
-    #    self.save()
-
     def _run_reporter(self, task, task_job, reporter, searcher,
                       checkpoint_semaphore=None):
         last_result = None
-        #while task_process.is_alive():
         while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
-                #task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
