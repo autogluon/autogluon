@@ -42,7 +42,7 @@ class RLSearcher(BaseSearcher):
             ')'
         return reprstr
 
-    def get_config(self):
+    def get_config(self, **kwargs):
         return self.controller.sample()[0]
 
     def get_best_config(self):
