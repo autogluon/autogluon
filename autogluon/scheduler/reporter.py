@@ -5,6 +5,7 @@ import threading
 import multiprocessing as mp
 from ..utils import save, load
 from dask.distributed import Queue
+import distributed
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,10 @@ class DistSemaphore(object):
             self._queue.put(1)
 
     def acquire(self):
-        _ = self._queue.get()
+        try:
+            _ = self._queue.get()
+        except distributed.comm.core.CommClosedError:
+            pass
 
     def release(self):
         self._queue.put(1)

@@ -26,7 +26,7 @@ def get_ip():
 class RemoteManager(object):
     NODES = {}
     LOCK = mp.Lock()
-    PORT_ID = mp.Value('i', 8780)
+    PORT_ID = mp.Value('i', 8700)
     MASTER_IP = None
     __instance = None
     def __new__(cls):

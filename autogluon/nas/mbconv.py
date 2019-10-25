@@ -1,18 +1,10 @@
 from mxnet.gluon.block import HybridBlock
 from mxnet.gluon import nn
 
-from ..utils import EasyDict
 from ..core import autogluon_function
 from .utils import *
 
 __all__ = ['MBConvBlock']
-
-#@autogluon_function()
-#def mobilenet_block_args(kernel, num_repeat, channels, expand_ratio,
-#                         stride, se_ratio=0.25, in_channels=0):
-#    return EasyDict(kernel=kernel, num_repeat=num_repeat,
-#                    channels=channels, expand_ratio=expand_ratio,
-#                    stride=stride, se_ratio=se_ratio, in_channels=in_channels)
 
 class MBConvBlock(HybridBlock):
     def __init__(self, in_channels, channels, expand_ratio, kernel, stride=1, se_ratio=0.25,

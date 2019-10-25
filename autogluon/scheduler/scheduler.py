@@ -76,12 +76,11 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        p = Thread(target=cls._start_distributed_task, args=(
-                   task, cls.RESOURCE_MANAGER, self.env_sem))
-        p.start()
+        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
         with self.LOCK:
             new_dict = self._dict_from_task(task)
-            new_dict['Process'] = p
+            #new_dict['Process'] = p
+            new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
 
     @staticmethod
@@ -90,8 +89,12 @@ class TaskScheduler(object):
         job = task.resources.node.submit(TaskScheduler._run_dist_task,
                                          task.fn, task.args, task.resources.gpu_ids,
                                          env_sem)
-        job.result()
-        resource_manager._release(task.resources)
+        #job.result()
+        #resource_manager._release(task.resources)
+        def _release_resource_callback(fut):
+            resource_manager._release(task.resources)
+        job.add_done_callback(_release_resource_callback)
+        return job
 
     @staticmethod
     def _run_dist_task(fn, args, gpu_ids, env_semaphore):
@@ -141,7 +144,8 @@ class TaskScheduler(object):
         with self.LOCK:
             new_scheduled_tasks = []
             for task_dict in self.scheduled_tasks:
-                if not task_dict['Process'].is_alive():
+                #if not task_dict['Process'].is_alive():
+                if task_dict['Job'].done():
                     self._clean_task_internal(task_dict)
                     self.finished_tasks.append(self._dict_from_task(task_dict))
                 else:
@@ -152,8 +156,9 @@ class TaskScheduler(object):
     def join_tasks(self):
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
-            task_dict['Process'].join()
+            task_dict['Job'].result()
             self._clean_task_internal(task_dict)
+        self._cleaning_tasks()
 
     def shutdown(self):
         self.join_tasks()

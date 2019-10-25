@@ -73,7 +73,7 @@ class FIFOScheduler(TaskScheduler):
             resource = {'num_cpus': 1, 'num_gpus': 0}
         if search_options is None:
             search_options = dict()
-        assert isinstance(train_fn, autogluon_method)
+        assert isinstance(train_fn, _autogluon_method)
         self.train_fn = train_fn
         self.args = args if args else train_fn.args
         self.resource = resource
@@ -188,22 +188,23 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        tp = threading.Thread(target=cls._start_distributed_task, args=(
-                              task, cls.RESOURCE_MANAGER, self.env_sem))
+        #tp = threading.Thread(target=cls._start_distributed_task, args=(
+        #                      task, cls.RESOURCE_MANAGER, self.env_sem))
+        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
         # reporter thread
-        checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
-        rp = threading.Thread(target=self._run_reporter, args=(task, tp, reporter,
-                              self.searcher, checkpoint_semaphore), daemon=False)
-        tp.start()
+        #checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
+        rp = threading.Thread(target=self._run_reporter, args=(task, job, reporter,
+                              self.searcher), daemon=False)
+        #tp.start()
         rp.start()
         task_dict = self._dict_from_task(task)
-        task_dict.update({'Task': task, 'Process': tp, 'ReporterThread': rp})
+        task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
         # checkpoint thread
         if self._checkpoint is not None:
-            sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
-                                  daemon=False)
-            sp.start()
-            task_dict['CheckpointThead'] = sp
+            def _save_checkpoint_callback(fut):
+                self._cleaning_tasks()
+                self.save()
+            job.add_done_callback(_save_checkpoint_callback)
 
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
@@ -211,20 +212,21 @@ class FIFOScheduler(TaskScheduler):
     def _clean_task_internal(self, task_dict):
         task_dict['ReporterThread'].join()
 
-    def _run_checkpoint(self, checkpoint_semaphore):
-        self._cleaning_tasks()
-        checkpoint_semaphore.acquire()
-        logger.debug('Saving Checkerpoint')
-        self.save()
+    #def _run_checkpoint(self, checkpoint_semaphore):
+    #    self._cleaning_tasks()
+    #    checkpoint_semaphore.acquire()
+    #    logger.debug('Saving Checkerpoint')
+    #    self.save()
 
-    def _run_reporter(self, task, task_process, reporter, searcher,
-                      checkpoint_semaphore):
+    def _run_reporter(self, task, task_job, reporter, searcher,
+                      checkpoint_semaphore=None):
         last_result = None
-        while task_process.is_alive():
+        #while task_process.is_alive():
+        while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
-                task_process.join()
+                #task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
@@ -233,6 +235,7 @@ class FIFOScheduler(TaskScheduler):
             reporter.move_on()
             last_result = reported_result
         if last_result is not None:
+            last_result['done'] = True
             searcher.update(
                 config=task.args['config'],
                 reward=last_result[self._reward_attr], **last_result)
@@ -253,12 +256,10 @@ class FIFOScheduler(TaskScheduler):
 
     def get_best_config(self):
         # Enable interactive monitoring
-        # self.join_tasks()
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
         # Enable interactive monitoring
-        # self.join_tasks()
         return self.searcher.get_best_reward()
 
     def add_training_result(self, task_id, reported_result, config=None):

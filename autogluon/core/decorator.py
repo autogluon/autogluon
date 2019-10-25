@@ -31,7 +31,7 @@ class _autogluon_method(object):
         self._rand_seed()
         striped_keys = [k.split('.')[0] for k in new_config.keys()]
  
-        if isinstance(args, argparse.Namespace) or isinstance(args, argparse.ArgumentParser):
+        if isinstance(args, (argparse.Namespace, argparse.ArgumentParser)):
             args_dict = vars(args)
         else:
             args_dict = args
@@ -219,7 +219,6 @@ def autogluon_object(**kwvars):
                 return 'AutoGluonObject -- ' + Cls.__name__
 
         autogluonobject.kwvars = autogluonobject.__init__.kwvars
-        #autogluonobject.kwspaces = autogluonobject.__init__.kwspaces
         return autogluonobject
 
     return registered_class

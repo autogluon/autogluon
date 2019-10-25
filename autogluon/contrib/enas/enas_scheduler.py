@@ -77,6 +77,9 @@ class ENAS_Scheduler(object):
         self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type)
         # controller setup
         self.controller = self.searcher.controller
+        controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
+        self.controller.collect_params().reset_ctx([controller_resource])
+        self.controller.context = controller_resource
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr*controller_batch_size})
