@@ -1,6 +1,9 @@
 # Customize Training Script
 :label:`sec_customscript`
 
+In this tutorial, we are showing the example of doing HPO using AutoGluon on any customized
+python scripts.
+
 ## Start with A Fine-tuning Example
 
 Import the basic packages, such as numpy, mxnet and gluoncv.

@@ -1,5 +1,5 @@
-Extending AutoGluon
-===================
+Customizing AutoGluon
+=====================
 
 AutoGluon allows different level of customizations.
 

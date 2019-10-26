@@ -6,6 +6,9 @@ or specialized optimizers. We provide an API to do that.
 
 ## Example for Constructing A Network
 
+This is an example of doing architecture search as HPO. If you are interested in efficient neural
+architecture search, please refer another tutorial `sec_proxyless`_ .
+
 ### CIFAR ResNet in GluonCV
 
 GluonCV provides [CIFARResNet](https://github.com/dmlc/gluon-cv/blob/master/gluoncv/model_zoo/cifarresnet.py#L167-L183), which allow user to specify how many layers at each stage. For example, we can construct a CIFAR ResNet with only 1 layer per stage:

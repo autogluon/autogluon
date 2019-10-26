@@ -34,7 +34,7 @@ This tutorial section is ...
       AutoGluon image classification tutorials.
 
    .. card::
-      :title: Customize Training
+      :title: Customizing AutoGluon
       :link: tutorials/extend/index.html
 
       Customize Training in AutoGluon
