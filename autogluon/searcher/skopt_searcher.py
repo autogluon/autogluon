@@ -104,23 +104,30 @@ class SKoptSearcher(BaseSearcher):
         try:
             new_points = self.bayes_optimizer.ask(n_points=1) # initially ask for one new config
             new_config_cs = self.skopt2config(new_points[0]) # hyperparameter-config to evaluate
-            new_config_cs.is_valid_configuration()
-            new_config = new_config_cs.get_dictionary()
-            if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                self._results[pickle.dumps(new_config)] = 0
-                return new_config
-            new_points = self.bayes_optimizer.ask(n_points=max_tries) # ask skopt for many configs since first one was not new
-            i = 1 # which new point to return as new_config, we already tried the first point above
-            while i < max_tries:
-                new_config_cs = self.skopt2config(new_points[i]) # hyperparameter-config to evaluate
+            try:
                 new_config_cs.is_valid_configuration()
                 new_config = new_config_cs.get_dictionary()
                 if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
                     self._results[pickle.dumps(new_config)] = 0
                     return new_config
+            except ValueError:
+                pass
+            new_points = self.bayes_optimizer.ask(n_points=max_tries) # ask skopt for many configs since first one was not new
+            i = 1 # which new point to return as new_config, we already tried the first point above
+            while i < max_tries:
+                new_config_cs = self.skopt2config(new_points[i]) # hyperparameter-config to evaluate
+                try:
+                    new_config_cs.is_valid_configuration()
+                    new_config = new_config_cs.get_dictionary()
+                    if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
+                        self._results[pickle.dumps(new_config)] = 0
+                        return new_config
+                except ValueError:
+                    pass
                 i += 1
         except ValueError:
-            warnings.warn("skopt failed to produce new config, using random search instead")
+            pass
+        logger.info("used random search instead of skopt to produce new hyperparameter configuration in this trial")
         return self.random_config()
     
     def default_config(self):

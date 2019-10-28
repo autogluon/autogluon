@@ -221,7 +221,7 @@ class HyperbandScheduler(FIFOScheduler):
                 terminator.on_task_report(task, reported_result)
             reported_result['bracket'] = bracket_id
             if rung_counts is not None:
-                for k, v in rung_counts:
+                for k, v in rung_counts.items():
                     key = 'count_at_{}'.format(k)
                     reported_result[key] = v
             self.add_training_result(
