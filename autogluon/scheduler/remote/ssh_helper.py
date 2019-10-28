@@ -208,7 +208,7 @@ def async_ssh(cmd_dict):
 
 def start_scheduler(addr, port, ssh_username, ssh_port,
                     ssh_private_key, remote_python=None):
-    cmd = "{python} -m distributed.cli.dask_scheduler --port {port}".format(
+    cmd = "{python} -m autogluon.scheduler.remote.dask_scheduler --port {port}".format(
         python=remote_python or sys.executable, port=port
     )
 
