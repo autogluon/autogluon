@@ -256,12 +256,12 @@ class FIFOScheduler(TaskScheduler):
                 self.mxboard.add_scalar(tag='loss',
                                         value=('task {task_id} valid_loss'.format(task_id=task_id),
                                                reported_result['loss']),
-                                        global_step=reported_result['epoch'])
+                                        global_step=reported_result[self._reward_attr])
             self.mxboard.add_scalar(tag=self._reward_attr,
                                     value=('task {task_id} {reward_attr}'.format(
                                            task_id=task_id, reward_attr=self._reward_attr),
                                            reported_result[self._reward_attr]),
-                                    global_step=reported_result['epoch'])
+                                    global_step=reported_result[self._reward_attr])
         with self.log_lock:
             # Note: We store all of reported_result in training_history[task_id],
             # not just the reward value.

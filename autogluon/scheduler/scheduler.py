@@ -3,6 +3,7 @@ import os
 import pickle
 import logging
 import subprocess
+from warnings import warn
 from threading import Thread
 import multiprocessing as mp
 from collections import OrderedDict
@@ -11,7 +12,7 @@ from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
 from .reporter import StatusReporter, Communicator, DistSemaphore
-from ..utils import DeprecationHelper
+from ..utils import DeprecationHelper, AutoGluonWarning
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,10 @@ class TaskScheduler(object):
         self._cleaning_tasks()
 
     def shutdown(self):
+        """shutdown() is now deprecated in favor of :function:`autogluon.done`.
+        """
+        warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
+             AutoGluonWarning)
         self.join_tasks()
         self.REMOTE_MANAGER.shutdown()
 

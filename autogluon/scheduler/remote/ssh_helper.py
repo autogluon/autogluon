@@ -15,7 +15,6 @@ import logging
 
 from threading import Thread
 from toolz import merge
-from tornado import gen
 
 logger = logging.getLogger(__name__)
 

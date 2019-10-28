@@ -157,10 +157,10 @@ class SKoptSearcher(BaseSearcher):
         self._results[pickle.dumps(new_config)] = 0
         return new_config
 
-    def update(self, config, reward, model_params=None):
+    def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
         """
-        super(SKoptSearcher, self).update(config, reward)
+        super(SKoptSearcher, self).update(config, reward, **kwargs)
         try:
             self.bayes_optimizer.tell(self.config2skopt(config),
                                       -reward)  # provide negative reward since skopt performs minimization
