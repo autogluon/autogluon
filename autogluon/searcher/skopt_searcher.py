@@ -9,7 +9,6 @@ from collections import OrderedDict
 import warnings
 warnings.filterwarnings("ignore", message="The objective has been evaluated at this point before.")
 
-import warnings
 # for suppress skopt warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from skopt import Optimizer

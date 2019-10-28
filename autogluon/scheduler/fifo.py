@@ -278,10 +278,11 @@ class FIFOScheduler(TaskScheduler):
         import matplotlib.pyplot as plt
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
-        for task_id, task_res in self.training_history.items():
-            rewards = [x[self._reward_attr] for x in task_res]
-            x = list(range(len(task_res)))
-            plt.plot(x, rewards, label='task {}'.format(task_id))
+        with self.log_lock:
+            for task_id, task_res in self.training_history.items():
+                rewards = [x[self._reward_attr] for x in task_res]
+                x = list(range(len(task_res)))
+                plt.plot(x, rewards, label='task {}'.format(task_id))
         if use_legend:
             plt.legend(loc='best')
         if filename is not None:
@@ -292,7 +293,8 @@ class FIFOScheduler(TaskScheduler):
     def state_dict(self, destination=None):
         destination = super(FIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
-        destination['training_history'] = json.dumps(self.training_history)
+        with self.log_lock:
+            destination['training_history'] = json.dumps(self.training_history)
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             destination['visualizer'] = json.dumps(self.mxboard._scalar_dict)
         return destination
@@ -300,7 +302,8 @@ class FIFOScheduler(TaskScheduler):
     def load_state_dict(self, state_dict):
         super(FIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
-        self.training_history = json.loads(state_dict['training_history'])
+        with self.log_lock:
+            self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))

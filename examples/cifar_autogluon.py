@@ -26,8 +26,6 @@ def parse_args():
                         help='scheduler name (default: fifo)')
     parser.add_argument('--checkpoint', type=str, default='checkpoint/cifar1.ag',
                         help='checkpoint path (default: None)')
-    parser.add_argument('--resume', action='store_true', default= False,
-                        help='resume from the checkpoint if needed')
     parser.add_argument('--debug', action='store_true', default= False,
                         help='debug if needed')
     args = parser.parse_args()
@@ -104,11 +102,6 @@ def train_cifar(args, reporter):
         best_val_score = 0
 
         start_epoch = 0
-        #if args.resume and reporter.has_dict():
-        #    #state_dict = reporter.get_dict()
-        #    print('resuming from state_dict:', state_dict.keys())
-        #    start_epoch = state_dict['epoch']
-        #    #update_params(net, state_dict['params'])
 
         for epoch in range(start_epoch, epochs):
             tic = time.time()
@@ -138,7 +131,6 @@ def train_cifar(args, reporter):
             name, acc = train_metric.get()
             name, val_acc = test(ctx, val_data)
             reporter(epoch=epoch, accuracy=val_acc)
-            #reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     train(args.epochs, context)
 
@@ -176,7 +168,6 @@ if __name__ == '__main__':
                                                       resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
                                                       num_trials=args.num_trials,
                                                       checkpoint=args.checkpoint,
-                                                      resume = args.resume,
                                                       time_attr='epoch', reward_attr="accuracy",
                                                       max_t=args.epochs, grace_period=args.epochs//4)
     elif args.scheduler == 'fifo':
@@ -184,7 +175,6 @@ if __name__ == '__main__':
                                                  resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
                                                  num_trials=args.num_trials,
                                                  checkpoint=args.checkpoint,
-                                                 resume = args.resume,
                                                  reward_attr="accuracy")
     else:
         raise RuntimeError('Unsuported Scheduler!')

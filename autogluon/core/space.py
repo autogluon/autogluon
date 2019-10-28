@@ -1,5 +1,5 @@
 import copy
-import collections
+from collections import OrderedDict
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper, EasyDict, classproperty
@@ -140,7 +140,7 @@ class List(NestedSpace):
 
     @property
     def kwspaces(self):
-        kw_spaces = collections.OrderedDict()
+        kw_spaces = OrderedDict()
         for idx, obj in enumerate(self.data):
             k = str(idx)
             if isinstance(obj, NestedSpace):
@@ -193,7 +193,7 @@ class Dict(NestedSpace):
 
     @property
     def kwspaces(self):
-        kw_spaces = collections.OrderedDict()
+        kw_spaces = OrderedDict()
         for k, obj in self.data.items():
             if isinstance(obj, NestedSpace):
                 kw_spaces[k] = obj
@@ -271,7 +271,7 @@ class Categorical(NestedSpace):
 
     @property
     def kwspaces(self):
-        kw_spaces = collections.OrderedDict()
+        kw_spaces = OrderedDict()
         for idx, obj in enumerate(self.data):
             if isinstance(obj, NestedSpace):
                 for sub_k, sub_v in obj.kwspaces.items():

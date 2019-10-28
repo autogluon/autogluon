@@ -2,7 +2,7 @@ import copy
 import logging
 import argparse
 import functools
-import collections
+from collections import OrderedDict
 import numpy as np
 import multiprocessing as mp
 import ConfigSpace as CS
@@ -90,7 +90,7 @@ class _autogluon_method(object):
     def kwspaces(self):
         """For RL searcher/controller
         """
-        kw_spaces = collections.OrderedDict()
+        kw_spaces = OrderedDict()
         for k, v in self.kwvars.items():
             if isinstance(v, (AutoGluonObject, Sequence, Dict)):
                 for sub_k, sub_v in v.kwspaces.items():
@@ -227,7 +227,7 @@ autogluon_register_dict = make_deprecate(autogluon_register_args, 'autogluon_reg
 
 def _autogluon_kwargs(**kwvars):
     def registered_func(func):
-        kwspaces = collections.OrderedDict()
+        kwspaces = OrderedDict()
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
             kwvars.update(kwargs)
