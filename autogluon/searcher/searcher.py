@@ -24,18 +24,6 @@ class BaseSearcher(object):
         self._results = OrderedDict()
         self._best_state_path = None
 
-    def configure_scheduler(self, scheduler):
-        """
-        Some searchers need to obtain information from the scheduler they are
-        used with, in order to configure themselves.
-        This method has to be called before the searcher can be used.
-
-        Args:
-            scheduler: TaskScheduler
-                Scheduler the searcher is used with.
-        """
-        pass
-
     def get_config(self, **kwargs):
         """Function to sample a new configuration
 
