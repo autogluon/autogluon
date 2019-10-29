@@ -4,7 +4,6 @@ import os
 import random
 import numpy as np
 import mxnet as mx
-
 import autogluon as ag
 from autogluon import TextClassification as task
 
@@ -52,40 +51,34 @@ parser.add_argument('--seed', default=100, type=int,
 
 if __name__ == '__main__':
     args = parser.parse_args()
-
     logger = logging.getLogger(__name__)
     logdir = os.path.join(os.path.splitext(args.savedir)[0].split('/')[0], 'log')
     if not os.path.exists(logdir):
         os.makedirs(logdir)
-
     dataset = task.Dataset(name=args.data)
-    results = task.fit(dataset,
-                       net=ag.Choice(args.nets),
-                       time_limits=args.time_limits,
-                       epochs=args.epochs,
-                       num_trials=args.num_trials,
-                       accumulate=args.accumulate,
-                       batch_size=args.batch_size,
-                       bert_dataset=args.bert_dataset,
-                       dev_batch_size=args.dev_batch_size, gpu=args.gpu,
-                       log_interval=args.log_interval,
-                       lr=ag.LogLinear(2e-06, 2e-04), #2e-05
-                       max_len=args.max_len,
-                       model_parameters=args.model_parameters, optimizer=ag.Choice(args.optims),
-                       output_dir=args.savedir, pretrained_bert_parameters=args.pretrained_bert_parameters,
-                       seed=args.seed, warmup_ratio=args.warmup_ratio, epsilon=args.epsilon,
-                       dtype=args.dtype, only_inference=args.only_inference, pad=args.pad,
-                       visualizer=args.visualizer)
-
-    print('Top-1 val acc: %.3f' % results.reward)
-
-    # test_acc = task.evaluate(dataset)
-    # print('Top-1 test acc: %.3f' % test_acc)
-    #
-    # sentence = 'I feel this is awesome!'
-    # ind, prob = task.predict(sentence)
-    # print('The input sentence is classified as [%s], with probability %.2f.' %
-    #       (dataset.train.synsets[ind.asscalar()], prob.asscalar()))
-    #
-    # print('The best configuration is:')
-    # print(results.config)
+    predictor = task.fit(dataset,
+                         net=ag.Choice(args.nets),
+                         time_limits=args.time_limits,
+                         epochs=args.epochs,
+                         num_trials=args.num_trials,
+                         accumulate=args.accumulate,
+                         batch_size=args.batch_size,
+                         bert_dataset=args.bert_dataset,
+                         dev_batch_size=args.dev_batch_size, gpu=args.gpu,
+                         log_interval=args.log_interval,
+                         lr=ag.LogLinear(2e-06, 2e-04),  # 2e-05
+                         max_len=args.max_len,
+                         model_parameters=args.model_parameters, optimizer=ag.Choice(args.optims),
+                         output_dir=args.savedir, pretrained_bert_parameters=args.pretrained_bert_parameters,
+                         seed=args.seed, warmup_ratio=args.warmup_ratio, epsilon=args.epsilon,
+                         dtype=args.dtype, only_inference=args.only_inference, pad=args.pad,
+                         visualizer=args.visualizer)
+    print('Top-1 val acc: %.3f' % predictor.results.reward)
+    test_acc = predictor.evaluate(dataset)
+    print('Top-1 test acc: %.3f' % test_acc)
+    sentence = 'I feel this is awesome!'
+    ind = predictor.predict(sentence)
+    prob = predictor.predict_proba(sentence)
+    print('The input sentence is classified as [%s], with probability %.2f.' % (ind.asscalar(), prob.asscalar()))
+    print('The best configuration is:')
+    print(predictor.results.config)

@@ -9,16 +9,74 @@ from ...core.optimizer import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
-from ..base import BaseTask
+from ..base import BaseTask, BasePredictor
 
 from .nets import get_built_in_network
 from .dataset import TextClassificationDataset
 from .pipeline import train_text_classification
 from .metrics import get_metric_instance
 
-__all__ = ['TextClassification']
+__all__ = ['TextClassification', 'TextClassificationPredictor']
 
 logger = logging.getLogger(__name__)
+
+
+class TextClassificationPredictor(BasePredictor):
+    def __init__(self, loss_func, eval_func, model=None, **kwargs):
+        super(TextClassificationPredictor, self).__init__(loss_func, eval_func, model, **kwargs)
+
+    def predict(self, sentence):
+        """The task predict function given an input.
+         Args:
+            sentence: the input
+         Example:
+            >>> ind = predictor.predict('this is cool')
+        """
+        pass
+
+    def predict_proba(self, sentence):
+        """The task predict probability function given an input.
+         Args:
+            sentence: the input
+         Example:
+            >>> prob = predictor.predict_proba('this is cool')
+        """
+        pass
+
+    def evaluate_predictions(self, y_true, y_pred):
+        """ Evaluate the provided list of predictions against list of ground truth labels according to the task-specific evaluation metric (self.eval_func). """
+        pass
+
+    def evaluate(self, sentence):
+        """The task evaluation function given an input.
+         Args:
+            sentence: the input
+         Example:
+            >>> acc = predictor.evaluate('this is cool')
+        """
+        pass
+
+    def load(self, output_directory):
+        """ Load Predictor object from given directory.
+            Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
+        """
+        pass  # Need to load models and set them = predictor.model
+
+    def save(self, output_directory):
+        """ Saves this object to file. Don't forget to save the models and the Results objects if they exist.
+            Before returning a Predictor, task.fit() should call predictor.save()
+        """
+        pass
+
+    def _save_results(self, output_directory):
+        """ Internal helper function: Save results in human-readable file JSON format """
+        pass
+
+    def _save_model(self, output_directory):
+        """ Internal helper function: Save self.model object to file located in output_directory.
+            For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
+        """
+        pass
 
 class TextClassification(BaseTask):
     """AutoGluon ImageClassification Task
@@ -67,11 +125,11 @@ class TextClassification(BaseTask):
         Example:
             >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
             >>>                         test_path='data/test')
-            >>> results = task.fit(dataset,
-            >>>                    nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
-            >>>                    time_limits=time_limits,
-            >>>                    num_gpus=1,
-            >>>                    num_trials = 4)
+            >>> predictor = task.fit(dataset,
+            >>>                      nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
+            >>>                      time_limits=time_limits,
+            >>>                      num_gpus=1,
+            >>>                      num_trials = 4)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
@@ -111,49 +169,49 @@ class TextClassification(BaseTask):
 
         return BaseTask.run_fit(train_text_classification, search_strategy, scheduler_options)
 
-    @classmethod
-    def predict(cls, sentence):
-        """The task predict function given an input.
-         Args:
-            img: the input
-         Example:
-            >>> ind, prob = task.predict('this is cool')
-        """
-        pass
-
-    @classmethod
-    def evaluate(cls, dataset):
-        """The task evaluation function given the test dataset.
-         Args:
-            dataset: test dataset
-         Example:
-            >>> from autogluon import ImageClassification as task
-            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-            >>> test_reward = task.evaluate(dataset)
-        """
-        logger.info('Start evaluating.')
-        args = cls.scheduler.train_fn.args
-        batch_size = args.batch_size * max(args.num_gpus, 1)
-
-        metric = get_metric_instance(args.metric)
-        ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        cls.results.model.collect_params().reset_ctx(ctx)
-
-        if isinstance(dataset, AutoGluonObject):
-            dataset = dataset._lazy_init()
-        test_data = gluon.data.DataLoader(
-            dataset.test, batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
-
-        for i, batch in enumerate(test_data):
-            data = mx.gluon.utils.split_and_load(batch[0], ctx_list=ctx,
-                                                 batch_axis=0, even_split=False)
-            label = mx.gluon.utils.split_and_load(batch[1], ctx_list=ctx,
-                                                  batch_axis=0, even_split=False)
-            outputs = [cls.results.model(X) for X in data]
-            metric.update(label, outputs)
-        _, test_reward = metric.get()
-        logger.info('Finished.')
-        return test_reward
+    # @classmethod
+    # def predict(cls, sentence):
+    #     """The task predict function given an input.
+    #      Args:
+    #         img: the input
+    #      Example:
+    #         >>> ind, prob = task.predict('this is cool')
+    #     """
+    #     pass
+    #
+    # @classmethod
+    # def evaluate(cls, dataset):
+    #     """The task evaluation function given the test dataset.
+    #      Args:
+    #         dataset: test dataset
+    #      Example:
+    #         >>> from autogluon import ImageClassification as task
+    #         >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+    #         >>> test_reward = task.evaluate(dataset)
+    #     """
+    #     logger.info('Start evaluating.')
+    #     args = cls.scheduler.train_fn.args
+    #     batch_size = args.batch_size * max(args.num_gpus, 1)
+    #
+    #     metric = get_metric_instance(args.metric)
+    #     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+    #     cls.results.model.collect_params().reset_ctx(ctx)
+    #
+    #     if isinstance(dataset, AutoGluonObject):
+    #         dataset = dataset._lazy_init()
+    #     test_data = gluon.data.DataLoader(
+    #         dataset.test, batch_size=batch_size, shuffle=False, num_workers=args.num_workers)
+    #
+    #     for i, batch in enumerate(test_data):
+    #         data = mx.gluon.utils.split_and_load(batch[0], ctx_list=ctx,
+    #                                              batch_axis=0, even_split=False)
+    #         label = mx.gluon.utils.split_and_load(batch[1], ctx_list=ctx,
+    #                                               batch_axis=0, even_split=False)
+    #         outputs = [cls.results.model(X) for X in data]
+    #         metric.update(label, outputs)
+    #     _, test_reward = metric.get()
+    #     logger.info('Finished.')
+    #     return test_reward
 
 
 # import json

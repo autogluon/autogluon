@@ -39,9 +39,9 @@ However, neural network training can be quite time-costly. To ensure quick runti
 ```python
 time_limits = 3*60 # 3mins
 epochs = 10
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   epochs=epochs)
+predictor = task.fit(dataset,
+                     time_limits=time_limits,
+                     epochs=epochs)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
@@ -49,7 +49,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```python
-print('Top-1 val acc: %.3f' % results.reward)
+print('Top-1 val acc: %.3f' % predictor.results.reward)
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new text.
@@ -57,19 +57,16 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
 ```python
-#classifier = task.fit(dataset,
-#                      time_limits=time_limits,
-#                      epochs=epochs)
-#test_acc = classifier.evaluate(dataset)
-#print('Top-1 test acc: %.3f' % test_acc)
+test_acc = predictor.evaluate(dataset)
+print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 Given an example sentence, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```python
 sentence = 'I feel this is awesome!'
-# ind = classifier.predict(sentence)
-# print('The input sentence is classified as [%d].' % (ind))
+ind = predictor.predict(sentence)
+print('The input sentence sentiment is classified as [%d].' % ind)
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
@@ -77,7 +74,7 @@ For example, we can inspect the best hyperparameter configuration corresponding 
 
 ```python
 print('The best configuration is:')
-print(results.config)
+print(predictor.results.config)
 ```
 
 This configuration is used to generate the above results.

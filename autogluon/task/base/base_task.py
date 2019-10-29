@@ -3,6 +3,7 @@ import collections
 import mxnet as mx
 from abc import abstractmethod
 from ...scheduler import *
+from .base_predictor import *
 
 __all__ = ['BaseDataset', 'BaseTask']
 
@@ -44,7 +45,8 @@ class BaseTask(object):
         model = train_fn(args, best_config, reporter=None)
         total_time = time.time() - start_time
         cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
-        return cls.results
+        cls.predictor = BasePredictor(loss_func=None, eval_func=None, model=model, results=cls.results)
+        return cls.predictor
 
     @classmethod
     def get_training_curves(cls, filename=None, plot=False, use_legend=True):

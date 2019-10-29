@@ -17,6 +17,8 @@
 
 import pickle, json
 from ...utils import plot_performance_vs_trials, plot_summary_of_models
+import logging
+from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,7 @@ __all__ = ['BasePredictor']
 PREDICTOR_FILENAME = "predictor.pkl" # Filename in which predictor object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
 RESULTS_FILENAME = "results.json" # Filename in which FitResults object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
 
-class BasePredictor(object):
+class BasePredictor(ABC):
     """ 
     Base object returned by task.fit() for each task implemented in AutoGluon.
     
@@ -49,16 +51,16 @@ class BasePredictor(object):
         >>> single_prediction = predictor.predict(x_i)
         >>> print((x_i, single_prediction))
     """
-    def __init__(self, loss_func, eval_func, model=None, **kwargs):
+    def __init__(self, loss_func, eval_func, model=None, results=None, **kwargs):
         self.model = model # MXnet model or list of multiple models / ensemble. Each model should have its own loading/saving functionality.
         self.loss_func = loss_func # Loss function (or string name) minimized during training
         self.eval_func = eval_func # Evaluation function / metric applied on validation/test data to gauge predictive performance.
         # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
-        self.results = self._createResults() # dict object to store all information during task.fit().
-    
-    @classmethod
+        # self.results = self._createResults() # dict object to store all information during task.fit().
+        self.results = results
+
     @abstractmethod
-    def load(output_directory):
+    def load(self, output_directory):
         """ Load Predictor object from given directory.
             Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
         """ 
@@ -74,8 +76,8 @@ class BasePredictor(object):
             Before returning a Predictor, task.fit() should call predictor.save()
         """
         filepath = output_directory + PREDICTOR_FILENAME
-        self.save_model(output_directory)
-        self.save_results(output_directory)
+        self._save_model(output_directory)
+        self._save_results(output_directory)
         self.model = None # Save model separately from Predictor object
         self.results = None # Save results separately from Predictor object
         pickle.dump(self, open(filepath,'wb'))
@@ -92,9 +94,9 @@ class BasePredictor(object):
             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
         """
         pass
-    
+
     @abstractmethod
-    def predict(X):
+    def predict(self, X):
         """ This method should be able to produce predictions regardless if:
             X = single data example (e.g. single image, single document), 
             X = batch of many examples, X = task.Dataset object 
@@ -137,7 +139,7 @@ class BasePredictor(object):
             if len(self.results['metadata']) > 0:
                 logger.info(json.dumps(self.results['metadata'], indent=2))
         
-        if len(results['trial_info']) > 0 and  verbosity > 1:
+        if len(self.results['trial_info']) > 0 and  verbosity > 1:
             ordered_trials = sorted(self.results['trial_info'].keys())
             if verbosity > 2:
                 for trial_id in ordered_trials:
@@ -146,8 +148,8 @@ class BasePredictor(object):
                     logger.info(json.dumps(self.results['trial_info'][trial_id], indent=2))
             
             # Create plot summaries:
-            plot_summary_of_models(results, output_directory)
-            plot_performance_vs_trials(results, output_directory)
+            plot_summary_of_models(self.results, output_directory)
+            plot_performance_vs_trials(self.results, output_directory)
         return self.results
     
     def _createResults(self):

@@ -191,13 +191,13 @@ On your own, please feel free to try running the following commands with small t
 
 ```python
 # time_limits = 10 * 60 # 10mins
-# results = task.fit(train=dataset, hpo_val=hpo_val_dataset, time_limits=time_limits)
+# predictor = task.fit(train=dataset, hpo_val=hpo_val_dataset, time_limits=time_limits)
 ```
 
 The top-1 accuracy of the best model on the hpo validation set is:
 
 ```python
-# print('Top-1 acc: %.3f' % results.reward)
+# print('Top-1 acc: %.3f' % predictor.results.reward)
 ```
 
 ###  Using AutoGluon to generate predictions on test sentences 
@@ -207,8 +207,8 @@ We first load the test data as a `Dataset` object and then call [predict](../api
 
 ```python
 # test_dataset = task.Dataset(path='/home/ubuntu/data/twittersa/test.csv')
-# inds = task.predict(test_dataset)
-# probs = task.predict_prob(test_dataset)
+# inds = predictor.predict(test_dataset)
+# probs = predictor.predict_proba(test_dataset)
 ```
 
 `inds` above contains the indices of the predicted class for each test sentence, while `probs` contains the confidence in these predictions.
