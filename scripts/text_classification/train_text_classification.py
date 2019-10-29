@@ -10,11 +10,11 @@ from autogluon import TextClassification as task
 
 parser = argparse.ArgumentParser(description='AutoGluon text classification')
 parser.add_argument('--data', default='SST', type=str,
-                    help='options')
-parser.add_argument('--nets', default='resnet18_v1,resnet34_v1', type=str,
-                    help='list of nets to run (default: resnet18_v1,resnet34_v1)')
-parser.add_argument('--optims', default='sgd,adam,nag', type=str,
-                    help='list of optims to run, (default: sgd,adam,nag)')
+                    help='options are SST, MRPC, QQP, QNLI, RTE, STS-B, CoLA, MNLI, WNLI, IMDB')
+parser.add_argument('--nets', default='bert_12_768_12', type=str,
+                    help='list of nets to run (default: bert_12_768_12)')
+parser.add_argument('--optims', default='bertadam', type=str,
+                    help='list of optims to run, (default: bertadam)')
 parser.add_argument('--searcher', type=str, default='random',
                     help='searcher name (default: random)')
 parser.add_argument('--trial_scheduler', type=str, default='fifo',
@@ -37,7 +37,7 @@ parser.add_argument('--num_gpus', default=1, type=int,
                     help='number of gpus per trial')
 parser.add_argument('--max_num_cpus', default=4, type=int,
                     help='number of cpus per trial')
-parser.add_argument('--num_training_epochs', default=10, type=int,
+parser.add_argument('--epochs', default=10, type=int,
                     help='number of epochs per trial')
 parser.add_argument('--lr_factor', default=0.75, type=float,
                     help='learning rate decay ratio')
@@ -62,12 +62,12 @@ if __name__ == '__main__':
     results = task.fit(dataset,
                        net=ag.Choice(args.nets),
                        time_limits=args.time_limits,
-                       num_training_epochs=args.num_training_epochs,
+                       epochs=args.epochs,
                        num_trials=args.num_trials,
                        accumulate=args.accumulate,
                        batch_size=args.batch_size,
                        bert_dataset=args.bert_dataset,
-                       dev_batch_size=args.dev_batch_size, epochs=args.num_training_epochs, gpu=args.gpu,
+                       dev_batch_size=args.dev_batch_size, gpu=args.gpu,
                        log_interval=args.log_interval,
                        lr=ag.LogLinear(2e-06, 2e-04), #2e-05
                        max_len=args.max_len,

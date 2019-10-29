@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 
 import mxnet as mx
 from mxnet import gluon, nd
-from mxnet.gluon.data.vision import transforms
-from gluoncv.data import transforms as gcv_transforms
+import gluonnlp as nlp
 
 from ...core.optimizer import *
 from ...core import *
@@ -26,15 +25,9 @@ class TextClassification(BaseTask):
     """
     Dataset = TextClassificationDataset
     @staticmethod
-    def fit(dataset='cifar10',
-            net=Choice('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=Choice(
-                SGD(learning_rate=LogLinear(1e-4, 1e-2),
-                    momentum=LogLinear(0.85, 0.95),
-                    wd=LogLinear(1e-5, 1e-3)),
-                Adam(learning_rate=LogLinear(1e-4, 1e-2),
-                     wd=LogLinear(1e-5, 1e-3)),
-            ),
+    def fit(dataset='SST',
+            net=Choice('bert_12_768_12'),
+            optimizer=Choice(nlp.optimizer.BERTAdam(learning_rate=LogLinear(1e-4, 1e-2))),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
