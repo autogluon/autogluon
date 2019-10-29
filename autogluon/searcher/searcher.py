@@ -1,7 +1,5 @@
 import os
-import json
 import pickle
-import copy
 import logging
 from collections import OrderedDict
 import multiprocessing as mp
@@ -26,23 +24,55 @@ class BaseSearcher(object):
         self._results = OrderedDict()
         self._best_state_path = None
 
-    def get_config(self):
+    def get_config(self, **kwargs):
         """Function to sample a new configuration
 
         This function is called inside TaskScheduler to query a new configuration
 
         Args:
+            kwargs:
+                Extra information may be passed from scheduler to searcher
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
-    def update(self, config, reward):
+    def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
+
+        Note that for multi-fidelity schedulers (e.g., Hyperband), also
+        intermediate results are reported. In this case, the time attribute is
+        among **kwargs. We can also assume that if
+        register_pending(config, ...) is received, then later on,
+        the searcher receives update(config, ...) with milestone as time attribute.
         """
-        with self.LOCK:
-            self._results[pickle.dumps(config)] = reward
-        logger.info('Finished Task with config: {} and reward: {}'.format(config, reward))
+        is_done = kwargs.get('done', False)
+        is_terminated = kwargs.get('terminated', False)
+        # Only if evaluation is done or terminated (otherwise, it is an intermediate
+        # result)
+        if is_done or is_terminated:
+            with self.LOCK:
+                # Note: In certain versions of a scheduler, we may see 'terminated'
+                # several times for the same config. In this case, we log the best
+                # (largest) result here
+                config_pkl = pickle.dumps(config)
+                old_reward = self._results.get(config_pkl, reward)
+                self._results[config_pkl] = max(reward, old_reward)
+            logger.info('Finished Task with config: {} and reward: {}'.format(
+                config, reward))
+
+    def register_pending(self, config, milestone=None):
+        """
+        Signals to searcher that evaluation for config has started, but not
+        yet finished, which allows model-based searchers to register this
+        evaluation as pending.
+        For multi-fidelity schedulers, milestone is the next milestone the
+        evaluation will attend, so that model registers (config, milestone)
+        as pending.
+        In general, the searcher may assume that update is called with that
+        config at a later time.
+        """
+        pass
 
     def get_best_reward(self):
         with self.LOCK:
@@ -66,8 +96,9 @@ class BaseSearcher(object):
                 return {}
 
     def is_best(self, config):
-        best_config = max(self._results, key=self._results.get)
-        return pickle.dumps(config) == best_config
+        with self.LOCK:
+            best_config = max(self._results, key=self._results.get)
+            return pickle.dumps(config) == best_config
 
     def get_best_state_path(self):
         assert os.path.isfile(self._best_state_path), \
@@ -111,7 +142,7 @@ class RandomSearcher(BaseSearcher):
         >>> searcher = RandomSearcher(cs)
         >>> searcher.get_config()
     """
-    def get_config(self):
+    def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called inside Hyperband to query a new configuration
 
@@ -125,10 +156,10 @@ class RandomSearcher(BaseSearcher):
         self._results[pickle.dumps(new_config)] = 0
         return new_config
 
-    def update(self, *args, **kwargs):
+    def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
         """
-        super(RandomSearcher, self).update(*args, **kwargs)
+        super(RandomSearcher, self).update(config, reward, **kwargs)
+
 
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
-

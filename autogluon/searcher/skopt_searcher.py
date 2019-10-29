@@ -84,7 +84,7 @@ class SKoptSearcher(BaseSearcher):
             skopt_hpspace.append(hp_dimension)
         self.bayes_optimizer = Optimizer(dimensions=skopt_hpspace, **kwargs)
     
-    def get_config(self, max_tries=1e2):
+    def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called to query a new configuration that has not yet been tried.
         Asks for one point at a time from skopt, up to max_tries. 
@@ -98,28 +98,36 @@ class SKoptSearcher(BaseSearcher):
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
+        max_tries = kwargs.get('max_tries', 1e2)
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
             return self.default_config()
         try:
             new_points = self.bayes_optimizer.ask(n_points=1) # initially ask for one new config
             new_config_cs = self.skopt2config(new_points[0]) # hyperparameter-config to evaluate
-            new_config_cs.is_valid_configuration()
-            new_config = new_config_cs.get_dictionary()
-            if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                self._results[pickle.dumps(new_config)] = 0
-                return new_config
-            new_points = self.bayes_optimizer.ask(n_points=max_tries) # ask skopt for many configs since first one was not new
-            i = 1 # which new point to return as new_config, we already tried the first point above
-            while i < max_tries:
-                new_config_cs = self.skopt2config(new_points[i]) # hyperparameter-config to evaluate
+            try:
                 new_config_cs.is_valid_configuration()
                 new_config = new_config_cs.get_dictionary()
                 if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
                     self._results[pickle.dumps(new_config)] = 0
                     return new_config
+            except ValueError:
+                pass
+            new_points = self.bayes_optimizer.ask(n_points=max_tries) # ask skopt for many configs since first one was not new
+            i = 1 # which new point to return as new_config, we already tried the first point above
+            while i < max_tries:
+                new_config_cs = self.skopt2config(new_points[i]) # hyperparameter-config to evaluate
+                try:
+                    new_config_cs.is_valid_configuration()
+                    new_config = new_config_cs.get_dictionary()
+                    if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
+                        self._results[pickle.dumps(new_config)] = 0
+                        return new_config
+                except ValueError:
+                    pass
                 i += 1
         except ValueError:
-            warnings.warn("skopt failed to produce new config, using random search instead")
+            pass
+        logger.info("used random search instead of skopt to produce new hyperparameter configuration in this trial")
         return self.random_config()
     
     def default_config(self):

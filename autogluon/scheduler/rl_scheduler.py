@@ -101,10 +101,10 @@ class RLScheduler(FIFOScheduler):
                 msg = 'checkpoint path {} is not available for resume.'.format(checkpoint)
                 logger.exception(msg)
 
-    def run(self, num_trials=None):
+    def run(self, **kwargs):
         """Run multiple number of trials
         """
-        self.num_trials = num_trials if num_trials else self.num_trials
+        self.num_trials = kwargs.get('num_trials', self.num_trials)
         logger.info('Starting Experiments')
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
@@ -267,7 +267,7 @@ class RLScheduler(FIFOScheduler):
 
         return rewards
 
-    def add_task(self, task, reporter):
+    def add_task(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -275,7 +275,7 @@ class RLScheduler(FIFOScheduler):
         """
         cls = RLScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        task.args['reporter'] = reporter
+        task.args['reporter'] = kwargs.get('reporter')
         # main process
         task_thread = threading.Thread(target=cls._start_distributed_task, args=(
                                        task, cls.RESOURCE_MANAGER, self.env_sem))
