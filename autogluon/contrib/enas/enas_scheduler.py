@@ -122,8 +122,9 @@ class ENAS_Scheduler(object):
         # update network arc
         config = self.controller.inference()
         self.supernet.sample(**config)
+        metric = mx.metric.Accuracy()
         for i, batch in tbar:
-            reward = self.eval_fn(self.supernet, batch, **self.val_args)
+            reward = self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
             sum_rewards += reward
             tbar.set_description('Acc: {}'.format(sum_rewards/(i+1)))
 
@@ -143,7 +144,7 @@ class ENAS_Scheduler(object):
                 configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
                 # schedule the training tasks and gather the reward
                 self.supernet.sample(**configs[0])
-                self.eval_fn(self.supernet, batch, metric, **self.val_args)
+                self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
                 reward = metric.get()[1]
                 reward = self.reward_fn(reward, self.supernet)
                 self.baseline = reward if not self.baseline else self.baseline
