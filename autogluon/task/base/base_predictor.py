@@ -58,9 +58,10 @@ class BasePredictor(ABC):
         # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
         # self.results = self._createResults() # dict object to store all information during task.fit().
         self.results = results
-
+    
+    @classmethod
     @abstractmethod
-    def load(self, output_directory):
+    def load(cls, output_directory):
         """ Load Predictor object from given directory.
             Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
         """
