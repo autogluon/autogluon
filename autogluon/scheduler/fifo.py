@@ -13,7 +13,8 @@ from .resource import DistributedResource
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..core import Task, autogluon_method
 from .scheduler import TaskScheduler
-from ..searcher import *
+from ..searcher.searcher_factory import searcher_factory
+from ..searcher import BaseSearcher
 from .reporter import DistStatusReporter
 from ..utils import DeprecationHelper
 
@@ -21,10 +22,6 @@ __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
-searchers = {
-    'random': RandomSearcher,
-    'skopt': SKoptSearcher,
-}
 
 class FIFOScheduler(TaskScheduler):
     """Simple scheduler that just runs trials in submission order.
@@ -76,7 +73,9 @@ class FIFOScheduler(TaskScheduler):
         self.args = args if args else train_fn.args
         self.resource = resource
         if isinstance(searcher, str):
-            self.searcher = searchers[searcher](train_fn.cs, **search_options)
+            kwargs = search_options.copy()
+            kwargs['configspace'] = train_fn.cs
+            self.searcher = searcher_factory(searcher, **kwargs)
         else:
             assert isinstance(searcher, BaseSearcher)
             self.searcher = searcher
