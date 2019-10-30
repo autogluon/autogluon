@@ -7,9 +7,6 @@ We again begin by letting AutoGluon know that `image_classification` is the task
 
 ```{.python .input}
 from autogluon import ImageClassification as task
-
-import logging
-logging.basicConfig(level=logging.INFO)
 ```
 
 ## Use fifo trial scheduler
