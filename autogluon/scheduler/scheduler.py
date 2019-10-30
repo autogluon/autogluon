@@ -151,8 +151,7 @@ class TaskScheduler(object):
                 p.join()
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
-        ret = return_list[0]
-        print('returning ', ret)
+        ret = return_list[0] if len(return_list) > 0 else None
         return ret
 
 

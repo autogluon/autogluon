@@ -8,6 +8,7 @@ import mxnet as mx
 from ...searcher import RLSearcher
 from ...scheduler.resource import get_gpu_count, get_cpu_count
 from ...task.image_classification.dataset import get_built_in_dataset
+from ...task.image_classification.utils import *
 from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, in_ipynb)
 from .enas_utils import *
 
@@ -134,6 +135,7 @@ class ENAS_Scheduler(object):
         decay = self.ema_decay
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
         # update 
+        metric = mx.metric.Accuracy()
         for i, batch in enumerate(self.val_data):
             if i >= self.controller_batch_size: break
             with mx.autograd.record():
@@ -141,8 +143,9 @@ class ENAS_Scheduler(object):
                 configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
                 # schedule the training tasks and gather the reward
                 self.supernet.sample(**configs[0])
-                metric = self.eval_fn(self.supernet, batch, **self.val_args)
-                reward = self.reward_fn(metric, self.supernet)
+                self.eval_fn(self.supernet, batch, metric, **self.val_args)
+                reward = metric.get()[1]
+                reward = self.reward_fn(reward, self.supernet)
                 self.baseline = reward if not self.baseline else self.baseline
                 # substract baseline
                 avg_rewards = mx.nd.array([reward - self.baseline],

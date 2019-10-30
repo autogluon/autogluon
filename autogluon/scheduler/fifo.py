@@ -87,13 +87,14 @@ class FIFOScheduler(TaskScheduler):
             assert isinstance(searcher, BaseSearcher)
             self.searcher = searcher
         # meta data
-        self.metadata = train_fn.kwspaces
-        keys = copy.deepcopy(list(self.metadata.keys()))
-        for k in keys:
-            if '.' in k:
-                v = self.metadata.pop(k)
-                new_k = k.split('.')[-1]
-                self.metadata[new_k] = v
+        self.metadata = {}
+        self.metadata['search_space'] = train_fn.kwspaces
+        keys = copy.deepcopy(list(self.metadata['search_space'].keys()))
+        #for k in keys:
+        #    if '.' in k:
+        #        v = self.metadata['search_space'].pop(k)
+        #        new_k = k.split('.')[-1]
+        #        self.metadata['search_space'][new_k] = v
         self.metadata['search_strategy'] = searcher
         self.metadata['stop_criterion'] = {'time_limits': time_out, 'max_reward': max_reward}
         self.metadata['resources_per_trial'] = resource

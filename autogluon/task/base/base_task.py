@@ -27,6 +27,7 @@ class BaseTask(object):
     Dataset = BaseDataset
     @classmethod
     def run_fit(cls, train_fn, search_strategy, scheduler_options):
+        start_time = time.time()
         # create scheduler and schedule tasks
         if isinstance(search_strategy, str):
             scheduler = schedulers[search_strategy.lower()]
@@ -43,7 +44,11 @@ class BaseTask(object):
         args = train_fn.args
         args.final_fit = True
         # final fit
-        return scheduler.run_with_config(best_config)
+        results = scheduler.run_with_config(best_config)
+        total_time = time.time() - start_time
+        results.update(best_reward=best_reward, best_config=best_config,
+                       total_time=total_time, metadata=scheduler.metadata)
+        return results
 
     @classmethod
     @abstractmethod

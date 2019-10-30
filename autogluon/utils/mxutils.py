@@ -24,9 +24,6 @@ def get_data_rec(input_size, crop_ratio,
     from mxnet import gluon
     rec_file = os.path.expanduser(rec_file)
     rec_file_idx = os.path.expanduser(rec_file_idx)
-    #rec_file = os.path.expanduser(rec_file)
-    #rec_file_idx = os.path.expanduser(rec_file_idx)
-    
     lighting_param = 0.1
     input_size = input_size
     crop_ratio = crop_ratio if crop_ratio > 0 else 0.875

@@ -8,7 +8,7 @@ from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
 
-__all__ = ['get_built_in_dataset', 'ImageClassificationDataset']
+__all__ = ['get_built_in_dataset', 'ClassificationDataset']
 
 built_in_datasets = [
     'mnist',
@@ -19,7 +19,7 @@ built_in_datasets = [
 ]
 
 @autogluon_object()
-class ImageClassificationDataset(object):
+class ClassificationDataset(object):
     """The image classification dataset.
     Args:
         name: the dataset name.

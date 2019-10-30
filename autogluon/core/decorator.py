@@ -13,9 +13,29 @@ from ..utils import EasyDict as ezdict
 from ..utils.deprecate import make_deprecate
 
 __all__ = ['autogluon_register_args', 'autogluon_object', 'autogluon_function',
-           'autogluon_register_dict']
+           'sample_config', 'autogluon_register_dict']
 
 logger = logging.getLogger(__name__)
+
+def sample_config(args, config):
+    args = copy.deepcopy(args)
+    striped_keys = [k.split('.')[0] for k in config.keys()]
+    if isinstance(args, (argparse.Namespace, argparse.ArgumentParser)):
+        args_dict = vars(args)
+    else:
+        args_dict = args
+    for k, v in args_dict.items():
+        # handle different type of configurations
+        if k in striped_keys:
+            if isinstance(v, NestedSpace):
+                sub_config = _strip_config_space(config, prefix=k)
+                args_dict[k] = v.sample(**sub_config)
+            else:
+                if '.' in k: continue
+                args_dict[k] = config[k]
+        elif isinstance(v, AutoGluonObject):
+            args_dict[k] = v.init()
+    return args
 
 class _autogluon_method(object):
     SEED = mp.Value('i', 0)
@@ -26,27 +46,9 @@ class _autogluon_method(object):
         functools.update_wrapper(self, f)
 
     def __call__(self, args, config, **kwargs):
-        args = copy.deepcopy(args)
         new_config = copy.deepcopy(config)
         self._rand_seed()
-        striped_keys = [k.split('.')[0] for k in new_config.keys()]
- 
-        if isinstance(args, (argparse.Namespace, argparse.ArgumentParser)):
-            args_dict = vars(args)
-        else:
-            args_dict = args
-
-        for k, v in args_dict.items():
-            # handle different type of configurations
-            if k in striped_keys:
-                if isinstance(v, NestedSpace):
-                    sub_config = _strip_config_space(new_config, prefix=k)
-                    args_dict[k] = v.sample(**sub_config)
-                else:
-                    if '.' in k: continue
-                    args_dict[k] = new_config[k]
-            elif isinstance(v, AutoGluonObject):
-                args_dict[k] = v.init()
+        args = sample_config(args, new_config)
 
         output = self.f(args, **kwargs)
         if 'reporter' in kwargs and kwargs['reporter'] is not None:
@@ -176,7 +178,6 @@ def autogluon_function(**kwvars):
         def wrapper_call(*args, **kwargs):
             agobj = autogluonobject(*args, **kwargs)
             agobj.kwvars = agobj.__init__.kwvars
-            #agobj.kwspaces = agobj.__init__.kwspaces
             return agobj
         return wrapper_call
     return registered_func
