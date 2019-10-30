@@ -54,16 +54,18 @@ class _autogluon_method(object):
             kwargs['reporter'](done=True)
         return output
  
-    def _register_args(self, default, **kwvars):
+    def register_args(self, default={}, **kwvars):
         if isinstance(default, (argparse.Namespace, argparse.ArgumentParser)):
             default = vars(default)
+        self.kwvars = {}
+        self.args = ezdict()
         self.args.update(default)
         self.update(**kwvars)
 
     def update(self, **kwargs):
         """For searcher support ConfigSpace
         """
-        self.kwvars = kwargs
+        self.kwvars.update(kwargs)
         for k, v in self.kwvars.items():
             if isinstance(v, (NestedSpace)):
                 self.args.update({k: v})
@@ -133,7 +135,7 @@ def autogluon_register_args(default={}, **kwvars):
             return func(*args, **kwargs)
 
         default = kwvars['_default_config']
-        wrapper_call._register_args(default=default, **kwvars)
+        wrapper_call.register_args(default=default, **kwvars)
         return wrapper_call
 
     return registered_func

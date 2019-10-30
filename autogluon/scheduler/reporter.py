@@ -74,6 +74,12 @@ class StatusReporter(object):
         reprstr = self.__class__.__name__
         return reprstr
 
+class FakeReporter(object):
+    """FakeReporter for internal use in final fit
+    """
+    def __call__(self, **kwargs):
+        pass
+
 class Communicator(threading.Thread):
     def __init__(self, process, local_reporter, dist_reporter):
         super(Communicator, self).__init__()
@@ -140,7 +146,10 @@ class DistStatusReporter(object):
         self._last_report_time = report_time
 
         #print('Reporting {}'.format(json.dumps(kwargs)))
-        self._queue.put(kwargs.copy())
+        try:
+            self._queue.put(kwargs.copy())
+        except RuntimeError:
+            return
         self._continue_semaphore.acquire()
 
     def fetch(self, block=True):

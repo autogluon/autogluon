@@ -82,13 +82,13 @@ In addition to the default network candidates, let's also add `resnet50` to the 
 
 ```{.python .input}
 import autogluon as ag
-net_list = ['resnet18_v1',
-            'resnet34_v1',
-            'resnet50_v1']
 
 # default net list for image classification would be overwritten
 # if net_list is provided
-nets = ag.Nets(net_list)
+import autogluon as ag
+nets = ag.space.Categorical('resnet18_v1', 'resnet34_v1','resnet50_v1')
+
+print(nets)
 
 print(nets)
 ```
@@ -112,7 +112,7 @@ sgd_opt = ag.optimizer.SGD(learning_rate=ag.LogLinear(1e-4, 1e-1),
                            wd=ag.LogLinear(1e-6, 1e-2))
 adam_opt = ag.optimizer.Adam(learning_rate=ag.LogLinear(1e-4, 1e-1),
                              wd=ag.LogLinear(1e-6, 1e-2))
-optimizers = ag.Optimizers([sgd_opt, adam_opt])
+optimizers = ag.space.Categorical(sgd_opt, adam_opt)
 
 print(optimizers)
 ```

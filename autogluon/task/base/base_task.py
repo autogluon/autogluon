@@ -26,40 +26,23 @@ class BaseTask(object):
     Dataset = BaseDataset
     @classmethod
     def run_fit(cls, train_fn, search_strategy, scheduler_options):
-        start_time = time.time()
         # create scheduler and schedule tasks
-        debug = scheduler_options.pop('debug')
         if isinstance(search_strategy, str):
             scheduler = schedulers[search_strategy.lower()]
         else:
             assert callable(search_strategy)
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
-        cls.scheduler = scheduler(train_fn, **scheduler_options)
-        if debug:
-            best_config = cls.scheduler.searcher.get_config()
-            best_reward = 0
-            model = train_fn(train_fn.args, best_config, reporter=None)
-        else:
-            cls.scheduler.run()
-            cls.scheduler.join_tasks()
-            best_reward = cls.scheduler.get_best_reward()
-            best_config = cls.scheduler.get_best_config()
-            args = train_fn.args
-            args.final_fit = True
-            # final fit
-            model = train_fn(args, best_config, reporter=None)
-        total_time = time.time() - start_time
-        cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
-        return cls.results
-
-    @classmethod
-    def get_training_curves(cls, filename=None, plot=False, use_legend=True):
-        cls.scheduler.get_training_curves(filename=None, plot=False, use_legend=True)
-
-    @classmethod
-    def shut_down(cls):
-        cls.scheduler.shutdown()
+        scheduler = scheduler(train_fn, **scheduler_options)
+        scheduler.run()
+        scheduler.join_tasks()
+        # gather the best configuration
+        best_reward = scheduler.get_best_reward()
+        best_config = scheduler.get_best_config()
+        args = train_fn.args
+        args.final_fit = True
+        # final fit
+        return scheduler.run_with_config(best_config)
 
     @classmethod
     @abstractmethod

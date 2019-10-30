@@ -69,7 +69,7 @@ class TaskScheduler(object):
             return {'TASK_ID': task['TASK_ID'], 'Args': task['Args']}
 
     def add_task(self, task, **kwargs):
-        """Adding a training task to the scheduler.
+        """Adding a training task to the scheduler (Async).
 
         Args:
             task (autogluon.scheduler.Task): a new trianing task
@@ -80,9 +80,16 @@ class TaskScheduler(object):
         job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
         with self.LOCK:
             new_dict = self._dict_from_task(task)
-            #new_dict['Process'] = p
             new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
+
+    def run_task(self, task):
+        """Run a training task to the scheduler (Sync).
+        """
+        cls = TaskScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
+        return job.result()
 
     @staticmethod
     def _start_distributed_task(task, resource_manager, env_sem):
@@ -90,7 +97,6 @@ class TaskScheduler(object):
         job = task.resources.node.submit(TaskScheduler._run_dist_task,
                                          task.fn, task.args, task.resources.gpu_ids,
                                          env_sem)
-        #job.result()
         def _release_resource_callback(fut):
             resource_manager._release(task.resources)
         job.add_done_callback(_release_resource_callback)
@@ -109,6 +115,13 @@ class TaskScheduler(object):
         terminator_semaphore = None
         if 'terminator_semaphore' in args:
             terminator_semaphore = args.pop('terminator_semaphore')
+
+        manager = mp.Manager()
+        return_list = manager.list()
+        def _worker(return_list, **kwargs):
+            ret = fn(**kwargs)
+            return_list.append(ret)
+
         try:
             env_semaphore.acquire()
             if len(gpu_ids) > 0:
@@ -116,7 +129,7 @@ class TaskScheduler(object):
                 os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
                 os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
             # start local progress
-            p = mp.Process(target=fn, kwargs=args)
+            p = mp.Process(target=_worker, args=(return_list,), kwargs=args)
             p.start()
             env_semaphore.release()
             if 'reporter' in args:
@@ -128,13 +141,19 @@ class TaskScheduler(object):
                         p.kill()
                         p.join()
                     else:
-                        subprocess.run(['kill', '-9', str(p.pid)])
-                        subprocess.run(['kill', '-9', str(p.pid)])
+                        try:
+                            subprocess.run(['kill', '-9', str(p.pid)])
+                            subprocess.run(['kill', '-9', str(p.pid)])
+                        except Exception:
+                            pass
                         p.join()
             else:
                 p.join()
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
+        ret = return_list[0]
+        print('returning ', ret)
+        return ret
 
 
     def _clean_task_internal(self, task_dict):
@@ -173,7 +192,6 @@ class TaskScheduler(object):
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
-        logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['TASK_ID'] = Task.TASK_ID.value
         return destination

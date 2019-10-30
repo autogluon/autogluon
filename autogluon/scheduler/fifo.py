@@ -5,7 +5,6 @@ import pickle
 import json
 import logging
 import threading
-from tqdm import trange
 import multiprocessing as mp
 from collections import OrderedDict
 
@@ -16,7 +15,12 @@ from ..core.decorator import _autogluon_method
 from .scheduler import TaskScheduler
 from ..searcher import *
 from .reporter import DistStatusReporter
-from ..utils import DeprecationHelper
+from ..utils import DeprecationHelper, in_ipynb
+
+if in_ipynb():
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
 
 __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 
@@ -24,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 searchers = {
     'random': RandomSearcher,
-    'skopt': SKoptSearcher,  # May have other BO solutions in the future...
+    'skopt': SKoptSearcher,
     'grid': GridSearcher,
 }
 
@@ -129,12 +133,12 @@ class FIFOScheduler(TaskScheduler):
         logger.info('Starting Experiments')
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
-        tbar = trange(self.num_finished_tasks, self.num_trials)
+        tbar = tqdm(range(self.num_finished_tasks, self.num_trials))
         for _ in tbar:
             if self.time_out and time.time() - start_time >= self.time_out \
                     or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
-            tbar.set_description('Current best reward: {} '.format(self.get_best_reward()))
+            tbar.set_description('Current best reward: {:.2f} '.format(self.get_best_reward()))
             self.schedule_next()
 
     def save(self, checkpoint=None):
@@ -166,6 +170,16 @@ class FIFOScheduler(TaskScheduler):
         task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
         self.add_task(task, **extra_kwargs)
+
+    def run_with_config(self, config):
+        """Run with config for final fit.
+        """
+        from .reporter import FakeReporter
+        task = Task(self.train_fn, {'args': self.args, 'config': config},
+                    DistributedResource(**self.resource))
+        reporter = FakeReporter()
+        task.args['reporter'] = reporter
+        return self.run_task(task)
 
     def _dict_from_task(self, task):
         if isinstance(task, Task):

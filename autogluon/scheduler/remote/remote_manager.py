@@ -83,6 +83,8 @@ class RemoteManager(object):
     def shutdown(cls):
         for node in cls.NODES.values():
             node.shutdown()
+        cls.NODES = {}
+        cls.__instance = None
 
     @classmethod
     def get_port_id(cls):
@@ -99,7 +101,7 @@ class RemoteManager(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(\n'
-        for node in cls.NODES.values():
+        for node in self.NODES.values():
            reprstr += '{}, \n'.format(node)
         reprstr += ')\n'
         return reprstr

@@ -30,11 +30,11 @@ class ImageClassification(BaseTask):
     def fit(dataset,
             net=Categorical('ResNet34_v1b', 'ResNet50_v1b'),
             optimizer=Categorical(
-                SGD(learning_rate=LogLinear(1e-4, 1e-2),
-                    momentum=LogLinear(0.85, 0.95),
-                    wd=LogLinear(1e-5, 1e-3)),
-                Adam(learning_rate=LogLinear(1e-4, 1e-2),
-                     wd=LogLinear(1e-5, 1e-3)),
+                SGD(learning_rate=Real(1e-4, 1e-2, log=True),
+                    momentum=Real(0.85, 0.95),
+                    wd=Real(1e-5, 1e-3, log=True)),
+                Adam(learning_rate=Real(1e-4, 1e-2, log=True),
+                     wd=Real(1e-5, 1e-3, log=True)),
             ),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
@@ -42,8 +42,8 @@ class ImageClassification(BaseTask):
             input_size=224,
             epochs=20,
             metric='accuracy',
-            num_cpus=get_cpu_count(),
-            num_gpus=get_gpu_count(),
+            num_cpus=4,
+            num_gpus=1,
             hybridize=True,
             search_strategy='random',
             search_options={},
@@ -54,8 +54,7 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True,
-            debug=False):
+            auto_search=True):
 
         """
         Auto fit on image classification dataset
@@ -72,7 +71,6 @@ class ImageClassification(BaseTask):
             savedir (str): Local dir to save training results to.
             search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
             resume (bool): If checkpoint exists, the experiment will resume from there.
-
 
         Example:
             >>> dataset = task.Dataset(train_path='~/data/train',
@@ -91,7 +89,7 @@ class ImageClassification(BaseTask):
         num_cpus = get_cpu_count() if num_cpus > get_cpu_count() else num_cpus
         num_gpus = get_gpu_count() if num_gpus > get_gpu_count() else num_gpus
 
-        train_image_classification.update(
+        train_image_classification.register_args(
             dataset=dataset,
             net=net,
             optimizer=optimizer,
@@ -114,18 +112,19 @@ class ImageClassification(BaseTask):
             'resume': resume,
             'visualizer': visualizer,
             'time_attr': 'epoch',
-            'reward_attr': 'reward',
+            'reward_attr': 'reward_attr',
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
-            'debug': debug,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
+                'searcher': 'random',
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        return BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
+        model_params = BaseTask.run_fit(train_image_classification, search_strategy,
+                                        scheduler_options)
 
     @classmethod
     def predict(cls, img):

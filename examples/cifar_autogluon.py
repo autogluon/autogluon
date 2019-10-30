@@ -22,6 +22,8 @@ def parse_args():
                         help='number of gpus to use.')
     parser.add_argument('--num-trials', default=10, type=int,
                         help='number of trail tasks')
+    parser.add_argument('--epochs', default=20, type=int,
+                        help='number of epochs')
     parser.add_argument('--scheduler', type=str, default='fifo',
                         help='scheduler name (default: fifo)')
     parser.add_argument('--checkpoint', type=str, default='checkpoint/cifar1.ag',
@@ -162,6 +164,8 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
+
+    train_cifar.update(epochs=args.epochs)
     # create searcher and scheduler
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.HyperbandScheduler(train_cifar,

@@ -19,7 +19,6 @@ def default_val_fn(net, batch, batch_fn, ctx):
 
 def default_train_fn(net, batch, batch_size, criterion, trainer, batch_fn, ctx):
     data, label = batch_fn(batch, ctx)
-    #net.collect_params().zero_grad()
     with mx.autograd.record():
         outputs = [net(X) for X in data]
         loss = [criterion(yhat, y) for yhat, y in zip(outputs, label)]

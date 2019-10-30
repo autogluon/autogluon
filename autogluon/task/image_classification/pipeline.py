@@ -14,6 +14,7 @@ from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from .nets import get_built_in_network
 from .dataset import get_built_in_dataset
+from ...utils.mxutils import collect_params
 
 __all__ = ['train_image_classification']
 
@@ -39,8 +40,6 @@ lr_schedulers = {
     hybridize=True,
     final_fit=False)
 def train_image_classification(args, reporter):
-    logger.debug('pipeline args: {}'.format(args))
-
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
     if type(args.net) == str:
@@ -126,8 +125,7 @@ def train_image_classification(args, reporter):
             metric.update(label, outputs)
 
         _, reward = metric.get()
-        if reporter:
-            reporter(epoch=epoch, reward=reward)
+        reporter(epoch=epoch, reward_attr=reward)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
@@ -135,7 +133,7 @@ def train_image_classification(args, reporter):
             test(epoch)
 
     if args.final_fit:
-        return net
+        return collect_params(net)
 
 def _train_val_split(train_dataset, split=1):
     # temporary solution, need to change using batchify function
