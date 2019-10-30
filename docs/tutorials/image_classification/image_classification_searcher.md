@@ -25,19 +25,19 @@ Recall that our goal in hyperparameter search is to identify the hyperparameter 
 The default searcher employed by AutoGluon is random search, which simply tries out new hyperparameter configurations drawn at random from the hyperparameter search space under consideration. You can specify that `task.fit` should employ random hyperparameter search simply by passing the string argument `search_strategy='random'` (although unnecessary as it is already the default option).
 
 ```{.python .input}
-results = task.fit(dataset,
-                   search_strategy='random',
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      search_strategy='random',
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      num_gpus=1)
 ```
 
 The resulting validation and test top-1 accuracy obtained through random search within the given `time_limits` and `epochs` constraints are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-test_acc = task.evaluate(test_dataset)
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -48,18 +48,18 @@ Instead of random search, AutoGluon can alternatively utilize the more sophistic
 You can specify `task.fit` should find hyperparameters via Bayesian optimization simply by passing the string argument `search_strategy='bayesopt'`:
 
 ```{.python .input}
-results = task.fit(dataset,
-                   search_strategy='bayesopt',
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      search_strategy='bayesopt',
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      num_gpus=1)
 ```
 
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `epochs` constraints) are:
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -68,15 +68,15 @@ print('Top-1 test acc: %.3f' % test_acc)
 For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
 
 ```{.python .input}
-results = task.fit(dataset,
+classifier = task.fit(dataset,
                    search_strategy='bayesopt', 
                    search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                    time_limits=time_limits,
                    epochs=epochs,
                    num_gpus=1)
 
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 

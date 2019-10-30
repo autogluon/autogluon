@@ -215,14 +215,14 @@ On your own, please feel free to try running the following commands with small t
 
 ```{.python .input}
 # time_limits = 10 * 60 # 10mins
-# results = task.fit(dataset, time_limits=time_limits,
-#                    num_gpus=1)
+# classifier = task.fit(dataset, time_limits=time_limits,
+#                       ngpus_per_trial=1)
 ```
 
 The top-1 accuracy of the best model on the validation set is:
 
 ```{.python .input}
-# print('Top-1 acc: %.3f' % results.reward)
+# print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
 ###  Using AutoGluon to generate predictions on test images 
@@ -231,7 +231,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
 ```{.python .input}
-# inds, probs = task.predict_batch('/home/ubuntu/data/shopeeiet/test')
+# inds, probs = classifier.predict('/home/ubuntu/data/shopeeiet/test')
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.

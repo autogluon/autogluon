@@ -29,18 +29,18 @@ dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 time_limits = 2*60
 epochs = 10
 
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
+# print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-test_acc = task.evaluate(test_dataset)
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -53,18 +53,18 @@ We could simply specify Hyperband via string name and use it in the `fit` functi
 ```{.python .input}
 search_strategy = 'hyperband'
 
-results = task.fit(dataset,
-                   search_strategy=search_strategy,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      search_strategy=search_strategy,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      num_gpus=1)
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -176,18 +176,18 @@ class MedianStoppingRule(object):
 Then we can use our defined scheduler:
 
 ```{.python .input}
-results = task.fit(dataset,
-                   search_strategy=MedianStopping_Scheduler,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      search_strategy=MedianStopping_Scheduler,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      num_gpus=1)
 ```
 
 Print the result:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 

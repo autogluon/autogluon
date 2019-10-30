@@ -35,18 +35,18 @@ epochs = 2
 We first again use the default arguments of the `fit` function to train the neural networks:
 
 ```{.python .input}
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 test_dataset = task.Dataset(test_path='~/data/test')
-test_acc = task.evaluate(test_dataset)
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -56,7 +56,7 @@ Recall that rather than training image classification models from scratch, AutoG
 
 ```{.python .input}
 print('Default Search Info:')
-print(results.metadata)
+print(classifier.results['metadata'])
 ```
 
 In general, we can expect fairly strong predictive performance using the default configurations in `fit`, if given enough computing resources and runtime.
@@ -87,8 +87,6 @@ import autogluon as ag
 # if net_list is provided
 import autogluon as ag
 nets = ag.space.Categorical('resnet18_v1', 'resnet34_v1','resnet50_v1')
-
-print(nets)
 
 print(nets)
 ```
@@ -145,7 +143,7 @@ Let's call `fit` with the Searcher and Scheduler specified above,
 and evaluate the resulting model on both validation and test datasets:
 
 ```{.python .input}
-results = task.fit(dataset,
+classifier = task.fit(dataset,
                    nets,
                    optimizers,
                    lr_scheduler=ag.Categorical('poly', 'cosine'),
@@ -158,8 +156,8 @@ results = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
-test_acc = task.evaluate(test_dataset)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -168,7 +166,7 @@ Let's now use the same image as used in :ref:`sec_imgquick` to generate a predic
 
 ```{.python .input}
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
-ind, prob = task.predict(image)
+ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
 ```

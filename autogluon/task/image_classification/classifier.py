@@ -1,4 +1,5 @@
 import os
+import math
 import pickle
 import mxnet as mx
 import matplotlib.pyplot as plt
@@ -56,7 +57,7 @@ class Classifier(BasePredictor):
     def save(self, checkpoint):
         save(self.state_dict(), checkpoint)
 
-    def predict(self, X, plot=True):
+    def predict(self, X, input_size=224, plot=True):
         """ This method should be able to produce predictions regardless if:
             X = single data example (e.g. single image, single document),
             X = batch of many examples, X = task.Dataset object
@@ -73,6 +74,8 @@ class Classifier(BasePredictor):
             plt.imshow(img.asnumpy())
             plt.show()
         # model inference
+        input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
+        resize = int(math.ceil(input_size / 0.875))
         transform_fn = transforms.Compose([
                 transforms.Resize(resize),
                 transforms.CenterCrop(input_size),
@@ -82,15 +85,15 @@ class Classifier(BasePredictor):
         img = transform_fn(img)
         proba = self.predict_proba(img)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
-        ind = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
+        idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
                           ind.astype('float32'))
-        return ind, F.gather_nd(proba, ind)
+        return ind, mx.nd.gather_nd(proba, idx)
 
     def predict_proba(self, X):
         """ Produces predicted class probabilities if we are dealing with a classification task.
             In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
         """
-        pred = self.model(img.expand_dims(0))
+        pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
@@ -106,7 +109,7 @@ class Classifier(BasePredictor):
         net = self.model
         batch_size = args.batch_size * max(len(ctx), 1)
         metric = get_metric_instance(args.metric)
-        input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
+        input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
         _, test_data, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, False)
         tbar = tqdm(enumerate(test_data))

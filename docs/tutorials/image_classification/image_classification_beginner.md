@@ -48,10 +48,10 @@ However, neural network training can be quite time-costly. To ensure quick runti
 ```{.python .input}
 time_limits = 3*60 # 3mins
 epochs = 10
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   num_gpus=1)
+classifier = task.fit(dataset,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      ngpus_per_trial=1)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
@@ -59,7 +59,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
@@ -68,7 +68,7 @@ We now construct a test dataset similarly as we did with the train dataset, and 
 
 ```{.python .input}
 test_dataset = task.Dataset(test_path='~/data/test')
-test_acc = task.evaluate(test_dataset)
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
@@ -76,7 +76,7 @@ Given an example image, we can easily use the final model to `predict` the label
 
 ```{.python .input}
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
-ind, prob = task.predict(image)
+ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
 ```
@@ -86,7 +86,7 @@ For example, we can inspect the best hyperparameter configuration corresponding 
 
 ```{.python .input}
 print('The best configuration is:')
-print(results.config)
+print(classifier.results['best_config'])
 ```
 
 This configuration is used to generate the above results.
