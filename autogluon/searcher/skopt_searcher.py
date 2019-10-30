@@ -88,7 +88,7 @@ class SKoptSearcher(BaseSearcher):
             skopt_hpspace.append(hp_dimension)
         self.bayes_optimizer = Optimizer(dimensions=skopt_hpspace, **kwargs)
     
-    def get_config(self, max_tries=1e2):
+    def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called to query a new configuration that has not yet been tried.
         Asks for one point at a time from skopt, up to max_tries. 
@@ -102,6 +102,7 @@ class SKoptSearcher(BaseSearcher):
             returns: (config, info_dict)
                 must return a valid configuration and a (possibly empty) info dict
         """
+        max_tries = kwargs.get('max_tries', 1e2)
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
             return self.default_config()
         try:
