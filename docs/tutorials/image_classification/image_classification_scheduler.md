@@ -32,7 +32,7 @@ epochs = 10
 classifier = task.fit(dataset,
                       time_limits=time_limits,
                       epochs=epochs,
-                      num_gpus=1)
+                      ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -57,7 +57,7 @@ classifier = task.fit(dataset,
                       search_strategy=search_strategy,
                       time_limits=time_limits,
                       epochs=epochs,
-                      num_gpus=1)
+                      ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -180,7 +180,7 @@ classifier = task.fit(dataset,
                       search_strategy=MedianStopping_Scheduler,
                       time_limits=time_limits,
                       epochs=epochs,
-                      num_gpus=1)
+                      ngpus_per_trial=1)
 ```
 
 Print the result:

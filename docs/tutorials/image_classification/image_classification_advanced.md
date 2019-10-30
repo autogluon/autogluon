@@ -150,7 +150,7 @@ classifier = task.fit(dataset,
                    search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=4,
-                   num_gpus=1)
+                   ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
