@@ -68,7 +68,7 @@ random_scheduler = ag.scheduler.FIFOScheduler(rl_simulation, rl_simulation.args,
                                               reward_attr="accuracy",
                                               resume=False)
 random_scheduler.run()
-random_scheduler.join_tasks()
+random_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(random_scheduler.get_best_config(), random_scheduler.get_best_reward()))
 ```
 
@@ -85,7 +85,7 @@ rl_scheduler = ag.scheduler.RLScheduler(rl_simulation,
                                         resume=False,
                                         sync=True)
 rl_scheduler.run()
-rl_scheduler.join_tasks()
+rl_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), rl_scheduler.get_best_reward()))
 ```
 
