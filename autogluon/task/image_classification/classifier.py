@@ -24,7 +24,7 @@ class Classifier(BasePredictor):
                  args, **kwargs):
         self.model = model
         self.eval_func = eval_func
-        self.results = results
+        self.results = self._format_results(results)
         self.scheduler_checkpoint = scheduler_checkpoint
         self.args = args
 
@@ -125,3 +125,29 @@ class Classifier(BasePredictor):
 
     def evaluate_predictions(self, y_true, y_pred):
         raise NotImplemented
+
+    @staticmethod
+    def _format_results(results):
+        def _merge_scheduler_history(training_history, config_history, reward_attr):
+            trial_info = {}
+            for tid, config in config_history.items():
+                trial_info[tid] = {}
+                trial_info[tid]['config'] = config
+                if tid in training_history:
+                    trial_info[tid]['history'] = training_history[tid]
+                    trial_info[tid]['metadata'] = {}
+
+                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
+                        last_history = training_history[tid][-1]
+                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
+                        trial_info[tid]['metadata'].update(last_history)
+            return trial_info
+
+        training_history = results.pop('training_history')
+        config_history = results.pop('config_history')
+        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
+                                                              results['reward_attr'])
+        results[results['reward_attr']] = results.pop('best_reward')
+        results['search_space'] = results['metadata'].pop('search_space')
+        results['search_strategy'] = results['metadata'].pop('search_strategy')
+        return results

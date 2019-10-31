@@ -49,7 +49,9 @@ class BaseTask(object):
         results.update(best_reward=best_reward, best_config=best_config,
                        total_time=total_time, metadata=scheduler.metadata,
                        training_history=scheduler.training_history,
-                       config_history=scheduler.config_history)
+                       config_history=scheduler.config_history,
+                       reward_attr=scheduler._reward_attr,
+                       args=args)
         return results
 
     @classmethod

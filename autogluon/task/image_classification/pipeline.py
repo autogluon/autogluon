@@ -57,7 +57,7 @@ def train_image_classification(args, reporter):
         for i, batch in enumerate(val_data):
             default_val_fn(net, batch, batch_fn, metric, ctx)
         _, reward = metric.get()
-        reporter(epoch=epoch, reward_attr=reward)
+        reporter(epoch=epoch, classification_reward=reward)
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
