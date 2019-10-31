@@ -7,6 +7,8 @@ import numpy as np
 from collections import OrderedDict
 import pandas as pd
 
+from .miscs import warning_filter
+
 __all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'mousover_plot']
 
 
@@ -80,15 +82,11 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
             hidden keys (list[str]): which keys of datadict NOT to show labels for.
     """
     try:
-        import warnings
-        # suppress deprecation warning
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        import bokeh
-        from bokeh.plotting import output_file, ColumnDataSource, show, figure
-        from bokeh.models import HoverTool, CategoricalColorMapper, LinearColorMapper, Legend, LegendItem, ColorBar
-        from bokeh.palettes import Category20
-        # re-enable deprecation warning
-        warnings.filterwarnings("default", category=DeprecationWarning)
+        with warning_filter():
+            import bokeh
+            from bokeh.plotting import output_file, ColumnDataSource, show, figure
+            from bokeh.models import HoverTool, CategoricalColorMapper, LinearColorMapper, Legend, LegendItem, ColorBar
+            from bokeh.palettes import Category20
         bokeh_imported = True
     except ImportError:
         bokeh_imported = False

@@ -5,6 +5,7 @@ from threading import Thread
 import multiprocessing as mp
 
 from .remote import Remote
+from ...utils import warning_filter
 
 __all__ = ['RemoteManager']
 
@@ -44,7 +45,8 @@ class RemoteManager(object):
     @classmethod
     def start_local_node(cls):
         port = cls.get_port_id()
-        remote = Remote.create_local_node(cls.MASTER_IP, port)
+        with warning_filter():
+            remote = Remote.create_local_node(cls.MASTER_IP, port)
         with cls.LOCK:
             cls.NODES[cls.MASTER_IP] = remote
 

@@ -5,16 +5,11 @@ import copy
 import logging
 from collections import OrderedDict
 
-# Suppress common skopt warning:
-import warnings
-warnings.filterwarnings("ignore", message="The objective has been evaluated at this point before.")
+from ..utils import warning_filter
 
-# for suppress skopt warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-from skopt import Optimizer
-from skopt.space import *
-# re-enable deprecation warning
-warnings.filterwarnings("default", category=DeprecationWarning)
+with warning_filter():
+    from skopt import Optimizer
+    from skopt.space import *
 
 from .searcher import BaseSearcher
 
