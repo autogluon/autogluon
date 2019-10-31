@@ -66,11 +66,11 @@ Creating a ENAS network using Sequential Block
 
 ```{.python .input}
 mynet = ENAS_Sequential(
-    ResUnit(1, 8, hidden_channels=ag.Categorical(4, 8), kernel=ag.Categorical(3, 5), stride=2),
-    ResUnit(8, 8, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=2),
-    ResUnit(8, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=2),
-    ResUnit(16, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=1, with_zero=True),
-    ResUnit(16, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=1, with_zero=True),
+    ResUnit(1, 8, hidden_channels=ag.space.Categorical(4, 8), kernel=ag.space.Categorical(3, 5), stride=2),
+    ResUnit(8, 8, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
+    ResUnit(8, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
+    ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
+    ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
     nn.GlobalAvgPool2D(),
     nn.Flatten(),
     nn.Activation('relu'),

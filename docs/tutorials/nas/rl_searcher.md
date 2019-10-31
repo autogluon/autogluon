@@ -51,8 +51,8 @@ AutoGluon searchable. The `reporter` is used to communicate with AutoGluon searc
 import autogluon as ag
 
 @ag.autogluon_register_args(
-    x=ag.Categorical(*list(range(100))),
-    y=ag.Categorical(*list(range(100))),
+    x=ag.space.Categorical(*list(range(100))),
+    y=ag.space.Categorical(*list(range(100))),
 )
 def rl_simulation(args, reporter):
     x, y = args.x, args.y

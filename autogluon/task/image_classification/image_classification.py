@@ -60,8 +60,8 @@ class ImageClassification(BaseTask):
 
         Args:
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.Categorical of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.Categorical of AutoGluonObject): optimizer candidates.
+            net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
+            optimizer (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): optimizer candidates.
             metric (str or object): observation metric.
             loss (object): training loss function.
             num_trials (int): number of trials in the experiment.
@@ -75,7 +75,7 @@ class ImageClassification(BaseTask):
             >>> dataset = task.Dataset(train_path='~/data/train',
             >>>                        test_path='data/test')
             >>> results = task.fit(dataset,
-            >>>                    nets=ag.Categorical['resnet18_v1', 'resnet34_v1'],
+            >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
             >>>                    time_limits=time_limits,
             >>>                    ngpus_per_trial=1,
             >>>                    num_trials = 4)

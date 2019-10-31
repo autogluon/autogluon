@@ -231,7 +231,7 @@ class Categorical(NestedSpace):
         data: the choice candidates
 
     Example:
-        >>> net = ag.Categorical('resnet50', 'resnet101')
+        >>> net = ag.space.Categorical('resnet50', 'resnet101')
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -329,7 +329,7 @@ class Int(SimpleSpace):
         default (optional): default value
 
     Example:
-        >>> learning_rate = ag.Int(0, 100)
+        >>> learning_rate = ag.space.Int(0, 100)
     """
     def __init__(self, lower, upper, default=None):
         self.lower = lower

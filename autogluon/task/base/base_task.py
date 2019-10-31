@@ -47,7 +47,9 @@ class BaseTask(object):
         results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
         results.update(best_reward=best_reward, best_config=best_config,
-                       total_time=total_time, metadata=scheduler.metadata)
+                       total_time=total_time, metadata=scheduler.metadata,
+                       training_history=scheduler.training_history,
+                       config_history=scheduler.config_history)
         return results
 
     @classmethod

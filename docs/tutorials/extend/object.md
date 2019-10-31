@@ -35,8 +35,8 @@ ag.utils.plot_network(net, (1, 3, 32, 32))
 
 ```{.python .input}
 @ag.autogluon_object(
-    nstage1=ag.Int(2, 4),
-    nstage2=ag.Int(2, 4),
+    nstage1=ag.space.Int(2, 4),
+    nstage2=ag.space.Int(2, 4),
 )
 class MyCifarResNet(CIFARResNetV1):
     def __init__(self, nstage1, nstage2):
@@ -57,7 +57,7 @@ We can also overwrite existing search spaces:
 
 ```{.python .input}
 mynet1 = MyCifarResNet(nstage1=1,
-                       nstage2=ag.Int(5, 10))
+                       nstage2=ag.space.Int(5, 10))
 print(mynet1.cs)
 ```
 

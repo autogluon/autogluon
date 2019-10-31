@@ -152,7 +152,7 @@ def autogluon_function(**kwvars):
     Example:
         >>> from gluoncv.model_zoo import get_model
         >>> 
-        >>> @ag.autogluon_function(pretrained=ag.Categorical(True, False))
+        >>> @ag.autogluon_function(pretrained=ag.space.Categorical(True, False))
         >>> def cifar_resnet(pretrained):
         >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
@@ -192,8 +192,8 @@ def autogluon_object(**kwvars):
         >>> from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
         >>>
         >>> @autogluon_object(
-        >>>     learning_rate=ag.LogLinear(1e-4, 1e-1),
-        >>>     wd=ag.Linear(1e-4, 1e-1),
+        >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
+        >>>     wd=ag.space.Real(1e-4, 1e-1),
         >>> )
         >>> class Adam(optim.Adam):
         >>>     pass

@@ -3,8 +3,8 @@ import autogluon as ag
 from autogluon import ImageClassification as task
 
 @ag.autogluon_object(
-    width_coefficient=ag.Categorical(1.1, 1.2),
-    depth_coefficient=ag.Categorical(1.1, 1.2),
+    width_coefficient=ag.space.Categorical(1.1, 1.2),
+    depth_coefficient=ag.space.Categorical(1.1, 1.2),
 )
 class EfficientNetB1(ag.nas.EfficientNet):
     def __init__(self, width_coefficient, depth_coefficient):

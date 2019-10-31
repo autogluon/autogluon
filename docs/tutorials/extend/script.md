@@ -118,7 +118,7 @@ from autogluon.utils.mxutils import get_data_rec
     input_size=ag.Choice(224, 256),
     crop_ratio=0.875,
     jitter_param=ag.Linear(0.1, 0.4),
-    max_rotate_angle=ag.Int(0, 10),
+    max_rotate_angle=ag.space.Int(0, 10),
 )
 def train_finetune(args, reporter):
     return train_loop(args, reporter)
