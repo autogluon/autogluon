@@ -86,6 +86,14 @@ class BaseSearcher(object):
         """
         pass
 
+    def remove_case(self, config, reward, **kwargs):
+        """Remove data case previously appended by update
+
+        For searchers which maintain the dataset of all cases (reports) passed
+        to update, this method allows to remove one case from the dataset.
+        """
+        pass
+
     def get_best_reward(self):
         with self.LOCK:
             if len(self._results) > 0:

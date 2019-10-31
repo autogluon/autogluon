@@ -50,6 +50,11 @@ class GPMultiFidelitySearcher(BaseSearcher):
             config_cs = self._to_config_cs(config)
             self.gp_searcher.register_pending(config_cs, milestone)
 
+    def remove_case(self, config, reward, **kwargs):
+        with self.LOCK:
+            config_cs = self._to_config_cs(config)
+            self.gp_searcher.remove_case(config_cs, reward, **kwargs)
+
     def _to_config_cs(self, config):
         return CS.Configuration(self.gp_searcher.hp_ranges.config_space,
                                 values=config)
