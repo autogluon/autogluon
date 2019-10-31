@@ -110,7 +110,7 @@ sgd_opt = ag.optimizer.SGD(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
                            wd=ag.space.Real(1e-6, 1e-2, log=True))
 adam_opt = ag.optimizer.Adam(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
                              wd=ag.space.Real(1e-6, 1e-2, log=True))
-optimizers = ag.space.space.Categorical(sgd_opt, adam_opt)
+optimizers = ag.space.Categorical(sgd_opt, adam_opt)
 
 print(optimizers)
 ```
