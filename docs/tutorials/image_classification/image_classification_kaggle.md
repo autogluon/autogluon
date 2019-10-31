@@ -260,3 +260,9 @@ To see an example submission, check out the file `sample submission.csv` at this
 To make your own submission, click [Submission](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/submit)
 and then follow the steps in the submission page (upload submission file, describe the submission,
 and click the `Make Submission` button). Let's see how your model fares in this competition!
+
+
+Finish and exit:
+```{.python .input}
+# ag.done()
+```

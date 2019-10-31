@@ -174,3 +174,8 @@ print('The input picture is classified as [%s], with probability %.2f.' %
 
 Beyond what we described here, there are many other aspects of `fit` that an advanced user can control.
 For that, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```

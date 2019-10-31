@@ -189,3 +189,8 @@ print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 For more complete usage of `fit` function, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```

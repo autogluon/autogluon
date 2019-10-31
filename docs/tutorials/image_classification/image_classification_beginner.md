@@ -89,4 +89,9 @@ print('The best configuration is:')
 print(classifier.results['best_config'])
 ```
 
-This configuration is used to generate the above results.
+This configuration was used to generate the above results.
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```
