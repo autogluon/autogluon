@@ -105,12 +105,12 @@ Additionally, the momentum in `SGD` is configured as another continuous search s
 
 
 ```{.python .input}
-sgd_opt = ag.optimizer.SGD(learning_rate=ag.LogLinear(1e-4, 1e-1),
-                           momentum=ag.Linear(0.85, 0.95),
-                           wd=ag.LogLinear(1e-6, 1e-2))
-adam_opt = ag.optimizer.Adam(learning_rate=ag.LogLinear(1e-4, 1e-1),
-                             wd=ag.LogLinear(1e-6, 1e-2))
-optimizers = ag.space.Categorical(sgd_opt, adam_opt)
+sgd_opt = ag.optimizer.SGD(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
+                           momentum=ag.space.Real(0.85, 0.95),
+                           wd=ag.space.Real(1e-6, 1e-2, log=True))
+adam_opt = ag.optimizer.Adam(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
+                             wd=ag.space.Real(1e-6, 1e-2, log=True))
+optimizers = ag.space.space.Categorical(sgd_opt, adam_opt)
 
 print(optimizers)
 ```
@@ -146,7 +146,7 @@ and evaluate the resulting model on both validation and test datasets:
 classifier = task.fit(dataset,
                    nets,
                    optimizers,
-                   lr_scheduler=ag.Categorical('poly', 'cosine'),
+                   lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                    search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=4,
