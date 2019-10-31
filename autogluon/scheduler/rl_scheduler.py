@@ -10,14 +10,18 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from ..utils import save, load
-from ..utils import mkdir, try_import_mxboard
+from ..utils import (save, load, in_ipynb, mkdir, try_import_mxboard)
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
 from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
+
+if in_ipynb():
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
 
 __all__ = ['RLScheduler']
 
@@ -116,7 +120,7 @@ class RLScheduler(FIFOScheduler):
 
     def run_sync(self):
         decay = self.ema_baseline_decay
-        for i in range(self.num_trials // self.controller_batch_size + 1):
+        for i in tqdm(range(self.num_trials // self.controller_batch_size + 1)):
             with mx.autograd.record():
                 # sample controller_batch_size number of configurations
                 batch_size = self.num_trials % self.num_trials \
@@ -160,7 +164,8 @@ class RLScheduler(FIFOScheduler):
                             DistributedResource(**self.resource))
                 # start training task
                 reporter = DistStatusReporter()
-                task_thread = self.add_task(task, reporter)
+                task.args['reporter'] = reporter
+                task_thread = self.add_job(task)
 
                 # run reporter
                 last_result = None
@@ -216,15 +221,14 @@ class RLScheduler(FIFOScheduler):
     def sync_schedule_tasks(self, configs):
         rewards = []
         results = {}
-        def _run_reporter(task, task_thread, reporter):
+        def _run_reporter(task, task_job, reporter):
             last_result = None
             config = task.args['config']
-            while task_thread.is_alive():
+            while not task_job.done():
                 reported_result = reporter.fetch()
                 #print('reported_result', reported_result)
                 if 'done' in reported_result and reported_result['done'] is True:
                     reporter.move_on()
-                    task_thread.join()
                     break
                 self.add_training_result(task.task_id, reported_result, task.args['config'])
                 reporter.move_on()
@@ -236,24 +240,25 @@ class RLScheduler(FIFOScheduler):
 
         # launch the tasks
         tasks = []
-        task_threads = []
+        task_jobs = []
         reporter_threads = []
         for config in configs:
             logger.debug('scheduling config: {}'.format(config))
             # create task
             task = Task(self.train_fn, {'args': self.args, 'config': config},
                         DistributedResource(**self.resource))
-            tasks.append(task)
             reporter = DistStatusReporter()
-            task_thread = self.add_task(task, reporter)
+            task.args['reporter'] = reporter
+            task_job = self.add_job(task)
             # run reporter
-            reporter_thread = threading.Thread(target=_run_reporter, args=(task, task_thread, reporter))
+            reporter_thread = threading.Thread(target=_run_reporter, args=(task, task_job, reporter))
             reporter_thread.start()
-            task_threads.append(task_thread)
+            tasks.append(task)
+            task_jobs.append(task_job)
             reporter_threads.append(reporter_thread)
 
-        for p1, p2 in zip(task_threads, reporter_threads):
-            p1.join()
+        for p1, p2 in zip(task_jobs, reporter_threads):
+            p1.result()
             p2.join()
         with self.LOCK:
             for task in tasks:
@@ -268,7 +273,7 @@ class RLScheduler(FIFOScheduler):
 
         return rewards
 
-    def add_task(self, task, **kwargs):
+    def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -276,12 +281,12 @@ class RLScheduler(FIFOScheduler):
         """
         cls = RLScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        task.args['reporter'] = kwargs.get('reporter')
         # main process
-        task_thread = threading.Thread(target=cls._start_distributed_task, args=(
-                                       task, cls.RESOURCE_MANAGER, self.env_sem))
-        task_thread.start()
-        return task_thread
+        #task_thread = threading.Thread(target=cls._start_distributed_job, args=(
+        #                               task, cls.RESOURCE_MANAGER, self.env_sem))
+        #task_thread.start()
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        return job
 
     def join_tasks(self):
         pass

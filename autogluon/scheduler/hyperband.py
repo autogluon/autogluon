@@ -132,7 +132,7 @@ class HyperbandScheduler(FIFOScheduler):
                 "type '{}' not supported, must be 'stopping' or 'promotion'".format(
                     type))
 
-    def add_task(self, task, **kwargs):
+    def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -180,7 +180,7 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], next_milestone)
 
         # main process
-        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         # reporter thread
         rp = threading.Thread(target=self._run_reporter,
                               args=(task, job, reporter, self.searcher, self.terminator,

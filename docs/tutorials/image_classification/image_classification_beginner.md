@@ -9,9 +9,9 @@ Besides, you could easily specify for greater control over the training process 
 We begin by specifying `image_classification` as our task of interest:
 
 ```{.python .input}
+import autogluon as ag
 from autogluon import ImageClassification as task
 ```
-
 
 ## Create AutoGluon Dataset
 

@@ -12,6 +12,6 @@ net.evaluate_latency(x)
 
 print('average latency is ', net.avg_latency)
 
-scheduler = ENAS_Scheduler(net, train_set='imagenet')
+scheduler = ENAS_Scheduler(net, train_set='imagenet', num_gpus=8, num_cpu=16)
 scheduler.run()
 

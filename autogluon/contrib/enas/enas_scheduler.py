@@ -29,13 +29,14 @@ class ENAS_Scheduler(object):
     def __init__(self, supernet, train_set='imagenet', val_set=None,
                  train_fn=default_train_fn, eval_fn=default_val_fn,
                  train_args={}, val_args={}, reward_fn= default_reward_fn,
-                 num_gpus=get_gpu_count(),
-                 num_cpu=get_cpu_count(), batch_size=256,
-                 epochs=120, warmup_epochs=5,
+                 num_gpus=1, num_cpus=4,
+                 batch_size=256, epochs=120, warmup_epochs=5,
                  controller_lr=0.01, controller_type='lstm',
                  controller_batch_size=10, ema_baseline_decay=0.95,
                  update_arch_frequency=20, checkname='./enas/checkpoint.ag',
                  plot_frequency=0, **kwargs):
+        num_cpus = get_cpu_count() if num_cpus > get_cpu_count() else num_cpus
+        num_gpus = get_gpu_count() if num_gpus > get_gpu_count() else num_gpus
         ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu(0)]
         supernet.collect_params().reset_ctx(ctx)
         supernet.hybridize()
@@ -47,16 +48,18 @@ class ENAS_Scheduler(object):
         self.checkname = checkname
         self.plot_frequency = plot_frequency
         if isinstance(train_set, str):
-            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size, shuffle=True).init()
-            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size, shuffle=True).init()
+            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
+                                             num_worker=num_cpus, shuffle=True).init()
+            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
+                                           num_worker=num_cpus, shuffle=True).init()
         if isinstance(train_set, gluon.data.Dataset):
             self.train_data = DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,
-                    last_batch="discard", num_workers=num_cpu)
+                    last_batch="discard", num_workers=num_cpus)
             # very important, make shuffle for training contoller
             self.val_data = DataLoader(
                     val_set, batch_size=batch_size, shuffle=True,
-                    num_workers=num_cpu, prefetch=0, sample_times=controller_batch_size)
+                    num_workers=num_cpus, prefetch=0, sample_times=controller_batch_size)
         else:
             self.train_data = train_set
             self.val_data = val_set

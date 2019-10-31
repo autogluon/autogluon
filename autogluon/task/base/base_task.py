@@ -37,7 +37,7 @@ class BaseTask(object):
             scheduler_options['searcher'] = 'random'
         scheduler = scheduler(train_fn, **scheduler_options)
         scheduler.run()
-        scheduler.join_tasks()
+        scheduler.join_jobs()
         # gather the best configuration
         best_reward = scheduler.get_best_reward()
         best_config = scheduler.get_best_config()

@@ -23,12 +23,9 @@ We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.s
 ```{.python .input}
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
 
-time_limits = 2*60
-epochs = 10
-
 classifier = task.fit(dataset,
-                      time_limits=time_limits,
-                      epochs=epochs,
+                      time_limits=2*60,
+                      epochs=10,
                       ngpus_per_trial=1)
 ```
 
@@ -52,8 +49,8 @@ search_strategy = 'hyperband'
 
 classifier = task.fit(dataset,
                       search_strategy=search_strategy,
-                      time_limits=time_limits,
-                      epochs=epochs,
+                      time_limits=2*60,
+                      epochs=10,
                       ngpus_per_trial=1)
 ```
 
@@ -63,134 +60,4 @@ The validation and test top-1 accuracy are:
 print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
-```
-
-## Create your own trial scheduler
-
-We could also create our own trial scheduler. Here is an example of creating the Median Stopping scheduler. It is a simple stopping rule, which stops the trials with the rewards less than the median of the rewards at the same number of iters in the history.
-
-
-```{.python .input}
-import collections
-import numpy as np
-import multiprocessing as mp
-from autogluon.scheduler import HyperbandScheduler
-
-
-class MedianStopping_Scheduler(HyperbandScheduler):
-    def __init__(self, train_fn, resource,
-                 searcher='random',
-                 search_options={},
-                 checkpoint='./exp/checkerpoint.ag', 
-                 resume=False,
-                 num_trials=None,
-                 time_out=None,
-                 time_attr="training_epoch",
-                 reward_attr="accuracy",
-                 visualizer='tensorboard',
-                 mode="max",
-                 grace_period=1.0,
-                 min_samples_required=3,
-                 dist_ip_addrs=[]):
-        super(MedianStopping_Scheduler, self).__init__(train_fn=train_fn, resource=resource, searcher=searcher,
-                                                       search_options=search_options, checkpoint=checkpoint,
-                                                       resume=resume, num_trials=num_trials, time_out=time_out,
-                                                       time_attr=time_attr, reward_attr=reward_attr,
-                                                       visualizer=visualizer, dist_ip_addrs=dist_ip_addrs)
-        self.terminator = MedianStoppingRule(time_attr, reward_attr, mode, grace_period,
-                                             min_samples_required)
-    def state_dict(self, destination=None):
-        pass
-
-class MedianStoppingRule(object):
-    LOCK = mp.Lock()
-    def __init__(self,
-                 time_attr="training_epoch",
-                 reward_attr="accuracy",
-                 mode="max",
-                 grace_period=1,
-                 min_samples_required=3):
-        self._time_attr = time_attr
-        self._reward_attr = reward_attr
-        self._stopped_tasks = set()
-        self._completed_tasks = set()
-        self._results = collections.defaultdict(list)
-        self._grace_period = grace_period
-        self._min_samples_required = min_samples_required
-        self._metric = reward_attr
-        if mode == "max":
-            self._metric_op = 1.
-        elif mode == "min":
-            self._metric_op = -1.
- 
-    def on_task_add(self, task):
-        pass
- 
-    def on_task_report(self, task, result):
-        # return True/False, which indicates whether we want to continue
-        time = result[self._time_attr]
-        self._results[task].append(result)
-        median_result = self._get_median_result(time)
-        best_result = self._best_result(task)
- 
-        if best_result < median_result and time > self._grace_period:
-            self._stopped_tasks.add(task)
-            return False
-        else:
-            return True
-
-    def on_task_complete(self, task, result):
-        self._results[task].append(result)
-        self._completed_tasks.add(task)
-
-    def on_task_remove(self, task):
-        if task in self._results:
-            self._completed_tasks.add(task)
-
-    def _get_median_result(self, time):
-        scores = []
-        for task in self._completed_tasks:
-            scores.append(self._running_result(task, time))
-        if len(scores) >= self._min_samples_required:
-            return np.median(scores)
-        else:
-            return float("-inf")
-
-    def _running_result(self, task, t_max=float("inf")):
-        results = self._results[task]
-        return np.max([self._metric_op * r[self._metric] 
-                       for r in results if r[self._time_attr] <= t_max])
-
-    def _best_result(self, task):
-        results = self._results[task]
-        return max(self._metric_op * r[self._metric] for r in results)
-
-    def __repr__(self):
-        return "MedianStoppingRule: num_stopped={}.".format(
-            len(self._stopped_tasks))
-```
-
-Then we can use our defined scheduler:
-
-```{.python .input}
-classifier = task.fit(dataset,
-                      search_strategy=MedianStopping_Scheduler,
-                      time_limits=time_limits,
-                      epochs=epochs,
-                      ngpus_per_trial=1)
-```
-
-Print the result:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
-
-For more complete usage of `fit` function, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
-
-Finish and exit:
-```{.python .input}
-ag.done()
 ```

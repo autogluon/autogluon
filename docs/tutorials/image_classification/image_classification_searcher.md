@@ -7,6 +7,7 @@ Beyond simply specifying the space of hyperparameter configurations to search ov
 We again begin by informing AutoGluon that `image_classification` is the task of interest, and  use the same subset of the `Shopee-IET` dataset as before (recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed).  To ensure this tutorial runs quickly, we heavily constrain the allowed time-limits and number of training epochs.
 
 ```{.python .input}
+import autogluon as ag
 from autogluon import ImageClassification as task
 
 dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
@@ -55,7 +56,7 @@ classifier = task.fit(dataset,
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `epochs` constraints) are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % results.reward)
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

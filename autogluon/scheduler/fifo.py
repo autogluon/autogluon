@@ -158,7 +158,7 @@ class FIFOScheduler(TaskScheduler):
         """Schedule next searcher suggested task
         """
         # Allow for the promotion of a previously chosen config. Also,
-        # extra_kwargs contains extra info passed to both add_task and to
+        # extra_kwargs contains extra info passed to both add_job and to
         # get_config (if no config is promoted)
         config, extra_kwargs = self._promote_config()
         if config is None:
@@ -170,7 +170,7 @@ class FIFOScheduler(TaskScheduler):
             extra_kwargs['new_config'] = False
         task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
-        self.add_task(task, **extra_kwargs)
+        self.add_job(task, **extra_kwargs)
 
     def run_with_config(self, config):
         """Run with config for final fit.
@@ -180,7 +180,7 @@ class FIFOScheduler(TaskScheduler):
                     DistributedResource(**self.resource))
         reporter = FakeReporter()
         task.args['reporter'] = reporter
-        return self.run_task(task)
+        return self.run_job(task)
 
     def _dict_from_task(self, task):
         if isinstance(task, Task):
@@ -189,7 +189,7 @@ class FIFOScheduler(TaskScheduler):
             assert isinstance(task, dict)
             return {'TASK_ID': task['TASK_ID'], 'Config': task['Config']}
 
-    def add_task(self, task, **kwargs):
+    def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -203,7 +203,7 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         # reporter thread
         rp = threading.Thread(target=self._run_reporter, args=(task, job, reporter,
                               self.searcher), daemon=False)
@@ -325,4 +325,3 @@ class FIFOScheduler(TaskScheduler):
 
 
 DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')
-

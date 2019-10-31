@@ -109,7 +109,7 @@ reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1
 Construct experiment scheduler, which automatically cretes a RL controller based on user defined search space.
 
 ```{.python .input}
-scheduler = ENAS_Scheduler(mynet, train_set='mnist', num_cpu=4,
+scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
                            plot_frequency=1, update_arch_frequency=5)
@@ -130,7 +130,7 @@ mynet.graph
 
 ```{.python .input}
 reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.5)
-scheduler = ENAS_Scheduler(mynet, train_set='mnist', num_cpu=4,
+scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
                            plot_frequency=1, update_arch_frequency=5)

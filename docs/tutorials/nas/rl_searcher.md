@@ -94,8 +94,8 @@ print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), 
 Get the result history:
 
 ```{.python .input}
-results_rl = [v[0] for v in rl_scheduler.training_history.values()]
-results_random = [v[0] for v in random_scheduler.training_history.values()]
+results_rl = [v[0]['accuracy'] for v in rl_scheduler.training_history.values()]
+results_random = [v[0]['accuracy'] for v in random_scheduler.training_history.values()]
 ```
 
 Average result every 10 trials:

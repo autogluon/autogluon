@@ -30,7 +30,7 @@ class TaskScheduler(object):
         >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
         >>> task = Task(my_task, {}, resource)
         >>> scheduler = TaskScheduler()
-        >>> scheduler.add_task(task)
+        >>> scheduler.add_job(task)
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
@@ -69,6 +69,9 @@ class TaskScheduler(object):
             return {'TASK_ID': task['TASK_ID'], 'Args': task['Args']}
 
     def add_task(self, task, **kwargs):
+        self.add_job(task, **kwargs)
+
+    def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler (Async).
 
         Args:
@@ -77,24 +80,24 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         with self.LOCK:
             new_dict = self._dict_from_task(task)
             new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
 
-    def run_task(self, task):
+    def run_job(self, task):
         """Run a training task to the scheduler (Sync).
         """
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_task(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         return job.result()
 
     @staticmethod
-    def _start_distributed_task(task, resource_manager, env_sem):
+    def _start_distributed_job(task, resource_manager, env_sem):
         logger.debug('\nScheduling {}'.format(task))
-        job = task.resources.node.submit(TaskScheduler._run_dist_task,
+        job = task.resources.node.submit(TaskScheduler._run_dist_job,
                                          task.fn, task.args, task.resources.gpu_ids,
                                          env_sem)
         def _release_resource_callback(fut):
@@ -103,7 +106,7 @@ class TaskScheduler(object):
         return job
 
     @staticmethod
-    def _run_dist_task(fn, args, gpu_ids, env_semaphore):
+    def _run_dist_job(fn, args, gpu_ids, env_semaphore):
         """Executing the task
         """
         # create local communicator
@@ -171,6 +174,8 @@ class TaskScheduler(object):
                 self.scheduled_tasks = new_scheduled_tasks
 
     def join_tasks(self):
+        warn("scheduler.join_tasks() is now deprecated in favor of scheduler.join_jobs().",
+             AutoGluonWarning)
         self.join_jobs()
 
     def join_jobs(self):
@@ -185,7 +190,7 @@ class TaskScheduler(object):
         """
         warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
              AutoGluonWarning)
-        self.join_tasks()
+        self.join_jobs()
         self.REMOTE_MANAGER.shutdown()
 
     def state_dict(self, destination=None):
