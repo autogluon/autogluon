@@ -3,6 +3,7 @@ import os
 import pickle
 import logging
 import subprocess
+from warnings import warn
 from threading import Thread
 import multiprocessing as mp
 from collections import OrderedDict
@@ -11,7 +12,7 @@ from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
 from .reporter import StatusReporter, Communicator, DistSemaphore
-from ..utils import DeprecationHelper
+from ..utils import DeprecationHelper, AutoGluonWarning
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class TaskScheduler(object):
         >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
         >>> task = Task(my_task, {}, resource)
         >>> scheduler = TaskScheduler()
-        >>> scheduler.add_task(task)
+        >>> scheduler.add_job(task)
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
@@ -68,7 +69,10 @@ class TaskScheduler(object):
             return {'TASK_ID': task['TASK_ID'], 'Args': task['Args']}
 
     def add_task(self, task, **kwargs):
-        """Adding a training task to the scheduler.
+        self.add_job(task, **kwargs)
+
+    def add_job(self, task, **kwargs):
+        """Adding a training task to the scheduler (Async).
 
         Args:
             task (autogluon.scheduler.Task): a new trianing task
@@ -76,25 +80,33 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        p = Thread(target=cls._start_distributed_task, args=(
-                   task, cls.RESOURCE_MANAGER, self.env_sem))
-        p.start()
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         with self.LOCK:
             new_dict = self._dict_from_task(task)
-            new_dict['Process'] = p
+            new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
 
-    @staticmethod
-    def _start_distributed_task(task, resource_manager, env_sem):
-        logger.debug('\nScheduling {}'.format(task))
-        job = task.resources.node.submit(TaskScheduler._run_dist_task,
-                                         task.fn, task.args, task.resources.gpu_ids,
-                                         env_sem)
-        job.result()
-        resource_manager._release(task.resources)
+    def run_job(self, task):
+        """Run a training task to the scheduler (Sync).
+        """
+        cls = TaskScheduler
+        cls.RESOURCE_MANAGER._request(task.resources)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        return job.result()
 
     @staticmethod
-    def _run_dist_task(fn, args, gpu_ids, env_semaphore):
+    def _start_distributed_job(task, resource_manager, env_sem):
+        logger.debug('\nScheduling {}'.format(task))
+        job = task.resources.node.submit(TaskScheduler._run_dist_job,
+                                         task.fn, task.args, task.resources.gpu_ids,
+                                         env_sem)
+        def _release_resource_callback(fut):
+            resource_manager._release(task.resources)
+        job.add_done_callback(_release_resource_callback)
+        return job
+
+    @staticmethod
+    def _run_dist_job(fn, args, gpu_ids, env_semaphore):
         """Executing the task
         """
         # create local communicator
@@ -106,6 +118,13 @@ class TaskScheduler(object):
         terminator_semaphore = None
         if 'terminator_semaphore' in args:
             terminator_semaphore = args.pop('terminator_semaphore')
+
+        manager = mp.Manager()
+        return_list = manager.list()
+        def _worker(return_list, **kwargs):
+            ret = fn(**kwargs)
+            return_list.append(ret)
+
         try:
             env_semaphore.acquire()
             if len(gpu_ids) > 0:
@@ -113,7 +132,7 @@ class TaskScheduler(object):
                 os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
                 os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
             # start local progress
-            p = mp.Process(target=fn, kwargs=args)
+            p = mp.Process(target=_worker, args=(return_list,), kwargs=args)
             p.start()
             env_semaphore.release()
             if 'reporter' in args:
@@ -125,13 +144,18 @@ class TaskScheduler(object):
                         p.kill()
                         p.join()
                     else:
-                        subprocess.run(['kill', '-9', str(p.pid)])
-                        subprocess.run(['kill', '-9', str(p.pid)])
+                        try:
+                            subprocess.run(['kill', '-9', str(p.pid)])
+                            subprocess.run(['kill', '-9', str(p.pid)])
+                        except Exception:
+                            pass
                         p.join()
             else:
                 p.join()
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
+        ret = return_list[0] if len(return_list) > 0 else None
+        return ret
 
 
     def _clean_task_internal(self, task_dict):
@@ -141,7 +165,7 @@ class TaskScheduler(object):
         with self.LOCK:
             new_scheduled_tasks = []
             for task_dict in self.scheduled_tasks:
-                if not task_dict['Process'].is_alive():
+                if task_dict['Job'].done():
                     self._clean_task_internal(task_dict)
                     self.finished_tasks.append(self._dict_from_task(task_dict))
                 else:
@@ -150,23 +174,31 @@ class TaskScheduler(object):
                 self.scheduled_tasks = new_scheduled_tasks
 
     def join_tasks(self):
+        warn("scheduler.join_tasks() is now deprecated in favor of scheduler.join_jobs().",
+             AutoGluonWarning)
+        self.join_jobs()
+
+    def join_jobs(self):
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
-            task_dict['Process'].join()
+            task_dict['Job'].result()
             self._clean_task_internal(task_dict)
+        self._cleaning_tasks()
 
     def shutdown(self):
-        self.join_tasks()
+        """shutdown() is now deprecated in favor of :function:`autogluon.done`.
+        """
+        warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
+             AutoGluonWarning)
+        self.join_jobs()
         self.REMOTE_MANAGER.shutdown()
 
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
         """
-        #self._cleaning_tasks()
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
-        logger.debug('\nState_Dict self.finished_tasks: {}'.format(self.finished_tasks))
         destination['finished_tasks'] = pickle.dumps(self.finished_tasks)
         destination['TASK_ID'] = Task.TASK_ID.value
         return destination

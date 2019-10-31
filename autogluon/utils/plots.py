@@ -7,6 +7,8 @@ import numpy as np
 from collections import OrderedDict
 import pandas as pd
 
+from .miscs import warning_filter
+
 __all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'mousover_plot']
 
 
@@ -21,14 +23,15 @@ def plot_performance_vs_trials(results, output_directory, filename="PerformanceV
         warnings.warn('AutoGluon summary plots cannot be created because matplotlib is not installed. Please do: "pip install matplotlib"')
         return None
     
-    ordered_val_perfs = [self.results['trial_info'][trial_id]['validation_perf'] for trial_id in ordered_trials]
-    x = range(len(ordered_trials))
+    ordered_trials = sorted(list(results['trial_info'].keys()))
+    ordered_val_perfs = [results['trial_info'][trial_id][results['reward_attr']] for trial_id in ordered_trials]
+    x = range(1, len(ordered_trials)+1)
     y = []
     for i in x:
         y.append(max([ordered_val_perfs[j] for j in range(i)])) # best validation performance in trials up until ith one (assuming higher = better)
     fig, ax = plt.subplots()
     ax.plot(x, y)
-    ax.set(xlabel='Completed Trials', ylabel='Best Validation Performance')
+    ax.set(xlabel='Completed Trials', ylabel='Best Performance')
     if output_directory is not None:
         fig.savefig(output_directory + filename)
     plt.show()
@@ -40,13 +43,16 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     attr_color = None
     attr_size = None
     datadict = {'trial_id': sorted(results['trial_info'].keys())}
-    datadict['validation_performance'] = [results['trial_info'][trial_id]['validation_perf'] for trial_id in datadict['trial_id']]
+    datadict['performance'] = [results['trial_info'][trial_id][results['reward_attr']] for trial_id in datadict['trial_id']]
     datadict['hyperparameters'] = [str(results['trial_info'][trial_id]['config']) for trial_id in datadict['trial_id']]
     
     # Determine x-axis attribute:
     if 'latency' in results['metadata']:
         datadict['latency'] = [results['trial_info'][trial_id]['metadata']['latency'] for trial_id in datadict['trial_id']]
         attr_x = 'latency'
+    else:
+        attr_x = list(results['best_config'].keys())[0]
+        datadict[attr_x] = [results['trial_info'][trial_id]['config'][attr_x] for trial_id in datadict['trial_id']]
     
     # Determine size attribute:
     if 'memory' in results['metadata']:
@@ -58,8 +64,9 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
         datadict['training_loss'] = [results['trial_info'][trial_id]['training_loss'] for trial_id in datadict['trial_id']]
         attr_color = 'training_loss'
     
-    mousover_plot(datadict, attr_x=attr_x, attr_y='validation_perf', attr_color=attr_color, 
-                  attr_size=attr_size, save_file=output_directory+save_file, plot_title=plot_title)
+    save_path = output_directory + save_file if output_directory else None
+    mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
+                  attr_size=attr_size, save_file=save_path, plot_title=plot_title)
 
 
 def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, save_file=None, plot_title="",
@@ -80,10 +87,11 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
             hidden keys (list[str]): which keys of datadict NOT to show labels for.
     """
     try:
-        import bokeh
-        from bokeh.plotting import output_file, ColumnDataSource, show, figure
-        from bokeh.models import HoverTool, CategoricalColorMapper, LinearColorMapper, Legend, LegendItem, ColorBar
-        from bokeh.palettes import Category20
+        with warning_filter():
+            import bokeh
+            from bokeh.plotting import output_file, ColumnDataSource, show, figure
+            from bokeh.models import HoverTool, CategoricalColorMapper, LinearColorMapper, Legend, LegendItem, ColorBar
+            from bokeh.palettes import Category20
         bokeh_imported = True
     except ImportError:
         bokeh_imported = False

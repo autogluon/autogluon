@@ -5,12 +5,11 @@ import copy
 import logging
 from collections import OrderedDict
 
-# Suppress common skopt warning:
-import warnings
-warnings.filterwarnings("ignore", message="The objective has been evaluated at this point before.")
+from ..utils import warning_filter
 
-from skopt import Optimizer
-from skopt.space import *
+with warning_filter():
+    from skopt import Optimizer
+    from skopt.space import *
 
 from .searcher import BaseSearcher
 
@@ -154,10 +153,10 @@ class SKoptSearcher(BaseSearcher):
         self._results[pickle.dumps(new_config)] = 0
         return new_config
 
-    def update(self, config, reward, model_params=None):
+    def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
         """
-        super(SKoptSearcher, self).update(config, reward)
+        super(SKoptSearcher, self).update(config, reward, **kwargs)
         try:
             self.bayes_optimizer.tell(self.config2skopt(config),
                                       -reward)  # provide negative reward since skopt performs minimization

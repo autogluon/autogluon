@@ -5,7 +5,6 @@ from gluoncv.model_zoo import get_model
 
 from ...core import *
 
-@autogluon_function()
 def get_built_in_network(name, *args, **kwargs):
     def _get_finetune_network(model_name, num_classes, ctx):
         finetune_net = get_model(model_name, pretrained=True)

@@ -123,7 +123,7 @@ class BasePredictor(ABC):
         """
         pass
 
-    def fit_summary(self, output_directory, verbosity = 2):
+    def fit_summary(self, output_directory=None, verbosity = 2):
         """
             Returns a summary of the fit process.
             Args:
@@ -135,18 +135,18 @@ class BasePredictor(ABC):
             for k in self.results.keys():
                 if k not in ['metadata', 'trial_info']:
                     summary[k] = self.results[k]
-            logger.info("Summary of Fit Process:  ")
-            logger.info(json.dumps(summary, indent=2))
+            print("Summary of Fit Process:  ")
+            print(summary)
             if len(self.results['metadata']) > 0:
-                logger.info(json.dumps(self.results['metadata'], indent=2))
+                print(self.results['metadata'])
 
         if len(self.results['trial_info']) > 0 and  verbosity > 1:
             ordered_trials = sorted(self.results['trial_info'].keys())
             if verbosity > 2:
                 for trial_id in ordered_trials:
-                    logger.info("Information about each trial:  ")
-                    logger.info("Trial ID: %s" % trial_id)
-                    logger.info(json.dumps(self.results['trial_info'][trial_id], indent=2))
+                    print("Information about each trial:  ")
+                    print("Trial ID: %s" % trial_id)
+                    print(self.results['trial_info'][trial_id])
 
             # Create plot summaries:
             plot_summary_of_models(self.results, output_directory)
@@ -160,10 +160,10 @@ class BasePredictor(ABC):
         """
         results = {}
         results['time'] = None # run-time of task.fit()
+        results['reward_attr'] = 'none' # (str), the reward attribute used to measure the performance
+        results[results['reward_attr']] = None # performance of the best trials
         results['num_trials_completed'] = None # number of trials completed during task.fit() 
         results['best_hyperparameters'] = None # hyperparameter values corresponding to the chosen model in self.model
-        results['validation_perf'] = None # validation performance achieved by the chosen model (what is currently called 'reward')
-        results['training_loss'] = None # training loss value achieved by the chosen model (on the training data)
         results['search_space'] = None # hyperparameter search space considered in task.fit()
         results['search_strategy'] = None # HPO algorithm used (ie. Hyperband, random, BayesOpt). If the HPO algorithm used kwargs, then this should be tuple (HPO_algorithm_string, HPO_kwargs)
         
@@ -176,7 +176,6 @@ class BasePredictor(ABC):
         
         results['trial_info'][trial_id] =  {
             'config' : hyperparameter configuration tried in this trial
-            'validation_perf' : validation performance achieved by the model from this trial
             'training_loss' : training loss value achieved by the model from this trial (on the training data)
             'metadata' : dict of various optional metadata with keys such as: latency, memory, time, early_stopped, etc.
         }

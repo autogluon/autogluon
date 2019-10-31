@@ -26,16 +26,16 @@ class Task(object):
     LOCK = mp.Lock()
     def __init__(self, fn, args, resources):
         self.fn = fn
-        self.args = {}
-        #self.args[] #copy.deepcopy(args)
+        self.args = copy.deepcopy(args)
         self.resources = resources
         with Task.LOCK:
             self.task_id = Task.TASK_ID.value
-            if 'args' in args:
-                self.args['args'] = argparse.Namespace(**vars(args['args']))
-                vars(self.args['args']).update({'task_id': self.task_id})
-            if 'config' in args:
-                self.args['config'] = copy.deepcopy(args['config'])
+            if 'args' in self.args:
+                if isinstance(self.args['args'], (argparse.Namespace, argparse.ArgumentParser)):
+                    args_dict = vars(self.args['args'])
+                else:
+                    args_dict = self.args['args']
+                args_dict.update({'task_id': self.task_id})
             Task.TASK_ID.value += 1
 
     @classmethod
