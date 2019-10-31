@@ -25,10 +25,10 @@ def plot_performance_vs_trials(results, output_directory, filename="PerformanceV
     
     ordered_trials = sorted(list(results['trial_info'].keys()))
     ordered_val_perfs = [results['trial_info'][trial_id][results['reward_attr']] for trial_id in ordered_trials]
-    x = range(len(ordered_trials))
+    x = range(1, len(ordered_trials)+1)
     y = []
     for i in x:
-        y.append(max([ordered_val_perfs[j] for j in range(i+1)])) # best validation performance in trials up until ith one (assuming higher = better)
+        y.append(max([ordered_val_perfs[j] for j in range(i)])) # best validation performance in trials up until ith one (assuming higher = better)
     fig, ax = plt.subplots()
     ax.plot(x, y)
     ax.set(xlabel='Completed Trials', ylabel='Best Performance')
@@ -64,8 +64,9 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
         datadict['training_loss'] = [results['trial_info'][trial_id]['training_loss'] for trial_id in datadict['trial_id']]
         attr_color = 'training_loss'
     
+    save_path = output_directory + save_file if output_directory else None
     mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
-                  attr_size=attr_size, save_file=output_directory+save_file, plot_title=plot_title)
+                  attr_size=attr_size, save_file=save_path, plot_title=plot_title)
 
 
 def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, save_file=None, plot_title="",

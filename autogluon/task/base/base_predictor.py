@@ -149,9 +149,8 @@ class BasePredictor(ABC):
                     print(self.results['trial_info'][trial_id])
 
             # Create plot summaries:
-            if output_directory:
-                plot_summary_of_models(self.results, output_directory)
-                plot_performance_vs_trials(self.results, output_directory)
+            plot_summary_of_models(self.results, output_directory)
+            plot_performance_vs_trials(self.results, output_directory)
         return self.results
     
     def _createResults(self):
