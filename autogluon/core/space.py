@@ -82,10 +82,10 @@ class List(NestedSpace):
         args: a list of search spaces.
 
     Example:
-        >>> sequence = ag.Sequence(
-        >>>     ag.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
-        >>>     ag.Categorical('BatchNorm', 'InstanceNorm'),
-        >>>     ag.Categorical('relu', 'sigmoid'),
+        >>> sequence = ag.List(
+        >>>     ag.space.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
+        >>>     ag.space.Categorical('BatchNorm', 'InstanceNorm'),
+        >>>     ag.space.Categorical('relu', 'sigmoid'),
         >>> )
     """
     def __init__(self, *args):
@@ -225,6 +225,7 @@ class Dict(NestedSpace):
 
 class Categorical(NestedSpace):
     """Categorical Search Space (Nested Space)
+    Add example for conditional space.
 
     Args:
         data: the choice candidates

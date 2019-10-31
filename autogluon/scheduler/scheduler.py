@@ -171,6 +171,9 @@ class TaskScheduler(object):
                 self.scheduled_tasks = new_scheduled_tasks
 
     def join_tasks(self):
+        self.join_jobs()
+
+    def join_jobs(self):
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
             task_dict['Job'].result()

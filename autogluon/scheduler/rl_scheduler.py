@@ -55,7 +55,7 @@ class RLScheduler(FIFOScheduler):
         >>>                                  time_attr='epoch',
         >>>                                  grace_period=1)
     """
-    def __init__(self, train_fn, resource, checkpoint='./exp/checkerpoint.ag',
+    def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
                  controller_resource={'num_cpus': 2, 'num_gpus': 0},

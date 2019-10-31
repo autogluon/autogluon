@@ -116,7 +116,6 @@ class ENAS_Scheduler(object):
 
     def validation(self):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
-        sum_rewards = 0
         # data iter
         tbar = tqdm(enumerate(self.val_data))
         # update network arc
@@ -124,11 +123,11 @@ class ENAS_Scheduler(object):
         self.supernet.sample(**config)
         metric = mx.metric.Accuracy()
         for i, batch in tbar:
-            reward = self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
-            sum_rewards += reward
-            tbar.set_description('Acc: {}'.format(sum_rewards/(i+1)))
+            self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
+            reward = metric.get()[1]
+            tbar.set_description('Acc: {}'.format(reward))
 
-        self.val_acc = sum_rewards / (i+1)
+        self.val_acc = reward
 
     def train_controller(self):
         """Run multiple number of trials
@@ -144,6 +143,7 @@ class ENAS_Scheduler(object):
                 configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
                 # schedule the training tasks and gather the reward
                 self.supernet.sample(**configs[0])
+                metric.reset()
                 self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
                 reward = metric.get()[1]
                 reward = self.reward_fn(reward, self.supernet)
