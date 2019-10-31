@@ -1,2 +1,2 @@
-from .mbconv import *
-from .efficientnet import *
+from .model_zoo import get_model
+from .models import *

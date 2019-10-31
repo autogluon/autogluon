@@ -3,9 +3,9 @@ import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.block import HybridBlock
 
-from ..utils import EasyDict
-from .utils import *
+from ...utils import EasyDict
 from .mbconv import *
+from .utils import *
 
 __all__ = ['EfficientNet', 'get_efficientnet_blockargs', 'get_efficientnet',
            'get_efficientnet_b0', 'get_efficientnet_b1', 'get_efficientnet_b2',

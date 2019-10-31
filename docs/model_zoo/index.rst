@@ -12,15 +12,7 @@ How to load pretrained 'efficientnet_b0'.
 .. code-block:: python
 
    import autogluon as ag
-   model = ag.get_model('efficientnet_b0', pretrained=True)
-
-
-How to evaluate the model:
-
-.. code-block:: python
-      
-   from autogluon import ImageClassification as task
-   task.evaluate('imagenet', model='efficientnet_b0', input_size=224)
+   model = ag.nas.get_model('efficientnet_b0', pretrained=True)
 
 
 EfficientNet

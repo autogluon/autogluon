@@ -1,7 +1,7 @@
 from mxnet.gluon.block import HybridBlock
 from mxnet.gluon import nn
 
-from ..core import autogluon_function
+from ...core import autogluon_function
 from .utils import *
 
 __all__ = ['MBConvBlock']

@@ -1,4 +1,4 @@
-from .efficientnet import *
+from .models.efficientnet import *
 
 _all__ = ['get_model']
 
