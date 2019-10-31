@@ -75,6 +75,16 @@ class HyperbandScheduler(FIFOScheduler):
             at level max_t. On the other hand, it decreases the variance of the
             latent process there.
             NOTE: This could also be removed...
+        searcher_data (str): Ways for searcher to maintain observed data:
+            Determines what observations (config, result), fetched in
+            _run_reporter, are collected in the searcher dataset (only relevant
+            for searchers that maintain a dataset).
+            rungs (default): Maintain results if time_attr value is equal to a
+                rung level.
+            all: Maintain all results reported to _run_reporter.
+            rungs_and_last: Maintain results as for rungs (at rung levels), and
+                also the result (for each config) with the largest time_attr
+                value.
 
     Example:
         >>> @autogluon_method
@@ -110,7 +120,8 @@ class HyperbandScheduler(FIFOScheduler):
                  type='stopping',
                  dist_ip_addrs=None,
                  keep_size_ratios=False,
-                 maxt_pending=False):
+                 maxt_pending=False,
+                 searcher_data='rungs'):
         super(HyperbandScheduler, self).__init__(
             train_fn=train_fn, args=args, resource=resource, searcher=searcher,
             search_options=search_options, checkpoint=checkpoint, resume=resume,
@@ -131,6 +142,19 @@ class HyperbandScheduler(FIFOScheduler):
             raise AssertionError(
                 "type '{}' not supported, must be 'stopping' or 'promotion'".format(
                     type))
+        sd_values = {'rungs', 'all', 'rungs_and_last'}
+        assert searcher_data in sd_values, \
+            "searcher_data = '{}', must be in {}".format(
+                searcher_data, sd_values)
+        self.searcher_data = searcher_data
+        # Only maintained if searcher_data == 'rungs_and_last':
+        # Maps task_id -> (config, reported_result, keep_case)
+        # Here, reported_result is the last recent result for config for which
+        # self.searcher.update has been called by task task_id (in
+        # _run_reporter). This allows us to remove this case from the dataset
+        # maintained by the searcher, once the next result for this config
+        # comes in. If keep_case == True, the case is not removed though.
+        self.last_recent_update = dict()
 
     def add_task(self, task, **kwargs):
         """Adding a training task to the scheduler.
@@ -155,6 +179,14 @@ class HyperbandScheduler(FIFOScheduler):
         task.args['reporter'] = reporter
         task.args['terminator_semaphore'] = terminator_semaphore
 
+        # NOTE: If search_data != 'rungs', the pending candidates chosen here
+        # may not correspond to the next recent data obtained in
+        # _run_reporter (in particular, they all lie on rung levels). We ignore
+        # this for sake of simplicity. Once the next result is recorded for
+        # this task, everything will be OK again.
+        # It is also not a problem that pending candidates registered here,
+        # will be registered once more in the future, as this is permitted
+        # by register_pending.
         milestones = self.terminator.on_task_add(task, **kwargs)
         if kwargs.get('new_config', True):
             first_milestone = milestones[-1]
@@ -201,6 +233,13 @@ class HyperbandScheduler(FIFOScheduler):
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
+    def _update_searcher(self, searcher, task, result, keep_case):
+        config = task.args['config']
+        searcher.update(
+            config=config, reward=result[self._reward_attr], **result)
+        if self.searcher_data == 'rungs_and_last':
+            self.last_recent_update[task.task_id] = (config, result, keep_case)
+
     def _run_reporter(self, task, task_process, reporter, searcher, terminator,
                       checkpoint_semaphore, terminator_semaphore):
         last_result = None
@@ -226,18 +265,47 @@ class HyperbandScheduler(FIFOScheduler):
                     reported_result[key] = v
             self.add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
-            if update_searcher and task_continues:
-                # Update searcher with intermediate result
-                # Note: If task_continues is False here, we also call
-                # searcher.update, but outside the loop.
-                searcher.update(
-                    config=task.args['config'],
-                    reward=reported_result[self._reward_attr],
-                    **reported_result)
+            if self.searcher_data == 'rungs':
+                # Only results on rung levels are reported to the searcher
+                if update_searcher and task_continues:
+                    # Update searcher with intermediate result
+                    # Note: If task_continues is False here, we also call
+                    # searcher.update, but outside the loop.
+                    self._update_searcher(
+                        searcher, task, reported_result, True)
+                    last_updated = reported_result
+                    if next_milestone is not None:
+                        searcher.register_pending(
+                            task.args['config'], next_milestone)
+            else:
+                # All results are reported to the searcher
+                if self.searcher_data == 'rungs_and_last' and \
+                        task.task_id in self.last_recent_update:
+                    # Remove last recently added result for this task, unless
+                    # it fell on a rung level (i.e., keep_case)
+                    rem_config, rem_result, keep_case = \
+                        self.last_recent_update[task.task_id]
+                    if not keep_case:
+                        searcher.remove_case(
+                            config=rem_config,
+                            reward=rem_result[self._reward_attr],
+                            **rem_result)
+                # If searcher_data == 'rungs_and_last', the result is kept in
+                # the dataset iff update_searcher == True
+                self._update_searcher(
+                    searcher, task, reported_result, update_searcher)
                 last_updated = reported_result
-                if next_milestone is not None:
+                # Since all results are reported, the next report for this task
+                # will be for resource + 1.
+                # NOTE: This assumes that results are reported for all successive
+                # resource levels (int). If any resource level is skipped,
+                # there may be left-over pending candidates, who will be
+                # removed once the task finishes.
+                if task_continues:
                     searcher.register_pending(
-                        task.args['config'], next_milestone)
+                        task.args['config'],
+                        int(reported_result[self._time_attr]) + 1)
+
             last_result = reported_result
             if task_continues:
                 reporter.move_on()
@@ -263,9 +331,7 @@ class HyperbandScheduler(FIFOScheduler):
         # Pass all of last_result to searcher (unless this has already been
         # done)
         if last_result is not last_updated:
-            searcher.update(
-                config=task.args['config'],
-                reward=last_result[self._reward_attr], **last_result)
+            self._update_searcher(searcher, task, last_result, True)
 
     def state_dict(self, destination=None):
         destination = super(HyperbandScheduler, self).state_dict(destination)
