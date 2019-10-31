@@ -6,6 +6,7 @@ import multiprocessing as mp
 from ..utils import save, load
 from dask.distributed import Queue
 import distributed
+from distributed.comm.core import CommClosedError
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,10 @@ class DistStatusReporter(object):
         self._continue_semaphore.acquire()
 
     def fetch(self, block=True):
-        kwargs = self._queue.get()
+        try:
+            kwargs = self._queue.get()
+        except CommClosedError:
+            return {}
         return kwargs
 
     def move_on(self):
