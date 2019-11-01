@@ -66,7 +66,6 @@ class WireNet(mx.gluon.HybridBlock):
     def graph(self):
         return self.blocks.graph
 
-    @property
     def sample(self, **config):
         return self.blocks.sample(**config)
 

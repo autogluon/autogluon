@@ -10,7 +10,7 @@ from ..enas import ENAS_Sequential
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-__all__ = ['Wire_Stage']
+__all__ = ['Wire_Stage', 'Wire_Sequential']
 
 class Wire_Stage(gluon.HybridBlock):
     """The Random Wire Stage, each op should work on the same featuremap size.
@@ -32,47 +32,46 @@ class Wire_Stage(gluon.HybridBlock):
                 self._blocks.add(op)
         self.latency_evaluated = False
         self._avg_latency = 1
-        # initialized as all connected
+        # initialize connections
         self._connections = {}
         keys = list(self._modules.keys())
-        for i in range(len(self._modules)):
-            for j in range(i+1, len(self._modules)):
+        N = len(self._modules)
+        for i in range(N-2):
+            for j in range(i+1, N-1):
                 if init_method == 'dense':
                     self._connections['{}.{}'.format(keys[i], keys[j])] = 1
                 else:
                     assert init_method == 'sequential'
                     self._connections['{}.{}'.format(keys[i], keys[j])] = 1 if j == (i + 1) else 0
                 self._kwspaces['{}.{}'.format(keys[i], keys[j])] = Categorical(0, 1)
+        assert len(self._connections) == (N - 1) * (N - 2) // 2
         self._active_nodes = list(keys)
-        self.reverse_keys = keys
-        self.reverse_keys.reverse()
+        self._invalide_nodes = []
+        self._leaf_nodes = [keys[-2]]
+        self.keys = keys
 
     def sample(self, **configs):
         for k, v in configs.items():
             self._connections[k] = v
-        # calc active nodes
+        in_node = self.keys[0]
         self._active_nodes = []
-
-        def connect2root(node, root, connections, graph_nodes):
-            if node in graph_nodes:
-                return True
-            if node == root:
-                graph_nodes.append(node)
-                return True
-            connected = False
+        self._leaf_nodes = []
+        def mark_connected(cur_node, connections, active_nodes):
+            if cur_node in active_nodes: return
+            active_nodes.append(cur_node)
+            is_leaf = True
             for k, v in connections.items():
-                if k.endswith(node) and v:
-                    new_node = k.split('.')[0]
-                    if new_node in graph_nodes:
-                        connected = True
-                    elif connect2root(new_node, root, connections, graph_nodes):
-                        connected = True
-            if connected:
-                graph_nodes.append(node)
-            return connected
-
-        return connect2root(self.reverse_keys[0], self.reverse_keys[-1], self._connections,
-                            self._active_nodes)
+                if k.startswith(cur_node) and v:
+                    is_leaf = False
+                    new_node = k.split('.')[-1]
+                    mark_connected(new_node, connections, active_nodes)
+            if is_leaf:
+                self._leaf_nodes.append(cur_node)
+        mark_connected(in_node, self._connections, self._active_nodes)
+        self._active_nodes.sort(key=int)# = sorted(self._active_nodes)
+        self._leaf_nodes.sort(key=int)# = sorted(self._leaf_nodes)
+        self._invalide_nodes = list(set(self.keys) - set(self._active_nodes))
+        #return True
 
     def hybrid_forward(self, F, x):
         # first node
@@ -85,12 +84,15 @@ class Wire_Stage(gluon.HybridBlock):
                 if k.split('.')[1] == node and v:
                     in_node = k.split('.')[0]
                     if in_node in self._active_nodes:
-                        print('k, in_node:', k, in_node)
+                        #print('k, in_node:', k, in_node)
                         assert in_node in results
                         inputs = inputs + results[in_node] if inputs is not None else results[in_node]
             assert inputs is not None
             results[node] = self._modules[node](inputs)
-        return results[self.reverse_keys[0]]
+        inputs = results[self._leaf_nodes[0]]
+        for leaf_node in self._leaf_nodes[1:]:
+            inputs += results[leaf_node]
+        return self._modules[self.keys[-1]](inputs)
 
     @property
     def kwspaces(self):
@@ -98,12 +100,12 @@ class Wire_Stage(gluon.HybridBlock):
 
     @property
     def nodehead(self):
-        node_name = self._prefix + '.' + self._active_nodes[0]
+        node_name = self._prefix + '.' + self.keys[0]
         return node_name
 
     @property
     def nodeend(self):
-        node_name = self._prefix + '.' + self._active_nodes[-1]
+        node_name = self._prefix + '.' + self.keys[-1]
         return node_name
 
     @property
@@ -111,6 +113,9 @@ class Wire_Stage(gluon.HybridBlock):
         from graphviz import Graph
         e = Graph(node_attr={'color': 'lightblue2', 'style': 'filled', 'shape': 'box'})
         e.attr(size='8,3')
+        out_node = self.keys[-1]
+        out_node_name = self._prefix + '.' + out_node
+        e.node(out_node_name, label=self._modules[out_node].__class__.__name__+out_node)
         for node in self._active_nodes:
             node_name = self._prefix + '.' + node
             e.node(node_name, label=self._modules[node].__class__.__name__+node)
@@ -120,6 +125,9 @@ class Wire_Stage(gluon.HybridBlock):
                 k1_name = self._prefix + '.' + k1
                 k2_name = self._prefix + '.' + k2
                 e.edge(k1_name, k2_name)
+        for k in self._leaf_nodes:
+            k_name = self._prefix + '.' + k
+            e.edge(k_name, out_node_name)
         return e
 
     def __repr__(self):
@@ -127,6 +135,9 @@ class Wire_Stage(gluon.HybridBlock):
         for key in self._active_nodes:
             op = self._modules[key]
             reprstr += '\n\t{}: {}'.format(key, op)
+        key = self.keys[-1]
+        op = self._modules[key]
+        reprstr += '\n\t{}: {}'.format(key, op)
         reprstr += ')\n'
         return reprstr
 
@@ -161,8 +172,9 @@ class Wire_Sequential(ENAS_Sequential):
         return self._kwspaces
 
     def sample(self, **configs):
-        rets = []
+        #rets = []
         for k, op in self._modules.items():
             min_config = _strip_config_space(configs, prefix=k)
-            rets.append(op.sample(**min_config))
-        return all(rets)
+            op.sample(**min_config)
+            #rets.append()
+        #return all(rets)

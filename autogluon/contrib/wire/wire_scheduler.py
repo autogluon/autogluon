@@ -23,9 +23,8 @@ class Wire_Scheduler(ENAS_Scheduler):
             tbar = tqdm(enumerate(self.train_data))
             for i, batch in tbar:
                 # sample network configuration
-                while True:
-                    config = self.controller.sample()[0]
-                    if self.supernet.sample(**config): break
+                config = self.controller.sample()[0]
+                self.supernet.sample(**config)
                 self.train_fn(self.supernet, batch, **self.train_args)
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
@@ -47,10 +46,7 @@ class Wire_Scheduler(ENAS_Scheduler):
         tbar = tqdm(enumerate(self.val_data))
         # update network arc
         config = self.controller.inference()
-        if not self.supernet.sample(**config):
-            while True:
-                config = self.controller.sample()[0]
-                if self.supernet.sample(**config): break
+        self.supernet.sample(**config)
         for i, batch in tbar:
             reward = self.eval_fn(self.supernet, batch, **self.val_args)
             sum_rewards += reward
@@ -69,16 +65,9 @@ class Wire_Scheduler(ENAS_Scheduler):
             with mx.autograd.record():
                 # sample controller_batch_size number of configurations
                 count = 0
-                while True:
-                    configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
-                    if self.supernet.sample(**configs[0]): break
-                    count += 1
-                    #if count > 5: break
-                #if count > 5:
-                #    # penalize incorrect configurations
-                #    reward = 0.0
-                #else:
-                # schedule the training tasks and gather the reward
+                #while True:
+                configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
+                self.supernet.sample(**configs[0])
                 metric = self.eval_fn(self.supernet, batch, **self.val_args)
                 reward = self.reward_fn(metric, self.supernet)
                 self.baseline = reward if not self.baseline else self.baseline
