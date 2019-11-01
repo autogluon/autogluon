@@ -8,7 +8,8 @@
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
 
-import contextlib, shutil, tempfile, math, random, warnings, os, json
+import contextlib, shutil, tempfile, math, random, warnings, os, json, time
+import logging
 from pathlib import Path
 from collections import OrderedDict
 import numpy as np
@@ -29,6 +30,8 @@ from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.mxnet.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
 from tabular.ml.mxnet.embednet import EmbedNet
+from tabular.ml.mxnet.tabular_nn_train_func import *
+
 
 @contextlib.contextmanager # TODO: keep this?
 def make_temp_directory():
@@ -38,7 +41,9 @@ def make_temp_directory():
     finally:
         shutil.rmtree(temp_dir)
 
-EPS = 10e-8
+EPS = 10e-8 # small number
+logger = logging.getLogger(__name__)
+
 
 class TabularNeuralNetModel(AbstractModel):
     
@@ -59,9 +64,9 @@ class TabularNeuralNetModel(AbstractModel):
     # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
     model_file_name = 'tabularNN.pkl'
     params_file_name = 'net.params' # Stores parameters of final network
-    temp_file_name = 'temp_net.params' # stores temporary network parameters (eg. during the course of training)
+    temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    def __init__(self, path, name, problem_type, objective_func, features=None, params=None):
+    def __init__(self, path, name, problem_type, objective_func, features=None, nn_options={}):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features)
         """ Create new TabularNeuralNetModel object.
             Args:
@@ -80,10 +85,10 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.processor = None # data processor
-        if params is None:
+        if nn_options is None:
             self.params = {}
         else:
-            self.params = params
+            self.params = nn_options
         self.set_default_params()
     
     def set_default_params(self):
@@ -93,39 +98,41 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('num_dataloading_workers', 2) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
         self._use_default_value('max_epochs', 30)  # TODO! debug # maximum number of epochs for training NN
-        
-        # For data processing:
+        self._use_default_value('seed_value', 123) # random seed for reproducibility in HPO (set = None to ignore)
+
+        # For data processing (TODO: currently preprocessors not included in HPO):
         self._use_default_value('proc.embed_min_categories', 3) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
         # Default search space: 3,4,10, 100, 1000
         self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
         # Default search space: ['median', 'mean', 'most_frequent']
         self._use_default_value('proc.max_category_levels', 10000) # maximum number of allowed levels per categorical feature
         # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        # Not used, we use QuantileTransformer instead for skewed features: self._use_default_value('proc.power_transform_method', 'yeo-johnson') # method argument of PowerTransformer (can alternatively be 'box-cox' but this will fail for features with negative values)
-        # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
         self._use_default_value('proc.skew_threshold', 0.9) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         # Default search space: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
         
         # Hyperparameters for neural net architecture:
         self._use_default_value('network_type', 'widedeep') # Type of neural net used to produce predictions
-        #  Search space: ['widedeep', 'feedforward']
+        # Search space: self._use_default_value('network_type', ag.space.Categorical('widedeep', 'feedforward') )
         self._use_default_value('layers', None) # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers. These numbers are not absolute, they will also be scaled based on number of training examples and problem type)
         # Default search space: List of lists that are manually created
         self._use_default_value('numeric_embed_dim', None) # Size of joint embedding for all numeric+one-hot features.
         # Default search space: TBD
         self._use_default_value('activation', 'relu')
-        # Default search space: ['relu', 'elu', 'tanh']
+        # Default search space: self._use_default_value('activation', ag.space.Categorical('relu', 'elu', 'tanh') )
         self._use_default_value('max_layer_width', 2056) # maximum number of hidden units in MLP layer
-        # Does not need to be searched by default!
+        # Does not need to be searched by default
         self._use_default_value('embedding_size_factor', 1.0)
         # Default search space: [0.01 - 100] on log-scale
         self._use_default_value('embed_exponent', 0.56)
          # Does not need to be searched by default!
         self._use_default_value('max_embedding_dim', 500)
         self._use_default_value('use_batchnorm', True) # whether or not to utilize Batch-normalization
-        self._use_default_value('dropout_prob', 0.1) # 0 turns off Dropout!
+        # Default search space: self._use_default_value('use_batchnorm', ag.space.bool() )
         
-        # Regression-specific hyperparameters:
+        self._use_default_value('dropout_prob', 0.1) # 0 turns off Dropout!
+        # Default search space: self._use_default_value('dropout_prob', ag.space.Real(0.0, 0.5) )
+        
+        # Regression-specific hyperparameters: 
         self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
         # If None, inferred based on training labels. Note: MUST be None for classification tasks!
         self._use_default_value('y_range_extend', 0.1) # Only used to extend size of inferred y_range when y_range = None.
@@ -136,11 +143,13 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('loss_function', None) # Loss function used for training
         self._use_default_value('optimizer', 'adam')
         self._use_default_value('learning_rate', 3e-4) # learning rate used for NN training
+        # Default search space: self._use_default_value('learning_rate', ag.space.Real(1e-4, 1e-2, log = True))
         self._use_default_value('weight_decay', 1e-2)
+        # Default search space: self._use_default_value('weight_decay', ag.space.Real(1e-6, 1e-2, log = True))
         self._use_default_value('clip_gradient', 1000.0)
-        self._use_default_value('momentum', 0.9) # only for SGD
+        self._use_default_value('momentum', 0.9) # only used for SGD
         self._use_default_value('epochs_wo_improve', max(5, int(self.params['max_epochs']/5.0))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
-        # Default params for original NNTabularModel: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
+        # Note: Default params for original NNTabularModel were: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
     
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
@@ -201,22 +210,22 @@ class TabularNeuralNetModel(AbstractModel):
         X_train = self.preprocess(X_train)
         if self.features is None:
             self.features = list(X_train.columns)
-        print('features: ', self.features)
+        logger.info('features: ', self.features)
         train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         if X_test is not None:
             X_test = self.preprocess(X_test)
             test_dataset = self.process_data(X_test, Y_test, is_test=True) # Dataset object to use for validation
         else:
             test_dataset = None
-        print("Training data has: %d examples, %d features (%d vector, %d embedding, %d language)" % 
+        logger.info("Training data has: %d examples, %d features (%d vector, %d embedding, %d language)" % 
               (train_dataset.num_examples, train_dataset.num_features, 
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
                len(train_dataset.feature_groups['language']) ))
         # train_dataset.save()
         # test_dataset.save()
-        # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs...
+        # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
         self.get_net(train_dataset)
-        self.train_net(train_dataset, test_dataset, initialize=True, setup_trainer=True)
+        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
         """
         # TODO: if we don't want to save intermediate network parameters, need to do something like this to clean them up after training.
         with make_temp_directory() as temp_dir:
@@ -228,7 +237,7 @@ class TabularNeuralNetModel(AbstractModel):
 
                 # Load the best one and export it
                 model.load(self.name)
-                print(f'Model validation metrics: {model.validate()}')
+                logger.info(f'Model validation metrics: {model.validate()}')
                 model.path = original_path\
         """
     
@@ -242,16 +251,26 @@ class TabularNeuralNetModel(AbstractModel):
                        num_net_outputs=self.num_net_outputs)
         self.architecture_desc = net.architecture_desc # Description of network architecture
         self.net_filename = self.path + self.temp_file_name
-        self.model= net
+        self.model = net
         return
     
-    def train_net(self, train_dataset, test_dataset=None, 
-                  initialize=True, setup_trainer=True):
+    def train_net(self, params, train_dataset, test_dataset=None, 
+                  initialize=True, setup_trainer=True, file_prefix=""):
         """ Trains neural net on given train dataset, early stops based on test_dataset.
-            To continue training of a previously trained model, set initialize = False.
-            To reuse the same trainer as previously, set: setup_trainer = False.
+            Args:
+                params (dict): various hyperparameter values
+                train_dataset (TabularNNDataset): training data used to learn network weights
+                test_dataset (TabularNNDataset): validation data used for hyperparameter tuning
+                initialize (bool): set = False to continue training of a previously trained model, otherwise initializes network weights randomly 
+                setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
+                file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
-        if initialize:
+        seed_value = self.params.get('seed_value')
+        if seed_value is not None: # Set seed
+            random.seed(seed_value)
+            np.random.seed(seed_value)
+            mx.random.seed(seed_value)
+        if initialize: # Initialize the weights of network
             self.model.collect_params().initialize(ctx=self.ctx)
             self.model.hybridize()
         if setup_trainer:
@@ -276,7 +295,7 @@ class TabularNeuralNetModel(AbstractModel):
                     output = self.model(data_batch)
                     labels = data_batch['label']
                     loss = self.loss_func(output, labels) / loss_scaling_factor
-                    # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
+                    # logger.info(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
                 cumulative_loss += nd.sum(loss).asscalar()
@@ -288,24 +307,24 @@ class TabularNeuralNetModel(AbstractModel):
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
-                print("Epoch %s.  Train loss: %s, Val %s: %s" %
+                logger.info("Epoch %s.  Train loss: %s, Val %s: %s" %
                   (e, train_loss, self.metric_map[self.problem_type], val_metric))
                 self.summary_writer.add_scalar(tag='val_'+self.metric_map[self.problem_type], 
                                                value=val_metric, global_step=e)
             else:
-                print("Epoch %s.  Train loss: %s" % (e, train_loss))
+                logger.info("Epoch %s.  Train loss: %s" % (e, train_loss))
             self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)
             # TODO: callback / logger here!!
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
             if e == 0: # special actions during first epoch:
-                print(self.model)  # TODO: remove?
+                logger.info(self.model)  # TODO: remove?
         self.model.load_parameters(self.net_filename) # Revert back to best model
         if test_dataset is None: # evaluate one final time:
-            print("Best model found in epoch %d" % best_val_epoch)
+            logger.info("Best model found in epoch %d" % best_val_epoch)
         else:
             final_val_metric = self.evaluate_metric(test_dataset)
-            print("Best model found in epoch %d. Val %s: %s" %
+            logger.info("Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.metric_map[self.problem_type], final_val_metric))
         return
     
@@ -416,16 +435,16 @@ class TabularNeuralNetModel(AbstractModel):
             cols_to_drop = []
         cols_to_keep = [col for col in list(X_train.columns) if col not in cols_to_drop]
         cols_to_use = [col for col in self.cat_names if col in cols_to_keep]
-        print(f'Using {len(cols_to_use)}/{len(self.cat_names)} categorical features')
+        logger.info(f'Using {len(cols_to_use)}/{len(self.cat_names)} categorical features')
         self.cat_names = cols_to_use
-        print(f'Using {len(self.cont_names)} cont features')
+        logger.info(f'Using {len(self.cont_names)} cont features')
         """
         if labels is None:
             raise ValueError("Attempting process training data without labels")
         self.types_of_features = self._get_types_of_features(df) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
-        print("AutoGluon infers your features are of the following types:")
-        print(json.dumps(self.types_of_features, indent=4))
-        print("\n\n")
+        logger.info("AutoGluon infers your features are of the following types:")
+        logger.info(json.dumps(self.types_of_features, indent=4))
+        logger.info("\n\n")
         df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor()
         processed_array = self.processor.fit_transform(df) # 2D numpy array
@@ -484,8 +503,8 @@ class TabularNeuralNetModel(AbstractModel):
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
         continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int')
-        print("categorical_featnames:", categorical_featnames)
-        print("continuous_featnames:", continuous_featnames)
+        logger.info(("categorical_featnames:  ", categorical_featnames))
+        logger.info(("continuous_featnames:  ", continuous_featnames))
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             raise ValueError("unknown feature types present in DataFrame")
@@ -594,9 +613,10 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
     
-    def save(self):
+    def save(self, file_prefix=""):
+        """ file_prefix (str): Appended to beginning of file-name """
         if self.model is not None:
-            self.model.save_parameters(self.path + self.params_file_name)
+            self.model.save_parameters(self.path + file_prefix + self.params_file_name)
         temp_model = self.model
         temp_sw = self.summary_writer
         self.model = None
@@ -606,12 +626,11 @@ class TabularNeuralNetModel(AbstractModel):
         self.summary_writer = temp_sw
     
     @classmethod
-    def load(cls, path, reset_paths=False):
-        load_path = path + cls.model_file_name
-        if not reset_paths:
-            obj = load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
+    def load(cls, path, file_prefix="", reset_paths=False):
+        """ file_prefix (str): Appended to beginning of file-name """
+        load_path = path + file_prefix + cls.model_file_name
+        obj = load_pkl.load(path=load_path)
+        if reset_paths: 
             obj.set_contexts(path)
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc) # recreate network from architecture description
         # TODO: maybe need to initialize/hybridize??
@@ -623,6 +642,48 @@ class TabularNeuralNetModel(AbstractModel):
         if param_name not in self.params:
             self.params[param_name] = param_value
     
+    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, scheduler_options):
+        """ Performs HPO and sets self.params to best hyperparameter values """
+        if self.feature_types_metadata is None:
+            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        scheduler_func = scheduler_options[0] # Unpack tuple
+        scheduler_options = scheduler_options[1]
+        if scheduler_func is None or scheduler_options is None:
+            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+        
+        start_time = time.time()
+        X_train = self.preprocess(X_train)
+        X_test = self.preprocess(X_test)
+        if self.features is None:
+            self.features = list(X_train.columns)
+        train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
+        test_dataset = self.process_data(X_test, Y_test, is_test=True) # Dataset object to use for validation
+        train_fileprefix = self.path+"train_"
+        test_fileprefix = self.path+"validation_"
+        train_dataset.save(file_prefix=train_fileprefix)
+        test_dataset.save(file_prefix=test_fileprefix)
+        train_fn.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix, tabNN=self, **self.params)
+        
+        scheduler = scheduler_func(tabularNN_train_fn, **scheduler_options)
+        scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX, 
+                                train_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX, 
+                                test_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX, 
+                                test_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX]) # transfer data files to workers
+        scheduler.run()
+        myscheduler.join_tasks()
+        myscheduler.get_training_curves(plot=False, use_legend=False)
+        best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff.
+        self.params.update(best_hp)
+        total_time = time.time() - start_time
+        
+        # TODO: cleanup temp files?
+        
+        # How to access file-name of config + validation performance? Ie. Results object?
+        
+        # TODO: final fit?
+        args.final_fit = True
+        model_weights = scheduler.run_with_config(best_config)
+        save(model_weights)
 
 
 """  General TODOs:
@@ -639,13 +700,7 @@ TODO: Save preprocessed data so that we can do HPO of neural net hyperparameters
 
 TODO: feature_types_metadata must be set outside of model class in trainer.
 
-TODO: enable seeds?
-
-TODO: test multiclassification
-
 TODO: benchmark 
-
-TODO: issue: embedding layers learn much slower than Dense layers. Need to carefully initialize
 
 TODO: automatically decrease batch-size if memory issue arises
 
