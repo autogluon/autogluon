@@ -32,7 +32,7 @@ class DefaultLearner(AbstractLearner):
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 nn_options = Dict of hyperparameters + search-spaces for neural network model
         """
-        X, y, X_test, y_test = self.general_data_processing(X, X_test, sample)
+        X, y, X_test, y_test = self.general_data_processing(X, X_test, sample=None)
 
         trainer = self.trainer_type(
             path=self.model_context,

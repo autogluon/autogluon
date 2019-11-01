@@ -10,9 +10,15 @@ from .dataset import TabularDataset
 from tabular.ml.learner.default_learner import DefaultLearner as Learner
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
 
-from ..base import *
-from ..base import schedulers # dick of possible schedulers, maps string -> scheduler function
+from .dataset import TabularDataset
+
+from ...core import *
+from ...searcher import *
 from ...scheduler import *
+from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ..base import BaseTask
+from ..base.base_task import schedulers
+
 
 
 __all__ = ['PredictTableColumn']
@@ -36,7 +42,7 @@ class PredictTableColumn(BaseTask):
             submission_columns=[], feature_generator=None, threshold=100,
             hyperparameter_tune=True, feature_prune=False, 
             nn_options = {}, 
-            num_cpus=None, num_gpus=None, time_limits=None, num_trials=2, dist_ip_addrs=[], visualizer='none',
+            nthreads_per_trial=None, ngpus_per_trial=None, time_limits=None, num_trials=5, dist_ip_addrs=[], visualizer='none',
             search_strategy='random', search_options={}):
         """
         train_data: Dataset object, which is similar to pandas DataFrame.
@@ -62,17 +68,17 @@ class PredictTableColumn(BaseTask):
         # Create feature generator, schedulers, searchers for each model:
         if feature_generator is None:
             feature_generator = AutoMLFeatureGenerator()
-        if num_cpus is None:
-            num_cpus = int(np.floor(multiprocessing.cpu_count()/2)) # At most half of processing power / trial
-        if num_gpus is None:
+        if nthreads_per_trial is None:
+            nthreads_per_trial = int(np.floor(multiprocessing.cpu_count()/2)) # At most half of processing power / trial
+        if ngpus_per_trial is None:
             if mx.test_utils.list_gpus():
-                num_gpus = 1 # single GPU / trial
+                ngpus_per_trial = 1 # single GPU / trial
             else:
-                num_gpus = 0
+                ngpus_per_trial = 0
         
         # All models use same scheduler (TODO: grant each model their own scheduler to run simultaneously):
         scheduler_options = {
-            'resource': {'num_cpus': num_cpus, 'num_gpus': num_gpus},
+            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'num_trials': num_trials,
             'time_out': time_limits,
             'visualizer': visualizer,
@@ -82,15 +88,15 @@ class PredictTableColumn(BaseTask):
             'searcher': search_strategy,
             'search_options': search_options,
         }
-        if isinstance(self.search_strategy, str):
+        if isinstance(search_strategy, str):
             scheduler = schedulers[search_strategy.lower()]
         else:
-            assert callable(self.search_strategy)
-            scheduler = self.search_strategy
+            assert callable(search_strategy)
+            scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options) # wrap into tuple
         
-        predictor = Learner(path_context=savedir, label=label, problem_type=problem_type, objective_func=objective_func, 
+        predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=objective_func, 
                           submission_columns=submission_columns, feature_generator=feature_generator, threshold=threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 

@@ -18,7 +18,8 @@ from tabular.ml.models.abstract_model import AbstractModel
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
-from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel, EPS
+
+from autogluon.core import * 
 
 logger = logging.getLogger(__name__)
 

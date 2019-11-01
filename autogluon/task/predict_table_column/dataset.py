@@ -37,6 +37,8 @@ class TabularDataset(pd.DataFrame):
         df = kwargs.get('df', None)
         subsample = kwargs.get('subsample', None)
         construct_from_df = False # whether or not we are constructing new dataset object from scratch based on provided DataFrame.
+        # if df is None and file_path is None: # Cannot be used currently!
+        #     raise ValueError("Must specify either named argument 'file_path' or 'df' in order to construct tabular Dataset")
         if df is not None: # Create Dataset from existing Python DataFrame:
             construct_from_df = True
             if type(df) != pd.DataFrame:

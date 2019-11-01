@@ -5,9 +5,7 @@
 
 from autogluon import PredictTableColumn as task 
 
-package_dir = 'auto-ml-with-gluon/' # TODO: change this to absolute filepath to auto-ml-with-gluon/ on your computer
-
-package_dir = '/Users/jonasmue/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-gluon/' # TODO! debug
+package_dir = 'autogluon/' # TODO: change this to absolute filepath to autogluon/ on your computer
 
 data_dir = package_dir+'tabular/datasets/AdultIncomeData/'
 train_file_path = data_dir+'train_data.csv'
@@ -22,7 +20,8 @@ train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if
 train_data = train_data.head(1000) # subsample for faster demo
 print(train_data.head())
 
-predictor = task.fit(train_data=train_data, label=label_column, savedir=savedir) # val=None automatically determines train/val split, otherwise we check to ensure train/val match
+predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, hyperparameter_tune=False) 
+# Since tuning_data = None, AutoGluon automatically determines train/validation split.
 
 
 print(predictor.load_trainer().__dict__) # summary of training processes
