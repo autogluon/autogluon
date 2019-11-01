@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import mxnet as mx
 from mxnet import nd, autograd, gluon
-from mxboard import SummaryWriter
+from mxboard import SummaryWriter # TODO: Do we want to keep?
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -32,21 +32,13 @@ from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
 from tabular.ml.mxnet.embednet import EmbedNet
 from tabular.ml.mxnet.tabular_nn_train_func import *
 
-
-@contextlib.contextmanager # TODO: keep this?
-def make_temp_directory():
-    temp_dir = tempfile.mkdtemp()
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
+# __all__ = ['TabularNeuralNetModel', 'EPS']
 
 EPS = 10e-8 # small number
 logger = logging.getLogger(__name__)
 
 
 class TabularNeuralNetModel(AbstractModel):
-    
     """ Class for neural network models that operate on tabular data. These networks use different types of input layers to process different types of data in various columns.
     
         Attributes:

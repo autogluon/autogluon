@@ -378,7 +378,7 @@ class AbstractFeatureGenerator:
             return 0
         prev_len = len(string)
         # print(string)
-        new_str = re.sub('[\w]+', '', string)
+        new_str = re.sub(r'[\w]+', '', string)
         new_len = len(new_str)
 
         # print(new_str)
