@@ -3,9 +3,11 @@
 
 # Clean use-case with mostly defaults:
 
-from autogluon import PredictTableColumn as task
+from autogluon import PredictTableColumn as task 
 
 package_dir = 'auto-ml-with-gluon/' # TODO: change this to absolute filepath to auto-ml-with-gluon/ on your computer
+
+package_dir = '/Users/jonasmue/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-gluon/' # TODO! debug
 
 data_dir = package_dir+'tabular/datasets/AdultIncomeData/'
 train_file_path = data_dir+'train_data.csv'
@@ -15,16 +17,19 @@ label_column = 'class' # name of column containing label to predict
 
 
 # Training time:
-train_data = task.load_data(train_file_path) # returns Pandas object, if user already has pandas object in python, can skip this step
+train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if user already has pandas object in python, can skip this step
+
 train_data = train_data.head(1000) # subsample for faster demo
 print(train_data.head())
 
 predictor = task.fit(train_data=train_data, label=label_column, savedir=savedir) # val=None automatically determines train/val split, otherwise we check to ensure train/val match
+
+
 print(predictor.load_trainer().__dict__) # summary of training processes
 
 
 # Inference time:
-test_data = task.load_data(test_file_path) # Pandas object
+test_data = task.Dataset(file_path=test_file_path) # Pandas object
 y_test = test_data[label_column]
 test_data = test_data.drop(labels=[label_column],axis=1) # Delete labels from test data since we wouldn't have them in practice
 print(test_data.head())
