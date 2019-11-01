@@ -16,14 +16,21 @@ from tabular.ml.trainer.auto_trainer import AutoTrainer
 # TODO: - Those that do not could be added to preprocessing function of model, but would then have to be recomputed on each model.
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
-    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=100, problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer, compute_feature_importance=False):
-        super().__init__(path_context=path_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator, threshold=threshold, problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
+    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=100, 
+                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer, compute_feature_importance=False):
+        super().__init__(path_context=path_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator, 
+                         threshold=threshold, problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
-    def fit(self, X: DataFrame, X_test: DataFrame = None, sample=None, hyperparameter_tune=False, feature_prune=False, searcher=None, scheduler=None):
+    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False, nn_options={}):
         """ Arguments:
-            sample (int): subsample data by just using the first SAMPLE datapoints. 
+                X (DataFrame): training data
+                X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+                hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
+                feature_prune (bool): whether to perform feature selection
+                scheduler_options (tuple: (search_strategy, dict): Options for scheduler
+                nn_options = Dict of hyperparameters + search-spaces for neural network model
         """
         X, y, X_test, y_test = self.general_data_processing(X, X_test, sample)
 
@@ -35,9 +42,7 @@ class DefaultLearner(AbstractLearner):
             feature_types_metadata=self.feature_generator.feature_types_metadata,
             low_memory=True,
             compute_feature_importance=self.compute_feature_importance,
-            searcher=searcher,
-            scheduler=scheduler,
-        )
+            scheduler_options=scheduler_options)
 
         self.trainer_path = trainer.path
         if self.objective_func is None:
@@ -45,7 +50,7 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
 
-        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
+        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, nn_options=nn_options)
         self.save_trainer(trainer=trainer)
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):

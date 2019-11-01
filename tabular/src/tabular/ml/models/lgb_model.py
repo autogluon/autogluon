@@ -43,18 +43,16 @@ class LGBModel(AbstractModel):
         self.num_boost_round = num_boost_round
         self.best_iteration = None
         self.eval_results = {}
-
         self.model_name_checkpointing_0 = 'model_checkpoint_0.pkl'
         self.model_name_checkpointing_1 = 'model_checkpoint_1.pkl'
         self.model_name_trained = 'model_trained.pkl'
         self.eval_result_path = 'eval_result.pkl'
         self.latest_model_checkpoint = 'model_checkpoint_latest.pointer'
-
+    
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None):
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
-
         self.eval_results = {}
         callbacks = []
         valid_names = ['train_set']
@@ -65,17 +63,14 @@ class LGBModel(AbstractModel):
             ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
-
+        
         callbacks += [
             record_evaluation_custom(self.path + self.eval_result_path, eval_result={}, interval=1000),
             # save_model_callback(self.path + self.model_name_checkpointing_0, latest_model_checkpoint=self.path + self.latest_model_checkpoint, interval=400, offset=0),
             # save_model_callback(self.path + self.model_name_checkpointing_1, latest_model_checkpoint=self.path + self.latest_model_checkpoint, interval=400, offset=200),
             # lgb.reset_parameter(learning_rate=lambda iter: alpha * (0.999 ** iter)),
         ]
-
-
         # lr_over_time = lambda iter: 0.05 * (0.99 ** iter)
-
         # alpha = 0.1
         print('TRAINING', self.num_boost_round, ' boosting rounds')
         print(self.params)
@@ -91,15 +86,12 @@ class LGBModel(AbstractModel):
         if type(self.eval_metric) != str:
             train_params['feval'] = self.eval_metric
         self.model = lgb.train(**train_params)
-
         # del dataset_train
         # del dataset_val
         # print('running gc...')
         # gc.collect()
         # print('ran garbage collection...')
-
         self.best_iteration = self.model.best_iteration
-
         # self.model.save_model(self.path + 'model.txt')
         # model_json = self.model.dump_model()
         #
@@ -107,15 +99,14 @@ class LGBModel(AbstractModel):
         #     json.dump(model_json, f, indent=4)
         # save_pkl.save(path=self.path + self.model_name_trained, object=self)  # TODO: saving self instead of model, not consistent with save callbacks
         # save_pointer.save(path=self.path + self.latest_model_checkpoint, content_path=self.path + self.model_name_trained)
-
+    
     def predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
-
+        
         y_pred_proba = self.model.predict(X)
-
         if (self.problem_type == BINARY):
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
@@ -137,9 +128,8 @@ class LGBModel(AbstractModel):
         if dataset_train is None:
             dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
         gc.collect()
-
         params = copy.deepcopy(self.params)
-
+        
         # TODO: Either edit lgb.cv to return models / oof preds or make custom implementation!
         cv_params = {
             'params': params,
@@ -157,15 +147,12 @@ class LGBModel(AbstractModel):
             cv_params['params']['metric'] = self.eval_metric
         if self.problem_type == REGRESSION:
             cv_params['stratified'] = False
-
+        
         print('Current parameters:\n', params)
         eval_hist = lgb.cv(**cv_params)  # TODO: Try to use customer early stopper to enable dart
-
         best_score = eval_hist[self.eval_metric_name + '-mean'][-1]
-
         print('Best num_boost_round:', len(eval_hist[self.eval_metric_name + '-mean']))
         print('Best CV score:', best_score)
-        
         return best_score
 
     def convert_to_weight(self, X: DataFrame):
@@ -190,8 +177,67 @@ class LGBModel(AbstractModel):
             # X_test, W_test = self.convert_to_weight(X=X_test)
             dataset_val = construct_dataset(x=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=self.params, save=save, weight=W_test)
             # dataset_val = construct_dataset_lowest_memory(X=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=self.params)
-
         return dataset_train, dataset_val
+    
+    def debug_features_to_use(self, X_test_in):
+        feature_splits = self.model.feature_importance()
+        total_splits = feature_splits.sum()
+        feature_names = list(X_test_in.columns.values)
+        feature_count = len(feature_names)
+        feature_importances = pd.DataFrame(data=feature_names, columns=['feature'])
+        feature_importances['splits'] = feature_splits
+        feature_importances_unused = feature_importances[feature_importances['splits'] == 0]
+        feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits/feature_count)]
+        print(feature_importances_unused)
+        print(feature_importances_used)
+        print('feature_importances_unused:', len(feature_importances_unused))
+        print('feature_importances_used:', len(feature_importances_used))
+        features_to_use = list(feature_importances_used['feature'].values)
+        print(features_to_use)
+        return features_to_use
+    
+    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler=None): # TODO! scheduler unused.
+        X = pd.concat([X_train, X_test], ignore_index=True)
+        y = pd.concat([y_train, y_test], ignore_index=True)
+        if spaces is None:
+            spaces = LGBMSpaces(problem_type=self.problem_type, objective_func=self.objective_func, num_classes=None).get_hyperparam_spaces_baseline()
+
+        X = self.preprocess(X)
+        dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
+        space = spaces[0]
+        # param_baseline = self.params
+
+        @use_named_args(space)
+        def objective(**params):
+            print(params)
+            new_params = copy.deepcopy(param_baseline)
+            new_params['verbose'] = -1
+            for param in params:
+                new_params[param] = params[param]
+
+            new_model = copy.deepcopy(self)
+            new_model.params = new_params
+            score = new_model.cv(dataset_train=dataset_train)
+
+            print(score)
+            if self.is_higher_better:
+                score = -score
+
+            return score
+
+        reg_gp = gp_minimize(objective, space, verbose=True, n_jobs=1, n_calls=15)
+
+        print('best score: {}'.format(reg_gp.fun))
+
+        optimal_params = copy.deepcopy(param_baseline)
+        for i, param in enumerate(space):
+            optimal_params[param.name] = reg_gp.x[i]
+
+        self.params = optimal_params
+        print(self.params)
+        return optimal_params
+
+"""" OLD code: 
 
     def hyperparameter_tune(self, X, y, spaces=None):
         if spaces is None:
@@ -235,25 +281,4 @@ class LGBModel(AbstractModel):
         print(self.params)
         return optimal_params
 
-    def debug_features_to_use(self, X_test_in):
-        feature_splits = self.model.feature_importance()
-
-        total_splits = feature_splits.sum()
-
-        feature_names = list(X_test_in.columns.values)
-        feature_count = len(feature_names)
-        feature_importances = pd.DataFrame(data=feature_names, columns=['feature'])
-        feature_importances['splits'] = feature_splits
-
-        feature_importances_unused = feature_importances[feature_importances['splits'] == 0]
-
-        feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits/feature_count)]
-
-        print(feature_importances_unused)
-        print(feature_importances_used)
-        print('feature_importances_unused:', len(feature_importances_unused))
-        print('feature_importances_used:', len(feature_importances_used))
-        features_to_use = list(feature_importances_used['feature'].values)
-        print(features_to_use)
-
-        return features_to_use
+"""

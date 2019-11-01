@@ -23,7 +23,7 @@ from sklearn.model_selection import KFold
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
-    def __init__(self, path: str, problem_type: str, objective_func=None, num_classes=None, low_memory=False, feature_types_metadata={}, compute_feature_importance=False, searcher=None, scheduler=None):
+    def __init__(self, path: str, problem_type: str, scheduler_options, objective_func=None, num_classes=None, low_memory=False, feature_types_metadata={}, compute_feature_importance=False):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
@@ -46,8 +46,9 @@ class AbstractTrainer:
         self.model_weights = None
         self.reset_paths = False
         self.feature_importance = {}
-        self.searcher = searcher # autogluon.searcher object
-        self.scheduler = scheduler
+        # Scheduler attributes:
+        self.scheduler_func = scheduler_options[0] # unpack tuple
+        self.scheduler_options = scheduler_options[1]
 
     def set_contexts(self, path_context):
         self.path, self.model_paths = self.create_contexts(path_context)
@@ -138,11 +139,8 @@ class AbstractTrainer:
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
         model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
-
         score = model.score(X=X_test, y=y_test)
-
         print('Score of', model.name, ':', score)
-
         if self.compute_feature_importance:
             self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
 
@@ -154,24 +152,26 @@ class AbstractTrainer:
         feature_importance = model.debug_feature_gain(X_test=X_test, Y_test=y_test, model=model, features_to_use=features_to_use)
         return feature_importance
 
-    def train_single_full(self, X_train, X_test, y_train, y_test, model: AbstractModel, hyperparameter_tune=False, feature_prune=False):
+    def train_single_full(self, X_train, X_test, y_train, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True):
         model.feature_types_metadata = self.feature_types_metadata
         if hyperparameter_tune:
-            model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
+            # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well:
+            # model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
+            model.hyperparameter_tune(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test, 
+                                      scheduler_options=(self.scheduler_func, self.scheduler_options))
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
             pass  # TODO
         self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
-
-    def train_multi(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=False, feature_prune=False):
+    
+    def train_multi(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         for i, model in enumerate(models):
             self.train_single_full(X_train, X_test, y_train, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
 
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
-    def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=False, feature_prune=False):
+    def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-
         for model_name in self.model_names:
             model = self.load_model(model_name)
             if model is not None:

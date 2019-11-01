@@ -1,4 +1,5 @@
-import contextlib, shutil, tempfile, math, random, warnings
+import contextlib, shutil, tempfile, math, random, warnings, pickle
+import logging
 from pathlib import Path
 from collections import OrderedDict
 import numpy as np
@@ -8,6 +9,8 @@ from mxnet import nd, autograd, gluon
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
+logger = logging.getLogger(__name__)
+
 
 class TabularNNDataset:
     """ Class for preprocessing & storing/feeding data batches used by tabular data neural networks. Assumes entire dataset can be loaded into numpy arrays.
@@ -15,7 +18,7 @@ class TabularNNDataset:
         
         Attributes:
             dataset (mxnet.gluon.data.dataset): Contains the raw data (use dataset._data to access). 
-                                                Different indices in this list correspond to different types of inputs to the neural network (each is 2D array)
+                                                Different indices in this list correspond to different types of inputs to the neural network (each is 2D ND array)
                                                 All vector-valued (continuous & one-hot) features are concatenated together into a single index of the dataset.
             data_desc (list[str]): Describes the data type of each index of dataset (options: 'vector','embed_<featname>', 'language_<featname>')
             dataloader (mxnet.gluon.data.DataLoader): Loads batches of data from dataset for neural net training and inference.
@@ -33,6 +36,9 @@ class TabularNNDataset:
         
         Note: Default numerical data-type is converted to float32 (as well as labels in regression).
     """
+    
+    DATAOBJ_SUFFIX = '_tabNNdataset.pkl' # hard-coded names for files. This file contains pickled TabularNNDataset object
+    DATAVALUES_SUFFIX = '_tabNNdata.npz' # This file contains raw data values as data_list of NDArrays
     
     def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, problem_type,
                  labels=None, is_test=True):
@@ -68,7 +74,7 @@ class TabularNNDataset:
         if labels is not None and len(labels) != self.num_examples:
             raise ValueError("number of labels and training examples do not match")
         
-        data_list = [] # stores all data of each feature-type in list used to construct MXNet dataset
+        data_list = [] # stores all data of each feature-type in list used to construct MXNet dataset. Each index of list = 2D NDArray.
         self.label_index = None # int describing which element of the dataset._data list holds labels
         self.data_desc = [] # describes feature-type of each index of data_list
         self.vectordata_index = None # int describing which element of the dataset._data list holds the vector data matrix
@@ -107,6 +113,7 @@ class TabularNNDataset:
             labels = np.array(labels)
             if self.problem_type == REGRESSION and labels.dtype != np.float32:
                 labels = labels.astype('float32') # Convert to proper float-type if not already
+            labels = nd.array(labels)
             data_list.append(labels)
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
@@ -235,16 +242,34 @@ class TabularNNDataset:
         """ Returns new batch where all values of the indicated features have been replaced by the provided mask_value. 
             Args:
                 features (list[str]): list of feature names that should be masked.
-                mask_value (float): value of mask which original feature values should be replaced by
+                mask_value (float): value of mask which original feature values should be replaced by. If None, we replace by mean/mode/unknown
                 data_batch (nd.array): the batch of data as provided by self.dataloader
             Returns:
                 new_batch (nd.array): batch of masked data in same format as data_batch
         """
         return None # TODO
     
-    def load(file_path):
-        return None # TODO save Dataset for reuse during hyperparameter search.
+    def save(self, file_prefix=""):
+        """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
+        dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
+        datalist_file = file_prefix + cls.DATAVALUES_SUFFIX
+        data_list = self.dataset._data
+        self.dataset = None # Avoid pickling these
+        self.dataloader = None
+        pickle.dump(self, open(dataobj_file,'wb'))
+        mx.nd.save(datalist_file, data_list)
+        logger.info("TabNN Dataset saved to files: \n %s \n %s" % (dataobj_file,datalist_file))
     
-    def save(self, file_path):
-        return None
-
+    @classmethod
+    def load(cls, file_prefix=""):
+        """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
+        dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
+        datalist_file = file_prefix + cls.DATAVALUES_SUFFIX
+        tabNNdataset = pickle.load(open(file_prefix, "rb"))
+        data_list = mx.nd.load(datalist_file)
+        tabNNdataset.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)
+        tabNNdataset.dataloader = mx.gluon.data.DataLoader(tabNNdataset.dataset, tabNNdataset.batch_size, shuffle= not tabNNdataset.is_test, 
+                                   last_batch = 'keep' if is_test else 'rollover', num_workers=tabNNdataset.params['num_dataloading_workers'])
+        return tabNNdataset
+        
+    
