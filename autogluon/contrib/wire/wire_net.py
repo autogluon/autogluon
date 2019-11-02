@@ -77,6 +77,7 @@ class WireNet(mx.gluon.HybridBlock):
         x = self.conv1(x)
         x = self.blocks(x)
         x = self.conv6(x)
+        x = F.Activation(x, 'relu')
 
         x = F.contrib.AdaptiveAvgPooling2D(x, 1)
         if self._dropout:

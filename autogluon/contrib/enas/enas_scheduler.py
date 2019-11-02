@@ -2,6 +2,7 @@ import os
 import pickle
 import logging
 from collections import OrderedDict
+from multiprocessing.pool import ThreadPool
 
 import mxnet as mx
 
@@ -78,7 +79,8 @@ class ENAS_Scheduler(object):
         self.warmup_epochs = warmup_epochs
         # create RL searcher/controller
         self.ema_decay = ema_baseline_decay
-        self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type)
+        self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type,
+                                   prefetch=controller_batch_size, num_workers=8)
         # controller setup
         self.controller = self.searcher.controller
         controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
@@ -90,6 +92,12 @@ class ENAS_Scheduler(object):
         self.update_arch_frequency = update_arch_frequency
         self.controller_batch_size = controller_batch_size
         self.val_acc = 0
+        # async controller sample
+        self._worker_pool = ThreadPool(2)
+        self._data_buffer = {}
+        self._rcvd_idx = 0
+        self._sent_idx = 0
+        self._prefetch_controller()
 
     def run(self):
         tq = tqdm(range(self.epochs))
@@ -99,7 +107,8 @@ class ENAS_Scheduler(object):
             tbar = tqdm(enumerate(self.train_data))
             for i, batch in tbar:
                 # sample network configuration
-                config = self.controller.sample()[0]
+                #config = self.controller.sample()[0]
+                config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
                 self.train_fn(self.supernet, batch, **self.train_args)
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
@@ -132,6 +141,28 @@ class ENAS_Scheduler(object):
 
         self.val_acc = reward
 
+    def _sample_controller(self):
+        assert self._rcvd_idx < self._sent_idx, "rcvd_idx must be smaller than sent_idx"
+        try:
+            ret = self._data_buffer.pop(self._rcvd_idx)
+            self._rcvd_idx += 1
+            return  ret.get()
+        except Exception:
+            self._worker_pool.terminate()
+            raise
+
+    def _prefetch_controller(self):
+        async_ret = self._worker_pool.apply_async(self._async_sample, ())
+        self._data_buffer[self._sent_idx] = async_ret
+        self._sent_idx += 1
+
+    def _async_sample(self):
+        with mx.autograd.record():
+            # sample controller_batch_size number of configurations
+            configs, log_probs, entropies = self.controller.sample(batch_size=self.controller_batch_size,
+                                                                   with_details=True)
+        return configs, log_probs, entropies
+
     def train_controller(self):
         """Run multiple number of trials
         """
@@ -139,13 +170,15 @@ class ENAS_Scheduler(object):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
         # update 
         metric = mx.metric.Accuracy()
-        for i, batch in enumerate(self.val_data):
-            if i >= self.controller_batch_size: break
-            with mx.autograd.record():
-                # sample controller_batch_size number of configurations
-                configs, log_probs, entropies = self.controller.sample(batch_size=1, with_details=True)
+        with mx.autograd.record():
+            # sample controller_batch_size number of configurations
+            configs, log_probs, entropies = self._sample_controller()
+            #    self.controller.sample(batch_size=self.controller_batch_size,
+            #                                                       with_details=True)
+            for i, batch in enumerate(self.val_data):
+                if i >= self.controller_batch_size: break
+                self.supernet.sample(**configs[i])
                 # schedule the training tasks and gather the reward
-                self.supernet.sample(**configs[0])
                 metric.reset()
                 self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
                 reward = metric.get()[1]
@@ -157,14 +190,15 @@ class ENAS_Scheduler(object):
                 # EMA baseline
                 self.baseline = decay * self.baseline + (1 - decay) * reward
                 # negative policy gradient
-                log_probs = log_probs.sum(axis=1)
-                loss = - log_probs * avg_rewards
+                log_prob = log_probs[i]
+                log_prob = log_prob.sum()
+                loss = - log_prob * avg_rewards
                 loss = loss.sum()
 
         # update
         loss.backward()
         self.controller_optimizer.step(self.controller_batch_size)
-        logger.debug('controller loss: {}'.format(loss.asscalar()))
+        self._prefetch_controller()
 
     def load(self, checkname=None):
         checkname = checkname if checkname else self.checkname
@@ -185,5 +219,5 @@ class ENAS_Scheduler(object):
         return destination
 
     def load_state_dict(self, state_dict):
-        update_params(self.supernet, state_dict['supernet_params'])
-        update_params(self.controller, state_dict['controller_params'])
+        update_params(self.supernet, state_dict['supernet_params'], ctx=self.ctx)
+        update_params(self.controller, state_dict['controller_params'], ctx=self.controller.context)

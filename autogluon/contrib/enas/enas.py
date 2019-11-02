@@ -144,8 +144,8 @@ class ENAS_Sequential(gluon.HybridBlock):
 
     @property
     def graph(self):
-        from graphviz import Graph
-        e = Graph(node_attr={'color': 'lightblue2', 'style': 'filled', 'shape': 'box'})
+        from graphviz import Digraph
+        e = Digraph(node_attr={'color': 'lightblue2', 'style': 'filled', 'shape': 'box'})
         #e.attr(rankdir='LR', size='8,3')
         pre_node = 'input'
         e.node(pre_node)

@@ -7,15 +7,12 @@ from ...core.space import Space, _strip_config_space
 
 from ..enas import ENAS_Sequential
 
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
-
 __all__ = ['Wire_Stage', 'Wire_Sequential']
 
 class Wire_Stage(gluon.HybridBlock):
     """The Random Wire Stage, each op should work on the same featuremap size.
     """
-    def __init__(self, *modules_list, init_method='sequential'):
+    def __init__(self, *modules_list, label_graph=True, init_method='sequential'):
         """
         Args:
             modules_list(list of Block)
@@ -49,6 +46,7 @@ class Wire_Stage(gluon.HybridBlock):
         self._invalide_nodes = []
         self._leaf_nodes = [keys[-2]]
         self.keys = keys
+        self.label_graph = label_graph
 
     def sample(self, **configs):
         for k, v in configs.items():
@@ -91,7 +89,7 @@ class Wire_Stage(gluon.HybridBlock):
             results[node] = self._modules[node](inputs)
         inputs = results[self._leaf_nodes[0]]
         for leaf_node in self._leaf_nodes[1:]:
-            inputs += results[leaf_node]
+            inputs = inputs + results[leaf_node]
         return self._modules[self.keys[-1]](inputs)
 
     @property
@@ -110,15 +108,17 @@ class Wire_Stage(gluon.HybridBlock):
 
     @property
     def graph(self):
-        from graphviz import Graph
-        e = Graph(node_attr={'color': 'lightblue2', 'style': 'filled', 'shape': 'box'})
+        from graphviz import Digraph
+        e = Digraph(node_attr={'color': 'lightblue2', 'style': 'filled'})#, 'shape': 'box'
         e.attr(size='8,3')
         out_node = self.keys[-1]
         out_node_name = self._prefix + '.' + out_node
-        e.node(out_node_name, label=self._modules[out_node].__class__.__name__+out_node)
+        node_label = self._modules[out_node].__class__.__name__ + out_node if self.label_graph else ''
+        e.node(out_node_name, label=node_label)
         for node in self._active_nodes:
             node_name = self._prefix + '.' + node
-            e.node(node_name, label=self._modules[node].__class__.__name__+node)
+            node_label = self._modules[node].__class__.__name__ + node if self.label_graph else ''
+            e.node(node_name, label=node_label)
         for k, v in self._connections.items():
             k1, k2 = k.split('.')
             if v and k1 in self._active_nodes and k2 in self._active_nodes:
@@ -172,9 +172,29 @@ class Wire_Sequential(ENAS_Sequential):
         return self._kwspaces
 
     def sample(self, **configs):
-        #rets = []
         for k, op in self._modules.items():
             min_config = _strip_config_space(configs, prefix=k)
             op.sample(**min_config)
-            #rets.append()
-        #return all(rets)
+
+    @property
+    def graph(self):
+        from graphviz import Digraph
+        e = Digraph(node_attr={'color': 'lightblue2', 'style': 'filled'}) #, 'shape': 'box'
+        pre_node = 'input'
+        e.node(pre_node)
+        for i, op in self._modules.items():
+            if hasattr(op, 'graph'):
+                e.subgraph(op.graph)
+                e.edge(pre_node, op.nodehead)
+                pre_node = op.nodeend
+            else:
+                if hasattr(op, 'node'):
+                    if op.node is None: continue
+                    node_info = op.node
+                else:
+                    node_info = {}
+                    node_info['label'] = op.__class__.__name__
+                e.node(i, **node_info)
+                e.edge(pre_node, i)
+                pre_node = i
+        return e
