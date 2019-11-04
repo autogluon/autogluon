@@ -10,7 +10,7 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from ..utils import (save, load, in_ipynb, mkdir, try_import_mxboard)
+from ..utils import (save, load, mkdir, try_import_mxboard)
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
@@ -18,10 +18,7 @@ from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+from tqdm.auto import tqdm
 
 __all__ = ['RLScheduler']
 

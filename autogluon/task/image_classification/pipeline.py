@@ -51,6 +51,7 @@ def train_image_classification(args, reporter):
     def train(epoch):
         for i, batch in enumerate(train_data):
             default_train_fn(net, batch, batch_size, args.loss, trainer, batch_fn, ctx)
+            mx.nd.waitall()
 
     def test(epoch):
         metric.reset()

@@ -82,7 +82,6 @@ class Wire_Stage(gluon.HybridBlock):
                 if k.split('.')[1] == node and v:
                     in_node = k.split('.')[0]
                     if in_node in self._active_nodes:
-                        #print('k, in_node:', k, in_node)
                         assert in_node in results
                         inputs = inputs + results[in_node] if inputs is not None else results[in_node]
             assert inputs is not None

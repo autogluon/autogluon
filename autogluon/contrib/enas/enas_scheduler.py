@@ -13,10 +13,7 @@ from ...task.image_classification.utils import *
 from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, in_ipynb)
 from .enas_utils import *
 
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+from tqdm.auto import tqdm
 
 __all__ = ['ENAS_Scheduler']
 
@@ -32,7 +29,7 @@ class ENAS_Scheduler(object):
                  train_args={}, val_args={}, reward_fn= default_reward_fn,
                  num_gpus=1, num_cpus=4,
                  batch_size=256, epochs=120, warmup_epochs=5,
-                 controller_lr=0.01, controller_type='lstm',
+                 controller_lr=1e-3, controller_type='lstm',
                  controller_batch_size=10, ema_baseline_decay=0.95,
                  update_arch_frequency=20, checkname='./enas/checkpoint.ag',
                  plot_frequency=0, **kwargs):
@@ -50,9 +47,9 @@ class ENAS_Scheduler(object):
         self.plot_frequency = plot_frequency
         if isinstance(train_set, str):
             train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
-                                             num_worker=num_cpus, shuffle=True).init()
+                                             num_workers=num_cpus, shuffle=True).init()
             val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
-                                           num_worker=num_cpus, shuffle=True).init()
+                                           num_workers=num_cpus, shuffle=True).init()
         if isinstance(train_set, gluon.data.Dataset):
             self.train_data = DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,
@@ -80,7 +77,7 @@ class ENAS_Scheduler(object):
         # create RL searcher/controller
         self.ema_decay = ema_baseline_decay
         self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type,
-                                   prefetch=controller_batch_size, num_workers=8)
+                                   prefetch=4, num_workers=4)
         # controller setup
         self.controller = self.searcher.controller
         controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
@@ -88,7 +85,7 @@ class ENAS_Scheduler(object):
         self.controller.context = controller_resource
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
-                optimizer_params={'learning_rate': controller_lr*controller_batch_size})
+                optimizer_params={'learning_rate': controller_lr})
         self.update_arch_frequency = update_arch_frequency
         self.controller_batch_size = controller_batch_size
         self.val_acc = 0
@@ -98,6 +95,8 @@ class ENAS_Scheduler(object):
         self._rcvd_idx = 0
         self._sent_idx = 0
         self._prefetch_controller()
+        # logging history
+        self.training_history = []
 
     def run(self):
         tq = tqdm(range(self.epochs))
@@ -107,10 +106,10 @@ class ENAS_Scheduler(object):
             tbar = tqdm(enumerate(self.train_data))
             for i, batch in tbar:
                 # sample network configuration
-                #config = self.controller.sample()[0]
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
                 self.train_fn(self.supernet, batch, **self.train_args)
+                mx.nd.waitall()
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
                 if self.plot_frequency > 0 and i % self.plot_frequency == 0:
@@ -140,6 +139,7 @@ class ENAS_Scheduler(object):
             tbar.set_description('Acc: {}'.format(reward))
 
         self.val_acc = reward
+        self.training_history.append(reward)
 
     def _sample_controller(self):
         assert self._rcvd_idx < self._sent_idx, "rcvd_idx must be smaller than sent_idx"
@@ -173,8 +173,6 @@ class ENAS_Scheduler(object):
         with mx.autograd.record():
             # sample controller_batch_size number of configurations
             configs, log_probs, entropies = self._sample_controller()
-            #    self.controller.sample(batch_size=self.controller_batch_size,
-            #                                                       with_details=True)
             for i, batch in enumerate(self.val_data):
                 if i >= self.controller_batch_size: break
                 self.supernet.sample(**configs[i])
@@ -216,8 +214,10 @@ class ENAS_Scheduler(object):
             destination._metadata = OrderedDict()
         destination['supernet_params'] = collect_params(self.supernet)
         destination['controller_params'] = collect_params(self.controller)
+        destination['training_history'] = self.training_history
         return destination
 
     def load_state_dict(self, state_dict):
         update_params(self.supernet, state_dict['supernet_params'], ctx=self.ctx)
         update_params(self.controller, state_dict['controller_params'], ctx=self.controller.context)
+        #self.training_history = state_dict['training_history']
