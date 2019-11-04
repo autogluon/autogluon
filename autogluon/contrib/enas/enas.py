@@ -7,10 +7,10 @@ from ...core.space import *
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-__all__ = ['autogluon_enas_unit', 'autogluon_enas_net',
+__all__ = ['enas_unit', 'enas_net',
            'Zero_Unit', 'ENAS_Unit', 'ENAS_Sequential']
 
-def autogluon_enas_unit(**kwvars):
+def enas_unit(**kwvars):
     def registered_class(Cls):
         class enas_unit(ENAS_Unit):
             def __init__(self, *args, **kwargs):
@@ -64,7 +64,7 @@ def autogluon_enas_unit(**kwvars):
         return enas_unit
     return registered_class
 
-def autogluon_enas_net(**kwvars):
+def enas_net(**kwvars):
     def registered_class(Cls):
         class ENAS_Net(Cls):
             def __init__(self, *args, **kwargs):

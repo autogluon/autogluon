@@ -3,11 +3,11 @@ from mxnet import gluon
 from ...nas.models.utils import *
 from ...nas.models.mbconv import MBConvBlock
 from ...core.space import *
-from .enas import autogluon_enas_unit, ENAS_Sequential
+from .enas import enas_unit, ENAS_Sequential
 
 __all__ = ['ENAS_MbBlock', 'ENAS_MBNet']
 
-@autogluon_enas_unit(
+@enas_unit(
     in_channels=32,
     channels=32,
     expand_ratio=Categorical(3, 6),

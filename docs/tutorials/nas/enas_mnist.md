@@ -46,7 +46,7 @@ class ConvBNReLU(mx.gluon.HybridBlock):
 ```{.python .input}
 from autogluon.contrib.enas import *
 
-@autogluon_enas_unit()
+@enas_unit()
 class ResUnit(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, hidden_channels, kernel, stride):
         super().__init__()
