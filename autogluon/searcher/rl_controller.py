@@ -2,6 +2,9 @@ import pickle
 import mxnet as mx
 import mxnet.gluon.nn as nn
 import mxnet.ndarray as F
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+
 from ..core.space import *
 from .searcher import BaseSearcher
 from ..utils import keydefaultdict, update_params
@@ -21,18 +24,20 @@ class RLSearcher(BaseSearcher):
         >>> searcher = RLSearcher(train_fn.kwspaces)
         >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm'):
+    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm', **kwargs):
         self._results = OrderedDict()
         self._best_state_path = None
         if controller_type == 'lstm':
-            self.controller = LSTMController(kwspaces, ctx=ctx)
+            self.controller = LSTMController(kwspaces, ctx=ctx, **kwargs)
         elif controller_type == 'alpha':
-            self.controller = AlphaController(kwspaces, ctx=ctx)
+            self.controller = AlphaController(kwspaces, ctx=ctx, **kwargs)
         elif controller_type == 'atten':
-            self.controller = AttenController(kwspaces, ctx=ctx)
+            self.controller = AttenController(kwspaces, ctx=ctx, **kwargs)
         else:
             raise NotImplemented
         self.controller.initialize(ctx=mx.cpu())
+        for _ in range(self.controller._nprefetch):
+            self.controller._prefetch()
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
@@ -61,11 +66,54 @@ class RLSearcher(BaseSearcher):
         update_params(self.controller, pickle.loads(state_dict['controller_params']))
 
 
-# Reference: https://github.com/carpedm20/ENAS-pytorch/
-class LSTMController(mx.gluon.Block):
-    def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
-                 ctx=mx.cpu()):
+class BaseController(mx.gluon.Block):
+    def __init__(self, prefetch=4, num_workers=4, timeout=20):
         super().__init__()
+        #manager = multiprocessing.Manager()
+        self._data_buffer = {}#manager.dict()
+        self._rcvd_idx = 0
+        self._sent_idx = 0
+        self._num_workers = num_workers
+        self._worker_pool = ThreadPool(self._num_workers)
+        self._timeout = timeout
+        self._nprefetch = prefetch
+
+    def sample(self, *args, **kwargs):
+        raise NotImplemented
+
+    def _prefetch(self):
+        async_ret = self._worker_pool.apply_async(self.sample, ())
+        self._data_buffer[self._sent_idx] = async_ret
+        self._sent_idx += 1
+
+    def initialize(self, ctx=mx.cpu(), *args, **kwargs):
+        self.context = ctx[0] if isinstance(ctx, (list, tuple)) else ctx
+        super().initialize(ctx=ctx, *args, **kwargs)
+
+    def pre_sample(self):
+        if self._rcvd_idx == self._sent_idx:
+            self._prefetch()
+        self._prefetch()
+        assert self._rcvd_idx < self._sent_idx, "rcvd_idx must be smaller than sent_idx"
+        try:
+            ret = self._data_buffer.pop(self._rcvd_idx)
+            self._rcvd_idx += 1
+            return  ret.get(timeout=self._timeout)
+        except multiprocessing.context.TimeoutError:
+            msg = '''Worker timed out after {} seconds. This might be caused by \n
+            - Slow transform. Please increase timeout to allow slower data loading in each worker.
+            '''.format(self._timeout)
+            print(msg)
+            raise
+        except Exception:
+            self._worker_pool.terminate()
+            raise
+
+# Reference: https://github.com/carpedm20/ENAS-pytorch/
+class LSTMController(BaseController):
+    def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
+                 ctx=mx.cpu(), **kwargs):
+        super().__init__(**kwargs)
         self.softmax_temperature = softmax_temperature
         self.spaces = list(kwspaces.items())
         self.hidden_size = hidden_size
@@ -95,10 +143,6 @@ class LSTMController(mx.gluon.Block):
         
         self.static_init_hidden = keydefaultdict(_init_hidden)
         self.static_inputs = keydefaultdict(_get_default_hidden)
-
-    def initialize(self, ctx=mx.cpu(), *args, **kwargs):
-        self.context = ctx[0] if isinstance(ctx, (list, tuple)) else ctx
-        super().initialize(ctx=ctx, *args, **kwargs)
 
     def forward(self, inputs, hidden, block_idx, is_embed):
         if not is_embed:
@@ -133,7 +177,7 @@ class LSTMController(mx.gluon.Block):
 
         return config
 
-    def sample(self, batch_size=1, with_details=False):
+    def sample(self, batch_size=1, with_details=False, with_entropy=False):
         """
         Return:
             configs (list of dict): list of configurations
@@ -151,7 +195,7 @@ class LSTMController(mx.gluon.Block):
 
             probs = F.softmax(logits, axis=-1)
             log_prob = F.log_softmax(logits, axis=-1)
-            entropy = -(log_prob * probs).sum(1, keepdims=False)
+            entropy = -(log_prob * probs).sum(1, keepdims=False) if with_entropy else None
 
             action = mx.random.multinomial(probs, 1)
             ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
@@ -175,7 +219,8 @@ class LSTMController(mx.gluon.Block):
             configs.append(config)
 
         if with_details:
-            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+            entropies = F.stack(*entropies, axis=1) if with_entropy else entropies
+            return configs, F.stack(*log_probs, axis=1), entropies
         else:
             return configs
 
@@ -187,10 +232,10 @@ class Alpha(mx.gluon.Block):
     def forward(self, batch_size):
         return self.weight.data().expand_dims(0).repeat(batch_size, axis=0)
 
-class AttenController(mx.gluon.Block):
+class AttenController(BaseController):
     def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
-                 ctx=mx.cpu()):
-        super().__init__()
+                 ctx=mx.cpu(), **kwargs):
+        super().__init__(**kwargs)
         self.softmax_temperature = softmax_temperature
         self.spaces = list(kwspaces.items())
         self.context = ctx
@@ -236,7 +281,7 @@ class AttenController(mx.gluon.Block):
 
         return config
 
-    def sample(self, batch_size=1, with_details=False):
+    def sample(self, batch_size=1, with_details=False, with_entropy=False):
         # self-attention
         x = self.embedding(batch_size).reshape(-3, 0)#.squeeze() # b x action x h
         kshape = (batch_size, self.num_total_tokens, self.hidden_size)
@@ -258,7 +303,7 @@ class AttenController(mx.gluon.Block):
             probs = F.softmax(logits, axis=-1)
             log_prob = F.log_softmax(logits, axis=-1)
 
-            entropy = -(log_prob * probs).sum(1, keepdims=False)
+            entropy = -(log_prob * probs).sum(1, keepdims=False) if with_entropy else None
 
             action = mx.random.multinomial(probs, 1)
             ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
@@ -279,13 +324,14 @@ class AttenController(mx.gluon.Block):
             configs.append(config)
 
         if with_details:
-            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+            entropies = F.stack(*entropies, axis=1) if with_entropy else entropies
+            return configs, F.stack(*log_probs, axis=1), entropies
         else:
             return configs
 
-class AlphaController(mx.gluon.Block):
-    def __init__(self, kwspaces, softmax_temperature=1.0, ctx=mx.cpu()):
-        super().__init__()
+class AlphaController(BaseController):
+    def __init__(self, kwspaces, softmax_temperature=1.0, ctx=mx.cpu(), **kwargs):
+        super().__init__(**kwargs)
         self.softmax_temperature = softmax_temperature
         self.spaces = list(kwspaces.items())
         self.context = ctx
@@ -318,7 +364,7 @@ class AlphaController(mx.gluon.Block):
 
         return config
 
-    def sample(self, batch_size=1, with_details=False):
+    def sample(self, batch_size=1, with_details=False, with_entropy=False):
         actions = []
         entropies = []
         log_probs = []
@@ -329,7 +375,7 @@ class AlphaController(mx.gluon.Block):
             probs = F.softmax(logits, axis=-1)
             log_prob = F.log_softmax(logits, axis=-1)
 
-            entropy = -(log_prob * probs).sum(1, keepdims=False)
+            entropy = -(log_prob * probs).sum(1, keepdims=False) if with_entropy else None
 
             action = mx.random.multinomial(probs, 1)
             ind = mx.nd.stack(mx.nd.arange(probs.shape[0], ctx=action.context),
@@ -350,6 +396,7 @@ class AlphaController(mx.gluon.Block):
             configs.append(config)
 
         if with_details:
-            return configs, F.stack(*log_probs, axis=1), F.stack(*entropies, axis=1)
+            entropies = F.stack(*entropies, axis=1) if with_entropy else entropies
+            return configs, F.stack(*log_probs, axis=1), entropies
         else:
             return configs

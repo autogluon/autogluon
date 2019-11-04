@@ -78,7 +78,6 @@ def default_train_fn(net, batch, batch_size, criterion, trainer, batch_fn, ctx):
     for l in loss:
         l.backward()
     trainer.step(batch_size, ignore_stale_grad=True)
-    mx.nd.waitall()
 
 def _train_val_split(train_dataset, split=1):
     # temporary solution, need to change using batchify function

@@ -29,11 +29,15 @@ def create_version_file():
 class install(setuptools.command.install.install):
     def run(self):
         create_version_file()
+        subprocess.check_call("pip uninstall dask".split())
+        subprocess.check_call("pip uninstall distributed".split())
         setuptools.command.install.install.run(self)
 
 class develop(setuptools.command.develop.develop):
     def run(self):
         create_version_file()
+        subprocess.check_call("pip uninstall -y dask".split())
+        subprocess.check_call("pip uninstall -y distributed".split())
         setuptools.command.develop.develop.run(self)
 
 try:
@@ -45,15 +49,13 @@ except(IOError, ImportError):
 requirements = [
     'tqdm',
     'numpy',
-    'cython',
     'scipy',
-    'matplotlib',
+    'cython',
     'requests',
-    'pytest',
-    'paramiko==2.5.0',
-    'distributed==2.6.0',
-    'dask[complete]==2.6.0',
+    'matplotlib',
     'tornado',
+    'paramiko==2.5.0',
+    'dask[complete]>=2.6.0',
     'ConfigSpace==0.4.10',
     'nose',
     'gluoncv',

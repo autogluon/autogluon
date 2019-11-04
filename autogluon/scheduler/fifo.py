@@ -17,10 +17,7 @@ from ..searcher import *
 from .reporter import DistStatusReporter
 from ..utils import DeprecationHelper, in_ipynb
 
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+from tqdm.auto import tqdm
 
 __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 
