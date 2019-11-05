@@ -5,10 +5,10 @@ import copy
 from collections import OrderedDict
 import mxnet as mx
 import matplotlib.pyplot as plt
-# from mxnet.gluon.data.vision import transforms
 
 from .model_zoo import *
 from ...utils import *
+from .pipeline import *
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
 if in_ipynb():
@@ -17,64 +17,6 @@ else:
     from tqdm import tqdm
 
 __all__ = ['TextClassificationPredictor']
-
-
-# class TextClassificationPredictor(BasePredictor):
-#     def __init__(self, loss_func, eval_func, model=None, **kwargs):
-#         super(TextClassificationPredictor, self).__init__(loss_func, eval_func, model, **kwargs)
-#
-#     def predict(self, sentence):
-#         """The task predict function given an input.
-#          Args:
-#             sentence: the input
-#          Example:
-#             >>> ind = predictor.predict('this is cool')
-#         """
-#         pass
-#
-#     def predict_proba(self, sentence):
-#         """The task predict probability function given an input.
-#          Args:
-#             sentence: the input
-#          Example:
-#             >>> prob = predictor.predict_proba('this is cool')
-#         """
-#         pass
-#
-#     def evaluate_predictions(self, y_true, y_pred):
-#         """ Evaluate the provided list of predictions against list of ground truth labels according to the task-specific evaluation metric (self.eval_func). """
-#         pass
-#
-#     def evaluate(self, sentence):
-#         """The task evaluation function given an input.
-#          Args:
-#             sentence: the input
-#          Example:
-#             >>> acc = predictor.evaluate('this is cool')
-#         """
-#         pass
-#
-#     def load(self, output_directory):
-#         """ Load Predictor object from given directory.
-#             Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
-#         """
-#         pass  # Need to load models and set them = predictor.model
-#
-#     def save(self, output_directory):
-#         """ Saves this object to file. Don't forget to save the models and the Results objects if they exist.
-#             Before returning a Predictor, task.fit() should call predictor.save()
-#         """
-#         pass
-#
-#     def _save_results(self, output_directory):
-#         """ Internal helper function: Save results in human-readable file JSON format """
-#         pass
-#
-#     def _save_model(self, output_directory):
-#         """ Internal helper function: Save self.model object to file located in output_directory.
-#             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
-#         """
-#         pass
 
 class TextClassificationPredictor(BasePredictor):
     """
@@ -101,7 +43,7 @@ class TextClassificationPredictor(BasePredictor):
 
         model_args = copy.deepcopy(args)
         model_args.update(results['best_config'])
-        model = get_network(args.net, args.dataset.num_classes)
+        model = get_network(args.net)
         update_params(model, model_params)
         return cls(eval_func, model, eval_func, scheduler_checkpoint, args)
 
@@ -119,64 +61,45 @@ class TextClassificationPredictor(BasePredictor):
     def save(self, checkpoint):
         save(self.state_dict(), checkpoint)
 
-    def predict(self, X, input_size=224, plot=True):
-        """ This method should be able to produce predictions regardless if:
-            X = single data example (e.g. single image, single document),
-            X = batch of many examples, X = task.Dataset object
-        """
+    def predict(self, X):
         """The task predict function given an input.
          Args:
-            img: the input
+            sentence: the input
          Example:
-            >>> ind, prob = classifier.predict('example.jpg')
+            >>> ind = predictor.predict('this is cool')
         """
-        # load and display the image
-        img = mx.image.imread(X) if isinstance(X, str) and os.path.isfile(X) else X
-        if plot:
-            plt.imshow(img.asnumpy())
-            plt.show()
-        # model inference
-        input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
-        resize = int(math.ceil(input_size / 0.875))
-        transform_fn = transforms.Compose([
-                transforms.Resize(resize),
-                transforms.CenterCrop(input_size),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
-        img = transform_fn(img)
-        proba = self.predict_proba(img)
+        proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
-        idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
-                          ind.astype('float32'))
-        return ind, mx.nd.gather_nd(proba, idx)
+        return ind
 
     def predict_proba(self, X):
-        """ Produces predicted class probabilities if we are dealing with a classification task.
-            In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
+        """The task predict probability function given an input.
+         Args:
+            sentence: the input
+         Example:
+            >>> prob = predictor.predict_proba('this is cool')
         """
         pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
-    def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
+    def evaluate(self, dataset, ctx=[mx.cpu()], *args):
         """The task evaluation function given the test dataset.
          Args:
             dataset: test dataset
          Example:
-            >>> from autogluon import ImageClassification as task
-            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-            >>> test_reward = classifier.evaluate(dataset)
+            >>> from autogluon import TextClassification as task
+            >>> dataset = task.Dataset(test_path='~/data/test')
+            >>> test_reward = predictor.evaluate(dataset)
         """
         args = self.args
         net = self.model
         batch_size = args.batch_size * max(len(ctx), 1)
         metric = get_metric_instance(args.metric)
-        input_size = net.input_size if hasattr(net, 'input_size') else input_size
-
-        _, test_data, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, False)
-        tbar = tqdm(enumerate(test_data))
+        _, dev_data_list, _, _ = preprocess_data(
+            args.bert_tokenizer, args.task, batch_size, args.dev_batch_size, args.max_len, args.vocabulary, args.pad)
+        tbar = tqdm(enumerate(dev_data_list))
         for i, batch in tbar:
-            self.eval_func(net, batch, batch_fn, metric, ctx)
+            self.eval_func(net, batch, metric, ctx)
             _, test_reward = metric.get()
             tbar.set_description('{}: {}'.format(args.metric, test_reward))
         _, test_reward = metric.get()

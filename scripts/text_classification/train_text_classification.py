@@ -73,7 +73,7 @@ if __name__ == '__main__':
                          seed=args.seed, warmup_ratio=args.warmup_ratio, epsilon=args.epsilon,
                          dtype=args.dtype, only_inference=args.only_inference, pad=args.pad,
                          visualizer=args.visualizer)
-    print('Top-1 val acc: %.3f' % predictor.results.reward)
+    print('Top-1 val acc: %.3f' % predictor.results['best_reward'])
     test_acc = predictor.evaluate(dataset)
     print('Top-1 test acc: %.3f' % test_acc)
     sentence = 'I feel this is awesome!'
@@ -81,4 +81,4 @@ if __name__ == '__main__':
     prob = predictor.predict_proba(sentence)
     print('The input sentence is classified as [%s], with probability %.2f.' % (ind.asscalar(), prob.asscalar()))
     print('The best configuration is:')
-    print(predictor.results.config)
+    print(predictor.results['best_config'])

@@ -62,7 +62,6 @@ class ClassificationDataset(object):
         self._read_dataset(**kwargs)
 
     def _read_dataset(self, **kwargs):
-        import time
         if self.name in built_in_datasets:
             self.train = get_built_in_dataset(self.name, train=True, input_size=self.input_size).init()
             self.val = None
