@@ -9,6 +9,7 @@ In this tutorial, we are using sentiment analysis as a text classification examp
 We begin by specifying `TextClassification` as our task of interest:
 
 ```python
+import autogluon as ag
 from autogluon import TextClassification as task
 
 import logging
@@ -49,7 +50,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```python
-print('Top-1 val acc: %.3f' % predictor.results.reward)
+print('Top-1 val acc: %.3f' % predictor.results['best_reward'])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new text.
@@ -74,7 +75,13 @@ For example, we can inspect the best hyperparameter configuration corresponding 
 
 ```python
 print('The best configuration is:')
-print(predictor.results.config)
+print(predictor.results['best_config'])
 ```
 
 This configuration is used to generate the above results.
+
+At the end, please remember to safely exit to release all the resources:
+
+```python
+ag.done()
+```

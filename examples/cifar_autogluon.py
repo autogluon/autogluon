@@ -11,8 +11,6 @@ from gluoncv.utils import makedirs, LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
 import autogluon as ag
-from autogluon import autogluon_method
-from autogluon.utils.mxutils import update_params
 
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
@@ -20,38 +18,35 @@ import ConfigSpace.hyperparameters as CSH
 # CLI
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a model for image classification.')
-    parser.add_argument('--batch-size', type=int, default=64,
-                        help='training batch size per device (CPU/GPU).')
     parser.add_argument('--num-gpus', type=int, default=1,
                         help='number of gpus to use.')
-    parser.add_argument('--model', type=str, default='cifar_resnet20_v1',
-                        help='model to use. options are resnet and wrn. default is cifar_resnet20_v1.')
-    parser.add_argument('-j', '--num-data-workers', dest='num_workers', default=4, type=int,
-                        help='number of preprocessing workers')
-    parser.add_argument('--lr', type=float, default=0.1,
-                        help='learning rate. default is 0.1.')
-    parser.add_argument('--momentum', type=float, default=0.9,
-                        help='momentum value for optimizer, default is 0.9.')
-    parser.add_argument('--wd', type=float, default=0.0001,
-                        help='weight decay rate. default is 0.0001.')
-    parser.add_argument('--epochs', default=20, type=int,
-                        help='number of epochs')
     parser.add_argument('--num-trials', default=10, type=int,
                         help='number of trail tasks')
+    parser.add_argument('--epochs', default=20, type=int,
+                        help='number of epochs')
     parser.add_argument('--scheduler', type=str, default='fifo',
                         help='scheduler name (default: fifo)')
     parser.add_argument('--checkpoint', type=str, default='checkpoint/cifar1.ag',
                         help='checkpoint path (default: None)')
-    parser.add_argument('--resume', action='store_true', default= False,
-                        help='resume from the checkpoint if needed')
     parser.add_argument('--debug', action='store_true', default= False,
                         help='debug if needed')
     args = parser.parse_args()
     return args
 
 
-@autogluon_method
+@ag.autogluon_register_args(
+    batch_size=64,
+    num_workers=2,
+    num_gpus=1,
+    model='cifar_resnet20_v1',
+    j=4,
+    lr=ag.space.Real(1e-2, 1e-1, log=True),
+    momentum=0.9,
+    wd=ag.space.Real(1e-5, 1e-3, log=True),
+    epochs=20,
+)
 def train_cifar(args, reporter):
+    print('args', args)
     batch_size = args.batch_size
 
     num_gpus = args.num_gpus
@@ -109,11 +104,6 @@ def train_cifar(args, reporter):
         best_val_score = 0
 
         start_epoch = 0
-        if args.resume and reporter.has_dict():
-            state_dict = reporter.get_dict()
-            print('resuming from state_dict:', state_dict.keys())
-            start_epoch = state_dict['epoch']
-            update_params(net, state_dict['params'])
 
         for epoch in range(start_epoch, epochs):
             tic = time.time()
@@ -143,7 +133,6 @@ def train_cifar(args, reporter):
             name, acc = train_metric.get()
             name, val_acc = test(ctx, val_data)
             reporter(epoch=epoch, accuracy=val_acc)
-            #reporter.save_dict(epoch=epoch, params=net.collect_params())
 
     train(args.epochs, context)
 
@@ -176,44 +165,21 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO)
 
-    # creating hyperparameters
-    cs = CS.ConfigurationSpace()
-    lr = CSH.UniformFloatHyperparameter('lr', lower=1e-3, upper=1e-1, log=True)
-    wd = CSH.UniformFloatHyperparameter('wd', lower=1e-4, upper=5e-4, log=False)
-    cs.add_hyperparameters([lr, wd])
-
+    train_cifar.update(epochs=args.epochs)
     # create searcher and scheduler
-    searcher = ag.searcher.RandomSampling(cs)
     if args.scheduler == 'hyperband':
-        myscheduler = ag.scheduler.Hyperband_Scheduler(train_cifar, args,
-                                                       {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                       num_trials=args.num_trials,
-                                                       checkpoint=args.checkpoint,
-                                                       resume = args.resume,
-                                                       time_attr='epoch', reward_attr="accuracy",
-                                                       max_t=args.epochs, grace_period=args.epochs//4)
+        myscheduler = ag.scheduler.HyperbandScheduler(train_cifar,
+                                                      resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
+                                                      num_trials=args.num_trials,
+                                                      checkpoint=args.checkpoint,
+                                                      time_attr='epoch', reward_attr="accuracy",
+                                                      max_t=args.epochs, grace_period=args.epochs//4)
     elif args.scheduler == 'fifo':
-        myscheduler = ag.scheduler.FIFO_Scheduler(train_cifar, args,
-                                                  {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                  num_trials=args.num_trials,
-                                                  checkpoint=args.checkpoint,
-                                                  resume = args.resume,
-                                                  reward_attr="accuracy")
-    elif args.scheduler == 'dist_fifo':
-        myscheduler = ag.distributed.DistributedFIFOScheduler(train_cifar, args,
-                                                              {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                              num_trials=args.num_trials,
-                                                              checkpoint=args.checkpoint,
-                                                              resume = args.resume,
-                                                              reward_attr="accuracy")
-    elif args.scheduler == 'dist_hyperband':
-        myscheduler = ag.distributed.DistributedHyperbandScheduler(train_cifar, args,
-                                                                   {'num_cpus': 2, 'num_gpus': args.num_gpus}, searcher,
-                                                                   num_trials=args.num_trials,
-                                                                   checkpoint=args.checkpoint,
-                                                                   resume = args.resume,
-                                                                   time_attr='epoch', reward_attr="accuracy",
-                                                                   max_t=args.epochs, grace_period=args.epochs//4)
+        myscheduler = ag.scheduler.FIFOScheduler(train_cifar,
+                                                 resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
+                                                 num_trials=args.num_trials,
+                                                 checkpoint=args.checkpoint,
+                                                 reward_attr="accuracy")
     else:
         raise RuntimeError('Unsuported Scheduler!')
 
@@ -222,15 +188,4 @@ if __name__ == '__main__':
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
-
-    if args.scheduler == 'dist_fifo' or args.scheduler == 'dist_hyperband':
-        print('Shutting Down the Scheduler')
-        myscheduler.shutdown()
-
-    if args.scheduler == 'fifo' or args.scheduler == 'hyberband':
-        # evaluating the best model params
-        best_model = get_model(args.model, classes=10)
-        best_model.initialize(mx.init.Xavier(), ctx=mx.cpu(0))
-        state_dict = myscheduler.get_best_state()
-        update_params(best_model, state_dict['params'])
-        print('Evaluating the best model and the best accuracy is {}'.format(cifar_evaluate(best_model, args)))
+    myscheduler.shutdown()

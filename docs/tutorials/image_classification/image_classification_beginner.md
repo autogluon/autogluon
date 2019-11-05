@@ -8,13 +8,10 @@ Besides, you could easily specify for greater control over the training process 
 
 We begin by specifying `image_classification` as our task of interest:
 
-```python
+```{.python .input}
+import autogluon as ag
 from autogluon import ImageClassification as task
-
-import logging
-logging.basicConfig(level=logging.INFO)
 ```
-
 
 ## Create AutoGluon Dataset
 
@@ -24,16 +21,16 @@ Our subset of the data contains the following possible labels: `BabyPants`, `Bab
 We download the data subset from this [link](../data.zip)
 and unzip it via the following commands:
 
-```python
+```{.python .input}
 import os
 os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
 os.system('unzip -o data.zip -d ~/')
 ```
 
-Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
+Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
-```python
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
+```{.python .input}
+dataset = task.Dataset(train_path='~/data/train')
 ```
 
 In the above call, a train/validation data split is automatically constructed based on the provided data, where 90% of the images are used for training and 10% held-out for validation. AutoGluon will automatically tune various hyperparameters of our neural network models in order to maximize classification performance on the validation data.  
@@ -48,37 +45,38 @@ While we stick with mostly default configurations in this Beginner tutorial, the
 
 However, neural network training can be quite time-costly. To ensure quick runtimes, we tell AutoGluon to obey strict limits: `num_training_epochs` specifies how much computational effort can be devoted to training any single network, while `time_limits` in seconds specifies how much time `fit` has to return a model. For demo purposes, we specify only small values for `time_limits`, `num_training_epochs`:
 
-```python
+```{.python .input}
 time_limits = 3*60 # 3mins
 epochs = 10
-results = task.fit(dataset,
-                   time_limits=time_limits,
-                   epochs=epochs)
+classifier = task.fit(dataset,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      ngpus_per_trial=1)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
 
 The best Top-1 accuracy achieved on the validation set is:
 
-```python
-print('Top-1 val acc: %.3f' % results.reward)
+```{.python .input}
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
 
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
-```python
-test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-test_acc = task.evaluate(test_dataset)
+```{.python .input}
+test_dataset = task.Dataset(test_path='~/data/test')
+test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
-```python
+```{.python .input}
 image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
-ind, prob = task.predict(image)
+ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
 ```
@@ -86,9 +84,14 @@ print('The input picture is classified as [%s], with probability %.2f.' %
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
 For example, we can inspect the best hyperparameter configuration corresponding to the final model which achieved the above results:
 
-```python
+```{.python .input}
 print('The best configuration is:')
-print(results.config)
+print(classifier.results['best_config'])
 ```
 
-This configuration is used to generate the above results.
+This configuration was used to generate the above results.
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```

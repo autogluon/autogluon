@@ -25,26 +25,35 @@ from .transforms import BERTDatasetTransform
 from ...core import *
 # from ...basic import autogluon_method
 
-__all__ = ['train_text_classification']
+__all__ = ['train_text_classification', 'evaluate']
 logger = logging.getLogger(__name__)
+
+
+def evaluate(model, loader_dev, metric, ctx, *args):
+    """Evaluate the model on validation dataset."""
+    use_roberta = 'roberta' in args.bert_model
+    metric.reset()
+    for batch_id, seqs in enumerate(loader_dev):
+        input_ids, valid_length, segment_ids, label = seqs
+        input_ids = input_ids.as_in_context(ctx)
+        valid_length = valid_length.as_in_context(ctx).astype('float32')
+        label = label.as_in_context(ctx)
+        if use_roberta:
+            out = model(input_ids, valid_length)
+        else:
+            out = model(input_ids, segment_ids.as_in_context(ctx), valid_length)
+        metric.update([label], [out])
+
+    metric_nm, metric_val = metric.get()
+    if not isinstance(metric_nm, list):
+        metric_nm, metric_val = [metric_nm], [metric_val]
+    mx.nd.waitall()
+    return metric_nm, metric_val
 
 @autogluon_register_args()
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function
-
-    tasks = {
-        'MRPC': MRPCTask(),
-        'QQP': QQPTask(),
-        'QNLI': QNLITask(),
-        'RTE': RTETask(),
-        'STS-B': STSBTask(),
-        'CoLA': CoLATask(),
-        'MNLI': MNLITask(),
-        'WNLI': WNLITask(),
-        'SST': SSTTask(),
-        'IMDB': nlp.data.IMDB(), #TODO: metric in args not in the task
-    }
     batch_size = args.batch_size
     dev_batch_size = args.dev_batch_size
     task_name = args.task_name
@@ -493,321 +502,321 @@ def train_text_classification(args, reporter=None):
     for segment, test_data in test_data_list:
         test(test_data, segment)
 
-@autogluon_method
-def train_text_classification(args, reporter=None):
-    """Training function."""
-    model_name = args.bert_model
-    dataset_name = args.bert_dataset
-    only_predict = args.only_predict
-    model_parameters = args.model_parameters
-    pretrained_bert_parameters = args.pretrained_bert_parameters
-    if pretrained_bert_parameters and model_parameters:
-        raise ValueError('Cannot provide both pre-trained BERT parameters and '
-                         'BertForQA model parameters.')
-    lower = args.uncased
-
-    epochs = args.epochs
-    batch_size = args.batch_size
-    test_batch_size = args.test_batch_size
-    lr = args.lr
-    ctx = mx.cpu() if args.gpu is None else mx.gpu(args.gpu)
-
-    accumulate = args.accumulate
-    log_interval = args.log_interval * accumulate if accumulate else args.log_interval
-    if accumulate:
-        log.info('Using gradient accumulation. Effective batch size = {}'.
-                 format(accumulate * batch_size))
-
-    optimizer = args.optimizer
-    warmup_ratio = args.warmup_ratio
-
-    version_2 = args.version_2
-    null_score_diff_threshold = args.null_score_diff_threshold
-
-    max_seq_length = args.max_seq_length
-    doc_stride = args.doc_stride
-    max_query_length = args.max_query_length
-    n_best_size = args.n_best_size
-    max_answer_length = args.max_answer_length
-
-    if max_seq_length <= max_query_length + 3:
-        raise ValueError('The max_seq_length (%d) must be greater than max_query_length '
-                         '(%d) + 3' % (max_seq_length, max_query_length))
-
-    # vocabulary and tokenizer
-    if args.sentencepiece:
-        logging.info('loading vocab file from sentence piece model: %s', args.sentencepiece)
-        if dataset_name:
-            warnings.warn('Both --dataset_name and --sentencepiece are provided. '
-                          'The vocabulary will be loaded based on --sentencepiece.')
-        vocab = nlp.vocab.BERTVocab.from_sentencepiece(args.sentencepiece)
-        dataset_name = None
-    else:
-        vocab = None
-
-    pretrained = not model_parameters and not pretrained_bert_parameters and not args.sentencepiece
-    bert, vocab = nlp.model.get_model(
-        name=model_name,
-        dataset_name=dataset_name,
-        vocab=vocab,
-        pretrained=pretrained,
-        ctx=ctx,
-        use_pooler=False,
-        use_decoder=False,
-        use_classifier=False)
-
-    if args.sentencepiece:
-        tokenizer = nlp.data.BERTSPTokenizer(args.sentencepiece, vocab, lower=lower)
-    else:
-        tokenizer = nlp.data.BERTTokenizer(vocab=vocab, lower=lower)
-
-    batchify_fn = nlp.data.batchify.Tuple(
-        nlp.data.batchify.Stack(),
-        nlp.data.batchify.Pad(axis=0, pad_val=vocab[vocab.padding_token]),
-        nlp.data.batchify.Pad(axis=0, pad_val=vocab[vocab.padding_token]),
-        nlp.data.batchify.Stack('float32'),
-        nlp.data.batchify.Stack('float32'),
-        nlp.data.batchify.Stack('float32'))
-
-    net = BertForQA(bert=bert)
-    if model_parameters:
-        # load complete BertForQA parameters
-        nlp.utils.load_parameters(net, model_parameters, ctx=ctx, cast_dtype=True)
-    elif pretrained_bert_parameters:
-        # only load BertModel parameters
-        nlp.utils.load_parameters(bert, pretrained_bert_parameters, ctx=ctx,
-                                  ignore_extra=True, cast_dtype=True)
-        net.span_classifier.initialize(init=mx.init.Normal(0.02), ctx=ctx)
-    elif pretrained:
-        # only load BertModel parameters
-        net.span_classifier.initialize(init=mx.init.Normal(0.02), ctx=ctx)
-    else:
-        # no checkpoint is loaded
-        net.initialize(init=mx.init.Normal(0.02), ctx=ctx)
-
-    net.hybridize(static_alloc=True)
-
-    loss_function = BertForQALoss()
-    loss_function.hybridize(static_alloc=True)
-
-    segment = 'train' if not args.debug else 'dev'
-    log.info('Loading %s data...', segment)
-    if version_2:
-        train_data = SQuAD(segment, version='2.0')
-    else:
-        train_data = SQuAD(segment, version='1.1')
-    if args.debug:
-        sampled_data = [train_data[i] for i in range(1000)]
-        train_data = mx.gluon.data.SimpleDataset(sampled_data)
-    log.info('Number of records in Train data:{}'.format(len(train_data)))
-
-    train_data_transform, _ = preprocess_dataset(
-        train_data, SQuADTransform(
-            copy.copy(tokenizer),
-            max_seq_length=max_seq_length,
-            doc_stride=doc_stride,
-            max_query_length=max_query_length,
-            is_pad=True,
-            is_training=True))
-    log.info('The number of examples after preprocessing:{}'.format(
-        len(train_data_transform)))
-
-    train_dataloader = mx.gluon.data.DataLoader(
-        train_data_transform, batchify_fn=batchify_fn,
-        batch_size=batch_size, num_workers=4, shuffle=True)
-
-    log.info('Start Training')
-
-    optimizer_params = {'learning_rate': lr}
-    try:
-        trainer = mx.gluon.Trainer(net.collect_params(), optimizer,
-                                   optimizer_params, update_on_kvstore=False)
-    except ValueError as e:
-        print(e)
-        warnings.warn('AdamW optimizer is not found. Please consider upgrading to '
-                      'mxnet>=1.5.0. Now the original Adam optimizer is used instead.')
-        trainer = mx.gluon.Trainer(net.collect_params(), 'adam',
-                                   optimizer_params, update_on_kvstore=False)
-
-    num_train_examples = len(train_data_transform)
-    step_size = batch_size * accumulate if accumulate else batch_size
-    num_train_steps = int(num_train_examples / step_size * epochs)
-    num_warmup_steps = int(num_train_steps * warmup_ratio)
-    step_num = 0
-
-    def set_new_lr(step_num, batch_id):
-        """set new learning rate"""
-        # set grad to zero for gradient accumulation
-        if accumulate:
-            if batch_id % accumulate == 0:
-                net.collect_params().zero_grad()
-                step_num += 1
-        else:
-            step_num += 1
-        # learning rate schedule
-        # Notice that this learning rate scheduler is adapted from traditional linear learning
-        # rate scheduler where step_num >= num_warmup_steps, new_lr = 1 - step_num/num_train_steps
-        if step_num < num_warmup_steps:
-            new_lr = lr * step_num / num_warmup_steps
-        else:
-            offset = (step_num - num_warmup_steps) * lr / \
-                (num_train_steps - num_warmup_steps)
-            new_lr = lr - offset
-        trainer.set_learning_rate(new_lr)
-        return step_num
-
-    # Do not apply weight decay on LayerNorm and bias terms
-    for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
-        v.wd_mult = 0.0
-    # Collect differentiable parameters
-    params = [p for p in net.collect_params().values()
-              if p.grad_req != 'null']
-    # Set grad_req if gradient accumulation is required
-    if accumulate:
-        for p in params:
-            p.grad_req = 'add'
-
-    epoch_tic = time.time()
-    total_num = 0
-    log_num = 0
-    for epoch_id in range(epochs):
-        step_loss = 0.0
-        tic = time.time()
-        for batch_id, data in enumerate(train_dataloader):
-            # set new lr
-            step_num = set_new_lr(step_num, batch_id)
-            # forward and backward
-            with mx.autograd.record():
-                _, inputs, token_types, valid_length, start_label, end_label = data
-
-                log_num += len(inputs)
-                total_num += len(inputs)
-
-                out = net(inputs.astype('float32').as_in_context(ctx),
-                          token_types.astype('float32').as_in_context(ctx),
-                          valid_length.astype('float32').as_in_context(ctx))
-
-                ls = loss_function(out, [
-                    start_label.astype('float32').as_in_context(ctx),
-                    end_label.astype('float32').as_in_context(ctx)]).mean()
-
-                if accumulate:
-                    ls = ls / accumulate
-            ls.backward()
-            # update
-            if not accumulate or (batch_id + 1) % accumulate == 0:
-                trainer.allreduce_grads()
-                nlp.utils.clip_grad_global_norm(params, 1)
-                trainer.update(1)
-
-            step_loss += ls.asscalar()
-
-            if (batch_id + 1) % log_interval == 0:
-                toc = time.time()
-                log.info('Epoch: {}, Batch: {}/{}, Loss={:.4f}, lr={:.7f} Time cost={:.1f} Thoughput={:.2f} samples/s'  # pylint: disable=line-too-long
-                         .format(epoch_id, batch_id, len(train_dataloader),
-                                 step_loss / log_interval,
-                                 trainer.learning_rate, toc - tic, log_num/(toc - tic)))
-                tic = time.time()
-                step_loss = 0.0
-                log_num = 0
-        epoch_toc = time.time()
-        log.info('Time cost={:.2f} s, Thoughput={:.2f} samples/s'.format(
-            epoch_toc - epoch_tic, total_num/(epoch_toc - epoch_tic)))
-
-    net.save_parameters(os.path.join(output_dir, 'net.params'))
-
-
-def evaluate():
-    """Evaluate the model on validation dataset.
-    """
-    log.info('Loading dev data...')
-    if version_2:
-        dev_data = SQuAD('dev', version='2.0')
-    else:
-        dev_data = SQuAD('dev', version='1.1')
-    if args.debug:
-        sampled_data = [dev_data[0], dev_data[1], dev_data[2]]
-        dev_data = mx.gluon.data.SimpleDataset(sampled_data)
-    log.info('Number of records in dev data:{}'.format(len(dev_data)))
-
-    dev_dataset = dev_data.transform(
-        SQuADTransform(
-            copy.copy(tokenizer),
-            max_seq_length=max_seq_length,
-            doc_stride=doc_stride,
-            max_query_length=max_query_length,
-            is_pad=False,
-            is_training=False)._transform, lazy=False)
-
-    dev_data_transform, _ = preprocess_dataset(
-        dev_data, SQuADTransform(
-            copy.copy(tokenizer),
-            max_seq_length=max_seq_length,
-            doc_stride=doc_stride,
-            max_query_length=max_query_length,
-            is_pad=False,
-            is_training=False))
-    log.info('The number of examples after preprocessing:{}'.format(
-        len(dev_data_transform)))
-
-    dev_dataloader = mx.gluon.data.DataLoader(
-        dev_data_transform,
-        batchify_fn=batchify_fn,
-        num_workers=4, batch_size=test_batch_size,
-        shuffle=False, last_batch='keep')
-
-    log.info('start prediction')
-
-    all_results = collections.defaultdict(list)
-
-    epoch_tic = time.time()
-    total_num = 0
-    for data in dev_dataloader:
-        example_ids, inputs, token_types, valid_length, _, _ = data
-        total_num += len(inputs)
-        out = net(inputs.astype('float32').as_in_context(ctx),
-                  token_types.astype('float32').as_in_context(ctx),
-                  valid_length.astype('float32').as_in_context(ctx))
-
-        output = mx.nd.split(out, axis=2, num_outputs=2)
-        example_ids = example_ids.asnumpy().tolist()
-        pred_start = output[0].reshape((0, -3)).asnumpy()
-        pred_end = output[1].reshape((0, -3)).asnumpy()
-
-        for example_id, start, end in zip(example_ids, pred_start, pred_end):
-            all_results[example_id].append(PredResult(start=start, end=end))
-
-    epoch_toc = time.time()
-    log.info('Time cost={:.2f} s, Thoughput={:.2f} samples/s'.format(
-        epoch_toc - epoch_tic, total_num/(epoch_toc - epoch_tic)))
-
-    log.info('Get prediction results...')
-
-    all_predictions = collections.OrderedDict()
-
-    for features in dev_dataset:
-        results = all_results[features[0].example_id]
-        example_qas_id = features[0].qas_id
-
-        prediction, _ = predict(
-            features=features,
-            results=results,
-            tokenizer=nlp.data.BERTBasicTokenizer(lower=lower),
-            max_answer_length=max_answer_length,
-            null_score_diff_threshold=null_score_diff_threshold,
-            n_best_size=n_best_size,
-            version_2=version_2)
-
-        all_predictions[example_qas_id] = prediction
-
-    with io.open(os.path.join(output_dir, 'predictions.json'),
-                 'w', encoding='utf-8') as fout:
-        data = json.dumps(all_predictions, ensure_ascii=False)
-        fout.write(data)
-
-    if version_2:
-        log.info('Please run evaluate-v2.0.py to get evaluation results for SQuAD 2.0')
-    else:
-        F1_EM = get_F1_EM(dev_data, all_predictions)
-        log.info(F1_EM)
+# @autogluon_method
+# def train_text_classification(args, reporter=None):
+#     """Training function."""
+#     model_name = args.bert_model
+#     dataset_name = args.bert_dataset
+#     only_predict = args.only_predict
+#     model_parameters = args.model_parameters
+#     pretrained_bert_parameters = args.pretrained_bert_parameters
+#     if pretrained_bert_parameters and model_parameters:
+#         raise ValueError('Cannot provide both pre-trained BERT parameters and '
+#                          'BertForQA model parameters.')
+#     lower = args.uncased
+#
+#     epochs = args.epochs
+#     batch_size = args.batch_size
+#     test_batch_size = args.test_batch_size
+#     lr = args.lr
+#     ctx = mx.cpu() if args.gpu is None else mx.gpu(args.gpu)
+#
+#     accumulate = args.accumulate
+#     log_interval = args.log_interval * accumulate if accumulate else args.log_interval
+#     if accumulate:
+#         log.info('Using gradient accumulation. Effective batch size = {}'.
+#                  format(accumulate * batch_size))
+#
+#     optimizer = args.optimizer
+#     warmup_ratio = args.warmup_ratio
+#
+#     version_2 = args.version_2
+#     null_score_diff_threshold = args.null_score_diff_threshold
+#
+#     max_seq_length = args.max_seq_length
+#     doc_stride = args.doc_stride
+#     max_query_length = args.max_query_length
+#     n_best_size = args.n_best_size
+#     max_answer_length = args.max_answer_length
+#
+#     if max_seq_length <= max_query_length + 3:
+#         raise ValueError('The max_seq_length (%d) must be greater than max_query_length '
+#                          '(%d) + 3' % (max_seq_length, max_query_length))
+#
+#     # vocabulary and tokenizer
+#     if args.sentencepiece:
+#         logging.info('loading vocab file from sentence piece model: %s', args.sentencepiece)
+#         if dataset_name:
+#             warnings.warn('Both --dataset_name and --sentencepiece are provided. '
+#                           'The vocabulary will be loaded based on --sentencepiece.')
+#         vocab = nlp.vocab.BERTVocab.from_sentencepiece(args.sentencepiece)
+#         dataset_name = None
+#     else:
+#         vocab = None
+#
+#     pretrained = not model_parameters and not pretrained_bert_parameters and not args.sentencepiece
+#     bert, vocab = nlp.model.get_model(
+#         name=model_name,
+#         dataset_name=dataset_name,
+#         vocab=vocab,
+#         pretrained=pretrained,
+#         ctx=ctx,
+#         use_pooler=False,
+#         use_decoder=False,
+#         use_classifier=False)
+#
+#     if args.sentencepiece:
+#         tokenizer = nlp.data.BERTSPTokenizer(args.sentencepiece, vocab, lower=lower)
+#     else:
+#         tokenizer = nlp.data.BERTTokenizer(vocab=vocab, lower=lower)
+#
+#     batchify_fn = nlp.data.batchify.Tuple(
+#         nlp.data.batchify.Stack(),
+#         nlp.data.batchify.Pad(axis=0, pad_val=vocab[vocab.padding_token]),
+#         nlp.data.batchify.Pad(axis=0, pad_val=vocab[vocab.padding_token]),
+#         nlp.data.batchify.Stack('float32'),
+#         nlp.data.batchify.Stack('float32'),
+#         nlp.data.batchify.Stack('float32'))
+#
+#     net = BertForQA(bert=bert)
+#     if model_parameters:
+#         # load complete BertForQA parameters
+#         nlp.utils.load_parameters(net, model_parameters, ctx=ctx, cast_dtype=True)
+#     elif pretrained_bert_parameters:
+#         # only load BertModel parameters
+#         nlp.utils.load_parameters(bert, pretrained_bert_parameters, ctx=ctx,
+#                                   ignore_extra=True, cast_dtype=True)
+#         net.span_classifier.initialize(init=mx.init.Normal(0.02), ctx=ctx)
+#     elif pretrained:
+#         # only load BertModel parameters
+#         net.span_classifier.initialize(init=mx.init.Normal(0.02), ctx=ctx)
+#     else:
+#         # no checkpoint is loaded
+#         net.initialize(init=mx.init.Normal(0.02), ctx=ctx)
+#
+#     net.hybridize(static_alloc=True)
+#
+#     loss_function = BertForQALoss()
+#     loss_function.hybridize(static_alloc=True)
+#
+#     segment = 'train' if not args.debug else 'dev'
+#     log.info('Loading %s data...', segment)
+#     if version_2:
+#         train_data = SQuAD(segment, version='2.0')
+#     else:
+#         train_data = SQuAD(segment, version='1.1')
+#     if args.debug:
+#         sampled_data = [train_data[i] for i in range(1000)]
+#         train_data = mx.gluon.data.SimpleDataset(sampled_data)
+#     log.info('Number of records in Train data:{}'.format(len(train_data)))
+#
+#     train_data_transform, _ = preprocess_dataset(
+#         train_data, SQuADTransform(
+#             copy.copy(tokenizer),
+#             max_seq_length=max_seq_length,
+#             doc_stride=doc_stride,
+#             max_query_length=max_query_length,
+#             is_pad=True,
+#             is_training=True))
+#     log.info('The number of examples after preprocessing:{}'.format(
+#         len(train_data_transform)))
+#
+#     train_dataloader = mx.gluon.data.DataLoader(
+#         train_data_transform, batchify_fn=batchify_fn,
+#         batch_size=batch_size, num_workers=4, shuffle=True)
+#
+#     log.info('Start Training')
+#
+#     optimizer_params = {'learning_rate': lr}
+#     try:
+#         trainer = mx.gluon.Trainer(net.collect_params(), optimizer,
+#                                    optimizer_params, update_on_kvstore=False)
+#     except ValueError as e:
+#         print(e)
+#         warnings.warn('AdamW optimizer is not found. Please consider upgrading to '
+#                       'mxnet>=1.5.0. Now the original Adam optimizer is used instead.')
+#         trainer = mx.gluon.Trainer(net.collect_params(), 'adam',
+#                                    optimizer_params, update_on_kvstore=False)
+#
+#     num_train_examples = len(train_data_transform)
+#     step_size = batch_size * accumulate if accumulate else batch_size
+#     num_train_steps = int(num_train_examples / step_size * epochs)
+#     num_warmup_steps = int(num_train_steps * warmup_ratio)
+#     step_num = 0
+#
+#     def set_new_lr(step_num, batch_id):
+#         """set new learning rate"""
+#         # set grad to zero for gradient accumulation
+#         if accumulate:
+#             if batch_id % accumulate == 0:
+#                 net.collect_params().zero_grad()
+#                 step_num += 1
+#         else:
+#             step_num += 1
+#         # learning rate schedule
+#         # Notice that this learning rate scheduler is adapted from traditional linear learning
+#         # rate scheduler where step_num >= num_warmup_steps, new_lr = 1 - step_num/num_train_steps
+#         if step_num < num_warmup_steps:
+#             new_lr = lr * step_num / num_warmup_steps
+#         else:
+#             offset = (step_num - num_warmup_steps) * lr / \
+#                 (num_train_steps - num_warmup_steps)
+#             new_lr = lr - offset
+#         trainer.set_learning_rate(new_lr)
+#         return step_num
+#
+#     # Do not apply weight decay on LayerNorm and bias terms
+#     for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
+#         v.wd_mult = 0.0
+#     # Collect differentiable parameters
+#     params = [p for p in net.collect_params().values()
+#               if p.grad_req != 'null']
+#     # Set grad_req if gradient accumulation is required
+#     if accumulate:
+#         for p in params:
+#             p.grad_req = 'add'
+#
+#     epoch_tic = time.time()
+#     total_num = 0
+#     log_num = 0
+#     for epoch_id in range(epochs):
+#         step_loss = 0.0
+#         tic = time.time()
+#         for batch_id, data in enumerate(train_dataloader):
+#             # set new lr
+#             step_num = set_new_lr(step_num, batch_id)
+#             # forward and backward
+#             with mx.autograd.record():
+#                 _, inputs, token_types, valid_length, start_label, end_label = data
+#
+#                 log_num += len(inputs)
+#                 total_num += len(inputs)
+#
+#                 out = net(inputs.astype('float32').as_in_context(ctx),
+#                           token_types.astype('float32').as_in_context(ctx),
+#                           valid_length.astype('float32').as_in_context(ctx))
+#
+#                 ls = loss_function(out, [
+#                     start_label.astype('float32').as_in_context(ctx),
+#                     end_label.astype('float32').as_in_context(ctx)]).mean()
+#
+#                 if accumulate:
+#                     ls = ls / accumulate
+#             ls.backward()
+#             # update
+#             if not accumulate or (batch_id + 1) % accumulate == 0:
+#                 trainer.allreduce_grads()
+#                 nlp.utils.clip_grad_global_norm(params, 1)
+#                 trainer.update(1)
+#
+#             step_loss += ls.asscalar()
+#
+#             if (batch_id + 1) % log_interval == 0:
+#                 toc = time.time()
+#                 log.info('Epoch: {}, Batch: {}/{}, Loss={:.4f}, lr={:.7f} Time cost={:.1f} Thoughput={:.2f} samples/s'  # pylint: disable=line-too-long
+#                          .format(epoch_id, batch_id, len(train_dataloader),
+#                                  step_loss / log_interval,
+#                                  trainer.learning_rate, toc - tic, log_num/(toc - tic)))
+#                 tic = time.time()
+#                 step_loss = 0.0
+#                 log_num = 0
+#         epoch_toc = time.time()
+#         log.info('Time cost={:.2f} s, Thoughput={:.2f} samples/s'.format(
+#             epoch_toc - epoch_tic, total_num/(epoch_toc - epoch_tic)))
+#
+#     net.save_parameters(os.path.join(output_dir, 'net.params'))
+#
+#
+# def evaluate():
+#     """Evaluate the model on validation dataset.
+#     """
+#     log.info('Loading dev data...')
+#     if version_2:
+#         dev_data = SQuAD('dev', version='2.0')
+#     else:
+#         dev_data = SQuAD('dev', version='1.1')
+#     if args.debug:
+#         sampled_data = [dev_data[0], dev_data[1], dev_data[2]]
+#         dev_data = mx.gluon.data.SimpleDataset(sampled_data)
+#     log.info('Number of records in dev data:{}'.format(len(dev_data)))
+#
+#     dev_dataset = dev_data.transform(
+#         SQuADTransform(
+#             copy.copy(tokenizer),
+#             max_seq_length=max_seq_length,
+#             doc_stride=doc_stride,
+#             max_query_length=max_query_length,
+#             is_pad=False,
+#             is_training=False)._transform, lazy=False)
+#
+#     dev_data_transform, _ = preprocess_dataset(
+#         dev_data, SQuADTransform(
+#             copy.copy(tokenizer),
+#             max_seq_length=max_seq_length,
+#             doc_stride=doc_stride,
+#             max_query_length=max_query_length,
+#             is_pad=False,
+#             is_training=False))
+#     log.info('The number of examples after preprocessing:{}'.format(
+#         len(dev_data_transform)))
+#
+#     dev_dataloader = mx.gluon.data.DataLoader(
+#         dev_data_transform,
+#         batchify_fn=batchify_fn,
+#         num_workers=4, batch_size=test_batch_size,
+#         shuffle=False, last_batch='keep')
+#
+#     log.info('start prediction')
+#
+#     all_results = collections.defaultdict(list)
+#
+#     epoch_tic = time.time()
+#     total_num = 0
+#     for data in dev_dataloader:
+#         example_ids, inputs, token_types, valid_length, _, _ = data
+#         total_num += len(inputs)
+#         out = net(inputs.astype('float32').as_in_context(ctx),
+#                   token_types.astype('float32').as_in_context(ctx),
+#                   valid_length.astype('float32').as_in_context(ctx))
+#
+#         output = mx.nd.split(out, axis=2, num_outputs=2)
+#         example_ids = example_ids.asnumpy().tolist()
+#         pred_start = output[0].reshape((0, -3)).asnumpy()
+#         pred_end = output[1].reshape((0, -3)).asnumpy()
+#
+#         for example_id, start, end in zip(example_ids, pred_start, pred_end):
+#             all_results[example_id].append(PredResult(start=start, end=end))
+#
+#     epoch_toc = time.time()
+#     log.info('Time cost={:.2f} s, Thoughput={:.2f} samples/s'.format(
+#         epoch_toc - epoch_tic, total_num/(epoch_toc - epoch_tic)))
+#
+#     log.info('Get prediction results...')
+#
+#     all_predictions = collections.OrderedDict()
+#
+#     for features in dev_dataset:
+#         results = all_results[features[0].example_id]
+#         example_qas_id = features[0].qas_id
+#
+#         prediction, _ = predict(
+#             features=features,
+#             results=results,
+#             tokenizer=nlp.data.BERTBasicTokenizer(lower=lower),
+#             max_answer_length=max_answer_length,
+#             null_score_diff_threshold=null_score_diff_threshold,
+#             n_best_size=n_best_size,
+#             version_2=version_2)
+#
+#         all_predictions[example_qas_id] = prediction
+#
+#     with io.open(os.path.join(output_dir, 'predictions.json'),
+#                  'w', encoding='utf-8') as fout:
+#         data = json.dumps(all_predictions, ensure_ascii=False)
+#         fout.write(data)
+#
+#     if version_2:
+#         log.info('Please run evaluate-v2.0.py to get evaluation results for SQuAD 2.0')
+#     else:
+#         F1_EM = get_F1_EM(dev_data, all_predictions)
+#         log.info(F1_EM)

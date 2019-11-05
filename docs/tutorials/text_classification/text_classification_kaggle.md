@@ -197,7 +197,7 @@ On your own, please feel free to try running the following commands with small t
 The top-1 accuracy of the best model on the hpo validation set is:
 
 ```python
-# print('Top-1 acc: %.3f' % predictor.results.reward)
+# print('Top-1 acc: %.3f' % predictor.results['best_reward'])
 ```
 
 ###  Using AutoGluon to generate predictions on test sentences 
@@ -229,3 +229,9 @@ To see an example submission, check out the file `sample submission.csv` at this
 To make your own submission, click [Submission](https://www.kaggle.com/c/twitter-sentiment-analysis2/submit)
 and then follow the steps in the submission page (upload submission file, describe the submission,
 and click the `Make Submission` button). Let's see how your model fares in this competition!
+
+At the end, please remember to safely exit to release all the resources:
+
+```python
+ag.done()
+```

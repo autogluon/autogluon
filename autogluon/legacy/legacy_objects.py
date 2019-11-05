@@ -1,9 +1,9 @@
-from ..core import Choice, Space
+from ..core import Categorical, Space
 from ..utils import DeprecationHelper
 from .space import List
 
 __all__ = ['Optimizers', 'Nets', 'Losses']
 
-Optimizers = DeprecationHelper(List, 'Choice')
-Nets = DeprecationHelper(List, 'Choice')
-Losses = DeprecationHelper(List, 'Choice')
+Optimizers = DeprecationHelper(List, 'Categorical')
+Nets = DeprecationHelper(List, 'Categorical')
+Losses = DeprecationHelper(List, 'Categorical')

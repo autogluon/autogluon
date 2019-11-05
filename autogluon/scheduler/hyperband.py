@@ -99,7 +99,7 @@ class HyperbandScheduler(FIFOScheduler):
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,
-                 checkpoint='./exp/checkerpoint.ag',
+                 checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None,
                  time_out=None, max_reward=1.0,
                  time_attr="epoch",
@@ -132,7 +132,7 @@ class HyperbandScheduler(FIFOScheduler):
                 "type '{}' not supported, must be 'stopping' or 'promotion'".format(
                     type))
 
-    def add_task(self, task, **kwargs):
+    def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
 
         Args:
@@ -180,38 +180,34 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], next_milestone)
 
         # main process
-        tp = threading.Thread(target=cls._start_distributed_task, args=(
-                              task, cls.RESOURCE_MANAGER, self.env_sem))
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
         # reporter thread
-        checkpoint_semaphore = mp.Semaphore(0) if self._checkpoint else None
         rp = threading.Thread(target=self._run_reporter,
-                              args=(task, tp, reporter, self.searcher, self.terminator,
-                                    checkpoint_semaphore, terminator_semaphore), daemon=False)
-        tp.start()
+                              args=(task, job, reporter, self.searcher, self.terminator,
+                                    None, terminator_semaphore), daemon=False)
         rp.start()
         task_dict = self._dict_from_task(task)
-        task_dict.update({'Task': task, 'Process': tp, 'ReporterThread': rp})
+        task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
         # checkpoint thread
         if self._checkpoint is not None:
-            sp = threading.Thread(target=self._run_checkpoint, args=(checkpoint_semaphore,),
-                                  daemon=False)
-            sp.start()
-            task_dict['CheckpointThead'] = sp
+            def _save_checkpoint_callback(fut):
+                self._cleaning_tasks()
+                self.save()
+            job.add_done_callback(_save_checkpoint_callback)
 
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
-    def _run_reporter(self, task, task_process, reporter, searcher, terminator,
+    def _run_reporter(self, task, task_job, reporter, searcher, terminator,
                       checkpoint_semaphore, terminator_semaphore):
         last_result = None
         last_updated = None
-        while task_process.is_alive():
+        while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
                 terminator_semaphore.release()
                 terminator.on_task_complete(task, last_result)
-                task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
@@ -256,13 +252,14 @@ class HyperbandScheduler(FIFOScheduler):
                         act_str, reported_result[self._time_attr], task))
                 terminator_semaphore.release()
                 terminator.on_task_remove(task)
-                task_process.join()
+                #task_process.join()
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
         # Pass all of last_result to searcher (unless this has already been
         # done)
         if last_result is not last_updated:
+            last_result['done'] = True
             searcher.update(
                 config=task.args['config'],
                 reward=last_result[self._reward_attr], **last_result)

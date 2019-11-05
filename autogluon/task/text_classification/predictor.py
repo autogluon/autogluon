@@ -1,0 +1,215 @@
+import os
+import math
+import pickle
+import copy
+from collections import OrderedDict
+import mxnet as mx
+import matplotlib.pyplot as plt
+# from mxnet.gluon.data.vision import transforms
+
+from .model_zoo import *
+from ...utils import *
+from .metrics import get_metric_instance
+from ..base.base_predictor import BasePredictor
+if in_ipynb():
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
+
+__all__ = ['TextClassificationPredictor']
+
+
+# class TextClassificationPredictor(BasePredictor):
+#     def __init__(self, loss_func, eval_func, model=None, **kwargs):
+#         super(TextClassificationPredictor, self).__init__(loss_func, eval_func, model, **kwargs)
+#
+#     def predict(self, sentence):
+#         """The task predict function given an input.
+#          Args:
+#             sentence: the input
+#          Example:
+#             >>> ind = predictor.predict('this is cool')
+#         """
+#         pass
+#
+#     def predict_proba(self, sentence):
+#         """The task predict probability function given an input.
+#          Args:
+#             sentence: the input
+#          Example:
+#             >>> prob = predictor.predict_proba('this is cool')
+#         """
+#         pass
+#
+#     def evaluate_predictions(self, y_true, y_pred):
+#         """ Evaluate the provided list of predictions against list of ground truth labels according to the task-specific evaluation metric (self.eval_func). """
+#         pass
+#
+#     def evaluate(self, sentence):
+#         """The task evaluation function given an input.
+#          Args:
+#             sentence: the input
+#          Example:
+#             >>> acc = predictor.evaluate('this is cool')
+#         """
+#         pass
+#
+#     def load(self, output_directory):
+#         """ Load Predictor object from given directory.
+#             Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
+#         """
+#         pass  # Need to load models and set them = predictor.model
+#
+#     def save(self, output_directory):
+#         """ Saves this object to file. Don't forget to save the models and the Results objects if they exist.
+#             Before returning a Predictor, task.fit() should call predictor.save()
+#         """
+#         pass
+#
+#     def _save_results(self, output_directory):
+#         """ Internal helper function: Save results in human-readable file JSON format """
+#         pass
+#
+#     def _save_model(self, output_directory):
+#         """ Internal helper function: Save self.model object to file located in output_directory.
+#             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
+#         """
+#         pass
+
+class TextClassificationPredictor(BasePredictor):
+    """
+    Classifier returned by task.fit()
+
+    Example user workflow:
+    """
+    def __init__(self, model, results, eval_func, scheduler_checkpoint,
+                 args, **kwargs):
+        self.model = model
+        self.eval_func = eval_func
+        self.results = self._format_results(results)
+        self.scheduler_checkpoint = scheduler_checkpoint
+        self.args = args
+
+    @classmethod
+    def load(cls, checkpoint):
+        state_dict = load(checkpoint)
+        args = state_dict['args']
+        results = state_dict['results']
+        eval_func = pickle.loads(state_dict['eval_func'])
+        scheduler_checkpoint = state_dict['scheduler_checkpoint']
+        model_params = state_dict['model_params']
+
+        model_args = copy.deepcopy(args)
+        model_args.update(results['best_config'])
+        model = get_network(args.net, args.dataset.num_classes)
+        update_params(model, model_params)
+        return cls(eval_func, model, eval_func, scheduler_checkpoint, args)
+
+    def state_dict(self, destination=None):
+        if destination is None:
+            destination = OrderedDict()
+            destination._metadata = OrderedDict()
+        destination['model_params'] = collect_params(self.model)
+        destination['eval_func'] = pickle.dumps(self.eval_func)
+        destination['results'] = self.results
+        destination['scheduler_checkpoint'] = self.scheduler_checkpoint
+        destination['args'] = self.args
+        return destination
+
+    def save(self, checkpoint):
+        save(self.state_dict(), checkpoint)
+
+    def predict(self, X, input_size=224, plot=True):
+        """ This method should be able to produce predictions regardless if:
+            X = single data example (e.g. single image, single document),
+            X = batch of many examples, X = task.Dataset object
+        """
+        """The task predict function given an input.
+         Args:
+            img: the input
+         Example:
+            >>> ind, prob = classifier.predict('example.jpg')
+        """
+        # load and display the image
+        img = mx.image.imread(X) if isinstance(X, str) and os.path.isfile(X) else X
+        if plot:
+            plt.imshow(img.asnumpy())
+            plt.show()
+        # model inference
+        input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
+        resize = int(math.ceil(input_size / 0.875))
+        transform_fn = transforms.Compose([
+                transforms.Resize(resize),
+                transforms.CenterCrop(input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        img = transform_fn(img)
+        proba = self.predict_proba(img)
+        ind = mx.nd.argmax(proba, axis=1).astype('int')
+        idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
+                          ind.astype('float32'))
+        return ind, mx.nd.gather_nd(proba, idx)
+
+    def predict_proba(self, X):
+        """ Produces predicted class probabilities if we are dealing with a classification task.
+            In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
+        """
+        pred = self.model(X.expand_dims(0))
+        return mx.nd.softmax(pred)
+
+    def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
+        """The task evaluation function given the test dataset.
+         Args:
+            dataset: test dataset
+         Example:
+            >>> from autogluon import ImageClassification as task
+            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
+            >>> test_reward = classifier.evaluate(dataset)
+        """
+        args = self.args
+        net = self.model
+        batch_size = args.batch_size * max(len(ctx), 1)
+        metric = get_metric_instance(args.metric)
+        input_size = net.input_size if hasattr(net, 'input_size') else input_size
+
+        _, test_data, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, False)
+        tbar = tqdm(enumerate(test_data))
+        for i, batch in tbar:
+            self.eval_func(net, batch, batch_fn, metric, ctx)
+            _, test_reward = metric.get()
+            tbar.set_description('{}: {}'.format(args.metric, test_reward))
+        _, test_reward = metric.get()
+        return test_reward
+
+    def _save_model(self, *args, **kwargs):
+        raise NotImplemented
+
+    def evaluate_predictions(self, y_true, y_pred):
+        raise NotImplemented
+
+    @staticmethod
+    def _format_results(results):
+        def _merge_scheduler_history(training_history, config_history, reward_attr):
+            trial_info = {}
+            for tid, config in config_history.items():
+                trial_info[tid] = {}
+                trial_info[tid]['config'] = config
+                if tid in training_history:
+                    trial_info[tid]['history'] = training_history[tid]
+                    trial_info[tid]['metadata'] = {}
+
+                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
+                        last_history = training_history[tid][-1]
+                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
+                        trial_info[tid]['metadata'].update(last_history)
+            return trial_info
+
+        training_history = results.pop('training_history')
+        config_history = results.pop('config_history')
+        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
+                                                              results['reward_attr'])
+        results[results['reward_attr']] = results.pop('best_reward')
+        results['search_space'] = results['metadata'].pop('search_space')
+        results['search_strategy'] = results['metadata'].pop('search_strategy')
+        return results

@@ -9,90 +9,37 @@ from ...core.optimizer import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
-from ..base import BaseTask, BasePredictor
+from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ..base import BaseTask
+from ...utils import update_params
 
-from .nets import get_built_in_network
+from .model_zoo import get_network
 from .dataset import TextClassificationDataset
-from .pipeline import train_text_classification
+from .pipeline import *
 from .metrics import get_metric_instance
+from .optimizers import *
+from .predictor import TextClassificationPredictor
 
-__all__ = ['TextClassification', 'TextClassificationPredictor']
+__all__ = ['TextClassification']
 
 logger = logging.getLogger(__name__)
 
-
-class TextClassificationPredictor(BasePredictor):
-    def __init__(self, loss_func, eval_func, model=None, **kwargs):
-        super(TextClassificationPredictor, self).__init__(loss_func, eval_func, model, **kwargs)
-
-    def predict(self, sentence):
-        """The task predict function given an input.
-         Args:
-            sentence: the input
-         Example:
-            >>> ind = predictor.predict('this is cool')
-        """
-        pass
-
-    def predict_proba(self, sentence):
-        """The task predict probability function given an input.
-         Args:
-            sentence: the input
-         Example:
-            >>> prob = predictor.predict_proba('this is cool')
-        """
-        pass
-
-    def evaluate_predictions(self, y_true, y_pred):
-        """ Evaluate the provided list of predictions against list of ground truth labels according to the task-specific evaluation metric (self.eval_func). """
-        pass
-
-    def evaluate(self, sentence):
-        """The task evaluation function given an input.
-         Args:
-            sentence: the input
-         Example:
-            >>> acc = predictor.evaluate('this is cool')
-        """
-        pass
-
-    def load(self, output_directory):
-        """ Load Predictor object from given directory.
-            Make sure to also load any models from files that exist in output_directory and set them = predictor.model.
-        """
-        pass  # Need to load models and set them = predictor.model
-
-    def save(self, output_directory):
-        """ Saves this object to file. Don't forget to save the models and the Results objects if they exist.
-            Before returning a Predictor, task.fit() should call predictor.save()
-        """
-        pass
-
-    def _save_results(self, output_directory):
-        """ Internal helper function: Save results in human-readable file JSON format """
-        pass
-
-    def _save_model(self, output_directory):
-        """ Internal helper function: Save self.model object to file located in output_directory.
-            For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
-        """
-        pass
-
 class TextClassification(BaseTask):
-    """AutoGluon ImageClassification Task
+    """AutoGluon TextClassification Task
     """
     Dataset = TextClassificationDataset
     @staticmethod
     def fit(dataset='SST',
-            net=Choice('bert_12_768_12'),
-            optimizer=Choice(nlp.optimizer.BERTAdam(learning_rate=LogLinear(1e-4, 1e-2))),
+            net=Categorical('bert_12_768_12'),
+            optimizer=Categorical(BERTAdam(learning_rate=Real(2e-06, 2e-04, log=True))),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
-            batch_size=64,
-            epochs=20,
+            batch_size=32,
+            epochs=3,
             metric='accuracy',
-            num_cpus=4,
-            num_gpus=1,
+            nthreads_per_trial=4,
+            ngpus_per_trial=1,
+            hybridize=True,
             search_strategy='random',
             search_options={},
             time_limits=None,
@@ -136,38 +83,48 @@ class TextClassification(BaseTask):
             # based on the dataset statistics
             pass
 
-        train_text_classification.update(
+        nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
+        ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+
+        train_text_classification.register_args(
             dataset=dataset,
             net=net,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
             loss=loss,
             metric=metric,
-            num_gpus=num_gpus,
+            num_gpus=ngpus_per_trial,
             batch_size=batch_size,
             epochs=epochs,
-            num_workers=num_cpus,
-            final_fit=False)
+            num_workers=nthreads_per_trial,
+            hybridize=hybridize,
+            final_fit=False,
+            **kwargs)
 
         scheduler_options = {
-            'resource': {'num_cpus': num_cpus, 'num_gpus': num_gpus},
+            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'checkpoint': checkpoint,
             'num_trials': num_trials,
             'time_out': time_limits,
             'resume': resume,
             'visualizer': visualizer,
             'time_attr': 'epoch',
-            'reward_attr': 'reward',
+            'reward_attr': 'classification_reward',
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
+                'searcher': 'random',
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
-
-        return BaseTask.run_fit(train_text_classification, search_strategy, scheduler_options)
+        results = BaseTask.run_fit(train_text_classification, search_strategy,
+                                   scheduler_options)
+        args = sample_config(train_text_classification.args, results['best_config'])
+        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+        update_params(model, results.pop('model_params'))
+        return TextClassificationPredictor(model, results, evaluate, checkpoint, args)
 
     # @classmethod
     # def predict(cls, sentence):

@@ -1,7 +1,17 @@
 # from autogluon.optimizer import optimizers
 # from autogluon.optimizer.utils import autogluon_optims, Optimizer
 #
-__all__ = ['BertAdam', 'get_optim']
+# __all__ = ['BertAdam', 'get_optim']
+
+from gluonnlp import optimizer
+from ...core import *
+
+__all__ = ['BERTAdam']
+
+@autogluon_object()
+class BERTAdam(optimizer.BERTAdam):
+    pass
+
 #
 # optims = ['bertadam'] + optimizers.optims  # TODO segregate the task specific optimizers
 #

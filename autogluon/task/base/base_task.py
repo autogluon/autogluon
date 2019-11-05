@@ -10,8 +10,9 @@ __all__ = ['BaseDataset', 'BaseTask']
 Results = collections.namedtuple('Results', 'model reward config time metadata')
 
 schedulers = {
+    'grid': FIFOScheduler,
     'random': FIFOScheduler,
-    'bayesopt': FIFOScheduler,
+    'skopt': FIFOScheduler,
     'hyperband': HyperbandScheduler,
     'rl': RLScheduler,
 }
@@ -34,52 +35,26 @@ class BaseTask(object):
             assert callable(search_strategy)
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
-        cls.scheduler = scheduler(train_fn, **scheduler_options)
-        cls.scheduler.run()
-        cls.scheduler.join_tasks()
-        # final fit
-        best_reward = cls.scheduler.get_best_reward()
-        best_config = cls.scheduler.get_best_config()
+        scheduler = scheduler(train_fn, **scheduler_options)
+        scheduler.run()
+        scheduler.join_jobs()
+        # gather the best configuration
+        best_reward = scheduler.get_best_reward()
+        best_config = scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
-        model = train_fn(args, best_config, reporter=None)
+        # final fit
+        results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
-        cls.results = Results(model, best_reward, best_config, total_time, cls.scheduler.metadata)
-        cls.predictor = BasePredictor(loss_func=None, eval_func=None, model=model, results=cls.results)
-        return cls.predictor
-
-    @classmethod
-    def get_training_curves(cls, filename=None, plot=False, use_legend=True):
-        cls.scheduler.get_training_curves(filename=None, plot=False, use_legend=True)
-
-    @classmethod
-    def shut_down(cls):
-        cls.scheduler.shutdown()
+        results.update(best_reward=best_reward, best_config=best_config,
+                       total_time=total_time, metadata=scheduler.metadata,
+                       training_history=scheduler.training_history,
+                       config_history=scheduler.config_history,
+                       reward_attr=scheduler._reward_attr,
+                       args=args)
+        return results
 
     @classmethod
     @abstractmethod
     def fit(cls, *args, **kwargs):
-        pass
-
-    @classmethod
-    @abstractmethod
-    def predict(cls, inputs):
-        """The task predict function given an input.
-         Args:
-            img: the input
-         Example:
-        """
-        pass
-
-    @classmethod
-    @abstractmethod
-    def evaluate(cls, dataset):
-        """The task evaluation function given the test dataset.
-         Args:
-            dataset: test dataset
-         Example:
-            >>> from autogluon import ImageClassification as task
-            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-            >>> test_reward = task.evaluate(dataset)
-        """
         pass

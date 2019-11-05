@@ -11,14 +11,14 @@ from ...core import *
 
 # from .transforms import TextDataTransform, BERTDatasetTransform
 # ['get_train_data_lengths', 'get_batchify_fn',
-#            'get_batch_sampler', 'get_transform_train_fn', 'get_transform_val_fn'] \
+#            'get_batch_sampler', 'get_transform_train_fn', 'get_transform_val_fn']
 
-__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
-             'WNLITask', 'SSTTask']
 
 @autogluon_object()
 class TextClassificationDataset(object):
     pass
+
+__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask', 'tasks']
 
 class GlueTask:
     """Abstract GLUE task class.
@@ -272,3 +272,16 @@ class MNLITask(GlueTask):
         """
         return [('test_matched', self.get_dataset(segment='test_matched')),
                 ('test_mismatched', self.get_dataset(segment='test_mismatched'))]
+
+tasks = {
+    'MRPC': MRPCTask(),
+    'QQP': QQPTask(),
+    'QNLI': QNLITask(),
+    'RTE': RTETask(),
+    'STS-B': STSBTask(),
+    'CoLA': CoLATask(),
+    'MNLI': MNLITask(),
+    'WNLI': WNLITask(),
+    'SST': SSTTask(),
+    'IMDB': nlp.data.IMDB(),  # TODO: metric in args not in the task
+}

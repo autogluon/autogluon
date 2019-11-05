@@ -3,11 +3,15 @@ from typing import AnyStr
 import gluonnlp as nlp
 import mxnet as mx
 from mxnet import gluon
-from mxnet.gluon import Block
+from mxnet.gluon import Block, HybridBlock
+import gluonnlp as nlp
+from gluonnlp.model import BERTClassifier, RoBERTaClassifier
+
+from .dataset import *
 
 # from autogluon.network import autogluon_nets, autogluon_net_instances, Net
 
-__all__ = ['get_model_instances', 'models', 'LMClassifier', 'BERTClassifier']
+__all__ = ['get_network', 'get_model_instances', 'models', 'LMClassifier', 'BERTClassifier']
 
 models = ['standard_lstm_lm_200',
           'standard_lstm_lm_650',
@@ -150,7 +154,52 @@ def get_model_instances(name,
 # def bert_24_1024_16(**kwargs):
 #     pass
 
+def get_network(net, ctx, *args):
+    if type(net) == str:
+        task_name = args.task_name
+        task = tasks[task_name]
+        model_name = args.bert_model
+        dataset = args.bert_dataset
+        pretrained_bert_parameters = args.pretrained_bert_parameters
+        model_parameters = args.model_parameters
+        get_pretrained = not (pretrained_bert_parameters is not None
+                              or model_parameters is not None)
 
+        use_roberta = 'roberta' in model_name
+        get_model_params = {
+            'name': model_name,
+            'dataset_name': dataset,
+            'pretrained': get_pretrained,
+            'ctx': ctx,
+            'use_decoder': False,
+            'use_classifier': False,
+        }
+        # RoBERTa does not contain parameters for sentence pair classification
+        if not use_roberta:
+            get_model_params['use_pooler'] = True
+
+        bert, vocabulary = nlp.model.get_model(**get_model_params)
+
+        # initialize the rest of the parameters
+        initializer = mx.init.Normal(0.02)
+        # STS-B is a regression task.
+        # STSBTask().class_labels returns None
+        do_regression = not task.class_labels
+        if do_regression:
+            num_classes = 1
+        else:
+            num_classes = len(task.class_labels)
+        # reuse the BERTClassifier class with num_classes=1 for regression
+        if use_roberta:
+            model = RoBERTaClassifier(bert, dropout=0.0, num_classes=num_classes)
+        else:
+            model = BERTClassifier(bert, dropout=0.1, num_classes=num_classes)
+        # initialize classifier
+        if not model_parameters:
+            model.classifier.initialize(init=initializer, ctx=ctx)
+    else:
+        net.initialize(ctx=ctx)
+    return net
 
 
 class LMClassifier(gluon.Block):
@@ -197,3 +246,35 @@ class BERTClassifier(gluon.Block):
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
         _, self.pooler_out = self.bert(inputs, token_types, valid_length)
         return self.classifier(self.pooler_out)
+
+
+class Nets(HybridBlock):
+    """Model for classification task with pretrained and head models.
+    """
+
+    def __init__(self, pretrained_net, head_net, num_classes=2, dropout=0.0,
+                 prefix=None, params=None):
+        super(Nets, self).__init__(prefix=prefix, params=params)
+        self.pretrained_net = pretrained_net
+        self.head_net = head_net
+
+    def __call__(self, inputs, token_types, valid_length=None):
+        # pylint: disable=dangerous-default-value, arguments-differ
+        """
+        """
+        # XXX Temporary hack for hybridization as hybridblock does not support None inputs
+        valid_length = [] if valid_length is None else valid_length
+        return super(Nets, self).__call__(inputs, token_types, valid_length)
+
+    def hybrid_forward(self, F, inputs, token_types, valid_length=None):
+        # pylint: disable=arguments-differ
+        """
+        """
+        # XXX Temporary hack for hybridization as hybridblock does not support None
+        if isinstance(valid_length, list) and len(valid_length) == 0:
+            valid_length = None
+        _, pooler_out = self.pretrained_net(inputs, token_types, valid_length)
+        try:
+            return self.head_net(pooler_out)
+        except ValueError:
+            raise ValueError
