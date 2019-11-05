@@ -1,5 +1,5 @@
-# Reproducing ProxylessNAS in 10 mins
-:label:`sec_proxyless`
+# Reproducing ENAS/ProxylessNAS in 10 mins
+:label:`sec_torch_enas`
 
 ## What is the key idea of ENAS and ProxylessNAS
 
@@ -13,41 +13,41 @@ Recent work of ENAS and ProxylessNAS construct an over-parameterized network (su
 across different architecutre to speed up the search speed. The reward is calculated every few iters instead
 of every entire training period.
 
-import MXNet and AutoGluon:
+import PyTorch and AutoGluon:
 
 ```{.python .input}
+import torch
+import torch.nn as nn
 import autogluon as ag
-import mxnet as mx
-import mxnet.gluon.nn as nn
 ```
 
 ## How to construct a SuperNet?
 
-Basic NN blocks for CNN.
+Basic NN modules for CNN.
 
 ```{.python .input}
-class Identity(mx.gluon.HybridBlock):
-    def hybrid_forward(self, F, x):
+class Identity(torch.nn.Module):
+    def forward(self, x):
         return x
     
-class ConvBNReLU(mx.gluon.HybridBlock):
+class ConvBNReLU(torch.nn.Module):
     def __init__(self, in_channels, channels, kernel, stride):
         super().__init__()
         padding = (kernel - 1) // 2
-        self.conv = nn.Conv2D(channels, kernel, stride, padding, in_channels=in_channels)
-        self.bn = nn.BatchNorm(in_channels=channels)
-        self.relu = nn.Activation('relu')
-    def hybrid_forward(self, F, x):
+        self.conv = nn.Conv2d(in_channels, channels, kernel, stride, padding)
+        self.bn = nn.BatchNorm2d(channels)
+        self.relu = nn.ReLU()
+    def forward(self, x):
         return self.relu(self.bn(self.conv(x)))
 ```
 
 ### AutoGluon ENAS Unit
 
 ```{.python .input}
-from autogluon.contrib.enas import *
+from autogluon.contrib.torch.enas import *
 
 @enas_unit()
-class ResUnit(mx.gluon.HybridBlock):
+class ResUnit(torch.nn.Module):
     def __init__(self, in_channels, channels, hidden_channels, kernel, stride):
         super().__init__()
         self.conv1 = ConvBNReLU(in_channels, hidden_channels, kernel, stride)
@@ -55,8 +55,8 @@ class ResUnit(mx.gluon.HybridBlock):
         if in_channels == channels and stride == 1:
             self.shortcut = Identity()
         else:
-            self.shortcut = nn.Conv2D(channels, 1, stride, in_channels=in_channels)
-    def hybrid_forward(self, F, x):
+            self.shortcut = nn.Conv2d(in_channels, channels, 1, stride)
+    def forward(self, x):
         return self.conv2(self.conv1(x)) + self.shortcut(x)
 ```
 
@@ -66,15 +66,15 @@ Creating a ENAS network using Sequential Block
 
 ```{.python .input}
 mynet = ENAS_Sequential(
-    ResUnit(1, 8, hidden_channels=ag.space.Categorical(4, 8), kernel=ag.space.Categorical(3, 5), stride=2),
-    ResUnit(8, 8, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
-    ResUnit(8, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
-    ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
-    ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
-    nn.GlobalAvgPool2D(),
+    ResUnit(1, 8, hidden_channels=ag.Categorical(4, 8), kernel=ag.Categorical(3, 5), stride=2),
+    ResUnit(8, 8, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=2),
+    ResUnit(8, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=2),
+    ResUnit(16, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=1, with_zero=True),
+    ResUnit(16, 16, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=1, with_zero=True),
+    nn.AdaptiveAvgPool2d(1),
     nn.Flatten(),
-    nn.Activation('relu'),
-    nn.Dense(10, in_units=16),
+    nn.ReLU(),
+    nn.Linear(16, 10),
 )
 
 mynet.initialize()
@@ -85,7 +85,7 @@ mynet.graph
 ### Evaluate Network Latency and Define Reward Function
 
 ```{.python .input}
-x = mx.nd.random.uniform(shape=(1, 1, 28, 28))
+x = torch.rand(1, 1, 28, 28)
 y = mynet.evaluate_latency(x)
 ```
 
@@ -109,10 +109,11 @@ reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1
 Construct experiment scheduler, which automatically cretes a RL controller based on user defined search space.
 
 ```{.python .input}
-scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn, batch_size=128,,
-                           warmup_epochs=0, epochs=1, controller_lr=3e-3,
-                           plot_frequency=2, update_arch_frequency=5)
+from autogluon.contrib.torch.enas_scheduler import Torch_ENAS_Scheduler
+scheduler = Torch_ENAS_Scheduler(mynet, train_set='mnist',
+                                 reward_fn=reward_fn, batch_size=128,
+                                 warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                                 plot_frequency=2, update_arch_frequency=5)
 ```
 
 Start the training:
@@ -146,3 +147,4 @@ mynet.graph
 ## Defining a Complicated Network
 
 Can we define a more complicated network than just sequential?
+

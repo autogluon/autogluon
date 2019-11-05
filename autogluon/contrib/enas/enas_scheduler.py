@@ -35,46 +35,21 @@ class ENAS_Scheduler(object):
                  plot_frequency=0, **kwargs):
         num_cpus = get_cpu_count() if num_cpus > get_cpu_count() else num_cpus
         num_gpus = get_gpu_count() if num_gpus > get_gpu_count() else num_gpus
-        ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu(0)]
-        supernet.collect_params().reset_ctx(ctx)
-        supernet.hybridize()
         self.supernet = supernet
         self.train_fn = train_fn
         self.eval_fn = eval_fn
         self.reward_fn = reward_fn
-        dataset_name = train_set
         self.checkname = checkname
         self.plot_frequency = plot_frequency
-        if isinstance(train_set, str):
-            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
-                                             num_workers=num_cpus, shuffle=True).init()
-            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
-                                           num_workers=num_cpus, shuffle=True).init()
-        if isinstance(train_set, gluon.data.Dataset):
-            self.train_data = DataLoader(
-                    train_set, batch_size=batch_size, shuffle=True,
-                    last_batch="discard", num_workers=num_cpus)
-            # very important, make shuffle for training contoller
-            self.val_data = DataLoader(
-                    val_set, batch_size=batch_size, shuffle=True,
-                    num_workers=num_cpus, prefetch=0, sample_times=controller_batch_size)
-        else:
-            self.train_data = train_set
-            self.val_data = val_set
-        iters_per_epoch = len(train_set) if hasattr(train_set, '__len__') else IMAGENET_TRAINING_SAMPLES // batch_size
-        self.train_args = init_default_train_args(batch_size, self.supernet, epochs, iters_per_epoch) \
-                if len(train_args) == 0 else train_args
-        self.val_args = val_args
-        self.val_args['ctx'] = ctx
-        self.val_args['batch_fn'] = imagenet_batch_fn if dataset_name == 'imagenet' else default_batch_fn
-        self.train_args['ctx'] = ctx
-        self.train_args['batch_fn'] = imagenet_batch_fn if dataset_name == 'imagenet' else default_batch_fn
-        self.ctx = ctx
-
         self.epochs = epochs
-        self.baseline = None
         self.warmup_epochs = warmup_epochs
+        self.controller_batch_size = controller_batch_size
+
+        self.initialize_miscs(train_set, val_set, batch_size, num_cpus, num_gpus,
+                              train_args, val_args)
+
         # create RL searcher/controller
+        self.baseline = None
         self.ema_decay = ema_baseline_decay
         self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type,
                                    prefetch=4, num_workers=4)
@@ -87,7 +62,6 @@ class ENAS_Scheduler(object):
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr})
         self.update_arch_frequency = update_arch_frequency
-        self.controller_batch_size = controller_batch_size
         self.val_acc = 0
         # async controller sample
         self._worker_pool = ThreadPool(2)
@@ -97,6 +71,42 @@ class ENAS_Scheduler(object):
         self._prefetch_controller()
         # logging history
         self.training_history = []
+
+    def initialize_miscs(self, train_set, val_set, batch_size, num_cpus, num_gpus,
+                         train_args, val_args):
+        """Initialize framework related miscs, such as train/val data and train/val
+        function arguments.
+        """
+        ctx = [mx.gpu(i) for i in range(num_gpus)] if num_gpus > 0 else [mx.cpu(0)]
+        self.supernet.collect_params().reset_ctx(ctx)
+        self.supernet.hybridize()
+        dataset_name = train_set
+
+        if isinstance(train_set, str):
+            train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
+                                             num_workers=num_cpus, shuffle=True).init()
+            val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
+                                           num_workers=num_cpus, shuffle=True).init()
+        if isinstance(train_set, gluon.data.Dataset):
+            self.train_data = DataLoader(
+                    train_set, batch_size=batch_size, shuffle=True,
+                    last_batch="discard", num_workers=num_cpus)
+            # very important, make shuffle for training contoller
+            self.val_data = DataLoader(
+                    val_set, batch_size=batch_size, shuffle=True,
+                    num_workers=num_cpus, prefetch=0, sample_times=self.controller_batch_size)
+        else:
+            self.train_data = train_set
+            self.val_data = val_set
+        iters_per_epoch = len(train_set) if hasattr(train_set, '__len__') else IMAGENET_TRAINING_SAMPLES // batch_size
+        self.train_args = init_default_train_args(batch_size, self.supernet, self.epochs, iters_per_epoch) \
+                if len(train_args) == 0 else train_args
+        self.val_args = val_args
+        self.val_args['ctx'] = ctx
+        self.val_args['batch_fn'] = imagenet_batch_fn if dataset_name == 'imagenet' else default_batch_fn
+        self.train_args['ctx'] = ctx
+        self.train_args['batch_fn'] = imagenet_batch_fn if dataset_name == 'imagenet' else default_batch_fn
+        self.ctx = ctx
 
     def run(self):
         tq = tqdm(range(self.epochs))
@@ -128,7 +138,9 @@ class ENAS_Scheduler(object):
     def validation(self):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
         # data iter
-        tbar = tqdm(enumerate(self.val_data))
+        it = self.val_data
+        it.reset_sample_times()
+        tbar = tqdm(enumerate(it))
         # update network arc
         config = self.controller.inference()
         self.supernet.sample(**config)

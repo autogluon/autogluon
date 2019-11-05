@@ -14,7 +14,7 @@ from ..core import Task
 from ..core.decorator import _autogluon_method
 from .scheduler import TaskScheduler
 from ..searcher import *
-from .reporter import DistStatusReporter
+from .reporter import DistStatusReporter, FakeReporter
 from ..utils import DeprecationHelper, in_ipynb
 
 from tqdm.auto import tqdm
@@ -172,7 +172,6 @@ class FIFOScheduler(TaskScheduler):
     def run_with_config(self, config):
         """Run with config for final fit.
         """
-        from .reporter import FakeReporter
         task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
         reporter = FakeReporter()

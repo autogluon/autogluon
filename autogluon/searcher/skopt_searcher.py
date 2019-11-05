@@ -6,7 +6,6 @@ import logging
 from collections import OrderedDict
 
 from ..utils import warning_filter
-
 with warning_filter():
     from skopt import Optimizer
     from skopt.space import *

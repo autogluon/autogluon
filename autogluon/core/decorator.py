@@ -8,7 +8,6 @@ import multiprocessing as mp
 import ConfigSpace as CS
 
 from .space import *
-from ..scheduler.reporter import FakeReporter
 from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space
 from ..utils import EasyDict as ezdict
 from ..utils.deprecate import make_deprecate
@@ -50,6 +49,7 @@ class _autogluon_method(object):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)
+        from ..scheduler.reporter import FakeReporter
         if 'reporter' not in kwargs:
             logger.debug('Creating FakeReporter for test purpose.')
             kwargs['reporter'] = FakeReporter()

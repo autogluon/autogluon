@@ -77,6 +77,9 @@ class _MultiWorkerIter(object):
             for _ in range(prefetch-1):
                 self._push_next()
 
+    def reset_sample_times(self):
+        self._sample_times = None
+
     def __len__(self):
         return len(self._batch_sampler)
 
@@ -91,7 +94,6 @@ class _MultiWorkerIter(object):
         self._sent_idx += 1
 
     def __next__(self):
-        #self._push_next()
         self._iters += 1
         if not self._sample_times or self._iters < self._sample_times:
             self._push_next()
