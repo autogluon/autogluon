@@ -25,19 +25,35 @@ def create_version_file():
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
 
+def try_and_install_mxnet():
+    """Install MXNet is not detected
+    """
+    try:
+        import mxnet as mx
+    except ImportError:
+        print("Automatically install MXNet cpu version.")
+        subprocess.check_call("pip install mxnet".split())
+    finally:
+        import mxnet as mx
+        print("MXNet {} detected.".format(mx.__version__))
+
+def uninstall_legacy_dask():
+    subprocess.check_call("pip uninstall -y dask".split())
+    subprocess.check_call("pip uninstall -y distributed".split())
+
 # run test scrip after installation
 class install(setuptools.command.install.install):
     def run(self):
         create_version_file()
-        subprocess.check_call("pip uninstall dask".split())
-        subprocess.check_call("pip uninstall distributed".split())
+        try_and_install_mxnet()
+        uninstall_legacy_dask()
         setuptools.command.install.install.run(self)
 
 class develop(setuptools.command.develop.develop):
     def run(self):
         create_version_file()
-        subprocess.check_call("pip uninstall -y dask".split())
-        subprocess.check_call("pip uninstall -y distributed".split())
+        try_and_install_mxnet()
+        uninstall_legacy_dask()
         setuptools.command.develop.develop.run(self)
 
 try:
