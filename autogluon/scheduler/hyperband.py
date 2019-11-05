@@ -229,7 +229,6 @@ class HyperbandScheduler(FIFOScheduler):
                                   daemon=False)
             sp.start()
             task_dict['CheckpointThead'] = sp
-
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
