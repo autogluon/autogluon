@@ -18,6 +18,8 @@ stage("Build Docs") {
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
         python setup.py develop
+        wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip
+        unzip -o data.zip -d ~/
         cd docs && bash build_doc.sh
 
         if [[ ${env.BRANCH_NAME} == master ]]; then
