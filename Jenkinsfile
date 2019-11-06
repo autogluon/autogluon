@@ -1,7 +1,7 @@
 max_time = 1800
 
 stage("Build Docs") {
-  node('linux-cpu') {
+  node('linux-gpu') {
     ws('workspace/autogluon-docs') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
@@ -36,7 +36,7 @@ stage("Build Docs") {
 }
 
 stage("Unit Test") {
-  node('linux-cpu') {
+  node('linux-gpu') {
     ws('workspace/autugluon-py3') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
