@@ -17,6 +17,8 @@ stage("Build Docs") {
         git submodule update --init --recursive
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
+        pip uninstall dask
+        pip uninstall distributed
         python setup.py develop
         wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip
         unzip -o data.zip -d ~/
