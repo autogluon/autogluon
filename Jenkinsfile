@@ -9,7 +9,7 @@ stage("Unit Test") {
         sh """#!/bin/bash
         set -ex
         # remove and create new env instead
-        conda env create -n autogluon_py3 -f docs/build.yml
+        conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -35,7 +35,7 @@ stage("Build Docs") {
         sh """#!/bin/bash
         set -ex
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        conda env create -n autogluon_docs -f docs/build.yml
+        conda env update -n autogluon_docs -f docs/build.yml
         conda activate autogluon_docs
         export PYTHONPATH=\${PWD}
         env
@@ -44,6 +44,16 @@ stage("Build Docs") {
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
         cd docs && bash build_doc.sh
+
+        if [[ ${env.BRANCH_NAME} == master ]]; then
+            aws s3 mb s3://autogluon.mxnet.io/
+            aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
+            echo "Uploaded doc to http://autogluon.mxnet.io"
+        else
+            aws s3 mb s3://autogluon-staging
+            aws s3 sync --delete _build/html/ s3://autogluon-staging/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/ --acl public-read
+            echo "Uploaded doc to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/index.html"
+        fi
         """
       }
     }
