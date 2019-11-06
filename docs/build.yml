@@ -1,0 +1,5 @@
+name: autogluon_docs
+dependencies:
+- python3.6
+- pip:
+  - mxnet-cu92mkl==1.5.1.post0
