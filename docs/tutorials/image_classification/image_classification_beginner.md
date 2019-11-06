@@ -59,7 +59,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
