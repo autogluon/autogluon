@@ -7,14 +7,7 @@ from .enas import enas_unit, ENAS_Sequential
 
 __all__ = ['ENAS_MbBlock', 'ENAS_MBNet']
 
-@enas_unit(
-    in_channels=32,
-    channels=32,
-    expand_ratio=Categorical(3, 6),
-    kernel=Categorical(3, 5),
-    input_size=32,
-    with_zero=False,
-)
+@enas_unit()
 class ENAS_MbBlock(MBConvBlock):
     pass
 

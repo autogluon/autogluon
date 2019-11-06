@@ -2,8 +2,9 @@ import os
 import mxnet as mx
 from tqdm.auto import tqdm
 from collections import OrderedDict
+import torch
 
-from ...utils import collect_params
+from ...utils import collect_params, update_params
 from ..enas import ENAS_Scheduler
 from .enas_utils import *
 from .torch_utils import AverageMeter
@@ -24,15 +25,16 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
         """
         criterion = torch.nn.CrossEntropyLoss()
         if num_gpus > 0:
+            criterion.cuda()
             self.supernet.cuda()
-            self.supernet = torch.nn.DataParallel(self.supernet, device_ids=list(range(num_gpus)))
+            self.supernet = DataParallel(self.supernet, device_ids=list(range(num_gpus)))
         # init datasets
         if isinstance(train_set, str):
             dataset_name = train_set
             transform_train, transform_val = get_transform(dataset_name)
-            train_set = get_dataset(dataset_name, root=os.path.dirname(self.checkname),
+            train_set = get_dataset(dataset_name, root=os.path.expanduser('~/.autogluon/datasets/'),
                                     transform=transform_train, train=True, download=True)
-            val_set = get_dataset(dataset_name, root=os.path.dirname(self.checkname),
+            val_set = get_dataset(dataset_name, root=os.path.expanduser('~/.autogluon/datasets/'),
                                  transform=transform_val, train=False, download=True)
         self.train_data = torch.utils.data.DataLoader(
                 train_set, batch_size=batch_size, shuffle=True,
@@ -42,20 +44,21 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
                 val_set, batch_size=batch_size, shuffle=True,
                 num_workers=num_cpus, pin_memory=True)
         self.train_args = init_default_train_args(
-                self.supernet, base_lr=0.1, epochs=self.epochs, iters_per_epoch=len(train_set),
+                self.supernet, epochs=self.epochs, base_lr=0.1,
+                iters_per_epoch=len(self.train_data),
                 criterion=criterion) if len(train_args) == 0 else train_args
         self.val_args = val_args
         self.train_args['use_cuda'] = True if num_gpus > 0 else False
         self.val_args['use_cuda'] = True if num_gpus > 0 else False
 
     def run(self):
+        self._prefetch_controller()
         tq = tqdm(range(self.epochs))
         for epoch in tq:
             # for recordio data
             tbar = tqdm(enumerate(self.train_data))
             for i, (data, label) in tbar:
                 # sample network configuration
-                self.supernet.train()
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
                 self.train_fn(self.supernet, data, label, i, epoch, **self.train_args)
@@ -75,7 +78,6 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
                         .format(epoch, self.val_acc, self.baseline))
 
     def validation(self):
-        self.supernet.eval()
         # data iter
         tbar = tqdm(enumerate(self.val_data))
         # update network arc
@@ -87,13 +89,12 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
             reward = metric.avg
             tbar.set_description('Acc: {}'.format(reward))
 
-        self.val_acc = reward
+        self.val_acc = reward.item()
         self.training_history.append(reward)
 
     def train_controller(self):
         """Run multiple number of trials
         """
-        self.supernet.eval()
         decay = self.ema_decay
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
         # update 
@@ -136,3 +137,27 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
         self.supernet.load_state_dict(state_dict['supernet_params'])
         update_params(self.controller, state_dict['controller_params'], ctx=self.controller.context)
         self.training_history = state_dict['training_history']
+
+class DataParallel(torch.nn.DataParallel):
+    def sample(self, *args, **kwargs):
+        return self.module.sample(*args, **kwargs)
+
+    @property
+    def kwspaces(self):
+        return self.module.kwspaces
+
+    @property
+    def graph(self):
+        return self.module.graph
+
+    @property
+    def latency(self):
+        return self.module.latency
+
+    @property
+    def avg_latency(self):
+        return self.module.latency
+
+    @property
+    def nparams(self):
+        return self.module.nparams

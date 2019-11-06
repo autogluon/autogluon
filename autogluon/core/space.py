@@ -4,8 +4,8 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper, EasyDict, classproperty
 
-__all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'Sequence', 'List', 'Dict',
-           'Categorical', 'Choice', 'Real', 'Linear', 'LogLinear', 'Int', 'Bool']
+__all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'List', 'Dict',
+           'Categorical', 'Choice', 'Real', 'Int', 'Bool']
 
 class Space(object):
     """Basic Search Space
@@ -156,8 +156,6 @@ class List(NestedSpace):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-Sequence = DeprecationHelper(List, 'Sequence')
-
 class Dict(NestedSpace):
     """A Searchable Dict (Nested Space)
     """
@@ -212,7 +210,7 @@ class Dict(NestedSpace):
         striped_keys = [k.split('.')[0] for k in config.keys()]
         for k, v in kwspaces.items():
             if k in striped_keys:
-                if isinstance(v, (Sequence, Dict, Categorical, AutoGluonObject)):
+                if isinstance(v, NestedSpace):
                     sub_config = _strip_config_space(config, prefix=k)
                     ret[k] = v.sample(**sub_config)
                 else:
@@ -307,18 +305,6 @@ class Real(SimpleSpace):
     def get_hp(self, name):
         return CSH.UniformFloatHyperparameter(name=name, lower=self.lower, upper=self.upper,
                                               default_value=self.default, log=self.log)
-
-Linear = DeprecationHelper(Real, 'Linear')
-
-class LogLinear(Real):
-    r"""LogLinear
-    .. warning::
-        This method is now deprecated in favor of :class:`autogluon.space.Real`. \
-    See :class:`autogluon.space.Real` for details."""
-    def __init__(self, lower, upper, default=None):
-        self.lower = lower
-        self.upper = upper
-        super().__init__(lower, upper, default, True)
 
 class Int(SimpleSpace):
     """integer search space.

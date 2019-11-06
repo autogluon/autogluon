@@ -112,7 +112,7 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 from autogluon.contrib.torch.enas_scheduler import Torch_ENAS_Scheduler
 scheduler = Torch_ENAS_Scheduler(mynet, train_set='mnist',
                                  reward_fn=reward_fn, batch_size=128,
-                                 warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                                 warmup_epochs=0, epochs=2, controller_lr=3e-3,
                                  plot_frequency=2, update_arch_frequency=5)
 ```
 
@@ -130,11 +130,22 @@ mynet.graph
 **Change the reward trade-off:**
 
 ```{.python .input}
-reward_fn = lambda metric, net: metric
-mynet.initialize(force_reinit=True)
+reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.8)
+```
+
+Reinitialize weights:
+
+```{.python .input}
+def weight_init(m):
+    if isinstance(m, nn.Conv2d):
+        torch.nn.init.xavier_uniform(m.weight.data)
+mynet.apply(weight_init)
+```
+
+```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn, batch_size=128,
-                           warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                           warmup_epochs=0, epochs=2, controller_lr=3e-3,
                            plot_frequency=2, update_arch_frequency=5)
 scheduler.run()
 ```
@@ -148,3 +159,38 @@ mynet.graph
 
 Can we define a more complicated network than just sequential?
 
+```{.python .input}
+@enas_net(
+    unit1 = ResUnit(1, 8, hidden_channels=8, kernel=ag.Categorical(3, 5), stride=1),
+    unit2 = ResUnit(8, 1, hidden_channels=8, kernel=3, stride=1),
+    body = mynet,
+)
+class MNIST_Net(nn.Module):
+    def __init__(self, unit1, unit2, body):
+        super().__init__()
+        self.unit1 = unit1
+        self.unit2 = unit2
+        self.body = body
+        
+    def forward(self, x):
+        x = self.unit1(x)
+        x = self.unit2(x)
+        return self.body(x)
+```
+
+Evaluate the Latency:
+
+```{.python .input}
+mnist_net = MNIST_Net()
+mnist_net.enas_modules.keys()
+```
+
+Start the training:
+
+```{.python .input}
+scheduler = Torch_ENAS_Scheduler(mnist_net, train_set='mnist',
+                                 reward_fn=reward_fn, batch_size=128,
+                                 warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                                 plot_frequency=2, update_arch_frequency=5)
+# scheduler.run()
+```

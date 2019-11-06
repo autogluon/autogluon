@@ -44,6 +44,7 @@ class ENAS_Scheduler(object):
         self.epochs = epochs
         self.warmup_epochs = warmup_epochs
         self.controller_batch_size = controller_batch_size
+        kwspaces = self.supernet.kwspaces
 
         self.initialize_miscs(train_set, val_set, batch_size, num_cpus, num_gpus,
                               train_args, val_args)
@@ -51,13 +52,13 @@ class ENAS_Scheduler(object):
         # create RL searcher/controller
         self.baseline = None
         self.ema_decay = ema_baseline_decay
-        self.searcher = RLSearcher(self.supernet.kwspaces, controller_type=controller_type,
+        self.searcher = RLSearcher(kwspaces, controller_type=controller_type,
                                    prefetch=4, num_workers=4)
         # controller setup
         self.controller = self.searcher.controller
-        controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
-        self.controller.collect_params().reset_ctx([controller_resource])
-        self.controller.context = controller_resource
+        #controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
+        #self.controller.collect_params().reset_ctx([controller_resource])
+        #self.controller.context = mx.cpu(0)
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr})
@@ -68,7 +69,7 @@ class ENAS_Scheduler(object):
         self._data_buffer = {}
         self._rcvd_idx = 0
         self._sent_idx = 0
-        self._prefetch_controller()
+        self._timeout = 20
         # logging history
         self.training_history = []
 
@@ -98,7 +99,8 @@ class ENAS_Scheduler(object):
         else:
             self.train_data = train_set
             self.val_data = val_set
-        iters_per_epoch = len(train_set) if hasattr(train_set, '__len__') else IMAGENET_TRAINING_SAMPLES // batch_size
+        iters_per_epoch = len(self.train_data) if hasattr(self.train_data, '__len__') else \
+                IMAGENET_TRAINING_SAMPLES // batch_size
         self.train_args = init_default_train_args(batch_size, self.supernet, self.epochs, iters_per_epoch) \
                 if len(train_args) == 0 else train_args
         self.val_args = val_args
@@ -109,6 +111,7 @@ class ENAS_Scheduler(object):
         self.ctx = ctx
 
     def run(self):
+        self._prefetch_controller()
         tq = tqdm(range(self.epochs))
         for epoch in tq:
             # for recordio data
@@ -137,15 +140,15 @@ class ENAS_Scheduler(object):
 
     def validation(self):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
-        # data iter
-        it = self.val_data
+        # data iter, avoid memory leak
+        it = iter(self.val_data)
         it.reset_sample_times()
-        tbar = tqdm(enumerate(it))
+        tbar = tqdm(it)
         # update network arc
         config = self.controller.inference()
         self.supernet.sample(**config)
         metric = mx.metric.Accuracy()
-        for i, batch in tbar:
+        for batch in tbar:
             self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
             reward = metric.get()[1]
             tbar.set_description('Acc: {}'.format(reward))
@@ -158,7 +161,7 @@ class ENAS_Scheduler(object):
         try:
             ret = self._data_buffer.pop(self._rcvd_idx)
             self._rcvd_idx += 1
-            return  ret.get()
+            return  ret.get(timeout=self._timeout)
         except Exception:
             self._worker_pool.terminate()
             raise
@@ -232,4 +235,4 @@ class ENAS_Scheduler(object):
     def load_state_dict(self, state_dict):
         update_params(self.supernet, state_dict['supernet_params'], ctx=self.ctx)
         update_params(self.controller, state_dict['controller_params'], ctx=self.controller.context)
-        #self.training_history = state_dict['training_history']
+        self.training_history = state_dict['training_history']

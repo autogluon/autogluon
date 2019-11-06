@@ -67,7 +67,7 @@ def build_rec_process(img_dir, train=False, num_thread=1):
     print('ImageRecord file for ' + prefix + ' has been built!')
 
 def extract_train(tar_fname, target_dir, with_rec=False, num_thread=1):
-    os.makedirs(target_dir)
+    mkdir(target_dir)
     with tarfile.open(tar_fname) as tar:
         print("Extracting "+tar_fname+"...")
         # extract each class one-by-one
@@ -87,7 +87,7 @@ def extract_train(tar_fname, target_dir, with_rec=False, num_thread=1):
         build_rec_process(target_dir, True, num_thread)
 
 def extract_val(tar_fname, target_dir, with_rec=False, num_thread=1):
-    os.makedirs(target_dir)
+    mkdir(target_dir)
     print('Extracting ' + tar_fname)
     with tarfile.open(tar_fname) as tar:
         tar.extractall(target_dir)
@@ -96,6 +96,7 @@ def extract_val(tar_fname, target_dir, with_rec=False, num_thread=1):
         build_rec_process(target_dir, False, num_thread)
     # move images to proper subfolders
     val_maps_file = os.path.join(os.path.dirname(__file__), 'imagenet_val_maps.pklz')
+    download('https://gluon-cv.mxnet.io/_downloads/f5c3f5262b5968d15a687bf7bd73db68/imagenet_val_maps.pklz', val_maps_file)
     with gzip.open(val_maps_file, 'rb') as f:
         dirs, mappings = pickle.load(f)
     for d in dirs:
