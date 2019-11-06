@@ -27,7 +27,6 @@ stage("Unit Test") {
   }
 }
 
-
 stage("Build Docs") {
   node('linux-gpu') {
     ws('workspace/autogluon-docs') {
@@ -46,6 +45,7 @@ stage("Build Docs") {
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
         cd docs && bash build_doc.sh
+        """
       }
     }
   }
