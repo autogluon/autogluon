@@ -84,7 +84,8 @@ class ENAS_MBNet(nn.Module):
         return x
 
 mbnet = ENAS_MBNet()
-x = torch.rand(8, 3, 224, 224)
+mbnet.cuda()
+x = torch.rand(8, 3, 224, 224).cuda()
 mbnet.evaluate_latency(x)
 
 print('average latency is ', mbnet.avg_latency)

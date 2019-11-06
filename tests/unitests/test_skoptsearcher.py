@@ -1,4 +1,3 @@
-import pytest
 import logging
 import random
 import ConfigSpace as CS
@@ -14,8 +13,6 @@ warnings.filterwarnings("ignore", message=".*skopt failed to produce new config,
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-
-@pytest.mark.serial
 def test_skoptsearcher():
     logger.debug('Start testing SKoptSearcher')
     random.seed(1)
@@ -86,3 +83,8 @@ def toy_reward(config):
     elif config['d'] == 'neutral':
         reward *= 2
     return reward
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    import nose
+    nose.runmodule()

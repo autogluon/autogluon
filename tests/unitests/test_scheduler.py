@@ -1,46 +1,35 @@
-import time
-import argparse
-import socket
-import logging
 import numpy as np
 import autogluon as ag
 
-logger = logging.getLogger(__name__)
+@ag.args(
+    lr=ag.space.Real(1e-3, 1e-2, log=True),
+    wd=ag.space.Real(1e-3, 1e-2))
+def train_fn(args, reporter):
+    #print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    for e in range(10):
+        dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+        reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-@ag.autogluon_method
-def my_task(args):
-    print('task_id: {}, lr is {}'.format(args.task_id, args.lr))
-    time.sleep(3.0)
+def test_fifo_scheduler():
+    scheduler = ag.scheduler.FIFOScheduler(train_fn,
+                                           resource={'num_cpus': 2, 'num_gpus': 0},
+                                           num_trials=20,
+                                           reward_attr='accuracy',
+                                           time_attr='epoch')
+    scheduler.run()
+    scheduler.join_jobs()
 
-def test_scheduler():
-    scheduler = ag.scheduler.TaskScheduler()
-    print('scheduler', scheduler)
-    args = argparse.ArgumentParser()
-    config = {'lr': ag.searcher.sample_from(
-            lambda: np.power(10.0, np.random.uniform(-4, -1)))}
-    for i in range(10):
-        resource = ag.resource.Resources(num_cpus=2, num_gpus=1)
-        task = ag.scheduler.Task(my_task, {'args': args, 'config': config}, resource)
-        scheduler.add_task(task)
-    scheduler.join_tasks()
-
-def test_dist_scheduler():
-    scheduler = ag.distributed.DistributedTaskScheduler(['172.31.3.95'])
-    print('scheduler', scheduler)
-    args = argparse.ArgumentParser()
-    config = {'lr': ag.searcher.sample_from(
-            lambda: np.power(10.0, np.random.uniform(-4, -1)))}
-    for i in range(10):
-        resource = ag.resource.DistributedResource(num_cpus=2, num_gpus=1)
-        task = ag.scheduler.Task(my_task, {'args': args, 'config': config}, resource)
-        scheduler.add_task(task)
-    scheduler.join_tasks()
-    scheduler.shutdown()
-
-def test_dist_fifo():
-    pass
+def test_hyperband_scheduler():
+    scheduler = ag.scheduler.HyperbandScheduler(train_fn,
+                                                resource={'num_cpus': 2, 'num_gpus': 0},
+                                                num_trials=20,
+                                                reward_attr='accuracy',
+                                                time_attr='epoch',
+                                                grace_period=1)
+    scheduler.run()
+    scheduler.join_jobs()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
     import nose
     nose.runmodule()
+    ag.done()

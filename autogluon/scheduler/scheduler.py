@@ -19,18 +19,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['TaskScheduler', 'DistributedTaskScheduler']
 
 class TaskScheduler(object):
-    """Distributed Task Scheduler
-
-    Args:
-        dist_ip_addrs (List): list of ip addresses for remote nodes
-
-    Example:
-        >>> def my_task():
-        >>>     pass
-        >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
-        >>> task = Task(my_task, {}, resource)
-        >>> scheduler = TaskScheduler()
-        >>> scheduler.add_job(task)
+    """Base Distributed Task Scheduler
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()

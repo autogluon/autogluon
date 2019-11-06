@@ -56,9 +56,6 @@ class ENAS_Scheduler(object):
                                    prefetch=4, num_workers=4)
         # controller setup
         self.controller = self.searcher.controller
-        #controller_resource = mx.gpu(0) if get_gpu_count() > 0 else mx.cpu(0)
-        #self.controller.collect_params().reset_ctx([controller_resource])
-        #self.controller.context = mx.cpu(0)
         self.controller_optimizer = mx.gluon.Trainer(
                 self.controller.collect_params(), 'adam',
                 optimizer_params={'learning_rate': controller_lr})

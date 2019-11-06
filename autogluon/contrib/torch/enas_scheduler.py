@@ -35,7 +35,7 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
             train_set = get_dataset(dataset_name, root=os.path.expanduser('~/.autogluon/datasets/'),
                                     transform=transform_train, train=True, download=True)
             val_set = get_dataset(dataset_name, root=os.path.expanduser('~/.autogluon/datasets/'),
-                                 transform=transform_val, train=False, download=True)
+                                  transform=transform_val, train=False, download=True)
         self.train_data = torch.utils.data.DataLoader(
                 train_set, batch_size=batch_size, shuffle=True,
                 num_workers=num_cpus, pin_memory=True, drop_last=True)
