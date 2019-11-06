@@ -19,7 +19,7 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        nosetests --with-timer --timer-ok 5 --timer-warning 20 -x -v tests/unittests
+        nosetests -v tests/unittests
         """
       }
     }
