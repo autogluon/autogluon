@@ -167,7 +167,6 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_net_outputs = 1
             if self.params['y_range'] is None: # Infer default y-range
                 y_vals = train_dataset.dataset._data[train_dataset.label_index].asnumpy()
-                print(type(y_vals))
                 min_y = min(y_vals)
                 max_y = max(y_vals)
                 std_y = np.std(y_vals)
@@ -300,9 +299,9 @@ class TabularNeuralNetModel(AbstractModel):
         loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
         if self.problem_type == REGRESSION: 
             if self.metric_map[REGRESSION] == 'MAE':
-                loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # std-dev of labels
+                loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
             elif self.metric_map[REGRESSION] == 'MSE':
-                loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # variance of labels
+                loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
         for e in range(max_epochs):
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):

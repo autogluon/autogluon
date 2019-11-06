@@ -29,9 +29,10 @@ import warnings
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon import PredictTableColumn as task
+import autogluon as ag
 
 # Benchmark options:
-fast_benchmark = False # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
+fast_benchmark = True # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
                        # Please disregard performance_value warnings when fast_benchmark = True.
 subsample_size = 1000
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
@@ -44,7 +45,7 @@ EPS = 1e-10
 
 # Information about each dataset in benchmark is stored in dict.
 # performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
-binary_dataset = {'folder': '~/WorkDocs/AutoGluon/githubAutogluon/auto-ml-with-gluon/tabular/datasets/AdultIncomeData/',
+binary_dataset = {'folder': '~/WorkDocs/Datasets/AdultIncomeBinaryClassification/',
                   'name': 'AdultIncomeBinary',
                   'problem_type': BINARY,
                   'label_column': 'class',
@@ -104,14 +105,15 @@ with warnings.catch_warnings(record=True) as caught_warnings:
         test_file_path = directory + test_file
         savedir = directory + 'AutogluonOutput/'
         label_column = dataset['label_column']
-        train_data = task.load_data(train_file_path)
-        test_data = task.load_data(test_file_path)
+        train_data = task.Dataset(file_path=train_file_path)
+        test_data = task.Dataset(file_path=test_file_path)
         y_test = test_data[label_column]
         test_data = test_data.drop(labels=[label_column], axis=1)
         if fast_benchmark:
             train_data = train_data.head(subsample_size) # subsample for fast_benchmark
         predictor = None # reset from last Dataset
-        predictor = task.fit(train_data=train_data, label=label_column, savedir=savedir)
+        predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
+                             hyperparameter_tune = False)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file
@@ -151,6 +153,3 @@ print("Worst performance: %s" % worst_perf)
 print("\n\n WARNINGS:")
 for w in caught_warnings:
     warnings.warn(w.message)
-
-
-

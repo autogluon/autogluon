@@ -164,10 +164,10 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
                 y_train=y_train, y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
-            self.hpo_model_names += hpo_models.keys()
+            self.hpo_model_names += list(sorted(hpo_models.keys()))
             self.model_paths.update(hpo_models)
             self.hpo_results[model.name] = hpo_results
-            self.model_types.update({name: type(model) for name in hpo_models.keys()})
+            self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
             self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
@@ -176,7 +176,10 @@ class AbstractTrainer:
         for i, model in enumerate(models):
             self.train_single_full(X_train, X_test, y_train, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         self.model_names += self.hpo_model_names # Update model list with (potentially empty) list of new models created during HPO
-        self.model_names = list(set(self.model_names)) # make unique
+        unique_names = []
+        for item in self.model_names:
+            if item not in unique_names: unique_names.append(item)
+        self.model_names = unique_names # make unique and preserve order
     
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):

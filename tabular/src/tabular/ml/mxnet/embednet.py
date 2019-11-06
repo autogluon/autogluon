@@ -119,6 +119,7 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 self.y_constraint = 'nonpositive'
             else:
                 self.y_constraint = None
+            self.y_range = (nd.array(self.y_range[0]), nd.array(self.y_range[1]))
         
         if architecture_desc is None: # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features, 
