@@ -1,4 +1,4 @@
-max_time = 120
+max_time = 600
 
 stage("Build Docs") {
   node('linux-gpu') {
