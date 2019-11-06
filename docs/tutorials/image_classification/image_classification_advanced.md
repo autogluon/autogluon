@@ -165,7 +165,8 @@ print('Top-1 test acc: %.3f' % test_acc)
 Let's now use the same image as used in :ref:`sec_imgquick` to generate a predicted label and the corresponding confidence.
 
 ```{.python .input}
-image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
+import os
+image = os.path.expanduser('~/data/test/BabyShirt/BabyShirt_323.jpg')
 ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
