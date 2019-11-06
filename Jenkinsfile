@@ -17,6 +17,7 @@ stage("Build Docs") {
         git submodule update --init --recursive
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
+        pip install --upgrade --force-reinstall --no-deps .
         cd docs && bash build_doc.sh
 
         if [[ ${env.BRANCH_NAME} == master ]]; then
