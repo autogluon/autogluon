@@ -17,7 +17,7 @@ stage("Build Docs") {
         git submodule update --init --recursive
         git clean -fx
         pip install git+https://github.com/d2l-ai/d2l-book
-        pip install --upgrade --force-reinstall --no-deps .
+        pip install --upgrade --force-reinstall .
         cd docs && bash build_doc.sh
 
         if [[ ${env.BRANCH_NAME} == master ]]; then
@@ -49,7 +49,7 @@ stage("Unit Test") {
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         # from https://stackoverflow.com/questions/19548957/can-i-force-pip-to-reinstall-the-current-version
-        pip install --upgrade --force-reinstall --no-deps .
+        pip install --upgrade --force-reinstall .
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         export MPLBACKEND=Agg
