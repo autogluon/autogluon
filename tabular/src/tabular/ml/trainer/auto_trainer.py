@@ -20,3 +20,5 @@ class AutoTrainer(AbstractTrainer):
             X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
         
         self.train_multi_and_ensemble(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
+        # self.cleanup()
+        # TODO: cleanup temp files

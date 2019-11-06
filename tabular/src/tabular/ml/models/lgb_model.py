@@ -196,7 +196,8 @@ class LGBModel(AbstractModel):
         print(features_to_use)
         return features_to_use
     
-    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler=None): # TODO! scheduler unused.
+    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler_options=None): # scheduler_options unused for now
+        print("Beginning hyperparameter tuning for Decision Tree Ensemble...")
         X = pd.concat([X_train, X_test], ignore_index=True)
         y = pd.concat([y_train, y_test], ignore_index=True)
         if spaces is None:
@@ -205,7 +206,7 @@ class LGBModel(AbstractModel):
         X = self.preprocess(X)
         dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
         space = spaces[0]
-        # param_baseline = self.params
+        param_baseline = self.params
 
         @use_named_args(space)
         def objective(**params):
@@ -235,7 +236,11 @@ class LGBModel(AbstractModel):
 
         self.params = optimal_params
         print(self.params)
-        return optimal_params
+        
+        # TODO: final fit should not be here eventually
+        self.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
+        self.save()
+        return ({self.name: self.path}, {}) # dummy hpo_info
 
 """" OLD code: 
 

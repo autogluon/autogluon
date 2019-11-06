@@ -9,7 +9,7 @@ from mxnet import nd, autograd, gluon
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) # TODO: Currently unused
 
 
 class TabularNNDataset:
@@ -113,8 +113,7 @@ class TabularNNDataset:
             labels = np.array(labels)
             if self.problem_type == REGRESSION and labels.dtype != np.float32:
                 labels = labels.astype('float32') # Convert to proper float-type if not already
-            labels = nd.array(labels)
-            data_list.append(labels)
+            data_list.append(mx.nd.array(labels.reshape(len(labels),1)))  # To avoid NDArray:  data_list.append(labels)
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
@@ -251,25 +250,25 @@ class TabularNNDataset:
     
     def save(self, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
-        dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
-        datalist_file = file_prefix + cls.DATAVALUES_SUFFIX
+        dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
+        datalist_file = file_prefix + self.DATAVALUES_SUFFIX
         data_list = self.dataset._data
         self.dataset = None # Avoid pickling these
         self.dataloader = None
         pickle.dump(self, open(dataobj_file,'wb'))
         mx.nd.save(datalist_file, data_list)
-        logger.info("TabNN Dataset saved to files: \n %s \n %s" % (dataobj_file,datalist_file))
+        print("TabularNN Dataset saved to files: \n %s \n %s" % (dataobj_file, datalist_file))
     
     @classmethod
     def load(cls, file_prefix=""):
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
         datalist_file = file_prefix + cls.DATAVALUES_SUFFIX
-        tabNNdataset = pickle.load(open(file_prefix, "rb"))
+        tabNNdataset = pickle.load(open(dataobj_file, "rb"))
         data_list = mx.nd.load(datalist_file)
         tabNNdataset.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)
         tabNNdataset.dataloader = mx.gluon.data.DataLoader(tabNNdataset.dataset, tabNNdataset.batch_size, shuffle= not tabNNdataset.is_test, 
-                                   last_batch = 'keep' if is_test else 'rollover', num_workers=tabNNdataset.params['num_dataloading_workers'])
+                                   last_batch = 'keep' if tabNNdataset.is_test else 'rollover', num_workers=tabNNdataset.params['num_dataloading_workers'])
         return tabNNdataset
         
     
