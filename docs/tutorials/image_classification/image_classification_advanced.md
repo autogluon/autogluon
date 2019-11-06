@@ -19,6 +19,9 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
+import os
+os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+os.system('unzip -o data.zip -d ~/')
 dataset = task.Dataset(train_path='~/data/train')
 ```
 
