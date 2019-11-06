@@ -3,5 +3,5 @@ dependencies:
 - python=3.6
 - graphviz
 - pip:
-  - mxnet-cu92mkl==1.6.0b20190910
+  - mxnet
   - nose
