@@ -13,7 +13,6 @@ stage("Unit Test") {
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        make clean
         # from https://stackoverflow.com/questions/19548957/can-i-force-pip-to-reinstall-the-current-version
         pip install --upgrade --force-reinstall --no-deps .
         env
