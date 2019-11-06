@@ -127,7 +127,7 @@ class Classifier(BasePredictor):
         raise NotImplemented
 
     @staticmethod
-    def _format_results(results):
+    def _format_results(results): # TODO: remove since this has been moved to base_predictor.py
         def _merge_scheduler_history(training_history, config_history, reward_attr):
             trial_info = {}
             for tid, config in config_history.items():

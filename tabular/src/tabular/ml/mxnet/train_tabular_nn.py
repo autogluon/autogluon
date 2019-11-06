@@ -1,5 +1,6 @@
 import contextlib, shutil, tempfile, math, random, warnings, os, json, time
 import logging
+import os
 from pathlib import Path
 from collections import OrderedDict
 import numpy as np
@@ -18,43 +19,40 @@ from tabular.ml.models.abstract_model import AbstractModel
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
+# import tabular.ml.mxnet.tabular_nn_model as tabNN
 
 from autogluon.core import * 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) # TODO: Currently unused
 
 @autogluon_register_args()
-def tabularNN_train_fn(args, reporter):
+def train_tabularNN(args, reporter):
     """ Training function used during HPO """
     tabNN = args.tabNN
+    tabNN.params.update(args) # Set params dict object == to args to explore in this trial.
     trial_id = args.task_id
-    trial_temp_file_name = tabNN.path + "trial_"+str(trial_id)+"_"+ TabularNeuralNetModel.temp_file_name  # save stuff here in this trial. 
-    """ Ensure uniqueness of file-name (should not be necessary): 
-    i = 1
-    while os.path.exists(trial_temp_file_name): # ensure unique file-name
-        trial_temp_file_name = tabNN.path + "trial_"+str(trial_id)+"_"+str(i)+"_"+TabularNeuralNetModel.temp_file_name
-        i += 1
-    """
+    directory = args.directory
+    file_prefix = "trial_"+str(trial_id)+"_" # append to all file names created during this trial. Do NOT change!
+    trial_temp_file_name = directory + file_prefix + tabNN.temp_file_name # temporary file used throughout this trial
     # Load datasets:
     train_fileprefix = args.train_fileprefix
     test_fileprefix = args.test_fileprefix
     train_dataset = TabularNNDataset.load(train_fileprefix)
     test_dataset = TabularNNDataset.load(test_fileprefix)
-    
+    # Define network:
     net = tabNN.get_net(train_dataset)
     ctx = tabNN.ctx
-    
+    # Set seed:
     seed_value = args.seed_value # Set seed
     if seed_value is not None:
         random.seed(seed_value)
         np.random.seed(seed_value)
         mx.random.seed(seed_value)
-    
-    # Initialize
+    # Initialize:
     tabNN.model.collect_params().initialize(ctx=ctx)
     tabNN.model.hybridize()
-    if setup_trainer:
-        tabNN.setup_trainer()
+    # TODO: Not used for now, we always setup the trainer:  if setup_trainer:
+    tabNN.setup_trainer()
     best_val_metric = np.inf  # smaller = better (aka Error rate for classification)
     val_metric = None # smaller = better
     best_val_epoch = 0
@@ -91,8 +89,11 @@ def tabularNN_train_fn(args, reporter):
             break
     tabNN.model.load_parameters(trial_temp_file_name) # Revert back to best model
     final_val_metric = tabNN.evaluate_metric(test_dataset)
+    modelobj_file, netparams_file = tabNN.save(file_prefix=file_prefix, directory=directory, return_name=True)
     # print("Best model found in epoch %d. Val %s: %s" % (best_val_epoch, tabNN.metric_map[tabNN.problem_type], final_val_metric))
-    reporter(epoch= e+1, validation_performance= -final_val_metric, file_name = trial_temp_file_name) # add fake epoch at the end containg performance of early-stopped model.  Negate since higher val_metric = worse
+    # add fake epoch at the end containg performance of early-stopped model.  Negate since higher val_metric = worse:
+    reporter(epoch= e+1, validation_performance= -final_val_metric, directory = directory, file_prefix = file_prefix,
+            modelobj_file = modelobj_file, netparams_file = netparams_file)
     
     # TODO: how to keep track of which filename corresponds to which performance?
 

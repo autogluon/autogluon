@@ -46,6 +46,9 @@ class AbstractTrainer:
         self.model_weights = None
         self.reset_paths = False
         self.feature_importance = {}
+        # Things stored
+        self.hpo_results = {} # Stores summary of HPO process
+        self.hpo_model_names = [] # stores additional models produced during HPO
         # Scheduler attributes:
         self.scheduler_func = scheduler_options[0] # unpack tuple
         self.scheduler_options = scheduler_options[1]
@@ -154,21 +157,27 @@ class AbstractTrainer:
 
     def train_single_full(self, X_train, X_test, y_train, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True):
         model.feature_types_metadata = self.feature_types_metadata
-        if hyperparameter_tune:
-            # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well:
-            # model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
-            model.hyperparameter_tune(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test, 
-                                      scheduler_options=(self.scheduler_func, self.scheduler_options))
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
-            pass  # TODO
-        self.train_and_save(X_train, X_test, y_train, y_test, model)
+        if hyperparameter_tune:
+            # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
+            # hpo_models (dict): keys = model_names, values = model_paths
+            hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
+                y_train=y_train, y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+            self.hpo_model_names += hpo_models.keys()
+            self.model_paths.update(hpo_models)
+            self.hpo_results[model.name] = hpo_results
+            self.model_types.update({name: type(model) for name in hpo_models.keys()})
+        else:
+            self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
     
     def train_multi(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         for i, model in enumerate(models):
             self.train_single_full(X_train, X_test, y_train, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-
+        self.model_names += self.hpo_model_names # Update model list with (potentially empty) list of new models created during HPO
+        self.model_names = list(set(self.model_names)) # make unique
+    
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)

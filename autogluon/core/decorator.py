@@ -49,11 +49,14 @@ class _autogluon_method(object):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)
-
+        
+        if 'reporter'not in kwargs:
+            from ..scheduler.reporter import FakeReporter
+            kwargs['reporter'] = FakeReporter()
+            
         output = self.f(args, **kwargs)
-        if 'reporter' in kwargs and kwargs['reporter'] is not None:
-            logger.debug('Reporter Done!')
-            kwargs['reporter'](done=True)
+        logger.debug('Reporter Done!')
+        kwargs['reporter'](done=True)
         return output
  
     def register_args(self, default={}, **kwvars):

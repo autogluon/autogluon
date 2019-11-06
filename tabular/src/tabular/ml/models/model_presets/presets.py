@@ -25,6 +25,7 @@ def get_preset_models(path, problem_type, objective_func, num_classes=None,
 
 def get_preset_models_binary(path, problem_type, objective_func, num_classes=None, num_boost_round=None, nn_options={}):
     models = [
+        # Good GBDT  
         LGBModel(path=path, name='LGBMClassifierCustom', params=lgb_get_param_baseline(problem_type, num_classes=num_classes), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
         TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func, nn_options=nn_options),
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
@@ -52,6 +53,7 @@ def get_preset_models_language(path):
 
 def get_preset_models_regression(path, problem_type, objective_func, num_boost_round=None, nn_options={}):
     models = [
+        # Good GBDT  
         LGBModel(path=path, name='LGBMRegressorCustom', params=lgb_get_param_baseline(problem_type), num_boost_round=num_boost_round, problem_type=problem_type, objective_func=objective_func),
         TabularNeuralNetModel(path=path, name='TabularNeuralNetModel', problem_type=problem_type, objective_func=objective_func, nn_options=nn_options), 
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),

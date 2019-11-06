@@ -25,7 +25,7 @@ __all__ = ['PredictTableColumn']
 
 logger = logging.getLogger(__name__)
 
-class PredictTableColumn(BaseTask): 
+class PredictTableColumn(BaseTask):
     """AutoGluon task for predicting a column of tabular dataset (classification & regression)
     
     """
@@ -41,7 +41,7 @@ class PredictTableColumn(BaseTask):
     def fit(train_data, label, tuning_data=None, output_directory='', problem_type=None, objective_func=None, 
             submission_columns=[], feature_generator=None, threshold=100,
             hyperparameter_tune=True, feature_prune=False, 
-            nn_options = {}, 
+            nn_options = {}, gbdt_options = {}, 
             nthreads_per_trial=None, ngpus_per_trial=None, time_limits=None, num_trials=5, dist_ip_addrs=[], visualizer='none',
             search_strategy='random', search_options={}):
         """
@@ -72,7 +72,7 @@ class PredictTableColumn(BaseTask):
             nthreads_per_trial = int(np.floor(multiprocessing.cpu_count()/2)) # At most half of processing power / trial
         if ngpus_per_trial is None:
             if mx.test_utils.list_gpus():
-                ngpus_per_trial = 1 # single GPU / trial
+                ngpus_per_trial = 1 # Single GPU / trial
             else:
                 ngpus_per_trial = 0
         
