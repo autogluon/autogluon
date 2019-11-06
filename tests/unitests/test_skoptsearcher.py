@@ -2,7 +2,7 @@ import logging
 import random
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-from autogluon.searcher import RandomSampling
+from autogluon.searcher import RandomSearcher
 from autogluon.searcher import SKoptSearcher
 
 # Suppress known UserWarnings:
@@ -11,7 +11,6 @@ warnings.filterwarnings("ignore", message=".*objective has been evaluated at thi
 warnings.filterwarnings("ignore", message=".*skopt failed to produce new config, using random search instead.*")
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 def test_skoptsearcher():
     logger.debug('Start testing SKoptSearcher')
@@ -40,7 +39,7 @@ def test_skoptsearcher():
     skrf_config_list = [None]*num_configs_totry 
     skrf_reward_list = [0.0]*num_configs_totry # stores rewards scaled between 0-1
     # Benchmark against random searcher:
-    rs_searcher = RandomSampling(cs)
+    rs_searcher = RandomSearcher(cs)
     random_config_list = [None]*num_configs_totry
     random_reward_list = [0.0]*num_configs_totry
     # Run search:
@@ -85,6 +84,5 @@ def toy_reward(config):
     return reward
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
     import nose
     nose.runmodule()

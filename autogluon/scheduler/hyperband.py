@@ -84,7 +84,7 @@ class HyperbandScheduler(FIFOScheduler):
         >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
         >>>     wd=ag.space.Real(1e-3, 1e-2))
         >>> def train_fn(args, reporter):
-        >>>     #print('lr: {}, wd: {}'.format(args.lr, args.wd))
+        >>>     print('lr: {}, wd: {}'.format(args.lr, args.wd))
         >>>     for e in range(10):
         >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         >>>         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)

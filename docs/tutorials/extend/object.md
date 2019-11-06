@@ -30,11 +30,11 @@ ag.utils.plot_network(net, (1, 3, 32, 32))
 
 ### Searchable Network Architecture using AutoGluon Object
 
-:function:`autogluon.autogluon_object` enables customized search space to any user defined class. It can also be used within `autogluon.Categorical()` if you have multiple networks to choose from.
+:function:`autogluon.obj` enables customized search space to any user defined class. It can also be used within `autogluon.Categorical()` if you have multiple networks to choose from.
 
 
 ```{.python .input}
-@ag.autogluon_object(
+@ag.obj(
     nstage1=ag.space.Int(2, 4),
     nstage2=ag.space.Int(2, 4),
 )
@@ -63,13 +63,13 @@ print(mynet1.cs)
 
 ### Decorate Existing Class
 
-We can also use :function:`autogluon.autogluon_object` to easily decorate any existing classes.
+We can also use :function:`autogluon.obj` to easily decorate any existing classes.
 For example, if we want to search learning rate and weight decay for Adam optimizer, we only
 need to add a decorator:
 
 ```{.python .input}
 from mxnet import optimizer as optim
-@ag.autogluon_object()
+@ag.obj()
 class Adam(optim.Adam):
     pass
 ```

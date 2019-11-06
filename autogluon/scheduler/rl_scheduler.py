@@ -36,25 +36,27 @@ class RLScheduler(FIFOScheduler):
         reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
 
     Example:
-        >>> @autogluon_method
+        >>> import numpy as np
+        >>> import autogluon as ag
+        >>> 
+        >>> @ag.args(
+        >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
+        >>>     wd=ag.space.Real(1e-3, 1e-2))
         >>> def train_fn(args, reporter):
+        >>>     print('lr: {}, wd: {}'.format(args.lr, args.wd))
         >>>     for e in range(10):
-        >>>         # forward, backward, optimizer step and evaluation metric
-        >>>         # generate fake top1_accuracy
-        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=top1_accuracy)
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> searcher = RandomSampling(cs)
-        >>> myscheduler = HyperbandScheduler(train_fn, args,
-        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
-        >>>                                  searcher=searcher, num_trials=20,
-        >>>                                  reward_attr='accuracy',
-        >>>                                  time_attr='epoch',
-        >>>                                  grace_period=1)
+        >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+        >>>         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+        >>> 
+        >>> scheduler = ag.scheduler.RLScheduler(train_fn,
+        >>>                                      resource={'num_cpus': 2, 'num_gpus': 0},
+        >>>                                      num_trials=20,
+        >>>                                      reward_attr='accuracy',
+        >>>                                      time_attr='epoch')
+        >>> scheduler.run()
+        >>> scheduler.join_jobs()
+        >>> scheduler.get_training_curves(plot=True)
+        >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',

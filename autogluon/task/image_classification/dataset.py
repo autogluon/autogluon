@@ -18,7 +18,7 @@ built_in_datasets = [
     'imagenet',
 ]
 
-@autogluon_object()
+@obj()
 class ClassificationDataset(object):
     """The image classification dataset.
     Args:
@@ -86,7 +86,7 @@ class ClassificationDataset(object):
             else:
                 raise NotImplementedError
 
-@autogluon_function()
+@func()
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
                          shuffle=True, **kwargs):
     """AutoGluonFunction

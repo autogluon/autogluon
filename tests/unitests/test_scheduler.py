@@ -5,7 +5,6 @@ import autogluon as ag
     lr=ag.space.Real(1e-3, 1e-2, log=True),
     wd=ag.space.Real(1e-3, 1e-2))
 def train_fn(args, reporter):
-    #print('lr: {}, wd: {}'.format(args.lr, args.wd))
     for e in range(10):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
@@ -26,6 +25,24 @@ def test_hyperband_scheduler():
                                                 reward_attr='accuracy',
                                                 time_attr='epoch',
                                                 grace_period=1)
+    scheduler.run()
+    scheduler.join_jobs()
+
+@ag.args(
+    lr=ag.space.Categorical(1e-3, 1e-2),
+    wd=ag.space.Categorical(1e-3, 1e-2))
+def rl_train_fn(args, reporter):
+    #print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    for e in range(10):
+        dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+        reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+
+def test_rl_scheduler():
+    scheduler = ag.scheduler.RLScheduler(rl_train_fn,
+                                         resource={'num_cpus': 2, 'num_gpus': 0},
+                                         num_trials=20,
+                                         reward_attr='accuracy',
+                                         time_attr='epoch')
     scheduler.run()
     scheduler.join_jobs()
 
