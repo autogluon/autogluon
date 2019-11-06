@@ -33,7 +33,7 @@ classifier = task.fit(dataset,
 The resulting validation and test top-1 accuracy obtained through random search within the given `time_limits` and `epochs` constraints are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -56,7 +56,7 @@ classifier = task.fit(dataset,
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `epochs` constraints) are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -73,7 +73,7 @@ classifier = task.fit(dataset,
                    epochs=epochs,
                    ngpus_per_trial=1)
 
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
