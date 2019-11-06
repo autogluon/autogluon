@@ -60,7 +60,7 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    # Search space we use by default (only specify non-fixed hyperparameters here):
+    # Search space we use by default (only specify non-fixed hyperparameters here):  # TODO: move to separate file
     default_searchspace = {
         'learning_rate': Real(1e-4, 1e-2, log=True),
         'weight_decay': Real(1e-12, 1e-1, log=True),
@@ -105,7 +105,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('num_dataloading_workers', 1) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
         self._use_default_value('max_epochs', 100)  # TODO! debug # maximum number of epochs for training NN
-        self._use_default_value('seed_value', 123) # random seed for reproducibility in HPO (set = None to ignore)
+        self._use_default_value('seed_value', 0) # random seed for reproducibility in HPO (set = None to ignore)
 
         # For data processing (currently preprocessors not searched during HPO):
         self._use_default_value('proc.embed_min_categories', 3) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
@@ -166,7 +166,8 @@ class TabularNeuralNetModel(AbstractModel):
         elif self.problem_type == REGRESSION:
             self.num_net_outputs = 1
             if self.params['y_range'] is None: # Infer default y-range
-                y_vals = train_dataset.dataset._data[train_dataset.label_index]
+                y_vals = train_dataset.dataset._data[train_dataset.label_index].asnumpy()
+                print(type(y_vals))
                 min_y = min(y_vals)
                 max_y = max(y_vals)
                 std_y = np.std(y_vals)
@@ -763,7 +764,7 @@ class TabularNeuralNetModel(AbstractModel):
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
         print("Best hyperparameter configuration for Tabular Neural Network: ")
         print(best_hp)
-        return (hpo_models, hpo_results) # TODO! debug: need to add all models
+        return (hpo_models, hpo_results)
         """
         # TODO: do final fit here?
         args.final_fit = True
