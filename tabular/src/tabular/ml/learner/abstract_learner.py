@@ -286,13 +286,24 @@ class AbstractLearner:
             raise ValueError("provided labels cannot have length = 0")
         y = y.dropna() # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
+        # print(unique_vals)
         REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
         if len(unique_vals) == 2:
-            problem_type =  BINARY
+            problem_type = BINARY
             reason = "only two unique label-values observed"
         elif unique_vals.dtype == 'float':
-            problem_type = REGRESSION
-            reason = "dtype of label-column == float"
+            unique_ratio = len(unique_vals) / float(len(y))
+            if unique_ratio <= REGRESS_THRESHOLD:
+                try:
+                    pd.to_numeric(y, downcast='integer')
+                    problem_type = MULTICLASS
+                    reason = "dtype of label-column == float, but few unique label-values observed and label-values can be converted to int"
+                except:
+                    problem_type = REGRESSION
+                    reason = "dtype of label-column == float and label-values can't be converted to int"
+            else:
+                problem_type = REGRESSION
+                reason = "dtype of label-column == float and many unique label-values observed"
         elif unique_vals.dtype == 'object':
             problem_type = MULTICLASS
             reason = "dtype of label-column == object"
