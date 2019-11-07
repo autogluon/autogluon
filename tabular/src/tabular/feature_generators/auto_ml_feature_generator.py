@@ -50,13 +50,26 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 X_features[datetime_feature] = pd.to_numeric(X_features[datetime_feature])  # TODO: Use actual date info
                 # TODO: Add fastai date features
 
-        # TODO: Experiment with concatenating nlp fields to a single feature for a single vectorizer fit
         if self.enable_nlp_features and self.features_nlp:
+            # Combine Text Fields
+            txt = ['. '.join(row) for row in X[self.features_nlp].values]
+            # print(txt[:10])
+            # txt_cleaned = LemmatizerPreprocessor().process(txt)
+            # print(txt_cleaned[:10])
+            # txt_cleaned_2 = StopWordsRemover().process(txt_cleaned)
+            # print(txt_cleaned_2[:10])
+
+            X['__nlp__'] = txt  # Could potentially find faster methods if this ends up being slow
+
+            features_nlp_current = ['__nlp__']
+
             if not self.fit:
                 features_nlp_to_remove = []
-                for nlp_feature in self.features_nlp:
+                print('fitting vectorizer for nlp features:', self.features_nlp)
+
+                for nlp_feature in features_nlp_current:
                     # TODO: Preprocess text?
-                    print('fitting vectorizer for', nlp_feature, '...')
+                    # print('fitting vectorizer for', nlp_feature, '...')
                     text_list = (list(X[nlp_feature].drop_duplicates().values))
                     vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
                     try:
@@ -64,12 +77,12 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         self.vectorizers.append(vectorizer_fit)
                     except ValueError:
                         print('removing nlp feature')
-                        features_nlp_to_remove.append(nlp_feature)
+                        features_nlp_to_remove = self.features_nlp
                     except:
                         raise
                 self.features_nlp = [feature for feature in self.features_nlp if feature not in features_nlp_to_remove]
             X_nlp_features_combined = []
-            for i, nlp_feature in enumerate(self.features_nlp):
+            for i, nlp_feature in enumerate(features_nlp_current):
                 vectorizer_fit = self.vectorizers[i]
                 nlp_features_names = vectorizer_fit.get_feature_names()
 
