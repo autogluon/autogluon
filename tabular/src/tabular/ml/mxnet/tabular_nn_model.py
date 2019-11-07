@@ -461,6 +461,7 @@ class TabularNeuralNetModel(AbstractModel):
         if labels is None:
             raise ValueError("Attempting process training data without labels")
         self.types_of_features = self._get_types_of_features(df) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
+        df = df[self.features]
         print("AutoGluon infers your features are of the following types:")
         print(json.dumps(self.types_of_features, indent=4))
         print("\n\n")
@@ -520,13 +521,20 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
-        continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int')
-        # print(("categorical_featnames:  ", categorical_featnames))
-        # print(("continuous_featnames:  ", continuous_featnames))
+        continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')
+        print("categorical_featnames:", categorical_featnames)
+        print("continuous_featnames:", continuous_featnames)
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
-        if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
-            raise ValueError("unknown feature types present in DataFrame")
-        
+        valid_features = categorical_featnames + continuous_featnames + language_featnames
+        if len(categorical_featnames) + len(continuous_featnames)\
+                + len(language_featnames)\
+                != df.shape[1]:
+            unknown_features = [feature for feature in df.columns if feature not in valid_features]
+            print('unknown features:', unknown_features)
+            df = df.drop(columns=unknown_features)
+            self.features = list(df.columns)
+            # raise ValueError("unknown feature types present in DataFrame")
+
         types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
