@@ -26,7 +26,7 @@ class RLScheduler(FIFOScheduler):
     """Reinforcement Scheduler, which automatically creates LSTM controller based on the search spaces.
 
     Args:
-        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_register_args` decorater to the original function.
+        train_fn (callable): A task launch function for training. Note: please add the `@ag.args` decorater to the original function.
         args (object): Default arguments for launching train_fn.
         resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
         searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
@@ -62,7 +62,7 @@ class RLScheduler(FIFOScheduler):
                  controller_resource={'num_cpus': 2, 'num_gpus': 0},
                  controller_batch_size=1,
                  dist_ip_addrs=[], sync=True, **kwargs):
-        assert isinstance(train_fn, _autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
+        assert isinstance(train_fn, _autogluon_method), 'Please use @ag.args ' + \
                 'to decorate your training script.'
         self.ema_baseline_decay = ema_baseline_decay
         self.sync = sync
