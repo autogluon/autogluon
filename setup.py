@@ -54,6 +54,7 @@ def uninstall_legacy_dask():
     finally:
         if has_dist:
             subprocess.check_call("pip uninstall -y distributed".split())
+    subprocess.check_call("pip install -y dask[complete]".split())
 
 # run test scrip after installation
 class install(setuptools.command.install.install):
@@ -85,7 +86,6 @@ requirements = [
     'matplotlib',
     'tornado',
     'paramiko==2.5.0',
-    'dask[complete]>=2.6.0',
     'ConfigSpace==0.4.10',
     'nose',
     'gluoncv',
