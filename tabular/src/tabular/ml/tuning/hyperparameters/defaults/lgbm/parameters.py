@@ -18,6 +18,7 @@ def get_param_multiclass_baseline(num_classes):
         'objective': 'multiclass',
         'metric': 'multi_error,multi_logloss',
         'num_classes': num_classes,
+        'verbose': -1,
 
         'boosting_type': 'gbdt',
         'learning_rate': 0.005,
@@ -36,6 +37,7 @@ def get_param_binary_baseline():
         'num_threads': -1,
         'objective': 'binary',
         'metric': 'binary_logloss,binary_error',
+        'verbose': -1,
 
         'boosting_type': 'gbdt',
         'learning_rate': 0.01,
@@ -53,6 +55,7 @@ def get_param_regression_baseline():
         'num_threads': -1,
         'objective': 'regression',
         'metric': 'l1',
+        'verbose': -1,
 
         'boosting_type': 'gbdt',
         'learning_rate': 0.01,
