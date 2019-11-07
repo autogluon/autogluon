@@ -46,11 +46,11 @@ stage("Unit Test") {
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        python setup.py develop
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+        python setup.py develop
         nosetests -v tests/unittests
         """
       }
