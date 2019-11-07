@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 import mxnet as mx
 
-from .dataset import TabularDataset
-
 
 # TODO: Perhaps change this to import from autogluon module rather than entirely separate tabular module. Need to replace all imports with the proper autogluon module once tabular has been fully integrated as a submodule of autogluon 
 from tabular.ml.learner.default_learner import DefaultLearner as Learner
@@ -39,7 +37,7 @@ class PredictTableColumn(BaseTask):
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory='', problem_type=None, objective_func=None, 
-            submission_columns=[], feature_generator=None, threshold=100,
+            submission_columns=[], feature_generator=None, threshold=10,
             hyperparameter_tune=True, feature_prune=False, 
             nn_options = {}, gbdt_options = {}, 
             nthreads_per_trial=None, ngpus_per_trial=None, time_limits=None, num_trials=5, dist_ip_addrs=[], visualizer='none',

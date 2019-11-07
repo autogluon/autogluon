@@ -23,7 +23,7 @@ from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 class AbstractLearner:
     save_file_name = 'learner.pkl'
 
-    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=100, problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
+    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=10, problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
         self.label = label
