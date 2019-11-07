@@ -3,7 +3,7 @@ import datetime, json, copy, warnings
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
-from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error, max_error
+from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error # , max_error
 import numpy as np
 from numpy import corrcoef
 
@@ -212,7 +212,9 @@ class AbstractLearner:
         if self.problem_type == REGRESSION: # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation
             pearson_corr = lambda x,y: corrcoef(x,y)[0][1]
             pearson_corr.__name__ = 'pearson_correlation'
-            regression_metrics = [mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error, max_error]
+            regression_metrics = [mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error,
+                                  # max_error
+                                  ]
             for reg_metric in regression_metrics:
                 metric_name = reg_metric.__name__
                 if metric_name not in perf_dict:
