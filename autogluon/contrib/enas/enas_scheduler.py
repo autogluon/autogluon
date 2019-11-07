@@ -112,22 +112,24 @@ class ENAS_Scheduler(object):
             # for recordio data
             if hasattr(self.train_data, 'reset'): self.train_data.reset()
             tbar = tqdm(self.train_data)
-            for i, batch in enumerate(tbar):
+            idx = 0
+            for batch in tbar:
                 # sample network configuration
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
                 self.train_fn(self.supernet, batch, **self.train_args)
                 mx.nd.waitall()
-                if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
+                if epoch >= self.warmup_epochs and (idx % self.update_arch_frequency) == 0:
                     self.train_controller()
-                if self.plot_frequency > 0 and i % self.plot_frequency == 0 and in_ipynb():
+                if self.plot_frequency > 0 and idx % self.plot_frequency == 0 and in_ipynb():
                     graph = self.supernet.graph
                     from IPython.display import SVG, display, clear_output
                     clear_output(wait=True)
                     graph.attr(rankdir='LR', size='8,3')
                     display(SVG(graph._repr_svg_()))
                 tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \
-                        .format(epoch, i, self.val_acc, self.baseline))
+                        .format(epoch, idx, self.val_acc, self.baseline))
+                idx += 1
             self.validation()
             self.save()
             tq.set_description('epoch {}, val_acc: {}, avg reward: {}' \

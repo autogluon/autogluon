@@ -27,14 +27,9 @@ class ImageClassification(BaseTask):
     Dataset = ClassificationDataset
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=Categorical(
-                SGD(learning_rate=Real(1e-4, 1e-2, log=True),
-                    momentum=Real(0.85, 0.95),
-                    wd=Real(1e-5, 1e-3, log=True)),
-                Adam(learning_rate=Real(1e-4, 1e-2, log=True),
-                     wd=Real(1e-5, 1e-3, log=True)),
-            ),
+            net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
+            optimizer= SGD(learning_rate=Real(1e-4, 1e-2, log=True),
+                           wd=Real(1e-5, 1e-3, log=True)),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
