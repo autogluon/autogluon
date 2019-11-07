@@ -10,6 +10,7 @@ class RFSpaces(AbstractSpaces):
 
     def get_binary_baseline(self):
         spaces = {
+            'n_estimators': [300],
             "max_depth": sp_randint(4, 32),
             "max_features": uniform(),
             "min_samples_split": sp_randint(2, 11),
@@ -24,9 +25,9 @@ class RFSpaces(AbstractSpaces):
 
     def get_regression_baseline(self):
         spaces = {
-            # 'n_estimators': [90],
+            'n_estimators': [300],
             "max_depth": sp_randint(4, 32),
-            # "max_features": uniform(),
+            "max_features": uniform(),
             "min_samples_split": sp_randint(2, 11),
             "criterion": ['mae'],  # TODO: Criterion should be defined by objective func
             'n_jobs': [-1]
