@@ -23,7 +23,7 @@ stage("Build Docs") {
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
             echo "Uploaded doc to http://autogluon.mxnet.io"
         else
-            aws s3 rb s3://autogluon-staging
+            aws s3 rb s3://autogluon-staging --force
             aws s3 mb s3://autogluon-staging --region us-west-2
             aws s3 sync --delete _build/html/ s3://autogluon-staging/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/ --acl public-read
             echo "Uploaded doc to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/index.html"
