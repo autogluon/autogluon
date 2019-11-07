@@ -53,8 +53,8 @@ def train_tabularNN(args, reporter):
     tabNN.model.hybridize()
     # TODO: Not used for now, we always setup the trainer:  if setup_trainer:
     tabNN.setup_trainer()
-    best_val_metric = np.inf  # smaller = better (aka Error rate for classification)
-    val_metric = None # smaller = better
+    best_val_metric = -np.inf  # higher = better
+    val_metric = None
     best_val_epoch = 0
     best_train_epoch = 0  # epoch with best training loss so far
     best_train_loss = np.inf  # smaller = better
@@ -63,7 +63,7 @@ def train_tabularNN(args, reporter):
     if tabNN.problem_type == REGRESSION: 
         if tabNN.metric_map[REGRESSION] == 'MAE':
             loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # std-dev of labels
-        elif tabNN.metric_map[REGRESSION] == 'MSE':
+        elif tabNN.metric_map[REGRESSION] == 'Rsquared':
             loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # variance of labels
     for e in range(max_epochs):
         cumulative_loss = 0
@@ -79,20 +79,20 @@ def train_tabularNN(args, reporter):
         train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
         if test_dataset is not None:
             val_metric = tabNN.evaluate_metric(test_dataset) # Evaluate after each epoch
-        if test_dataset is None or val_metric <= best_val_metric: # assume model is getting better while validation accuracy remains the same.
+        if test_dataset is None or val_metric >= best_val_metric: # assume model is getting better while validation accuracy remains the same.
             best_val_metric = val_metric
             best_val_epoch = e
             tabNN.model.save_parameters(trial_temp_file_name)
         # print("Epoch %s.  Train loss: %s, Val %s: %s" % (e, train_loss, tabNN.metric_map[tabNN.problem_type], val_metric))
-        reporter(epoch=e, validation_performance= -val_metric, train_loss= train_loss) # Negate since higher val_metric = worse
+        reporter(epoch=e, validation_performance=val_metric, train_loss=train_loss) # Higher val_metric = better
         if e - best_val_epoch > args.epochs_wo_improve:
             break
     tabNN.model.load_parameters(trial_temp_file_name) # Revert back to best model
     final_val_metric = tabNN.evaluate_metric(test_dataset)
     modelobj_file, netparams_file = tabNN.save(file_prefix=file_prefix, directory=directory, return_name=True)
     # print("Best model found in epoch %d. Val %s: %s" % (best_val_epoch, tabNN.metric_map[tabNN.problem_type], final_val_metric))
-    # add fake epoch at the end containg performance of early-stopped model.  Negate since higher val_metric = worse:
-    reporter(epoch= e+1, validation_performance= -final_val_metric, directory = directory, file_prefix = file_prefix,
+    # add fake epoch at the end containg performance of early-stopped model.  Higher val_metric = better
+    reporter(epoch= e+1, validation_performance = final_val_metric, directory = directory, file_prefix = file_prefix,
             modelobj_file = modelobj_file, netparams_file = netparams_file)
     
     # TODO: how to keep track of which filename corresponds to which performance?

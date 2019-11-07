@@ -54,7 +54,7 @@ class TabularNeuralNetModel(AbstractModel):
     # Constants used throughout this class:
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
-    metric_map = {REGRESSION: 'MAE', BINARY: 'error_rate', MULTICLASS: 'error_rate'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
+    metric_map = {REGRESSION: 'Rsquared', BINARY: 'accuracy', MULTICLASS: 'accuracy'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
     # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
     model_file_name = 'tabularNN.pkl'
     params_file_name = 'net.params' # Stores parameters of final network
@@ -290,7 +290,7 @@ class TabularNeuralNetModel(AbstractModel):
             self.model.hybridize()
         if setup_trainer:
             self.setup_trainer()
-        best_val_metric = np.inf # smaller = better (aka Error rate for classification)
+        best_val_metric = -np.inf # higher = better
         val_metric = None
         best_val_epoch = 0
         best_train_epoch = 0 # epoch with best training loss so far
@@ -300,7 +300,7 @@ class TabularNeuralNetModel(AbstractModel):
         if self.problem_type == REGRESSION: 
             if self.metric_map[REGRESSION] == 'MAE':
                 loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
-            elif self.metric_map[REGRESSION] == 'MSE':
+            elif self.metric_map[REGRESSION] == 'Rsquared':
                 loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
         for e in range(max_epochs):
             cumulative_loss = 0
@@ -317,11 +317,12 @@ class TabularNeuralNetModel(AbstractModel):
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
                 val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
-            if test_dataset is None or val_metric <= best_val_metric: # keep training while validation accuracy remains the same.
+            if test_dataset is None or val_metric >= best_val_metric: # keep training while validation accuracy remains the same.
                 best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
+                # TODO: currently evaluate_metric is evaluating different metric...
                 print("Epoch %s.  Train loss: %s, Val %s: %s" %
                   (e, train_loss, self.metric_map[self.problem_type], val_metric))
                 self.summary_writer.add_scalar(tag='val_'+self.metric_map[self.problem_type], 
@@ -344,12 +345,14 @@ class TabularNeuralNetModel(AbstractModel):
     
     def evaluate_metric(self, dataset, mx_metric=None):
         """ Evaluates metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
-            If provided, mx_metric must be a function that follows the mxnet.metric API.
-            By default, returns error-rate in the case of classification, MSE for regression.
+            If provided, mx_metric must be a function that follows the mxnet.metric API. Higher values = better!
+            By default, returns accuracy in the case of classification, R^2 for regression.
+            
+            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics... 
         """
         if mx_metric is None:
             if self.problem_type == REGRESSION:
-                mx_metric = mx.metric.MAE()
+                mx_metric = mx.metric.MSE()
             else:
                 mx_metric = mx.metric.Accuracy()
         
@@ -358,9 +361,10 @@ class TabularNeuralNetModel(AbstractModel):
             preds = self.model(data_batch)
             mx_metric.update(preds=preds, labels=data_batch['label']) # argmax not needed, even for classification
         if self.problem_type == REGRESSION:
-            return mx_metric.get()[1]
+            y_var = np.var(dataset.dataset._data[dataset.label_index].asnumpy()) + EPS
+            return 1.0 - mx_metric.get()[1] / y_var
         else:
-            return 1.0 - mx_metric.get()[1] # error rate
+            return mx_metric.get()[1] # accuracy
     
     def predict_proba(self, X, preprocess=True):
         """ To align predict wiht abstract_model API. 
