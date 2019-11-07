@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 import copy
-import random
+import time
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.utils.loaders import load_pkl
@@ -14,12 +14,11 @@ from tabular.ml.models.abstract_model import AbstractModel
 from tabular.ml.tuning.autotune import AutoTune
 
 import tabular.metrics
-from tabular.metrics import accuracy, mean_absolute_error, root_mean_squared_error
+from tabular.metrics import accuracy, root_mean_squared_error
 from sklearn.model_selection import train_test_split
-from scipy.optimize import minimize
-from sklearn.metrics import log_loss
 from sklearn.model_selection import KFold
 
+from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
@@ -38,13 +37,6 @@ class AbstractTrainer:
             self.objective_func = root_mean_squared_error
 
         self.objective_func_expects_y_pred = tabular.metrics.scorer_expects_y_pred(scorer=self.objective_func)
-
-        # if type(objective_func) == tabular.metrics._ProbaScorer:
-        #     self.objective_func_expects_y_pred = False
-        # elif type(objective_func) == tabular.metrics._ThresholdScorer:
-        #     self.objective_func_expects_y_pred = False
-        # else:
-        #     self.objective_func_expects_y_pred = True
 
         self.num_classes = num_classes
         self.low_memory = low_memory
@@ -152,9 +144,13 @@ class AbstractTrainer:
     def train_single(self, X_train, X_test, y_train, y_test, model, objective_func=accuracy):
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
+        start_time = time.time()
         model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
+        end_time = time.time()
         score = model.score(X=X_test, y=y_test)
-        print('Score of', model.name, ':', score)
+        print('Score of ' + model.name + ':', score)
+        print('Fit Runtime:', model.name, '=', end_time-start_time, 's')
+
         if self.compute_feature_importance:
             self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
 
@@ -198,24 +194,18 @@ class AbstractTrainer:
         for model_name in self.model_names:
             model = self.load_model(model_name)
             if model is not None:
-                print(model_name, model.score(X_test, y_test))
+                print(model_name, model.score(X_test, y_test))  # TODO: Might want to remove this to avoid needless computation
 
-        y_pred_ensemble = self.predict_voting_ensemble(X_test=X_test, models=self.model_names)
-        acc_ensemble = self.objective_func(y_true=y_test, y_pred=y_pred_ensemble)
-        self.model_performance['ensemble.equal_weights'] = acc_ensemble
-        print('Score of ensemble:', acc_ensemble)
+        ensemble_voting_score = self.score(X=X_test, y=y_test, weights='voting')  # TODO: Might want to remove this to avoid needless computation
+        self.model_performance['ensemble.equal_weights'] = ensemble_voting_score
+        print('Score of voting ensemble:', ensemble_voting_score)
 
-        ##########
-        # TODO: Comment out if you want to use basic same-weight voting ensemble
-        # TODO: Make this maximize optimization function, not logloss
         self.model_weights = self.compute_optimal_voting_ensemble_weights(models=self.model_names, X_test=X_test, y_test=y_test)
 
-        y_pred_ensemble_optimal = self.predict_voting_ensemble(X_test=X_test, models=self.model_names, weights=self.model_weights)
-        acc_ensemble_optimize = self.objective_func(y_true=y_test, y_pred=y_pred_ensemble_optimal)
-        print('acc ensemble_optimize:', acc_ensemble_optimize)
-        self.model_performance['ensemble.optimized'] = acc_ensemble_optimize
+        ensemble_weighted_score = self.score(X=X_test, y=y_test)
+        print('Score of weighted ensemble:', ensemble_weighted_score)
+        self.model_performance['ensemble.optimized'] = ensemble_weighted_score
         print('optimal weights:', self.model_weights)
-        ##########
 
         # TODO: Consider having this be a separate call outside of train, to use on a fitted trainer object
         if self.compute_feature_importance:
@@ -301,8 +291,14 @@ class AbstractTrainer:
     def predict_proba_voting_ensemble(self, models, X_test, weights=None):
         if weights is None:
             weights = [1/len(models)]*len(models)
-        pred_probas = self.pred_proba_predictions(models=models, X_test=X_test)
-        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
+        model_index_to_ignore = []
+        for index, weight in enumerate(weights):
+            if weight == 0:
+                model_index_to_ignore.append(index)
+        models_to_predict_on = [model for index, model in enumerate(models) if index not in model_index_to_ignore]
+        models_to_predict_on_weights = [weight for index, weight in enumerate(weights) if index not in model_index_to_ignore]
+        pred_probas = self.pred_proba_predictions(models=models_to_predict_on, X_test=X_test)
+        preds_norm = [pred * weight for pred, weight in zip(pred_probas, models_to_predict_on_weights)]
         preds_ensemble = np.sum(preds_norm, axis=0)
         return preds_ensemble
 
@@ -315,81 +311,12 @@ class AbstractTrainer:
         optimal_weights = self.compute_optimal_voting_ensemble_weights(models=models, X_test=X_test, y_test=y_test)
         return self.predict_voting_ensemble(models=models, X_test=X_test, weights=optimal_weights)
 
-    def compute_optimal_voting_ensemble_weights(self, models, X_test, y_test, iterations=10):
+    # Ensemble Selection (https://dl.acm.org/citation.cfm?id=1015432)
+    def compute_optimal_voting_ensemble_weights(self, models, X_test, y_test):
         pred_probas = self.pred_proba_predictions(models=models, X_test=X_test)
-        # TODO: Use accuracy instead of logloss?
-        if (self.problem_type == BINARY) or (self.problem_type == MULTICLASS):
-            def opt_func(weights):
-                final_prediction = 0
-                for weight, prediction in zip(weights, pred_probas):
-                    final_prediction += weight * prediction
-
-                # if len(final_prediction.shape) == 1:
-                #     y_pred_ensemble = [1 if pred >= 0.5 else 0 for pred in final_prediction]
-                # else:
-                #     y_pred_ensemble = np.argmax(final_prediction, axis=1)
-                # acc = accuracy_score(y_test, y_pred_ensemble)
-                # print(acc)
-                if (self.problem_type == MULTICLASS) and (final_prediction.shape[1] != len(set(y_test))):
-                    # Need to provide lablels since y_test does not contain all classes.
-                    log_loss_val = log_loss(y_test, final_prediction, labels=range(max(final_prediction.shape[1], len(set(y_test)))))
-                else:
-                    log_loss_val = log_loss(y_test, final_prediction)
-                return log_loss_val
-        else:
-            def opt_func(weights):
-                final_prediction = 0
-                for weight, prediction in zip(weights, pred_probas):
-                    final_prediction += weight * prediction
-                log_loss_val = mean_absolute_error(y_test, final_prediction)
-                return log_loss_val
-
-        cur_best = None
-        # TODO: Parallelize?
-        for i in range(iterations):
-            starting_values = [random.random() for _ in range(len(models))]
-            starting_values = starting_values / np.sum(starting_values)
-
-            res = minimize(opt_func, starting_values, method='Nelder-Mead')
-
-            if cur_best is None:
-                cur_best = res
-            elif cur_best['fun'] > res['fun']:
-                # print('new best!')
-                cur_best = res
-
-        best_weights = cur_best['x']
-
-        rerun = False
-        rerun_models = []
-        # TODO: Crashes when all model weights are negative. Handle this by returning model which always predicts 0 for regression (or most frequent class in binary/multiclass), or raise this as a dedicated error
-        for i, weight in enumerate(best_weights):
-            if weight < 0:
-                print('model', i, 'has negative weight, setting to 0 and re-running optimization...')
-                rerun = True
-        if rerun:
-            print('rerunning...')
-            print('Ensemble Score Prior: {best_score}'.format(best_score=cur_best['fun']))
-            print('Best Weights Prior: {weights}'.format(weights=cur_best['x']))
-
-            for i, weight in enumerate(best_weights):
-                if weight >= 0:
-                    rerun_models.append(models[i])
-            updated_weights = self.compute_optimal_voting_ensemble_weights(models=rerun_models, X_test=X_test, y_test=y_test, iterations=iterations)
-            updated_weight_index = 0
-            for i, weight in enumerate(best_weights):
-                if weight >= 0:
-                    # print('updated weight from', weight, 'to', updated_weights[updated_weight_index])
-                    best_weights[i] = updated_weights[updated_weight_index]
-                    updated_weight_index += 1
-                else:
-                    # print('updated weight from', weight, 'to', 0)
-                    best_weights[i] = 0
-        else:
-            print('Ensemble Score: {best_score}'.format(best_score=cur_best['fun']))
-            print('Best Weights: {weights}'.format(weights=best_weights))
-
-        return best_weights
+        ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
+        ensemble_selection.fit(predictions=pred_probas, labels=y_test, identifiers=None)
+        return ensemble_selection.weights_
 
     def save_model(self, model):
         if self.low_memory:
