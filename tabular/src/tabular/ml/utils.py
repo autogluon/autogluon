@@ -22,10 +22,8 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
 
 
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
-    print('CONSTRUCTING DATASET')
     # save_pd.save(path=location + '.csv', df=x, header=False)
     feature_list = list(x.columns.values)
-    print(len(feature_list))
     # dataset = lgb.Dataset(data=location + '.csv', label=y, reference=reference, feature_name=feature_list)
     dataset = lgb.Dataset(data=x, label=y, reference=reference, free_raw_data=True, params=params, weight=weight)
 
@@ -39,13 +37,11 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
         dataset.save_binary(location + '.bin')
         # dataset_binary = lgb.Dataset(location + '.bin', reference=reference, free_raw_data=False)# .construct()
 
-    print('DATASET CONSTRUCTED!')
 
     return dataset
 
 
 def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=None, params=None):
-    print('CONSTRUCTING DATASET 2')
     cat_columns = list(X.select_dtypes(include='category').columns.values)
     # X = X.drop(columns_categorical, axis=1)
 
@@ -110,13 +106,11 @@ def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=No
 
     # bst = lgb.train(model_params, xgtrain, valid_sets=[xgvalid], valid_names=['valid'], evals_result=evals_results, **fit_params)
 
-    print('DATASET CONSTRUCTED 2!')
     return xgtrain
 
 
 @calculate_time
 def construct_dataset_lowest_memory(X: DataFrame, y: Series, location, reference=None, params=None):
-    print('CONSTRUCTING DATASET 3')
 
     cat_columns = list(X.select_dtypes(include='category').columns.values)
 
@@ -135,7 +129,6 @@ def construct_dataset_lowest_memory(X: DataFrame, y: Series, location, reference
                           feature_name=columns,
                           )
 
-    print('DATASET CONSTRUCTED 3!')
     return xgtrain
 
 
