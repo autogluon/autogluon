@@ -27,7 +27,7 @@ classifier = task.fit(dataset,
                       search_strategy='random',
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=0)
 ```
 
 The resulting validation and test top-1 accuracy obtained through random search within the given `time_limits` and `epochs` constraints are:
@@ -50,7 +50,7 @@ classifier = task.fit(dataset,
                       search_strategy='skopt',
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=0)
 ```
 
 The resulting validation and test top-1 accuracy obtained through Bayesian optimization (within the given `time_limits` and `epochs` constraints) are:
@@ -71,7 +71,7 @@ For those of you familiar with Bayesian optimization, AutoGluon allows you to co
 #                   search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
 #                   time_limits=time_limits,
 #                   epochs=epochs,
-#                   ngpus_per_trial=1)
+#                   ngpus_per_trial=0)
 #
 #print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 #test_acc = classifier.evaluate(test_dataset)

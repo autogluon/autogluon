@@ -10,15 +10,13 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from ..utils import (save, load, mkdir, try_import_mxboard)
+from ..utils import (save, load, mkdir, try_import_mxboard, tqdm)
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
 from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
-
-from tqdm.auto import tqdm
 
 __all__ = ['RLScheduler']
 

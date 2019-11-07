@@ -20,7 +20,6 @@ stage("Build Docs") {
         python setup.py develop
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
-            aws s3 mb s3://autogluon.mxnet.io/
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
             echo "Uploaded doc to http://autogluon.mxnet.io"
         else

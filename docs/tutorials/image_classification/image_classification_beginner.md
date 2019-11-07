@@ -50,7 +50,7 @@ epochs = 10
 classifier = task.fit(dataset,
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=0)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
