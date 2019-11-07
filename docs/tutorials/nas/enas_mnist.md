@@ -79,7 +79,7 @@ mynet = ENAS_Sequential(
 
 mynet.initialize()
 
-mynet.graph
+#mynet.graph
 ```
 
 ### Evaluate Network Latency and Define Reward Function
@@ -100,6 +100,8 @@ We also provide number of params
 mynet.nparams
 ```
 
+Defind the reward function:
+
 ```{.python .input}
 reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1)
 ```
@@ -111,8 +113,8 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 ```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn, batch_size=128,
-                           warmup_epochs=0, epochs=2, controller_lr=3e-3,
-                           plot_frequency=2, update_arch_frequency=5)
+                           warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                           plot_frequency=1, update_arch_frequency=5)
 ```
 
 Start the training:
@@ -133,8 +135,8 @@ reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.8
 mynet.initialize(force_reinit=True)
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn, batch_size=128,
-                           warmup_epochs=0, epochs=2, controller_lr=3e-3,
-                           plot_frequency=2, update_arch_frequency=5)
+                           warmup_epochs=0, epochs=1, controller_lr=3e-3,
+                           plot_frequency=1, update_arch_frequency=5)
 scheduler.run()
 ```
 
@@ -146,3 +148,9 @@ mynet.graph
 ## Defining a Complicated Network
 
 Can we define a more complicated network than just sequential?
+
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```

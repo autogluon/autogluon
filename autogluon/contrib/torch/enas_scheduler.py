@@ -1,10 +1,9 @@
 import os
 import mxnet as mx
-from tqdm.auto import tqdm
 from collections import OrderedDict
 import torch
 
-from ...utils import collect_params, update_params
+from ...utils import collect_params, update_params, tqdm, in_ipynb
 from ..enas import ENAS_Scheduler
 from .enas_utils import *
 from .torch_utils import AverageMeter
@@ -56,15 +55,15 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
         tq = tqdm(range(self.epochs))
         for epoch in tq:
             # for recordio data
-            tbar = tqdm(enumerate(self.train_data))
-            for i, (data, label) in tbar:
+            tbar = enumerate(self.train_data)
+            for i, (data, label) in tqdm(tbar):
                 # sample network configuration
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
                 self.train_fn(self.supernet, data, label, i, epoch, **self.train_args)
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
-                if self.plot_frequency > 0 and i % self.plot_frequency == 0:
+                if self.plot_frequency > 0 and i % self.plot_frequency == 0 and in_ipynb():
                     from IPython.display import SVG, display, clear_output
                     clear_output(wait=True)
                     graph = self.supernet.graph
@@ -79,7 +78,7 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
 
     def validation(self):
         # data iter
-        tbar = tqdm(enumerate(self.val_data))
+        tbar = enumerate(tqdm(self.val_data))
         # update network arc
         config = self.controller.inference()
         self.supernet.sample(**config)

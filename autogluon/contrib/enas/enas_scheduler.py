@@ -10,10 +10,8 @@ from ...searcher import RLSearcher
 from ...scheduler.resource import get_gpu_count, get_cpu_count
 from ...task.image_classification.dataset import get_built_in_dataset
 from ...task.image_classification.utils import *
-from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, in_ipynb)
+from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, tqdm, in_ipynb)
 from .enas_utils import *
-
-from tqdm.auto import tqdm
 
 __all__ = ['ENAS_Scheduler']
 
@@ -113,8 +111,8 @@ class ENAS_Scheduler(object):
         for epoch in tq:
             # for recordio data
             if hasattr(self.train_data, 'reset'): self.train_data.reset()
-            tbar = tqdm(enumerate(self.train_data))
-            for i, batch in tbar:
+            tbar = tqdm(self.train_data)
+            for i, batch in enumerate(tbar):
                 # sample network configuration
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
@@ -122,10 +120,10 @@ class ENAS_Scheduler(object):
                 mx.nd.waitall()
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
-                if self.plot_frequency > 0 and i % self.plot_frequency == 0:
+                if self.plot_frequency > 0 and i % self.plot_frequency == 0 and in_ipynb():
+                    graph = self.supernet.graph
                     from IPython.display import SVG, display, clear_output
                     clear_output(wait=True)
-                    graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
                     display(SVG(graph._repr_svg_()))
                 tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \

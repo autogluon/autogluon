@@ -1,5 +1,7 @@
 name: autogluon_docs
 dependencies:
-- python3.6
+- python=3.6
+- graphviz
 - pip:
-  - mxnet-cu92mkl==1.5.1.post0
+  - mxnet-cu92==1.5.1.post0
+  - nose
