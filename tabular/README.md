@@ -17,14 +17,17 @@ brew install libomp
 # Create virtual env 
 python3 -m venv ~/virtual/TabularAutoGluon
 source ~/virtual/TabularAutoGluon/bin/activate
+pip install pip --upgrade
 
+# Install MXNet (see instructions here: https://mxnet.apache.org/get_started/?version=v1.5.1&platform=linux&language=python&environ=pip&processor=cpu):
 
-# First install **tabular** module + dependencies:
+pip install mxnet 
 
+#  Install *tabular* module + dependencies:
 cd tabular/ # From inside the parent autogluon/ that contains this whole repository
 pip install -r requirements.txt
 python setup.py install
 
-# Then install **autogluon**:
+# Install *autogluon*:
 cd ..
 python setup.py develop
