@@ -74,7 +74,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```{.python .input}
-image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
+image = 'data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
