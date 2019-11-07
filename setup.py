@@ -54,7 +54,7 @@ def uninstall_legacy_dask():
     finally:
         if has_dist:
             subprocess.check_call("pip uninstall -y distributed".split())
-    subprocess.check_call("pip install -y dask[complete]".split())
+    subprocess.check_call("pip install dask[complete]".split())
 
 # run test scrip after installation
 class install(setuptools.command.install.install):
