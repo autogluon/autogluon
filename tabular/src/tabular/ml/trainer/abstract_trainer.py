@@ -13,7 +13,8 @@ from tabular.ml.utils import get_pred_from_proba
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.ml.tuning.autotune import AutoTune
 
-from sklearn.metrics import accuracy_score, mean_absolute_error
+import tabular.metrics
+from tabular.metrics import accuracy, mean_absolute_error, root_mean_squared_error
 from sklearn.model_selection import train_test_split
 from scipy.optimize import minimize
 from sklearn.metrics import log_loss
@@ -30,11 +31,21 @@ class AbstractTrainer:
         if objective_func is not None:
             self.objective_func = objective_func
         elif self.problem_type == BINARY:
-            self.objective_func = accuracy_score
+            self.objective_func = accuracy
         elif self.problem_type == MULTICLASS:
-            self.objective_func = accuracy_score
+            self.objective_func = accuracy
         else:
-            self.objective_func = mean_absolute_error
+            self.objective_func = root_mean_squared_error
+
+        self.objective_func_expects_y_pred = tabular.metrics.scorer_expects_y_pred(scorer=self.objective_func)
+
+        # if type(objective_func) == tabular.metrics._ProbaScorer:
+        #     self.objective_func_expects_y_pred = False
+        # elif type(objective_func) == tabular.metrics._ThresholdScorer:
+        #     self.objective_func_expects_y_pred = False
+        # else:
+        #     self.objective_func_expects_y_pred = True
+
         self.num_classes = num_classes
         self.low_memory = low_memory
         self.compute_feature_importance = compute_feature_importance
@@ -138,7 +149,7 @@ class AbstractTrainer:
     def train(self, X_train, y_train, X_test=None, y_test=None):
         raise NotImplementedError
 
-    def train_single(self, X_train, X_test, y_train, y_test, model, objective_func=accuracy_score):
+    def train_single(self, X_train, X_test, y_train, y_test, model, objective_func=accuracy):
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
         model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
@@ -171,7 +182,7 @@ class AbstractTrainer:
         else:
             self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
-    
+
     def train_multi(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         for i, model in enumerate(models):
             self.train_single_full(X_train, X_test, y_train, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
@@ -180,7 +191,7 @@ class AbstractTrainer:
         for item in self.model_names:
             if item not in unique_names: unique_names.append(item)
         self.model_names = unique_names # make unique and preserve order
-    
+
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
@@ -236,7 +247,7 @@ class AbstractTrainer:
             del model
 
     @staticmethod
-    def train_ensemble(X_train, X_test, y_train, y_test, model_base: AbstractModel, objective_func=accuracy_score):
+    def train_ensemble(X_train, X_test, y_train, y_test, model_base: AbstractModel, objective_func=accuracy):
         oof_pred_proba, models_cv = AbstractTrainer.get_cv(X=X_train, y=y_train, n_splits=5, model=model_base)
         for model in models_cv:
             print(model.score(X=X_test, y=y_test))
@@ -257,9 +268,17 @@ class AbstractTrainer:
     def predict_proba(self, X):
         return self.predict_proba_voting_ensemble(models=self.model_names, X_test=X, weights=self.model_weights)
 
-    def score(self, X, y):
-        y_pred = self.predict(X)
-        return self.objective_func(y_true=y, y_pred=y_pred)
+    def score(self, X, y, weights=None):
+        if weights is None:
+            weights = self.model_weights
+        elif weights == 'voting':
+            weights = [1/len(self.model_names)]*len(self.model_names)
+        if self.objective_func_expects_y_pred:
+            y_pred_ensemble = self.predict_voting_ensemble(models=self.model_names, X_test=X, weights=weights)
+            return self.objective_func(y, y_pred_ensemble)
+        else:
+            y_pred_proba_ensemble = self.predict_proba_voting_ensemble(models=self.model_names, X_test=X, weights=weights)
+            return self.objective_func(y, y_pred_proba_ensemble)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
         autotuner = AutoTune(model_base=model_base)

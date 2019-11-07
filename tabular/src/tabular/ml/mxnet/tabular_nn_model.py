@@ -68,7 +68,7 @@ class TabularNeuralNetModel(AbstractModel):
         'embedding_size_factor': Real(0.5, 1.5),
         'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
     }
-    
+
     def __init__(self, path, name, problem_type, objective_func, features=None, nn_options={}):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features)
         """ Create new TabularNeuralNetModel object.
@@ -135,11 +135,11 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('max_embedding_dim', 500)
         self._use_default_value('use_batchnorm', True) # whether or not to utilize Batch-normalization
         # Default search space: self._use_default_value('use_batchnorm', ag.space.bool() )
-        
+
         self._use_default_value('dropout_prob', 0.1) # 0 turns off Dropout!
         # Default search space: self._use_default_value('dropout_prob', ag.space.Real(0.0, 0.5) )
-        
-        # Regression-specific hyperparameters: 
+
+        # Regression-specific hyperparameters:
         self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
         # If None, inferred based on training labels. Note: MUST be None for classification tasks!
         self._use_default_value('y_range_extend', 0.1) # Only used to extend size of inferred y_range when y_range = None.
@@ -238,6 +238,7 @@ class TabularNeuralNetModel(AbstractModel):
                 self.params.pop(hyperparam, None)
             self._set_default_params() # reset defaults for the missing keys
             # TODO: OLD: sets hyperparams to fixed values based on search space: self.params[hyperparam] = self._hp_default_value(self.params[hyperparam])
+
         self.get_net(train_dataset)
         self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
         """
@@ -268,14 +269,14 @@ class TabularNeuralNetModel(AbstractModel):
         self.model = net
         return
     
-    def train_net(self, params, train_dataset, test_dataset=None, 
+    def train_net(self, params, train_dataset, test_dataset=None,
                   initialize=True, setup_trainer=True, file_prefix=""):
         """ Trains neural net on given train dataset, early stops based on test_dataset.
             Args:
                 params (dict): various hyperparameter values
                 train_dataset (TabularNNDataset): training data used to learn network weights
                 test_dataset (TabularNNDataset): validation data used for hyperparameter tuning
-                initialize (bool): set = False to continue training of a previously trained model, otherwise initializes network weights randomly 
+                initialize (bool): set = False to continue training of a previously trained model, otherwise initializes network weights randomly
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
                 file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
@@ -347,8 +348,8 @@ class TabularNeuralNetModel(AbstractModel):
         """ Evaluates metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
             If provided, mx_metric must be a function that follows the mxnet.metric API. Higher values = better!
             By default, returns accuracy in the case of classification, R^2 for regression.
-            
-            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics... 
+
+            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics...
         """
         if mx_metric is None:
             if self.problem_type == REGRESSION:
@@ -652,7 +653,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.summary_writer = temp_sw
         if return_name:
             return (modelobj_filepath, params_filepath)
-    
+
     @classmethod
     def load(cls, path, file_prefix="", reset_paths=False):
         """ file_prefix (str): Appended to beginning of file-name.
@@ -660,7 +661,7 @@ class TabularNeuralNetModel(AbstractModel):
         """
         path = path + file_prefix
         obj = load_pkl.load(path = path + cls.model_file_name)
-        if reset_paths: 
+        if reset_paths:
             obj.set_contexts(path)
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc) # recreate network from architecture description
         # TODO: maybe need to initialize/hybridize??
@@ -674,7 +675,7 @@ class TabularNeuralNetModel(AbstractModel):
     
     @staticmethod
     def _hp_default_value(hp_value):
-        """ Extracts default fixed value from hyperparameter search space to use a fixed value instead of a search space. 
+        """ Extracts default fixed value from hyperparameter search space to use a fixed value instead of a search space.
             TODO: Unused
         """
         if not isinstance(hp_value, Space):
@@ -687,7 +688,7 @@ class TabularNeuralNetModel(AbstractModel):
             raise ValueError("Cannot call fit() on NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
         else:
             return hp_value.get_hp('dummy_name').default_value
-    
+
     def hyperparameter_tune(self, X_train, X_test, y_train, y_test, scheduler_options):
         """ Performs HPO and sets self.params to best hyperparameter values """
         print("Beginning hyperparameter tuning for Tabular Neural Network...")
@@ -698,7 +699,7 @@ class TabularNeuralNetModel(AbstractModel):
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        
+
         start_time = time.time()
         X_train = self.preprocess(X_train)
         X_test = self.preprocess(X_test)
@@ -719,19 +720,19 @@ class TabularNeuralNetModel(AbstractModel):
         test_fileprefix = self.path + "validation"
         train_dataset.save(file_prefix=train_fileprefix) # TODO: cleanup after HPO?
         test_dataset.save(file_prefix=test_fileprefix)
-        train_tabularNN.register_args(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix, 
+        train_tabularNN.register_args(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                       directory=directory, tabNN=self, **params_copy)
         scheduler = scheduler_func(train_tabularNN, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
-            scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX, 
-                                train_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX, 
-                                test_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX, 
+            scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
+                                train_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX,
+                                test_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
                                 test_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX]) # TODO: currently does not work.
             train_fileprefix = "train"
             test_fileprefix = "validation"
             directory = self.path # TODO: need to change to path to working directory on every remote machine
-            train_tabularNN.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix, 
+            train_tabularNN.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                    directory=directory)
         scheduler.run()
         scheduler.join_jobs()
@@ -740,7 +741,7 @@ class TabularNeuralNetModel(AbstractModel):
         best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
         hpo_results = {'best_reward': scheduler.get_best_reward(),
                        'best_config': best_hp,
-                       'total_time': time.time() - start_time, 
+                       'total_time': time.time() - start_time,
                        'metadata': scheduler.metadata,
                        'training_history': scheduler.training_history,
                        'config_history': scheduler.config_history,
@@ -749,7 +750,7 @@ class TabularNeuralNetModel(AbstractModel):
                       }
         hpo_results = BasePredictor._format_results(hpo_results) # store results summarizing HPO for TabularNN model
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers") 
+            raise NotImplementedError("need to fetch model files from remote Workers")
             # TODO: need to handle locations carefully: fetch these 2 files and put into self.path:
             # 1) hpo_results['trial_info'][trial]['metadata']['modelobj_file']
             # 2) hpo_results['trial_info'][trial]['metadata']['netparams_file']
@@ -760,7 +761,7 @@ class TabularNeuralNetModel(AbstractModel):
             trial_model_name = self.name+"_"+file_id
             trial_model_path = self.path + file_prefix
             hpo_models[trial_model_name] = trial_model_path
-        
+
         print("Time for TabularNN hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
@@ -773,7 +774,7 @@ class TabularNeuralNetModel(AbstractModel):
         model_weights = scheduler.run_with_config(best_config)
         save(model_weights)
         """
-    
+
     def _set_default_searchspace(self):
         search_space = self.default_searchspace.copy()
         for key in self.nondefault_params: # delete all specified hyperparams from the default search space.

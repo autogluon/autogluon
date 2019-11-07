@@ -23,22 +23,9 @@ class LGBModel(AbstractModel):
         super().__init__(path=path, name=name, model=model, problem_type=problem_type, objective_func=objective_func, features=features, debug=debug)
         self.params = params
         self.metric_types = self.params['metric'].split(',')
-        if self.objective_func in lgb_utils.supported_metrics:
-            self.eval_metric = lgb_utils.get_eval_metric(self.objective_func)
-        elif 'binary_error' in self.metric_types:
-            self.eval_metric = 'binary_error'
-        elif 'multi_error' in self.metric_types:
-            self.eval_metric = 'multi_error'
-        elif 'l2' in self.metric_types:
-            self.eval_metric = 'l2'
-        else:
-            self.eval_metric = self.metric_types[-1]
 
-        if type(self.eval_metric) == str:
-            self.eval_metric_name = self.eval_metric
-            self.is_higher_better = False  # TODO: Find actual way to calculate instead of assuming
-        else:
-            self.eval_metric_name, _, self.is_higher_better = self.eval_metric([0], lgb_utils.DummyData())
+        self.eval_metric_name = self.objective_func.name
+        self.is_higher_better = True
 
         self.num_boost_round = num_boost_round
         self.best_iteration = None
@@ -48,9 +35,13 @@ class LGBModel(AbstractModel):
         self.model_name_trained = 'model_trained.pkl'
         self.eval_result_path = 'eval_result.pkl'
         self.latest_model_checkpoint = 'model_checkpoint_latest.pointer'
-    
+
+    def get_eval_metric(self):
+        return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
+
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None):
+        eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
         self.eval_results = {}
@@ -63,7 +54,7 @@ class LGBModel(AbstractModel):
             ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
-        
+
         callbacks += [
             record_evaluation_custom(self.path + self.eval_result_path, eval_result={}, interval=1000),
             # save_model_callback(self.path + self.model_name_checkpointing_0, latest_model_checkpoint=self.path + self.latest_model_checkpoint, interval=400, offset=0),
@@ -82,9 +73,10 @@ class LGBModel(AbstractModel):
             'valid_names': valid_names,
             'evals_result': self.eval_results,
             'callbacks': callbacks,
+            'verbose_eval': 10,
         }
-        if type(self.eval_metric) != str:
-            train_params['feval'] = self.eval_metric
+        if type(eval_metric) != str:
+            train_params['feval'] = eval_metric
         self.model = lgb.train(**train_params)
         # del dataset_train
         # del dataset_val
@@ -99,13 +91,13 @@ class LGBModel(AbstractModel):
         #     json.dump(model_json, f, indent=4)
         # save_pkl.save(path=self.path + self.model_name_trained, object=self)  # TODO: saving self instead of model, not consistent with save callbacks
         # save_pointer.save(path=self.path + self.latest_model_checkpoint, content_path=self.path + self.model_name_trained)
-    
+
     def predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
-        
+
         y_pred_proba = self.model.predict(X)
         if (self.problem_type == BINARY):
             if len(y_pred_proba.shape) == 1:
@@ -129,7 +121,7 @@ class LGBModel(AbstractModel):
             dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
         gc.collect()
         params = copy.deepcopy(self.params)
-        
+        eval_metric = self.get_eval_metric()
         # TODO: Either edit lgb.cv to return models / oof preds or make custom implementation!
         cv_params = {
             'params': params,
@@ -140,14 +132,14 @@ class LGBModel(AbstractModel):
             'verbose_eval': 10,
             'seed': 0,
         }
-        if type(self.eval_metric) != str:
-            cv_params['feval'] = self.eval_metric
+        if type(eval_metric) != str:
+            cv_params['feval'] = eval_metric
             cv_params['params']['metric'] = 'None'
         else:
-            cv_params['params']['metric'] = self.eval_metric
+            cv_params['params']['metric'] = eval_metric
         if self.problem_type == REGRESSION:
             cv_params['stratified'] = False
-        
+
         print('Current parameters:\n', params)
         eval_hist = lgb.cv(**cv_params)  # TODO: Try to use customer early stopper to enable dart
         best_score = eval_hist[self.eval_metric_name + '-mean'][-1]
@@ -178,7 +170,7 @@ class LGBModel(AbstractModel):
             dataset_val = construct_dataset(x=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=self.params, save=save, weight=W_test)
             # dataset_val = construct_dataset_lowest_memory(X=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=self.params)
         return dataset_train, dataset_val
-    
+
     def debug_features_to_use(self, X_test_in):
         feature_splits = self.model.feature_importance()
         total_splits = feature_splits.sum()
@@ -195,7 +187,7 @@ class LGBModel(AbstractModel):
         features_to_use = list(feature_importances_used['feature'].values)
         print(features_to_use)
         return features_to_use
-    
+
     def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler_options=None): # scheduler_options unused for now
         print("Beginning hyperparameter tuning for Decision Tree Ensemble...")
         X = pd.concat([X_train, X_test], ignore_index=True)
@@ -236,7 +228,7 @@ class LGBModel(AbstractModel):
 
         self.params = optimal_params
         print(self.params)
-        
+
         # TODO: final fit should not be here eventually
         self.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
         self.save()

@@ -7,10 +7,11 @@ from tabular.ml.utils import get_pred_from_proba
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from sklearn.model_selection import RandomizedSearchCV
 from tabular.utils.decorators import calculate_time
-import inspect
 
 from tabular.utils.loaders import load_pkl
 from tabular.utils.savers import save_pkl
+
+import tabular.metrics
 
 
 class AbstractModel:
@@ -28,12 +29,13 @@ class AbstractModel:
         self.problem_type = problem_type
         self.objective_func = objective_func
 
-        # TODO: Find a better way of determining this
-        objective_func_args = inspect.signature(self.objective_func)
-        if 'y_pred' in objective_func_args.parameters:
-            self.objective_func_expects_y_pred = True
-        else:  # TODO: This is present to handle things like sklearn.metrics.roc_auc_score() which are present in binary classification but expect y_pred_proba
-            self.objective_func_expects_y_pred = False
+        if type(objective_func) == tabular.metrics._ProbaScorer:
+            self.metric_needs_y_pred = False
+        elif type(objective_func) == tabular.metrics._ThresholdScorer:
+            self.metric_needs_y_pred = False
+        else:
+            self.metric_needs_y_pred = True
+
         self.features = features
         self.debug = debug
         if type(model) == str:
@@ -76,9 +78,9 @@ class AbstractModel:
             return y_pred_proba[:, 1]
 
     def score(self, X, y):
-        if self.objective_func_expects_y_pred:
+        if self.metric_needs_y_pred:
             y_pred = self.predict(X=X)
-            return self.objective_func(y_true=y, y_pred=y_pred)
+            return self.objective_func(y, y_pred)
         else:
             y_pred_proba = self.predict_proba(X=X)
             return self.objective_func(y, y_pred_proba)
@@ -110,18 +112,14 @@ class AbstractModel:
         if spaces is None:
             print('skipping hyperparameter tuning, no spaces specified...')
             return {}
-        # TODO: Make this specific to the objective func! Use https://scikit-learn.org/stable/modules/generated/sklearn.metrics.make_scorer.html
-        if self.problem_type == REGRESSION:
-            scoring = 'neg_mean_absolute_error'  # self.objective_func.make_scorer()  # TODO FIXME
-        else:
-            scoring = 'accuracy'  # TODO FIXME
 
         model = copy.deepcopy(self)
         X = model.preprocess(X)
-        # Set the parameters by cross-validation
 
+        # Set the parameters by cross-validation
+        scorer = self.objective_func.sklearn_scorer()
         clf = RandomizedSearchCV(model.model, param_distributions=spaces, n_iter=10, cv=5,
-                                 scoring=scoring)
+                                 scoring=scorer)
         clf.fit(X, y)
 
         print("Best parameters set found on development set:")
@@ -189,14 +187,17 @@ class AbstractModel:
                 feature = features[indice+j]
                 val[feature] = X_test_shuffled[feature]
             X_test_raw = pd.concat(x, ignore_index=True)
-            Y_pred = model.predict(X_test_raw, preprocess=False)
+            if model.metric_needs_y_pred:
+                Y_pred = model.predict(X_test_raw, preprocess=False)
+            else:
+                Y_pred = model.predict_proba(X_test_raw, preprocess=False)
             row_index = 0
             for j in range(compute_count):
                 row_index_end = row_index + row_count
                 Y_pred_cur = Y_pred[row_index:row_index_end]
                 row_index = row_index_end
-                accuracy = model.objective_func(y_true=Y_test, y_pred=Y_pred_cur)
-                model_score_diff.append(model_score_base - accuracy)
+                score = model.objective_func(Y_test, Y_pred_cur)
+                model_score_diff.append(model_score_base - score)
 
         results = pd.Series(data=model_score_diff, index=features)
         results = results.sort_values(ascending=False)

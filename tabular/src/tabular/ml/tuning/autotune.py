@@ -51,7 +51,7 @@ class AutoTune:
     # TODO: CV5 instead of holdout? Should be better
     # TODO: Add holdout here, it is overfitting with Logistic Regression
     def tune(self, X_train, y_train, X_test, y_test, X_holdout, y_holdout, total_runs=999):
-        objective_goal_is_negative = self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
+        objective_goal_is_negative = False  # Fixed to false if using sklearn scorers # self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
         print('Autotuning', self.model_base.name, 'for', total_runs, 'runs...')
 
         if len(self.features_in_iter) == 0:
