@@ -78,10 +78,10 @@ class AbstractFeatureGenerator:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
                 self.features_to_remove_post.append(column)
-            print(column, unique_value_count)
+            # print(column, unique_value_count)
         self.features_binned = set(self.features_binned) - set(self.features_to_remove_post)
         self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
-        for column in self.features_binned:
+        for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
             # print(X_features[column].value_counts().sort_index())
         self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
@@ -94,6 +94,7 @@ class AbstractFeatureGenerator:
             X_features = self.drop_duplicate_features(X_features)
         X_features.index = X_index
         self.features = list(X_features.columns)
+        self.feature_type_family['object'] += self.features_binned
         self.fit = True
         print('fit', X_len, 'data points with', len(self.features), 'features')
         return X_features
@@ -119,13 +120,14 @@ class AbstractFeatureGenerator:
         
         # Create any columns present in the training dataset that are now missing from this dataframe:
         missing_cols = []
-        for col in self.features:
+        for col in self.features_init:
             if col not in X_columns:
                 missing_cols.append(col)
                 if col in self.features_object: # was a dtype==object column in training dataset
                     X[col] = [None] * len(X)
                 else: # was a dtype==numerical column in training dataset
                     X[col] = [np.nan] * len(X)
+        # TODO (Nick): I don't think we should allow missing columns. This is very dangerous, we should throw an exception instead.
         if len(missing_cols) > 0:
             warnings.warn("The columns listed below from the training data are no longer in the given dataset. " 
                           "(AutoGluon will proceed assuming their values are missing, but you should remove these columns "
@@ -240,15 +242,15 @@ class AbstractFeatureGenerator:
             # # print(unique_ratio)
             # print(dtype)
             type_family = self.get_type_family(dtype)
-            print(num_unique, '\t', num_unique_duplicates, '\t', unique_ratio, '\t', type_family, '\t', column,)
+            # print(num_unique, '\t', num_unique_duplicates, '\t', unique_ratio, '\t', type_family, '\t', column,)
 
             if num_unique == 1:
                 mark_for_removal = True
 
-            if num_unique == num_rows:
-                print('fully unique!')
-            if unique_ratio > 0.5:
-                print('fairly unique!')
+            # if num_unique == num_rows:
+            #     print('fully unique!')
+            # if unique_ratio > 0.5:
+            #     print('fairly unique!')
             # print(col_val.value_counts())
 
             # print()
@@ -283,6 +285,8 @@ class AbstractFeatureGenerator:
     # TODO: Expand to int64 -> date features (milli from epoch etc)
     def check_if_datetime_feature(self, X: Series):
         type_family = self.get_type_family(X.dtype)
+        # TODO: Check if low numeric numbers, could be categorical encoding!
+        # TODO: If low numeric, potentially it is just numeric instead of date
         if X.isnull().all():
             return False
         if type_family == 'datetime':
