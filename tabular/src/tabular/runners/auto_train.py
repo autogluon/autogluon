@@ -1,8 +1,8 @@
 
 import datetime
 
+from autogluon import PredictTableColumn as task
 from tabular.utils.loaders import load_pd
-from tabular.ml.learner.default_learner import DefaultLearner
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
 
 
@@ -13,7 +13,7 @@ from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGe
 # feature_generator_kwargs [Optional] specify params to feature generator
 # sample [Optional] allows for training on only sample # of rows, for prototyping
 # returns the learner model context (used to load learner back with DefaultLearner.load(model_context), and the learner itself
-def train(data, label: str, X_test=None, learner_context: str = None, submission_columns: list = None, feature_generator_kwargs: dict = None, problem_type: str = None, objective_func=None, sample: int = None, compute_feature_importance=False):
+def train(data, label: str, X_test=None, learner_context: str = None, submission_columns: list = None, hyperparameter_tune=False, feature_generator_kwargs: dict = None, problem_type: str = None, objective_func=None):
     if type(data) == str:
         data = load_pd.load(data, encoding='latin1')
     if X_test is not None:
@@ -31,8 +31,7 @@ def train(data, label: str, X_test=None, learner_context: str = None, submission
         }
 
     feature_generator = AutoMLFeatureGenerator(**feature_generator_kwargs)
-    learner = DefaultLearner(path_context=learner_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator, problem_type=problem_type, objective_func=objective_func, compute_feature_importance=compute_feature_importance)
-    learner.fit(X=data, X_test=X_test, sample=sample)
+    learner = task.fit(train_data=data, label=label, tuning_data=X_test, output_directory=learner_context, feature_generator=feature_generator, problem_type=problem_type, objective_func=objective_func, hyperparameter_tune=hyperparameter_tune, submission_columns=submission_columns)
 
     return learner.path_context, learner
 
