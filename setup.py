@@ -38,8 +38,22 @@ def try_and_install_mxnet():
         print("MXNet {} detected.".format(mx.__version__))
 
 def uninstall_legacy_dask():
-    subprocess.check_call("pip uninstall -y dask".split())
-    subprocess.check_call("pip uninstall -y distributed".split())
+    has_dask = True
+    try:
+        import dask
+    except ImportError:
+        has_dask = False
+    finally:
+        if has_dask:
+            subprocess.check_call("pip uninstall -y dask".split())
+    has_dist = True
+    try:
+        import distributed
+    except ImportError:
+        has_dist = False
+    finally:
+        if has_dist:
+            subprocess.check_call("pip uninstall -y distributed".split())
 
 # run test scrip after installation
 class install(setuptools.command.install.install):

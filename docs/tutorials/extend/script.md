@@ -104,20 +104,20 @@ def train_loop(args, reporter):
 import autogluon as ag
 from autogluon.utils.mxutils import get_data_rec
 
-@ag.autogluon_register_args(
+@ag.args(
     dataset='apparel',
     net='resnet18_v1b',
     epochs=ag.Choice(40, 80),
-    lr=ag.LogLinear(1e-4, 1e-2),
-    lr_factor=ag.LogLinear(0.1, 1),
+    lr=ag.Real(1e-4, 1e-2, log=True),
+    lr_factor=ag.Real(0.1, 1, log=True),
     batch_size=256,
     momentum=0.9,
-    wd=ag.LogLinear(1e-5, 1e-3),
+    wd=ag.Real(1e-5, 1e-3, log=True),
     num_gpus=8,
     num_workers=30,
     input_size=ag.Choice(224, 256),
     crop_ratio=0.875,
-    jitter_param=ag.Linear(0.1, 0.4),
+    jitter_param=ag.Real(0.1, 0.4),
     max_rotate_angle=ag.space.Int(0, 10),
 )
 def train_finetune(args, reporter):

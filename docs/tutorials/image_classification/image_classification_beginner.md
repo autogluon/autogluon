@@ -22,15 +22,14 @@ We download the data subset from this [link](../data.zip)
 and unzip it via the following commands:
 
 ```{.python .input}
-import os
-os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
-os.system('unzip -o data.zip -d ~/')
+filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+ag.unzip(filename)
 ```
 
 Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
 ```{.python .input}
-dataset = task.Dataset(train_path='~/data/train')
+dataset = task.Dataset(train_path='data/train')
 ```
 
 In the above call, a train/validation data split is automatically constructed based on the provided data, where 90% of the images are used for training and 10% held-out for validation. AutoGluon will automatically tune various hyperparameters of our neural network models in order to maximize classification performance on the validation data.  
@@ -59,7 +58,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.

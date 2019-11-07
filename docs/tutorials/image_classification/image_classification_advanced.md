@@ -44,7 +44,7 @@ classifier = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_dataset = task.Dataset(test_path='~/data/test')
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -156,7 +156,7 @@ classifier = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

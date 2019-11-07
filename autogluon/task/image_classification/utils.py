@@ -24,8 +24,7 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit):
         train_dataset = dataset.train
         val_dataset = dataset.val
     if val_dataset is None and not final_fit:
-        split = 2
-        train_dataset, val_dataset = _train_val_split(train_dataset, split)
+        train_dataset, val_dataset = _train_val_split(train_dataset)
 
     if isinstance(dataset, str) and dataset.lower() == 'imagenet':
         train_data = train_dataset
@@ -79,32 +78,43 @@ def default_train_fn(net, batch, batch_size, criterion, trainer, batch_fn, ctx):
         l.backward()
     trainer.step(batch_size, ignore_stale_grad=True)
 
-def _train_val_split(train_dataset, split=1):
-    # temporary solution, need to change using batchify function
-    if split == 0:
-        return train_dataset, None
-    split_len = len(train_dataset) // 10
-    if split == 1:
-        data = [train_dataset[i][0].expand_dims(0) for i in
-                range(split * split_len, len(train_dataset))]
-        label = [np.array([train_dataset[i][1]]) for i in
-                 range(split * split_len, len(train_dataset))]
-    else:
-        data = [train_dataset[i][0].expand_dims(0) for i in
-                range((split - 1) * split_len)] + \
-               [train_dataset[i][0].expand_dims(0) for i in
-                range(split * split_len, len(train_dataset))]
-        label = [np.array([train_dataset[i][1]]) for i in range((split - 1) * split_len)] + \
-                [np.array([train_dataset[i][1]]) for i in
-                 range(split * split_len, len(train_dataset))]
-    train = gluon.data.dataset.ArrayDataset(
-        mx.nd.concat(*data, dim=0),
-        np.concatenate(tuple(label), axis=0))
-    val_data = [train_dataset[i][0].expand_dims(0) for i in
-                range((split - 1) * split_len, split * split_len)]
-    val_label = [np.array([train_dataset[i][1]]) for i in
-                 range((split - 1) * split_len, split * split_len)]
-    val = gluon.data.dataset.ArrayDataset(
-        mx.nd.concat(*val_data, dim=0),
-        np.concatenate(tuple(val_label), axis=0))
-    return train, val
+def _train_val_split(train_dataset, split_ratio=0.2):
+    num_samples = len(train_dataset)
+    split_idx = int(num_samples * split_ratio)
+    val_sampler = SplitSampler(0, split_idx)
+    train_sampler = SplitSampler(split_idx, num_samples)
+    return _SampledDataset(train_dataset, train_sampler), _SampledDataset(train_dataset, val_sampler)
+
+class SplitSampler(object):
+    """Samples elements from [start, start+length) randomly without replacement.
+
+    Parameters
+    ----------
+    length : int
+        Length of the sequence.
+    """
+    def __init__(self, start, end):
+        self._start = start
+        self._end = end
+
+    def __iter__(self):
+        indices = list(range(self._start, self._end))
+        np.random.shuffle(indices)
+        return iter(indices)
+
+    def __len__(self):
+        return self._length
+
+class _SampledDataset(mx.gluon.data.Dataset):
+    """Dataset with elements chosen by a sampler"""
+    def __init__(self, dataset, sampler):
+        self._dataset = dataset
+        self._sampler = sampler
+        self._indices = list(iter(sampler))
+
+    def __len__(self):
+        return len(self._sampler)
+
+    def __getitem__(self, idx):
+        return self._dataset[self._indices[idx]]
+

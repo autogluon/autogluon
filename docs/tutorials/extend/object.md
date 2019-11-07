@@ -77,7 +77,7 @@ class Adam(optim.Adam):
 Then we can create an instance:
 
 ```{.python .input}
-myoptim = Adam(learning_rate=ag.LogLinear(1e-2, 1e-1), wd=ag.LogLinear(1e-5, 1e-3))
+myoptim = Adam(learning_rate=ag.Real(1e-2, 1e-1, log=True), wd=ag.Real(1e-5, 1e-3, log=True))
 print(myoptim.cs)
 ```
 

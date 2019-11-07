@@ -3,12 +3,17 @@ import requests
 import errno
 import shutil
 import hashlib
+import zipfile
 import logging
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['download', 'mkdir', 'check_sha1', 'raise_num_file']
+__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'unzip', 'raise_num_file']
+
+def unzip(zip_file_path, root=os.path.expanduser('./')):
+    with zipfile.ZipFile(zip_file_path) as zf:
+        zf.extractall(root)
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
