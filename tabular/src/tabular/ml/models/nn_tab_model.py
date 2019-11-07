@@ -39,6 +39,7 @@ def make_temp_directory():
         shutil.rmtree(temp_dir)
 
 
+# TODO: Crashes when sent data to infer which has NaN's in a column that no NaN's existed during training
 class NNTabularModel(AbstractModel):
     model_internals_file_name = 'model-internals.pkl'
 

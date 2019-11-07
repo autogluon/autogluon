@@ -15,14 +15,14 @@ jmespath==0.9.4
 joblib==0.13.2
 jsonschema==3.0.1
 kiwisolver==1.1.0
-lightgbm==2.2.3
+lightgbm==2.3.0
 llvmlite==0.29.0
 matplotlib==3.1.1
 murmurhash==1.0.2
 mxboard
 numba==0.44.1
 numexpr==2.6.9
-numpy==1.16.4
+numpy==1.17.2
 packaging==19.0
 pandas==0.24.2
 Pillow==6.1.0
@@ -50,7 +50,7 @@ tqdm==4.32.2
 urllib3==1.25.3
 wasabi==0.2.2
 nvidia-ml-py3==7.352.0
-torch==1.1.0.post2
+torch==1.1.0
 torchvision==0.3.0
 fastai==1.0.55
 beautifulsoup4==4.7.1

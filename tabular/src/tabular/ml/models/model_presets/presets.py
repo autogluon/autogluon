@@ -8,12 +8,12 @@ from tabular.ml.tuning.hyperparameters.defaults.nn.parameters import get_param_b
 from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
 
 # TODO: Don't pass in num_boost_round, have it be defined in hyperparmeters?
-def get_preset_models(path, problem_type, objective_func, num_classes=None, 
+def get_preset_models(path, problem_type, objective_func, num_classes=None,
                       num_boost_round=None, nn_options={}):
     if problem_type == BINARY:
         return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, nn_options=nn_options)
     elif problem_type == MULTICLASS:
-        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes, 
+        return get_preset_models_binary(path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes,
                                         num_boost_round=num_boost_round, nn_options=nn_options)  # TODO: consider having separate default models for multi-class instead of re-using binary
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type, objective_func=objective_func, num_boost_round=num_boost_round, nn_options=nn_options)
