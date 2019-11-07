@@ -4,10 +4,11 @@ AutoML package that adapts autogluon to tabular datasets. Trains and tunes neura
 
 For example usage, see:  **autogluon/task/predict_table_column/examples/example_tabular_predictions.py**
 
+For more advanced usage, see: **autogluon/task/predict_table_column/examples/example_advanced_tabular.py**
 
 ## Setup
 
-To run this code locally (on mac), do the following:
+To run this code locally (on Mac), do the following:
 
 ```
 # Install libomp to support LightGBM package on mac
@@ -17,12 +18,13 @@ brew install libomp
 python3 -m venv ~/virtual/TabularAutoGluon
 source ~/virtual/TabularAutoGluon/bin/activate
 
-# First need to install autogluon 
 
-# Next install **tabular** module + dependencies
+# First install **tabular** module + dependencies:
+
+cd tabular/ # From inside the parent autogluon/ that contains this whole repository
 pip install -r requirements.txt
 python setup.py install
 
-# Run smoke test to confirm code is working
-python src/tabular/sandbox/smoke/binary/run_smoke_binary.py
-
+# Then install **autogluon**:
+cd ..
+python setup.py develop

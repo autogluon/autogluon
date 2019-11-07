@@ -19,7 +19,6 @@ train_data = train_data.head(100) # subsample for faster demo
 print(train_data.head())
 
 # Call fit() with hyperparameter optimization:
-
 nn_options = {
     'max_epochs': 10,
     'batch_size': 1024,
@@ -35,6 +34,7 @@ trainer = predictor.load_trainer() # use to show summary of training / HPO proce
 print(trainer.model_performance)
 print(trainer.model_names)
 print(trainer.hpo_results)
+
 
 
 # Inference time:
