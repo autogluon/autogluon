@@ -44,7 +44,7 @@ We first again use the default arguments of the `fit` function to train the neur
 classifier = task.fit(dataset,
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=0)
+                      ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
@@ -154,7 +154,7 @@ classifier = task.fit(dataset,
                    search_strategy=search_strategy,
                    time_limits=time_limits,
                    epochs=4,
-                   ngpus_per_trial=0)
+                   ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:
