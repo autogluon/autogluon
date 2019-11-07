@@ -45,6 +45,8 @@ class AbstractFeatureGenerator:
     def train_vectorizer(text_list, vectorizer):
         print('fitting vectorizer...')
         results = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
+
         # x = results.toarray()
         names = vectorizer.get_feature_names()
 
