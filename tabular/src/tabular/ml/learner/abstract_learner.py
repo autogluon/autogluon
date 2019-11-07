@@ -203,7 +203,7 @@ class AbstractLearner:
                           "You should carefully study why there are missing labels in your evaluation data." % (len(missing_inds),len(y_true)))
         
         perf = self.objective_func(y_true, y_pred)
-        metric = self.objective_func.__name__
+        metric = self.objective_func.name
         if not silent:
             print("Evaluation: %s on test data: %f" % (metric, perf))
         if not auxiliary_metrics:
