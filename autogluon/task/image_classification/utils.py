@@ -85,6 +85,7 @@ def _train_val_split(train_dataset, split_ratio=0.2):
     train_sampler = SplitSampler(split_idx, num_samples)
     return _SampledDataset(train_dataset, train_sampler), _SampledDataset(train_dataset, val_sampler)
 
+
 class SplitSampler(object):
     """Samples elements from [start, start+length) randomly without replacement.
 
@@ -96,6 +97,7 @@ class SplitSampler(object):
     def __init__(self, start, end):
         self._start = start
         self._end = end
+        self._length = end - start
 
     def __iter__(self):
         indices = list(range(self._start, self._end))

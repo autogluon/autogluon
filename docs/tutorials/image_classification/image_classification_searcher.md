@@ -10,7 +10,7 @@ We again begin by informing AutoGluon that `image_classification` is the task o
 import autogluon as ag
 from autogluon import ImageClassification as task
 
-dataset = task.Dataset(name='shopeeiet', train_path='~/data/train')
+dataset = task.Dataset(name='shopeeiet', train_path='data/train')
 
 time_limits = 2*60
 epochs = 10
@@ -66,16 +66,16 @@ print('Top-1 test acc: %.3f' % test_acc)
 For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
 
 ```{.python .input}
-classifier = task.fit(dataset,
-                   search_strategy='skopt', 
-                   search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   ngpus_per_trial=1)
-
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
+#classifier = task.fit(dataset,
+#                   search_strategy='skopt', 
+#                   search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+#                   time_limits=time_limits,
+#                   epochs=epochs,
+#                   ngpus_per_trial=1)
+#
+#print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+#test_acc = classifier.evaluate(test_dataset)
+#print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `search_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `search_options` when `search_strategy='skopt'`.
@@ -84,5 +84,5 @@ To understand other aspects of the `fit` function that may be customized, please
 
 Finish and exit:
 ```{.python .input}
-ag.done()
+#ag.done()
 ```

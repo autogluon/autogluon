@@ -91,7 +91,7 @@ class HyperbandStopping_Manager(object):
             next_milestone = None
             bracket_id = self._task_info[task.task_id]
             bracket = self._brackets[bracket_id]
-            if result[self._time_attr] < self._max_t:
+            if 'done' not in result and result[self._time_attr] < self._max_t:
                 action, update_searcher, next_milestone = bracket.on_result(
                     task, result[self._time_attr], result[self._reward_attr])
                 # Special case: If config just reached the last milestone in

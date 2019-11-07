@@ -10,6 +10,7 @@ The advanced functionalities of AutoGluon allow you to leverage your external kn
 We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
 
 ```{.python .input}
+import autogluon as ag
 from autogluon import ImageClassification as task
 ```
 
@@ -19,7 +20,12 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
-dataset = task.Dataset(train_path='~/data/train')
+filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+ag.unzip(filename)
+```
+
+```{.python .input}
+dataset = task.Dataset(train_path='data/train')
 ```
 
 ## Understanding default configurations of AutoGluon's fit
@@ -81,8 +87,6 @@ refer to the [search space API](../api/autogluon.space.html).
 In addition to the default network candidates, let's also add `resnet50` to the search space:
 
 ```{.python .input}
-import autogluon as ag
-
 # default net list for image classification would be overwritten
 # if net_list is provided
 import autogluon as ag
@@ -165,7 +169,7 @@ print('Top-1 test acc: %.3f' % test_acc)
 Let's now use the same image as used in :ref:`sec_imgquick` to generate a predicted label and the corresponding confidence.
 
 ```{.python .input}
-image = '/home/ubuntu/data/test/BabyShirt/BabyShirt_323.jpg'
+image = './data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
       (dataset.init().synsets[ind.asscalar()], prob.asscalar()))

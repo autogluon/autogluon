@@ -110,7 +110,7 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 
 ```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn, batch_size=128,,
+                           reward_fn=reward_fn, batch_size=128,
                            warmup_epochs=0, epochs=2, controller_lr=3e-3,
                            plot_frequency=2, update_arch_frequency=5)
 ```
