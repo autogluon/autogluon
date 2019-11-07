@@ -94,8 +94,8 @@ class TabularNeuralNetModel(AbstractModel):
             self.params = {}
             self.nondefault_params = []
         else:
-            self.params = nn_options
-            self.nondefault_params = list(nn_options.keys()) # These are the hyperparameters that user has specified.
+            self.params = nn_options.copy()
+            self.nondefault_params = list(nn_options.keys())[:] # These are the hyperparameters that user has specified.
         self._set_default_params()
     
     def _set_default_params(self):
@@ -147,7 +147,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Hyperparameters for neural net training:
         self._use_default_value('batch_size', 2048) # batch-size used for NN training
         # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
-        self._use_default_value('loss_function', None) # Loss function used for training
+        self._use_default_value('loss_function', None) # MXNet loss function minimized during training
         self._use_default_value('optimizer', 'adam')
         self._use_default_value('learning_rate', 3e-4) # learning rate used for NN training
         # Default search space: self._use_default_value('learning_rate', ag.space.Real(1e-4, 1e-2, log = True))
@@ -238,7 +238,6 @@ class TabularNeuralNetModel(AbstractModel):
                 self.params.pop(hyperparam, None)
             self._set_default_params() # reset defaults for the missing keys
             # TODO: OLD: sets hyperparams to fixed values based on search space: self.params[hyperparam] = self._hp_default_value(self.params[hyperparam])
-        
         self.get_net(train_dataset)
         self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
         """
@@ -280,6 +279,7 @@ class TabularNeuralNetModel(AbstractModel):
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
                 file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
+        print("Training Tabular Neural Network...")
         seed_value = self.params.get('seed_value')
         if seed_value is not None: # Set seed
             random.seed(seed_value)
@@ -494,7 +494,6 @@ class TabularNeuralNetModel(AbstractModel):
             else:
                 self.params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
         self.loss_func = self.params['loss_function']
-        return
     
     # Helper functions for tabular NN:
     

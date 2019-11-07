@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__) # TODO: Currently unused
 def train_tabularNN(args, reporter):
     """ Training function used during HPO """
     tabNN = args.tabNN
+    tabNN.params = tabNN.params.copy() # duplicate to make sure there are no remaining pointers across trials.
     tabNN.params.update(args) # Set params dict object == to args to explore in this trial.
     trial_id = args.task_id
     directory = args.directory

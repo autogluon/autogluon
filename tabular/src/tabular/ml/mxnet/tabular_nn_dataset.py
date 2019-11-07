@@ -28,7 +28,7 @@ class TabularNNDataset:
             feature_dataindex_map (dict): maps feature_name -> i such that dataset._data[i] = data array for this feature. Cannot be used for vector-valued features, instead use vecfeature_col_map
             feature_groups (dict): maps feature_type (ie. 'vector' or 'embed' or 'language') to list of feature names of this type (empty list if there are no features of this type)
             vectordata_index (int): describes which element of the dataset._data list holds the vector data matrix (access via self.dataset._data[self.vectordata_index]); None if no vector features
-            label_index (int): describing which element of the dataset._data list holds labels (access via self.dataset._data[self.label_index]); None if no labels
+            label_index (int): describing which element of the dataset._data list holds labels (access via self.dataset._data[self.label_index].asnumpy()); None if no labels
             num_categories_per_embedfeature (list): Number of categories for each embedding feature (order matters!)
             num_examples (int): number of examples in this dataset
             num_features (int): number of features (we only consider original variables as features, so num_features may not correspond to dimensionality of the data eg in the case of one-hot encoding)
@@ -112,8 +112,8 @@ class TabularNNDataset:
         if labels is not None:
             labels = np.array(labels)
             if self.problem_type == REGRESSION and labels.dtype != np.float32:
-                labels = labels.astype('float32') # Convert to proper float-type if not already
-            data_list.append(mx.nd.array(labels.reshape(len(labels),1)))  # To avoid NDArray:  data_list.append(labels)
+                    labels = labels.astype('float32') # Convert to proper float-type if not already
+            data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
@@ -233,7 +233,7 @@ class TabularNNDataset:
             formatted_batch['language'] = []
             for i in self.language_indices:
                 formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
-        if self.label_index: # None if there are no labels
+        if self.label_index is not None: # is None if there are no labels
             formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
         return formatted_batch
     

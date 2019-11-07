@@ -22,10 +22,10 @@
     - text features in dataset
 """
 
+import warnings, shutil
 import numpy as np
 import mxnet as mx
 from random import seed
-import warnings
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon import PredictTableColumn as task
@@ -40,8 +40,11 @@ perf_threshold = 1.1 # How much worse can performance on each dataset be vs prev
 # Each train/test dataset must be located in single directory with the given names.
 train_file = 'train_data.csv'
 test_file = 'test_data.csv'
-seed_val = 1 # random seed
+seed_val = 0 # random seed
 EPS = 1e-10
+
+# nn_options = None   # nn_options =  {}
+nn_options = {'max_epochs': 5} # TODO: can control model training time here
 
 # Information about each dataset in benchmark is stored in dict.
 # performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
@@ -104,6 +107,7 @@ with warnings.catch_warnings(record=True) as caught_warnings:
         train_file_path = directory + train_file
         test_file_path = directory + test_file
         savedir = directory + 'AutogluonOutput/'
+        shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
         label_column = dataset['label_column']
         train_data = task.Dataset(file_path=train_file_path)
         test_data = task.Dataset(file_path=test_file_path)
@@ -113,7 +117,7 @@ with warnings.catch_warnings(record=True) as caught_warnings:
             train_data = train_data.head(subsample_size) # subsample for fast_benchmark
         predictor = None # reset from last Dataset
         predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                             hyperparameter_tune = False)
+                             hyperparameter_tune = False, nn_options=nn_options)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file
