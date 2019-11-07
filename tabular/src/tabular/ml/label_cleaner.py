@@ -1,15 +1,16 @@
-from pandas import Series
+from pandas import Series, DataFrame
+import numpy as np
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
 
 
 # LabelCleaner cleans labels prior to entering feature generation
 class LabelCleaner:
     @staticmethod
-    def construct(problem_type: str, y: Series):
+    def construct(problem_type: str, y: Series, y_uncleaned: Series):
         if problem_type == BINARY:
             return LabelCleanerBinary(y)
         elif problem_type == MULTICLASS:
-            return LabelCleanerMulticlass(y)
+            return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
             return LabelCleanerDummy()
         elif problem_type == LANGUAGE_MODEL:
@@ -23,20 +24,55 @@ class LabelCleaner:
     def inverse_transform(self, y: Series) -> Series:
         raise NotImplementedError
 
+    def transform_proba(self, y):
+        return y
+
+    def inverse_transform_proba(self, y):
+        return y
+
 
 class LabelCleanerMulticlass(LabelCleaner):
-    def __init__(self, y: Series):
+    def __init__(self, y: Series, y_uncleaned: Series):
         self.cat_mappings_dependent_var: dict = self._generate_categorical_mapping(y)
         self.inv_map: dict = {v: k for k, v in self.cat_mappings_dependent_var.items()}
+
+        self.cat_mappings_dependent_var_uncleaned: dict = self._generate_categorical_mapping(y_uncleaned)
+        self.inv_map_uncleaned: dict = {v: k for k, v in self.cat_mappings_dependent_var_uncleaned.items()}
+
         self.num_classes = len(self.cat_mappings_dependent_var.keys())
+        self.ordered_class_labels = list(y_uncleaned.astype('category').cat.categories)
+        self.valid_ordered_class_labels = list(y.astype('category').cat.categories)
+        self.invalid_class_count = len(self.ordered_class_labels) - len(self.valid_ordered_class_labels)
+        self.labels_to_zero_fill = [1 if label not in self.valid_ordered_class_labels else 0 for label in self.ordered_class_labels]
+        self.label_index_to_keep = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 0]
+        self.label_index_to_remove = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 1]
 
     def transform(self, y: Series) -> Series:
+        if type(y) == np.ndarray:
+            y = Series(y)
         y = y.map(self.inv_map)
         return y
 
     def inverse_transform(self, y: Series) -> Series:
         y = y.map(self.cat_mappings_dependent_var)
         return y
+
+    # TODO: Unused?
+    def transform_proba(self, y):
+        if self.invalid_class_count > 0:
+            # This assumes y has only 0's for any columns it is about to remove, if it does not, weird things may start to happen since rows will not sum to 1
+            y_transformed = np.delete(y, self.label_index_to_remove, axis=1)
+            return y_transformed
+        else:
+            return y
+
+    def inverse_transform_proba(self, y):
+        if self.invalid_class_count > 0:
+            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)])
+            y_transformed[:, self.label_index_to_keep] = y
+            return y_transformed
+        else:
+            return y
 
     def _generate_categorical_mapping(self, y: Series) -> dict:
         categories = y.astype('category')
@@ -47,7 +83,7 @@ class LabelCleanerMulticlass(LabelCleaner):
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
     def __init__(self, y: Series):
-        self.num_classes = None
+        self.num_classes = 2
         self.unique_values = list(y.unique())
         if len(self.unique_values) != 2:
             raise AssertionError('y does not contain exactly 2 unique values:', self.unique_values)
@@ -77,6 +113,8 @@ class LabelCleanerBinary(LabelCleaner):
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
 
     def transform(self, y: Series) -> Series:
+        if type(y) == np.ndarray:
+            y = Series(y)
         y = y.map(self.inv_map)
         return y
 
@@ -90,6 +128,8 @@ class LabelCleanerDummy(LabelCleaner):
         self.num_classes = None
 
     def transform(self, y: Series) -> Series:
+        if type(y) == np.ndarray:
+            y = Series(y)
         return y
 
     def inverse_transform(self, y: Series) -> Series:

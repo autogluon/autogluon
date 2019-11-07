@@ -13,6 +13,7 @@ from tabular.ml.utils import get_pred_from_proba
 from tabular.utils.loaders import load_pkl, load_pd
 from tabular.utils.savers import save_pkl, save_pd
 from tabular.ml.trainer.abstract_trainer import AbstractTrainer
+from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 
 
 # TODO: Take as input objective function, function takes y_test, y_pred_proba as inputs and outputs score
@@ -59,7 +60,7 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, sample=None):
+    def predict_proba(self, X_test: DataFrame, inverse_transform=True, sample=None):
         ##########
         # Enable below for local testing
         if sample is not None:
@@ -69,7 +70,8 @@ class AbstractLearner:
 
         X_test = self.feature_generator.transform(X_test)
         y_pred_proba = trainer.predict_proba(X_test)
-
+        if inverse_transform:
+            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         return y_pred_proba
 
     # TODO: Add decorators for cache functionality, return core code to previous state
@@ -92,7 +94,7 @@ class AbstractLearner:
             X_test_cache_miss = X_test
 
         if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, sample=sample)
+            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, inverse_transform=False, sample=sample)
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_test_cache_miss.index
@@ -117,11 +119,64 @@ class AbstractLearner:
     def score(self, X: DataFrame, y=None):
         if y is None:
             X, y = self.extract_label(X)
-        trainer = self.load_trainer()
         X = self.feature_generator.transform(X)
-        score = trainer.score(X=X, y=y)
-        return score
-    
+        y = self.label_cleaner.transform(y)
+        trainer = self.load_trainer()
+        if self.problem_type == MULTICLASS:
+            y = y.fillna(-1)
+            if trainer.objective_func_expects_y_pred:
+                return trainer.score(X=X, y=y)
+            else:
+                # Log loss
+                if -1 in y.unique():
+                    raise ValueError('Multiclass scoring with ' + self.objective_func.name + ' does not support unknown classes.')
+                return trainer.score(X=X, y=y)
+        else:
+            return trainer.score(X=X, y=y)
+
+    # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
+    def score_debug(self, X: DataFrame, y=None):
+        if y is None:
+            X, y = self.extract_label(X)
+        X = self.feature_generator.transform(X)
+        y = self.label_cleaner.transform(y)
+        y = y.fillna(-1)
+        trainer = self.load_trainer()
+        scores = {}
+        model_names = trainer.model_names
+        if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
+            # Handles case where we need to add empty columns to represent classes that were not used for training
+            y_pred_proba = trainer.predict_proba(X)
+            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
+            scores['weighted_ensemble'] = self.objective_func(y, y_pred_proba)
+
+            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
+            pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
+            for i, model_name in enumerate(model_names):
+                scores[model_name] = self.objective_func(y, pred_probas[i])
+
+        else:
+            scores['weighted_ensemble'] = trainer.score(X=X, y=y)
+            for model_name in model_names:
+                model = trainer.load_model(model_name)
+                scores[model_name] = model.score(X=X, y=y)
+            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
+
+        ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
+        ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
+        oracle_weights = ensemble_selection.weights_
+        oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
+        oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
+        if trainer.objective_func_expects_y_pred:
+            oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
+            scores['oracle_ensemble'] = self.objective_func(y, oracle_pred_ensemble)
+        else:
+            scores['oracle_ensemble'] = self.objective_func(y, oracle_pred_proba_ensemble)
+
+        print('MODEL SCORES:')
+        print(scores)
+        return scores
+
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
         """ Evaluate predictions. 
             Args:
@@ -190,9 +245,9 @@ class AbstractLearner:
                     print("Detailed (per-class) classification report:")
                     print(json.dumps(perf_dict[metric_name], indent=4))
         return perf_dict
-    
+
     def extract_label(self, X):
-        y = self.label_cleaner.transform(X[self.label])
+        y = X[self.label].copy()
         X = X.drop(self.label, axis=1)
         return X, y
 
@@ -217,7 +272,7 @@ class AbstractLearner:
         return submission
 
     def predict_and_submit(self, X_test: DataFrame, save=True, save_proba=False):
-        y_pred_proba = self.predict_proba(X_test=X_test)
+        y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
         return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
     @staticmethod

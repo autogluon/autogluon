@@ -70,19 +70,24 @@ class DefaultLearner(AbstractLearner):
         
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
-        
+
+        # Gets labels prior to removal of infrequent classes
+        y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
+
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
-        X = self.cleaner.clean(X)
+        X = self.cleaner.clean(X)  # TODO: Consider merging cleaner into label_cleaner
 
         if sample is not None:
             X = X.sample(n=sample, random_state=self.random_state).reset_index(drop=True)
             X = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold).clean(X=X)
 
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label])
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
 
         X, y = self.extract_label(X)
+        y = self.label_cleaner.transform(y)
         if X_test is not None and self.label in X_test.columns:
             X_test, y_test = self.extract_label(X_test)
+            y_test = self.label_cleaner.transform(y_test)
         else:
             y_test = None
 
