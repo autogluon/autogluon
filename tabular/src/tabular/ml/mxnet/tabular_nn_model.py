@@ -356,7 +356,6 @@ class TabularNeuralNetModel(AbstractModel):
                 mx_metric = mx.metric.MSE()
             else:
                 mx_metric = mx.metric.Accuracy()
-        
         for batch_idx, data_batch in enumerate(dataset.dataloader):
             data_batch = dataset.format_batch_data(data_batch, self.ctx)
             preds = self.model(data_batch)
@@ -522,15 +521,15 @@ class TabularNeuralNetModel(AbstractModel):
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
         continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')
-        print("categorical_featnames:", categorical_featnames)
-        print("continuous_featnames:", continuous_featnames)
+        # print("categorical_featnames:", categorical_featnames)
+        # print("continuous_featnames:", continuous_featnames)
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames)\
                 + len(language_featnames)\
                 != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            print('unknown features:', unknown_features)
+            # print('unknown features:', unknown_features)
             df = df.drop(columns=unknown_features)
             self.features = list(df.columns)
             # raise ValueError("unknown feature types present in DataFrame")
@@ -710,7 +709,6 @@ class TabularNeuralNetModel(AbstractModel):
 
         start_time = time.time()
         X_train = self.preprocess(X_train)
-        X_test = self.preprocess(X_test)
         if self.features is None:
             self.features = list(X_train.columns)
         params_copy = self.params.copy()
@@ -723,6 +721,7 @@ class TabularNeuralNetModel(AbstractModel):
                     print(hyperparam + ":   " + str(params_copy[hyperparam]))
         directory = self.path # path to directory where all remote workers store things
         train_dataset = self.process_data(X_train, y_train, is_test=False) # Dataset object
+        X_test = self.preprocess(X_test)
         test_dataset = self.process_data(X_test, y_test, is_test=True) # Dataset object to use for validation
         train_fileprefix = self.path + "train"
         test_fileprefix = self.path + "validation"
