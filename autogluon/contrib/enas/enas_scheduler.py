@@ -123,12 +123,9 @@ class ENAS_Scheduler(object):
                     self.train_controller()
                 if self.plot_frequency > 0 and idx % self.plot_frequency == 0 and in_ipynb():
                     graph = self.supernet.graph
-                    from IPython.display import SVG, display, clear_output
-                    clear_output(wait=True)
                     graph.attr(rankdir='LR', size='8,3')
-                    display(SVG(graph._repr_svg_()))
-                tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \
-                        .format(epoch, idx, self.val_acc, self.baseline))
+                    tbar.set_svg(graph._repr_svg_())
+                tbar.set_description('avg reward: {}'.format(self.baseline))
                 idx += 1
             self.validation()
             self.save()

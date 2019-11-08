@@ -64,13 +64,10 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
                 if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
                     self.train_controller()
                 if self.plot_frequency > 0 and i % self.plot_frequency == 0 and in_ipynb():
-                    from IPython.display import SVG, display, clear_output
-                    clear_output(wait=True)
                     graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
-                    display(SVG(graph._repr_svg_()))
-                tbar.set_description('epoch {}, iter {}, val_acc: {}, avg reward: {}' \
-                        .format(epoch, i, self.val_acc, self.baseline))
+                    tbar.set_svg(graph._repr_svg_())
+                tbar.set_description('avg reward: {}'.format(self.baseline))
             self.validation()
             self.save()
             tq.set_description('epoch {}, val_acc: {}, avg reward: {}' \
