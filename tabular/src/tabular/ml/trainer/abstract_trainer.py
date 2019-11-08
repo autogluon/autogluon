@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import copy
 import time
+import traceback
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.utils.loaders import load_pkl
@@ -169,12 +170,18 @@ class AbstractTrainer:
         if hyperparameter_tune:
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
             # hpo_models (dict): keys = model_names, values = model_paths
-            hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                y_train=y_train, y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
-            self.hpo_model_names += list(sorted(hpo_models.keys()))
-            self.model_paths.update(hpo_models)
-            self.hpo_results[model.name] = hpo_results
-            self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
+            try:  # TODO: Make exception handling more robust? Return successful HPO models?
+                hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
+                    y_train=y_train, y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+            except Exception as err:
+                traceback.print_tb(err.__traceback__)
+                print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')
+                del model
+            else:
+                self.hpo_model_names += list(sorted(hpo_models.keys()))
+                self.model_paths.update(hpo_models)
+                self.hpo_results[model.name] = hpo_results
+                self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
             self.train_and_save(X_train, X_test, y_train, y_test, model)
         self.save()
@@ -227,14 +234,20 @@ class AbstractTrainer:
 
     def train_and_save(self, X_train, X_test, y_train, y_test, model: AbstractModel):
         print('training', model.name)
-        self.train_single(X_train, X_test, y_train, y_test, model, objective_func=self.objective_func)
-        self.model_names.append(model.name)
-        self.model_performance[model.name] = model.score(X_test, y_test)
-        self.model_paths[model.name] = model.path
-        self.model_types[model.name] = type(model)
-        self.save_model(model=model)
-        if self.low_memory:
+        try:
+            self.train_single(X_train, X_test, y_train, y_test, model, objective_func=self.objective_func)
+        except Exception as err:
+            traceback.print_tb(err.__traceback__)
+            print('Warning: Exception caused ' + model.name + ' to fail during training... Skipping model.')
             del model
+        else:
+            self.model_names.append(model.name)
+            self.model_performance[model.name] = model.score(X_test, y_test)
+            self.model_paths[model.name] = model.path
+            self.model_types[model.name] = type(model)
+            self.save_model(model=model)
+            if self.low_memory:
+                del model
 
     @staticmethod
     def train_ensemble(X_train, X_test, y_train, y_test, model_base: AbstractModel, objective_func=accuracy):
