@@ -195,6 +195,23 @@ class ENAS_Sequential(gluon.HybridBlock):
     def __getitem__(self, index):
         return self._blocks[index]
 
+    def hybrid_forward(self, F, x):
+        for k, op in self._modules.items():
+            x = op(x)
+        return x
+
+    def prune(self):
+        _modules_keys = self._modules.keys()
+        module_list = []
+        for k in _modules_keys:
+            if isinstance(self._modules[k], ENAS_Unit):
+                index = self._modules[k].index
+                op = self._modules[k].module_list[index]
+                module_list.append(op)
+            else:
+                module_list.append(self._modules[k])
+        return module_list
+
     @property
     def nodeend(self):
         return list(self._modules.keys())[-1]
@@ -225,37 +242,10 @@ class ENAS_Sequential(gluon.HybridBlock):
                     e.edge(pre_node, i)
                 pre_node = i
         return e
-    #@property
-    #def graph(self):
-    #    from graphviz import Digraph
-    #    e = Digraph(node_attr={'color': 'lightblue2', 'style': 'filled', 'shape': 'box'})
-    #    #e.attr(rankdir='LR', size='8,3')
-    #    pre_node = 'input'
-    #    e.node(pre_node)
-    #    for i, op in self._modules.items():
-    #        if hasattr(op, 'graph'):
-    #            e.subgraph(op.graph)
-    #            e.edge(pre_node, op.nodehead)
-    #            pre_node = op.nodeend
-    #        else:
-    #            if hasattr(op, 'node'):
-    #                if op.node is None: continue
-    #                node_info = op.node
-    #            else:
-    #                node_info = {'label': op.__class__.__name__}
-    #            e.node(i, **node_info)
-    #            e.edge(pre_node, i)
-    #            pre_node = i
-    #    return e
  
     @property
     def kwspaces(self):
         return self._kwspaces
-
-    def hybrid_forward(self, F, x):
-        for k, op in self._modules.items():
-            x = op(x)
-        return x
 
     @property
     def nparams(self):
@@ -337,8 +327,6 @@ class ENAS_Unit(gluon.HybridBlock):
 
     def hybrid_forward(self, F, x):
         return self.module_list[self.index](x)
-
-
 
     @property
     def kwspaces(self):

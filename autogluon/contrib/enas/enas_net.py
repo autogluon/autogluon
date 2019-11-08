@@ -12,18 +12,17 @@ class ENAS_MbBlock(MBConvBlock):
     pass
 
 class ENAS_MBNet(gluon.HybridBlock):
-    def __init__(self, blocks_args=None, dropout_rate=0.2, num_classes=1000, input_size=224,
-                 activation='swish', **kwargs):
+    def __init__(self, blocks_args=[], dropout_rate=0.2, num_classes=1000, input_size=224,
+                 activation='swish', blocks=None, **kwargs):
         r"""ENAS model with MobileNet search space
 
         Args:
             blocks_args (list of autogluon.Dict)
         """
         super(ENAS_MBNet, self).__init__(**kwargs)
-        if blocks_args is None:
+        if len(blocks_args)==0 and blocks is None:
             blocks_args = get_enas_blockargs()
-        assert isinstance(blocks_args, list), 'blocks_args should be a list'
-        assert len(blocks_args) > 0, 'block args must be greater than 0'
+        #assert isinstance(blocks_args, (tuple, list)), 'blocks_args should be a list'
         self.input_size = input_size
         with self.name_scope():
             self._features = gluon.nn.HybridSequential()
@@ -37,7 +36,7 @@ class ENAS_MBNet(gluon.HybridBlock):
             input_size = _update_input_size(input_size, 2)
             _blocks = []
             for block_arg in blocks_args:
-                block_arg.update(in_channels=out_channels, input_size=input_size)
+                block_arg.update(in_channels=out_channels, input_size=input_size, activation=activation)
                 out_channels=block_arg.channels
                 _blocks.append(ENAS_MbBlock(**block_arg))
                 input_size = _update_input_size(input_size, block_arg.stride)
@@ -48,9 +47,13 @@ class ENAS_MBNet(gluon.HybridBlock):
                 for _ in range(block_arg.num_repeat - 1):
                     _blocks.append(ENAS_MbBlock(**block_arg))
 
-            self._blocks = ENAS_Sequential(_blocks)
+            if blocks is not None:
+                self._blocks = ENAS_Sequential(blocks)
+            else:
+                self._blocks = ENAS_Sequential(_blocks)
             # Head
             self._conv_head = gluon.nn.HybridSequential()
+            out_channels = 320
             hidden_channels = 1280
             with self._conv_head.name_scope():
                 _add_conv(self._conv_head, hidden_channels, activation=activation,

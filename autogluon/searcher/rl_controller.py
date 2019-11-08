@@ -270,8 +270,8 @@ class AttenController(BaseController):
             i1 = sum(self.num_tokens[:idx+1])
             logits = alphas[:, i0: i1]
             probs = F.softmax(logits, axis=-1)
-            action = mx.random.multinomial(probs, 1)
-            actions.append(action[:, 0])
+            action = mx.nd.argmax(probs, 1)
+            actions.append(action)
 
         config = {}
         for i, action in enumerate(actions):
@@ -353,8 +353,8 @@ class AlphaController(BaseController):
         for idx in range(len(self.num_tokens)):
             logits = self.decoders[idx](1)
             probs = F.softmax(logits, axis=-1)
-            action = mx.random.multinomial(probs, 1)
-            actions.append(action[:, 0])
+            action = mx.nd.argmax(probs, 1)
+            actions.append(action)
 
         config = {}
         for i, action in enumerate(actions):
