@@ -1,8 +1,6 @@
 Search Space
 ------------
 
-.. currentmodule:: autogluon
-
 Search spaces for hyperparameter optimization and neural architecture search.
 
 .. admonition:: Example
@@ -36,6 +34,9 @@ Search spaces for hyperparameter optimization and neural architecture search.
    >>> scheduler.get_training_curves(plot=True)
    >>> ag.done()
 
+.. automodule:: autogluon.core
+.. currentmodule:: autogluon.core.space
+
 .. autosummary::
    :nosignatures:
    :toctree: _autogen
@@ -51,9 +52,12 @@ Search spaces for hyperparameter optimization and neural architecture search.
 Decorators
 ----------
 
+.. currentmodule:: autogluon.core.decorator
+
 Decorators for customizing AutoGluon. Allows hyperparameter search on user-defined objects and functions.
 
 .. autosummary::
+   :nosignatures:
    :toctree: _autogen
 
    args

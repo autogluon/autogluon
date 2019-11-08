@@ -136,7 +136,7 @@ class ENAS_Scheduler(object):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
         # data iter, avoid memory leak
         it = iter(self.val_data)
-        it.reset_sample_times()
+        if hasattr(it, 'reset_sample_times'): it.reset_sample_times()
         tbar = tqdm(it)
         # update network arc
         config = self.controller.inference()
