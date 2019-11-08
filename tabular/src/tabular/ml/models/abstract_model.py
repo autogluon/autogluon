@@ -28,6 +28,7 @@ class AbstractModel:
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func
+        self.feature_types_metadata = {}  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
         if type(objective_func) == tabular.metrics._ProbaScorer:
             self.metric_needs_y_pred = False
