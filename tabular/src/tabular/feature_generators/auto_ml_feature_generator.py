@@ -3,10 +3,12 @@ import pandas as pd
 from pandas import DataFrame, Series
 import numpy as np
 import copy
+import traceback
 
 from tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
 from tabular.ml.vectorizers import vectorizer_auto_ml_default
+from tabular.ml.vectorizers import get_ngram_freq, downscale_vectorizer
 
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
@@ -43,6 +45,19 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_text_features_combined = pd.concat(X_text_features_combined, axis=1)
 
         X = self.preprocess(X)
+
+        if self.enable_raw_features and self.features_to_keep_raw:
+            X_features = X_features.join(X[self.features_to_keep_raw])
+
+        if self.enable_categorical_features and self.features_categorical:
+            X_categoricals = X[self.features_categorical]
+            # TODO: Add stateful categorical generator, merge rare cases to an unknown value
+            # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
+            X_categoricals = X_categoricals.astype('category')
+            X_features = X_features.join(X_categoricals)
+
+        if self.enable_nlp_ratio_features and self.features_nlp_ratio:
+            X_features = X_features.join(X_text_features_combined)
 
         if self.enable_datetime_features and self.features_datetime:
             for datetime_feature in self.features_datetime:
@@ -81,35 +96,79 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                     except:
                         raise
                 self.features_nlp = [feature for feature in self.features_nlp if feature not in features_nlp_to_remove]
-            X_nlp_features_combined = []
-            for i, nlp_feature in enumerate(features_nlp_current):
-                vectorizer_fit = self.vectorizers[i]
-                nlp_features_names = vectorizer_fit.get_feature_names()
+            X_features_cols_prior_to_nlp = list(X_features.columns)
+            keep_trying_nlp = True
 
-                X_nlp_features = pd.DataFrame(vectorizer_fit.transform(X[nlp_feature].values).toarray())  # FIXME
-                X_nlp_features.columns = [nlp_feature + '.' + str(x) for x in nlp_features_names]
-                X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1)
+            downsample_ratio = None
+            nlp_failure_count = 0
+            while keep_trying_nlp:
+                try:
+                    X_nlp_features_combined = self.generate_nlp_ngrams(X=X, features_nlp_current=features_nlp_current, downsample_ratio=downsample_ratio)
 
-                self.features_vectorizers = self.features_vectorizers + list(X_nlp_features.columns)
+                    if self.features_nlp:
+                        print(X_nlp_features_combined)
+                        X_features = X_features.join(X_nlp_features_combined)
 
-                X_nlp_features_combined.append(X_nlp_features)
+                    if not self.fit:
+                        self.features_vectorizers = self.features_vectorizers + list(X_nlp_features_combined.columns)
+                    keep_trying_nlp = False
+                except Exception as err:
+                    nlp_failure_count += 1
+                    if self.fit:
+                        print('Error: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
+                        raise
+                    traceback.print_tb(err.__traceback__)
 
-            if self.features_nlp:
-                X_nlp_features_combined = pd.concat(X_nlp_features_combined, axis=1)
-                print(X_nlp_features_combined)
-                X_features = X_features.join(X_nlp_features_combined)
-
-        if self.enable_categorical_features and self.features_categorical:
-            X_categoricals = X[self.features_categorical]
-            X_categoricals = X_categoricals.astype('category')
-            X_features = X_features.join(X_categoricals)
-
-        if self.enable_raw_features and self.features_to_keep_raw:
-            X_features = X_features.join(X[self.features_to_keep_raw])
-
-        if self.enable_nlp_ratio_features and self.features_nlp_ratio:
-            X_features = X_features.join(X_text_features_combined)
-
-        print('transformed...')
+                    X_nlp_features_combined = None
+                    X_features = X_features[X_features_cols_prior_to_nlp]
+                    skip_nlp = False
+                    for vectorizer in self.vectorizers:
+                        vocab_size = len(vectorizer.vocabulary_)
+                        if vocab_size <= 50:
+                            skip_nlp = True
+                    if nlp_failure_count >= 3:
+                        skip_nlp = True
+                    if skip_nlp:
+                        print('Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        self.vectorizers = []
+                        self.features_nlp = []
+                        self.features_vectorizers = []
+                        self.enable_nlp_features = False
+                        keep_trying_nlp = False
+                    else:
+                        print('Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        downsample_ratio = 0.25
 
         return X_features
+
+    def generate_nlp_ngrams(self, X, features_nlp_current, downsample_ratio: int = None):
+        X_nlp_features_combined = []
+        for i, nlp_feature in enumerate(features_nlp_current):
+            vectorizer_fit = self.vectorizers[i]
+
+            transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
+
+            if downsample_ratio is not None:
+                if (downsample_ratio >= 1) or (downsample_ratio <= 0):
+                    raise ValueError('downsample_ratio must be <1 and >0, but downsample_ratio is ' + str(downsample_ratio))
+                vocab_size = len(vectorizer_fit.vocabulary_)
+                downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
+                print('Reducing Vectorizer vocab size from', vocab_size, 'to', downsampled_vocab_size, 'to avoid OOM error.')
+                ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
+                downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
+                # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
+                #  If we have this functionality, simply update transform_matrix each time OOM occurs instead of re-calling .transform
+                transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
+
+            nlp_features_names = vectorizer_fit.get_feature_names()
+
+            X_nlp_features = pd.DataFrame(transform_matrix.toarray())  # FIXME
+            X_nlp_features.columns = [nlp_feature + '.' + str(x) for x in nlp_features_names]
+            X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1)
+
+            X_nlp_features_combined.append(X_nlp_features)
+
+        if self.features_nlp:
+            X_nlp_features_combined = pd.concat(X_nlp_features_combined, axis=1)
+
+        return X_nlp_features_combined

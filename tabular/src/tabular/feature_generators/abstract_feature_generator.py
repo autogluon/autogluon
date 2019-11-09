@@ -45,20 +45,11 @@ class AbstractFeatureGenerator:
     @staticmethod
     def train_vectorizer(text_list, vectorizer):
         print('fitting vectorizer...')
-        results = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
         vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
 
-        # x = results.toarray()
-        names = vectorizer.get_feature_names()
-
-        # z = pd.DataFrame((results).toarray())
-        # z.columns = [str(x) for x in names]
-        #
-        # ngram_counts = z.sum(axis=0)
-        # print(z)
-
-        print('vectorizer fit!')
-        return vectorizer, results
+        print('vectorizer fit with', len(vectorizer.vocabulary_), 'vocabulary size')
+        return vectorizer, transform_matrix
 
     def preprocess(self, X: DataFrame):
         return X
