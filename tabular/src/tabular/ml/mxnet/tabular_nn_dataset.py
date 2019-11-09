@@ -3,13 +3,13 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import mxnet as mx
+
+# TODO these files should be moved eventually:
 from tabular.utils.loaders import load_pkl
 from tabular.utils.savers import save_pkl
-
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
-
 
 class TabularNNDataset:
     """ Class for preprocessing & storing/feeding data batches used by tabular data neural networks. Assumes entire dataset can be loaded into numpy arrays.

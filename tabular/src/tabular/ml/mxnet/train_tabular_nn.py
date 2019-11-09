@@ -14,16 +14,15 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, QuantileTransformer, FunctionTransformer
 
 # TODO these files should be moved eventually:
+from autogluon.core import * 
 from tabular.utils.loaders import load_pkl
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.mxnet.tabular_nn_dataset import TabularNNDataset
-# import tabular.ml.mxnet.tabular_nn_model as tabNN
-
-from autogluon.core import * 
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
+EPS = 10e-8 # small number
 
 @autogluon_register_args()
 def train_tabularNN(args, reporter):
@@ -63,9 +62,9 @@ def train_tabularNN(args, reporter):
     loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
     if tabNN.problem_type == REGRESSION: 
         if tabNN.metric_map[REGRESSION] == 'MAE':
-            loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # std-dev of labels
+            loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
         elif tabNN.metric_map[REGRESSION] == 'Rsquared':
-            loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index])/5.0 + EPS # variance of labels
+            loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
     for e in range(max_epochs):
         cumulative_loss = 0
         for batch_idx, data_batch in enumerate(train_dataset.dataloader):
