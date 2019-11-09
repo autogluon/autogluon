@@ -102,19 +102,19 @@ class TabularNeuralNetModel(AbstractModel):
         """ Specifies hyperparameter values to use by default """
         
         # Configuration-options that we never search over in HPO but user can specify:
-        self._use_default_value('num_dataloading_workers', 1) # not searched... depends on num_cpus provided by trial manager
+        self._use_default_value('num_dataloading_workers', 2) # not searched... depends on num_cpus provided by trial manager
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
-        self._use_default_value('max_epochs', 100)  # TODO! debug # maximum number of epochs for training NN
+        self._use_default_value('max_epochs', 300)  # maximum number of epochs for training NN
         self._use_default_value('seed_value', 0) # random seed for reproducibility in HPO (set = None to ignore)
 
         # For data processing (currently preprocessors not searched during HPO):
-        self._use_default_value('proc.embed_min_categories', 3) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        self._use_default_value('proc.embed_min_categories', 4) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
         # Default search space: 3,4,10, 100, 1000
         self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
         # Default search space: ['median', 'mean', 'most_frequent']
-        self._use_default_value('proc.max_category_levels', 10000) # maximum number of allowed levels per categorical feature
+        self._use_default_value('proc.max_category_levels', 500) # maximum number of allowed levels per categorical feature
         # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        self._use_default_value('proc.skew_threshold', 0.9) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        self._use_default_value('proc.skew_threshold', 0.95) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         # Default search space: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
         
         # Hyperparameters for neural net architecture:
@@ -132,7 +132,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Default search space: [0.01 - 100] on log-scale
         self._use_default_value('embed_exponent', 0.56)
          # Does not need to be searched by default!
-        self._use_default_value('max_embedding_dim', 500)
+        self._use_default_value('max_embedding_dim', 100)
         self._use_default_value('use_batchnorm', True) # whether or not to utilize Batch-normalization
         # Default search space: self._use_default_value('use_batchnorm', ag.space.bool() )
 
@@ -142,16 +142,16 @@ class TabularNeuralNetModel(AbstractModel):
         # Regression-specific hyperparameters:
         self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
         # If None, inferred based on training labels. Note: MUST be None for classification tasks!
-        self._use_default_value('y_range_extend', 0.1) # Only used to extend size of inferred y_range when y_range = None.
+        self._use_default_value('y_range_extend', 0.05) # Only used to extend size of inferred y_range when y_range = None.
         
         # Hyperparameters for neural net training:
-        self._use_default_value('batch_size', 2048) # batch-size used for NN training
+        self._use_default_value('batch_size', 1024) # batch-size used for NN training
         # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
         self._use_default_value('loss_function', None) # MXNet loss function minimized during training
         self._use_default_value('optimizer', 'adam')
         self._use_default_value('learning_rate', 3e-4) # learning rate used for NN training
         # Default search space: self._use_default_value('learning_rate', ag.space.Real(1e-4, 1e-2, log = True))
-        self._use_default_value('weight_decay', 1e-2)
+        self._use_default_value('weight_decay', 1e-6)
         # Default search space: self._use_default_value('weight_decay', ag.space.Real(1e-6, 1e-2, log = True))
         self._use_default_value('clip_gradient', 100.0)
         self._use_default_value('momentum', 0.9) # only used for SGD
@@ -186,7 +186,7 @@ class TabularNeuralNetModel(AbstractModel):
         
         if self.params['layers'] is None: # Use default choices for MLP architecture
             if self.problem_type == REGRESSION:
-                default_layer_sizes = [256, 128] # overall network will have 3 layers. Input layer, 256-unit hidden layer, output layer.
+                default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
             elif self.problem_type == BINARY or self.problem_type == MULTICLASS:
                 default_sizes = [256, 128] # will be scaled adaptively
                 base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
@@ -203,7 +203,7 @@ class TabularNeuralNetModel(AbstractModel):
             min_numeric_embed_dim = 32
             max_numeric_embed_dim = self.params['max_layer_width']
             self.params['numeric_embed_dim'] = int(min(max_numeric_embed_dim, max(min_numeric_embed_dim,
-                                                    self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+0.01) )))
+                                                    self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
     
     def fit(self, X_train, Y_train, X_test=None, Y_test=None):
