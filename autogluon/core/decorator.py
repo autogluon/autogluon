@@ -166,12 +166,15 @@ def func(**kwvars):
                 self.kwargs = kwargs
                 self._inited = False
 
-            def sample(self, **nkwvars):
-                # lazy initialization for passing config files
-                self.kwargs.update(nkwvars)
-                for k, v in self.kwargs.items():
-                    if k in self.kwspaces and isinstance(self.kwspaces[k], Categorical):
-                        self.kwargs[k] = self.kwspaces[k][v]
+            def sample(self, **config):
+                kwargs = self.kwargs
+                kwspaces = autogluonobject.kwspaces
+                for k, v in kwargs.items():
+                    if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
+                        sub_config = _strip_config_space(config, prefix=k)
+                        kwargs[k] = kwspaces[k].sample(**sub_config)
+                    elif k in config:
+                        kwargs[k] = config[k]
                         
                 return self.func(*self.args, **self.kwargs)
 
@@ -208,13 +211,15 @@ def obj(**kwvars):
                 self._kwargs = kwargs
                 self._inited = False
 
-            def sample(self, **nkwvars):
+            def sample(self, **config):
                 kwargs = self._kwargs
-                kwargs.update(nkwvars)
                 kwspaces = autogluonobject.kwspaces
                 for k, v in kwargs.items():
-                    if k in kwspaces and isinstance(kwspaces[k], Categorical):
-                        kwargs[k] = kwspaces[k][v]
+                    if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
+                        sub_config = _strip_config_space(config, prefix=k)
+                        kwargs[k] = kwspaces[k].sample(**sub_config)
+                    elif k in config:
+                        kwargs[k] = config[k]
 
                 args = self._args
                 return Cls(*args, **kwargs)

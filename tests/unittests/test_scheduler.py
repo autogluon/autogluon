@@ -32,7 +32,6 @@ def test_hyperband_scheduler():
     lr=ag.space.Categorical(1e-3, 1e-2),
     wd=ag.space.Categorical(1e-3, 1e-2))
 def rl_train_fn(args, reporter):
-    #print('lr: {}, wd: {}'.format(args.lr, args.wd))
     for e in range(10):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)

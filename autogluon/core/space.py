@@ -104,6 +104,12 @@ class List(NestedSpace):
     def __len__(self):
         return len(self.data)
 
+    def __getstate__(self):
+        return self.data
+
+    def __setstate__(self, d):
+        self.data = d
+
     def __getattribute__(self, s):
         try:    
             x = super(List, self).__getattribute__(s)
@@ -117,12 +123,13 @@ class List(NestedSpace):
     def sample(self, **config):
         ret = []
         kwspaces = self.kwspaces
-        kwspaces.update(config)
         striped_keys = [k.split('.')[0] for k in config.keys()]
         for idx, obj in enumerate(self.data):
-            if isinstance(obj, AutoGluonObject):
+            if isinstance(obj, NestedSpace):
                 sub_config = _strip_config_space(config, prefix=str(idx))
                 ret.append(obj.sample(**sub_config))
+            elif isinstance(obj, SimpleSpace):
+                ret.append(config[str(idx)])
             else:
                 ret.append(obj)
         return ret
@@ -132,9 +139,9 @@ class List(NestedSpace):
         cs = CS.ConfigurationSpace()
         for k, v in enumerate(self.data):
             if isinstance(v, NestedSpace):
-                _add_cs(cs, v.cs, k)
+                _add_cs(cs, v.cs, str(k))
             elif isinstance(v, Space):
-                hp = v.get_hp(name=k)
+                hp = v.get_hp(name=str(k))
                 _add_hp(cs, hp)
         return cs
 
@@ -178,11 +185,17 @@ class Dict(NestedSpace):
     def __setitem__(self, key, data):
         self.data[key] = data
 
+    def __getstate__(self):
+        return self.data
+
+    def __setstate__(self, d):
+        self.data = d
+
     @property
     def cs(self):
         cs = CS.ConfigurationSpace()
         for k, v in self.data.items():
-            if hasattr(v, 'cs'):
+            if isinstance(v, NestedSpace):
                 _add_cs(cs, v.cs, k)
             elif isinstance(v, Space):
                 hp = v.get_hp(name=k)
