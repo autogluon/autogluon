@@ -256,7 +256,7 @@ class TabularNNDataset:
         self.dataloader = None
         save_pkl.save(path=dataobj_file, object=self)
         mx.nd.save(datalist_file, data_list)
-        print("TabularNN Dataset saved to files: \n %s \n %s" % (dataobj_file, datalist_file))
+        # print("TabularNN Dataset saved to files: \n %s \n %s" % (dataobj_file, datalist_file))
 
     @classmethod
     def load(cls, file_prefix=""):

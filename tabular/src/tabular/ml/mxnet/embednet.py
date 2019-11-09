@@ -111,6 +111,7 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
         
         self.y_range = params['y_range'] # Used specifically for regression. = None for classification.
         if self.y_range is not None:
+            self.y_range = (params['y_range'][0], params['y_range'][1])
             if self.y_range[0] == -np.inf and self.y_range[1] == np.inf:
                 self.y_range = None # do not worry about Y-range in this case
             elif self.y_range[0] >= 0 and self.y_range[1] == np.inf:
@@ -119,7 +120,9 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 self.y_constraint = 'nonpositive'
             else:
                 self.y_constraint = None
-            self.y_range = (nd.array(self.y_range[0]), nd.array(self.y_range[1]))
+                self.y_span = nd.array(params['y_range'][1] - params['y_range'][0])
+                self.y_lower = nd.array(params['y_range'][0])
+            self.y_range = (nd.array(params['y_range'][0]), nd.array(params['y_range'][1]))
         
         if architecture_desc is None: # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features, 
@@ -162,9 +165,10 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             unscaled_pred = self.output_block(input_activations)
             if self.y_constraint == 'nonnegative':
                 return self.y_range[0] + nd.abs(unscaled_pred)
-            if self.y_constraint == 'nonpositive':
+            elif self.y_constraint == 'nonpositive':
                 return self.y_range[1] - nd.abs(unscaled_pred)
-            return self.y_range[0] + nd.sigmoid(unscaled_pred) * (self.y_range[1] - self.y_range[0])
+            else:
+                return nd.sigmoid(unscaled_pred) * self.y_span + self.y_lower
 
 """ OLD 
     def _create_embednet_from_architecture(architecture_desc):

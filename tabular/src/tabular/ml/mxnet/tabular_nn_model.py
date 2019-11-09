@@ -65,8 +65,11 @@ class TabularNeuralNetModel(AbstractModel):
         'learning_rate': Real(1e-4, 1e-2, log=True),
         'weight_decay': Real(1e-12, 1e-1, log=True),
         'dropout_prob': Real(0.0, 0.5),
-        'embedding_size_factor': Real(0.5, 1.5),
         'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
+        'embedding_size_factor': Real(0.5, 1.5),
+        'use_batchnorm': Categorical(True, False),
+        'activation': Categorical('relu', 'softrelu', 'tanh'),
+        # 'batch_size': Categorical(512, 1024, 2056, 128), # used in preprocessing so cannot search atm
     }
 
     def __init__(self, path, name, problem_type, objective_func, features=None, nn_options={}):
@@ -114,7 +117,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Default search space: ['median', 'mean', 'most_frequent']
         self._use_default_value('proc.max_category_levels', 500) # maximum number of allowed levels per categorical feature
         # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        self._use_default_value('proc.skew_threshold', 0.95) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        self._use_default_value('proc.skew_threshold', 0.99) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         # Default search space: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
         
         # Hyperparameters for neural net architecture:
@@ -145,7 +148,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('y_range_extend', 0.05) # Only used to extend size of inferred y_range when y_range = None.
         
         # Hyperparameters for neural net training:
-        self._use_default_value('batch_size', 1024) # batch-size used for NN training
+        self._use_default_value('batch_size', 512) # batch-size used for NN training
         # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
         self._use_default_value('loss_function', None) # MXNet loss function minimized during training
         self._use_default_value('optimizer', 'adam')
