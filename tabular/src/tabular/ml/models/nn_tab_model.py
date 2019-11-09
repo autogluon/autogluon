@@ -49,7 +49,6 @@ class NNTabularModel(AbstractModel):
         self.procs = [FillMissing, Categorify, Normalize]
         self.cat_names = []
         self.cont_names = []
-        self.feature_types_metadata = {}
         self.max_unique_categorical_values = max_unique_categorical_values
         self.eval_result = None
 
@@ -68,13 +67,13 @@ class NNTabularModel(AbstractModel):
 
         try:
             X_train_stats = X_train.describe(include='all').T.reset_index()
-            cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.max_unique_categorical_values) | (X_train_stats['unique'].isna())]['index'].values
+            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.max_unique_categorical_values) | (X_train_stats['unique'].isna())]['index'].values
         except:
-            cols_to_drop = []
-        cols_to_keep = [col for col in X_train.columns.values if (col not in cols_to_drop)]
-        cols_to_use = [col for col in self.cat_names if col in cols_to_keep]
-        print(f'Using {len(cols_to_use)}/{len(self.cat_names)} categorical features')
-        self.cat_names = cols_to_use
+            cat_cols_to_drop = []
+        cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
+        cat_cols_to_use = [col for col in self.cat_names if col in cat_cols_to_keep]
+        print(f'Using {len(cat_cols_to_use)}/{len(self.cat_names)} categorical features')
+        self.cat_names = cat_cols_to_use
         self.cat_names = [feature for feature in self.cat_names if feature in list(X_train.columns)]
 
         self.cont_names = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')  # + self.__get_feature_type_if_present('vectorizers')  # Disabling vectorizers until more performance testing is done
