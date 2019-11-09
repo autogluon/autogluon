@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import autogluon as ag
 
@@ -7,6 +8,12 @@ import autogluon as ag
 class myobj:
     def __init__(self, name):
         self.name = name
+
+@ag.func(
+    framework=ag.space.Categorical('mxnet', 'pytorch'),
+)
+def myfunc(framework):
+    return framework
 
 @ag.args(
     a=ag.space.Real(1e-3, 1e-2, log=True),
@@ -23,10 +30,11 @@ class myobj:
             obj=myobj(),
         ),
     h=ag.space.Categorical('test', myobj()),
+    i = myfunc(),
     )
 def train_fn(args, reporter):
-    a, b, c, d, e, f, g, h = args.a, args.b, args.c, args.d, args.e, \
-            args.f, args.g, args.h
+    a, b, c, d, e, f, g, h, i = args.a, args.b, args.c, args.d, args.e, \
+            args.f, args.g, args.h, args.i
     assert a <= 1e-2 and a >= 1e-3
     assert b <= 1e-2 and b >= 1e-3
     assert c <= 10 and c >= 1
@@ -37,12 +45,13 @@ def train_fn(args, reporter):
     assert g['a'] <= 10 and g['a'] >= 0
     assert g.obj.name in ['auto', 'gluon']
     assert hasattr(h, 'name') or h == 'test'
-    reporter(epoch=e, accuracy=1)
+    assert i in ['mxnet', 'pytorch']
+    reporter(epoch=e, accuracy=0)
 
 def test_fifo_scheduler():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 2, 'num_gpus': 0},
-                                           num_trials=2,
+                                           num_trials=20,
                                            reward_attr='accuracy',
                                            time_attr='epoch')
     scheduler.run()
