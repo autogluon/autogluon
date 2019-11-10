@@ -1,5 +1,8 @@
+""" Lists the default (fixed) hyperparameter values we use in our Gradient Boosting model. """
+
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
+DEFAULT_NUM_BOOST_ROUND = 10000
 
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
@@ -14,12 +17,12 @@ def get_param_baseline(problem_type, num_classes=None):
 
 def get_param_multiclass_baseline(num_classes):
     params = {
+        'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
         'objective': 'multiclass',
         'metric': 'multi_error,multi_logloss',
         'num_classes': num_classes,
         'verbose': -1,
-
         'boosting_type': 'gbdt',
         'learning_rate': 0.005,
         'num_leaves': 256,
@@ -34,11 +37,11 @@ def get_param_multiclass_baseline(num_classes):
 
 def get_param_binary_baseline():
     params = {
+        'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
         'objective': 'binary',
         'metric': 'binary_logloss,binary_error',
         'verbose': -1,
-
         'boosting_type': 'gbdt',
         'learning_rate': 0.01,
         'num_leaves': 256,
@@ -52,11 +55,11 @@ def get_param_binary_baseline():
 
 def get_param_regression_baseline():
     params = {
+        'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
         'objective': 'regression',
         'metric': 'l1',
         'verbose': -1,
-
         'boosting_type': 'gbdt',
         'learning_rate': 0.01,
         'num_leaves': 128,

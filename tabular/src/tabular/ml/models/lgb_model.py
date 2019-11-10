@@ -1,4 +1,14 @@
+import gc, copy
+import lightgbm as lgb
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, Series
 
+from skopt.utils import use_named_args # TODO: remove
+from skopt import gp_minimize # TODO: remove
+
+
+# TODO: Move these files:
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.ml.utils import construct_dataset
 from tabular.callbacks.lgb.callbacks import record_evaluation_custom, early_stopping_custom
@@ -6,28 +16,21 @@ from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.tuning.hyperparameters.lgbm_spaces import LGBMSpaces
 from tabular.ml.models.utils import lgb_utils
-import lightgbm as lgb
-import numpy as np
-import pandas as pd
-from pandas import DataFrame, Series
-import gc
-
-import copy
-from skopt.utils import use_named_args
-from skopt import gp_minimize
+from tabular.ml.tuning.hyperparameters.defaults.lgbm.parameters import get_param_baseline
 
 
 class LGBModel(AbstractModel):
-    def __init__(self, path, name, params, num_boost_round, problem_type, objective_func, features=None, debug=0):
+    def __init__(self, path, name, problem_type, objective_func,
+                 num_classes=None, gbm_options={}, features=None, debug=0):
         model = None
         super().__init__(path=path, name=name, model=model, problem_type=problem_type, objective_func=objective_func, features=features, debug=debug)
-        self.params = params
+        self.params = get_param_baseline(problem_type=problem_type, num_classes=num_classes) # get default hyperparameters
+        if gbm_options is not None:
+            self.params.update(gbm_options) # update with user-specified settings
+        
         self.metric_types = self.params['metric'].split(',')
-
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True
-
-        self.num_boost_round = num_boost_round
         self.best_iteration = None
         self.eval_results = {}
         self.model_name_checkpointing_0 = 'model_checkpoint_0.pkl'
@@ -40,7 +43,7 @@ class LGBModel(AbstractModel):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
 
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
-    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None):
+    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, **kwargs):
         eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
@@ -63,12 +66,14 @@ class LGBModel(AbstractModel):
         ]
         # lr_over_time = lambda iter: 0.05 * (0.99 ** iter)
         # alpha = 0.1
-        print('TRAINING', self.num_boost_round, ' boosting rounds')
+        num_boost_round = self.params.pop('num_boost_round')
+        print('Training Gradient Boosting Model for %s rounds...' % num_boost_round)
+        print("with the following hyperparameter settings:")
         print(self.params)
         train_params = {
             'params': self.params,
             'train_set': dataset_train,
-            'num_boost_round': self.num_boost_round,
+            'num_boost_round': num_boost_round, 
             'valid_sets': valid_sets,
             'valid_names': valid_names,
             'evals_result': self.eval_results,
@@ -78,6 +83,7 @@ class LGBModel(AbstractModel):
         if type(eval_metric) != str:
             train_params['feval'] = eval_metric
         self.model = lgb.train(**train_params)
+        self.params['num_boost_round'] = num_boost_round # re-set this value after training
         # del dataset_train
         # del dataset_val
         # print('running gc...')
@@ -189,7 +195,7 @@ class LGBModel(AbstractModel):
         return features_to_use
 
     def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler_options=None): # scheduler_options unused for now
-        print("Beginning hyperparameter tuning for Decision Tree Ensemble...")
+        print("Beginning hyperparameter tuning for Gradient Boosting Model...")
         X = pd.concat([X_train, X_test], ignore_index=True)
         y = pd.concat([y_train, y_test], ignore_index=True)
         if spaces is None:

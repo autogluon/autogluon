@@ -1,4 +1,4 @@
-
+# Do not change these!
 BINARY = 'binary'
 MULTICLASS = 'multiclass'
 REGRESSION = 'regression'

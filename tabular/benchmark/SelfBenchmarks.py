@@ -30,21 +30,24 @@ from random import seed
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon import PredictTableColumn as task
 import autogluon as ag
-
-# Benchmark options:
+ 
+############ Benchmark options you can set: ########################
+hyperparameter_tune = False
 fast_benchmark = True # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
                        # Please disregard performance_value warnings when fast_benchmark = True.
 subsample_size = 1000
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
+# nn_options =  {} # or set = None to omit neural net
+# gbm_options = {} # or set = None to omit gradient boosting
+nn_options = {'num_epochs': 5} # Can control model training time here.
+gbm_options = {'num_boost_round': 100}
+###################################################################
 
 # Each train/test dataset must be located in single directory with the given names.
 train_file = 'train_data.csv'
 test_file = 'test_data.csv'
 seed_val = 0 # random seed
 EPS = 1e-10
-
-# nn_options = None   # nn_options =  {}
-nn_options = {'max_epochs': 5} # TODO: can control model training time here
 
 # Information about each dataset in benchmark is stored in dict.
 # performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
@@ -117,7 +120,8 @@ with warnings.catch_warnings(record=True) as caught_warnings:
             train_data = train_data.head(subsample_size) # subsample for fast_benchmark
         predictor = None # reset from last Dataset
         predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                             hyperparameter_tune = False, nn_options=nn_options)
+                             hyperparameter_tune=hyperparameter_tune, 
+                             nn_options=nn_options, gbm_options=gbm_options)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file

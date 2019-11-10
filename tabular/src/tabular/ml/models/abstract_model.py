@@ -51,7 +51,7 @@ class AbstractModel:
         path = path_context
         return path
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
 

@@ -58,14 +58,14 @@ def train_tabularNN(args, reporter):
     best_val_epoch = 0
     best_train_epoch = 0  # epoch with best training loss so far
     best_train_loss = np.inf  # smaller = better
-    max_epochs = args.max_epochs
+    num_epochs = args.num_epochs
     loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
     if tabNN.problem_type == REGRESSION: 
         if tabNN.metric_map[REGRESSION] == 'MAE':
             loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
         elif tabNN.metric_map[REGRESSION] == 'Rsquared':
             loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
-    for e in range(max_epochs):
+    for e in range(num_epochs):
         cumulative_loss = 0
         for batch_idx, data_batch in enumerate(train_dataset.dataloader):
             data_batch = train_dataset.format_batch_data(data_batch, ctx)

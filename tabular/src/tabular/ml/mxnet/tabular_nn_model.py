@@ -62,14 +62,15 @@ class TabularNeuralNetModel(AbstractModel):
     
     # Search space we use by default (only specify non-fixed hyperparameters here):  # TODO: move to separate file
     default_searchspace = {
-        'learning_rate': Real(1e-4, 1e-2, log=True),
-        'weight_decay': Real(1e-12, 1e-1, log=True),
+        'learning_rate': Real(1e-4, 3e-2, log=True),
+        'weight_decay': Real(1e-12, 0.5, log=True),
         'dropout_prob': Real(0.0, 0.5),
         'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
         'embedding_size_factor': Real(0.5, 1.5),
+        'network_type': Categorical('widedeep','feedforward'), 
         'use_batchnorm': Categorical(True, False),
         'activation': Categorical('relu', 'softrelu', 'tanh'),
-        # 'batch_size': Categorical(512, 1024, 2056, 128), # used in preprocessing so cannot search atm
+        # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
     }
 
     def __init__(self, path, name, problem_type, objective_func, features=None, nn_options={}):
@@ -78,12 +79,6 @@ class TabularNeuralNetModel(AbstractModel):
             Args:
                 params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
         """
-        #self.bs = params['nn.tabular.bs']
-        # self.ps = params['nn.tabular.ps']
-        # self.emb_drop = params['nn.tabular.emb_drop']
-        # self.lr = params['nn.tabular.lr']
-        # self.epochs = params['nn.tabular.epochs']
-        # self.metric = params['nn.tabular.metric']
         self.problem_type = problem_type
         self.objective_func = objective_func
         self.feature_types_metadata = None
@@ -91,8 +86,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.processor = None # data processor
-        # self.hpo_results = None # Results dict summarizing hyperparameter optimization # TODO: unused
-        # self.final_fit = True
+
         if nn_options is None:
             self.params = {}
             self.nondefault_params = []
@@ -105,9 +99,9 @@ class TabularNeuralNetModel(AbstractModel):
         """ Specifies hyperparameter values to use by default """
         
         # Configuration-options that we never search over in HPO but user can specify:
-        self._use_default_value('num_dataloading_workers', 2) # not searched... depends on num_cpus provided by trial manager
-        self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # not searched... depends on num_gpus provided by trial manager
-        self._use_default_value('max_epochs', 300)  # maximum number of epochs for training NN
+        self._use_default_value('num_dataloading_workers', 1) # will be overwritten by nthreads_per_trial
+        self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # will be overwritten by ngpus_per_trial
+        self._use_default_value('num_epochs', 300)  # maximum number of epochs for training NN
         self._use_default_value('seed_value', 0) # random seed for reproducibility in HPO (set = None to ignore)
 
         # For data processing (currently preprocessors not searched during HPO):
@@ -158,7 +152,7 @@ class TabularNeuralNetModel(AbstractModel):
         # Default search space: self._use_default_value('weight_decay', ag.space.Real(1e-6, 1e-2, log = True))
         self._use_default_value('clip_gradient', 100.0)
         self._use_default_value('momentum', 0.9) # only used for SGD
-        self._use_default_value('epochs_wo_improve', max(5, int(self.params['max_epochs']/5.0))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
+        self._use_default_value('epochs_wo_improve', max(5, int(self.params['num_epochs']/5.0))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
         # Note: Default params for original NNTabularModel were: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
     
     def set_net_defaults(self, train_dataset):
@@ -209,11 +203,12 @@ class TabularNeuralNetModel(AbstractModel):
                                                     self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
     
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_test (pd.DataFrame): test data features (should have same column names as Xtrain)
             Y_train (pd.Series): 
-            Y_test (pd.Series): are pandas Series 
+            Y_test (pd.Series): are pandas Series
+            kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
         if self.feature_types_metadata is None:
             raise ValueError("Trainer class must set feature_types_metadata for this model")
@@ -221,6 +216,14 @@ class TabularNeuralNetModel(AbstractModel):
         if self.features is None:
             self.features = list(X_train.columns)
         # print('features: ', self.features)
+        if 'num_cpus' in kwargs:
+            self.params['num_dataloading_workers'] = max(1, int(kwargs['num_cpus']/2.0))
+        if 'num_gpus' in kwargs:
+            if kwargs['num_gpus'] >= 1:
+                self.params['ctx'] = mx.gpu()  # TODO: currently does not use more than 1 GPU
+            else:
+                self.params['ctx'] = mx.cpu()
+
         train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -240,12 +243,11 @@ class TabularNeuralNetModel(AbstractModel):
             for hyperparam in bad_keys:
                 self.params.pop(hyperparam, None)
             self._set_default_params() # reset defaults for the missing keys
-            # TODO: OLD: sets hyperparams to fixed values based on search space: self.params[hyperparam] = self._hp_default_value(self.params[hyperparam])
 
         self.get_net(train_dataset)
         self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
         """
-        # TODO: if we don't want to save intermediate network parameters, need to do something like this to clean them up after training.
+        # TODO: if we don't want to save intermediate network parameters, need to do something like saving in temp directory to clean up after training:
         with make_temp_directory() as temp_dir:
             save_callback = SaveModelCallback(self.model, monitor=self.metric, mode=save_callback_mode, name=self.name)
             with progress_disabled_ctx(self.model) as model:
@@ -283,7 +285,8 @@ class TabularNeuralNetModel(AbstractModel):
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
                 file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
-        print("Training Tabular Neural Network...")
+        print("Training tabular Neural Network for up to %s epochs..." 
+              % self.params['num_epochs'])
         seed_value = self.params.get('seed_value')
         if seed_value is not None: # Set seed
             random.seed(seed_value)
@@ -299,14 +302,14 @@ class TabularNeuralNetModel(AbstractModel):
         best_val_epoch = 0
         best_train_epoch = 0 # epoch with best training loss so far
         best_train_loss = np.inf # smaller = better
-        max_epochs = self.params['max_epochs']
+        num_epochs = self.params['num_epochs']
         loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
         if self.problem_type == REGRESSION: 
             if self.metric_map[REGRESSION] == 'MAE':
                 loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
             elif self.metric_map[REGRESSION] == 'Rsquared':
                 loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
-        for e in range(max_epochs):
+        for e in range(num_epochs):
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
@@ -709,6 +712,13 @@ class TabularNeuralNetModel(AbstractModel):
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+        num_cpus = scheduler_options['resource']['num_cpus']
+        num_gpus = scheduler_options['resource']['num_gpus']
+        self.params['num_dataloading_workers'] = max(1, int(num_cpus/2.0))
+        if num_gpus >= 1:
+            self.params['ctx'] = mx.gpu() # TODO: currently does not use more than 1 GPU
+        else:
+            self.params['ctx'] = mx.cpu()
 
         start_time = time.time()
         X_train = self.preprocess(X_train)

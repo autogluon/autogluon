@@ -20,7 +20,7 @@ print(train_data.head())
 
 # Call fit() with hyperparameter optimization:
 nn_options = {
-    'max_epochs': 10,
+    'num_epochs': 10,
     'batch_size': 1024,
     'learning_rate': ag.space.Real(1e-4, 1e-2, log=True),
     'weight_decay': ag.space.Real(1e-12, 1e-1, log=True)

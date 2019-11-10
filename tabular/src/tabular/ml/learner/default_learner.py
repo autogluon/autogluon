@@ -23,14 +23,16 @@ class DefaultLearner(AbstractLearner):
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
-    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False, nn_options={}):
+    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False, 
+            nn_options={}, gbm_options={}):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
-                nn_options = Dict of hyperparameters + search-spaces for neural network model
+                nn_options (dict): hyperparameters + search-spaces for neural network models. If = None, we do not train any neural networks.
+                gbm_options (dict): hyperparameters + search-spaces for gradient boosting models. If None, do not train any gradient boosting models.
         """
         X, y, X_test, y_test = self.general_data_processing(X, X_test, sample=None)
 
@@ -50,7 +52,8 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
 
-        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, nn_options=nn_options)
+        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
+                      nn_options=nn_options, gbm_options=gbm_options)
         self.save_trainer(trainer=trainer)
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):
