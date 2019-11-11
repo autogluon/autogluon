@@ -1,5 +1,6 @@
-Scheduler
----------
+autogluon.scheduler
+-------------------
+
 
 .. currentmodule:: autogluon.scheduler
 

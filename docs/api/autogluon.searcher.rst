@@ -1,5 +1,5 @@
-Searcher
---------
+autogluon.searcher
+------------------
 
 .. currentmodule:: autogluon.searcher
 

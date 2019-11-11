@@ -1,7 +1,11 @@
-Search Space
-------------
+autogluon.core
+--------------
 
-Search spaces for hyperparameter optimization and neural architecture search.
+Search Space
+~~~~~~~~~~~~
+
+Core features in AutoGluon, including search spaces and decorators for customized search configuration
+and user-defined objects.
 
 .. admonition:: Example
 
@@ -13,10 +17,10 @@ Search spaces for hyperparameter optimization and neural architecture search.
    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
    >>>     wd=ag.space.Real(1e-3, 1e-2))
    >>> def train_fn(args, reporter):
-   ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-   ...     for e in range(10):
-   ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-   ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+   >>>     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+   >>>     for e in range(10):
+   >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+   >>>         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
    Create a schedule and run the experiment:
 
@@ -50,7 +54,7 @@ Search spaces for hyperparameter optimization and neural architecture search.
    AutoGluonObject
 
 Decorators
-----------
+~~~~~~~~~~
 
 .. currentmodule:: autogluon.core.decorator
 
