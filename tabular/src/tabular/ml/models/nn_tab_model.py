@@ -58,7 +58,7 @@ class NNTabularModel(AbstractModel):
     def __get_feature_type_if_present(self, feature_type):
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         X_train = self.preprocess(X_train)
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -120,8 +120,8 @@ class NNTabularModel(AbstractModel):
                 model.path = original_path
 
     def _generate_datasets(self, X_train, Y_train, X_test, Y_test):
-        df_train = pd.concat([X_train.copy(), X_test.copy()]).reset_index(drop=True)
-        df_train[LABEL] = pd.concat([Y_train.copy(), Y_test.copy()]).reset_index(drop=True)
+        df_train = pd.concat([X_train, X_test], ignore_index=True)
+        df_train[LABEL] = pd.concat([Y_train, Y_test], ignore_index=True)
         train_idx = np.arange(len(X_train))
         val_idx = np.arange(len(X_test)) + len(X_train)
 
