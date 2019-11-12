@@ -46,6 +46,8 @@ class AbstractTrainer:
         self.model_performance = {}
         self.model_paths = {}
         self.model_types = {}
+        self.model_fit_times = {}
+        self.model_pred_times = {}
         self.models = {}
         self.model_weights = None
         self.reset_paths = False
@@ -147,14 +149,21 @@ class AbstractTrainer:
     def train_single(self, X_train, X_test, y_train, y_test, model, objective_func=accuracy):
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
-        start_time = time.time()
+        fit_start_time = time.time()
         model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
                   'num_gpus': self.scheduler_options['resource']['num_gpus'] } # Additional configurations for model.fit
         model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
-        end_time = time.time()
+        fit_end_time = time.time()
         score = model.score(X=X_test, y=y_test)
+        pred_end_time = time.time()
         print('Score of ' + model.name + ':', score)
-        print('Fit Runtime:', model.name, '=', end_time-start_time, 's')
+        print('Fit Runtime:  ', model.name, '=', fit_end_time-fit_start_time, 's')
+        print('Score Runtime:', model.name, '=', pred_end_time-fit_end_time, 's')
+
+        # TODO: Should model have this information?
+        # TODO: Add to HPO
+        self.model_fit_times[model.name] = fit_end_time-fit_start_time
+        self.model_pred_times[model.name] = pred_end_time-fit_end_time
 
         if self.compute_feature_importance:
             self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
@@ -200,7 +209,7 @@ class AbstractTrainer:
         self.model_names = unique_names # make unique and preserve order
 
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
-    def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel], 
+    def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel],
                                  hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         for model_name in self.model_names:
