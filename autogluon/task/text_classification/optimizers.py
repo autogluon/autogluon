@@ -1,5 +1,5 @@
 from gluonnlp import optimizer
-from ...core import *
+from ...core import autogluon_object
 
 __all__ = ['BERTAdam']
 

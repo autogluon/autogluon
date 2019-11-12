@@ -233,5 +233,5 @@ and click the `Make Submission` button). Let's see how your model fares in this 
 At the end, please remember to safely exit to release all the resources:
 
 ```python
-ag.done()
+# ag.done()
 ```

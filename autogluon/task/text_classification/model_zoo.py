@@ -3,14 +3,13 @@ from typing import AnyStr
 import gluonnlp as nlp
 import mxnet as mx
 from mxnet import gluon
-from mxnet.gluon import Block, HybridBlock
+from mxnet.gluon import Block, HybridBlock, nn
 import gluonnlp as nlp
-from gluonnlp.model import BERTClassifier, RoBERTaClassifier
 
 from .dataset import *
 
 
-__all__ = ['get_network', 'get_model_instances', 'models', 'LMClassifier', 'BERTClassifier']
+__all__ = ['get_network', 'get_model_instances', 'models', 'LMClassifier', 'BERTClassifier', 'RoBERTaClassifier']
 
 models = ['standard_lstm_lm_200',
           'standard_lstm_lm_650',
@@ -160,6 +159,81 @@ class BERTClassifier(gluon.Block):
     def forward(self, inputs, token_types, valid_length=None):  # pylint: disable=arguments-differ
         _, self.pooler_out = self.bert(inputs, token_types, valid_length)
         return self.classifier(self.pooler_out)
+
+class RoBERTaClassifier(HybridBlock):
+    """Model for sentence (pair) classification task with BERT.
+    The model feeds token ids and token type ids into BERT to get the
+    pooled BERT sequence representation, then apply a Dense layer for
+    classification.
+    Parameters
+    ----------
+    bert: RoBERTaModel
+        The RoBERTa model.
+    num_classes : int, default is 2
+        The number of target classes.
+    dropout : float or None, default 0.0.
+        Dropout probability for the bert output.
+    prefix : str or None
+        See document of `mx.gluon.Block`.
+    params : ParameterDict or None
+        See document of `mx.gluon.Block`.
+    Inputs:
+        - **inputs**: input sequence tensor, shape (batch_size, seq_length)
+        - **valid_length**: optional tensor of input sequence valid lengths.
+            Shape (batch_size, num_classes).
+    Outputs:
+        - **output**: Regression output, shape (batch_size, num_classes)
+    """
+
+    def __init__(self, roberta, num_classes=2, dropout=0.0,
+                 prefix=None, params=None):
+        super(RoBERTaClassifier, self).__init__(prefix=prefix, params=params)
+        self.roberta = roberta
+        self._units = roberta._units
+        with self.name_scope():
+            self.classifier = nn.HybridSequential(prefix=prefix)
+            if dropout:
+                self.classifier.add(nn.Dropout(rate=dropout))
+            self.classifier.add(nn.Dense(units=self._units, activation='tanh'))
+            if dropout:
+                self.classifier.add(nn.Dropout(rate=dropout))
+            self.classifier.add(nn.Dense(units=num_classes))
+
+    def __call__(self, inputs, valid_length=None):
+        # pylint: disable=dangerous-default-value, arguments-differ
+        """Generate the unnormalized score for the given the input sequences.
+        Parameters
+        ----------
+        inputs : NDArray or Symbol, shape (batch_size, seq_length)
+            Input words for the sequences.
+        valid_length : NDArray or Symbol, or None, shape (batch_size)
+            Valid length of the sequence. This is used to mask the padded tokens.
+        Returns
+        -------
+        outputs : NDArray or Symbol
+            Shape (batch_size, num_classes)
+        """
+        return super(RoBERTaClassifier, self).__call__(inputs, valid_length)
+
+    def hybrid_forward(self, F, inputs, valid_length=None):
+        # pylint: disable=arguments-differ
+        """Generate the unnormalized score for the given the input sequences.
+        Parameters
+        ----------
+        inputs : NDArray or Symbol, shape (batch_size, seq_length)
+            Input words for the sequences.
+        valid_length : NDArray or Symbol, or None, shape (batch_size)
+            Valid length of the sequence. This is used to mask the padded tokens.
+        Returns
+        -------
+        outputs : NDArray or Symbol
+            Shape (batch_size, num_classes)
+        """
+        seq_out = self.roberta(inputs, valid_length)
+        assert not isinstance(seq_out, (tuple, list)), 'Expected one output from RoBERTaModel'
+        outputs = seq_out.slice(begin=(0, 0, 0), end=(None, 1, None))
+        outputs = outputs.reshape(shape=(-1, self._units))
+        return self.classifier(outputs)
 
 
 class Nets(HybridBlock):

@@ -12,7 +12,7 @@ parser.add_argument('--data', default='SST', type=str,
                     help='options are SST, MRPC, QQP, QNLI, RTE, STS-B, CoLA, MNLI, WNLI, IMDB')
 parser.add_argument('--nets', default='bert_12_768_12', type=str,
                     help='list of nets to run (default: bert_12_768_12)')
-parser.add_argument('--optims', default='bertadam', type=str,
+parser.add_argument('--optimizers', default='bertadam', type=str,
                     help='list of optims to run, (default: bertadam)')
 parser.add_argument('--searcher', type=str, default='random',
                     help='searcher name (default: random)')
@@ -32,10 +32,10 @@ parser.add_argument('--max_metric', default=1.0, type=float,
                     help='the max metric that is used to stop the trials')
 parser.add_argument('--num_trials', default=6, type=int,
                     help='number of experiment trials')
-parser.add_argument('--num_gpus', default=1, type=int,
+parser.add_argument('--ngpus_per_trial', default=1, type=int,
                     help='number of gpus per trial')
-parser.add_argument('--max_num_cpus', default=4, type=int,
-                    help='number of cpus per trial')
+parser.add_argument('--nthreads_per_trial', default=4, type=int,
+                    help='number of threads per trial')
 parser.add_argument('--epochs', default=10, type=int,
                     help='number of epochs per trial')
 parser.add_argument('--lr_factor', default=0.75, type=float,
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         os.makedirs(logdir)
     dataset = task.Dataset(name=args.data)
     predictor = task.fit(dataset,
-                         net=ag.Choice(args.nets),
+                         net=ag.space.Categorical(args.nets),
                          time_limits=args.time_limits,
                          epochs=args.epochs,
                          num_trials=args.num_trials,
@@ -66,12 +66,14 @@ if __name__ == '__main__':
                          bert_dataset=args.bert_dataset,
                          dev_batch_size=args.dev_batch_size, gpu=args.gpu,
                          log_interval=args.log_interval,
-                         lr=ag.LogLinear(2e-06, 2e-04),  # 2e-05
+                         lr=ag.space.Real(2e-06, 2e-04, log=True),  # 2e-05
                          max_len=args.max_len,
-                         model_parameters=args.model_parameters, optimizer=ag.Choice(args.optims),
+                         model_parameters=args.model_parameters, optimizer=ag.space.Categorical(args.optimizers),
                          output_dir=args.savedir, pretrained_bert_parameters=args.pretrained_bert_parameters,
                          seed=args.seed, warmup_ratio=args.warmup_ratio, epsilon=args.epsilon,
                          dtype=args.dtype, only_inference=args.only_inference, pad=args.pad,
+                         nthreads_per_trial=args.nthreads_per_trial,
+                         ngpus_per_trial=args.ngpus_per_trial,
                          visualizer=args.visualizer)
     print('Top-1 val acc: %.3f' % predictor.results['best_reward'])
     test_acc = predictor.evaluate(dataset)
