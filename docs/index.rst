@@ -28,16 +28,16 @@ This tutorial section is ...
 .. container:: cards
    
    .. card::
+      :tittle: Crash Course
+      :link: tutorials/course/index.html
+
+      Crash Course on AutoGluon core APIs.
+
+   .. card::
       :title: Image Classification
       :link: tutorials/image_classification/index.html
 
-      AutoGluon image classification tutorials.
-
-   .. card::
-      :title: Customizing AutoGluon
-      :link: tutorials/extend/index.html
-
-      Customize Training in AutoGluon
+      Image classification tutorials.
 
    .. card::
       :title: AutoGluon NAS

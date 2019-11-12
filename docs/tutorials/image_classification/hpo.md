@@ -1,4 +1,4 @@
-# Image Classification - Advanced
+# Image Classification - Search Space and HPO
 :label:`sec_imgadvanced`
 
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.

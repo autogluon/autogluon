@@ -5,13 +5,15 @@ import shutil
 import hashlib
 import zipfile
 import logging
-from tqdm import tqdm
+from .tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'unzip', 'raise_num_file']
 
 def unzip(zip_file_path, root=os.path.expanduser('./')):
+    """Unzip the files.
+    """
     with zipfile.ZipFile(zip_file_path) as zf:
         zf.extractall(root)
 

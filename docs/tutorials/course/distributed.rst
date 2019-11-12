@@ -1,8 +1,8 @@
-"""2. Setup Distributed Machines
-=============================
+Setup Distributed Machines
+==========================
 
 This is a quick tutorial for setting up AutoGluon with Distributed Training.
-AutoGluon automatically schedule tasks onto remote machines, just like local one.
+AutoGluon automatically schedule tasks onto remote machines, just like the local one.
 AutoGluon handles the communications and provides the same experience of
 a big machine with many GPUs.
 
@@ -51,73 +51,62 @@ Then we may use EC2 AMI to clone as many worker machines as you want.
 Resource Management
 -------------------
 
-.. image:: ../../../_static/img/distributed_resource_manager.png
+.. image:: https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_distributed.png
 
 
 A Toy Example
 -------------
 
-"""
+.. admonition:: Example
 
-import time
-import numpy as np
-import autogluon as ag
-from autogluon.basic import autogluon_register_args
-from autogluon.resource import DistributedResource
+    >>> import time
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> from autogluon.basic import autogluon_register_args
+    >>> from autogluon.resource import DistributedResource
+    >>> 
 
-################################################################
-# Construct a fake training function for demo
-#
+    Construct a fake training function for demo
 
-@autogluon_register_args(
-    batch_size=64,
-    lr=ag.LogLinearSpace(1e-4, 1e-1),
-    momentum=0.9,
-    wd=ag.LinearSpace(1e-4, 5e-4),
-    )
-def train_fn(args, reporter):
-    print('task_id: {}, lr: {}'.format(args.task_id, args.lr))
-    for e in range(10):
-        top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        reporter(epoch=e, accuracy=top1_accuracy)
-    # wait for 1 sec
-    time.sleep(1.0)
+    >>> @autogluon_register_args(
+    >>>     batch_size=64,
+    >>>     lr=ag.LogLinearSpace(1e-4, 1e-1),
+    >>>     momentum=0.9,
+    >>>     wd=ag.LinearSpace(1e-4, 5e-4),
+    >>>     )
+    >>> def train_fn(args, reporter):
+    >>>     print('task_id: {}, lr: {}'.format(args.task_id, args.lr))
+    >>>     for e in range(10):
+    >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    >>>         reporter(epoch=e, accuracy=top1_accuracy)
+    >>>     # wait for 1 sec
+    >>>     time.sleep(1.0)
 
-################################################################
-# Create a Random Searcher
-#
+    Create a Random Searcher
 
-searcher = ag.searcher.RandomSampling(train_fn.cs)
-print( searcher.get_config())
+    >>> searcher = ag.searcher.RandomSampling(train_fn.cs)
+    >>> print(searcher.get_config())
 
-################################################################
-# Provide a list of ip addresses for remote machines
-#
+    Provide a list of ip addresses for remote machines
 
-extra_node_ips = ['172.31.3.95']
+    >>> extra_node_ips = ['172.31.3.95']
 
-################################################################
-# Create a distributed scheduler. If no ipaddresses are provided, 
-# scheduler will only use the local resources
-#
+    Create a distributed scheduler. If no ipaddresses are provided, 
+    scheduler will only use the local resources
 
-scheduler = ag.distributed.DistributedFIFOScheduler(
-    train_fn, train_fn.args,
-    resource={'num_cpus': 2, 'num_gpus': 1},
-    searcher=searcher,
-    dist_ip_addrs=extra_node_ips)
-print(scheduler)
+    >>> scheduler = ag.distributed.DistributedFIFOScheduler(
+    >>>     train_fn, train_fn.args,
+    >>>     resource={'num_cpus': 2, 'num_gpus': 1},
+    >>>     searcher=searcher,
+    >>>     dist_ip_addrs=extra_node_ips)
+    >>> print(scheduler)
 
-################################################################
-# Launch 16 Tasks
-#
+    Launch 16 Tasks
 
-scheduler.run(16)
-scheduler.join_tasks()
+    >>> scheduler.run(16)
+    >>> scheduler.join_jobs()
 
-################################################################
-# Plot the results and shut down (required for distributed version)
-#
+    Plot the results and exit.
 
-scheduler.get_training_curves()
-scheduler.shutdown()
+    >>> scheduler.get_training_curves()
+    >>> ag.done()

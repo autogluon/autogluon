@@ -13,8 +13,9 @@ Utils
    :nosignatures:
    :toctree: _autogen
 
-   load
    save
+   load
    download
    check_sha1
    mkdir
+   unzip
