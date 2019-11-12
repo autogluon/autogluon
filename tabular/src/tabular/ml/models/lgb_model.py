@@ -27,7 +27,7 @@ class LGBModel(AbstractModel):
         self.params = get_param_baseline(problem_type=problem_type, num_classes=num_classes) # get default hyperparameters
         if gbm_options is not None:
             self.params.update(gbm_options) # update with user-specified settings
-        
+
         self.metric_types = self.params['metric'].split(',')
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True
@@ -73,7 +73,7 @@ class LGBModel(AbstractModel):
         train_params = {
             'params': self.params,
             'train_set': dataset_train,
-            'num_boost_round': num_boost_round, 
+            'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
             'valid_names': valid_names,
             'evals_result': self.eval_results,

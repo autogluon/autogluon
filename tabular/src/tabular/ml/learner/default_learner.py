@@ -52,7 +52,7 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
 
-        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
+        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                       nn_options=nn_options, gbm_options=gbm_options)
         self.save_trainer(trainer=trainer)
 

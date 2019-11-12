@@ -140,7 +140,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
         # If None, inferred based on training labels. Note: MUST be None for classification tasks!
         self._use_default_value('y_range_extend', 0.05) # Only used to extend size of inferred y_range when y_range = None.
-        
+
         # Hyperparameters for neural net training:
         self._use_default_value('batch_size', 512) # batch-size used for NN training
         # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
@@ -152,9 +152,10 @@ class TabularNeuralNetModel(AbstractModel):
         # Default search space: self._use_default_value('weight_decay', ag.space.Real(1e-6, 1e-2, log = True))
         self._use_default_value('clip_gradient', 100.0)
         self._use_default_value('momentum', 0.9) # only used for SGD
-        self._use_default_value('epochs_wo_improve', max(5, int(self.params['num_epochs']/5.0))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
+        # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
+        self._use_default_value('epochs_wo_improve', max(5, min(20, int(self.params['num_epochs']/5.0)))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
         # Note: Default params for original NNTabularModel were: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
-    
+
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
         if self.problem_type == MULTICLASS:
