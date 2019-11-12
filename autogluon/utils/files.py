@@ -17,6 +17,7 @@ def unzip(zip_file_path, root=os.path.expanduser('./')):
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
+
     Parameters
     ----------
     url : str
@@ -29,6 +30,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
     sha1_hash : str, optional
         Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
         but doesn't match.
+
     Returns
     -------
     str
@@ -76,12 +78,14 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
 
 def check_sha1(filename, sha1_hash):
     """Check whether the sha1 hash of the file content matches the expected hash.
+
     Parameters
     ----------
     filename : str
         Path to the file.
     sha1_hash : str
         Expected sha1 hash in hexadecimal digits.
+
     Returns
     -------
     bool

@@ -40,7 +40,7 @@ class NestedSpace(Space):
 
 class AutoGluonObject(NestedSpace):
     r"""Searchable Objects created by decorating user-defined object using
-    :func:`@autogluon.core.obj` or :func:`@autogluon.core.func` decorators.
+    :func:`autogluon.obj` or :func:`autogluon.func` decorators.
     """
     def __call__(self, *args, **kwargs):
         if not self._inited:
@@ -76,17 +76,14 @@ class AutoGluonObject(NestedSpace):
         return 'AutoGluonObject'
 
 class List(NestedSpace):
-    """A Searchable List (Nested Space)
+    r"""A Searchable List (Nested Space)
 
-    Args:
-        args: a list of search spaces.
+    Parameters
+    ----------
 
-    Example:
-        >>> sequence = ag.List(
-        >>>     ag.space.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
-        >>>     ag.space.Categorical('BatchNorm', 'InstanceNorm'),
-        >>>     ag.space.Categorical('relu', 'sigmoid'),
-        >>> )
+    args : list
+        a list of search spaces.
+
     """
     def __init__(self, *args):
         self.data = [*args]
@@ -238,11 +235,12 @@ class Categorical(NestedSpace):
     """Categorical Search Space (Nested Space)
     Add example for conditional space.
 
-    Args:
-        data: the choice candidates
+    Parameters
+    ----------
+    data : Space or python built-in objects
+        the choice candidates
 
-    Example:
-        >>> net = ag.space.Categorical('resnet50', 'resnet101')
+
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -300,14 +298,17 @@ Choice = DeprecationHelper(Categorical, 'Choice')
 class Real(SimpleSpace):
     """linear search space.
 
-    Args:
-        lower: the lower bound of the search space
-        upper: the upper bound of the search space
-        default (optional): default value
-        log (True/False): search space in log scale
+    Parameters
+    ----------
+    lower : float
+        the lower bound of the search space
+    upper : float
+        the upper bound of the search space
+    default : float (optional)
+        default value
+    log : (True/False)
+        search space in log scale
 
-    Example:
-        >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
         self.lower = lower
@@ -322,13 +323,16 @@ class Real(SimpleSpace):
 class Int(SimpleSpace):
     """integer search space.
 
-    Args:
-        lower: the lower bound of the search space
-        upper: the upper bound of the search space
-        default (optional): default value
+    Parameters
+    ----------
+    lower : int
+        the lower bound of the search space
+    upper : int
+        the upper bound of the search space
+    default : int (optional)
+        default value
 
-    Example:
-        >>> learning_rate = ag.space.Int(0, 100)
+
     """
     def __init__(self, lower, upper, default=None):
         self.lower = lower
@@ -342,8 +346,6 @@ class Int(SimpleSpace):
 class Bool(Int):
     """Bool Search Space
 
-    Example:
-        >>> pretrained = ag.Bool()
     """
     def __init__(self):
         super(Bool, self).__init__(0, 1)

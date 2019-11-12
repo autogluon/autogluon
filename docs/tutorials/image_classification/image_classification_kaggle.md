@@ -65,7 +65,7 @@ Now we have the desired directory structure under `~/data/shopeeiet/`, which in 
 
 Here are some example images from this data:
 
-![](../img/shopeeiet_example.png)
+![](../../img/shopeeiet_example.png)
 
 
 

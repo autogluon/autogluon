@@ -120,14 +120,14 @@ class _autogluon_method(object):
 
 def args(default={}, **kwvars):
     """Decorator for customized training script, registering arguments or searchable spaces
-    to the decorated function. The arguments should be python objects, autogluon objects
-    (see :function:`autogluon.autogluon_object`_ .), or autogluon search spaces
-    (:class:`autogluon.Int`, :class:`autogluon.Linear` ...).
+    to the decorated function. The arguments should be python built-in objects,
+    autogluon objects (see :func:`autogluon.obj`_ .), or autogluon search spaces
+    (:class:`autogluon.space.Int`, :class:`autogluon.space.Real` ...).
 
     Example:
-        >>> @ag.args(batch_size=10, lr=ag.Linear(0.01, 0.1))
+        >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
         >>> def my_train(args):
-        >>>     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
+        ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
 
     """
     kwvars['_default_config'] = default
@@ -148,14 +148,14 @@ def func(**kwvars):
     """Register args or searchable spaces to the functions.
 
     Return:
-        AutoGluonobject: a lazy init object, which allows distributed training.
+        :class:`autogluon.space.AutoGluonObject`: a lazy init object, which allows distributed training.
 
     Example:
         >>> from gluoncv.model_zoo import get_model
         >>> 
         >>> @ag.func(pretrained=ag.space.Categorical(True, False))
         >>> def cifar_resnet(pretrained):
-        >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
+        ...     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
     def registered_func(func):
         class autogluonobject(AutoGluonObject):
@@ -190,11 +190,11 @@ def obj(**kwvars):
     """Register args or searchable spaces to the class.
 
     Return:
-        AutoGluonobject: a lazy init object, which allows distributed training.
+        :class:`autogluon.space.AutoGluonObject`: a lazy init object, which allows distributed training.
 
     Example:
-        >>> from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
-        >>>
+        >>> import autogluon as ag
+        >>> from mxnet import optimizer as optim
         >>> @ag.obj(
         >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
         >>>     wd=ag.space.Real(1e-4, 1e-1),

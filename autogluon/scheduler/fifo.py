@@ -30,17 +30,30 @@ searchers = {
 }
 
 class FIFOScheduler(TaskScheduler):
-    """Simple scheduler that just runs trials in submission order.
+    r"""Simple scheduler that just runs trials in submission order.
 
-    Args:
-        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
-        args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (str or object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
-        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
+    args : object (optional)
+        Default arguments for launching train_fn.
+    resource : dict
+        Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : str or object
+        Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
+    time_attr : str
+            A training result attr to use for comparing time.
+            Note that you can pass in something non-temporal such as
+            `training_epoch` as a measure of progress, the only requirement
+            is that the attribute should increase monotonically.
+    reward_attr : str
+        The training result objective value attribute. As with `time_attr`, this may refer to any objective value.
+        Stopping procedures will use this attribute.
+    dist_ip_addrs : list of str
+        IP addresses of remote machines.
 
     Example:
-
         >>> import numpy as np
         >>> import autogluon as ag
         >>> 

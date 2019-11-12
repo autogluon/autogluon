@@ -1,10 +1,13 @@
-Utils
-----------
+autogluon.utils
+---------------
+
+AutoGluon built-in utility functions and objects.
 
 .. automodule:: autogluon.utils
 .. currentmodule:: autogluon.utils
 
-Decorators for customizing AutoGluon. Allows hyperparameter search on user-defined objects and functions.
+Utils
+~~~~~
 
 .. autosummary::
    :nosignatures:

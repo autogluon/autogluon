@@ -16,65 +16,74 @@ logger = logging.getLogger(__name__)
 
 
 class HyperbandScheduler(FIFOScheduler):
-    """Implements different variants of asynchronous Hyperband
+    r"""Implements different variants of asynchronous Hyperband
 
     See 'type' for the different variants. One implementation detail is when
     using multiple brackets, task allocation to bracket is done randomly with
     over a softmax probability.
 
-    Args:
-        train_fn (callable): A task launch function for training.
-            Note: please add the `@autogluon_method` decorater to the original function.
-        args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources.
-            For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher.
-            For example, autogluon.searcher.RandomSearcher
-        time_attr (str): A training result attr to use for comparing time.
-            Note that you can pass in something non-temporal such as
-            `training_epoch` as a measure of progress, the only requirement
-            is that the attribute should increase monotonically.
-        reward_attr (str): The training result objective value attribute.
-            As with `time_attr`, this may refer to any objective value.
-            Stopping procedures will use this attribute.
-        max_t (float): max time units per task.
-            Trials will be stopped after max_t time units (determined by
-            time_attr) have passed.
-        grace_period (float): Only stop tasks at least this old in time.
-            Also: min_t. The units are the same as the attribute named by
-            `time_attr`.
-        reduction_factor (float): Used to set halving rate and amount.
-            This is simply a unit-less scalar.
-        brackets (int): Number of brackets. Each bracket has a different
-            grace period, all share max_t and reduction_factor.
-            If brackets == 1, we just run successive halving, for
-            brackets > 1, we run Hyperband.
-        type (str): Type of Hyperband scheduler:
-            stopping: See HyperbandStopping_Manager. Tasks and config evals are
-                tightly coupled. A task is stopped at a milestone if worse than
-                most others, otherwise it continues. As implemented in Ray/Tune:
-                https://ray.readthedocs.io/en/latest/tune-schedulers.html#asynchronous-hyperband
-            promotion: See HyperbandPromotion_Manager. A config eval may be
-                associated with multiple tasks over its lifetime. It is never
-                terminated, but may be paused. Whenever a task becomes available,
-                it may promote a config to the next milestone, if better than most
-                others. If no config can be promoted, a new one is chosen. This
-                variant may benefit from pause&resume, which is not directly
-                supported here. As proposed in this paper (termed ASHA):
-                https://arxiv.org/abs/1810.05934
-        keep_size_ratios (bool): Implemented for type 'promotion' only. If True,
-            promotions are done only if the (current estimate of the) size ratio
-            between rung and next rung are 1 / reduction_factor or better. This
-            avoids higher rungs to get more populated than they would be in
-            synchronous Hyperband. A drawback is that promotions to higher rungs
-            take longer.
-        maxt_pending (bool): Relevant only if a model-based searcher is used.
-            If True, register pending config at level max_t
-            whenever a new evaluation is started. This has a direct effect on
-            the acquisition function (for model-based variant), which operates
-            at level max_t. On the other hand, it decreases the variance of the
-            latent process there.
-            NOTE: This could also be removed...
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training.
+    args : object (optional)
+        Default arguments for launching train_fn.
+    resource : dict
+        Computation resources.  For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : object (optional)
+        Autogluon searcher.  For example, autogluon.searcher.RandomSearcher
+    time_attr : str
+        A training result attr to use for comparing time.
+        Note that you can pass in something non-temporal such as
+        `training_epoch` as a measure of progress, the only requirement
+        is that the attribute should increase monotonically.
+    reward_attr :str
+        The training result objective value attribute. As with `time_attr`, this may refer to any objective value.
+        Stopping procedures will use this attribute.
+    max_t : float
+        max time units per task.  Trials will be stopped after max_t time units (determined by
+        time_attr) have passed.
+    grace_period : float
+        Only stop tasks at least this old in time.  Also: min_t. The units are the same as the attribute named by
+        `time_attr`.
+    reduction_factor : float
+        Used to set halving rate and amount.  This is simply a unit-less scalar.
+    brackets : int
+        Number of brackets. Each bracket has a different
+        grace period, all share max_t and reduction_factor.
+        If brackets == 1, we just run successive halving, for
+        brackets > 1, we run Hyperband.
+    type : str
+        Type of Hyperband scheduler:
+        stopping: See HyperbandStopping_Manager. Tasks and config evals are
+            tightly coupled. A task is stopped at a milestone if worse than
+            most others, otherwise it continues. As implemented in Ray/Tune:
+            https://ray.readthedocs.io/en/latest/tune-schedulers.html#asynchronous-hyperband
+        promotion: See HyperbandPromotion_Manager. A config eval may be
+            associated with multiple tasks over its lifetime. It is never
+            terminated, but may be paused. Whenever a task becomes available,
+            it may promote a config to the next milestone, if better than most
+            others. If no config can be promoted, a new one is chosen. This
+            variant may benefit from pause&resume, which is not directly
+            supported here. As proposed in this paper (termed ASHA):
+            https://arxiv.org/abs/1810.05934
+    keep_size_ratios : bool
+        Implemented for type 'promotion' only. If True,
+        promotions are done only if the (current estimate of the) size ratio
+        between rung and next rung are 1 / reduction_factor or better. This
+        avoids higher rungs to get more populated than they would be in
+        synchronous Hyperband. A drawback is that promotions to higher rungs
+        take longer.
+    maxt_pending : bool
+        Relevant only if a model-based searcher is used.
+        If True, register pending config at level max_t
+        whenever a new evaluation is started. This has a direct effect on
+        the acquisition function (for model-based variant), which operates
+        at level max_t. On the other hand, it decreases the variance of the
+        latent process there.
+        NOTE: This could also be removed...
+    dist_ip_addrs : list of str
+        IP addresses of remote machines.
 
     Example:
         >>> import numpy as np
