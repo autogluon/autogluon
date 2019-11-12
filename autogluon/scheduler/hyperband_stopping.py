@@ -51,11 +51,12 @@ class HyperbandStopping_Manager(object):
         self._max_t = max_t
         self._min_t = grace_period
         self._num_stopped = 0
-        # Tracks state for new task add
-        self._brackets = [
-            _Bracket(grace_period, max_t, reduction_factor, s)
-            for s in range(brackets)
-        ]
+        self._brackets = []
+        for s in range(brackets):
+            bracket = _Bracket(grace_period, max_t, reduction_factor, s)
+            if not bracket._rungs:
+                break
+            self._brackets.append(bracket)
 
     def on_task_add(self, task, **kwargs):
         """
