@@ -189,6 +189,7 @@ class AbstractTrainer:
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
                 print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')
+                print(err)
                 del model
             else:
                 self.hpo_model_names += list(sorted(hpo_models.keys()))
@@ -253,6 +254,7 @@ class AbstractTrainer:
         except Exception as err:
             traceback.print_tb(err.__traceback__)
             print('Warning: Exception caused ' + model.name + ' to fail during training... Skipping model.')
+            print(err)
             del model
         else:
             self.model_names.append(model.name)

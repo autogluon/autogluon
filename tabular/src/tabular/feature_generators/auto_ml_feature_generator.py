@@ -130,6 +130,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         skip_nlp = True
                     if skip_nlp:
                         print('Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        print(err)
                         self.vectorizers = []
                         self.features_nlp = []
                         self.features_vectorizers = []
@@ -137,6 +138,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         keep_trying_nlp = False
                     else:
                         print('Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        print(err)
                         downsample_ratio = 0.25
 
         return X_features
