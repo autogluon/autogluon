@@ -64,11 +64,13 @@ class HyperbandPromotion_Manager(object):
         self._reduction_factor = reduction_factor
         self._max_t = max_t
         self._min_t = grace_period
-        # Tracks state for new task add
-        self._brackets = [
-            PromotionBracket(
+        self._brackets = []
+        for s in range(brackets):
+            bracket = PromotionBracket(
                 grace_period, max_t, reduction_factor, s, keep_size_ratios)
-            for s in range(brackets)]
+            if not bracket._rungs:
+                break
+            self._brackets.append(bracket)
 
     def on_task_add(self, task, **kwargs):
         assert 'bracket' in kwargs
