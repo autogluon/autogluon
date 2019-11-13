@@ -58,11 +58,11 @@ class SKoptSearcher(BaseSearcher):
     
         - get_config() cannot ensure valid configurations for conditional spaces since skopt 
         does not contain this functionality like ConfigSpace does. 
-        Currently SKoptSearcher.get_config() will catc these Exceptions and revert to random_config() in this case
+        Currently SKoptSearcher.get_config() will catch these Exceptions and revert to random_config() in this case
         
         - get_config(max_tries) uses skopt batch BayesOpt functionality to query at most 
         max_tries number of configs to try out.
-        If all of these have configus have already been scheduled to try (might happen in asynchronous setting), 
+        If all of these have configs have already been scheduled to try (might happen in asynchronous setting), 
         then get_config simply reverts to random search via random_config().
     """
     

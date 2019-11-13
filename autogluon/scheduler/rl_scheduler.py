@@ -23,7 +23,7 @@ __all__ = ['RLScheduler']
 logger = logging.getLogger(__name__)
 
 class RLScheduler(FIFOScheduler):
-    r"""Reinforcement Scheduler, which automatically creates LSTM controller based on the search spaces.
+    r"""Scheduler that uses Reinforcement Learning with a LSTM controller created based on the provided search spaces
 
     Parameters
     ----------
