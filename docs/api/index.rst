@@ -7,7 +7,9 @@ describing what they are and what they do. The APIs are grouped into the followi
 .. toctree::
    :maxdepth: 1
 
-   autogluon
+   autogluon.space
+   autogluon.core
+   autogluon.task
    autogluon.scheduler
    autogluon.searcher
    autogluon.utils

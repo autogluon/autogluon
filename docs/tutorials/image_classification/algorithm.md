@@ -9,11 +9,14 @@ We again begin by informing AutoGluon that `image_classification` is the task o
 ```{.python .input}
 import autogluon as ag
 from autogluon import ImageClassification as task
+```
 
-dataset = task.Dataset(name='shopeeiet', train_path='data/train')
+Download dataset:
 
-time_limits = 2*60
-epochs = 10
+```{.python .input}
+filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+ag.unzip(filename)
+dataset = task.Dataset(train_path='data/train')
 ```
 
 Recall that our goal in hyperparameter search is to identify the hyperparameter configuration under which the resulting trained model exhibits the best predictive performance on the validation data (ie. *validation accuracy* for our classification task).  AutoGluon employs a [`Searcher`](../api/autogluon.searcher.html) object that controls which hyperparameter-values from the search space should be explored in the next trial (ie. training run). Certain search procedures such as *Bayesian optimization* may base this choice on all the previous trials that have been executed, using observations of how well the previously tested hyperparameter configurations performed to inform which new hyperparameter configuration seems most promising to try next.  [autogluon.searcher](../api/autogluon.searcher.html) supports various search search_strategys for both hyperparameter optimization and architecture search. 
@@ -23,6 +26,9 @@ Recall that our goal in hyperparameter search is to identify the hyperparameter 
 The default searcher employed by AutoGluon is random search, which simply tries out new hyperparameter configurations drawn at random from the hyperparameter search space under consideration. You can specify that `task.fit` should employ random hyperparameter search simply by passing the string argument `search_strategy='random'` (although unnecessary as it is already the default option).
 
 ```{.python .input}
+time_limits = 2*60
+epochs = 10
+
 classifier = task.fit(dataset,
                       search_strategy='random',
                       time_limits=time_limits,

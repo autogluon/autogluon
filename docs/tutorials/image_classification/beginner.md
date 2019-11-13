@@ -66,7 +66,7 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
 ```{.python .input}
-test_dataset = task.Dataset(test_path='~/data/test')
+test_dataset = task.Dataset(test_path='data/test')
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

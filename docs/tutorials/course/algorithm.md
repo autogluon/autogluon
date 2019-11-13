@@ -2,7 +2,7 @@
 
 ## AutoGluon System Implementatin Logic
 
-.. image:: https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_system.png
+![](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_system.png)
 
 ## Create A Toy Reward Space
 

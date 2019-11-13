@@ -1,12 +1,11 @@
-AutoGluon Crash Course
-======================
+Advanced API
+============
 
-A crash cource for AutoGluon APIs.
+Tutorials for customizing AutoGluon using advanced APIs.
 
 .. toctree::
    :maxdepth: 1
 
-   fit
    core
    algorithm
    distributed

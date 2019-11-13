@@ -9,46 +9,76 @@ AutoGluon: AutoML Toolkit with MXNet Gluon
 - Easy customization for advanced usage.
 - Painless setup using distributed computations.
 
+Supported Applications
+----------------------
+
+.. raw:: html
+   :file: static/application.html
+
 Installation
 ------------
 
-PIP Install AutoGluon:
+.. include:: install-include.rst
 
-.. code-block:: bash
-
-   pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
-
-Please visit this `tutorial <http://mxnet.incubator.apache.org/get_started>`_ to install MXNet.
+Check :doc:`install` for more installation instructions and options.
 
 Tutorials
 ---------
 
-This tutorial section is ...
+Quick Start
+~~~~~~~~~~~
 
 .. container:: cards
-   
-   .. card::
-      :tittle: Crash Course
-      :link: tutorials/course/index.html
 
-      Crash Course on AutoGluon core APIs.
+   .. card::
+      :title: Installation
+      :link: install.html
+
+      Install AutoGluon on your machine.
+
+   .. card::
+      :title: Image Classification
+      :link: tutorials/image_classification/beginner.html
+
+      First step using AutoGluon for Image Classification.
+
+
+Tasks
+~~~~~
+
+.. container:: cards
 
    .. card::
       :title: Image Classification
       :link: tutorials/image_classification/index.html
 
-      Image classification tutorials.
+      Dive into deep Tutorials.
+
+Advanced Topic
+~~~~~~~~~~~~~~
+
+.. container:: cards
 
    .. card::
-      :title: AutoGluon NAS
+      :title: Advanced API in AutoGluon
+      :link: tutorials/course/index.html
+
+      Advanced Usage & APIs in AutoGluon.
+
+   .. card::
+      :title: Neural Architecture Search
       :link: tutorials/nas/index.html
 
-      AutoGluon Neural Architecture Search tutorials.
+      Neural Architecture Search tutorials.
 
 .. toctree::
    :maxdepth: 1
    :hidden:
 
-   tutorials/index
+   install
+   tutorials/image_classification/index
+   tutorials/course/index
+   tutorials/customize/index
+   tutorials/nas/index
    api/index
    model_zoo/index

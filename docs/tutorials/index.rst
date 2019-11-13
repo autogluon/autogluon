@@ -1,36 +1,6 @@
 Tutorial
 ========
 
-Crash Course
-------------
-.. container:: cards
-   
-   .. card::
-      :tittle: FIT API
-      :link: course/fit.html
-
-      Learn to use FIT API.
-
-   .. card::
-      :tittle: Search Space and Decorator
-      :link: course/core.html
-
-      Learn AutoGluon Core API for customized search spaces,
-      customize searchable objects, and training functions.
-
-   .. card::
-      :tittle: Search Algorithms
-      :link: course/algorithm.html
-
-      Learning AutoGluon built-in search algorithms and
-      early-stopping scheduling strategy.
-
-   .. card::
-      :tittle: Distributed Search Tutorial
-      :link: cource/distributed.md
-
-      Easily scale up training across multiple machines using
-      automatic distributed search.
 
 Image Classification
 --------------------
@@ -43,7 +13,7 @@ Image Classification
       Quick start tutorial.
 
    .. card::
-      :title: Search Spaces and HPO
+      :title: Customized Search and HPO
       :link: image_classification/hpo.html
 
       Image classification HPO tutorial.
@@ -55,11 +25,41 @@ Image Classification
       Change default search algorithms tutorial.
 
    .. card::
-      :title: Kaggle Competation
+      :title: Use Your Own Dataset
       :link: image_classification/kaggle.html
 
       Participate Kaggle competation.
 
+Advanced API in AutoGluon
+-------------------------
+.. container:: cards
+   
+   .. card::
+      :title: FIT API
+      :link: course/fit.html
+
+      Learn to use FIT API.
+
+   .. card::
+      :title: Search Space and Decorator
+      :link: course/core.html
+
+      Learn AutoGluon Core API for customized search spaces,
+      customize searchable objects, and training functions.
+
+   .. card::
+      :title: Search Algorithms
+      :link: course/algorithm.html
+
+      Learning AutoGluon built-in search algorithms and
+      early-stopping scheduling strategy.
+
+   .. card::
+      :title: Distributed Search Tutorial
+      :link: cource/distributed.md
+
+      Easily scale up training across multiple machines using
+      automatic distributed search.
 
 Neural Architecture Search
 --------------------------

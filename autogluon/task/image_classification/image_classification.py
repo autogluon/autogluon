@@ -53,18 +53,30 @@ class ImageClassification(BaseTask):
         """
         Auto fit on image classification dataset
 
-        Args:
-            dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): optimizer candidates.
-            metric (str or object): observation metric.
-            loss (object): training loss function.
-            num_trials (int): number of trials in the experiment.
-            time_limits (int): training time limits in seconds.
-            resources_per_trial (dict): Machine resources to allocate per trial.
-            savedir (str): Local dir to save training results to.
-            search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
-            resume (bool): If checkpoint exists, the experiment will resume from there.
+        Parameters
+        ----------
+        dataset : (str or autogluon.task.ImageClassification.Dataset)
+            Training dataset.
+        net : (str or autogluon.AutoGluonObject)
+            Network candidates.
+        optimizer : (str or autogluon.AutoGluonObject)
+            optimizer candidates.
+        metric : (str or object)
+            observation metric.
+        loss : (object)
+            training loss function.
+        num_trials : (int)
+            number of trials in the experiment.
+        time_limits : (int)
+            training time limits in seconds.
+        resources_per_trial : (dict)
+            Machine resources to allocate per trial.
+        savedir : (str)
+            Local dir to save training results to.
+        search_strategy : (str)
+            Search Algorithms ('random', 'bayesopt' and 'hyperband')
+        resume : (bool)
+            If checkpoint exists, the experiment will resume from there.
 
         Example:
             >>> dataset = task.Dataset(train_path='~/data/train',

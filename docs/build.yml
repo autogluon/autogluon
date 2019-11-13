@@ -3,5 +3,6 @@ dependencies:
 - python=3.6
 - graphviz
 - pip:
+  - jupyter-sphinx>=0.2.2
   - mxnet-cu92==1.5.0b20190331
   - nose

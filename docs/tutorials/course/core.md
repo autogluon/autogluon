@@ -86,10 +86,10 @@ Dict Space returns a dict of sampled results.
 
 ```{.python .input}
 g = ag.space.Dict(
-        key=ag.space.Categorical('alpha', 'beta'),
-        value=ag.space.Int(0, 3),
+        key1=ag.space.Categorical('alpha', 'beta'),
+        key2=ag.space.Int(0, 3),
     )
-print(f)
+print(g)
 ```
 
 ## Decorators for Searchbale Object and Customized Training Scripts
