@@ -4,57 +4,93 @@ import mxnet as mx
 from mxnet import gluon, nd
 
 from ...core.optimizer import *
-from .dataset import *
+from ...core.optimizer import *
+from ...core import *
+from ...searcher import *
+from ...scheduler import *
+from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
+
+from .dataset import *
+from .pipeline import train_object_detection
+
+#from .classifier import Classifier
 
 __all__ = ['ObjectDetection']
 
 logger = logging.getLogger(__name__)
 
 class ObjectDetection(BaseTask):
-    r"""
-    AutoGluon Object Detection Task
+    """AutoGluon ImageClassification Task
     """
-    
     @staticmethod
     def Dataset(*args, **kwargs):
         return get_dataset(*args, **kwargs)
 
     @staticmethod
     def fit(dataset='voc',
-            net=Choice('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=Choice(
-                SGD(learning_rate=LogLinear(1e-4, 1e-2),
-                    momentum=LogLinear(0.85, 0.95),
-                    wd=LogLinear(1e-5, 1e-3)),
-                Adam(learning_rate=LogLinear(1e-4, 1e-2),
-                     wd=LogLinear(1e-5, 1e-3)),
-            ),
-            lr_scheduler='cosine',
+            net=Categorical('mobilenet1.0', ),
+            #net=Categorical('mobilenet1.0', 'mobilenet1.0'),
+            #optimizer=Categorical(
+            #    SGD(learning_rate=Real(1e-4, 1e-2, log=True),
+            #        momentum=Real(0.85, 0.95),
+            #        wd=Real(1e-5, 1e-3, log=True)),
+            #    Adam(learning_rate=Real(1e-4, 1e-2, log=True),
+            #         wd=Real(1e-5, 1e-3, log=True)),
+            #),
+            #lr = 0.01,
+            lr=Categorical(0.00025, 0.00025),
+            #lr=Categorical(0.0001),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
-            batch_size=64,
-            epochs=20,
+            #batch_size=64,
+            batch_size=16,
+            input_size=224,
+            epochs=200,
             metric='accuracy',
-            num_cpus=4,
-            num_gpus=1,
+            num_trials=2,
+            nthreads_per_trial=12,
+            ngpus_per_trial=1,
+            hybridize=True,
             search_strategy='random',
             search_options={},
             time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
-            num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True):
+            auto_search=True,
+            seed=223,
+            data_shape=416,
+            num_workers=32,
+            start_epoch=0,
+            lr_mode='step',
+            lr_decay=0.1,
+            lr_decay_period=0,
+            lr_decay_epoch='160,180',
+            warmup_lr=0.0,
+            warmup_epochs=2,
+            momentum=0.9,
+            wd=0.0005,
+            log_interval=100,
+            save_prefix='',
+            save_interval=10,
+            val_interval=1,
+            num_samples=-1,
+            no_random_shape=False,
+            no_wd=False,
+            mixup=False,
+            no_mixup_epochs=20,
+            label_smooth=False,
+            syncbn=False,
+            ):
 
         """
-        Fit networks on dataset
-
+        Auto fit on image classification dataset
         Args:
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): optimizer candidates.
+            net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
+            optimizer (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): optimizer candidates.
             metric (str or object): observation metric.
             loss (object): training loss function.
             num_trials (int): number of trials in the experiment.
@@ -63,15 +99,13 @@ class ObjectDetection(BaseTask):
             savedir (str): Local dir to save training results to.
             search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
             resume (bool): If checkpoint exists, the experiment will resume from there.
-
-
         Example:
-            >>> dataset = taskDataset(name='shopeeiet', train_path='data/train',
-            >>>                         test_path='data/test')
+            >>> dataset = task.Dataset(train_path='~/data/train',
+            >>>                        test_path='data/test')
             >>> results = task.fit(dataset,
-            >>>                    nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
+            >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
             >>>                    time_limits=time_limits,
-            >>>                    num_gpus=1,
+            >>>                    ngpus_per_trial=1,
             >>>                    num_trials = 4)
         """
         if auto_search:
@@ -79,35 +113,77 @@ class ObjectDetection(BaseTask):
             # based on the dataset statistics
             pass
 
-        train_image_classification.update(
+        nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
+        ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+
+        train_object_detection.register_args(
             dataset=dataset,
             net=net,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
+            lr = lr,
             loss=loss,
             metric=metric,
-            num_gpus=num_gpus,
+            num_gpus=ngpus_per_trial,
             batch_size=batch_size,
+            input_size=input_size,
             epochs=epochs,
-            num_workers=num_cpus,
-            final_fit=False)
+            num_workers=nthreads_per_trial,
+            hybridize=hybridize,
+            final_fit=False,
+            seed=seed,
+            data_shape=data_shape,
+            start_epoch=0,
+            lr_mode=lr_mode,
+            lr_decay=lr_decay,
+            lr_decay_period=lr_decay_period,
+            lr_decay_epoch=lr_decay_epoch,
+            warmup_lr=warmup_lr,
+            warmup_epochs=warmup_epochs,
+            momentum=momentum,
+            wd=wd,
+            log_interval=log_interval,
+            save_prefix=save_prefix,
+            save_interval=save_interval,
+            val_interval=val_interval,
+            num_samples=num_samples,
+            no_random_shape=no_random_shape,
+            no_wd=no_wd,
+            mixup=mixup,
+            no_mixup_epochs=no_mixup_epochs,
+            label_smooth=label_smooth,
+            resume=resume,
+            syncbn=syncbn)
 
         scheduler_options = {
-            'resource': {'num_cpus': num_cpus, 'num_gpus': num_gpus},
+            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'checkpoint': checkpoint,
             'num_trials': num_trials,
             'time_out': time_limits,
             'resume': resume,
             'visualizer': visualizer,
             'time_attr': 'epoch',
-            'reward_attr': 'reward',
+            'reward_attr': 'map_reward',
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
+                'searcher': 'random',
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
+                
+        #without autogluon
+        '''
+        from ...scheduler.reporter import FakeReporter
+        train_object_detection(train_object_detection.args, {'lr.choice': 0, 'net.choice':0}, reporter=FakeReporter)
+        '''
 
-        return BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
+        results = BaseTask.run_fit(train_object_detection, search_strategy,
+                                   scheduler_options)
+        print(">>>>>>>>>>>>>>> finish results")
+        pdb.set_trace()
+        args = sample_config(train_object_detection.args, results['best_config'])
+
+        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+        update_params(model, results.pop('model_params'))
+        #return Classifier(model, results, default_val_fn, checkpoint, args)
