@@ -272,9 +272,6 @@ class FIFOScheduler(TaskScheduler):
         extra_args = dict()
         return config, extra_args
 
-    def get_best_state(self):
-        raise NotImplemented
-
     def get_best_config(self):
         """Get the best configuration from the finished jobs.
         """

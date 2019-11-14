@@ -40,14 +40,14 @@ def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL):
 
     Parameters
     ----------
-        obj : object
-            saved object
-        f : string or file object
-            a file-like object (has to implement write and flush) or a string containing a file name
-        pickle_module : pickle
-            module used for pickling metadata and objects
-        pickle_protocol : protocol
-            an be specified to override the default protocol
+    obj : object
+        saved object
+    f : string or file object
+        a file-like object (has to implement write and flush) or a string containing a file name
+    pickle_module : pickle
+        module used for pickling metadata and objects
+    pickle_protocol : protocol
+        an be specified to override the default protocol
 
     Examples
     --------

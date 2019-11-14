@@ -127,11 +127,11 @@ class RLScheduler(FIFOScheduler):
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         if self.sync:
-            self.run_sync()
+            self._run_sync()
         else:
-            self.run_async()
+            self._run_async()
 
-    def run_sync(self):
+    def _run_sync(self):
         decay = self.ema_baseline_decay
         for i in tqdm(range(self.num_trials // self.controller_batch_size + 1)):
             with mx.autograd.record():
@@ -162,7 +162,7 @@ class RLScheduler(FIFOScheduler):
             self.controller_optimizer.step(batch_size)
             logger.debug('controller loss: {}'.format(loss.asscalar()))
 
-    def run_async(self):
+    def _run_async(self):
         def _async_run_trial():
             self.mp_count.value += 1
             self.mp_seed.value += 1
