@@ -226,7 +226,7 @@ class AbstractTrainer:
 
         ensemble_weighted_score = self.score(X=X_test, y=y_test)
         print('Score of weighted ensemble:', ensemble_weighted_score)
-        self.model_performance['ensemble.optimized'] = ensemble_weighted_score
+        self.model_performance['weighted_ensemble'] = ensemble_weighted_score
         print('optimal weights:', self.model_weights)
 
         # TODO: Consider having this be a separate call outside of train, to use on a fitted trainer object
@@ -234,7 +234,7 @@ class AbstractTrainer:
             self._compute_ensemble_feature_importance()
             with pd.option_context('display.max_rows', 10000, 'display.max_columns', 10):
                 print('Ensemble feature importance:')
-                print(self.feature_importance['ensemble.optimized'].sort_values(ascending=False))
+                print(self.feature_importance['weighted_ensemble'].sort_values(ascending=False))
 
         self.save()
 
@@ -245,7 +245,7 @@ class AbstractTrainer:
         for model in self.model_names:
             models_feature_importance[model] = self.feature_importance[model] * model_name_to_weight[model]
         models_feature_importance.fillna(0, inplace=True)
-        self.feature_importance['ensemble.optimized'] = models_feature_importance.sum(axis=1)
+        self.feature_importance['weighted_ensemble'] = models_feature_importance.sum(axis=1)
 
     def train_and_save(self, X_train, X_test, y_train, y_test, model: AbstractModel):
         print('training', model.name)

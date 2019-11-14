@@ -4,6 +4,7 @@ from pandas import DataFrame, Series
 import numpy as np
 import copy
 import traceback
+import psutil
 
 from tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
@@ -106,7 +107,6 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                     X_nlp_features_combined = self.generate_nlp_ngrams(X=X, features_nlp_current=features_nlp_current, downsample_ratio=downsample_ratio)
 
                     if self.features_nlp:
-                        print(X_nlp_features_combined)
                         X_features = X_features.join(X_nlp_features_combined)
 
                     if not self.fit:
@@ -150,17 +150,29 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
             transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
 
-            if downsample_ratio is not None:
-                if (downsample_ratio >= 1) or (downsample_ratio <= 0):
-                    raise ValueError('downsample_ratio must be <1 and >0, but downsample_ratio is ' + str(downsample_ratio))
-                vocab_size = len(vectorizer_fit.vocabulary_)
-                downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
-                print('Reducing Vectorizer vocab size from', vocab_size, 'to', downsampled_vocab_size, 'to avoid OOM error.')
-                ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
-                downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
-                # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
-                #  If we have this functionality, simply update transform_matrix each time OOM occurs instead of re-calling .transform
-                transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
+            predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
+            mem_avail = psutil.virtual_memory().available
+            mem_rss = psutil.Process().memory_info().rss
+            max_memory_percentage = 0.25  # TODO: Finetune this, or find a better metric, this mostly hinges on LightGBM, as it expands all features to float32 upon training start, which causes a huge memory spike. 0.20 is safe, higher might be unsafe
+            predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
+            predicted_percentage = predicted_rss / mem_avail
+            if not self.fit:
+                if downsample_ratio is None:
+                    if predicted_percentage > max_memory_percentage:
+                        downsample_ratio = max_memory_percentage / predicted_percentage
+                        print('Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+
+                if downsample_ratio is not None:
+                    if (downsample_ratio >= 1) or (downsample_ratio <= 0):
+                        raise ValueError('downsample_ratio must be <1 and >0, but downsample_ratio is ' + str(downsample_ratio))
+                    vocab_size = len(vectorizer_fit.vocabulary_)
+                    downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
+                    print('Reducing Vectorizer vocab size from', vocab_size, 'to', downsampled_vocab_size, 'to avoid OOM error.')
+                    ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
+                    downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
+                    # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
+                    #  If we have this functionality, simply update transform_matrix each time OOM occurs instead of re-calling .transform
+                    transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
 
             nlp_features_names = vectorizer_fit.get_feature_names()
 
