@@ -125,11 +125,11 @@ class ENAS_Scheduler(object):
                     graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
                     tbar.set_svg(graph._repr_svg_())
-                tbar.set_description('avg reward: {}'.format(self.baseline))
+                tbar.set_description('avg reward: {:.2f}'.format(self.baseline))
                 idx += 1
             self.validation()
             self.save()
-            tq.set_description('epoch {}, val_acc: {}, avg reward: {}' \
+            tq.set_description('epoch {}, val_acc: {:.2f}, avg reward: {:.2f}' \
                         .format(epoch, self.val_acc, self.baseline))
 
     def validation(self):
@@ -145,7 +145,7 @@ class ENAS_Scheduler(object):
         for batch in tbar:
             self.eval_fn(self.supernet, batch, metric=metric, **self.val_args)
             reward = metric.get()[1]
-            tbar.set_description('Acc: {}'.format(reward))
+            tbar.set_description('Val Acc: {}'.format(reward))
 
         self.val_acc = reward
         self.training_history.append(reward)

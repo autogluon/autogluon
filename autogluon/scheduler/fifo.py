@@ -203,6 +203,15 @@ class FIFOScheduler(TaskScheduler):
 
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
+
+        Relevant entries in kwargs:
+        - bracket: HB bracket to be used. Has been sampled in _promote_config
+        - new_config: If True, task starts new config eval, otherwise it promotes
+          a config (only if type == 'promotion')
+        Only if new_config == False:
+        - config_key: Internal key for config
+        - resume_from: config promoted from this milestone
+        - milestone: config promoted to this milestone (next from resume_from)
         """
         cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
@@ -242,7 +251,7 @@ class FIFOScheduler(TaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(
+            self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
             reporter.move_on()
             last_result = reported_result
@@ -267,14 +276,16 @@ class FIFOScheduler(TaskScheduler):
         raise NotImplemented
 
     def get_best_config(self):
-        # Enable interactive monitoring
+        """Get the best configuration from the finished jobs.
+        """
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
-        # Enable interactive monitoring
+        """Get the best reward from the finished jobs.
+        """
         return self.searcher.get_best_reward()
 
-    def add_training_result(self, task_id, reported_result, config=None):
+    def _add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(tag='loss',
@@ -297,6 +308,21 @@ class FIFOScheduler(TaskScheduler):
                     self.config_history[task_id] = config
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
+        """Get Training Curves
+
+        Parameters
+        ----------
+            filename : str
+            plot : bool
+            use_legend : bool
+
+        Example:
+            >>> scheduler.run()
+            >>> scheduler.join_jobs()
+            >>> scheduler.get_training_curves(plot=True)
+
+            .. image:: https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/doc/api/autogluon.1.png?raw=true
+        """
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
@@ -315,6 +341,11 @@ class FIFOScheduler(TaskScheduler):
         if plot: plt.show()
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Example:
+            >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         destination = super(FIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
         with self.log_lock:
@@ -324,6 +355,11 @@ class FIFOScheduler(TaskScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Example:
+            >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         super(FIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
         with self.log_lock:

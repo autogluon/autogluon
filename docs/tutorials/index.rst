@@ -30,16 +30,10 @@ Image Classification
 
       Participate Kaggle competation.
 
-Advanced API in AutoGluon
--------------------------
+Customize AutoGluon
+-------------------
 .. container:: cards
    
-   .. card::
-      :title: FIT API
-      :link: course/fit.html
-
-      Learn to use FIT API.
-
    .. card::
       :title: Search Space and Decorator
       :link: course/core.html

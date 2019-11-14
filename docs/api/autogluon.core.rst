@@ -54,10 +54,21 @@ Core APIs
 
 .. autosummary::
    :nosignatures:
-   :toctree: _autogen
 
    args
    obj
    func
+   done
+
+.. autofunction::
+   args
+
+.. autofunction::
+   obj
+
+.. autofunction::
+   func
+
+.. autofunction::
    done
 

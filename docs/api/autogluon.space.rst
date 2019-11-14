@@ -46,7 +46,6 @@ Search Space
 
 .. autosummary::
    :nosignatures:
-   :toctree: _autogen
 
    Real
    Int
@@ -55,4 +54,61 @@ Search Space
    List
    Dict
    AutoGluonObject
+
+.. autoclass:: Real
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Real
+        :methods:
+
+.. autoclass:: Int
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Int
+        :methods:
+
+.. autoclass:: Bool
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Bool
+        :methods:
+
+.. autoclass:: Categorical
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Categorical
+        :methods:
+
+.. autoclass:: List
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: List
+        :methods:
+
+.. autoclass:: Dict
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Dict
+        :methods:
+
+.. autoclass:: AutoGluonObject
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: AutoGluonObject
+        :methods:
+
 

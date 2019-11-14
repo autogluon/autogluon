@@ -132,7 +132,7 @@ will support both basic and advanced search search_strategys for both hyperparam
 We currently support Hyperband, random search and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 The easiest way to specify random search is via the string name:
 
-In AutoGluon, [autogluon.scheduler](../api/autogluon.scheduler.html) orchestrates how individual training jobs are scheduled.
+In AutoGluon, :meth:`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
 We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.scheduler.FIFO_Scheduler)

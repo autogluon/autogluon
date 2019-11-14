@@ -27,11 +27,19 @@ autogluon.task
 
 .. automodule:: autogluon.task
 
-Image Classification
-~~~~~~~~~~~~~~~~~~~~
+AutoGluon Applications
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. autosummary::
-   :toctree: _autogen
+   :nosignatures:
 
    ImageClassification.fit
 
+.. autoclass:: ImageClassification
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ImageClassification
+        :methods:

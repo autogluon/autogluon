@@ -59,16 +59,15 @@ A Toy Example
 
 .. admonition:: Example
 
+    Import the packages:
+
     >>> import time
     >>> import numpy as np
     >>> import autogluon as ag
-    >>> from autogluon.basic import autogluon_register_args
-    >>> from autogluon.resource import DistributedResource
-    >>> 
 
     Construct a fake training function for demo
 
-    >>> @autogluon_register_args(
+    >>> @ag.args(
     >>>     batch_size=64,
     >>>     lr=ag.LogLinearSpace(1e-4, 1e-1),
     >>>     momentum=0.9,

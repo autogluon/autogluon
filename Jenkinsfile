@@ -41,7 +41,7 @@ stage("Build Docs") {
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         git clean -fx
-        pip install git+https://github.com/d2l-ai/d2l-book
+        pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then

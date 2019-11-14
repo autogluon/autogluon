@@ -114,7 +114,7 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn, batch_size=128,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
-                           plot_frequency=1, update_arch_frequency=5)
+                           plot_frequency=10, update_arch_frequency=5)
 ```
 
 Start the training:
@@ -136,7 +136,7 @@ mynet.initialize(force_reinit=True)
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
                            reward_fn=reward_fn, batch_size=128,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
-                           plot_frequency=1, update_arch_frequency=5)
+                           plot_frequency=10, update_arch_frequency=5)
 scheduler.run()
 ```
 

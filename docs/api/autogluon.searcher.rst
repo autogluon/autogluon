@@ -46,9 +46,45 @@ Searchers
 
 .. autosummary::
    :nosignatures:
-   :toctree: _autogen
 
    GridSearcher
    RandomSearcher
-   RLSearcher
    SKoptSearcher
+   RLSearcher
+
+.. autoclass:: GridSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: GridSearcher
+        :methods:
+
+.. autoclass:: RandomSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RandomSearcher
+        :methods:
+
+
+.. autoclass:: SKoptSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: SKoptSearcher
+        :methods:
+
+.. autoclass:: RLSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RLSearcher
+        :methods:

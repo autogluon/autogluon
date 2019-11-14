@@ -7,7 +7,6 @@ autogluon.scheduler
 
    >>> import numpy as np
    >>> import autogluon as ag
-   >>> 
    >>> @ag.args(
    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
    >>>     wd=ag.space.Real(1e-3, 1e-2))
@@ -43,8 +42,63 @@ Schedulers
 
 .. autosummary::
    :nosignatures:
-   :toctree: _autogen
 
    FIFOScheduler
    HyperbandScheduler
    RLScheduler
+
+.. autoclass:: FIFOScheduler
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: FIFOScheduler
+        :methods:
+
+.. autoclass:: HyperbandScheduler
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: HyperbandScheduler
+        :methods:
+
+
+.. autoclass:: RLScheduler
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RLScheduler
+        :methods:
+
+
+Early Stopping Managers
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autosummary::
+   :nosignatures:
+
+   HyperbandStopping_Manager
+   HyperbandPromotion_Manager
+
+.. autoclass:: HyperbandStopping_Manager
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: HyperbandStopping_Manager
+        :methods:
+
+.. autoclass:: HyperbandPromotion_Manager
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: HyperbandPromotion_Manager
+        :methods:

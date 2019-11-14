@@ -10,7 +10,8 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter, DistSemaphore
 from ..utils import DeprecationHelper
 
-__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler']
+__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler',
+           'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,12 @@ class HyperbandScheduler(FIFOScheduler):
     ----------
     train_fn : callable
         A task launch function for training.
-    args : object (optional)
+    args : object, optional
         Default arguments for launching train_fn.
     resource : dict
         Computation resources.  For example, `{'num_cpus':2, 'num_gpus':1}`
-    searcher : object (optional)
-        Autogluon searcher.  For example, autogluon.searcher.RandomSearcher
+    searcher : object, optional
+        Autogluon searcher.  For example, :class:`autogluon.searcher.RandomSearcher`
     time_attr : str
         A training result attr to use for comparing time.
         Note that you can pass in something non-temporal such as
@@ -55,18 +56,20 @@ class HyperbandScheduler(FIFOScheduler):
         brackets > 1, we run Hyperband.
     type : str
         Type of Hyperband scheduler:
-        stopping: See HyperbandStopping_Manager. Tasks and config evals are
-            tightly coupled. A task is stopped at a milestone if worse than
-            most others, otherwise it continues. As implemented in Ray/Tune:
-            https://ray.readthedocs.io/en/latest/tune-schedulers.html#asynchronous-hyperband
-        promotion: See HyperbandPromotion_Manager. A config eval may be
-            associated with multiple tasks over its lifetime. It is never
-            terminated, but may be paused. Whenever a task becomes available,
-            it may promote a config to the next milestone, if better than most
-            others. If no config can be promoted, a new one is chosen. This
-            variant may benefit from pause&resume, which is not directly
-            supported here. As proposed in this paper (termed ASHA):
-            https://arxiv.org/abs/1810.05934
+            stopping:
+                See :class:`HyperbandStopping_Manager`. Tasks and config evals are
+                tightly coupled. A task is stopped at a milestone if worse than
+                most others, otherwise it continues. As implemented in Ray/Tune:
+                https://ray.readthedocs.io/en/latest/tune-schedulers.html#asynchronous-hyperband
+            promotion:
+                See :class:`HyperbandPromotion_Manager`. A config eval may be
+                associated with multiple tasks over its lifetime. It is never
+                terminated, but may be paused. Whenever a task becomes available,
+                it may promote a config to the next milestone, if better than most
+                others. If no config can be promoted, a new one is chosen. This
+                variant may benefit from pause&resume, which is not directly
+                supported here. As proposed in this paper (termed ASHA):
+                https://arxiv.org/abs/1810.05934
     keep_size_ratios : bool
         Implemented for type 'promotion' only. If True,
         promotions are done only if the (current estimate of the) size ratio
@@ -86,6 +89,7 @@ class HyperbandScheduler(FIFOScheduler):
         IP addresses of remote machines.
 
     Example:
+
         >>> import numpy as np
         >>> import autogluon as ag
         >>> 
@@ -222,7 +226,7 @@ class HyperbandScheduler(FIFOScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            # Call before add_training_results, since we may be able to report
+            # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
             task_continues, update_searcher, next_milestone, bracket_id, rung_counts = \
                 terminator.on_task_report(task, reported_result)
@@ -231,7 +235,7 @@ class HyperbandScheduler(FIFOScheduler):
                 for k, v in rung_counts.items():
                     key = 'count_at_{}'.format(k)
                     reported_result[key] = v
-            self.add_training_result(
+            self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
             if update_searcher and task_continues:
                 # Update searcher with intermediate result
@@ -276,11 +280,21 @@ class HyperbandScheduler(FIFOScheduler):
                 reward=last_result[self._reward_attr], **last_result)
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Example:
+            >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         destination = super(HyperbandScheduler, self).state_dict(destination)
         destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Example:
+            >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         super(HyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))

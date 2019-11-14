@@ -188,7 +188,7 @@ class RLScheduler(FIFOScheduler):
                         reporter.move_on()
                         task_thread.join()
                         break
-                    self.add_training_result(task.task_id, reported_result, task.args['config'])
+                    self._add_training_result(task.task_id, reported_result, task.args['config'])
                     reporter.move_on()
                     last_result = reported_result
                 reward = last_result[self._reward_attr]
@@ -242,7 +242,7 @@ class RLScheduler(FIFOScheduler):
                 if 'done' in reported_result and reported_result['done'] is True:
                     reporter.move_on()
                     break
-                self.add_training_result(task.task_id, reported_result, task.args['config'])
+                self._add_training_result(task.task_id, reported_result, task.args['config'])
                 reporter.move_on()
                 last_result = reported_result
             if last_result is not None:

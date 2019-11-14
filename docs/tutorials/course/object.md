@@ -30,7 +30,7 @@ ag.utils.plot_network(net, (1, 3, 32, 32))
 
 ### Searchable Network Architecture using AutoGluon Object
 
-:function:`autogluon.obj` enables customized search space to any user defined class. It can also be used within `autogluon.Categorical()` if you have multiple networks to choose from.
+:func:`autogluon.obj` enables customized search space to any user defined class. It can also be used within `autogluon.Categorical()` if you have multiple networks to choose from.
 
 
 ```{.python .input}
@@ -63,7 +63,7 @@ print(mynet1.cs)
 
 ### Decorate Existing Class
 
-We can also use :function:`autogluon.obj` to easily decorate any existing classes.
+We can also use :func:`autogluon.obj` to easily decorate any existing classes.
 For example, if we want to search learning rate and weight decay for Adam optimizer, we only
 need to add a decorator:
 
@@ -84,7 +84,7 @@ print(myoptim.cs)
 ### Launch Experiments using AutoGluon Object
 
 AutoGluon Object is compatible with Fit API in AutoGluon tasks, and also works with user-defined training
-scripts using :function:`autogluon.autogluon_register_args`. We can start fitting:
+scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:
 
 ```{.python .input}
 from autogluon import ImageClassification as task

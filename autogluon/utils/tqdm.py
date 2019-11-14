@@ -1,12 +1,6 @@
 import sys
 from .miscs import in_ipynb
 
-#if in_ipynb():
-#    try:
-#        from tqdm.notebook import tqdm
-#    except Exception:
-#        from tqdm import tqdm
-#else:
 from tqdm import tqdm as base
 
 __all__ = ['tqdm']
@@ -144,7 +138,8 @@ class mytqdm(base):
         pbar, ptext = tbar.children
         pbar.value = self.n
 
-        timg.value = self.img
+        if self.img:
+            timg.value = "<br>%s<br>" % self.img
 
         if msg:
             # html escape special characters (like '&')
@@ -205,7 +200,7 @@ class mytqdm(base):
         # Replace with IPython progress bar display (with correct total)
         unit_scale = 1 if self.unit_scale is True else self.unit_scale or 1
         total = self.total * unit_scale if self.total else self.total
-        self.img = ' '
+        self.img = None
         self.container = self.status_printer(
             self.fp, total, self.desc, self.ncols, self.img)
         self.sp = self.display

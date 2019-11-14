@@ -39,16 +39,21 @@ class NestedSpace(Space):
 
 
 class AutoGluonObject(NestedSpace):
-    r"""Searchable Objects created by decorating user-defined object using
+    r"""Searchable Objects,
+    created by decorating customized class or function using
     :func:`autogluon.obj` or :func:`autogluon.func` decorators.
     """
     def __call__(self, *args, **kwargs):
+        """Convenience method for interacting with AutoGluonObject.
+        """
         if not self._inited:
             self._inited = True
             self._instance = self.init()
         return self._instance.__call__(*args, **kwargs)
 
     def init(self):
+        """Initiate a real instance for interacting with AutoGluonObject.
+        """
         config = self.cs.get_default_configuration().get_dictionary()
         return self.sample(**config)
 
