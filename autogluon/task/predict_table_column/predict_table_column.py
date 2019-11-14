@@ -116,12 +116,12 @@ class PredictTableColumn(BaseTask):
         if num_trials is None:
             if time_limits is None:
                 time_limits = 10 * 60  # run for 10min by default
-            if time_limits <= 20:  # threshold = 20 sec, ie. too little time to run >1 trial.
+            if time_limits <= 20:  # threshold = 20sec, ie. too little time to run >1 trial.
                 num_trials = 1
             else:
-                num_trials = 1000000  # run as many trials as you can within the given time_limits
+                num_trials = 1000  # run up to 1000 trials (or as you can within the given time_limits)
         elif time_limits is None:
-            time_limits = 100000000  # user only specified num_trials, so run all of them regardless of time-limits
+            time_limits = int(1e6)  # user only specified num_trials, so run all of them regardless of time-limits
         time_limits *= 0.9  # reduce slightly to account for extra time overhead
         time_limits /= float(len(hyperparameters.keys()))  # each model type gets half the available time
         

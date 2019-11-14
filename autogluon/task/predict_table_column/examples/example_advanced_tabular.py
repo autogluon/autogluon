@@ -1,4 +1,6 @@
-""" Example script for PredictTableColumn task demonstrating how to use non-default arguments with HPO """
+""" Example script for PredictTableColumn task demonstrating how to use non-default arguments 
+    in the hyperparameter optimization.
+"""
 
 import autogluon as ag
 from autogluon import PredictTableColumn as task
@@ -18,7 +20,8 @@ train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if
 train_data = train_data.head(100) # subsample for faster demo
 print(train_data.head())
 
-# Call fit() with hyperparameter optimization:
+# Call fit() with hyperparameter optimization that uses the search spaces specified below.
+# Note that if hyperparameter_tune=True: AutoGluon uses default search spaces for any hyperparameters you did not specify below.
 nn_options = {
     'num_epochs': 10,
     'batch_size': 1024,
@@ -26,8 +29,12 @@ nn_options = {
     'weight_decay': ag.space.Real(1e-12, 1e-1, log=True)
 }
 
+gbm_options = {
+    'num_boost_round': 1000,
+}
+
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, hyperparameter_tune=True, 
-                     num_trials=10, time_limits=10*60, nn_options=nn_options)
+                     num_trials=10, time_limits=10*60, hyperparameters={'GBM': gbm_options, 'NN':nn_options})
 # Since tuning_data = None, AutoGluon automatically determines train/validation split.
 
 trainer = predictor.load_trainer() # use to show summary of training / HPO processes

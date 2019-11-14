@@ -2,12 +2,10 @@
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
 from tabular.ml.models.lgb_model import LGBModel
 from tabular.ml.mxnet.tabular_nn_model import TabularNeuralNetModel
-
 from tabular.ml.models.nn_nlp_lm_model import NNNLPLanguageModel
 from tabular.ml.models.nn_tab_model import NNTabularModel # TODO: remove
 from tabular.ml.tuning.hyperparameters.defaults.nn.parameters import get_param_baseline as nn_get_param_baseline, get_nlp_param_baseline # TODO: remove
 
-# TODO: Don't pass in num_boost_round, have it be defined in hyperparmeters?
 def get_preset_models(path, problem_type, objective_func, num_classes=None,
                       hyperparameters={'NN':{},'GBM':{}}):
     if problem_type in [BINARY, MULTICLASS]:

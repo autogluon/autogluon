@@ -24,8 +24,8 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     # TODO: Should scheduler_options have a default value? Without it it makes it hard to use
-    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False,
-            nn_options={}, gbm_options={}):
+    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, 
+            feature_prune=False, hyperparameters = {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data

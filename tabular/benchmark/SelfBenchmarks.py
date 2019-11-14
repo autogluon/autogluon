@@ -27,21 +27,29 @@ import numpy as np
 import mxnet as mx
 from random import seed
 
-from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon import PredictTableColumn as task
 import autogluon as ag
+
+# TODO: move this file
+from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+
  
 ############ Benchmark options you can set: ########################
-hyperparameter_tune = False
-fast_benchmark = True # False # If True, run a faster benchmark (subsample training sets, less epochs, etc.)
-                       # Please disregard performance_value warnings when fast_benchmark = True.
-subsample_size = 1000
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-# nn_options =  {} # or set = None to omit neural net
-# gbm_options = {} # or set = None to omit gradient boosting
-nn_options = {'num_epochs': 5} # Can control model training time here.
-gbm_options = {'num_boost_round': 100}
-hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
+fast_benchmark = True # False 
+# If True, run a faster benchmark (subsample training sets, less epochs, etc),
+# otherwise we run full benchmark with default AutoGluon settings.
+# performance_value warnings are disabled when fast_benchmark = True.
+
+#### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
+if fast_benchmark:
+    hyperparameter_tune = True
+    subsample_size = 1000
+    nn_options = {'num_epochs': 5} 
+    gbm_options = {'num_boost_round': 100}
+    hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
+    num_trials = 3
+    time_limits = 2*60
 ###################################################################
 
 # Each train/test dataset must be located in single directory with the given names.
@@ -120,8 +128,13 @@ with warnings.catch_warnings(record=True) as caught_warnings:
         if fast_benchmark:
             train_data = train_data.head(subsample_size) # subsample for fast_benchmark
         predictor = None # reset from last Dataset
-        predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                             hyperparameter_tune=hyperparameter_tune, hyperparameters=hyperparameters)
+        if fast_benchmark:
+            predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
+                hyperparameter_tune=hyperparameter_tune, hyperparameters=hyperparameters,
+                time_limits=time_limits, num_trials=num_trials)
+        else:
+            predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
+                                 hyperparameter_tune=True)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file
@@ -134,22 +147,14 @@ with warnings.catch_warnings(record=True) as caught_warnings:
             perf = 1.0 - perf_dict['r2_score'] # unexplained variance score.
         performance_vals[idx] = perf
         print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], performance_vals[idx], dataset['performance_val']))
-        if performance_vals[idx] > dataset['performance_val'] * perf_threshold:
-            warnings.warn("Performance on dataset %s is %s times worse than previous performance." % (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
+        if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):
+            warnings.warn("Performance on dataset %s is %s times worse than previous performance." % 
+                          (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
 
 # Summarize:
 avg_perf = np.mean(performance_vals)
 median_perf = np.median(performance_vals)
 worst_perf = np.max(performance_vals)
-if avg_perf > previous_avg_performance * perf_threshold:
-    warnings.warn("Average Performance is %s times worse than previously." % (avg_perf/(EPS+previous_avg_performance)))
-
-if median_perf > previous_median_performance * perf_threshold:
-    warnings.warn("Median Performance is %s times worse than previously." % (median_perf/(EPS+previous_median_performance)))
-
-if worst_perf > previous_worst_performance * perf_threshold:
-    warnings.warn("Worst Performance is %s times worse than previously." % (worst_perf/(EPS+previous_worst_performance)))
-
 for idx in range(len(datasets)):
     print("Performance on dataset %s: %s   (previous perf=%s)" % (datasets[idx]['name'], performance_vals[idx], datasets[idx]['performance_val']))
 
@@ -157,7 +162,17 @@ print("Average performance: %s" % avg_perf)
 print("Median performance: %s" % median_perf)
 print("Worst performance: %s" % worst_perf)
 
+if not fast_benchmark:
+    if avg_perf > previous_avg_performance * perf_threshold:
+        warnings.warn("Average Performance is %s times worse than previously." % (avg_perf/(EPS+previous_avg_performance)))
+    if median_perf > previous_median_performance * perf_threshold:
+        warnings.warn("Median Performance is %s times worse than previously." % (median_perf/(EPS+previous_median_performance)))
+    if worst_perf > previous_worst_performance * perf_threshold:
+        warnings.warn("Worst Performance is %s times worse than previously." % (worst_perf/(EPS+previous_worst_performance)))
+
 # List all warnings again to make sure they are seen:
 print("\n\n WARNINGS:")
 for w in caught_warnings:
     warnings.warn(w.message)
+
+ag.done() # shutdown AutoGluon resource manager

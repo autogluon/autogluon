@@ -1,4 +1,4 @@
-import gc, copy, random, time, logging
+import gc, copy, random, time, logging, os
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -252,11 +252,16 @@ class LGBModel(AbstractModel):
         
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test)
         dataset_train_filename = "dataset_train.bin"
-        print(self.path + dataset_train_filename)
-        dataset_train.save_binary(self.path + dataset_train_filename)
+        train_file = self.path + dataset_train_filename
+        if os.path.exists(train_file): # clean up old files first
+            os.remove(train_file)
+        dataset_train.save_binary(train_file)
         if dataset_val is not None:
             dataset_val_filename = "dataset_val.bin" # names without directory info
-            dataset_val.save_binary(self.path + dataset_val_filename)
+            val_file = self.path + dataset_val_filename
+            if os.path.exists(val_file): # clean up old files first
+                os.remove(val_file)
+            dataset_val.save_binary(val_file)
         else:
             dataset_val_filename = None
         
