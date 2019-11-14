@@ -3,10 +3,8 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
-
 # from skopt.utils import use_named_args # TODO: remove
 # from skopt import gp_minimize # TODO: remove
-
 
 # TODO: Move these files:
 from autogluon.core import *
@@ -329,7 +327,9 @@ class LGBModel(AbstractModel):
         self.params.update(def_search_space)
     
 
-""" OLD code: my (minorly) revised HPO function 
+""" OLD code: TODO: remove once confirming no longer needed.
+
+# my (minorly) revised HPO function 
 
     def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler_options=None): # scheduler_options unused for now
         print("Beginning hyperparameter tuning for Gradient Boosting Model...")
