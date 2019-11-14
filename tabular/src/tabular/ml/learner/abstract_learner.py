@@ -288,17 +288,24 @@ class AbstractLearner:
         y = y.dropna() # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
         # print(unique_vals)
+        print('First 10 unique y values:', unique_vals[:10])
+        unique_count = len(unique_vals)
+        MULTICLASS_LIMIT = 1000 # if numeric and class count would be above this amount, assume it is regression
         REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
         elif unique_vals.dtype == 'float':
             unique_ratio = len(unique_vals) / float(len(y))
-            if unique_ratio <= REGRESS_THRESHOLD:
+            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 try:
-                    pd.to_numeric(y, downcast='integer')
-                    problem_type = MULTICLASS
-                    reason = "dtype of label-column == float, but few unique label-values observed and label-values can be converted to int"
+                    can_convert_to_int = np.array_equal(y, y.astype(int))
+                    if can_convert_to_int:
+                        problem_type = MULTICLASS
+                        reason = "dtype of label-column == float, but few unique label-values observed and label-values can be converted to int"
+                    else:
+                        problem_type = REGRESSION
+                        reason = "dtype of label-column == float and label-values can't be converted to int"
                 except:
                     problem_type = REGRESSION
                     reason = "dtype of label-column == float and label-values can't be converted to int"
@@ -314,12 +321,12 @@ class AbstractLearner:
                 problem_type = REGRESSION
                 reason = "dtype of label-column == int and many unique label-values observed"
             else:
-                problem_type = MULTICLASS
+                problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
                 reason = "dtype of label-column == int, but few unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
-        print("\n AutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
-        print("If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s']) \n\n" % (BINARY, MULTICLASS, REGRESSION))
+        print("\nAutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
+        print("If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s'])\n" % (BINARY, MULTICLASS, REGRESSION))
         return problem_type
 
     def save(self):
