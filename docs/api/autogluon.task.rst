@@ -1,5 +1,8 @@
+.. role:: hidden
+    :class: hidden-section
+
 autogluon.task
----------------
+===============
 
 .. admonition:: Example
    
@@ -28,12 +31,15 @@ autogluon.task
 .. automodule:: autogluon.task
 
 AutoGluon Applications
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 .. autosummary::
    :nosignatures:
 
    ImageClassification
+
+:hidden:`ImageClassification`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ImageClassification
    :members:

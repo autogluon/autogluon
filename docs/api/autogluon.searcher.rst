@@ -10,8 +10,8 @@ autogluon.searcher
    >>> import numpy as np
    >>> import autogluon as ag
    >>> @ag.args(
-   >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-   >>>     wd=ag.space.Real(1e-3, 1e-2))
+   ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+   ...     wd=ag.space.Real(1e-3, 1e-2))
    >>> def train_fn(args, reporter):
    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
    ...     for e in range(10):
@@ -27,11 +27,11 @@ autogluon.searcher
    Create a scheduler and run the dummy experiment:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
-   >>>                                        searcher = searcher,
-   >>>                                        resource={'num_cpus': 2, 'num_gpus': 0},
-   >>>                                        num_trials=10,
-   >>>                                        reward_attr='accuracy',
-   >>>                                        time_attr='epoch')
+   ...                                        searcher = searcher,
+   ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
+   ...                                        num_trials=10,
+   ...                                        reward_attr='accuracy',
+   ...                                        time_attr='epoch')
    >>> scheduler.run()
 
    Visiualize the results and exit:

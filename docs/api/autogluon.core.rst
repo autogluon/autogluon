@@ -12,9 +12,9 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
 
    >>> import autogluon as ag
    >>> @ag.obj(
-   >>>     name=ag.space.Categorical('auto', 'gluon'),
-   >>>     idx = ag.space.Int(0, 100),
-   >>> )
+   ...     name=ag.space.Categorical('auto', 'gluon'),
+   ...     idx = ag.space.Int(0, 100),
+   ... )
    >>> class myobj:
    ...     def __init__(self, name, idx):
    ...         self.name = name
@@ -27,9 +27,9 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
    Create the objects using decorated class and function as argument of autogluon.args
 
    >>> @ag.args(
-   >>>     h=ag.space.Categorical('test', myobj()),
-   >>>     i = myfunc(),
-   >>>     )
+   ...     h=ag.space.Categorical('test', myobj()),
+   ...     i = myfunc(),
+   ...     )
    >>> def train_fn(args, reporter):
    ...     h, i = args.h, args.i
    ...     assert hasattr(h, 'name') or h == 'test'

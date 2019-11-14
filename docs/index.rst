@@ -54,7 +54,7 @@ Advanced Topic
       Neural Architecture Search tutorials.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    tutorials/image_classification/index
