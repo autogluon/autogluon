@@ -1,5 +1,8 @@
+.. role:: hidden
+    :class: hidden-section
+
 autogluon.space
----------------
+===============
 
 Search Space in AutoGluon.
 
@@ -39,7 +42,7 @@ Search Space in AutoGluon.
 
 
 Search Space
-~~~~~~~~~~~~
+------------
 
 .. automodule:: autogluon.space
 .. currentmodule:: autogluon.space
@@ -55,6 +58,9 @@ Search Space
    Dict
    AutoGluonObject
 
+:hidden:`Real`
+~~~~~~~~~~~~~~
+
 .. autoclass:: Real
    :members:
 
@@ -62,6 +68,9 @@ Search Space
 
     .. autoautosummary:: Real
         :methods:
+
+:hidden:`Int`
+~~~~~~~~~~~~~
 
 .. autoclass:: Int
    :members:
@@ -71,6 +80,9 @@ Search Space
     .. autoautosummary:: Int
         :methods:
 
+:hidden:`Bool`
+~~~~~~~~~~~~~~
+
 .. autoclass:: Bool
    :members:
 
@@ -78,6 +90,9 @@ Search Space
 
     .. autoautosummary:: Bool
         :methods:
+
+:hidden:`Categorical`
+~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: Categorical
    :members:
@@ -87,6 +102,9 @@ Search Space
     .. autoautosummary:: Categorical
         :methods:
 
+:hidden:`List`
+~~~~~~~~~~~~~~
+
 .. autoclass:: List
    :members:
 
@@ -94,6 +112,9 @@ Search Space
 
     .. autoautosummary:: List
         :methods:
+
+:hidden:`Dict`
+~~~~~~~~~~~~~~
 
 .. autoclass:: Dict
    :members:
@@ -103,6 +124,9 @@ Search Space
     .. autoautosummary:: Dict
         :methods:
 
+:hidden:`AutoGluonObject`
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. autoclass:: AutoGluonObject
    :members:
 
@@ -110,5 +134,3 @@ Search Space
 
     .. autoautosummary:: AutoGluonObject
         :methods:
-
-

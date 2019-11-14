@@ -1,5 +1,8 @@
+.. role:: hidden
+    :class: hidden-section
+
 autogluon.core
---------------
+==============
 
 Decorators for customizing AutoGluon. Allows hyperparameter search on user-defined objects and functions.
 
@@ -16,7 +19,7 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
    ...     def __init__(self, name, idx):
    ...         self.name = name
    ...         self.idx = idx
-   >>>
+   ...
    >>> @ag.func(framework=ag.space.Categorical('mxnet', 'pytorch'))
    >>> def myfunc(framework):
    ...     return framework
@@ -28,18 +31,18 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
    >>>     i = myfunc(),
    >>>     )
    >>> def train_fn(args, reporter):
-   >>>     h, i = args.h, args.i
-   >>>     assert hasattr(h, 'name') or h == 'test'
-   >>>     assert i in ['mxnet', 'pytorch']
-   >>>     reporter(epoch=e, accuracy=0)
+   ...     h, i = args.h, args.i
+   ...     assert hasattr(h, 'name') or h == 'test'
+   ...     assert i in ['mxnet', 'pytorch']
+   ...     reporter(epoch=e, accuracy=0)
 
    Create a scheduler and run the dummy experiment:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
-   >>>                                        resource={'num_cpus': 2, 'num_gpus': 0},
-   >>>                                        num_trials=20,
-   >>>                                        reward_attr='accuracy',
-   >>>                                        time_attr='epoch')
+   ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
+   ...                                        num_trials=20,
+   ...                                        reward_attr='accuracy',
+   ...                                        time_attr='epoch')
    >>> scheduler.run()
 
    Exit:
@@ -47,7 +50,7 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
    >>> ag.done()
 
 Core APIs
-~~~~~~~~~
+---------
 
 .. automodule:: autogluon
 .. currentmodule:: autogluon
@@ -60,14 +63,26 @@ Core APIs
    func
    done
 
+:hidden:`args`
+~~~~~~~~~~~~~~
+
 .. autofunction::
    args
+
+:hidden:`obj`
+~~~~~~~~~~~~~
 
 .. autofunction::
    obj
 
+:hidden:`func`
+~~~~~~~~~~~~~~
+
 .. autofunction::
    func
+
+:hidden:`done`
+~~~~~~~~~~~~~~
 
 .. autofunction::
    done

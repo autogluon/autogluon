@@ -192,7 +192,7 @@ class TaskScheduler(object):
         self._cleaning_tasks()
 
     def shutdown(self):
-        """shutdown() is now deprecated in favor of :function:`autogluon.done`.
+        """shutdown() is now deprecated in favor of :func:`autogluon.done`.
         """
         warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
              AutoGluonWarning)

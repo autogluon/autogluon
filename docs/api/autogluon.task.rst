@@ -33,7 +33,7 @@ AutoGluon Applications
 .. autosummary::
    :nosignatures:
 
-   ImageClassification.fit
+   ImageClassification
 
 .. autoclass:: ImageClassification
    :members:

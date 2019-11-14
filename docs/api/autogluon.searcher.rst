@@ -1,3 +1,6 @@
+.. role:: hidden
+    :class: hidden-section
+
 autogluon.searcher
 ------------------
 
@@ -52,6 +55,9 @@ Searchers
    SKoptSearcher
    RLSearcher
 
+:hidden:`GridSearcher`
+~~~~~~~~~~~~~~~~~~~~~~
+
 .. autoclass:: GridSearcher
    :members:
    :inherited-members:
@@ -60,6 +66,9 @@ Searchers
 
     .. autoautosummary:: GridSearcher
         :methods:
+
+:hidden:`RandomSearcher`
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: RandomSearcher
    :members:
@@ -71,6 +80,9 @@ Searchers
         :methods:
 
 
+:hidden:`SKoptSearcher`
+~~~~~~~~~~~~~~~~~~~~~~~
+
 .. autoclass:: SKoptSearcher
    :members:
    :inherited-members:
@@ -79,6 +91,9 @@ Searchers
 
     .. autoautosummary:: SKoptSearcher
         :methods:
+
+:hidden:`RLSearcher`
+~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: RLSearcher
    :members:

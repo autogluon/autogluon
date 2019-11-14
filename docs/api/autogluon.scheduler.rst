@@ -1,5 +1,8 @@
+.. role:: hidden
+    :class: hidden-section
+
 autogluon.scheduler
--------------------
+===================
 
 .. admonition:: Example
 
@@ -36,7 +39,7 @@ autogluon.scheduler
       :width: 400
 
 Schedulers
-~~~~~~~~~~
+----------
 
 .. currentmodule:: autogluon.scheduler
 
@@ -47,6 +50,9 @@ Schedulers
    HyperbandScheduler
    RLScheduler
 
+:hidden:`FIFOScheduler`
+~~~~~~~~~~~~~~~~~~~~~~~
+
 .. autoclass:: FIFOScheduler
    :members:
    :inherited-members:
@@ -55,6 +61,9 @@ Schedulers
 
     .. autoautosummary:: FIFOScheduler
         :methods:
+
+:hidden:`HyperbandScheduler`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: HyperbandScheduler
    :members:
@@ -65,6 +74,9 @@ Schedulers
     .. autoautosummary:: HyperbandScheduler
         :methods:
 
+
+:hidden:`RLScheduler`
+~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: RLScheduler
    :members:
@@ -77,13 +89,16 @@ Schedulers
 
 
 Early Stopping Managers
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 .. autosummary::
    :nosignatures:
 
    HyperbandStopping_Manager
    HyperbandPromotion_Manager
+
+:hidden:`HyperbandStopping_Manager`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: HyperbandStopping_Manager
    :members:
@@ -93,6 +108,9 @@ Early Stopping Managers
 
     .. autoautosummary:: HyperbandStopping_Manager
         :methods:
+
+:hidden:`HyperbandPromotion_Manager`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: HyperbandPromotion_Manager
    :members:

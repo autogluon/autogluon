@@ -205,13 +205,14 @@ class FIFOScheduler(TaskScheduler):
             task (:class:`autogluon.scheduler.Task`): a new trianing task
 
         Relevant entries in kwargs:
-        - bracket: HB bracket to be used. Has been sampled in _promote_config
-        - new_config: If True, task starts new config eval, otherwise it promotes
-          a config (only if type == 'promotion')
+            - bracket: HB bracket to be used. Has been sampled in _promote_config
+            - new_config: If True, task starts new config eval, otherwise it promotes
+              a config (only if type == 'promotion')
+
         Only if new_config == False:
-        - config_key: Internal key for config
-        - resume_from: config promoted from this milestone
-        - milestone: config promoted to this milestone (next from resume_from)
+            - config_key: Internal key for config
+            - resume_from: config promoted from this milestone
+            - milestone: config promoted to this milestone (next from resume_from)
         """
         cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
