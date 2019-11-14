@@ -6,6 +6,7 @@ from lightgbm.compat import range_
 import time
 import os
 from lightgbm.callback import _format_eval_result, EarlyStopException
+import psutil
 
 
 # callback
@@ -89,7 +90,11 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
     best_score_list = []
     cmp_op = []
     enabled = [True]
+    indices_to_check = []
     timex = [time.time()]
+    mem_status = psutil.Process()
+    init_mem_rss = []
+    init_mem_avail = []
 
     def _init(env):
         if not ignore_dart_warning:
@@ -110,7 +115,6 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
             if manual_stop_file:
                 print('Manually stop training by creating file at location: ', manual_stop_file)
 
-        print(env.evaluation_result_list)
         for eval_ret in env.evaluation_result_list:
             best_iter.append(0)
             best_score_list.append(None)
@@ -121,19 +125,27 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                 best_score.append(float('inf'))
                 cmp_op.append(lt)
 
+        if metrics_to_use is None:
+            for i in range(len(env.evaluation_result_list)):
+                indices_to_check.append(i)
+                if first_metric_only:
+                    break
+        else:
+            for i, eval in enumerate(env.evaluation_result_list):
+                if (eval[0], eval[1]) in metrics_to_use:
+                    indices_to_check.append(i)
+                    if first_metric_only:
+                        break
+
+        init_mem_rss.append(mem_status.memory_info().rss)
+        init_mem_avail.append(psutil.virtual_memory().available)
+
     def _callback(env):
-        cur_time = time.time()
-        # if verbose:
-        #     print(cur_time - timex[0])
-        timex[0] = cur_time
         if not cmp_op:
             _init(env)
         if not enabled[0]:
             return
-        if metrics_to_use is None:
-            indices_to_check = range(len(env.evaluation_result_list))
-        else:
-            indices_to_check = [i for i, eval in enumerate(env.evaluation_result_list) if (eval[0], eval[1]) in metrics_to_use]
+
         for i in indices_to_check:
             score = env.evaluation_result_list[i][2]
             if best_score_list[i] is None or cmp_op[i](score, best_score[i]):
@@ -164,8 +176,42 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                     print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                     raise EarlyStopException(best_iter[i], best_score_list[i])
-            if first_metric_only:  # the only first metric is used for early stopping
-                break
+
+        # TODO: Add toggle parameter to early_stopping to disable this
+        # TODO: Identify optimal threshold values for early_stopping based on lack of memory
+        if env.iteration % 10 == 0:
+            available = psutil.virtual_memory().available
+            cur_rss = mem_status.memory_info().rss
+
+            if cur_rss < init_mem_rss[0]:
+                init_mem_rss[0] = cur_rss
+            estimated_model_size_mb = (cur_rss - init_mem_rss[0]) >> 20
+            available_mb = available >> 20
+
+            model_size_memory_ratio = estimated_model_size_mb / available_mb
+            if verbose or (model_size_memory_ratio > 0.5):
+                print('Available Memory:', available_mb, 'MB')
+                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+
+            early_stop = False
+            if model_size_memory_ratio > 1.0:
+                print('Warning: Large model size may cause OOM error during saving if training continues')
+                print('Available Memory:', available_mb, 'MB')
+                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                early_stop = True
+
+            # TODO: We will want to track size of model as well, even if we early stop before OOM, we will still crash when saving if the model is large enough
+            if available_mb < 512:  # Less than 500 MB
+                print('Warning: Low available memory may cause OOM error if training continues')
+                print('Available Memory:', available_mb, 'MB')
+                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                early_stop = True
+
+            if early_stop:
+                print('Warning: Early stopping prior to optimal result to avoid OOM error, increase memory allocation to maximize model quality.')
+                print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                        best_iter[0] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[0]])))
+                raise EarlyStopException(best_iter[0], best_score_list[0])
 
     _callback.order = 30
     return _callback

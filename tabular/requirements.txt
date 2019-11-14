@@ -7,6 +7,7 @@ matplotlib==3.1.1
 mxboard
 numpy==1.17.2
 pandas==0.24.2
+psutil
 pyarrow==0.15.0
 s3fs==0.3.1
 scikit-learn==0.21.2
