@@ -183,6 +183,10 @@ class FIFOScheduler(TaskScheduler):
 
     def run_with_config(self, config):
         """Run with config for final fit.
+        It launches a single training trial under any fixed values of the hyperparameters.
+        For example, after HPO has identified the best hyperparameter values based on a hold-out dataset,
+        one can use this function to retrain a model with the same hyperparameters on all the available labeled data
+        (including the hold out set). It can also returns other objects or states.
         """
         task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
