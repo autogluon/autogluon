@@ -178,7 +178,7 @@ class PromotionBracket(object):
         self._count_tasks = dict()
         for milestone, _ in self._rungs:
             self._count_tasks[milestone] = 0
-        if max_t > self._rungs[0][0]:
+        if self._rungs and max_t > self._rungs[0][0]:
             self._count_tasks[max_t] = 0
 
     def _find_promotable_config(self, recorded, config_key=None):
