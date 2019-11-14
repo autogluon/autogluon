@@ -20,6 +20,7 @@ class AbstractFeatureGenerator:
         self.features_object = []
         self.feature_types = defaultdict(list)
         self.feature_type_family = defaultdict(list)
+        self.feature_type_family_generated = defaultdict(list)
         self.features_bool = []
         self.features_nlp = []
         self.features_nlp_ratio = []
@@ -36,11 +37,38 @@ class AbstractFeatureGenerator:
 
     @property
     def feature_types_metadata(self):
-        return {
+        feature_types_metadata = copy.deepcopy({
             'nlp': self.features_nlp,
             'vectorizers': self.features_vectorizers,
             **self.feature_type_family
-        }
+        })
+        for key, val in self.feature_type_family_generated.items():
+            feature_types_metadata[key] += val
+        return feature_types_metadata
+
+    @property
+    def feature_types_metadata_generated(self):
+        feature_types_metadata_generated = copy.deepcopy({
+            **self.feature_type_family_generated
+        })
+        if 'int' in feature_types_metadata_generated:  # TODO: Clean this, feature_vectorizers should already be handled
+            feature_types_metadata_generated['int'] += self.features_vectorizers
+        elif len(self.features_vectorizers) > 0:
+            feature_types_metadata_generated['int'] = self.features_vectorizers
+        return feature_types_metadata_generated
+
+    @property
+    def feature_types_metadata_full(self):
+        feature_types_metadata_full = copy.deepcopy({
+            **self.feature_type_family
+        })
+        for key, val in self.feature_type_family_generated.items():
+            feature_types_metadata_full[key] += val
+        if 'int' in feature_types_metadata_full:  # TODO: Clean this, feature_vectorizers should already be handled
+            feature_types_metadata_full['int'] += self.features_vectorizers
+        elif len(self.features_vectorizers) > 0:
+            feature_types_metadata_full['int'] = self.features_vectorizers
+        return feature_types_metadata_full
 
     @staticmethod
     def train_vectorizer(text_list, vectorizer):
@@ -87,9 +115,19 @@ class AbstractFeatureGenerator:
             X_features = self.drop_duplicate_features(X_features)
         X_features.index = X_index
         self.features = list(X_features.columns)
-        self.feature_type_family['int'] += self.features_binned
+        self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
         print('fit', X_len, 'data points with', len(self.features), 'features')
+        print('Original Features:')
+        for key, val in self.feature_type_family.items():
+            print('\t' + key + ' features:', len(val))
+        print('Generated Features:')
+        for key, val in self.feature_types_metadata_generated.items():
+            print('\t' + key + ' features:', len(val))
+        print('All Features:')
+        for key, val in self.feature_types_metadata_full.items():
+            print('\t' + key + ' features:', len(val))
+
         return X_features
 
     @calculate_time
@@ -300,7 +338,6 @@ class AbstractFeatureGenerator:
         if avg_words < 3:
             return False
 
-        print('found an nlp feature!')
         return True
 
     def generate_text_features(self, X: Series, feature: str) -> DataFrame:
