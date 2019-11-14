@@ -1,8 +1,9 @@
 """ Lists the default (fixed) hyperparameter values we use in our Gradient Boosting model. """
 
+# TODO: move these files
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
-DEFAULT_NUM_BOOST_ROUND = 10000
+DEFAULT_NUM_BOOST_ROUND = 10000 # default for single training run
 
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
@@ -29,10 +30,11 @@ def get_param_multiclass_baseline(num_classes):
         'feature_fraction': 0.9,
         'min_data_in_leaf': 3,
         'two_round': True,
+        'seed_value': 0,
         # 'device': 'gpu'  # needs GPU-enabled lightGBM build
         # TODO: Bin size max increase
     }
-    return params
+    return params.copy()
 
 
 def get_param_binary_baseline():
@@ -49,8 +51,9 @@ def get_param_binary_baseline():
         'min_data_in_leaf': 5,
         # 'is_unbalance': True,  # TODO: Set is_unbalanced: True for F1-score, AUC!
         'two_round': True,
+        'seed_value': 0,
     }
-    return params
+    return params.copy()
 
 
 def get_param_regression_baseline():
@@ -66,5 +69,6 @@ def get_param_regression_baseline():
         'feature_fraction': 0.9,
         'min_data_in_leaf': 5,
         'two_round': True,
+        'seed_value': 0,
     }
-    return params
+    return params.copy()

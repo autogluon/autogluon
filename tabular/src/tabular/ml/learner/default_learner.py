@@ -32,8 +32,7 @@ class DefaultLearner(AbstractLearner):
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
-                nn_options (dict): hyperparameters + search-spaces for neural network models. If = None, we do not train any neural networks.
-                gbm_options (dict): hyperparameters + search-spaces for gradient boosting models. If None, do not train any gradient boosting models.
+                hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
         X, y, X_test, y_test = self.general_data_processing(X, X_test, sample=None)
 
@@ -52,9 +51,8 @@ class DefaultLearner(AbstractLearner):
             self.objective_func = trainer.objective_func
 
         self.save()
-
         trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      nn_options=nn_options, gbm_options=gbm_options)
+                      hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):
@@ -108,5 +106,3 @@ class DefaultLearner(AbstractLearner):
             X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
 
         return X, y, X_test, y_test
-
-# TODO: issue can only call learner.fit() or learner.general_data_processing() once. Second time always produces:  AttributeError: 'DataFrame' object has no attribute 'unique'

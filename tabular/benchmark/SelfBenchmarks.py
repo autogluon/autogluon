@@ -41,6 +41,7 @@ perf_threshold = 1.1 # How much worse can performance on each dataset be vs prev
 # gbm_options = {} # or set = None to omit gradient boosting
 nn_options = {'num_epochs': 5} # Can control model training time here.
 gbm_options = {'num_boost_round': 100}
+hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
 ###################################################################
 
 # Each train/test dataset must be located in single directory with the given names.
@@ -120,8 +121,7 @@ with warnings.catch_warnings(record=True) as caught_warnings:
             train_data = train_data.head(subsample_size) # subsample for fast_benchmark
         predictor = None # reset from last Dataset
         predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                             hyperparameter_tune=hyperparameter_tune, 
-                             nn_options=nn_options, gbm_options=gbm_options)
+                             hyperparameter_tune=hyperparameter_tune, hyperparameters=hyperparameters)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file

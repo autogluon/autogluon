@@ -8,7 +8,6 @@ import mxnet as mx
 from tabular.ml.learner.default_learner import DefaultLearner as Learner
 from tabular.ml.trainer.auto_trainer import AutoTrainer
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
-
 from .dataset import TabularDataset
 
 from ...core import *
@@ -38,12 +37,14 @@ class PredictTableColumn(BaseTask):
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory='', problem_type=None, objective_func=None, 
-            submission_columns=[], feature_generator=None, trainer_type=AutoTrainer, threshold=10,
+            submission_columns=[], threshold=10,
             hyperparameter_tune=True, feature_prune=False,
-            nn_options = {'num_epochs': 300}, gbm_options = {'num_boost_round': 10000},
+            hyperparameters = {'NN': {'num_epochs': 300}, 
+                               'GBM': {'num_boost_round': 10000},
+                              },
             time_limits=None, num_trials=None, dist_ip_addrs=[], visualizer='none',
             nthreads_per_trial=None, ngpus_per_trial=None,
-            search_strategy='random', search_options={}):
+            search_strategy='random', search_options={}, **kwargs):
         """
         train_data: Dataset object, which is highly similar to pandas DataFrame.
         label (str): name of column that contains the target variable to predict
@@ -63,14 +64,13 @@ class PredictTableColumn(BaseTask):
         threshold: TODO: describe
         hyperparameter_tune (bool): whether to tune hyperparameters or just use fixed hyperparameter values for each model
         feature_prune (bool): whether to perform feature selection
-        nn_options (dict): Keyword arguments specifying hyperparameters of neural network models.
+        hyperparameters (dict): Keys = different model types to train, options: 'NN' (neural network), 'GBM' (gradient-boosting model).
+            Values = dict of hyperparameter settings for each model type.
             Each hyperparameter can be fixed value or search space. For full list of options, see: TODO.
             Hyperparameters not specified will be set to default values (or default search spaces if hyperparameter_tune = True).
-            If nn_options = None, then fit() will not train any neural network models.
-        gbm_options (dict): Keyword arguments specifying hyperparameters of gradient boosting models.
-            Each hyperparameter can be fixed value or search space. For full list of options, see: TODO.
-            Hyperparameters not specified will be set to default values (or default search spaces if hyperparameter_tune = True).
-            If gbm_options = None, then fit() will not train any gradient boosting models.
+            Caution: Any provided search spaces will be overriden by fixed defauls if hyperparameter_tune = False.
+            If 'NN' key is missing from hyperparameters, then fit() will not train any neural network models.
+            Likewise if 'GBM' key is missing, then fit() will not train any gradient boosting models.
         search_strategy (str): which hyperparameter search algorithm to use
         search_options (dict): auxiliary keyword arguments for the searcher that performs hyperparameter optimization
         time_limits (int): Approximately how long this call to fit() should run for (wallclock time in seconds).
@@ -80,15 +80,28 @@ class PredictTableColumn(BaseTask):
         visualizer (str): Method to visualize training progress during fit().
         nthreads_per_trial (int): how many CPUs to use in each trial (ie. training run of a single model)
         ngpus_per_trial (int): how many GPUs to use in each trial (ie. training run on a single model).
+        
+        
+        Kwargs can include:
+        
+        feature_generator_type (default=AutoMLFeatureGenerator): A FeatureGenerator class (see AbstractFeatureGenerator).            
+            Note: class file must be imported into Python session in order to use custom class.
+        feature_generator_kwargs (default={}). Kwargs dict to pass into FeatureGenerator constructor.
+        trainer_type (default=AutoTrainer): A Trainer class (see AbstractTrainer).
+            Note: class file must be imported into Python session in order to use custom class.
+            TODO (Nick): does trainer constructor ever require kwargs? If so should have trainer_type_kwargs dict used similarly as feature_generator_kwargs
         """
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
             raise ValueError("Column names must match between training and tuning data")
-
-        # Create feature generator, schedulers, searchers for each model:
-        if feature_generator is None:
-            feature_generator = AutoMLFeatureGenerator()
+        
+        # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
+        feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
+        feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
+        feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
+        trainer_type = kwargs.get('trainer_type', AutoTrainer)
+        
         if nthreads_per_trial is None:
             nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
         if ngpus_per_trial is None:
@@ -110,9 +123,8 @@ class PredictTableColumn(BaseTask):
         elif time_limits is None:
             time_limits = 100000000  # user only specified num_trials, so run all of them regardless of time-limits
         time_limits *= 0.9  # reduce slightly to account for extra time overhead
-        if (nn_options is not None) and (gbm_options is not None):
-            time_limits /= 2  # each model type gets half the available time
-
+        time_limits /= float(len(hyperparameters.keys()))  # each model type gets half the available time
+        
         # All models use same scheduler (TODO: grant each model their own scheduler to run simultaneously):
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
@@ -136,6 +148,6 @@ class PredictTableColumn(BaseTask):
                           submission_columns=submission_columns, feature_generator=feature_generator, trainer_type=trainer_type, threshold=threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
-                      nn_options=nn_options, gbm_options=gbm_options)
+                      hyperparameters=hyperparameters)
         return predictor
 

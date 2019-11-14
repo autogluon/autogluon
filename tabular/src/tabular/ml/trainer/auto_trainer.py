@@ -10,13 +10,13 @@ class AutoTrainer(AbstractTrainer):
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
                          feature_types_metadata=feature_types_metadata, compute_feature_importance=compute_feature_importance)
 
-    def get_models(self, nn_options={}, gbm_options={}):
+    def get_models(self, hyperparameters={'NN':{},'GBM':{}}):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,
-                                 num_classes=self.num_classes, nn_options=nn_options, gbm_options=gbm_options)
+                                 num_classes=self.num_classes, hyperparameters=hyperparameters)
 
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
-              nn_options={}, gbm_options={}):
-        models = self.get_models(nn_options, gbm_options)
+              hyperparameters={'NN':{},'GBM':{}}):
+        models = self.get_models(hyperparameters)
         if (y_test is None) or (X_test is None):
             X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
         self.train_multi_and_ensemble(X_train, X_test, y_train, y_test, models,

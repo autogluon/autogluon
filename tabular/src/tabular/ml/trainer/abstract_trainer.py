@@ -185,7 +185,7 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
                 hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                    y_train=y_train, y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+                    Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
                 print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')

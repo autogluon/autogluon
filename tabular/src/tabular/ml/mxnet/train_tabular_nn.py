@@ -93,7 +93,7 @@ def train_tabularNN(args, reporter):
     # print("Best model found in epoch %d. Val %s: %s" % (best_val_epoch, tabNN.metric_map[tabNN.problem_type], final_val_metric))
     # add fake epoch at the end containg performance of early-stopped model.  Higher val_metric = better
     reporter(epoch= e+1, validation_performance = final_val_metric, directory = directory, file_prefix = file_prefix,
-            modelobj_file = modelobj_file, netparams_file = netparams_file)
+             modelobj_file = modelobj_file, netparams_file = netparams_file) # unused in reporter, only directory+file_prefix required to load model.
     
     # TODO: how to keep track of which filename corresponds to which performance?
 

@@ -26,7 +26,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder, QuantileTransfo
 from autogluon.core import *
 from autogluon.task.base import *
 from tabular.utils.loaders import load_pkl
-from tabular.ml.models.abstract_model import AbstractModel
+from tabular.ml.models.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from tabular.utils.savers import save_pkl
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.ml.mxnet.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
@@ -37,8 +37,7 @@ from tabular.ml.mxnet.train_tabular_nn import train_tabularNN
 # __all__ = ['TabularNeuralNetModel', 'EPS']
 
 EPS = 10e-8 # small number
-logger = logging.getLogger(__name__) # TODO: Currently unused
-
+logger = logging.getLogger(__name__)
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
@@ -75,7 +74,7 @@ class TabularNeuralNetModel(AbstractModel):
         # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
     }
 
-    def __init__(self, path, name, problem_type, objective_func, features=None, nn_options={}):
+    def __init__(self, path, name, problem_type, objective_func, features=None, hyperparameters={}):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features)
         """ Create new TabularNeuralNetModel object.
             Args:
@@ -88,14 +87,12 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.processor = None # data processor
-
-        if nn_options is None:
-            self.params = {}
-            self.nondefault_params = []
-        else:
-            self.params = nn_options.copy()
-            self.nondefault_params = list(nn_options.keys())[:] # These are the hyperparameters that user has specified.
+        self.params = {}
+        self.nondefault_params = []
         self._set_default_params()
+        if hyperparameters is not None:
+            self.params.update(hyperparameters.copy())
+            self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
     
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -104,7 +101,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._use_default_value('num_dataloading_workers', 1) # will be overwritten by nthreads_per_trial
         self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # will be overwritten by ngpus_per_trial
         self._use_default_value('num_epochs', 300)  # maximum number of epochs for training NN
-        self._use_default_value('seed_value', 0) # random seed for reproducibility in HPO (set = None to ignore)
+        self._use_default_value('seed_value', None) # random seed for reproducibility (set = None to ignore)
 
         # For data processing (currently preprocessors not searched during HPO):
         self._use_default_value('proc.embed_min_categories', 4) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
@@ -213,6 +210,7 @@ class TabularNeuralNetModel(AbstractModel):
             Y_test (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
+        self.params = fixedvals_from_searchspaces(self.params)
         if self.feature_types_metadata is None:
             raise ValueError("Trainer class must set feature_types_metadata for this model")
         X_train = self.preprocess(X_train)
@@ -240,13 +238,7 @@ class TabularNeuralNetModel(AbstractModel):
         # train_dataset.save()
         # test_dataset.save()
         # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
-        if np.any([isinstance(self.params[hyperparam], Space) for hyperparam in self.params]):
-            logger.warning("Attempting to fit model without HPO, but search space is provided. Fit will use default hyperparameter values from search space.")
-            bad_keys = [hyperparam for hyperparam in self.params if isinstance(self.params[hyperparam], Space)][:] # delete all keys which are of type autogluon Space
-            for hyperparam in bad_keys:
-                self.params.pop(hyperparam, None)
-            self._set_default_params() # reset defaults for the missing keys
-
+        
         self.get_net(train_dataset)
         self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
         """
@@ -689,23 +681,7 @@ class TabularNeuralNetModel(AbstractModel):
         if param_name not in self.params:
             self.params[param_name] = param_value
     
-    @staticmethod
-    def _hp_default_value(hp_value):
-        """ Extracts default fixed value from hyperparameter search space to use a fixed value instead of a search space.
-            TODO: Unused
-        """
-        if not isinstance(hp_value, Space):
-            return hp_value
-        if isinstance(hp_value, Categorical):
-            return hp_value[0]
-        elif isinstance(hp_value, List):
-            return [z[0] for z in hp_value]
-        elif isinstance(hp_value, NestedSpace):
-            raise ValueError("Cannot call fit() on NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
-        else:
-            return hp_value.get_hp('dummy_name').default_value
-
-    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, scheduler_options):
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options):
         """ Performs HPO and sets self.params to best hyperparameter values """
         print("Beginning hyperparameter tuning for Tabular Neural Network...")
         self._set_default_searchspace() # changes non-specified default hyperparams from fixed values to search-spaces.
@@ -736,9 +712,9 @@ class TabularNeuralNetModel(AbstractModel):
                 if isinstance(params_copy[hyperparam], Space):
                     print(hyperparam + ":   " + str(params_copy[hyperparam]))
         directory = self.path # path to directory where all remote workers store things
-        train_dataset = self.process_data(X_train, y_train, is_test=False) # Dataset object
+        train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         X_test = self.preprocess(X_test)
-        test_dataset = self.process_data(X_test, y_test, is_test=True) # Dataset object to use for validation
+        test_dataset = self.process_data(X_test, Y_test, is_test=True) # Dataset object to use for validation
         train_fileprefix = self.path + "train"
         test_fileprefix = self.path + "validation"
         train_dataset.save(file_prefix=train_fileprefix) # TODO: cleanup after HPO?
@@ -757,6 +733,7 @@ class TabularNeuralNetModel(AbstractModel):
             directory = self.path # TODO: need to change to path to working directory on every remote machine
             train_tabularNN.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                    directory=directory)
+        
         scheduler.run()
         scheduler.join_jobs()
         scheduler.get_training_curves(plot=False, use_legend=False)
@@ -771,7 +748,7 @@ class TabularNeuralNetModel(AbstractModel):
                        'reward_attr': scheduler._reward_attr,
                        'args': train_tabularNN.args
                       }
-        hpo_results = BasePredictor._format_results(hpo_results) # store results summarizing HPO for TabularNN model
+        hpo_results = BasePredictor._format_results(hpo_results) # store results summarizing HPO for this model
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             raise NotImplementedError("need to fetch model files from remote Workers")
             # TODO: need to handle locations carefully: fetch these 2 files and put into self.path:
@@ -779,6 +756,7 @@ class TabularNeuralNetModel(AbstractModel):
             # 2) hpo_results['trial_info'][trial]['metadata']['netparams_file']
         hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
         for trial in sorted(hpo_results['trial_info'].keys()):
+            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband)s
             file_id = "trial_"+str(trial) # unique identifier to files from this trial
             file_prefix = file_id + "_"
             trial_model_name = self.name+"_"+file_id
@@ -799,8 +777,11 @@ class TabularNeuralNetModel(AbstractModel):
         """
 
     def _set_default_searchspace(self):
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from 
+            default fixed value to default spearch space. 
+        """
         search_space = self.default_searchspace.copy()
-        for key in self.nondefault_params: # delete all specified hyperparams from the default search space.
+        for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = search_space.pop(key, None)
         self.params.update(search_space)
 
