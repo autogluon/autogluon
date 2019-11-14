@@ -1,4 +1,4 @@
-max_time = 1800
+max_time = 180
 
 stage("Unit Test") {
   node('linux-gpu') {

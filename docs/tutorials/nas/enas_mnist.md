@@ -1,4 +1,4 @@
-# Reproducing ProxylessNAS in 10 mins
+# How to Use ENAS in 10 mins
 :label:`sec_proxyless`
 
 ## What is the key idea of ENAS and ProxylessNAS
