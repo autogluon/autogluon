@@ -43,7 +43,10 @@ class AbstractFeatureGenerator:
             **self.feature_type_family
         })
         for key, val in self.feature_type_family_generated.items():
-            feature_types_metadata[key] += val
+            if key in feature_types_metadata:
+                feature_types_metadata[key] += val
+            else:
+                feature_types_metadata[key] = val
         return feature_types_metadata
 
     @property
@@ -63,7 +66,10 @@ class AbstractFeatureGenerator:
             **self.feature_type_family
         })
         for key, val in self.feature_type_family_generated.items():
-            feature_types_metadata_full[key] += val
+            if key in feature_types_metadata_full:
+                feature_types_metadata_full[key] += val
+            else:
+                feature_types_metadata_full[key] = val
         if 'int' in feature_types_metadata_full:  # TODO: Clean this, feature_vectorizers should already be handled
             feature_types_metadata_full['int'] += self.features_vectorizers
         elif len(self.features_vectorizers) > 0:
