@@ -10,10 +10,10 @@ from tabular.ml.label_cleaner import LabelCleaner
 from tabular.ml.trainer.auto_trainer import AutoTrainer
 
 
-# TODO: Take as input objective function, function takes y_test, y_pred_proba as inputs and outputs score
 # TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)
 # TODO: - Differentiate between advanced generators that require fit (stateful, gl_code_matrix) and those that do not (bucket label averaging in SCOT GC 2019)
 # TODO: - Those that do not could be added to preprocessing function of model, but would then have to be recomputed on each model.
+# TODO: Add cv / OOF generator option, so that AutoGluon can be used as a base model in an ensemble stacker
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=10,
@@ -23,7 +23,8 @@ class DefaultLearner(AbstractLearner):
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
-    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False, 
+    # TODO: Should scheduler_options have a default value? Without it it makes it hard to use
+    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, feature_prune=False,
             nn_options={}, gbm_options={}):
         """ Arguments:
                 X (DataFrame): training data

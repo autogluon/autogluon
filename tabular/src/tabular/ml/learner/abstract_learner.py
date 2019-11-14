@@ -16,10 +16,6 @@ from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 
 
-# TODO: Take as input objective function, function takes y_test, y_pred_proba as inputs and outputs score
-# TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)
-# TODO: - Differentiate between advanced generators that require fit (stateful, gl_code_matrix) and those that do not (bucket label averaging in SCOT GC 2019)
-# TODO: - Those that do not could be added to preprocessing function of model, but would then have to be recomputed on each model.
 # TODO: - Semi-supervised learning
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class AbstractLearner:
