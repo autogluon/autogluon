@@ -53,28 +53,27 @@ class FIFOScheduler(TaskScheduler):
     dist_ip_addrs : list of str
         IP addresses of remote machines.
 
-    Example:
-        >>> import numpy as np
-        >>> import autogluon as ag
-        >>> 
-        >>> @ag.args(
-        >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-        >>>     wd=ag.space.Real(1e-3, 1e-2))
-        >>> def train_fn(args, reporter):
-        >>>     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-        >>>     for e in range(10):
-        >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
-        >>> 
-        >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
-        >>>                                        resource={'num_cpus': 2, 'num_gpus': 0},
-        >>>                                        num_trials=20,
-        >>>                                        reward_attr='accuracy',
-        >>>                                        time_attr='epoch')
-        >>> scheduler.run()
-        >>> scheduler.join_jobs()
-        >>> scheduler.get_training_curves(plot=True)
-        >>> ag.done()
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(10):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
+    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
+    ...                                        num_trials=20,
+    ...                                        reward_attr='accuracy',
+    ...                                        time_attr='epoch')
+    >>> scheduler.run()
+    >>> scheduler.join_jobs()
+    >>> scheduler.get_training_curves(plot=True)
+    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,
@@ -317,10 +316,11 @@ class FIFOScheduler(TaskScheduler):
             plot : bool
             use_legend : bool
 
-        Example:
-            >>> scheduler.run()
-            >>> scheduler.join_jobs()
-            >>> scheduler.get_training_curves(plot=True)
+        Examples
+        --------
+        >>> scheduler.run()
+        >>> scheduler.join_jobs()
+        >>> scheduler.get_training_curves(plot=True)
 
             .. image:: https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/doc/api/autogluon.1.png?raw=true
         """
@@ -344,8 +344,9 @@ class FIFOScheduler(TaskScheduler):
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
 
-        Example:
-            >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
         destination = super(FIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
@@ -358,8 +359,9 @@ class FIFOScheduler(TaskScheduler):
     def load_state_dict(self, state_dict):
         """Load from the saved state dict.
 
-        Example:
-            >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
         super(FIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])

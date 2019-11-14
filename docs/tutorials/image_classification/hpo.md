@@ -76,19 +76,13 @@ examples to show how to specify a custom hyperparameter search space, and ensure
 ## Specify which pretrained networks to try
 
 We start with specifying the pretrained neural network candidates.
-In AutoGluon, the network candidates are represented as [autogluon.Nets](../api/autogluon.network.html),
-which is simply a list of networks.  
 Given such a list, AutoGluon will try training different networks from this list to identify the best-performing candidate.
-This is an example of a `categorical` search space, in which there are a limited number of values to choose from.
+This is an example of a `Categorial` search space, in which there are a limited number of values to choose from.
 
 For more information regarding categorical search spaces, please
-refer to the [search space API](../api/autogluon.space.html).
-
-In addition to the default network candidates, let's also add `resnet50` to the search space:
+refer to the :meth:`autogluon.space.Categorial`.
 
 ```{.python .input}
-# default net list for image classification would be overwritten
-# if net_list is provided
 import autogluon as ag
 nets = ag.space.Categorical('resnet18_v1', 'resnet34_v1','resnet50_v1')
 
@@ -127,16 +121,40 @@ We then put the new network and optimizer search space and the learning rate sch
 
 ## Specify a hyperparameter search strategy and how to schedule trials
 
-[autogluon.searcher](../api/autogluon.searcher.html)
-will support both basic and advanced search search_strategys for both hyperparameter optimization and architecture search. Advanced search search_strategys, such as Population-Based Training, and BOHB, are coming soon.  
-We currently support Hyperband, random search and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
-The easiest way to specify random search is via the string name:
+In AutoGluon, :meth:`autogluon.searcher` supports different search search_strategys for both hyperparameter optimization and architecture search.
+Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space. 
+This process of finding good hyperparameters from a given search space is commonly referred to as *hyperparameter optimization* (HPO) or *hyperparameter tuning*. 
+:meth:`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
+We currently support random search, Hyperband and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 
-In AutoGluon, :meth:`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
+### Search algorithm
+
+Here we use BayesOpt as an example of advanced search algorithm.
+Instead of random search, AutoGluon can alternatively utilize the more sophisticated strategy of :class:`autogluon.searcher.SKoptSearcher` to identify good hyperparameters.  Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration. This surrogate model can then be used to infer which hyperparameter configurations could plausibly lead to the best predictive performance (ie. those hyperparameter-values that are similar to the top-performing configurations tried so far, as well as the hyperparameter-values that are very dissimilar to all configurations tried so far, since the surrogate model is highly uncertain about their corresponding performance). Within the same time-limit constraints, Bayesian optimization can often produce a superior model  compared to random search by making smarter decisions about which hyperparameter configuration to explore next. Although updating the surrogate model takes time, these updates are generally negligible compared with the neural network training time required to execute a single trial. 
+
+For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
+
+```{.python .input}
+classifier = task.fit(dataset,
+                   search_strategy='skopt', 
+                   search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+                   time_limits=time_limits,
+                   epochs=epochs,
+                   ngpus_per_trial=1)
+
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+test_acc = classifier.evaluate(test_dataset)
+print('Top-1 test acc: %.3f' % test_acc)
+```
+
+Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `search_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `search_options` when `search_strategy='skopt'`.
+
+
+### Early stopping
 
 AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
-We support a serial [FIFO scheduler](../api/autogluon.scheduler.html#autogluon.scheduler.FIFO_Scheduler)
-and an early stopping scheduler: [Hyperband](../api/autogluon.scheduler.html#autogluon.scheduler.Hyperband_Scheduler).
+We support a serial :class:`autogluon.scheduler.FIFOScheduler`
+and an early stopping scheduler :class:`autogluon.scheduler.HyperbandScheduler`.
 Which scheduler to use is easily specified via the string name:
 
 ```{.python .input}

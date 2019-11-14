@@ -147,15 +147,18 @@ def args(default={}, **kwvars):
 def func(**kwvars):
     """Register args or searchable spaces to the functions.
 
-    Return:
-        :class:`autogluon.space.AutoGluonObject`: a lazy init object, which allows distributed training.
+    Returns
+    -------
+    instance of :class:`autogluon.space.AutoGluonObject`:
+        a lazy init object, which allows distributed training.
 
-    Example:
-        >>> from gluoncv.model_zoo import get_model
-        >>> 
-        >>> @ag.func(pretrained=ag.space.Categorical(True, False))
-        >>> def cifar_resnet(pretrained):
-        ...     return get_model('cifar_resnet20_v1', pretrained=pretrained)
+    Examples
+    --------
+    >>> from gluoncv.model_zoo import get_model
+    >>> 
+    >>> @ag.func(pretrained=ag.space.Categorical(True, False))
+    >>> def cifar_resnet(pretrained):
+    ...     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
     def registered_func(func):
         class autogluonobject(AutoGluonObject):
@@ -189,18 +192,21 @@ def func(**kwvars):
 def obj(**kwvars):
     """Register args or searchable spaces to the class.
 
-    Return:
-        :class:`autogluon.space.AutoGluonObject`: a lazy init object, which allows distributed training.
+    Returns
+    -------
+    instance of :class:`autogluon.space.AutoGluonObject`:
+        a lazy init object, which allows distributed training.
 
-    Example:
-        >>> import autogluon as ag
-        >>> from mxnet import optimizer as optim
-        >>> @ag.obj(
-        >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
-        >>>     wd=ag.space.Real(1e-4, 1e-1),
-        >>> )
-        >>> class Adam(optim.Adam):
-        >>>     pass
+    Examples
+    --------
+    >>> import autogluon as ag
+    >>> from mxnet import optimizer as optim
+    >>> @ag.obj(
+    >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
+    >>>     wd=ag.space.Real(1e-4, 1e-1),
+    >>> )
+    >>> class Adam(optim.Adam):
+    >>>     pass
 
     """
     def registered_class(Cls):

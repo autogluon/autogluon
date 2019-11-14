@@ -48,28 +48,29 @@ class RLScheduler(FIFOScheduler):
     dist_ip_addrs : list of str
         IP addresses of remote machines.
 
-    Example:
-        >>> import numpy as np
-        >>> import autogluon as ag
-        >>> 
-        >>> @ag.args(
-        >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-        >>>     wd=ag.space.Real(1e-3, 1e-2))
-        >>> def train_fn(args, reporter):
-        >>>     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-        >>>     for e in range(10):
-        >>>         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
-        >>> 
-        >>> scheduler = ag.scheduler.RLScheduler(train_fn,
-        >>>                                      resource={'num_cpus': 2, 'num_gpus': 0},
-        >>>                                      num_trials=20,
-        >>>                                      reward_attr='accuracy',
-        >>>                                      time_attr='epoch')
-        >>> scheduler.run()
-        >>> scheduler.join_jobs()
-        >>> scheduler.get_training_curves(plot=True)
-        >>> ag.done()
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> 
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(10):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    ... 
+    >>> scheduler = ag.scheduler.RLScheduler(train_fn,
+    ...                                      resource={'num_cpus': 2, 'num_gpus': 0},
+    ...                                      num_trials=20,
+    ...                                      reward_attr='accuracy',
+    ...                                      time_attr='epoch')
+    >>> scheduler.run()
+    >>> scheduler.join_jobs()
+    >>> scheduler.get_training_curves(plot=True)
+    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
@@ -304,6 +305,12 @@ class RLScheduler(FIFOScheduler):
         pass
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
@@ -318,6 +325,12 @@ class RLScheduler(FIFOScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         #self.baseline = pickle.loads(state_dict['baseline'])
         Task.set_id(state_dict['TASK_ID'])

@@ -89,6 +89,13 @@ class List(NestedSpace):
     args : list
         a list of search spaces.
 
+    Examples
+    --------
+    >>> sequence = ag.List(
+    >>>     ag.space.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
+    >>>     ag.space.Categorical('BatchNorm', 'InstanceNorm'),
+    >>>     ag.space.Categorical('relu', 'sigmoid'),
+    >>> )
     """
     def __init__(self, *args):
         self.data = [*args]
@@ -167,6 +174,14 @@ class List(NestedSpace):
 
 class Dict(NestedSpace):
     """A Searchable Dict (Nested Space)
+
+    Examples
+    --------
+    >>> g = ag.space.Dict(
+    >>>         key1=ag.space.Categorical('alpha', 'beta'),
+    >>>         key2=ag.space.Int(0, 3),
+    >>>     )
+    >>> print(g)
     """
     def __init__(self, **kwargs):
         self.data = EasyDict(kwargs)
@@ -245,7 +260,10 @@ class Categorical(NestedSpace):
     data : Space or python built-in objects
         the choice candidates
 
-
+    Examples
+    --------
+    a = ag.space.Categorical('a', 'b', 'c', 'd')
+    b = ag.space.Categorical('resnet50', autogluon_obj())
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -314,6 +332,9 @@ class Real(SimpleSpace):
     log : (True/False)
         search space in log scale
 
+    Examples
+    --------
+    >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
         self.lower = lower
@@ -338,6 +359,9 @@ class Int(SimpleSpace):
         default value
 
 
+    Examples
+    --------
+    >>> range = ag.space.Int(0, 100)
     """
     def __init__(self, lower, upper, default=None):
         self.lower = lower
@@ -351,6 +375,9 @@ class Int(SimpleSpace):
 class Bool(Int):
     """Bool Search Space
 
+    Examples
+    --------
+    pretrained = ag.space.Bool()
     """
     def __init__(self):
         super(Bool, self).__init__(0, 1)

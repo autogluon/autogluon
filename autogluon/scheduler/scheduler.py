@@ -202,8 +202,9 @@ class TaskScheduler(object):
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
 
-        Example:
-            >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
         if destination is None:
             destination = OrderedDict()
@@ -215,8 +216,9 @@ class TaskScheduler(object):
     def load_state_dict(self, state_dict):
         """Load from the saved state dict.
 
-        Example:
-            >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])

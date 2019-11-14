@@ -19,12 +19,6 @@ Image Classification
       Image classification HPO tutorial.
 
    .. card::
-      :title: Search Algorithms
-      :link: image_classification/algorithm.html
-
-      Change default search algorithms tutorial.
-
-   .. card::
       :title: Use Your Own Dataset
       :link: image_classification/kaggle.html
 

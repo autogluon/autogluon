@@ -35,5 +35,4 @@ AutoGluon provides fit API which allows faster prototyping on image classificati
 
    beginner
    hpo
-   algorithm
    kaggle

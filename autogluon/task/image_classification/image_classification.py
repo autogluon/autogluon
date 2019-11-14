@@ -78,14 +78,15 @@ class ImageClassification(BaseTask):
         resume : (bool)
             If checkpoint exists, the experiment will resume from there.
 
-        Example:
-            >>> dataset = task.Dataset(train_path='~/data/train',
-            >>>                        test_path='data/test')
-            >>> results = task.fit(dataset,
-            >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-            >>>                    time_limits=time_limits,
-            >>>                    ngpus_per_trial=1,
-            >>>                    num_trials = 4)
+        Examples
+        --------
+        >>> dataset = task.Dataset(train_path='~/data/train',
+        >>>                        test_path='data/test')
+        >>> results = task.fit(dataset,
+        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                    time_limits=time_limits,
+        >>>                    ngpus_per_trial=1,
+        >>>                    num_trials = 4)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps

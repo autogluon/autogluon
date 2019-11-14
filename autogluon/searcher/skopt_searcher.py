@@ -35,23 +35,24 @@ class SKoptSearcher(BaseSearcher):
         and use the Expected Improvement acquisition function by invoking the following kwargs:
         SKoptSearcher(cs, base_estimator='RF', acq_func='EI').
     
-    Example:
-         >>> import autogluon as ag
-         >>> @ag.args(
-         >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-         >>>     wd=ag.space.Real(1e-3, 1e-2))
-         >>> def train_fn(args, reporter):
-         >>>     pass
-         >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
-         >>> searcher.get_config()
-         {'lr': 0.0031622777, 'wd': 0.0055}
+    Examples
+    --------
+     >>> import autogluon as ag
+     >>> @ag.args(
+     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
+     >>>     wd=ag.space.Real(1e-3, 1e-2))
+     >>> def train_fn(args, reporter):
+     >>>     pass
+     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+     >>> searcher.get_config()
+     {'lr': 0.0031622777, 'wd': 0.0055}
 
-         >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
-         >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
-         >>> next_config = searcher.get_config()
-         >>> next_reward = 10.0 # made-up value.
-         >>> searcher.update(next_config, next_reward)
-        
+     >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
+     >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
+     >>> next_config = searcher.get_config()
+     >>> next_reward = 10.0 # made-up value.
+     >>> searcher.update(next_config, next_reward)
+    
     .. note::
 
         SKopt behavior:
@@ -97,11 +98,12 @@ class SKoptSearcher(BaseSearcher):
         (since skopt configurations cannot handle conditional spaces like ConfigSpace can).
         TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
         
-        Args:
-            max_tries: the maximum number of tries to ask for a unique config from skopt before
-            reverting to random search.
-            returns: (config, info_dict)
-                must return a valid configuration and a (possibly empty) info dict
+        Parameters
+        ----------
+        max_tries: int
+            the maximum number of tries to ask for a unique config from skopt before reverting to random search.
+        returns: config, info_dict
+            must return a valid configuration and a (possibly empty) info dict
         """
         max_tries = kwargs.get('max_tries', 1e2)
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
@@ -138,8 +140,9 @@ class SKoptSearcher(BaseSearcher):
     def default_config(self):
         """ Function to return the default configuration that should be tried first.
         
-        Args:
-            returns: config
+        Returns
+        -------
+        returns: config
         """
         new_config_cs = self.configspace.get_default_configuration()
         new_config = new_config_cs.get_dictionary()
@@ -150,8 +153,9 @@ class SKoptSearcher(BaseSearcher):
         """Function to randomly sample a new configuration which must be valid.
            TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
 
-        Args:
-            returns: config
+        Returns
+        -------
+        returns: config
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
@@ -174,7 +178,9 @@ class SKoptSearcher(BaseSearcher):
 
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).
-        Args:
+
+        Returns
+        -------
             returns: object of same type as: skOpt.Optimizer.ask()
         """
         point = []
@@ -185,7 +191,8 @@ class SKoptSearcher(BaseSearcher):
     def skopt2config(self, point):
         """ Converts skopt point (list object) to autogluon config format (dict object. 
         
-        Args:
+        Returns
+        -------
             returns: object of same type as: RandomSampling.configspace.sample_configuration().get_dictionary()
         """
         config = self.configspace.sample_configuration()
