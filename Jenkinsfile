@@ -41,6 +41,7 @@ stage("Build Docs") {
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         git clean -fx
+        pip uninstall -y d2lbook
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
         cd docs && bash build_doc.sh
