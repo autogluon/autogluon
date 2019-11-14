@@ -59,7 +59,8 @@ class DefaultLearner(AbstractLearner):
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
-        # if self.problem_type != REGRESSION:
+        # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
+        # if self.problem_type == MULTICLASS:
         #     X[self.label] = X[self.label].fillna('')
         # TODO(Nick): from original Grail code (it had an error for Regression tasks). I have replaced this by dropping all examples will missing labels below.  If this is no longer needed, delete.
         

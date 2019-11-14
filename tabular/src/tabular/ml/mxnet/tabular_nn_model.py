@@ -40,6 +40,8 @@ EPS = 10e-8 # small number
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
 
+# TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
+#  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
 class TabularNeuralNetModel(AbstractModel):
     """ Class for neural network models that operate on tabular data. These networks use different types of input layers to process different types of data in various columns.
     
@@ -325,7 +327,7 @@ class TabularNeuralNetModel(AbstractModel):
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
                 val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
-            if test_dataset is None or val_metric >= best_val_metric: # keep training while validation accuracy remains the same.
+            if test_dataset is None or val_metric > best_val_metric:  # keep training if score has improved
                 best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
