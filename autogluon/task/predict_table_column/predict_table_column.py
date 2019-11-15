@@ -32,7 +32,9 @@ class PredictTableColumn(BaseTask):
     @staticmethod
     def load(output_directory):
         """ output_directory (str): path to directory where models are stored """
-        output_directory = os.path.expanduser(output_directory) # replace ~ with absolute path if it exists
+        if output_directory is None:
+            raise ValueError("output_directory cannot be None in load()")
+        output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
         return Learner.load(output_directory)
     
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.

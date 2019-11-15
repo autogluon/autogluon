@@ -213,9 +213,9 @@ class AbstractTrainer:
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel],
                                  hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-        for model_name in self.model_names:
-            print(model_name, self.model_performance[model_name])
-
+        if not hyperparameter_tune: # TODO: we currently do not store model_performance after HPO
+            for model_name in self.model_names:
+                print(model_name, self.model_performance[model_name])
         if len(self.model_names) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 

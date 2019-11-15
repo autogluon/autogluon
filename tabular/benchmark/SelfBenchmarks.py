@@ -98,7 +98,7 @@ toyclassif_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyCl
 
 
  # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-datasets = [toyregres_dataset, toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
+datasets = [toyregres_dataset] # , toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
 
 # Aggregate performance summaries obtained in previous benchmark run:
 prev_perf_vals = [dataset['performance_val'] for dataset in datasets]
