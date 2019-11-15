@@ -10,22 +10,21 @@ import traceback
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.utils.loaders import load_pkl
 from tabular.utils.savers import save_pkl
-from tabular.ml.utils import get_pred_from_proba
+from tabular.ml.utils import get_pred_from_proba, generate_kfold
 from tabular.ml.models.abstract_model import AbstractModel
 from tabular.ml.tuning.autotune import AutoTune
 
 import tabular.metrics
 from tabular.metrics import accuracy, root_mean_squared_error
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
 
 from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
-    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, 
-                 num_classes=None, low_memory=False, feature_types_metadata={}, 
+    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
+                 num_classes=None, low_memory=False, feature_types_metadata={},
                  compute_feature_importance=False):
         self.path = path
         self.problem_type = problem_type
@@ -97,19 +96,10 @@ class AbstractTrainer:
 
         return X_train, X_test, y_train, y_test
 
-    @staticmethod
-    def generate_kfold(X, n_splits, random_state=0):
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-        kf.get_n_splits(X)
-        kfolds = []
-        for train_index, test_index in kf.split(X):
-            kfolds.append([train_index, test_index])
-        return kfolds
-
     # Note: This should not be used for time-series data
     @staticmethod
     def get_cv(X, y, n_splits, model: AbstractModel, random_state=0):
-        kfolds = AbstractTrainer.generate_kfold(X, n_splits, random_state)
+        kfolds = generate_kfold(X, n_splits, random_state)
         models = []
         oof = []
 

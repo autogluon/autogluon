@@ -4,6 +4,7 @@ import os
 from pandas import DataFrame, Series
 import lightgbm as lgb
 import gc
+from sklearn.model_selection import KFold, StratifiedKFold
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.utils.savers import save_pd
 from tabular.utils.decorators import calculate_time
@@ -19,6 +20,21 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     else:
         y_pred = np.argmax(y_pred_proba, axis=1)
     return y_pred
+
+
+def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False):
+    kfolds = []
+    if stratified and (y is not None):
+        kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        kf.get_n_splits(X, y)
+        for train_index, test_index in kf.split(X, y):
+            kfolds.append([train_index, test_index])
+    else:
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        kf.get_n_splits(X)
+        for train_index, test_index in kf.split(X):
+            kfolds.append([train_index, test_index])
+    return kfolds
 
 
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
