@@ -66,6 +66,22 @@ class LabelCleanerMulticlass(LabelCleaner):
         else:
             return y
 
+
+    # TODO: Error occurred when training on covertype with 400 samples for training,
+    #  Only 5/7 classes were used in training due to the other two not exceeding threshold limit.
+    #  LabelCleaner should handle this correctly by morphing y_pred into correct 6 class during prior to score func by merging the two unknowns, but it failed
+    """
+    Traceback (most recent call last):
+      File "/Users/neerick/workspace/awslabs/autogluon/tabular/src/tabular/sandbox/covertype/run_learner.py", line 36, in <module>
+        learner.score_debug(X=X_test)
+      File "/Users/neerick/workspace/awslabs/autogluon/tabular/src/tabular/ml/learner/abstract_learner.py", line 148, in score_debug
+        scores['weighted_ensemble'] = self.objective_func(y, y_pred_proba)
+      File "/Users/neerick/workspace/awslabs/autogluon/tabular/src/tabular/metrics/__init__.py", line 116, in __call__
+        return self._sign * self._score_func(y_true, y_pred, **self._kwargs)
+      File "/Users/neerick/workspace/awslabs/autogluon/venv/lib/python3.6/site-packages/sklearn/metrics/classification.py", line 1809, in log_loss
+        lb.classes_))
+    ValueError: y_true and y_pred contain different number of classes 6, 7. Please provide the true labels explicitly through the labels argument. Classes found in y_true: [-1.  0.  1.  2.  3.  4.]
+    """
     def inverse_transform_proba(self, y):
         if self.invalid_class_count > 0:
             y_transformed = np.zeros([len(y), len(self.ordered_class_labels)])
