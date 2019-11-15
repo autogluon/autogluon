@@ -28,16 +28,16 @@ def try_import_mxnet():
 
 def try_import_dask():
     try:
-        import dask
+        import distributed
     except ImportError:
         raise ImportError(
-            "Unable to import dependency dask. "
-            "A quick tip is to install via `pip install dask[complete]`. ")
+            "Unable to import dependency distributed. "
+            "A quick tip is to install via `pip install distributed==2.6.0`. ")
     from distutils.version import LooseVersion
-    dask_version = '2.6.0'
-    if LooseVersion(dask.__version__) < LooseVersion(dask_version):
-        msg = ("Current Dask version {} is lower than the minimum requirement {}, "
-               "please run: `pip uninstall dask && pip install dask[complete]`")
+    distributed_version = '2.6.0'
+    if LooseVersion(distributed.__version__) != LooseVersion(distributed_version):
+        msg = ("Current Dask version {} is different from requirement {}, "
+               "please run: `pip uninstall -y distributed && pip install distributed==2.6.0`")
         raise ImportError(msg)
 
 def try_import_cv2():

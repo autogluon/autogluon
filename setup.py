@@ -38,15 +38,6 @@ def try_and_install_mxnet():
         print("MXNet {} detected.".format(mx.__version__))
 
 def uninstall_legacy_dask():
-    has_dask = True
-    try:
-        import dask
-    except ImportError:
-        has_dask = False
-    finally:
-        if has_dask:
-            subprocess.check_call("pip uninstall -y dask".split())
-    subprocess.check_call("pip install dask[complete]==2.6.0".split())
     has_dist = True
     try:
         import distributed
