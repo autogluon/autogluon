@@ -77,18 +77,18 @@ class VOC(DatasetBase):
 
 @obj()
 class TinyVOC(DatasetBase):
-    def __init__(self):
+    def __init__(self, root, *args, **kwargs):
         super().__init__()
         self.train_dataset = TinyVOCDetection(
-            root = '/home/ubuntu/tiny_motorbike',
+            root = root,
             splits=[(2007, 'tiny_motorbike_train')])
         self.val_dataset = TinyVOCDetection(
-            root = '/home/ubuntu/tiny_motorbike',
+            root = root,
             splits=[(2007, 'tiny_motorbike_val')])
         self.val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=self.val_dataset.classes)
     
         self.test_dataset = TinyVOCDetection(
-            root = '/home/ubuntu/tiny_motorbike',
+            root = root,
             splits=[(2007, 'tiny_motorbike_test')])
 
 
