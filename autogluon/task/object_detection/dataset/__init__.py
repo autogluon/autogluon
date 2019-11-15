@@ -8,7 +8,7 @@ def get_dataset(dataset_name, *args, **kwargs):
     if dataset_name=="voc":
         print(">>> create dataset: voc")
         return VOC(*args, **kwargs)
-    elif dataset_name=="tiny_voc":
+    elif dataset_name=="tiny_motorbike":
         print(">>> create dataset: tiny voc")
         return TinyVOC(*args, **kwargs)
     elif dataset_name=="coco":
