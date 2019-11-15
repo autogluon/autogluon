@@ -70,7 +70,7 @@ except(IOError, ImportError):
     long_description = open('README.md').read()
 
 requirements = [
-    'tqdm',
+    'tqdm>=4.38.0',
     'numpy',
     'scipy',
     'cython',
