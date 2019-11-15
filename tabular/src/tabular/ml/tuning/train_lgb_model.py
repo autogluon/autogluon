@@ -32,7 +32,7 @@ def train_lgb(args, reporter):
     eval_metric = lgb_model.get_eval_metric()
     if lgb_model.problem_type == BINARY:
         train_loss_name = 'binary_logloss'
-    elif lgb_model.problem_type == MULTI:
+    elif lgb_model.problem_type == MULTICLASS:
         train_loss_name = 'multi_logloss'
     elif lgb_model.problem_type == REGRESSION:
         train_loss_name = 'l1'
