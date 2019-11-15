@@ -11,8 +11,6 @@ stage("Unit Test") {
         # remove and create new env instead
         conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
-        pip uninstall -y ConfigSpace
-        pip install ConfigSpace
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
@@ -43,8 +41,6 @@ stage("Build Docs") {
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
-        pip uninstall -y ConfigSpace
-        pip install ConfigSpace
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
         cd docs && bash build_doc.sh
