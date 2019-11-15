@@ -39,7 +39,7 @@ stage("Build Docs") {
         conda activate autogluon_docs
         export PYTHONPATH=\${PWD}
         env
-        export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
