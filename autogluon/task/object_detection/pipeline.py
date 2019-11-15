@@ -20,18 +20,8 @@ from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
 from gluoncv.utils import LRScheduler, LRSequential
 
-import pdb
-
-
-#from .metrics import get_metric_instance
-#from ...core.optimizer import SGD, NAG
 from ...core import *
-#from ...nas.model_zoo import get_model
-#from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...utils.mxutils import collect_params
-#from .nets import get_built_in_network
-#from .dataset import get_built_in_dataset
-#from .utils import *
 
 def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_workers, args):
     """Get dataloader."""
@@ -204,13 +194,9 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
             current_map = float(mean_ap[-1])
         else:
             current_map = 0.
-        #reporter(epoch=epoch, detection_reward=current_map)
-        print(">>>>> finish training")
         reporter(epoch=epoch, map_reward=current_map)
-    print(">>>>> finish training")
-        #save_params(net, best_map, current_map, epoch, args.save_interval, args.save_prefix)
 
-@autogluon_register_args()
+@args()
 def train_object_detection(args, reporter):
     # fix seed for mxnet, numpy and python builtin random generator.
     gutils.random.seed(args.seed)
@@ -218,8 +204,6 @@ def train_object_detection(args, reporter):
     # training contexts
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
 
-    #TODO: args.datast should be str
-    # network
     net_name = '_'.join(('yolo3', args.net, 'custom'))
     args.save_prefix += net_name
 
@@ -227,25 +211,18 @@ def train_object_detection(args, reporter):
                                   classes=args.dataset.get_classes(),
                                   pretrained_base=False, 
                                   transfer='coco')
-    async_net = net
 
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         net.initialize()
-        async_net.initialize()
 
     # training data
     train_dataset, val_dataset, eval_metric = args.dataset.get_train_val_metric()
-    train_data, val_data = get_dataloader(
-        async_net, train_dataset, val_dataset, args.data_shape, args.batch_size, args.num_workers, args)
+    train_data, val_data = get_dataloader(net,
+        train_dataset, val_dataset, args.data_shape, args.batch_size, args.num_workers, args)
 
     # training
     train(net, train_data, val_data, eval_metric, ctx, args, reporter, args.final_fit)
 
-    print("~~~~~~~~~~~~~~~~~~~~~~~>>>>>>>> before final_fit")
-    print(args.final_fit)
     if args.final_fit:
-        print("~~~~~~~~~~~~~~~~~~~~~~~>>>>>>>l>!!!!!!!!!!!!!!!!!!!!!!!!!!!", args.final_fit)
-        #TODO:
-        return {'model_params': collect_params(net),
-                'num_classes': 1}
+        return {'model_params': collect_params(net)}

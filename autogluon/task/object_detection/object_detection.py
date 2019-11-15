@@ -13,8 +13,11 @@ from ..base import BaseTask
 
 from .dataset import *
 from .pipeline import train_object_detection
+from .utils import *
+from ...utils import update_params
 
-#from .classifier import Classifier
+from .classifier import Classifier
+import pdb
 
 __all__ = ['ObjectDetection']
 
@@ -29,26 +32,15 @@ class ObjectDetection(BaseTask):
 
     @staticmethod
     def fit(dataset='voc',
-            net=Categorical('mobilenet1.0', ),
-            #net=Categorical('mobilenet1.0', 'mobilenet1.0'),
-            #optimizer=Categorical(
-            #    SGD(learning_rate=Real(1e-4, 1e-2, log=True),
-            #        momentum=Real(0.85, 0.95),
-            #        wd=Real(1e-5, 1e-3, log=True)),
-            #    Adam(learning_rate=Real(1e-4, 1e-2, log=True),
-            #         wd=Real(1e-5, 1e-3, log=True)),
-            #),
-            #lr = 0.01,
-            lr=Categorical(0.00025, 0.00025),
-            #lr=Categorical(0.0001),
+            net=Categorical('mobilenet1.0'),
+            lr=Categorical(5e-4, 1e-4),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
-            #batch_size=64,
             batch_size=16,
-            input_size=224,
             epochs=200,
             metric='accuracy',
             num_trials=2,
             nthreads_per_trial=12,
+            num_workers=32,
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
@@ -62,7 +54,6 @@ class ObjectDetection(BaseTask):
             auto_search=True,
             seed=223,
             data_shape=416,
-            num_workers=32,
             start_epoch=0,
             lr_mode='step',
             lr_decay=0.1,
@@ -86,7 +77,7 @@ class ObjectDetection(BaseTask):
             ):
 
         """
-        Auto fit on image classification dataset
+        Auto fit on image object detection dataset
         Args:
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
             net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
@@ -124,7 +115,6 @@ class ObjectDetection(BaseTask):
             metric=metric,
             num_gpus=ngpus_per_trial,
             batch_size=batch_size,
-            input_size=input_size,
             epochs=epochs,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
@@ -172,18 +162,13 @@ class ObjectDetection(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
                 
-        #without autogluon
-        '''
-        from ...scheduler.reporter import FakeReporter
-        train_object_detection(train_object_detection.args, {'lr.choice': 0, 'net.choice':0}, reporter=FakeReporter)
-        '''
-
         results = BaseTask.run_fit(train_object_detection, search_strategy,
                                    scheduler_options)
-        print(">>>>>>>>>>>>>>> finish results")
-        pdb.set_trace()
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish results")
         args = sample_config(train_object_detection.args, results['best_config'])
+        print('The best config:\n', results['best_config'])
 
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+        #pdb.set_trace()
+        model = get_network(args.net, dataset.init().get_classes(), mx.cpu(0))
         update_params(model, results.pop('model_params'))
-        #return Classifier(model, results, default_val_fn, checkpoint, args)
+        return Classifier(model, results, checkpoint, args)

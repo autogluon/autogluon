@@ -41,7 +41,8 @@ class BaseTask(object):
         # gather the best configuration
         best_reward = scheduler.get_best_reward()
         best_config = scheduler.get_best_config()
-        best_config.update(final_fit=True)
+        #best_config.update(final_fit=True)
+        best_config.update()
         args = train_fn.args
         args.final_fit = True
         # final fit

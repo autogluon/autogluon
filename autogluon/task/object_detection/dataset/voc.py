@@ -12,7 +12,7 @@ except ImportError:
 import mxnet as mx
 from gluoncv.data.base import VisionDataset
 
-
+from ....core import *
 from .base import DatasetBase
 import autogluon as ag
 
@@ -20,8 +20,9 @@ from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 
 
-class VOCDetection(VisionDataset):
-    """Pascal VOC detection Dataset.
+class TinyVOCDetection(gdata.VOCDetection):
+    """Tiny VOC detection Dataset.
+    It only contains one category, motorbike
     Parameters
     ----------
     root : str, default '~/mxnet/datasets/voc'
@@ -51,110 +52,14 @@ class VOCDetection(VisionDataset):
     def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'voc'),
                  splits=((2007, 'trainval'), (2012, 'trainval')),
                  transform=None, index_map=None, preload_label=True):
-        super(VOCDetection, self).__init__(root)
-        self._im_shapes = {}
-        self._root = os.path.expanduser(root)
-        self._transform = transform
-        self._splits = splits
-        self._items = self._load_items(splits)
-        self._anno_path = os.path.join('{}', 'Annotations', '{}.xml')
-        self._image_path = os.path.join('{}', 'JPEGImages', '{}.jpg')
-        self.index_map = index_map or dict(zip(self.classes, range(self.num_class)))
-        self._label_cache = self._preload_labels() if preload_label else None
-
-    def __str__(self):
-        detail = ','.join([str(s[0]) + s[1] for s in self._splits])
-        return self.__class__.__name__ + '(' + detail + ')'
-
-    @property
-    def classes(self):
-        """Category names."""
-        try:
-            self._validate_class_names(self.CLASSES)
-        except AssertionError as e:
-            raise RuntimeError("Class names must not contain {}".format(e))
-        return type(self).CLASSES
-
-    def __len__(self):
-        return len(self._items)
-
-    def __getitem__(self, idx):
-        img_id = self._items[idx]
-        img_path = self._image_path.format(*img_id)
-        label = self._label_cache[idx] if self._label_cache else self._load_label(idx)
-        img = mx.image.imread(img_path, 1)
-        #print(label, img_path)
-        if self._transform is not None:
-            return self._transform(img, label)
-        return img, label
-
-    def _load_items(self, splits):
-        """Load individual image indices from splits."""
-        ids = []
-        for year, name in splits:
-            root = os.path.join(self._root, 'VOC' + str(year))
-            lf = os.path.join(root, 'ImageSets', 'Main', name + '.txt')
-            with open(lf, 'r') as f:
-                ids += [(root, line.strip()) for line in f.readlines()]
-        return ids
-
-    def _load_label(self, idx):
-        """Parse xml file and return labels."""
-        img_id = self._items[idx]
-        anno_path = self._anno_path.format(*img_id)
-        root = ET.parse(anno_path).getroot()
-        size = root.find('size')
-        width = float(size.find('width').text)
-        height = float(size.find('height').text)
-        if idx not in self._im_shapes:
-            # store the shapes for later usage
-            self._im_shapes[idx] = (width, height)
-        label = []
-        for obj in root.iter('object'):
-            try:
-                difficult = int(obj.find('difficult').text)
-            except ValueError:
-                difficult = 0
-            cls_name = obj.find('name').text.strip().lower()
-            if cls_name not in self.classes:
-                continue
-            #pdb.set_trace()
-            cls_id = self.index_map[cls_name]
-            xml_box = obj.find('bndbox')
-            xmin = (float(xml_box.find('xmin').text) - 1)
-            ymin = (float(xml_box.find('ymin').text) - 1)
-            xmax = (float(xml_box.find('xmax').text) - 1)
-            ymax = (float(xml_box.find('ymax').text) - 1)
-            try:
-                self._validate_label(xmin, ymin, xmax, ymax, width, height)
-            except AssertionError as e:
-                raise RuntimeError("Invalid label at {}, {}".format(anno_path, e))
-            label.append([xmin, ymin, xmax, ymax, cls_id, difficult])
-            #pdb.set_trace()
-        return np.array(label)
-
-    def _validate_label(self, xmin, ymin, xmax, ymax, width, height):
-        """Validate labels."""
-        assert 0 <= xmin < width, "xmin must in [0, {}), given {}".format(width, xmin)
-        assert 0 <= ymin < height, "ymin must in [0, {}), given {}".format(height, ymin)
-        assert xmin < xmax <= width, "xmax must in (xmin, {}], given {}".format(width, xmax)
-        assert ymin < ymax <= height, "ymax must in (ymin, {}], given {}".format(height, ymax)
-
-    def _validate_class_names(self, class_list):
-        """Validate class names."""
-        assert all(c.islower() for c in class_list), "uppercase characters"
-        stripped = [c for c in class_list if c.strip() != c]
-        if stripped:
-            warnings.warn('white space removed for {}'.format(stripped))
-
-    def _preload_labels(self):
-        """Preload all labels into memory."""
-        logging.debug("Preloading %s labels into memory...", str(self))
-        return [self._load_label(idx) for idx in range(len(self))]
+        super(TinyVOCDetection, self).__init__(root=root,
+                                               splits=splits,
+                                               transform=transform,
+                                               index_map=index_map,
+                                               preload_label=preload_label),
 
 
-
-@ag.autogluon_object()
+@obj()
 class VOC(DatasetBase):
     def __init__(self):
         super().__init__()
@@ -170,18 +75,28 @@ class VOC(DatasetBase):
     def get_dataset_name(self):
         return 'voc'
 
-@ag.autogluon_object()
+@obj()
 class TinyVOC(DatasetBase):
     def __init__(self):
         super().__init__()
-        self.train_dataset = VOCDetection(
-            splits=[(2007, 'my_motorbike_train')])
-        self.val_dataset = VOCDetection(
-            splits=[(2007, 'my_motorbike_test')])
+        self.train_dataset = TinyVOCDetection(
+            root = '/home/ubuntu/tiny_motorbike',
+            splits=[(2007, 'tiny_motorbike_train')])
+        self.val_dataset = TinyVOCDetection(
+            root = '/home/ubuntu/tiny_motorbike',
+            splits=[(2007, 'tiny_motorbike_val')])
         self.val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=self.val_dataset.classes)
+    
+        self.test_dataset = TinyVOCDetection(
+            root = '/home/ubuntu/tiny_motorbike',
+            splits=[(2007, 'tiny_motorbike_test')])
+
 
     def get_train_val_metric(self):
         return (self.train_dataset, self.val_dataset, self.val_metric)
+
+    def get_test_metric(self):
+        return (self.test_dataset, self.val_metric)
 
     def get_dataset_name(self):
         return 'tinyvoc'
