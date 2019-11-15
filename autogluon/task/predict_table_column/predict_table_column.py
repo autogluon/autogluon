@@ -3,20 +3,19 @@ import numpy as np
 import pandas as pd
 import mxnet as mx
 
-
-# TODO: Perhaps change this to import from autogluon module rather than entirely separate tabular module. Need to replace all imports with the proper autogluon module once tabular has been fully integrated as a submodule of autogluon 
-from tabular.ml.learner.default_learner import DefaultLearner as Learner
-from tabular.ml.trainer.auto_trainer import AutoTrainer
-from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
-
 from .dataset import TabularDataset
-
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ..base.base_task import schedulers
+
+# TODO: Change these import locations once tabular has been fully integrated as a submodule of autogluon 
+from tabular.ml.learner.default_learner import DefaultLearner as Learner
+from tabular.ml.trainer.auto_trainer import AutoTrainer
+from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
+from tabular.utils.fit_utils import setup_outputdir, setup_compute, setup_trial_limits
 
 
 __all__ = ['PredictTableColumn']
@@ -38,7 +37,7 @@ class PredictTableColumn(BaseTask):
     
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.
     @staticmethod
-    def fit(train_data, label, tuning_data=None, output_directory='', problem_type=None, objective_func=None, 
+    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None, 
             submission_columns=[], threshold=10,
             hyperparameter_tune=True, feature_prune=False,
             hyperparameters = {'NN': {'num_epochs': 300}, 
@@ -53,6 +52,7 @@ class PredictTableColumn(BaseTask):
         tuning_data: Another Dataset object containing validation data reserved for hyperparameter tuning (in same format as training data).
             Note: final model returned may be fit on this tuning_data as well as train_data! Do not provide your test data here.
         output_directory (str): Path to directory where models and intermediate outputs should be saved.
+            If unspecified, a time-stamped folder called 'autogluon-fit-TIMESTAMP" will be created in the working directory to store all models.
             Note: To call fit() twice and save all results of each fit, you must specify different locations for output_directory.
                   Otherwise files from first fit() will be overwritten by second fit().
         problem_type (str): Type of prediction problem, ie. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
@@ -103,30 +103,9 @@ class PredictTableColumn(BaseTask):
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
-        output_directory = os.path.expanduser(output_directory) # replace ~ with absolute path if it exists
-        
-        if nthreads_per_trial is None:
-            nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
-        if ngpus_per_trial is None:
-            if mx.test_utils.list_gpus():
-                ngpus_per_trial = 1  # Single GPU / trial
-            else:
-                ngpus_per_trial = 0
-        if ngpus_per_trial > 1:
-            ngpus_per_trial = 1
-            print("predict_table_column currently does not use more than 1 GPU per training run. ngpus_per_trial has been set = 1")
-        # Adjust default time limits / trials:
-        if num_trials is None:
-            if time_limits is None:
-                time_limits = 10 * 60  # run for 10min by default
-            if time_limits <= 20:  # threshold = 20sec, ie. too little time to run >1 trial.
-                num_trials = 1
-            else:
-                num_trials = 1000  # run up to 1000 trials (or as you can within the given time_limits)
-        elif time_limits is None:
-            time_limits = int(1e6)  # user only specified num_trials, so run all of them regardless of time-limits
-        time_limits *= 0.9  # reduce slightly to account for extra time overhead
-        time_limits /= float(len(hyperparameters.keys()))  # each model type gets half the available time
+        output_directory = setup_outputdir(output_directory) # Format directory name
+        nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
+        time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
         
         # All models use same scheduler (TODO: grant each model their own scheduler to run simultaneously):
         scheduler_options = {
