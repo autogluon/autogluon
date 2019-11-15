@@ -214,9 +214,10 @@ class AbstractTrainer:
                                  hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         for model_name in self.model_names:
-            model = self.load_model(model_name)
-            if model is not None:
-                print(model_name, model.score(X_test, y_test))  # TODO: Might want to remove this to avoid needless computation
+            print(model_name, self.model_performance[model_name])
+
+        if len(self.model_names) == 0:
+            raise ValueError('AutoGluon did not successfully train any models')
 
         ensemble_voting_score = self.score(X=X_test, y=y_test, weights='voting')  # TODO: Might want to remove this to avoid needless computation
         self.model_performance['ensemble.equal_weights'] = ensemble_voting_score
