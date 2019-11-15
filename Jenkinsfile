@@ -9,12 +9,13 @@ stage("Unit Test") {
         sh """#!/bin/bash
         set -ex
         # remove and create new env instead
-        conda env update -n autogluon_py3 -f docs/build.yml
+        conda env remove -y -n autogluon_py3
+        conda env create -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
-        export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip uninstall -y autogluon
@@ -35,13 +36,13 @@ stage("Build Docs") {
         sh """#!/bin/bash
         set -ex
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
+        conda env remove -y -autogluon_docs
         conda env update -n autogluon_docs -f docs/build.yml
         conda activate autogluon_docs
         export PYTHONPATH=\${PWD}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-9.2/lib64
         git clean -fx
-        pip uninstall -y d2lbook
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
         cd docs && bash build_doc.sh

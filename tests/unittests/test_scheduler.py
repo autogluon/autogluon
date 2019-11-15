@@ -12,7 +12,7 @@ def train_fn(args, reporter):
 def test_fifo_scheduler():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 2, 'num_gpus': 0},
-                                           num_trials=20,
+                                           num_trials=10,
                                            reward_attr='accuracy',
                                            time_attr='epoch')
     scheduler.run()
@@ -21,7 +21,7 @@ def test_fifo_scheduler():
 def test_hyperband_scheduler():
     scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                                 resource={'num_cpus': 2, 'num_gpus': 0},
-                                                num_trials=20,
+                                                num_trials=10,
                                                 reward_attr='accuracy',
                                                 time_attr='epoch',
                                                 grace_period=1)
@@ -39,7 +39,7 @@ def rl_train_fn(args, reporter):
 def test_rl_scheduler():
     scheduler = ag.scheduler.RLScheduler(rl_train_fn,
                                          resource={'num_cpus': 2, 'num_gpus': 0},
-                                         num_trials=20,
+                                         num_trials=10,
                                          reward_attr='accuracy',
                                          time_attr='epoch')
     scheduler.run()
