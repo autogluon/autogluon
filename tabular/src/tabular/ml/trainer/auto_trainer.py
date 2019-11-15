@@ -4,7 +4,7 @@ from tabular.ml.models.model_presets.presets import get_preset_models
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
-    def __init__(self, path, problem_type, scheduler_options, objective_func=None, num_classes=None,
+    def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
                  low_memory=False, feature_types_metadata={}, compute_feature_importance=False):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,

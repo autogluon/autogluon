@@ -24,7 +24,9 @@ from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
-    def __init__(self, path: str, problem_type: str, scheduler_options, objective_func=None, num_classes=None, low_memory=False, feature_types_metadata={}, compute_feature_importance=False):
+    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, 
+                 num_classes=None, low_memory=False, feature_types_metadata={}, 
+                 compute_feature_importance=False):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
@@ -56,8 +58,12 @@ class AbstractTrainer:
         self.hpo_results = {} # Stores summary of HPO process
         self.hpo_model_names = [] # stores additional models produced during HPO
         # Scheduler attributes:
-        self.scheduler_func = scheduler_options[0] # unpack tuple
-        self.scheduler_options = scheduler_options[1]
+        if scheduler_options is not None:
+            self.scheduler_func = scheduler_options[0] # unpack tuple
+            self.scheduler_options = scheduler_options[1]
+        else:
+            self.scheduler_func = None
+            self.scheduler_options = None
         # nthreads_per_trial = self.scheduler_options['resource']['num_cpus']
         # ngpus_per_trial = self.scheduler_options['resource']['num_gpus']
 
@@ -150,8 +156,10 @@ class AbstractTrainer:
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
         fit_start_time = time.time()
-        model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
-                  'num_gpus': self.scheduler_options['resource']['num_gpus'] } # Additional configurations for model.fit
+        model_fit_kwargs = {}
+        if self.scheduler_options is not None:
+            model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
+                'num_gpus': self.scheduler_options['resource']['num_gpus'] } # Additional configurations for model.fit
         model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
         fit_end_time = time.time()
         score = model.score(X=X_test, y=y_test)
@@ -181,6 +189,8 @@ class AbstractTrainer:
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
+            if self.scheduler_func is None or self.scheduler_options is None:
+                raise ValueError("scheduler_options cannot be None when hyperparameter_tune = True")
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?

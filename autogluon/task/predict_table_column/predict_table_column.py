@@ -1,4 +1,4 @@
-import logging, multiprocessing
+import logging, multiprocessing, os
 import numpy as np
 import pandas as pd
 import mxnet as mx
@@ -8,6 +8,7 @@ import mxnet as mx
 from tabular.ml.learner.default_learner import DefaultLearner as Learner
 from tabular.ml.trainer.auto_trainer import AutoTrainer
 from tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
+
 from .dataset import TabularDataset
 
 from ...core import *
@@ -32,6 +33,7 @@ class PredictTableColumn(BaseTask):
     @staticmethod
     def load(output_directory):
         """ output_directory (str): path to directory where models are stored """
+        output_directory = os.path.expanduser(output_directory) # replace ~ with absolute path if it exists
         return Learner.load(output_directory)
     
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.
@@ -101,6 +103,7 @@ class PredictTableColumn(BaseTask):
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
+        output_directory = os.path.expanduser(output_directory) # replace ~ with absolute path if it exists
         
         if nthreads_per_trial is None:
             nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))

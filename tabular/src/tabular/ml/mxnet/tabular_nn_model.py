@@ -221,7 +221,7 @@ class TabularNeuralNetModel(AbstractModel):
             self.params['num_dataloading_workers'] = max(1, int(kwargs['num_cpus']/2.0))
         if 'num_gpus' in kwargs:
             if kwargs['num_gpus'] >= 1:
-                self.params['ctx'] = mx.gpu()  # TODO: currently does not use more than 1 GPU
+                self.params['ctx'] = mx.gpu()  # TODO: currently cannot use more than 1 GPU
             else:
                 self.params['ctx'] = mx.cpu()
 

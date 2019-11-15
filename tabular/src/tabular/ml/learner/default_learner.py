@@ -23,8 +23,7 @@ class DefaultLearner(AbstractLearner):
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
-    # TODO: Should scheduler_options have a default value? Without it it makes it hard to use
-    def fit(self, X: DataFrame, scheduler_options, X_test: DataFrame = None, hyperparameter_tune=True, 
+    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
             feature_prune=False, hyperparameters = {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
         """ Arguments:
                 X (DataFrame): training data

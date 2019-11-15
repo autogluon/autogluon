@@ -82,6 +82,7 @@ class AbstractModel:
         return path
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+        # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
 

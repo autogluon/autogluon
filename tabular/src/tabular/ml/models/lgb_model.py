@@ -53,6 +53,7 @@ class LGBModel(AbstractModel):
 
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, **kwargs):
+        # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         self.params = fixedvals_from_searchspaces(self.params)
         if self.params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
             self.params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
@@ -241,7 +242,9 @@ class LGBModel(AbstractModel):
         seed_val = self.params.pop('seed_value', None)
         num_boost_round = self.params.pop('num_boost_round', 1000)
         
-        directory = self.path
+        directory = self.path # also create model directory if it doesn't exist
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         scheduler_func = scheduler_options[0] # Unpack tuple
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:

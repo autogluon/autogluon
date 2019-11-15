@@ -36,20 +36,20 @@ from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
  
 ############ Benchmark options you can set: ########################
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-fast_benchmark = True # False 
+fast_benchmark = True # False
+hyperparameter_tune = True
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
 # performance_value warnings are disabled when fast_benchmark = True.
 
 #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
 if fast_benchmark:
-    hyperparameter_tune = True
-    subsample_size = 1000
-    nn_options = {'num_epochs': 5} 
-    gbm_options = {'num_boost_round': 100}
+    subsample_size = 5000
+    nn_options = {'num_epochs': 50} 
+    gbm_options = {'num_boost_round': 1000}
     hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
-    num_trials = 3
-    time_limits = 2*60
+    num_trials = 100
+    time_limits = 10*60
 ###################################################################
 
 # Each train/test dataset must be located in single directory with the given names.
@@ -134,7 +134,7 @@ with warnings.catch_warnings(record=True) as caught_warnings:
                 time_limits=time_limits, num_trials=num_trials)
         else:
             predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                                 hyperparameter_tune=True)
+                                 hyperparameter_tune=hyperparameter_tune)
         if predictor.problem_type != dataset['problem_type']:
             warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
         predictor = None  # We delete predictor here to test loading previously-trained predictor from file
