@@ -19,7 +19,7 @@ stage("Unit Test") {
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip uninstall -y autogluon
         python setup.py develop
-        nosetests -v tests/unittests --processes=0
+        nosetests -v tests/unittests
         """
       }
     }
