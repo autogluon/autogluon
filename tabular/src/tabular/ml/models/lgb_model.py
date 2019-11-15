@@ -23,7 +23,7 @@ from tabular.ml.tuning.train_lgb_model import train_lgb
 
 # TODO:debug!  from tabular.ml.tuning.train_lgb_model import train_lgb
 
-logger = logging.getLogger(__name__) # TODO: Currently 
+logger = logging.getLogger(__name__) # TODO: Currently
 
 class LGBModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func,
@@ -35,7 +35,7 @@ class LGBModel(AbstractModel):
         if hyperparameters is not None:
             self.params.update(hyperparameters.copy()) # update with user-specified settings
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
-        
+
         self.metric_types = self.params['metric'].split(',')
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True
@@ -55,15 +55,16 @@ class LGBModel(AbstractModel):
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, **kwargs):
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         self.params = fixedvals_from_searchspaces(self.params)
-        if self.params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
-            self.params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
-        
+        if 'min_data_in_leaf' in self.params:
+            if self.params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
+                self.params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
+
         num_boost_round = self.params.pop('num_boost_round', 1000)
         print('Training Gradient Boosting Model for %s rounds...' % num_boost_round)
         print("with the following hyperparameter settings:")
         print(self.params)
         seed_val = self.params.pop('seed_value', None)
-        
+
         eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
@@ -75,7 +76,7 @@ class LGBModel(AbstractModel):
             callbacks += [
                 early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, 
                                       ignore_dart_warning=True, verbose=False, manual_stop_file=self.path + 'stop.txt'),
-            ]
+                ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
 
@@ -90,7 +91,7 @@ class LGBModel(AbstractModel):
         train_params = {
             'params': self.params.copy(),
             'train_set': dataset_train,
-            'num_boost_round': num_boost_round, 
+            'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
             'valid_names': valid_names,
             'evals_result': self.eval_results,
@@ -185,13 +186,13 @@ class LGBModel(AbstractModel):
         return X, w
 
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
-        lgb_dataset_params_keys = ['two_round','num_threads', 'num_classes'] # Keys that are specific to lightGBM Dataset object construction.
+        lgb_dataset_params_keys = ['objective', 'two_round','num_threads', 'num_classes', 'verbose'] # Keys that are specific to lightGBM Dataset object construction.
         data_params = {}
         for key in lgb_dataset_params_keys:
             if key in self.params:
                 data_params[key] = self.params[key]
         data_params = data_params.copy()
-        
+
         W_train = None  # TODO: Add weight support
         W_test = None  # TODO: Add weight support
         if X_train is not None:
@@ -241,7 +242,7 @@ class LGBModel(AbstractModel):
         params_copy = self.params.copy()
         seed_val = self.params.pop('seed_value', None)
         num_boost_round = self.params.pop('num_boost_round', 1000)
-        
+
         directory = self.path # also create model directory if it doesn't exist
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -252,7 +253,7 @@ class LGBModel(AbstractModel):
         num_threads = scheduler_options['resource'].get('num_cpus', -1)
         self.params['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
-        
+
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
@@ -267,7 +268,7 @@ class LGBModel(AbstractModel):
             dataset_val.save_binary(val_file)
         else:
             dataset_val_filename = None
-        
+
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
         else:
@@ -275,8 +276,8 @@ class LGBModel(AbstractModel):
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
                     print(hyperparam + ":   " + str(params_copy[hyperparam]))
-        
-        train_lgb.register_args(dataset_train_filename=dataset_train_filename, 
+
+        train_lgb.register_args(dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
             directory=directory, lgb_model=self, **params_copy)
         scheduler = scheduler_func(train_lgb, **scheduler_options)
@@ -285,10 +286,10 @@ class LGBModel(AbstractModel):
             scheduler.upload_files([dataset_train_file, dataset_val_file]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             train_lgb.update(directory=directory)
-        
+
         scheduler.run()
         scheduler.join_jobs()
-        
+
         # Store results / models from this HPO run:
         best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
         hpo_results = {'best_reward': scheduler.get_best_reward(),
@@ -313,7 +314,7 @@ class LGBModel(AbstractModel):
             trial_model_name = self.name+"_"+file_id
             trial_model_path = self.path + file_prefix
             hpo_models[trial_model_name] = trial_model_path
-        
+
         print("Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
@@ -326,14 +327,14 @@ class LGBModel(AbstractModel):
         # save(final_model)
 
     def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from 
-            default fixed value to default spearch space. 
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default spearch space.
         """
         def_search_space = get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes).copy()
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = def_search_space.pop(key, None)
         self.params.update(def_search_space)
-    
+
 
 """ OLD code: TODO: remove once confirming no longer needed.
 
