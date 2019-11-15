@@ -35,7 +35,7 @@ stage("Build Docs") {
         sh """#!/bin/bash
         set -ex
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        conda env remove -y autogluon_docs
+        conda env remove -y -n autogluon_docs
         conda env create -n autogluon_docs -f docs/build.yml
         conda activate autogluon_docs
         export PYTHONPATH=\${PWD}
