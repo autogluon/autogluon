@@ -1,18 +1,18 @@
 import ConfigSpace as CS
 from mxnet import optimizer as optim
 
-from ..core import *
+from ..core import obj
 
 __all__ = ['Adam', 'NAG', 'SGD']
 
-@autogluon_object()
+@obj()
 class Adam(optim.Adam):
     pass
 
-@autogluon_object()
+@obj()
 class NAG(optim.NAG):
     pass
 
-@autogluon_object()
+@obj()
 class SGD(optim.SGD):
     pass

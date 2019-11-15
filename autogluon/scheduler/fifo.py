@@ -14,13 +14,10 @@ from ..core import Task
 from ..core.decorator import _autogluon_method
 from .scheduler import TaskScheduler
 from ..searcher import *
-from .reporter import DistStatusReporter
+from .reporter import DistStatusReporter, FakeReporter
 from ..utils import DeprecationHelper, in_ipynb
 
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+from tqdm.auto import tqdm
 
 __all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
 
@@ -33,37 +30,50 @@ searchers = {
 }
 
 class FIFOScheduler(TaskScheduler):
-    """Simple scheduler that just runs trials in submission order.
+    r"""Simple scheduler that just runs trials in submission order.
 
-    Args:
-        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
-        args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (str or object): Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
-        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
+    args : object (optional)
+        Default arguments for launching train_fn.
+    resource : dict
+        Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : str or object
+        Autogluon searcher. For example, autogluon.searcher.self.argsRandomSampling
+    time_attr : str
+            A training result attr to use for comparing time.
+            Note that you can pass in something non-temporal such as
+            `training_epoch` as a measure of progress, the only requirement
+            is that the attribute should increase monotonically.
+    reward_attr : str
+        The training result objective value attribute. As with `time_attr`, this may refer to any objective value.
+        Stopping procedures will use this attribute.
+    dist_ip_addrs : list of str
+        IP addresses of remote machines.
 
-    Example:
-        >>> @autogluon_method
-        >>> def train_fn(args, reporter):
-        >>>     for e in range(10):
-        >>>         # forward, backward, optimizer step and evaluation metric
-        >>>         # generate fake top1_accuracy
-        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=top1_accuracy)
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> searcher = RandomSampling(cs)
-        >>> myscheduler = FIFOScheduler(train_fn, args,
-        >>>                             resource={'num_cpus': 2, 'num_gpus': 0},
-        >>>                             searcher=searcher, num_trials=20,
-        >>>                             reward_attr='accuracy',
-        >>>                             time_attr='epoch',
-        >>>                             grace_period=1)
-        >>> # run tasks
-        >>> myscheduler.run()
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(10):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
+    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
+    ...                                        num_trials=20,
+    ...                                        reward_attr='accuracy',
+    ...                                        time_attr='epoch')
+    >>> scheduler.run()
+    >>> scheduler.join_jobs()
+    >>> scheduler.get_training_curves(plot=True)
+    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,
@@ -139,7 +149,6 @@ class FIFOScheduler(TaskScheduler):
             if self.time_out and time.time() - start_time >= self.time_out \
                     or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
-            #tbar.set_description('Current best reward: {:.2f} '.format(self.get_best_reward()))
             self.schedule_next()
 
     def save(self, checkpoint=None):
@@ -174,8 +183,11 @@ class FIFOScheduler(TaskScheduler):
 
     def run_with_config(self, config):
         """Run with config for final fit.
+        It launches a single training trial under any fixed values of the hyperparameters.
+        For example, after HPO has identified the best hyperparameter values based on a hold-out dataset,
+        one can use this function to retrain a model with the same hyperparameters on all the available labeled data
+        (including the hold out set). It can also returns other objects or states.
         """
-        from .reporter import FakeReporter
         task = Task(self.train_fn, {'args': self.args, 'config': config},
                     DistributedResource(**self.resource))
         reporter = FakeReporter()
@@ -194,6 +206,16 @@ class FIFOScheduler(TaskScheduler):
 
         Args:
             task (:class:`autogluon.scheduler.Task`): a new trianing task
+
+        Relevant entries in kwargs:
+            - bracket: HB bracket to be used. Has been sampled in _promote_config
+            - new_config: If True, task starts new config eval, otherwise it promotes
+              a config (only if type == 'promotion')
+
+        Only if new_config == False:
+            - config_key: Internal key for config
+            - resume_from: config promoted from this milestone
+            - milestone: config promoted to this milestone (next from resume_from)
         """
         cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
@@ -233,7 +255,7 @@ class FIFOScheduler(TaskScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            self.add_training_result(
+            self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
             reporter.move_on()
             last_result = reported_result
@@ -254,18 +276,17 @@ class FIFOScheduler(TaskScheduler):
         extra_args = dict()
         return config, extra_args
 
-    def get_best_state(self):
-        raise NotImplemented
-
     def get_best_config(self):
-        # Enable interactive monitoring
+        """Get the best configuration from the finished jobs.
+        """
         return self.searcher.get_best_config()
 
     def get_best_reward(self):
-        # Enable interactive monitoring
+        """Get the best reward from the finished jobs.
+        """
         return self.searcher.get_best_reward()
 
-    def add_training_result(self, task_id, reported_result, config=None):
+    def _add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             if 'loss' in reported_result:
                 self.mxboard.add_scalar(tag='loss',
@@ -288,6 +309,22 @@ class FIFOScheduler(TaskScheduler):
                     self.config_history[task_id] = config
 
     def get_training_curves(self, filename=None, plot=False, use_legend=True):
+        """Get Training Curves
+
+        Parameters
+        ----------
+            filename : str
+            plot : bool
+            use_legend : bool
+
+        Examples
+        --------
+        >>> scheduler.run()
+        >>> scheduler.join_jobs()
+        >>> scheduler.get_training_curves(plot=True)
+
+            .. image:: https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/doc/api/autogluon.1.png?raw=true
+        """
         if filename is None and not plot:
             logger.warning('Please either provide filename or allow plot in get_training_curves')
         import matplotlib.pyplot as plt
@@ -306,6 +343,12 @@ class FIFOScheduler(TaskScheduler):
         if plot: plt.show()
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         destination = super(FIFOScheduler, self).state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
         with self.log_lock:
@@ -315,6 +358,12 @@ class FIFOScheduler(TaskScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         super(FIFOScheduler, self).load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
         with self.log_lock:

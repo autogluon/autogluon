@@ -3,34 +3,26 @@ from mxnet import gluon
 from ...nas.models.utils import *
 from ...nas.models.mbconv import MBConvBlock
 from ...core.space import *
-from .enas import autogluon_enas_unit, ENAS_Sequential
+from .enas import enas_unit, ENAS_Sequential
 
 __all__ = ['ENAS_MbBlock', 'ENAS_MBNet']
 
-@autogluon_enas_unit(
-    in_channels=32,
-    channels=32,
-    expand_ratio=Categorical(3, 6),
-    kernel=Categorical(3, 5),
-    input_size=32,
-    with_zero=False,
-)
+@enas_unit()
 class ENAS_MbBlock(MBConvBlock):
     pass
 
 class ENAS_MBNet(gluon.HybridBlock):
-    def __init__(self, blocks_args=None, dropout_rate=0.2, num_classes=1000, input_size=224,
-                 activation='swish', **kwargs):
+    def __init__(self, blocks_args=[], dropout_rate=0.2, num_classes=1000, input_size=224,
+                 activation='swish', blocks=None, **kwargs):
         r"""ENAS model with MobileNet search space
 
         Args:
             blocks_args (list of autogluon.Dict)
         """
         super(ENAS_MBNet, self).__init__(**kwargs)
-        if blocks_args is None:
+        if len(blocks_args)==0 and blocks is None:
             blocks_args = get_enas_blockargs()
-        assert isinstance(blocks_args, list), 'blocks_args should be a list'
-        assert len(blocks_args) > 0, 'block args must be greater than 0'
+        #assert isinstance(blocks_args, (tuple, list)), 'blocks_args should be a list'
         self.input_size = input_size
         with self.name_scope():
             self._features = gluon.nn.HybridSequential()
@@ -44,7 +36,7 @@ class ENAS_MBNet(gluon.HybridBlock):
             input_size = _update_input_size(input_size, 2)
             _blocks = []
             for block_arg in blocks_args:
-                block_arg.update(in_channels=out_channels, input_size=input_size)
+                block_arg.update(in_channels=out_channels, input_size=input_size, activation=activation)
                 out_channels=block_arg.channels
                 _blocks.append(ENAS_MbBlock(**block_arg))
                 input_size = _update_input_size(input_size, block_arg.stride)
@@ -55,9 +47,13 @@ class ENAS_MBNet(gluon.HybridBlock):
                 for _ in range(block_arg.num_repeat - 1):
                     _blocks.append(ENAS_MbBlock(**block_arg))
 
-            self._blocks = ENAS_Sequential(_blocks)
+            if blocks is not None:
+                self._blocks = ENAS_Sequential(blocks)
+            else:
+                self._blocks = ENAS_Sequential(_blocks)
             # Head
             self._conv_head = gluon.nn.HybridSequential()
+            out_channels = 320
             hidden_channels = 1280
             with self._conv_head.name_scope():
                 _add_conv(self._conv_head, hidden_channels, activation=activation,
@@ -105,16 +101,16 @@ def get_enas_blockargs():
     blocks_args = [
         Dict(kernel=3, num_repeat=1, channels=16, expand_ratio=1, stride=1, se_ratio=0.25, in_channels=32),
         Dict(kernel=3, num_repeat=1, channels=16, expand_ratio=1, stride=1, se_ratio=0.25, in_channels=16, with_zero=True),
-        Dict(kernel=Categorical(3, 5), num_repeat=1, channels=24, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=16),
-        Dict(kernel=Categorical(3, 5), num_repeat=3, channels=24, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=24, with_zero=True),
-        Dict(kernel=Categorical(3, 5), num_repeat=1, channels=40, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=24),
-        Dict(kernel=Categorical(3, 5), num_repeat=3, channels=40, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=40, with_zero=True),
-        Dict(kernel=Categorical(3, 5), num_repeat=1, channels=80, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=40),
-        Dict(kernel=Categorical(3, 5), num_repeat=4, channels=80, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=80, with_zero=True),
-        Dict(kernel=Categorical(3, 5), num_repeat=1, channels=112, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=80),
-        Dict(kernel=Categorical(3, 5), num_repeat=4, channels=112, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=112, with_zero=True),
-        Dict(kernel=Categorical(3, 5), num_repeat=1, channels=192, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=112),
-        Dict(kernel=Categorical(3, 5), num_repeat=5, channels=192, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=192, with_zero=True),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=1, channels=24, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=16),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=3, channels=24, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=24, with_zero=True),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=1, channels=40, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=24),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=3, channels=40, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=40, with_zero=True),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=1, channels=80, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=40),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=4, channels=80, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=80, with_zero=True),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=1, channels=112, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=80),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=4, channels=112, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=112, with_zero=True),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=1, channels=192, expand_ratio=Categorical(3, 6), stride=2, se_ratio=0.25, in_channels=112),
+        Dict(kernel=Categorical(3, 5, 7), num_repeat=5, channels=192, expand_ratio=Categorical(3, 6), stride=1, se_ratio=0.25, in_channels=192, with_zero=True),
         Dict(kernel=3, num_repeat=1, channels=320, expand_ratio=6, stride=1, se_ratio=0.25, in_channels=192),
     ]
     return blocks_args

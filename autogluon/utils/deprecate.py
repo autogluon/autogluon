@@ -37,7 +37,7 @@ class DeprecationHelper(object):
 
     def _warn(self):
         warn("autogluon.{} is now deprecated in favor of autogluon.{}." \
-             .format(self.new_name, self.old_name), AutoGluonWarning)
+             .format(self.old_name, self.new_name), AutoGluonWarning)
 
     def __call__(self, *args, **kwargs):
         self._warn()

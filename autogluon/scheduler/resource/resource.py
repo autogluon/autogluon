@@ -91,9 +91,11 @@ def get_cpu_count():
     return cpu_count()
 
 def get_gpu_count():
-    from .nvutil import cudaInit, cudaDeviceGetCount
+    from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
     if not cudaInit(): return 0
-    return cudaDeviceGetCount()
+    gpu_count = cudaDeviceGetCount()
+    cudaShutdown()
+    return gpu_count
 
 def get_remote_cpu_count(node):
     ret = node.submit(get_cpu_count)

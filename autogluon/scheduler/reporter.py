@@ -10,7 +10,7 @@ from distributed.comm.core import CommClosedError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Communicator', 'DistStatusReporter']
+__all__ = ['Communicator', 'DistStatusReporter', 'FakeReporter']
 
 class StatusReporter(object):
     """Report status through the training scheduler.

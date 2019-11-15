@@ -19,18 +19,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['TaskScheduler', 'DistributedTaskScheduler']
 
 class TaskScheduler(object):
-    """Distributed Task Scheduler
-
-    Args:
-        dist_ip_addrs (List): list of ip addresses for remote nodes
-
-    Example:
-        >>> def my_task():
-        >>>     pass
-        >>> resource = DistributedResource(num_cpus=2, num_gpus=1)
-        >>> task = Task(my_task, {}, resource)
-        >>> scheduler = TaskScheduler()
-        >>> scheduler.add_job(task)
+    """Base Distributed Task Scheduler
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
@@ -50,6 +39,8 @@ class TaskScheduler(object):
         self.env_sem = DistSemaphore(1)
 
     def add_remote(self, ip_addrs):
+        """Add remote nodes to the scheduler computation resource.
+        """
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         with self.LOCK:
             remotes = TaskScheduler.REMOTE_MANAGER.add_remote_nodes(ip_addrs)
@@ -69,13 +60,26 @@ class TaskScheduler(object):
             return {'TASK_ID': task['TASK_ID'], 'Args': task['Args']}
 
     def add_task(self, task, **kwargs):
+        """add_task() is now deprecated in favor of add_job().
+        """
+        warn("scheduler.add_task() is now deprecated in favor of scheduler.add_job().",
+             AutoGluonWarning)
         self.add_job(task, **kwargs)
 
     def add_job(self, task, **kwargs):
-        """Adding a training task to the scheduler (Async).
+        """Adding a training task to the scheduler.
 
         Args:
-            task (autogluon.scheduler.Task): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new trianing task
+
+        Relevant entries in kwargs:
+        - bracket: HB bracket to be used. Has been sampled in _promote_config
+        - new_config: If True, task starts new config eval, otherwise it promotes
+          a config (only if type == 'promotion')
+        Only if new_config == False:
+        - config_key: Internal key for config
+        - resume_from: config promoted from this milestone
+        - milestone: config promoted to this milestone (next from resume_from)
         """
         # adding the task
         cls = TaskScheduler
@@ -179,6 +183,8 @@ class TaskScheduler(object):
         self.join_jobs()
 
     def join_jobs(self):
+        """Wait all scheduled jobs to finish
+        """
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
             task_dict['Job'].result()
@@ -186,7 +192,7 @@ class TaskScheduler(object):
         self._cleaning_tasks()
 
     def shutdown(self):
-        """shutdown() is now deprecated in favor of :function:`autogluon.done`.
+        """shutdown() is now deprecated in favor of :func:`autogluon.done`.
         """
         warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
              AutoGluonWarning)
@@ -195,6 +201,10 @@ class TaskScheduler(object):
 
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
+
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
         if destination is None:
             destination = OrderedDict()
@@ -204,6 +214,12 @@ class TaskScheduler(object):
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         Task.set_id(state_dict['TASK_ID'])
         logger.debug('\nLoading finished_tasks: {} '.format(self.finished_tasks))

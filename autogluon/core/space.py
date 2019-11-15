@@ -4,8 +4,8 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from ..utils import DeprecationHelper, EasyDict, classproperty
 
-__all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'Sequence', 'List', 'Dict',
-           'Categorical', 'Choice', 'Real', 'Linear', 'LogLinear', 'Int', 'Bool']
+__all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'List', 'Dict',
+           'Categorical', 'Choice', 'Real', 'Int', 'Bool']
 
 class Space(object):
     """Basic Search Space
@@ -39,16 +39,21 @@ class NestedSpace(Space):
 
 
 class AutoGluonObject(NestedSpace):
-    r"""Searchable Objects created by decorating user-defined object using
-    :func:`@autogluon.autogluon_object` or :func:`@autogluon.autogluon_function` decorators.
+    r"""Searchable Objects,
+    created by decorating customized class or function using
+    :func:`autogluon.obj` or :func:`autogluon.func` decorators.
     """
     def __call__(self, *args, **kwargs):
+        """Convenience method for interacting with AutoGluonObject.
+        """
         if not self._inited:
             self._inited = True
             self._instance = self.init()
         return self._instance.__call__(*args, **kwargs)
 
     def init(self):
+        """Initiate a real instance for interacting with AutoGluonObject.
+        """
         config = self.cs.get_default_configuration().get_dictionary()
         return self.sample(**config)
 
@@ -76,17 +81,21 @@ class AutoGluonObject(NestedSpace):
         return 'AutoGluonObject'
 
 class List(NestedSpace):
-    """A Searchable List (Nested Space)
+    r"""A Searchable List (Nested Space)
 
-    Args:
-        args: a list of search spaces.
+    Parameters
+    ----------
 
-    Example:
-        >>> sequence = ag.List(
-        >>>     ag.space.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
-        >>>     ag.space.Categorical('BatchNorm', 'InstanceNorm'),
-        >>>     ag.space.Categorical('relu', 'sigmoid'),
-        >>> )
+    args : list
+        a list of search spaces.
+
+    Examples
+    --------
+    >>> sequence = ag.List(
+    >>>     ag.space.Categorical('conv3x3', 'conv5x5', 'conv7x7'),
+    >>>     ag.space.Categorical('BatchNorm', 'InstanceNorm'),
+    >>>     ag.space.Categorical('relu', 'sigmoid'),
+    >>> )
     """
     def __init__(self, *args):
         self.data = [*args]
@@ -104,6 +113,12 @@ class List(NestedSpace):
     def __len__(self):
         return len(self.data)
 
+    def __getstate__(self):
+        return self.data
+
+    def __setstate__(self, d):
+        self.data = d
+
     def __getattribute__(self, s):
         try:    
             x = super(List, self).__getattribute__(s)
@@ -117,12 +132,13 @@ class List(NestedSpace):
     def sample(self, **config):
         ret = []
         kwspaces = self.kwspaces
-        kwspaces.update(config)
         striped_keys = [k.split('.')[0] for k in config.keys()]
         for idx, obj in enumerate(self.data):
-            if isinstance(obj, AutoGluonObject):
+            if isinstance(obj, NestedSpace):
                 sub_config = _strip_config_space(config, prefix=str(idx))
                 ret.append(obj.sample(**sub_config))
+            elif isinstance(obj, SimpleSpace):
+                ret.append(config[str(idx)])
             else:
                 ret.append(obj)
         return ret
@@ -132,9 +148,9 @@ class List(NestedSpace):
         cs = CS.ConfigurationSpace()
         for k, v in enumerate(self.data):
             if isinstance(v, NestedSpace):
-                _add_cs(cs, v.cs, k)
+                _add_cs(cs, v.cs, str(k))
             elif isinstance(v, Space):
-                hp = v.get_hp(name=k)
+                hp = v.get_hp(name=str(k))
                 _add_hp(cs, hp)
         return cs
 
@@ -156,10 +172,16 @@ class List(NestedSpace):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
 
-Sequence = DeprecationHelper(List, 'Sequence')
-
 class Dict(NestedSpace):
     """A Searchable Dict (Nested Space)
+
+    Examples
+    --------
+    >>> g = ag.space.Dict(
+    >>>         key1=ag.space.Categorical('alpha', 'beta'),
+    >>>         key2=ag.space.Int(0, 3),
+    >>>     )
+    >>> print(g)
     """
     def __init__(self, **kwargs):
         self.data = EasyDict(kwargs)
@@ -180,11 +202,17 @@ class Dict(NestedSpace):
     def __setitem__(self, key, data):
         self.data[key] = data
 
+    def __getstate__(self):
+        return self.data
+
+    def __setstate__(self, d):
+        self.data = d
+
     @property
     def cs(self):
         cs = CS.ConfigurationSpace()
         for k, v in self.data.items():
-            if hasattr(v, 'cs'):
+            if isinstance(v, NestedSpace):
                 _add_cs(cs, v.cs, k)
             elif isinstance(v, Space):
                 hp = v.get_hp(name=k)
@@ -212,7 +240,7 @@ class Dict(NestedSpace):
         striped_keys = [k.split('.')[0] for k in config.keys()]
         for k, v in kwspaces.items():
             if k in striped_keys:
-                if isinstance(v, (Sequence, Dict, Categorical, AutoGluonObject)):
+                if isinstance(v, NestedSpace):
                     sub_config = _strip_config_space(config, prefix=k)
                     ret[k] = v.sample(**sub_config)
                 else:
@@ -227,11 +255,15 @@ class Categorical(NestedSpace):
     """Categorical Search Space (Nested Space)
     Add example for conditional space.
 
-    Args:
-        data: the choice candidates
+    Parameters
+    ----------
+    data : Space or python built-in objects
+        the choice candidates
 
-    Example:
-        >>> net = ag.space.Categorical('resnet50', 'resnet101')
+    Examples
+    --------
+    a = ag.space.Categorical('a', 'b', 'c', 'd')
+    b = ag.space.Categorical('resnet50', autogluon_obj())
     """
     def __init__(self, *data):
         self.data = [*data]
@@ -289,14 +321,20 @@ Choice = DeprecationHelper(Categorical, 'Choice')
 class Real(SimpleSpace):
     """linear search space.
 
-    Args:
-        lower: the lower bound of the search space
-        upper: the upper bound of the search space
-        default (optional): default value
-        log (True/False): search space in log scale
+    Parameters
+    ----------
+    lower : float
+        the lower bound of the search space
+    upper : float
+        the upper bound of the search space
+    default : float (optional)
+        default value
+    log : (True/False)
+        search space in log scale
 
-    Example:
-        >>> learning_rate = ag.Real(0.01, 0.1, log=True)
+    Examples
+    --------
+    >>> learning_rate = ag.Real(0.01, 0.1, log=True)
     """
     def __init__(self, lower, upper, default=None, log=False):
         self.lower = lower
@@ -308,28 +346,22 @@ class Real(SimpleSpace):
         return CSH.UniformFloatHyperparameter(name=name, lower=self.lower, upper=self.upper,
                                               default_value=self.default, log=self.log)
 
-Linear = DeprecationHelper(Real, 'Linear')
-
-class LogLinear(Real):
-    r"""LogLinear
-    .. warning::
-        This method is now deprecated in favor of :class:`autogluon.space.Real`. \
-    See :class:`autogluon.space.Real` for details."""
-    def __init__(self, lower, upper, default=None):
-        self.lower = lower
-        self.upper = upper
-        super().__init__(lower, upper, default, True)
-
 class Int(SimpleSpace):
     """integer search space.
 
-    Args:
-        lower: the lower bound of the search space
-        upper: the upper bound of the search space
-        default (optional): default value
+    Parameters
+    ----------
+    lower : int
+        the lower bound of the search space
+    upper : int
+        the upper bound of the search space
+    default : int (optional)
+        default value
 
-    Example:
-        >>> learning_rate = ag.space.Int(0, 100)
+
+    Examples
+    --------
+    >>> range = ag.space.Int(0, 100)
     """
     def __init__(self, lower, upper, default=None):
         self.lower = lower
@@ -343,8 +375,9 @@ class Int(SimpleSpace):
 class Bool(Int):
     """Bool Search Space
 
-    Example:
-        >>> pretrained = ag.Bool()
+    Examples
+    --------
+    pretrained = ag.space.Bool()
     """
     def __init__(self):
         super(Bool, self).__init__(0, 1)

@@ -25,7 +25,7 @@ lr_schedulers = {
     'cosine': mx.lr_scheduler.CosineScheduler
 }
 
-@autogluon_register_args()
+@args()
 def train_image_classification(args, reporter):
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
@@ -51,6 +51,7 @@ def train_image_classification(args, reporter):
     def train(epoch):
         for i, batch in enumerate(train_data):
             default_train_fn(net, batch, batch_size, args.loss, trainer, batch_fn, ctx)
+            mx.nd.waitall()
 
     def test(epoch):
         metric.reset()

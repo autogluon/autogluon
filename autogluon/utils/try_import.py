@@ -1,4 +1,4 @@
-__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2', 'try_import_skopt']
+__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2']
 
 def try_import_mxboard():
     try:
@@ -33,6 +33,12 @@ def try_import_dask():
         raise ImportError(
             "Unable to import dependency dask. "
             "A quick tip is to install via `pip install dask[complete]`. ")
+    from distutils.version import LooseVersion
+    dask_version = '2.6.0'
+    if LooseVersion(dask.__version__) < LooseVersion(dask_version):
+        msg = ("Current Dask version {} is lower than the minimum requirement {}, "
+               "please run: `pip uninstall dask && pip install dask[complete]`")
+        raise ImportError(msg)
 
 def try_import_cv2():
     try:
@@ -41,11 +47,3 @@ def try_import_cv2():
         raise ImportError(
             "Unable to import dependency cv2. "
             "A quick tip is to install via `pip install opencv-python`. ")
-
-def try_import_skopt():
-    try:
-        import skopt
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency skopt. "
-            "A quick tip is to install via `pip install scikit-optimize`. ")
