@@ -6,7 +6,6 @@ import logging
 from collections import OrderedDict
 
 from ..utils import warning_filter
-
 with warning_filter():
     from skopt import Optimizer
     from skopt.space import *
@@ -19,45 +18,53 @@ logger = logging.getLogger(__name__)
 class SKoptSearcher(BaseSearcher):
     """SKopt Searcher for ConfigSpace. Requires that 'scikit-optimize' package is installed.
     
-    Args:
-        configspace: ConfigSpace.ConfigurationSpace
-            The configuration space to sample from. It contains the full
-            specification of the Hyperparameters with their priors
-        kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
-                please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
-            These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
-            which acquisition function to use, how to optimize the acquisition function, etc.
-            The skopt library provides very comprehensive Bayesian optimization functionality,
-            popular non-default kwargs options here might include: 
-            - base_estimator = 'GP' or 'RF' or 'ET' or 'GBRT' (to specify different surrogate models like Gaussian Processes, Random Forests, etc)
-            - acq_func = 'LCB' or 'EI' or 'PI' or 'gp_hedge' (to specify different acquisition functions like Lower Confidence Bound, Expected Improvement, etc)
-            For example, we can tell our Searcher to perform Bayesian optimization with a Random Forest surrogate model
-            and use the Expected Improvement acquisition function by invoking the following kwargs:
-            SKoptSearcher(cs, base_estimator='RF', acq_func='EI').
+    Parameters
+    ----------
+    configspace: ConfigSpace.ConfigurationSpace
+        The configuration space to sample from. It contains the full
+        specification of the Hyperparameters with their priors
+    kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
+            please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
+        These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
+        which acquisition function to use, how to optimize the acquisition function, etc.
+        The skopt library provides very comprehensive Bayesian optimization functionality,
+        popular non-default kwargs options here might include: 
+        - base_estimator = 'GP' or 'RF' or 'ET' or 'GBRT' (to specify different surrogate models like Gaussian Processes, Random Forests, etc)
+        - acq_func = 'LCB' or 'EI' or 'PI' or 'gp_hedge' (to specify different acquisition functions like Lower Confidence Bound, Expected Improvement, etc)
+        For example, we can tell our Searcher to perform Bayesian optimization with a Random Forest surrogate model
+        and use the Expected Improvement acquisition function by invoking the following kwargs:
+        SKoptSearcher(cs, base_estimator='RF', acq_func='EI').
     
-    Example:
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> # create configuration space
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
-        >>> searcher = SKoptSearcher(cs, base_estimator='RF', acq_func='EI')
-        >>> next_config = searcher.get_config()
-        >>> next_reward = 10.0 # made-up value.
-        >>> searcher.update(next_config, next_reward)
+    Examples
+    --------
+     >>> import autogluon as ag
+     >>> @ag.args(
+     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
+     >>>     wd=ag.space.Real(1e-3, 1e-2))
+     >>> def train_fn(args, reporter):
+     >>>     pass
+     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+     >>> searcher.get_config()
+     {'lr': 0.0031622777, 'wd': 0.0055}
+
+     >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
+     >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
+     >>> next_config = searcher.get_config()
+     >>> next_reward = 10.0 # made-up value.
+     >>> searcher.update(next_config, next_reward)
+    
+    .. note::
+
+        SKopt behavior:
+    
+        - get_config() cannot ensure valid configurations for conditional spaces since skopt 
+        does not contain this functionality like ConfigSpace does. 
+        Currently SKoptSearcher.get_config() will catch these Exceptions and revert to random_config() in this case
         
-    Notes on SKopt behavior:
-    
-    - get_config() cannot ensure valid configurations for conditional spaces since skopt 
-    does not contain this functionality like ConfigSpace does. 
-    Currently SKoptSearcher.get_config() will catc these Exceptions and revert to random_config() in this case
-    
-    - get_config(max_tries) uses skopt batch BayesOpt functionality to query at most 
-    max_tries number of configs to try out.
-    If all of these have configus have already been scheduled to try (might happen in asynchronous setting), 
-    then get_config simply reverts to random search via random_config().
+        - get_config(max_tries) uses skopt batch BayesOpt functionality to query at most 
+        max_tries number of configs to try out.
+        If all of these have configs have already been scheduled to try (might happen in asynchronous setting), 
+        then get_config simply reverts to random search via random_config().
     """
     
     def __init__(self, configspace, **kwargs):
@@ -91,11 +98,12 @@ class SKoptSearcher(BaseSearcher):
         (since skopt configurations cannot handle conditional spaces like ConfigSpace can).
         TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
         
-        Args:
-            max_tries: the maximum number of tries to ask for a unique config from skopt before
-            reverting to random search.
-            returns: (config, info_dict)
-                must return a valid configuration and a (possibly empty) info dict
+        Parameters
+        ----------
+        max_tries: int
+            the maximum number of tries to ask for a unique config from skopt before reverting to random search.
+        returns: config, info_dict
+            must return a valid configuration and a (possibly empty) info dict
         """
         max_tries = kwargs.get('max_tries', 1e2)
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
@@ -132,8 +140,9 @@ class SKoptSearcher(BaseSearcher):
     def default_config(self):
         """ Function to return the default configuration that should be tried first.
         
-        Args:
-            returns: config
+        Returns
+        -------
+        returns: config
         """
         new_config_cs = self.configspace.get_default_configuration()
         new_config = new_config_cs.get_dictionary()
@@ -144,8 +153,9 @@ class SKoptSearcher(BaseSearcher):
         """Function to randomly sample a new configuration which must be valid.
            TODO: may loop indefinitely due to no termination condition (like RandomSearcher.get_config() ) 
 
-        Args:
-            returns: config
+        Returns
+        -------
+        returns: config
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
@@ -168,7 +178,9 @@ class SKoptSearcher(BaseSearcher):
 
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).
-        Args:
+
+        Returns
+        -------
             returns: object of same type as: skOpt.Optimizer.ask()
         """
         point = []
@@ -179,7 +191,8 @@ class SKoptSearcher(BaseSearcher):
     def skopt2config(self, point):
         """ Converts skopt point (list object) to autogluon config format (dict object. 
         
-        Args:
+        Returns
+        -------
             returns: object of same type as: RandomSampling.configspace.sample_configuration().get_dictionary()
         """
         config = self.configspace.sample_configuration()

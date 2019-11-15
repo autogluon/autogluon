@@ -8,8 +8,9 @@ def done():
     It will shutdown autogluon backend, such as schedulers and workers.
     We recommand calling this method in the end of your code.
 
-    Example:
-        >>> autogluon.done()
+    Examples
+    --------
+    >>> autogluon.done()
     """
     logger.info('Shutting Down AutoGluon backend.')
     RemoteManager.shutdown()

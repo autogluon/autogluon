@@ -3,15 +3,23 @@ import requests
 import errno
 import shutil
 import hashlib
+import zipfile
 import logging
-from tqdm import tqdm
+from .tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['download', 'mkdir', 'check_sha1', 'raise_num_file']
+__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'unzip', 'raise_num_file']
+
+def unzip(zip_file_path, root=os.path.expanduser('./')):
+    """Unzip the files.
+    """
+    with zipfile.ZipFile(zip_file_path) as zf:
+        zf.extractall(root)
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
+
     Parameters
     ----------
     url : str
@@ -24,6 +32,7 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
     sha1_hash : str, optional
         Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
         but doesn't match.
+
     Returns
     -------
     str
@@ -71,12 +80,14 @@ def download(url, path=None, overwrite=False, sha1_hash=None):
 
 def check_sha1(filename, sha1_hash):
     """Check whether the sha1 hash of the file content matches the expected hash.
+
     Parameters
     ----------
     filename : str
         Path to the file.
     sha1_hash : str
         Expected sha1 hash in hexadecimal digits.
+
     Returns
     -------
     bool

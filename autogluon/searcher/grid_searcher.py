@@ -4,7 +4,21 @@ from .searcher import BaseSearcher
 from ..core.space import Categorical
 
 class GridSearcher(BaseSearcher):
-    """Grid Searcher
+    """Grid Searcher, only search spaces :class:`autogluon.space.Categorical`
+
+    Examples
+    --------
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     x=ag.space.Categorical(0, 1, 2),
+    >>>     y=ag.space.Categorical('a', 'b', 'c'))
+    >>> def train_fn(args, reporter):
+    ...     pass
+    >>> searcher = ag.searcher.GridSearcher(train_fn.cs)
+    >>> searcher.get_config()
+    Number of configurations for grid search is 9
+    {'x.choice': 2, 'y.choice': 2}
+   
     """
     def __init__(self, cs):
         super().__init__(cs)

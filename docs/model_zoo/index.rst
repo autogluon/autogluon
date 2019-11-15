@@ -53,7 +53,7 @@ How to reproduce search on EfficientNet?
    import autogluon as ag
    from autogluon import ImageClassification as task
 
-   @ag.autogluon_object(
+   @ag.obj(
        width_coefficient=ag.space.Categorical(1.1, 1.2),
        depth_coefficient=ag.space.Categorical(1.1, 1.2),
    )

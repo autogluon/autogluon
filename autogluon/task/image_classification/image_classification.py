@@ -27,14 +27,9 @@ class ImageClassification(BaseTask):
     Dataset = ClassificationDataset
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet34_v1b', 'ResNet50_v1b'),
-            optimizer=Categorical(
-                SGD(learning_rate=Real(1e-4, 1e-2, log=True),
-                    momentum=Real(0.85, 0.95),
-                    wd=Real(1e-5, 1e-3, log=True)),
-                Adam(learning_rate=Real(1e-4, 1e-2, log=True),
-                     wd=Real(1e-5, 1e-3, log=True)),
-            ),
+            net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
+            optimizer= SGD(learning_rate=Real(1e-4, 1e-2, log=True),
+                           wd=Real(1e-5, 1e-3, log=True)),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             batch_size=64,
@@ -58,27 +53,40 @@ class ImageClassification(BaseTask):
         """
         Auto fit on image classification dataset
 
-        Args:
-            dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): optimizer candidates.
-            metric (str or object): observation metric.
-            loss (object): training loss function.
-            num_trials (int): number of trials in the experiment.
-            time_limits (int): training time limits in seconds.
-            resources_per_trial (dict): Machine resources to allocate per trial.
-            savedir (str): Local dir to save training results to.
-            search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
-            resume (bool): If checkpoint exists, the experiment will resume from there.
+        Parameters
+        ----------
+        dataset : (str or autogluon.task.ImageClassification.Dataset)
+            Training dataset.
+        net : (str or autogluon.AutoGluonObject)
+            Network candidates.
+        optimizer : (str or autogluon.AutoGluonObject)
+            optimizer candidates.
+        metric : (str or object)
+            observation metric.
+        loss : (object)
+            training loss function.
+        num_trials : (int)
+            number of trials in the experiment.
+        time_limits : (int)
+            training time limits in seconds.
+        resources_per_trial : (dict)
+            Machine resources to allocate per trial.
+        savedir : (str)
+            Local dir to save training results to.
+        search_strategy : (str)
+            Search Algorithms ('random', 'bayesopt' and 'hyperband')
+        resume : (bool)
+            If checkpoint exists, the experiment will resume from there.
 
-        Example:
-            >>> dataset = task.Dataset(train_path='~/data/train',
-            >>>                        test_path='data/test')
-            >>> results = task.fit(dataset,
-            >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-            >>>                    time_limits=time_limits,
-            >>>                    ngpus_per_trial=1,
-            >>>                    num_trials = 4)
+        Examples
+        --------
+        >>> dataset = task.Dataset(train_path='~/data/train',
+        >>>                        test_path='data/test')
+        >>> results = task.fit(dataset,
+        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                    time_limits=time_limits,
+        >>>                    ngpus_per_trial=1,
+        >>>                    num_trials = 4)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps

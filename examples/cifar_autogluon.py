@@ -188,4 +188,4 @@ if __name__ == '__main__':
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))
     print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                    myscheduler.get_best_reward()))
-    myscheduler.shutdown()
+    ag.done()
