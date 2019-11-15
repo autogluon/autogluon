@@ -1,4 +1,4 @@
-__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_dask', 'try_import_cv2']
+__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_cv2']
 
 def try_import_mxboard():
     try:
@@ -25,20 +25,6 @@ def try_import_mxnet():
         raise ImportError(
             "Unable to import dependency mxnet. "
             "A quick tip is to install via `pip install mxnet-mkl/mxnet-cu90mkl --pre`. ")
-
-def try_import_dask():
-    try:
-        import distributed
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency distributed. "
-            "A quick tip is to install via `pip install distributed==2.6.0`. ")
-    from distutils.version import LooseVersion
-    distributed_version = '2.6.0'
-    if LooseVersion(distributed.__version__) != LooseVersion(distributed_version):
-        msg = ("Current Dask version {} is different from requirement {}, "
-               "please run: `pip uninstall -y distributed && pip install distributed==2.6.0`")
-        raise ImportError(msg)
 
 def try_import_cv2():
     try:
