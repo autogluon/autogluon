@@ -38,8 +38,8 @@ In order to have results after you grab a cup of coffee, time_limits is set to 1
 time_limits = 15*60 # 15mins
 epochs = 30
 classifier = task.fit(dataset,
-                      net=Categorical('mobilenet1.0'),
-                      lr=Categorical(5e-4, 1e-4),
+                      net=ag.Categorical('mobilenet1.0'),
+                      lr=ag.Categorical(5e-4, 1e-4),
                       time_limits=time_limits,
                       epochs=epochs,
                       ngpus_per_trial=1)
