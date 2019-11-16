@@ -127,13 +127,14 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
         os.makedirs(log_dir)
     fh = logging.FileHandler(log_file_path)
     logger.addHandler(fh)
-    #logger.info(args)
+    logger.info(args)
     #logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
     best_map = [0]
 
     pre_current_map = 0
     tbar = tqdm(range(args.start_epoch, args.epochs))
     for epoch in tbar:
+        #tbar2.next()
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -175,7 +176,6 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
             center_metrics.update(0, center_losses)
             scale_metrics.update(0, scale_losses)
             cls_metrics.update(0, cls_losses)
-            '''
             if args.log_interval and not (i + 1) % args.log_interval:
                 name1, loss1 = obj_metrics.get()
                 name2, loss2 = center_metrics.get()
@@ -183,22 +183,18 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
                 name4, loss4 = cls_metrics.get()
                 logger.info('[Epoch {}][Batch {}], LR: {:.2E}, Speed: {:.3f} samples/sec, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
                     epoch, i, trainer.learning_rate, batch_size/(time.time()-btic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
-            '''
             btic = time.time()
 
         name1, loss1 = obj_metrics.get()
         name2, loss2 = center_metrics.get()
         name3, loss3 = scale_metrics.get()
         name4, loss4 = cls_metrics.get()
-        tbar.set_description('[Epoch {}] Training cost: {:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
-            epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
         #logger.info('[Epoch {}] Training cost: {:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
-            #epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
+        #    epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
         if (not (epoch + 1) % args.val_interval) and not final_fit:
             # consider reduce the frequency of validation to save time
             map_name, mean_ap = validate(net, val_data, ctx, eval_metric)
             val_msg = ' '.join(['{}={}'.format(k, v) for k, v in zip(map_name, mean_ap)])
-            #logger.info('[Epoch {}] Validation: \n{}'.format(epoch, val_msg))
             tbar.set_description('[Epoch {}] Validation: {}'.format(epoch, val_msg))
             current_map = float(mean_ap[-1])
             pre_current_map = current_map
