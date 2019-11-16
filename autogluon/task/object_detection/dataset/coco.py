@@ -1,5 +1,5 @@
 from .base import DatasetBase
-import autogluon as ag
+from ....core import *
 
 from gluoncv import data as gdata
 

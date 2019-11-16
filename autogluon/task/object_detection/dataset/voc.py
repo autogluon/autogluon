@@ -99,7 +99,7 @@ class TinyVOC(DatasetBase):
         return (self.test_dataset, self.val_metric)
 
     def get_dataset_name(self):
-        return 'tinyvoc'
+        return 'tiny_motorbike'
 
     def get_classes(self):
         return self.train_dataset.classes 
