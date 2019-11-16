@@ -49,6 +49,17 @@ Customize AutoGluon
       Easily scale up training across multiple machines using
       automatic distributed search.
 
+Object Detection
+--------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Using FIT
+      :link: object_detection/beginner.html
+
+      Quick start tutorial.
+
+
 Neural Architecture Search
 --------------------------
 .. container:: cards
