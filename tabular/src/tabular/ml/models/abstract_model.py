@@ -117,6 +117,13 @@ class AbstractModel:
             y_pred_proba = self.predict_proba(X=X)
             return self.objective_func(y, y_pred_proba)
 
+    def score_with_y_pred_proba(self, y, y_pred_proba):
+        if self.metric_needs_y_pred:
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            return self.objective_func(y, y_pred)
+        else:
+            return self.objective_func(y, y_pred_proba)
+
     # TODO: Add simple generic CV logic
     def cv(self, X, y, k_fold=5):
         raise NotImplementedError
