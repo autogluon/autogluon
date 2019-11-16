@@ -5,7 +5,6 @@
 import warnings
 import numpy as np
 from collections import OrderedDict
-import pandas as pd
 
 from .miscs import warning_filter
 
