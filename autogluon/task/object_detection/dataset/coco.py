@@ -3,10 +3,7 @@ import autogluon as ag
 
 from gluoncv import data as gdata
 
-@ag.autogluon_object(
-    nstage1=ag.Int(2, 4),
-    nstage2=ag.Int(2, 4),
-)
+@obj()
 class COCO(DatasetBase):
     def __init__(self):
         super(COCO. self).__init__()
