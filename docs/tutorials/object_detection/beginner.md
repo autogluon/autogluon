@@ -55,7 +55,7 @@ print("mAP on test dataset: {}".format(test_acc[1][1]))
 The mAP is not bad after just 30 epochs. Let's see one visualization result. We randomly select an image from test dataset, and show predicted bbox and probability over the origin image.  
 
 ```{.python .input}
-image = '000499.jpg'
+image = '000467.jpg'
 image_path = os.path.join(root, 'tiny_motorbike/VOC2007/JPEGImages', image)
 
 ind, prob, loc = classifier.predict(image_path)
