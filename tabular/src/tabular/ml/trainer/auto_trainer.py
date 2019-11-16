@@ -19,7 +19,7 @@ class AutoTrainer(AbstractTrainer):
         models = self.get_models(hyperparameters)
         if (y_test is None) or (X_test is None):
             X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
-        self.train_multi_and_ensemble(X_train, X_test, y_train, y_test, models,
+        self.train_multi_and_ensemble(X_train, y_train, X_test, y_test, models,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         # self.cleanup()
         # TODO: cleanup temp files, eg. those from HPO
