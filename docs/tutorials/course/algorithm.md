@@ -1,10 +1,17 @@
-# Search Algorithms and Early Stopping
+# Search Algorithms
 
 ## AutoGluon System Implementatin Logic
 
 ![](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_system.png)
 
-## Create A Toy Reward Space
+AutoGluon system includes Searcher, Scheduler and Resource Manager.
+The Searcher suggests configurations for the next training jobs.
+Scheduler schedule the training job when the computation resources are
+available.
+In this tutorial, we will illustrate how the search algorithm works and
+compare the performance on a toy experiments.
+
+## Create A Reward for Toy Experiments
 
 Input Space `x = [0: 99], y = [0: 99]`.
 The rewards is a combination of 2 gaussians as shown in the following figure:
@@ -45,13 +52,13 @@ plt.show()
 
 ### Customize Train Function
 
-We can simply define any function with a decorator `autogluon_register_args` whichs converts the function to
+We can simply define any function with a decorator `ag.args` whichs converts the function to
 AutoGluon searchable. The `reporter` is used to communicate with AutoGluon search algorithms.
 
 ```{.python .input}
 import autogluon as ag
 
-@ag.autogluon_register_args(
+@ag.args(
     x=ag.space.Categorical(*list(range(100))),
     y=ag.space.Categorical(*list(range(100))),
 )
@@ -63,7 +70,7 @@ def rl_simulation(args, reporter):
 ### Random Search Baseline
 
 ```{.python .input}
-random_scheduler = ag.scheduler.FIFOScheduler(rl_simulation, rl_simulation.args,
+random_scheduler = ag.scheduler.FIFOScheduler(rl_simulation,
                                               resource={'num_cpus': 1, 'num_gpus': 0},
                                               num_trials=300,
                                               reward_attr="accuracy",
@@ -81,10 +88,7 @@ rl_scheduler = ag.scheduler.RLScheduler(rl_simulation,
                                         num_trials=300,
                                         reward_attr="accuracy",
                                         controller_batch_size=4,
-                                        controller_lr=5e-3,
-                                        checkpoint='./rl_exp/checkerpoint.ag',
-                                        resume=False,
-                                        sync=True)
+                                        controller_lr=5e-3)
 rl_scheduler.run()
 rl_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), rl_scheduler.get_best_reward()))
@@ -111,4 +115,10 @@ Plot the results:
 
 ```{.python .input}
 plt.plot(range(len(results1)), results1, range(len(results2)), results2)
+```
+
+Exit AutoGluon:
+
+```{.python .input}
+ag.done()
 ```

@@ -20,7 +20,7 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
-filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ag.unzip(filename)
 ```
 

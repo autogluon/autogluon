@@ -75,7 +75,7 @@ class RLScheduler(FIFOScheduler):
     def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
-                 controller_resource={'num_cpus': 2, 'num_gpus': 0},
+                 controller_resource={'num_cpus': 0, 'num_gpus': 0},
                  controller_batch_size=1,
                  dist_ip_addrs=[], sync=True, **kwargs):
         assert isinstance(train_fn, _autogluon_method), 'Please use @ag.args ' + \
@@ -139,7 +139,7 @@ class RLScheduler(FIFOScheduler):
                 batch_size = self.num_trials % self.num_trials \
                     if i == self.num_trials // self.controller_batch_size \
                     else self.controller_batch_size
-                if batch_size == 0: break
+                if batch_size == 0: continue
                 configs, log_probs, entropies = self.controller.sample(
                     batch_size, with_details=True)
                 # schedule the training tasks and gather the reward
@@ -193,7 +193,7 @@ class RLScheduler(FIFOScheduler):
                     reporter.move_on()
                     last_result = reported_result
                 reward = last_result[self._reward_attr]
-                self.searcher.update(config, reward)
+                self.searcher.update(config, reward, done=True)
                 with self.lock:
                     if self.baseline is None:
                         self.baseline = reward
@@ -247,7 +247,7 @@ class RLScheduler(FIFOScheduler):
                 reporter.move_on()
                 last_result = reported_result
             if last_result is not None:
-                self.searcher.update(config, last_result[self._reward_attr])
+                self.searcher.update(config, last_result[self._reward_attr], done=True)
             with self.lock:
                 results[pickle.dumps(config)] = last_result[self._reward_attr]
 
