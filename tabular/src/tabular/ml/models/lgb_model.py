@@ -307,6 +307,7 @@ class LGBModel(AbstractModel):
             # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
             # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
         hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). Ask Hang how to ID these?
             file_id = "trial_"+str(trial) # unique identifier to files from this trial
@@ -314,13 +315,14 @@ class LGBModel(AbstractModel):
             trial_model_name = self.name+"_"+file_id
             trial_model_path = self.path + file_prefix
             hpo_models[trial_model_name] = trial_model_path
+            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
         print("Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
         print("Best hyperparameter configuration for Gradient Boosting Model: ")
         print(best_hp)
-        return (hpo_models, hpo_results)
+        return (hpo_models, hpo_model_performances, hpo_results)
         # TODO: do final fit here?
         # args.final_fit = True
         # final_model = scheduler.run_with_config(best_config)

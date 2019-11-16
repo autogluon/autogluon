@@ -48,15 +48,18 @@ class TabularNeuralNetModel(AbstractModel):
             types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of dataframe corresponding to the features of this type
             feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in processed_array corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
-        processor (sklearn.ColumnTransformer): scikit-learn preprocessor object
+        processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
+        
+        Note: This model always assumes higher values of self.objective_func indicate better performance
         
     """
     
     # Constants used throughout this class:
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
-    metric_map = {REGRESSION: 'Rsquared', BINARY: 'accuracy', MULTICLASS: 'accuracy'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
+    # TODO: remove: metric_map = {REGRESSION: 'Rsquared', BINARY: 'accuracy', MULTICLASS: 'accuracy'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
     # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
+    rescale_losses = {gluon.loss.L1Loss:'std', gluon.loss.HuberLoss:'std', gluon.loss.L2Loss:'var'} # dict of loss names where we should rescale loss, value indicates how to rescale. Call self.loss_func.name
     model_file_name = 'tabularNN.pkl'
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
@@ -82,6 +85,7 @@ class TabularNeuralNetModel(AbstractModel):
         """
         self.problem_type = problem_type
         self.objective_func = objective_func
+        self.eval_metric_name = self.objective_func.name
         self.feature_types_metadata = None
         self.types_of_features = None
         self.feature_arraycol_map = None
@@ -298,12 +302,20 @@ class TabularNeuralNetModel(AbstractModel):
         best_train_epoch = 0 # epoch with best training loss so far
         best_train_loss = np.inf # smaller = better
         num_epochs = self.params['num_epochs']
+        if test_dataset is not None:
+            y_test = test_dataset.get_labels()
+        
         loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
-        if self.problem_type == REGRESSION: 
-            if self.metric_map[REGRESSION] == 'MAE':
-                loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
-            elif self.metric_map[REGRESSION] == 'Rsquared':
-                loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
+        loss_torescale = [key for key in self.rescale_losses if isinstance(self.loss_func, key)]
+        if len(loss_torescale) > 0:
+            loss_torescale = loss_torescale[0]
+            if self.rescale_losses[loss_torescale] == 'std':
+                loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS # std-dev of labels
+            elif self.rescale_losses[loss_torescale] == 'var':
+                loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS # variance of labels
+            else:
+                raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale],self.loss_func))
+        # Training Loop:
         for e in range(num_epochs):
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
@@ -318,16 +330,17 @@ class TabularNeuralNetModel(AbstractModel):
                 cumulative_loss += nd.sum(loss).asscalar()
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
-                val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
-            if test_dataset is None or val_metric > best_val_metric:  # keep training if score has improved
+                # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
+                val_metric = self.score(X=test_dataset, y=y_test)
+            if test_dataset is None or val_metric >= best_val_metric:  # keep training if score has improved
                 best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
                 # TODO: currently evaluate_metric is evaluating different metric...
                 print("Epoch %s.  Train loss: %s, Val %s: %s" %
-                  (e, train_loss, self.metric_map[self.problem_type], val_metric))
-                self.summary_writer.add_scalar(tag='val_'+self.metric_map[self.problem_type], 
+                  (e, train_loss, self.eval_metric_name, val_metric))
+                self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
                                                value=val_metric, global_step=e)
             else:
                 print("Epoch %s.  Train loss: %s" % (e, train_loss))
@@ -342,7 +355,7 @@ class TabularNeuralNetModel(AbstractModel):
         else:
             final_val_metric = self.evaluate_metric(test_dataset)
             print("Best model found in epoch %d. Val %s: %s" %
-                  (best_val_epoch, self.metric_map[self.problem_type], final_val_metric))
+                  (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
     
     def evaluate_metric(self, dataset, mx_metric=None):
@@ -369,13 +382,20 @@ class TabularNeuralNetModel(AbstractModel):
     
     def predict_proba(self, X, preprocess=True):
         """ To align predict wiht abstract_model API. 
-            Preprocess here only refers to feature processing stesp done by all AbstratModel objects, 
+            Preprocess here only refers to feature processing stesp done by all AbstractModel objects, 
             not tabularNN-specific preprocessing steps.
+            If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions, 
+            but cannot use preprocess in this case (needs to be already processed).
         """
-        if preprocess:
-            X = self.preprocess(X)
-        return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
-    
+        if isinstance(X, TabularNNDataset):
+            return self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
+        elif isinstance(X, pd.DataFrame):
+            if preprocess:
+                X = self.preprocess(X)
+            return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
+        else:
+            raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
+        
     def _predict_tabular_data(self, new_data, process=True, predict_proba=True): # TODO ensure API lines up with tabular.Model class.
         """ Specific TabularNN method to produce predictions on new (unprocessed) data. 
             Returns 1D numpy array unless predict_proba=True and task is multi-class classification (not binary).
@@ -388,7 +408,7 @@ class TabularNeuralNetModel(AbstractModel):
         if process:
             new_data = self.process_data(new_data, labels=None, is_test=True)
         if not isinstance(new_data, TabularNNDataset):
-            raise ValueError("new_data must of of type TabularNNDataset if preprocess=False")
+            raise ValueError("new_data must of of type TabularNNDataset if process=False")
         if self.problem_type == REGRESSION or not predict_proba:
             preds = nd.zeros((new_data.num_examples,1))
         else:
@@ -755,6 +775,7 @@ class TabularNeuralNetModel(AbstractModel):
             # 1) hpo_results['trial_info'][trial]['metadata']['modelobj_file']
             # 2) hpo_results['trial_info'][trial]['metadata']['netparams_file']
         hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband)s
             file_id = "trial_"+str(trial) # unique identifier to files from this trial
@@ -762,13 +783,14 @@ class TabularNeuralNetModel(AbstractModel):
             trial_model_name = self.name+"_"+file_id
             trial_model_path = self.path + file_prefix
             hpo_models[trial_model_name] = trial_model_path
+            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
         print("Time for TabularNN hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
         print("Best hyperparameter configuration for Tabular Neural Network: ")
         print(best_hp)
-        return (hpo_models, hpo_results)
+        return (hpo_models, hpo_model_performances, hpo_results)
         """
         # TODO: do final fit here?
         args.final_fit = True

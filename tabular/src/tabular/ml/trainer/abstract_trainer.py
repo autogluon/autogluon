@@ -184,7 +184,7 @@ class AbstractTrainer:
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
-                hpo_models, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
+                hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
                     Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
@@ -194,6 +194,7 @@ class AbstractTrainer:
             else:
                 self.hpo_model_names += list(sorted(hpo_models.keys()))
                 self.model_paths.update(hpo_models)
+                self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
                 self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
@@ -213,9 +214,9 @@ class AbstractTrainer:
     def train_multi_and_ensemble(self, X_train, X_test, y_train, y_test, models: List[AbstractModel],
                                  hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, X_test, y_train, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-        if not hyperparameter_tune: # TODO: we currently do not store model_performance after HPO
-            for model_name in self.model_names:
-                print(model_name, self.model_performance[model_name])
+        # if not hyperparameter_tune: # TODO: we store and print model_performance after HPO
+        for model_name in self.model_names:
+            print("Performance of %s model: %s" % (model_name, self.model_performance[model_name]))
         if len(self.model_names) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 

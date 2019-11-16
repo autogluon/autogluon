@@ -145,6 +145,13 @@ class TabularNNDataset:
         """ Number of vector features (each onehot feature counts = 1, regardless of how many categories) """
         return len(self.feature_groups['vector'])
 
+    def get_labels(self):
+        """ Returns numpy array of labels for this dataset """
+        if self.label_index is not None:
+            return self.dataset._data[self.label_index].asnumpy().flatten()
+        else:
+            return None
+
     def getNumCategoriesEmbeddings(self):
         """ Returns number of categories for each embedding feature.
             Should only be applied to training data.

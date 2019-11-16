@@ -17,7 +17,7 @@ def train_lgb(args, reporter):
     """ Training script for hyperparameter optimization of Gradient Boosting model """
     # list of args which are not model hyperparameters:
     nonparam_args = set(['directory', 'task_id', 'lgb_model', 'dataset_train_filename', 'dataset_val_filename'])
-    trial_id = args.task_id
+    trial_id = args.task_id # Note may not start at 0 if HPO has been run for other models with same scheduler
     directory = args.directory
     file_prefix = "trial_"+str(trial_id)+"_" # append to all file names created during this trial. Do NOT change!
     lgb_model = args.lgb_model
@@ -76,8 +76,9 @@ def train_lgb(args, reporter):
     if seed_value is not None:
         lgb_model.params['seed_value'] = seed_value
     lgb_model.best_iteration = lgb_model.model.best_iteration
-    if lgb_model.eval_results['best_iter'] != lgb_model.best_iteration:
-        raise ValueError('eval_results[best_iter]=%s does not match lgb_model.best_iteration=%s' % (lgb_model.eval_results['best_iter'], lgb_model.best_iteration) )
+    # TODO: difficult to ensure these iters always match
+    # if lgb_model.eval_results['best_iter'] != lgb_model.best_iteration:
+    #     raise ValueError('eval_results[best_iter]=%s does not match lgb_model.best_iteration=%s' % (lgb_model.eval_results['best_iter'], lgb_model.best_iteration) )
     # print('eval_results[best_iter]=%s does not match lgb_model.best_iteration=%s' % (lgb_model.eval_results['best_iter'], lgb_model.best_iteration) )
     trial_model_file = lgb_model.save(file_prefix=file_prefix, directory=directory, return_filename=True)
     reporter(epoch=num_boost_round+1, validation_performance=lgb_model.eval_results['best_valperf'],

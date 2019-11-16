@@ -30,13 +30,13 @@ def train_tabularNN(args, reporter):
     tabNN = args.tabNN
     tabNN.params = tabNN.params.copy() # duplicate to make sure there are no remaining pointers across trials.
     tabNN.params.update(args) # Set params dict object == to args to explore in this trial.
-    trial_id = args.task_id
+    trial_id = args.task_id # Note may not start at 0 if HPO has been run for other models with same scheduler
     directory = args.directory
     file_prefix = "trial_"+str(trial_id)+"_" # append to all file names created during this trial. Do NOT change!
     trial_temp_file_name = directory + file_prefix + tabNN.temp_file_name # temporary file used throughout this trial
     # Load datasets:
     train_fileprefix = args.train_fileprefix
-    test_fileprefix = args.test_fileprefix
+    test_fileprefix = args.test_fileprefix # cannot be None
     train_dataset = TabularNNDataset.load(train_fileprefix)
     test_dataset = TabularNNDataset.load(test_fileprefix)
     # Define network:
@@ -53,18 +53,26 @@ def train_tabularNN(args, reporter):
     tabNN.model.hybridize()
     # TODO: Not used for now, we always setup the trainer:  if setup_trainer:
     tabNN.setup_trainer()
-    best_val_metric = -np.inf  # higher = better
+    best_val_metric = -np.inf  # we always assume higher = better
     val_metric = None
     best_val_epoch = 0
     best_train_epoch = 0  # epoch with best training loss so far
     best_train_loss = np.inf  # smaller = better
     num_epochs = args.num_epochs
-    loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
-    if tabNN.problem_type == REGRESSION: 
-        if tabNN.metric_map[REGRESSION] == 'MAE':
-            loss_scaling_factor = np.std(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # std-dev of labels
-        elif tabNN.metric_map[REGRESSION] == 'Rsquared':
-            loss_scaling_factor = np.var(train_dataset.dataset._data[train_dataset.label_index].asnumpy())/5.0 + EPS # variance of labels
+    if test_dataset is not None:
+        y_test = test_dataset.get_labels()
+    
+    loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
+    loss_torescale = [key for key in tabNN.rescale_losses if isinstance(tabNN.loss_func, key)]
+    if len(loss_torescale) > 0:
+        loss_torescale = loss_torescale[0]
+        if tabNN.rescale_losses[loss_torescale] == 'std':
+            loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS # std-dev of labels
+        elif tabNN.rescale_losses[loss_torescale] == 'var':
+            loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS # variance of labels
+        else:
+            raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (tabNN.rescale_losses[loss_torescale],tabNN.loss_func))
+    # Training Loop:
     for e in range(num_epochs):
         cumulative_loss = 0
         for batch_idx, data_batch in enumerate(train_dataset.dataloader):
@@ -78,21 +86,23 @@ def train_tabularNN(args, reporter):
             cumulative_loss += nd.sum(loss).asscalar()
         train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
         if test_dataset is not None:
-            val_metric = tabNN.evaluate_metric(test_dataset) # Evaluate after each epoch
+            # val_metric = tabNN.evaluate_metric(test_dataset) # Evaluate after each epoch
+            val_metric = tabNN.score(X=test_dataset, y=y_test)
         if test_dataset is None or val_metric >= best_val_metric: # assume model is getting better while validation accuracy remains the same.
             best_val_metric = val_metric
             best_val_epoch = e
             tabNN.model.save_parameters(trial_temp_file_name)
-        # print("Epoch %s.  Train loss: %s, Val %s: %s" % (e, train_loss, tabNN.metric_map[tabNN.problem_type], val_metric))
+        # print("Epoch %s.  Train loss: %s, Val %s: %s" % (e, train_loss, tabNN.eval_metric_name, val_metric))
         reporter(epoch=e, validation_performance=val_metric, train_loss=train_loss) # Higher val_metric = better
         if e - best_val_epoch > args.epochs_wo_improve:
             break
     tabNN.model.load_parameters(trial_temp_file_name) # Revert back to best model
-    final_val_metric = tabNN.evaluate_metric(test_dataset)
+    # final_val_metric = tabNN.evaluate_metric(test_dataset)
+    final_performance = tabNN.score(X=test_dataset, y=y_test)
     modelobj_file, netparams_file = tabNN.save(file_prefix=file_prefix, directory=directory, return_name=True)
-    # print("Best model found in epoch %d. Val %s: %s" % (best_val_epoch, tabNN.metric_map[tabNN.problem_type], final_val_metric))
+    # print("Best model found in epoch %d. Val %s: %s" % (best_val_epoch, tabNN.eval_metric_name, final_val_metric))
     # add fake epoch at the end containg performance of early-stopped model.  Higher val_metric = better
-    reporter(epoch= e+1, validation_performance = final_val_metric, directory = directory, file_prefix = file_prefix,
+    reporter(epoch= e+1, validation_performance = final_performance, directory = directory, file_prefix = file_prefix,
              modelobj_file = modelobj_file, netparams_file = netparams_file) # unused in reporter, only directory+file_prefix required to load model.
     
     # TODO: how to keep track of which filename corresponds to which performance?

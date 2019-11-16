@@ -57,7 +57,7 @@ class AbstractModel:
         self.path = self.create_contexts(path + name + '/')
         self.model = model
         self.problem_type = problem_type
-        self.objective_func = objective_func
+        self.objective_func = objective_func # Note: we require higher values = better performance
         self.feature_types_metadata = {}  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
         if type(objective_func) == tabular.metrics._ProbaScorer:
