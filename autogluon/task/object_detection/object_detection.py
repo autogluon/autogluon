@@ -16,7 +16,7 @@ from .pipeline import train_object_detection
 from .utils import *
 from ...utils import update_params
 
-from .classifier import Classifier
+from .detector import Detector
 import pdb
 
 __all__ = ['ObjectDetection']
@@ -171,4 +171,4 @@ class ObjectDetection(BaseTask):
         #pdb.set_trace()
         model = get_network(args.net, dataset.init().get_classes(), mx.cpu(0))
         update_params(model, results.pop('model_params'))
-        return Classifier(model, results, checkpoint, args)
+        return Detector(model, results, checkpoint, args)

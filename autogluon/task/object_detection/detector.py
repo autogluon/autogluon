@@ -33,7 +33,7 @@ import gluoncv as gcv
 
 
 
-class Classifier(BasePredictor):
+class Detector(BasePredictor):
     """
     Classifier returned by task.fit()
     Example user workflow:

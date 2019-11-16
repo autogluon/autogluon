@@ -37,18 +37,18 @@ In order to have results after you grab a cup of coffee, time_limits is set to 1
 ```{.python .input}
 time_limits = 15*60 # 15mins
 epochs = 30
-classifier = task.fit(dataset,
-                      net=ag.Categorical('mobilenet1.0'),
-                      lr=ag.Categorical(5e-4, 1e-4),
-                      time_limits=time_limits,
-                      epochs=epochs,
-                      ngpus_per_trial=1)
+detector = task.fit(dataset,
+                    net=ag.Categorical('mobilenet1.0'),
+                    lr=ag.Categorical(5e-4, 1e-4),
+                    time_limits=time_limits,
+                    epochs=epochs,
+                    ngpus_per_trial=1)
 ```
 
-After fitting, AutoGluon will automatically return the best model among all models in searching space. From output, we know the best model is the one trained with the second learning rate. Now, let's see how well the returned model perform on test dataset by simply calling classifier.evaluate().
+After fitting, AutoGluon will automatically return the best model among all models in searching space. From output, we know the best model is the one trained with the second learning rate. Now, let's see how well the returned model perform on test dataset by simply calling detector.evaluate().
 
 ```{.python .input}
-test_acc = classifier.evaluate(dataset) # it only evaluates on test dataset.
+test_acc = detector.evaluate(dataset) # it only evaluates on test dataset.
 print("mAP on test dataset: {}".format(test_acc[1][1]))
 ```
 
@@ -58,7 +58,7 @@ The mAP is not bad after just 30 epochs. Let's see one visualization result. We 
 image = '000467.jpg'
 image_path = os.path.join(root, 'tiny_motorbike/VOC2007/JPEGImages', image)
 
-ind, prob, loc = classifier.predict(image_path)
+ind, prob, loc = detector.predict(image_path)
 ```
 
 We have tried models with various settings. Finally, showdown the whole processs via following command. 
