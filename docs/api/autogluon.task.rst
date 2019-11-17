@@ -23,7 +23,7 @@ autogluon.task
 
    Evaluate on Test Dataset:
    
-   >>> test_dataset = task.Dataset(test_path='data/test')
+   >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
    >>> print('Top-1 test acc: %.3f' % test_acc)
    Top-1 test acc: 0.506
@@ -49,3 +49,37 @@ AutoGluon Applications
 
     .. autoautosummary:: ImageClassification
         :methods:
+
+.. automodule:: autogluon.task.image_classification
+
+.. autofunction::
+   get_dataset
+
+.. autoclass:: ImageFolderDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ImageFolderDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: ImageFolderDataset
+        :attributes:
+
+
+.. autoclass:: RecordDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RecordDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: RecordDataset
+        :attributes:

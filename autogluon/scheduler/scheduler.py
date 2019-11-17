@@ -70,7 +70,7 @@ class TaskScheduler(object):
         """Adding a training task to the scheduler.
 
         Args:
-            task (:class:`autogluon.scheduler.Task`): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new training task
 
         Relevant entries in kwargs:
         - bracket: HB bracket to be used. Has been sampled in _promote_config

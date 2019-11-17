@@ -20,22 +20,22 @@ Let's first create the dataset using the same subset of the `Shopee-IET` dataset
 Recall that as we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
-filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ag.unzip(filename)
 ```
 
 ```{.python .input}
-dataset = task.Dataset(train_path='data/train')
+dataset = task.Dataset('data/train')
 ```
 
 ## Understanding default configurations of AutoGluon's fit
 
 To ensure this demo runs quickly, we expect each call to `fit` can be finished within minutes,
-and individual training runs (also referred to as `trials`) each last for 10 epochs.
+and individual training runs (also referred to as `trials`) each last for 4 epochs.
 
 ```{.python .input}
 time_limits = 1*60
-epochs = 2
+epochs = 4
 ```
 
 We first again use the default arguments of the `fit` function to train the neural networks:
@@ -50,8 +50,8 @@ classifier = task.fit(dataset,
 The validation and test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
-test_dataset = task.Dataset(test_path='~/data/test')
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+test_dataset = task.Dataset('~/data/test', train=False)
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -171,7 +171,7 @@ classifier = task.fit(dataset,
                    lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                    search_strategy=search_strategy,
                    time_limits=time_limits,
-                   epochs=4,
+                   epochs=epochs,
                    ngpus_per_trial=1)
 ```
 
@@ -190,7 +190,7 @@ Let's now use the same image as used in :ref:`sec_imgquick` to generate a predic
 image = './data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
+      (dataset.init().classes[ind.asscalar()], prob.asscalar()))
 ```
 
 

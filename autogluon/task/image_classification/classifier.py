@@ -106,7 +106,7 @@ class Classifier(BasePredictor):
         metric = get_metric_instance(args.metric)
         input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
-        _, test_data, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, False)
+        test_data, _, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, True, None)
         tbar = tqdm(enumerate(test_data))
         for i, batch in tbar:
             self.eval_func(net, batch, batch_fn, metric, ctx)
@@ -141,8 +141,8 @@ class Classifier(BasePredictor):
         training_history = results.pop('training_history')
         config_history = results.pop('config_history')
         results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                              results['reward_attr'])
-        results[results['reward_attr']] = results.pop('best_reward')
+                                                         results['reward_attr'])
+        results[results['reward_attr']] = results['best_reward']
         results['search_space'] = results['metadata'].pop('search_space')
         results['search_strategy'] = results['metadata'].pop('search_strategy')
         return results
