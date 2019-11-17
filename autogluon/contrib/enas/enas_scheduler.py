@@ -80,9 +80,9 @@ class ENAS_Scheduler(object):
 
         if isinstance(train_set, str):
             train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
-                                             num_workers=num_cpus, shuffle=True).init()
+                                             num_workers=num_cpus, shuffle=True)
             val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
-                                           num_workers=num_cpus, shuffle=True).init()
+                                           num_workers=num_cpus, shuffle=True)
         if isinstance(train_set, gluon.data.Dataset):
             self.train_data = DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,

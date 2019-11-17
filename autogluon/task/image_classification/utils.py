@@ -4,6 +4,7 @@ from mxnet import gluon
 import gluoncv as gcv
 from .nets import *
 from .dataset import *
+from ...utils.dataloader import DataLoader 
 
 __all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn']
@@ -15,16 +16,15 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit):
         train_dataset = get_built_in_dataset(dataset, train=True,
                                              input_size=input_size,
                                              batch_size=batch_size,
-                                             num_workers=num_workers).init()
+                                             num_workers=num_workers)
         val_dataset = get_built_in_dataset(dataset, train=False,
                                            input_size=input_size,
                                            batch_size=batch_size,
-                                           num_workers=num_workers).init()
+                                           num_workers=num_workers)
+    elif final_fit:
+        train_dataset, val_dataset = dataset, None
     else:
-        train_dataset = dataset.train
-        val_dataset = dataset.val
-    if val_dataset is None and not final_fit:
-        train_dataset, val_dataset = _train_val_split(train_dataset)
+        train_dataset, val_dataset = _train_val_split(dataset)
 
     if isinstance(dataset, str) and dataset.lower() == 'imagenet':
         train_data = train_dataset
@@ -33,6 +33,7 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit):
         imagenet_samples = 1281167
         num_batches = imagenet_samples // batch_size
     else:
+        num_workers = 0
         train_data = gluon.data.DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True,
             last_batch="rollover", num_workers=num_workers)
@@ -44,7 +45,6 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit):
         batch_fn = default_batch_fn
         num_batches = len(train_data)
     return train_data, val_data, batch_fn, num_batches
-
 
 def get_network(net, num_classes, ctx):
     if type(net) == str:
@@ -84,7 +84,6 @@ def _train_val_split(train_dataset, split_ratio=0.2):
     val_sampler = SplitSampler(0, split_idx)
     train_sampler = SplitSampler(split_idx, num_samples)
     return _SampledDataset(train_dataset, train_sampler), _SampledDataset(train_dataset, val_sampler)
-
 
 class SplitSampler(object):
     """Samples elements from [start, start+length) randomly without replacement.

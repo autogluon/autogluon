@@ -64,7 +64,7 @@ Given an example image, we can easily use the final model to `predict` the label
 image = 'data/test/BabyShirt/BabyShirt_323.jpg'
 ind, prob = classifier.predict(image)
 print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.init().synsets[ind.asscalar()], prob.asscalar()))
+      (dataset.init().classes[ind.asscalar()], prob.asscalar()))
 ```
 
 The `classifier.results` contains summaries describing various aspects of the training process.

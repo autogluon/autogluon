@@ -49,3 +49,37 @@ AutoGluon Applications
 
     .. autoautosummary:: ImageClassification
         :methods:
+
+.. automodule:: autogluon.task.image_classification
+
+.. autofunction::
+   get_dataset
+
+.. autoclass:: ImageFolderDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ImageFolderDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: ImageFolderDataset
+        :attributes:
+
+
+.. autoclass:: RecordDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RecordDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: RecordDataset
+        :attributes:

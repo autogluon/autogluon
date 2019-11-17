@@ -13,7 +13,6 @@ from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...utils.mxutils import collect_params
 from .nets import get_built_in_network
-from .dataset import get_built_in_dataset
 from .utils import *
 
 __all__ = ['train_image_classification']
@@ -37,7 +36,7 @@ def train_image_classification(args, reporter):
     input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
     train_data, val_data, batch_fn, num_batches = get_data_loader(
             args.dataset, input_size, batch_size, args.num_workers, args.final_fit)
-    
+ 
     if isinstance(args.lr_scheduler, str):
         lr_scheduler = lr_schedulers[args.lr_scheduler](num_batches * args.epochs,
                                                         base_lr=args.optimizer.lr)
@@ -49,7 +48,8 @@ def train_image_classification(args, reporter):
     metric = get_metric_instance(args.metric)
 
     def train(epoch):
-        for i, batch in enumerate(train_data):
+        from ...utils import tqdm
+        for i, batch in enumerate(tqdm(train_data)):
             default_train_fn(net, batch, batch_size, args.loss, trainer, batch_fn, ctx)
             mx.nd.waitall()
 

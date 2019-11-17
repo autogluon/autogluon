@@ -12,7 +12,7 @@ from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ...utils import update_params
 
-from .dataset import ClassificationDataset, get_built_in_dataset
+from .dataset import get_dataset
 from .pipeline import train_image_classification
 from .utils import *
 from .classifier import Classifier
@@ -24,7 +24,28 @@ logger = logging.getLogger(__name__)
 class ImageClassification(BaseTask):
     """AutoGluon ImageClassification Task
     """
-    Dataset = ClassificationDataset
+    @staticmethod
+    def Dataset(*args, **kwargs):
+        """A convenient function for image classification dataset, supported datasets given by
+        built-in datasets ('mnist', 'cifar10', 'cifar100', 'imagenet'),
+        :class:`ImageFolderDataset` and :class:`RecordioDataset`.
+
+        Parameters
+        ----------
+            name : str, optional
+                The name for built-in dataset, overrite other options.
+                The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+            train : bool, default True
+                Train or validation mode
+            train_path : str
+                The training data location
+            input_size : int
+                The input image size.
+            crop_ratio : float
+                Center crop ratio for evaluation only
+        """
+        return get_dataset(*args, **kwargs)
+
     @staticmethod
     def fit(dataset,
             net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
@@ -57,13 +78,13 @@ class ImageClassification(BaseTask):
         ----------
         dataset : (str or autogluon.task.ImageClassification.Dataset)
             Training dataset.
-        net : (str or autogluon.AutoGluonObject)
+        net : (str or :class:`autogluon.AutoGluonObject`)
             Network candidates.
-        optimizer : (str or autogluon.AutoGluonObject)
+        optimizer : (str or :class:`autogluon.AutoGluonObject`)
             optimizer candidates.
         metric : (str or object)
             observation metric.
-        loss : (object)
+        loss : (mxnet.gluon.loss)
             training loss function.
         num_trials : (int)
             number of trials in the experiment.
