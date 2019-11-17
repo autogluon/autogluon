@@ -7,7 +7,7 @@ AutoGluon provides fit API which allows faster prototyping on object detection
 
    .. card::
       :title: Quick Start Using FIT
-      :link: object_detection/beginner.html
+      :link: beginner.html
 
       Quick start tutorial.
 
