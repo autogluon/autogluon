@@ -24,6 +24,16 @@ Image Classification
 
       Participate Kaggle competation.
 
+Object Detection
+--------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Using FIT
+      :link: object_detection/beginner.html
+
+      Quick start tutorial.
+
 Customize AutoGluon
 -------------------
 .. container:: cards
@@ -48,6 +58,7 @@ Customize AutoGluon
 
       Easily scale up training across multiple machines using
       automatic distributed search.
+
 
 Neural Architecture Search
 --------------------------
