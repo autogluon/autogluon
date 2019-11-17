@@ -27,7 +27,7 @@ ag.unzip(filename)
 Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
 ```{.python .input}
-dataset = task.Dataset(train_path='data/train')
+dataset = task.Dataset('data/train')
 ```
 
 ## Use AutoGluon to fit models
@@ -36,7 +36,7 @@ Now, we want to obtain a neural network classifier using AutoGluon:
 
 ```{.python .input}
 classifier = task.fit(dataset,
-                      epochs=10,
+                      epochs=4,
                       ngpus_per_trial=1)
 ```
 
@@ -45,7 +45,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
 Within `fit`, this model is also finally fitted on our entire dataset (ie. merging training+validation) using the same optimal hyperparameter configuration. The resulting model is considered as final model to be applied to classify new images.
@@ -53,7 +53,7 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 We now evaluate the classifier on a test dataset:
 
 ```{.python .input}
-test_dataset = task.Dataset(test_path='data/test')
+test_dataset = task.Dataset('data/test', train=False)
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```

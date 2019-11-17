@@ -23,7 +23,7 @@ autogluon.task
 
    Evaluate on Test Dataset:
    
-   >>> test_dataset = task.Dataset(test_path='data/test')
+   >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
    >>> print('Top-1 test acc: %.3f' % test_acc)
    Top-1 test acc: 0.506

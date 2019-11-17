@@ -290,7 +290,7 @@ class RLScheduler(FIFOScheduler):
         """Adding a training task to the scheduler.
 
         Args:
-            task (:class:`autogluon.scheduler.Task`): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new training task
         """
         cls = RLScheduler
         cls.RESOURCE_MANAGER._request(task.resources)

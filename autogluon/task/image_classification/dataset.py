@@ -5,12 +5,10 @@ import numpy as np
 from PIL import Image
 
 import mxnet as mx
-from mxnet import gluon
-from mxnet import nd
+from mxnet import gluon, nd
 from mxnet.gluon.data import Dataset as MXDataset
-from mxnet.gluon.data.vision.datasets import ImageRecordDataset
-from mxnet.gluon.data.vision import transforms
-import gluoncv.data.transforms as gcv_transforms
+from mxnet.gluon.data.vision import ImageRecordDataset, transforms
+
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
@@ -26,7 +24,7 @@ built_in_datasets = [
 ]
 
 @func()
-def get_dataset(name=None, train=True, train_path=None,
+def get_dataset(path=None, train=True, name=None,
                input_size=224, crop_ratio=0.875, jitter_param=0.4,
                *args, **kwargs):
     """A convenient function for image classification dataset, supported datasets given by
@@ -40,7 +38,7 @@ def get_dataset(name=None, train=True, train_path=None,
             The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
         train : bool, default True
             Train or validation mode
-        train_path : str
+        path : str
             The training data location. If using :class:`ImageFolderDataset`,
             image folder`path/to/the/folder` should be provided.
             If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
@@ -68,9 +66,9 @@ def get_dataset(name=None, train=True, train_path=None,
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-    dataset_cls = ImageFolderDataset if '.rec' not in train_path \
+    dataset_cls = ImageFolderDataset if '.rec' not in path \
             else RecordDataset
-    dataset = dataset_cls(train_path, transform=transform, *args, **kwargs)
+    dataset = dataset_cls(path, transform=transform, *args, **kwargs)
     return dataset.init()
 
 @obj()
@@ -254,6 +252,7 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
     """
     print('get_built_in_dataset', name)
     if name in ['cifar10', 'cifar']:
+        import gluoncv.data.transforms as gcv_transforms
         transform_split = transforms.Compose([
             gcv_transforms.RandomCrop(32, pad=4),
             transforms.RandomFlipLeftRight(),
@@ -265,6 +264,7 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
         ])
         return gluon.data.vision.CIFAR10(train=train).transform_first(transform_split)
     elif name == 'cifar100':
+        import gluoncv.data.transforms as gcv_transforms
         transform_split = transforms.Compose([
             gcv_transforms.RandomCrop(32, pad=4),
             transforms.RandomFlipLeftRight(),

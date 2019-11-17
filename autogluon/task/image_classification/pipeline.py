@@ -35,7 +35,8 @@ def train_image_classification(args, reporter):
 
     input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
     train_data, val_data, batch_fn, num_batches = get_data_loader(
-            args.dataset, input_size, batch_size, args.num_workers, args.final_fit)
+            args.dataset, input_size, batch_size, args.num_workers, args.final_fit,
+            args.split_ratio)
  
     if isinstance(args.lr_scheduler, str):
         lr_scheduler = lr_schedulers[args.lr_scheduler](num_batches * args.epochs,
@@ -61,8 +62,8 @@ def train_image_classification(args, reporter):
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
-        #if not args.final_fit:
-        #    test(epoch)
+        if not args.final_fit:
+            test(epoch)
 
     if args.final_fit:
         return {'model_params': collect_params(net),
