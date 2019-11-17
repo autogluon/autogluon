@@ -67,10 +67,10 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
                     graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
                     tbar.set_svg(graph._repr_svg_())
-                tbar.set_description('avg reward: {}'.format(self.baseline))
+                tbar.set_description('avg reward: {:.2f}'.format(self.baseline))
             self.validation()
             self.save()
-            tq.set_description('epoch {}, val_acc: {}, avg reward: {}' \
+            tq.set_description('epoch {}, val_acc: {:.2f}, avg reward: {:.2f}' \
                         .format(epoch, self.val_acc, self.baseline))
 
     def validation(self):
