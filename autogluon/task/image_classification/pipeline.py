@@ -48,8 +48,7 @@ def train_image_classification(args, reporter):
     metric = get_metric_instance(args.metric)
 
     def train(epoch):
-        from ...utils import tqdm
-        for i, batch in enumerate(tqdm(train_data)):
+        for i, batch in enumerate(train_data):
             default_train_fn(net, batch, batch_size, args.loss, trainer, batch_fn, ctx)
             mx.nd.waitall()
 
@@ -62,8 +61,8 @@ def train_image_classification(args, reporter):
 
     for epoch in range(1, args.epochs + 1):
         train(epoch)
-        if not args.final_fit:
-            test(epoch)
+        #if not args.final_fit:
+        #    test(epoch)
 
     if args.final_fit:
         return {'model_params': collect_params(net),
