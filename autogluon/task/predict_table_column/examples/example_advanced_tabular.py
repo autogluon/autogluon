@@ -1,22 +1,24 @@
 """ Example script for PredictTableColumn task demonstrating how to use non-default arguments 
     in the hyperparameter optimization.
 """
-
+import os
 import autogluon as ag
 from autogluon import PredictTableColumn as task
 
-package_dir = 'autogluon/' # TODO: change this to absolute filepath to autogluon/ on your computer
+# Download example dataset:
+data_dir = 'AdultIncomeBinaryClassification'
+data_url = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip'
+if (not os.path.exists(data_dir)) or (not os.path.exists(data_dir)):
+    os.system("wget " + data_url + " -O temp.zip && unzip -o temp.zip && rm temp.zip")
 
-data_dir = package_dir+'tabular/datasets/AdultIncomeData/'
-train_file_path = data_dir+'train_data.csv'
-test_file_path = data_dir+'test_data.csv'
-savedir = data_dir+'Output/'
+train_file_path = data_dir+'/train_data.csv'
+test_file_path = data_dir+'/test_data.csv'
+savedir = data_dir+'/Output/'
 label_column = 'class' # name of column containing label to predict
 
 
 # Training time:
 train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if user already has pandas object in python, can skip this step
-
 train_data = train_data.head(100) # subsample for faster demo
 print(train_data.head())
 
@@ -38,10 +40,8 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
 # Since tuning_data = None, AutoGluon automatically determines train/validation split.
 
 trainer = predictor.load_trainer() # use to show summary of training / HPO processes
-print(trainer.model_performance)
-print(trainer.model_names)
 print(trainer.hpo_results)
-
+print(trainer.model_performance)
 
 
 # Inference time:

@@ -22,7 +22,7 @@
     - text features in dataset
 """
 
-import warnings, shutil
+import warnings, shutil, os
 import numpy as np
 import mxnet as mx
 from random import seed
@@ -37,14 +37,14 @@ from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 ############ Benchmark options you can set: ########################
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 fast_benchmark = True # False
-hyperparameter_tune = True
+hyperparameter_tune = False
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
 # performance_value warnings are disabled when fast_benchmark = True.
 
 #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
 if fast_benchmark:
-    subsample_size = 5000
+    subsample_size = 100
     nn_options = {'num_epochs': 5} 
     gbm_options = {'num_boost_round': 100}
     hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
@@ -60,33 +60,33 @@ EPS = 1e-10
 
 # Information about each dataset in benchmark is stored in dict.
 # performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
-binary_dataset = {'folder': '~/WorkDocs/Datasets/AdultIncomeBinaryClassification/',
-                  'name': 'AdultIncomeBinary',
+binary_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
+                  'name': 'AdultIncomeBinaryClassification',
                   'problem_type': BINARY,
                   'label_column': 'class',
                   'performance_val': 0.129} # Mixed types of features.
 
-multi_dataset = {'folder': '~/WorkDocs/Datasets/CoverTypeMulticlassClassification/',
-                  'name': 'CoverTypeMulticlass',
+multi_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
+                  'name': 'CoverTypeMulticlassClassification',
                   'problem_type': MULTICLASS,
                   'label_column': 'Cover_Type',
                   'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
-regression_dataset = {'folder': '~/WorkDocs/Datasets/AmesHousingPriceRegression/',
-                   'name': 'AmesHousingRegression',
+regression_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
+                   'name': 'AmesHousingPriceRegression',
                   'problem_type': REGRESSION,
                   'label_column': 'SalePrice',
                   'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
 
-toyregres_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyRegression/', 
-                     'name': 'ToyRegression',
+toyregres_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/toyRegression.zip', 
+                     'name': 'toyRegression',
                      'problem_type': REGRESSION, 
                     'label_column': 'y', 
                     'performance_val': 0.183}
 # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
-toyclassif_dataset = {'folder': '~/WorkDocs/Datasets/AutogluonToyBenchmark/toyClassification/', 
-                     'name': 'ToyClassification',
+toyclassif_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/toyClassification.zip',
+                     'name': 'toyClassification',
                      'problem_type': MULTICLASS, 
                     'label_column': 'y', 
                     'performance_val': 0.436}
@@ -115,9 +115,14 @@ with warnings.catch_warnings(record=True) as caught_warnings:
         mx.random.seed(seed_val)
         dataset = datasets[idx]
         print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
-        directory = dataset['folder']
+        directory = dataset['name'] + "/"
         train_file_path = directory + train_file
         test_file_path = directory + test_file
+        if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
+            # fetch files from s3:
+            print("%s data not found locally, so fetching from %s" % (dataset['name'],  dataset['url']))
+            os.system("wget " + dataset['url'] + " -O temp.zip && unzip -o temp.zip && rm temp.zip")
+        
         savedir = directory + 'AutogluonOutput/'
         shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
         label_column = dataset['label_column']
