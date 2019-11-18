@@ -24,7 +24,7 @@ class SKoptSearcher(BaseSearcher):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
-            please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
+        please see documentation at: `skopt.optimizer.Optimizer <http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer>`_
         These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
         which acquisition function to use, how to optimize the acquisition function, etc.
         The skopt library provides very comprehensive Bayesian optimization functionality,

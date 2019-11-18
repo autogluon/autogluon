@@ -177,7 +177,6 @@ class ObjectDetection(BaseTask):
                 
         results = BaseTask.run_fit(train_object_detection, search_strategy,
                                    scheduler_options)
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
         print('The best config:\n', results['best_config'])
 

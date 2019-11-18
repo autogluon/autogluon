@@ -1,13 +1,10 @@
 # Search Space and Decorator
 
 This tutorial explains the supported search spaces and how to use them, including
-simple search spaces (:class:`autogluon.space.Int`, :class:`autogluon.space.Real`,
-:class:`autogluon.space.Categorical`) and nested search spaces
-(:class:`autogluon.space.Categorical`, :class:`autogluon.space.List`,
-:class:`autogluon.space.Dict`).
+simple search spaces (Int, Real and Categorical) and nested search spaces
+(Categorical, List, Dict).
 AutoGluon also enables search spaces in user-defined objects using the decorator
-:func:`autogluon.obj` and user-defined functions using the decorator
-:func:`autogluon.func`.
+`ag.obj` and user-defined functions using the decorator `ag.func`.
 
 ## Search Space
 
@@ -104,7 +101,7 @@ Get one example configuration:
 f.rand
 ```
 
-#### Dict Space :class:`autogluon.space.List`
+#### Dict Space :class:`autogluon.space.Dict`
 
 Dict Space returns a dict of sampled results.
 
@@ -129,9 +126,14 @@ Get one example configuration:
 g.rand
 ```
 
-## Decorators for Searchbale Object and Customized Training Scripts
+### Decorators for Searchbale Object and Customized Training Scripts
+
+In this section, we show how to insert search space into customized objects and
+training functions.
 
 #### Searchable space in customized class :func:`autogluon.obj`
+
+In AutoGluon searchable object can be returned by a user defined class with a decorator.
 
 ```{.python .input}
 @ag.obj(
@@ -145,7 +147,7 @@ class MyObj:
         self.rank = rank
         self.static_value = static_value
     def __repr__(self):
-        repr = 'MyObj: name {}, rand {}, static_value {}'.format(
+        repr = 'MyObj -- name: {}, rank: {}, static_value: {}'.format(
                 self.name, self.rank, self.static_value)
         return repr
 h = MyObj()
@@ -157,8 +159,10 @@ Get one example random object:
 ```{.python .input}
 h.rand
 ```
+
 .. _NestedExampleObj:
-We can also use it in a Nested Space such as :class`autogluon.space.Categorical`.
+
+We can also use it within a Nested Space such as :class:`autogluon.space.Categorical`.
 In this example, the resulting nested space will be sampled from 
 
 ```{.python .input}
@@ -183,6 +187,8 @@ for _ in range(5):
 ```
 
 #### Searchable space in customized function :func:`autogluon.obj`
+
+We can also insert searchable space in a customized function:
 
 ```{.python .input}
 @ag.func(

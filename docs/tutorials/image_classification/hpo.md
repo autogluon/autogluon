@@ -28,81 +28,51 @@ ag.unzip(filename)
 dataset = task.Dataset('data/train')
 ```
 
-## Understanding default configurations of AutoGluon's fit
-
-To ensure this demo runs quickly, we expect each call to `fit` can be finished within minutes,
-and individual training runs (also referred to as `trials`) each last for 4 epochs.
-
-```{.python .input}
-time_limits = 1*60
-epochs = 4
-```
-
-We first again use the default arguments of the `fit` function to train the neural networks:
-
-```{.python .input}
-classifier = task.fit(dataset,
-                      time_limits=time_limits,
-                      epochs=epochs,
-                      ngpus_per_trial=1)
-```
-
-The validation and test top-1 accuracy are:
-
-```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
-test_dataset = task.Dataset('~/data/test', train=False)
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
-
-
-## Specify which pretrained networks to try
+## Specify Which Networks to try
 
 We start with specifying the pretrained neural network candidates.
 Given such a list, AutoGluon will try training different networks from this list to identify the best-performing candidate.
-This is an example of a `Categorial` search space, in which there are a limited number of values to choose from.
-
-For more information regarding categorical search spaces, please
-refer to the :meth:`autogluon.space.Categorial`.
+This is an example of a :class:`autogluon.space.Categorial` search space, in which there are a limited number of values to choose from.
 
 ```{.python .input}
-import autogluon as ag
-nets = ag.space.Categorical('resnet18_v1', 'resnet34_v1','resnet50_v1')
+import gluoncv as gcv
 
-print(nets)
+@ag.func(
+    multiplier=ag.Categorical(0.25, 1.0),
+)
+def get_mobilenet(multiplier):
+    return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
+
+
+net = ag.space.Categorical('resnet50_v1b', get_mobilenet())
+
+print(net)
 ```
 
-## Specify which optimizers to try
+## Specify The Optimizer and Its Search Spaece
 
-Similarly, we can manually specify which of optimizer candidates to try, in order to further improve the results.
+Similarly, we can manually specify the optimizer candidates.
 We can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
-
-Additionally, we can customize the optimizer-specific hyperparameters as another search space.
-As an example for both `Adam` and `SGD`, we can configure the learning rate and weight decay in a continuous-valued search space.
-Below, we specify that this space should be searched on a log-linear scale, providing two numbers to be lower and upper bounds for the space of values to try.  
-
-Additionally, the momentum in `SGD` is configured as another continuous search space on a linear scale, where the two numbers are also the lower and upper bounds of the space. Moreover, to achieve better results, we could also configure the learning rate scheduler as a categorical space, where in this example, we enable decay and cosine based learning rate schedulers for SGD optimizer.
+Additionally, we can customize the optimizer-specific hyperparameters search spaces, such as learning rate and weight decay using :class:`autogluon.space.Real`.
 
 
 ```{.python .input}
-sgd_opt = ag.optimizer.SGD(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
-                           momentum=ag.space.Real(0.85, 0.95),
-                           wd=ag.space.Real(1e-6, 1e-2, log=True))
-adam_opt = ag.optimizer.Adam(learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
-                             wd=ag.space.Real(1e-6, 1e-2, log=True))
-optimizers = ag.space.Categorical(sgd_opt, adam_opt)
+from mxnet import optimizer as optim
 
-print(optimizers)
+@ag.obj(
+    learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
+    momentum=ag.space.Real(0.85, 0.95),
+    wd=ag.space.Real(1e-6, 1e-2, log=True)
+)
+class NAG(optim.NAG):
+    pass
+
+optimizer = NAG()
+
+print(optimizer)
 ```
 
-Please refer to :class:`autogluon.space.Real` for more details.
-
-Besides, we could also specify the candidates of learning rate schedulers which are typically leveraged to achieve better results.
-We then put the new network and optimizer search space and the learning rate schedulers together in the call to `fit` and might expect better results if we have made smart choices:
-
-
-## Specify a hyperparameter search strategy and how to schedule trials
+## Search Algorithms
 
 In AutoGluon, :meth:`autogluon.searcher` supports different search search_strategys for both hyperparameter optimization and architecture search.
 Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space. 
@@ -110,15 +80,22 @@ This process of finding good hyperparameters from a given search space is common
 :meth:`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
 We currently support random search, Hyperband and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 
-### Search algorithm
+### Bayesian Optimization
 
-Here we use BayesOpt as an example of advanced search algorithm.
-Instead of random search, AutoGluon can alternatively utilize the more sophisticated strategy of :class:`autogluon.searcher.SKoptSearcher` to identify good hyperparameters.  Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration. This surrogate model can then be used to infer which hyperparameter configurations could plausibly lead to the best predictive performance (ie. those hyperparameter-values that are similar to the top-performing configurations tried so far, as well as the hyperparameter-values that are very dissimilar to all configurations tried so far, since the surrogate model is highly uncertain about their corresponding performance). Within the same time-limit constraints, Bayesian optimization can often produce a superior model  compared to random search by making smarter decisions about which hyperparameter configuration to explore next. Although updating the surrogate model takes time, these updates are generally negligible compared with the neural network training time required to execute a single trial. 
+Here is an example of using Bayesian Optimization using :class:`autogluon.searcher.SKoptSearcher`.
+
+Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration. This surrogate model can then be used to infer which hyperparameter configurations could plausibly lead to the best predictive performance.
 
 For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
+Please see detail in :class:`autogluon.searcher.SKoptSearcher`
 
 ```{.python .input}
+time_limits = 2*60
+epochs = 10
+
 classifier = task.fit(dataset,
+                      net=net,
+                      optimizer=optimizer,
                       search_strategy='skopt', 
                       search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                       time_limits=time_limits,
@@ -126,59 +103,49 @@ classifier = task.fit(dataset,
                       ngpus_per_trial=1)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
+```
+
+Load the test dataset and evaluate:
+
+```{.python .input}
+test_dataset = task.Dataset('~/data/test', train=False)
+
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Under the hood, Bayesian optimization in AutoGluon is implemented via the [**scikit-optimize**](https://scikit-optimize.github.io/) library, which allows the user to specify all sorts of Bayesian optimization variants. The full functionality of this library is available to use with `task.fit()`, simply by passing the appropriate `kwargs` as `search_options`.  Please see the [skopt.optimizer.Optimizer](http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer) documentation for the full list of keyword arguments that can be passed as `search_options` when `search_strategy='skopt'`.
+### Hyperband Early stopping
 
-
-### Early stopping
-
-AutoGluon currently supports scheduling trials in serial order and with early stopping (eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
-We support a serial :class:`autogluon.scheduler.FIFOScheduler`
-and an early stopping scheduler :class:`autogluon.scheduler.HyperbandScheduler`.
-Which scheduler to use is easily specified via the string name:
+AutoGluon currently supports scheduling trials in serial order and with early stopping
+(eg. if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
+Here is an example of using an early stopping scheduler :class:`autogluon.scheduler.HyperbandScheduler`:
 
 ```{.python .input}
 search_strategy = 'hyperband'
-```
 
-Let's call `fit` with the Searcher and Scheduler specified above,
-and evaluate the resulting model on both validation and test datasets:
-
-```{.python .input}
 classifier = task.fit(dataset,
-                      nets,
-                      optimizers,
+                      net=net,
+                      optimizer=optimizer,
                       lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                       search_strategy=search_strategy,
-                      time_limits=time_limits,
                       epochs=epochs,
+                      num_trials=16,
+                      verbose=False,
+                      plot_results=True,
                       ngpus_per_trial=1)
+
+print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
 
-The validation and test top-1 accuracy are:
+The test top-1 accuracy are:
 
 ```{.python .input}
-print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-
-Let's now use the same image as used in :ref:`sec_imgquick` to generate a predicted label and the corresponding confidence.
-
-```{.python .input}
-image = './data/test/BabyShirt/BabyShirt_323.jpg'
-ind, prob = classifier.predict(image)
-print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.init().classes[ind.asscalar()], prob.asscalar()))
-```
-
-
-Beyond what we described here, there are many other aspects of `fit` that an advanced user can control.
-For that, please refer to the [fit API](../api/autogluon.task.image_classification.html#autogluon.task.image_classification.ImageClassification.fit).
+Please see comparison of different search algorithms and scheduling strategies :ref:`course_alg`.
+More options using fit is available at :class:`autogluon.task.ImageClassification`.
 
 Finish and exit:
 ```{.python .input}

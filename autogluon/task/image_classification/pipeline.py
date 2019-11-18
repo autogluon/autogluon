@@ -29,9 +29,10 @@ lr_schedulers = {
 @args()
 def train_image_classification(args, reporter):
     logging.basicConfig()
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.info(args)
+    logger = logging.getLogger(__name__)
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+        logger.info(args)
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
 

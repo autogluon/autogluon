@@ -62,6 +62,8 @@ class ImageClassification(BaseTask):
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
+            plot_results=False,
+            verbose=False,
             search_options={},
             time_limits=None,
             resume=False,
@@ -79,9 +81,9 @@ class ImageClassification(BaseTask):
         ----------
         dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
             Training dataset.
-        net : str or :class:`autogluon.AutoGluonObject`
+        net : str or :class:`autogluon.space.AutoGluonObject`
             Network candidates.
-        optimizer : str or :class:`autogluon.AutoGluonObject`
+        optimizer : str or :class:`autogluon.space.AutoGluonObject`
             optimizer candidates.
         metric : str or object
             observation metric.
@@ -132,6 +134,7 @@ class ImageClassification(BaseTask):
             batch_size=batch_size,
             input_size=input_size,
             epochs=epochs,
+            verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
             final_fit=False)
@@ -148,6 +151,7 @@ class ImageClassification(BaseTask):
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
+            'plot_results': plot_results,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
