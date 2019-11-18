@@ -82,7 +82,7 @@ class AbstractTrainer:
         return path, model_paths
 
     def generate_train_test_split(self, X: DataFrame, y: Series, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
-        if (test_size < 0.0) or (test_size  > 1.0):
+        if (test_size <= 0.0) or (test_size >= 1.0):
             raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
         if self.problem_type == REGRESSION:
             stratify = None
@@ -133,15 +133,6 @@ class AbstractTrainer:
         print(oof_pred_proba)
         return oof_pred_proba, models
 
-    @staticmethod
-    def get_oof_preds(kfolds, kmodels):
-        oof = []
-        for k, fold in enumerate(kfolds):
-            _, _, X_test, y_test = fold
-            y_pred_proba = kmodels[k].predict_proba(X_test)
-            oof.append(y_pred_proba)
-        return oof
-
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
               holdout_frac=0.1, hyperparameters= {}):
         raise NotImplementedError
@@ -156,7 +147,7 @@ class AbstractTrainer:
         if type(model) == BaggedEnsembleModel:
             X = pd.concat([X_train, X_test], ignore_index=True)  # TODO: Consider doing earlier so this isn't repeated for each model
             y = pd.concat([y_train, y_test], ignore_index=True)
-            model.fit(X=X, y=y, k_fold=2, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X, y=y, k_fold=5, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
 
@@ -312,22 +303,6 @@ class AbstractTrainer:
             if self.low_memory:
                 del model
 
-    @staticmethod
-    def train_ensemble(X_train, X_test, y_train, y_test, model_base: AbstractModel, objective_func=accuracy):
-        oof_pred_proba, models_cv = AbstractTrainer.get_cv(X=X_train, y=y_train, n_splits=5, model=model_base)
-        for model in models_cv:
-            print(model.score(X=X_test, y=y_test))
-        cv_preds = []
-        for model in models_cv:
-            cv_pred = model.predict_proba(X_test)
-            cv_preds.append(cv_pred)
-        num_models = len(cv_preds)
-        cv_preds_norm = [cv_pred / num_models for cv_pred in cv_preds]
-        y_pred_proba_ensemble = np.sum(cv_preds_norm, axis=0)
-        y_pred_ensemble = np.argmax(y_pred_proba_ensemble, axis=1)
-        print('ensemble:', objective_func(y_true=y_test, y_pred=y_pred_ensemble))
-        return oof_pred_proba, y_pred_proba_ensemble, models_cv
-
     def predict(self, X):
         return self.predict_voting_ensemble(models=self.model_names, X_test=X, weights=self.model_weights)
 
@@ -372,7 +347,6 @@ class AbstractTrainer:
             model = self.load_model(model_name)
             oof_y_pred_probas.append(model.oof_pred_proba)
         return self.score_with_y_pred_proba_weighted(y=y, y_pred_probas=oof_y_pred_probas, weights=weights)
-
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
         autotuner = AutoTune(model_base=model_base)
@@ -454,4 +428,3 @@ class AbstractTrainer:
             obj.set_contexts(path)
             obj.reset_paths = reset_paths
             return obj
-

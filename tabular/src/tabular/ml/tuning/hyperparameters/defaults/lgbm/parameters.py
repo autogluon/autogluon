@@ -61,7 +61,7 @@ def get_param_regression_baseline():
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
         'objective': 'regression',
-        'metric': 'l1',
+        'metric': 'regression',
         'verbose': -1,
         'boosting_type': 'gbdt',
         'learning_rate': 0.01,

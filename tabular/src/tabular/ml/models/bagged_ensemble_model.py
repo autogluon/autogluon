@@ -24,14 +24,14 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Likely will caues issues involving memory since later models will have earlier models still in memory during training.
     #  Add option for low_memory to save models as they are trained, and only load model for prediction.
-    def fit(self, X, y, k_fold=5, **kwargs):
+    def fit(self, X, y, k_fold=5, random_state=0, **kwargs):
         print('BAGGING', self.name)
         self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         if self.problem_type == REGRESSION:
             stratified = False
         else:
             stratified = True
-        random_state = 0  # TODO: This should be a value sent in and shared across all bags. If stacking, it should be incremented by 1 for each stacking layer
+        # random_state = 0  # TODO: This should be a value sent in and shared across all bags. If stacking, it should be incremented by 1 for each stacking layer
 
         # TODO: Preprocess data here instead of repeatedly
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state)

@@ -3,18 +3,14 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
-# from skopt.utils import use_named_args # TODO: remove
-# from skopt import gp_minimize # TODO: remove
 
 # TODO: Move these files:
 from autogluon.core import *
 from autogluon.task.base import *
 from tabular.ml.models.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from tabular.ml.utils import construct_dataset
-from tabular.callbacks.lgb.callbacks import record_evaluation_custom, early_stopping_custom
-from tabular.ml.trainer.abstract_trainer import AbstractTrainer
+from tabular.callbacks.lgb.callbacks import early_stopping_custom
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from tabular.ml.tuning.hyperparameters.lgbm_spaces import LGBMSpaces
 from tabular.ml.models.utils import lgb_utils
 from tabular.ml.tuning.hyperparameters.defaults.lgbm.parameters import get_param_baseline
 from tabular.ml.tuning.hyperparameters.defaults.lgbm.searchspaces import get_default_searchspace
@@ -25,6 +21,7 @@ from tabular.ml.tuning.train_lgb_model import train_lgb
 
 logger = logging.getLogger(__name__) # TODO: Currently
 
+# TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func,
                  num_classes=None, hyperparameters={}, features=None, debug=0):
@@ -81,9 +78,6 @@ class LGBModel(AbstractModel):
             valid_sets = [dataset_val] + valid_sets
 
         callbacks += [
-            record_evaluation_custom(self.path + self.eval_result_path, eval_result={}, interval=1000),
-            # save_model_callback(self.path + self.model_name_checkpointing_0, latest_model_checkpoint=self.path + self.latest_model_checkpoint, interval=400, offset=0),
-            # save_model_callback(self.path + self.model_name_checkpointing_1, latest_model_checkpoint=self.path + self.latest_model_checkpoint, interval=400, offset=200),
             # lgb.reset_parameter(learning_rate=lambda iter: alpha * (0.999 ** iter)),
         ]
         # lr_over_time = lambda iter: 0.05 * (0.99 ** iter)
@@ -244,6 +238,7 @@ class LGBModel(AbstractModel):
         num_boost_round = self.params.pop('num_boost_round', 1000)
 
         directory = self.path # also create model directory if it doesn't exist
+        # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
         if not os.path.exists(directory):
             os.makedirs(directory)
         scheduler_func = scheduler_options[0] # Unpack tuple

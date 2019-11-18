@@ -100,7 +100,9 @@ class AbstractModel:
         y_pred_proba = self.model.predict_proba(X)
 
         if self.problem_type == BINARY:
-            if y_pred_proba.shape[1] > 1:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
                 return y_pred_proba[:, 1]
             else:
                 return y_pred_proba

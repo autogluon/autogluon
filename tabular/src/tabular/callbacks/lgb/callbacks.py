@@ -187,7 +187,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
             available_mb = available >> 20
 
             model_size_memory_ratio = estimated_model_size_mb / available_mb
-            if verbose or (model_size_memory_ratio > 0.5):
+            if verbose or (model_size_memory_ratio > 0.25):
                 print('Available Memory:', available_mb, 'MB')
                 print('Estimated Model Size:', estimated_model_size_mb, 'MB')
 
@@ -352,12 +352,14 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
                     print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                     raise EarlyStopException(best_iter[i], best_score_list[i])
+        # TODO: This should be moved inside for loop at the start, otherwise it won't record the final iteration
         idx = indices_to_check[0]
         eval_results['best_iter'] = best_iter[idx] + 1 # add one to index to align with lightgbm best_iteration instance variable.
         eval_results['best_valperf'] = best_score[idx] # validation performance at round = best_iter
         eval_results['best_trainloss'] = best_trainloss[idx] # training loss at round = best_iter
         reporter(epoch=env.iteration, validation_performance=validation_perf, train_loss=train_loss_val, 
                  best_iter_sofar=eval_results['best_iter'], best_valperf_sofar=eval_results['best_valperf'])
+        # TODO: Add memory checks as in early_stopping_custom
     _callback.order = 30
     return _callback
 

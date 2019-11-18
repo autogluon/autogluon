@@ -21,7 +21,6 @@ import copy
 from tabular.utils.loaders import load_pkl
 from tabular.ml.constants import REGRESSION, BINARY
 from tabular.ml.models.abstract_model import AbstractModel
-from tabular.ml.trainer.abstract_trainer import AbstractTrainer
 from tabular.ml.tuning.hyperparameters.nn_tab_spaces import NNTabularSpaces
 from tabular.utils.savers import save_pkl
 
