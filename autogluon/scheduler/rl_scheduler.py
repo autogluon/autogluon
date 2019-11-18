@@ -10,7 +10,7 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from ..utils import (save, load, in_ipynb, mkdir, try_import_mxboard)
+from ..utils import (save, load, mkdir, try_import_mxboard, tqdm)
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
@@ -18,46 +18,59 @@ from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
-
 __all__ = ['RLScheduler']
 
 logger = logging.getLogger(__name__)
 
 class RLScheduler(FIFOScheduler):
-    """Reinforcement Scheduler, which automatically creates LSTM controller based on the search spaces.
+    r"""Scheduler that uses Reinforcement Learning with a LSTM controller created based on the provided search spaces
 
-    Args:
-        train_fn (callable): A task launch function for training. Note: please add the `@autogluon_register_args` decorater to the original function.
-        args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher. For example, autogluon.searcher.RandomSampling
-        time_attr (str): A training result attr to use for comparing time. Note that you can pass in something non-temporal such as `training_epoch` as a measure of progress, the only requirement is that the attribute should increase monotonically.
-        reward_attr (str): The training result objective value attribute. As with `time_attr`, this may refer to any objective value. Stopping procedures will use this attribute.
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training. Note: please add the `@ag.args` decorater to the original function.
+    args : object (optional)
+        Default arguments for launching train_fn.
+    resource : dict
+        Computation resources.  For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : object (optional)
+        Autogluon searcher.  For example, autogluon.searcher.RandomSearcher
+    time_attr : str
+        A training result attr to use for comparing time.
+        Note that you can pass in something non-temporal such as
+        `training_epoch` as a measure of progress, the only requirement
+        is that the attribute should increase monotonically.
+    reward_attr : str
+        The training result objective value attribute. As with `time_attr`, this may refer to any objective value.
+        Stopping procedures will use this attribute.
+    controller_resource : int
+        Batch size for training controllers.
+    dist_ip_addrs : list of str
+        IP addresses of remote machines.
 
-    Example:
-        >>> @autogluon_method
-        >>> def train_fn(args, reporter):
-        >>>     for e in range(10):
-        >>>         # forward, backward, optimizer step and evaluation metric
-        >>>         # generate fake top1_accuracy
-        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=top1_accuracy)
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> searcher = RandomSampling(cs)
-        >>> myscheduler = HyperbandScheduler(train_fn, args,
-        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
-        >>>                                  searcher=searcher, num_trials=20,
-        >>>                                  reward_attr='accuracy',
-        >>>                                  time_attr='epoch',
-        >>>                                  grace_period=1)
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> 
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(10):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    ... 
+    >>> scheduler = ag.scheduler.RLScheduler(train_fn,
+    ...                                      resource={'num_cpus': 2, 'num_gpus': 0},
+    ...                                      num_trials=20,
+    ...                                      reward_attr='accuracy',
+    ...                                      time_attr='epoch')
+    >>> scheduler.run()
+    >>> scheduler.join_jobs()
+    >>> scheduler.get_training_curves(plot=True)
+    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
@@ -65,7 +78,7 @@ class RLScheduler(FIFOScheduler):
                  controller_resource={'num_cpus': 2, 'num_gpus': 0},
                  controller_batch_size=1,
                  dist_ip_addrs=[], sync=True, **kwargs):
-        assert isinstance(train_fn, _autogluon_method), 'Please use autogluon.autogluon_register_args ' + \
+        assert isinstance(train_fn, _autogluon_method), 'Please use @ag.args ' + \
                 'to decorate your training script.'
         self.ema_baseline_decay = ema_baseline_decay
         self.sync = sync
@@ -114,11 +127,11 @@ class RLScheduler(FIFOScheduler):
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
         logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
         if self.sync:
-            self.run_sync()
+            self._run_sync()
         else:
-            self.run_async()
+            self._run_async()
 
-    def run_sync(self):
+    def _run_sync(self):
         decay = self.ema_baseline_decay
         for i in tqdm(range(self.num_trials // self.controller_batch_size + 1)):
             with mx.autograd.record():
@@ -149,7 +162,7 @@ class RLScheduler(FIFOScheduler):
             self.controller_optimizer.step(batch_size)
             logger.debug('controller loss: {}'.format(loss.asscalar()))
 
-    def run_async(self):
+    def _run_async(self):
         def _async_run_trial():
             self.mp_count.value += 1
             self.mp_seed.value += 1
@@ -176,7 +189,7 @@ class RLScheduler(FIFOScheduler):
                         reporter.move_on()
                         task_thread.join()
                         break
-                    self.add_training_result(task.task_id, reported_result, task.args['config'])
+                    self._add_training_result(task.task_id, reported_result, task.args['config'])
                     reporter.move_on()
                     last_result = reported_result
                 reward = last_result[self._reward_attr]
@@ -230,7 +243,7 @@ class RLScheduler(FIFOScheduler):
                 if 'done' in reported_result and reported_result['done'] is True:
                     reporter.move_on()
                     break
-                self.add_training_result(task.task_id, reported_result, task.args['config'])
+                self._add_training_result(task.task_id, reported_result, task.args['config'])
                 reporter.move_on()
                 last_result = reported_result
             if last_result is not None:
@@ -292,6 +305,12 @@ class RLScheduler(FIFOScheduler):
         pass
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
@@ -306,6 +325,12 @@ class RLScheduler(FIFOScheduler):
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         self.finished_tasks = pickle.loads(state_dict['finished_tasks'])
         #self.baseline = pickle.loads(state_dict['baseline'])
         Task.set_id(state_dict['TASK_ID'])

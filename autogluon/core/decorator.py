@@ -12,8 +12,9 @@ from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space
 from ..utils import EasyDict as ezdict
 from ..utils.deprecate import make_deprecate
 
-__all__ = ['autogluon_register_args', 'autogluon_object', 'autogluon_function',
-           'sample_config', 'autogluon_register_dict']
+__all__ = ['args', 'obj', 'func', 'sample_config',
+           'autogluon_register_args', 'autogluon_object', 'autogluon_function',
+           'autogluon_register_dict']
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,14 @@ class _autogluon_method(object):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)
+        from ..scheduler.reporter import FakeReporter
+        if 'reporter' not in kwargs:
+            logger.debug('Creating FakeReporter for test purpose.')
+            kwargs['reporter'] = FakeReporter()
 
         output = self.f(args, **kwargs)
-        if 'reporter' in kwargs and kwargs['reporter'] is not None:
-            logger.debug('Reporter Done!')
-            kwargs['reporter'](done=True)
+        logger.debug('Reporter Done!')
+        kwargs['reporter'](done=True)
         return output
  
     def register_args(self, default={}, **kwvars):
@@ -81,7 +85,7 @@ class _autogluon_method(object):
     def cs(self):
         cs = CS.ConfigurationSpace()
         for k, v in self.kwvars.items():
-            if isinstance(v, (Categorical, Sequence, Dict, AutoGluonObject)):
+            if isinstance(v, NestedSpace):
                 _add_cs(cs, v.cs, k)
             elif isinstance(v, Space):
                 hp = v.get_hp(name=k)
@@ -96,12 +100,9 @@ class _autogluon_method(object):
         """
         kw_spaces = OrderedDict()
         for k, v in self.kwvars.items():
-            if isinstance(v, (AutoGluonObject, Sequence, Dict)):
-                for sub_k, sub_v in v.kwspaces.items():
-                    new_k = '{}.{}'.format(k, sub_k)
-                    kw_spaces[new_k] = sub_v
-            elif isinstance(v, Categorical):
-                kw_spaces['{}.choice'.format(k)] = v
+            if isinstance(v, NestedSpace):
+                if isinstance(v, Categorical):
+                    kw_spaces['{}.choice'.format(k)] = v
                 for sub_k, sub_v in v.kwspaces.items():
                     new_k = '{}.{}'.format(k, sub_k)
                     kw_spaces[new_k] = sub_v
@@ -117,16 +118,16 @@ class _autogluon_method(object):
         return repr(self.f)
 
 
-def autogluon_register_args(default={}, **kwvars):
+def args(default={}, **kwvars):
     """Decorator for customized training script, registering arguments or searchable spaces
-    to the decorated function. The arguments should be python objects, autogluon objects
-    (see :function:`autogluon.autogluon_object`_ .), or autogluon search spaces
-    (:class:`autogluon.Int`, :class:`autogluon.Linear` ...).
+    to the decorated function. The arguments should be python built-in objects,
+    autogluon objects (see :func:`autogluon.obj`_ .), or autogluon search spaces
+    (:class:`autogluon.space.Int`, :class:`autogluon.space.Real` ...).
 
     Example:
-        >>> @autogluon_register_args(batch_size=10, lr=ag.Linear(0.01, 0.1))
+        >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
         >>> def my_train(args):
-        >>>     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
+        ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
 
     """
     kwvars['_default_config'] = default
@@ -143,18 +144,21 @@ def autogluon_register_args(default={}, **kwvars):
     return registered_func
 
 
-def autogluon_function(**kwvars):
+def func(**kwvars):
     """Register args or searchable spaces to the functions.
 
-    Return:
-        AutoGluonobject: a lazy init object, which allows distributed training.
+    Returns
+    -------
+    instance of :class:`autogluon.space.AutoGluonObject`:
+        a lazy init object, which allows distributed training.
 
-    Example:
-        >>> from gluoncv.model_zoo import get_model
-        >>> 
-        >>> @ag.autogluon_function(pretrained=ag.space.Categorical(True, False))
-        >>> def cifar_resnet(pretrained):
-        >>>     return get_model('cifar_resnet20_v1', pretrained=pretrained)
+    Examples
+    --------
+    >>> from gluoncv.model_zoo import get_model
+    >>> 
+    >>> @ag.func(pretrained=ag.space.Categorical(True, False))
+    >>> def cifar_resnet(pretrained):
+    ...     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
     def registered_func(func):
         class autogluonobject(AutoGluonObject):
@@ -165,12 +169,15 @@ def autogluon_function(**kwvars):
                 self.kwargs = kwargs
                 self._inited = False
 
-            def sample(self, **nkwvars):
-                # lazy initialization for passing config files
-                self.kwargs.update(nkwvars)
-                for k, v in self.kwargs.items():
-                    if k in self.kwspaces and isinstance(self.kwspaces[k], Categorical):
-                        self.kwargs[k] = self.kwspaces[k][v]
+            def sample(self, **config):
+                kwargs = self.kwargs
+                kwspaces = autogluonobject.kwspaces
+                for k, v in kwargs.items():
+                    if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
+                        sub_config = _strip_config_space(config, prefix=k)
+                        kwargs[k] = kwspaces[k].sample(**sub_config)
+                    elif k in config:
+                        kwargs[k] = config[k]
                         
                 return self.func(*self.args, **self.kwargs)
 
@@ -182,21 +189,24 @@ def autogluon_function(**kwvars):
         return wrapper_call
     return registered_func
 
-def autogluon_object(**kwvars):
+def obj(**kwvars):
     """Register args or searchable spaces to the class.
 
-    Return:
-        AutoGluonobject: a lazy init object, which allows distributed training.
+    Returns
+    -------
+    instance of :class:`autogluon.space.AutoGluonObject`:
+        a lazy init object, which allows distributed training.
 
-    Example:
-        >>> from gluoncv.model_zoo.cifarresnet import CIFARResNetV1, CIFARBasicBlockV1
-        >>>
-        >>> @autogluon_object(
-        >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
-        >>>     wd=ag.space.Real(1e-4, 1e-1),
-        >>> )
-        >>> class Adam(optim.Adam):
-        >>>     pass
+    Examples
+    --------
+    >>> import autogluon as ag
+    >>> from mxnet import optimizer as optim
+    >>> @ag.obj(
+    >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),
+    >>>     wd=ag.space.Real(1e-4, 1e-1),
+    >>> )
+    >>> class Adam(optim.Adam):
+    >>>     pass
 
     """
     def registered_class(Cls):
@@ -207,13 +217,15 @@ def autogluon_object(**kwvars):
                 self._kwargs = kwargs
                 self._inited = False
 
-            def sample(self, **nkwvars):
+            def sample(self, **config):
                 kwargs = self._kwargs
-                kwargs.update(nkwvars)
                 kwspaces = autogluonobject.kwspaces
                 for k, v in kwargs.items():
-                    if k in kwspaces and isinstance(kwspaces[k], Categorical):
-                        kwargs[k] = kwspaces[k][v]
+                    if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
+                        sub_config = _strip_config_space(config, prefix=k)
+                        kwargs[k] = kwspaces[k].sample(**sub_config)
+                    elif k in config:
+                        kwargs[k] = config[k]
 
                 args = self._args
                 return Cls(*args, **kwargs)
@@ -225,8 +237,6 @@ def autogluon_object(**kwvars):
         return autogluonobject
 
     return registered_class
-
-autogluon_register_dict = make_deprecate(autogluon_register_args, 'autogluon_register_dict')
 
 def _autogluon_kwargs(**kwvars):
     def registered_func(func):
@@ -249,3 +259,8 @@ def _autogluon_kwargs(**kwvars):
         wrapper_call.kwvars = kwvars
         return wrapper_call
     return registered_func
+
+autogluon_register_args = make_deprecate(args, 'autogluon_register_args')
+autogluon_register_dict = make_deprecate(args, 'autogluon_register_dict')
+autogluon_function = make_deprecate(func, 'autogluon_function')
+autogluon_object = make_deprecate(obj, 'autogluon_object')

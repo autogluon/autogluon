@@ -1,4 +1,4 @@
-# Reproducing ProxylessNAS in 10 mins
+# How to Use ENAS in 10 mins
 :label:`sec_proxyless`
 
 ## What is the key idea of ENAS and ProxylessNAS
@@ -46,7 +46,7 @@ class ConvBNReLU(mx.gluon.HybridBlock):
 ```{.python .input}
 from autogluon.contrib.enas import *
 
-@autogluon_enas_unit()
+@enas_unit()
 class ResUnit(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, hidden_channels, kernel, stride):
         super().__init__()
@@ -79,7 +79,7 @@ mynet = ENAS_Sequential(
 
 mynet.initialize()
 
-print(mynet)
+#mynet.graph
 ```
 
 ### Evaluate Network Latency and Define Reward Function
@@ -100,6 +100,8 @@ We also provide number of params
 mynet.nparams
 ```
 
+Defind the reward function:
+
 ```{.python .input}
 reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1)
 ```
@@ -110,9 +112,9 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 
 ```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn,
+                           reward_fn=reward_fn, batch_size=128,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
-                           plot_frequency=1, update_arch_frequency=5)
+                           plot_frequency=10, update_arch_frequency=5)
 ```
 
 Start the training:
@@ -126,14 +128,15 @@ The resulting architecture is:
 mynet.graph
 ```
 
-**Change to a different reward trade-off:**
+**Change the reward trade-off:**
 
 ```{.python .input}
-reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.5)
+reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.8)
+mynet.initialize(force_reinit=True)
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn,
+                           reward_fn=reward_fn, batch_size=128,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
-                           plot_frequency=1, update_arch_frequency=5)
+                           plot_frequency=10, update_arch_frequency=5)
 scheduler.run()
 ```
 
@@ -145,3 +148,9 @@ mynet.graph
 ## Defining a Complicated Network
 
 Can we define a more complicated network than just sequential?
+
+
+Finish and exit:
+```{.python .input}
+ag.done()
+```

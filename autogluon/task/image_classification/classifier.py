@@ -8,12 +8,7 @@ from mxnet.gluon.data.vision import transforms
 from .utils import *
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
-from ...utils import in_ipynb, save, load
-if in_ipynb():
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
-
+from ...utils import save, load, tqdm
 class Classifier(BasePredictor):
     """
     Classifier returned by task.fit()

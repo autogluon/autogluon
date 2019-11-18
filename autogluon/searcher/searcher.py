@@ -13,10 +13,11 @@ logger = logging.getLogger(__name__)
 class BaseSearcher(object):
     """Base Searcher (A virtual class to inherit from)
 
-    Args:
-        configspace: ConfigSpace.ConfigurationSpace
-            The configuration space to sample from. It contains the full
-            specification of the Hyperparameters with their priors
+    Parameters
+    ----------
+    configspace: ConfigSpace.ConfigurationSpace
+        The configuration space to sample from. It contains the full
+        specification of the Hyperparameters with their priors
     """
     LOCK = mp.Lock()
     def __init__(self, configspace):
@@ -30,10 +31,10 @@ class BaseSearcher(object):
         This function is called inside TaskScheduler to query a new configuration
 
         Args:
-            kwargs:
-                Extra information may be passed from scheduler to searcher
-            returns: (config, info_dict)
-                must return a valid configuration and a (possibly empty) info dict
+        kwargs:
+            Extra information may be passed from scheduler to searcher
+        returns: (config, info_dict)
+            must return a valid configuration and a (possibly empty) info dict
         """
         raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
 
@@ -126,29 +127,32 @@ class BaseSearcher(object):
 class RandomSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
 
-    Args:
-        configspace: ConfigSpace.ConfigurationSpace
-            The configuration space to sample from. It contains the full
-            specification of the Hyperparameters with their priors
+    Parameters
+    ----------
+    configspace: ConfigSpace.ConfigurationSpace
+        The configuration space to sample from. It contains the full
+        specification of the Hyperparameters with their priors
 
-    Example:
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> # create configuration space
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> # create searcher
-        >>> searcher = RandomSearcher(cs)
-        >>> searcher.get_config()
+    Examples
+    --------
+    >>> import ConfigSpace as CS
+    >>> import ConfigSpace.hyperparameters as CSH
+    >>> # create configuration space
+    >>> cs = CS.ConfigurationSpace()
+    >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
+    >>> cs.add_hyperparameter(lr)
+    >>> # create searcher
+    >>> searcher = RandomSearcher(cs)
+    >>> searcher.get_config()
     """
     def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called inside Hyperband to query a new configuration
 
-        Args:
-            returns: (config, info_dict)
-                must return a valid configuration and a (possibly empty) info dict
+        Parameters
+        ----------
+        returns: (config, info_dict)
+            must return a valid configuration and a (possibly empty) info dict
         """
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():

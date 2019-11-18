@@ -1,0 +1,10 @@
+name: autogluon_docs
+dependencies:
+- python=3.7
+- graphviz
+- pip:
+  - jupyter-sphinx>=0.2.2
+  - mxnet-cu100==1.5.0b20190331
+  - nose
+  - docutils
+  - mu-notedown

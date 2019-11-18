@@ -5,12 +5,14 @@ import os
 import threading
 import string
 
-__all__ = ['cudaInit', 'cudaDeviceGetCount']
+__all__ = ['cudaInit', 'cudaDeviceGetCount', 'cudaSystemGetNVMLVersion'
+           'cudaShutdown']
 
-NVML_SUCCESS                   = 0
-NVML_ERROR_UNINITIALIZED       = 1
-NVML_ERROR_LIBRARY_NOT_FOUND   = 12
-NVML_ERROR_FUNCTION_NOT_FOUND  = 13
+NVML_SUCCESS                                = 0
+NVML_ERROR_UNINITIALIZED                    = 1
+NVML_ERROR_LIBRARY_NOT_FOUND                = 12
+NVML_ERROR_FUNCTION_NOT_FOUND               = 13
+NVML_SYSTEM_NVML_VERSION_BUFFER_SIZE        = 80
 
 cudaLib = None
 libLoadLock = threading.Lock()
@@ -78,6 +80,13 @@ def _LoadNvmlLibrary():
 
     return ret
 
+def cudaSystemGetNVMLVersion():
+    c_version = create_string_buffer(NVML_SYSTEM_NVML_VERSION_BUFFER_SIZE)
+    fn = _cudaGetFunctionPointer("nvmlSystemGetNVMLVersion")
+    ret = fn(c_version, c_uint(NVML_SYSTEM_NVML_VERSION_BUFFER_SIZE))
+    _cudaCheckReturn(ret)
+    return c_version.value.decode('UTF-8')
+
 ## Function access ##
 _cudaGetFunctionPointer_cache = dict() # function pointers are cached to prevent unnecessary libLoadLock locking
 def _cudaGetFunctionPointer(name):
@@ -133,3 +142,19 @@ class NVMLError(Exception):
 
     def __eq__(self, other):
         return self.value == other.value
+
+def cudaShutdown():
+    #
+    # Leave the library loaded, but shutdown the interface
+    #
+    fn = _cudaGetFunctionPointer("nvmlShutdown")
+    ret = fn()
+    _cudaCheckReturn(ret)
+    
+    # Atomically update refcount
+    global _cudaLib_refcount
+    libLoadLock.acquire()
+    if (0 < _cudaLib_refcount):
+        _cudaLib_refcount -= 1
+    libLoadLock.release()
+    return None

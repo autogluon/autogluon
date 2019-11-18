@@ -10,51 +10,59 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter, DistSemaphore
 from ..utils import DeprecationHelper
 
-__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler']
+__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler',
+           'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
 
 logger = logging.getLogger(__name__)
 
 
 class HyperbandScheduler(FIFOScheduler):
-    """Implements different variants of asynchronous Hyperband
+    r"""Implements different variants of asynchronous Hyperband
 
     See 'type' for the different variants. One implementation detail is when
     using multiple brackets, task allocation to bracket is done randomly with
     over a softmax probability.
 
-    Args:
-        train_fn (callable): A task launch function for training.
-            Note: please add the `@autogluon_method` decorater to the original function.
-        args (object): Default arguments for launching train_fn.
-        resource (dict): Computation resources.
-            For example, `{'num_cpus':2, 'num_gpus':1}`
-        searcher (object): Autogluon searcher.
-            For example, autogluon.searcher.RandomSearcher
-        time_attr (str): A training result attr to use for comparing time.
-            Note that you can pass in something non-temporal such as
-            `training_epoch` as a measure of progress, the only requirement
-            is that the attribute should increase monotonically.
-        reward_attr (str): The training result objective value attribute.
-            As with `time_attr`, this may refer to any objective value.
-            Stopping procedures will use this attribute.
-        max_t (float): max time units per task.
-            Trials will be stopped after max_t time units (determined by
-            time_attr) have passed.
-        grace_period (float): Only stop tasks at least this old in time.
-            Also: min_t. The units are the same as the attribute named by
-            `time_attr`.
-        reduction_factor (float): Used to set halving rate and amount.
-            This is simply a unit-less scalar.
-        brackets (int): Number of brackets. Each bracket has a different
-            grace period, all share max_t and reduction_factor.
-            If brackets == 1, we just run successive halving, for
-            brackets > 1, we run Hyperband.
-        type (str): Type of Hyperband scheduler:
-            stopping: See HyperbandStopping_Manager. Tasks and config evals are
+    Parameters
+    ----------
+    train_fn : callable
+        A task launch function for training.
+    args : object, optional
+        Default arguments for launching train_fn.
+    resource : dict
+        Computation resources.  For example, `{'num_cpus':2, 'num_gpus':1}`
+    searcher : object, optional
+        Autogluon searcher.  For example, :class:`autogluon.searcher.RandomSearcher`
+    time_attr : str
+        A training result attr to use for comparing time.
+        Note that you can pass in something non-temporal such as
+        `training_epoch` as a measure of progress, the only requirement
+        is that the attribute should increase monotonically.
+    reward_attr :str
+        The training result objective value attribute. As with `time_attr`, this may refer to any objective value.
+        Stopping procedures will use this attribute.
+    max_t : float
+        max time units per task.  Trials will be stopped after max_t time units (determined by
+        time_attr) have passed.
+    grace_period : float
+        Only stop tasks at least this old in time.  Also: min_t. The units are the same as the attribute named by
+        `time_attr`.
+    reduction_factor : float
+        Used to set halving rate and amount.  This is simply a unit-less scalar.
+    brackets : int
+        Number of brackets. Each bracket has a different
+        grace period, all share max_t and reduction_factor.
+        If brackets == 1, we just run successive halving, for
+        brackets > 1, we run Hyperband.
+    type : str
+        Type of Hyperband scheduler:
+            stopping:
+                See :class:`HyperbandStopping_Manager`. Tasks and config evals are
                 tightly coupled. A task is stopped at a milestone if worse than
                 most others, otherwise it continues. As implemented in Ray/Tune:
                 https://ray.readthedocs.io/en/latest/tune-schedulers.html#asynchronous-hyperband
-            promotion: See HyperbandPromotion_Manager. A config eval may be
+            promotion:
+                See :class:`HyperbandPromotion_Manager`. A config eval may be
                 associated with multiple tasks over its lifetime. It is never
                 terminated, but may be paused. Whenever a task becomes available,
                 it may promote a config to the next milestone, if better than most
@@ -62,40 +70,52 @@ class HyperbandScheduler(FIFOScheduler):
                 variant may benefit from pause&resume, which is not directly
                 supported here. As proposed in this paper (termed ASHA):
                 https://arxiv.org/abs/1810.05934
-        keep_size_ratios (bool): Implemented for type 'promotion' only. If True,
-            promotions are done only if the (current estimate of the) size ratio
-            between rung and next rung are 1 / reduction_factor or better. This
-            avoids higher rungs to get more populated than they would be in
-            synchronous Hyperband. A drawback is that promotions to higher rungs
-            take longer.
-        maxt_pending (bool): Relevant only if a model-based searcher is used.
-            If True, register pending config at level max_t
-            whenever a new evaluation is started. This has a direct effect on
-            the acquisition function (for model-based variant), which operates
-            at level max_t. On the other hand, it decreases the variance of the
-            latent process there.
-            NOTE: This could also be removed...
+    keep_size_ratios : bool
+        Implemented for type 'promotion' only. If True,
+        promotions are done only if the (current estimate of the) size ratio
+        between rung and next rung are 1 / reduction_factor or better. This
+        avoids higher rungs to get more populated than they would be in
+        synchronous Hyperband. A drawback is that promotions to higher rungs
+        take longer.
+    maxt_pending : bool
+        Relevant only if a model-based searcher is used.
+        If True, register pending config at level max_t
+        whenever a new evaluation is started. This has a direct effect on
+        the acquisition function (for model-based variant), which operates
+        at level max_t. On the other hand, it decreases the variance of the
+        latent process there.
+        NOTE: This could also be removed...
+    dist_ip_addrs : list of str
+        IP addresses of remote machines.
 
-    Example:
-        >>> @autogluon_method
-        >>> def train_fn(args, reporter):
-        >>>     for e in range(10):
-        >>>         # forward, backward, optimizer step and evaluation metric
-        >>>         # generate fake top1_accuracy
-        >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        >>>         reporter(epoch=e, accuracy=top1_accuracy)
-        >>> import ConfigSpace as CS
-        >>> import ConfigSpace.hyperparameters as CSH
-        >>> cs = CS.ConfigurationSpace()
-        >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
-        >>> cs.add_hyperparameter(lr)
-        >>> searcher = RandomSampling(cs)
-        >>> myscheduler = HyperbandScheduler(train_fn, args,
-        >>>                                  resource={'num_cpus': 2, 'num_gpus': 0}, 
-        >>>                                  searcher=searcher, num_trials=20,
-        >>>                                  reward_attr='accuracy',
-        >>>                                  time_attr='epoch',
-        >>>                                  grace_period=1)
+    See Also
+    --------
+    HyperbandStopping_Manager
+    HyperbandPromotion_Manager
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>> 
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(10):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
+    ...                                             resource={'num_cpus': 2, 'num_gpus': 0},
+    ...                                             num_trials=20,
+    ...                                             reward_attr='accuracy',
+    ...                                             time_attr='epoch',
+    ...                                             grace_period=1)
+    >>> scheduler.run()
+    >>> scheduler.join_jobs()
+    >>> scheduler.get_training_curves(plot=True)
+    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,
@@ -211,7 +231,7 @@ class HyperbandScheduler(FIFOScheduler):
                 if checkpoint_semaphore is not None:
                     checkpoint_semaphore.release()
                 break
-            # Call before add_training_results, since we may be able to report
+            # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
             task_continues, update_searcher, next_milestone, bracket_id, rung_counts = \
                 terminator.on_task_report(task, reported_result)
@@ -220,7 +240,7 @@ class HyperbandScheduler(FIFOScheduler):
                 for k, v in rung_counts.items():
                     key = 'count_at_{}'.format(k)
                     reported_result[key] = v
-            self.add_training_result(
+            self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
             if update_searcher and task_continues:
                 # Update searcher with intermediate result
@@ -265,11 +285,23 @@ class HyperbandScheduler(FIFOScheduler):
                 reward=last_result[self._reward_attr], **last_result)
 
     def state_dict(self, destination=None):
+        """Returns a dictionary containing a whole state of the Scheduler
+
+        Examples
+        --------
+        >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
+        """
         destination = super(HyperbandScheduler, self).state_dict(destination)
         destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
     def load_state_dict(self, state_dict):
+        """Load from the saved state dict.
+
+        Examples
+        --------
+        >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
+        """
         super(HyperbandScheduler, self).load_state_dict(state_dict)
         self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
