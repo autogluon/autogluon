@@ -40,4 +40,3 @@ predictor = task.load(savedir)
 
 y_pred = predictor.predict(test_data)
 perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
-

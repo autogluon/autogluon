@@ -91,8 +91,8 @@ class PredictTableColumn(BaseTask):
                     TODO (Nick): does trainer constructor ever require kwargs? If so should have trainer_type_kwargs dict used similarly as feature_generator_kwargs
                 label_count_threshold (int): For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                                  AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (ie. will never predict them), default = 10.
-                ignore_columns (list): banned subset of column names that model may not use as predictive features (eg. contains label, user-ID, etc).
-                    DataFrame of just these columns may be submitted in a ML competition. Default = []
+                id_columns (list): banned subset of column names that model may not use as predictive features (eg. contains label, user-ID, etc), default = [].
+                    These columns are ignored during fit(), but DataFrame of just these columns may be submitted in a ML competition.
         
         Example:
             >>> from autogluon import PredictTableColumn as task
@@ -111,7 +111,7 @@ class PredictTableColumn(BaseTask):
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         label_count_threshold = kwargs.get('label_count_threshold', 10)
-        ignore_columns = kwargs.get('ignore_columns', [])
+        id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
@@ -136,7 +136,7 @@ class PredictTableColumn(BaseTask):
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=objective_func, 
-            ignore_columns=ignore_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
+            id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
                       hyperparameters=hyperparameters)
