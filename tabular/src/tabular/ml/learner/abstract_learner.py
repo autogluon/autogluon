@@ -50,7 +50,8 @@ class AbstractLearner:
         save_path = path_context + self.save_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_test: DataFrame=None, sample=None):
+    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
+            feature_prune=False, holdout_frac=0.1, hyperparameters={}, sample=None):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()

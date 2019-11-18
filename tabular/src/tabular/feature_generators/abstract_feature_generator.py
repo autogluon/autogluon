@@ -123,7 +123,7 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
-        print('fit', X_len, 'data points with', len(self.features), 'features')
+        print('Feature Generator processed ', X_len, 'data points with', len(self.features), 'features')
         print('Original Features:')
         for key, val in self.feature_type_family.items():
             print('\t' + key + ' features:', len(val))

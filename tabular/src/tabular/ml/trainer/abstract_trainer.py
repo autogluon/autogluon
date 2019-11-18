@@ -82,6 +82,8 @@ class AbstractTrainer:
         return path, model_paths
 
     def generate_train_test_split(self, X: DataFrame, y: Series, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
+        if (test_size < 0.0) or (test_size  > 1.0):
+            raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
         if self.problem_type == REGRESSION:
             stratify = None
         else:
@@ -140,7 +142,8 @@ class AbstractTrainer:
             oof.append(y_pred_proba)
         return oof
 
-    def train(self, X_train, y_train, X_test=None, y_test=None):
+    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
+              holdout_frac=0.1, hyperparameters= {}):
         raise NotImplementedError
 
     def train_single(self, X_train, y_train, X_test, y_test, model, objective_func=accuracy):

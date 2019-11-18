@@ -40,7 +40,7 @@ class PredictTableColumn(BaseTask):
     # TODO: need flag use_trees, use_nets to control whether NN / lightGBM are used at all.
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None, 
-            hyperparameter_tune=True, feature_prune=False,
+            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, 
             hyperparameters = {'NN': {'num_epochs': 300}, 
                                'GBM': {'num_boost_round': 10000},
                               },
@@ -72,6 +72,8 @@ class PredictTableColumn(BaseTask):
                 Caution: Any provided search spaces will be overriden by fixed defauls if hyperparameter_tune = False.
                 If 'NN' key is missing from hyperparameters, then fit() will not train any neural network models.
                 Likewise if 'GBM' key is missing, then fit() will not train any gradient boosting models.
+            holdout_frac (float): Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None).
+                Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used.
             search_strategy (str): which hyperparameter search algorithm to use
             search_options (dict): auxiliary keyword arguments for the searcher that performs hyperparameter optimization
             time_limits (int): Approximately how long this call to fit() should run for (wallclock time in seconds).
@@ -115,6 +117,8 @@ class PredictTableColumn(BaseTask):
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
+        if holdout_frac is None:
+            holdout_frac = 0.2 if hyperparameter_tune else 0.1
         
         # All models use same scheduler (TODO: grant each model their own scheduler to run simultaneously):
         scheduler_options = {
@@ -139,6 +143,6 @@ class PredictTableColumn(BaseTask):
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
-                      hyperparameters=hyperparameters)
+                      holdout_frac=holdout_frac, hyperparameters=hyperparameters)
         return predictor
 

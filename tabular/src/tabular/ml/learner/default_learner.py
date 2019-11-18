@@ -24,13 +24,14 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
-            feature_prune=False, hyperparameters = {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
+            feature_prune=False, holdout_frac=0.1, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
+                holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None)
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
         X, y, X_test, y_test = self.general_data_processing(X, X_test, sample=None)

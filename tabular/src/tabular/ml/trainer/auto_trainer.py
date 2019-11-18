@@ -15,10 +15,10 @@ class AutoTrainer(AbstractTrainer):
                                  num_classes=self.num_classes, hyperparameters=hyperparameters)
 
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
-              hyperparameters={'NN':{},'GBM':{}}):
+              holdout_frac=0.1, hyperparameters= {'NN':{},'GBM':{}}):
         models = self.get_models(hyperparameters)
         if (y_test is None) or (X_test is None):
-            X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
+            X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=holdout_frac)
         self.train_multi_and_ensemble(X_train, y_train, X_test, y_test, models,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         # self.cleanup()
