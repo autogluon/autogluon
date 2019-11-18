@@ -1,11 +1,11 @@
 """ Example script for PredictTableColumn task demonstrating how to use non-default arguments 
     in the hyperparameter optimization.
 """
-import os
-import autogluon as ag
-from autogluon import PredictTableColumn as task
 
 # Download example dataset:
+
+import os
+
 data_dir = 'AdultIncomeBinaryClassification'
 data_url = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip'
 if (not os.path.exists(data_dir)) or (not os.path.exists(data_dir)):
@@ -18,6 +18,10 @@ label_column = 'class' # name of column containing label to predict
 
 
 # Training time:
+
+import autogluon as ag
+from autogluon import PredictTableColumn as task
+
 train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if user already has pandas object in python, can skip this step
 train_data = train_data.head(100) # subsample for faster demo
 print(train_data.head())
@@ -39,6 +43,7 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
                      num_trials=10, time_limits=10*60, hyperparameters={'GBM': gbm_options, 'NN':nn_options})
 # Since tuning_data = None, AutoGluon automatically determines train/validation split.
 
+ag.done() # Turn off autogluon's remote workers. You cannot call fit() with HPO after this within the same python session.
 trainer = predictor.load_trainer() # use to show summary of training / HPO processes
 print(trainer.hpo_results)
 print(trainer.model_performance)
@@ -55,6 +60,4 @@ predictor = task.load(savedir)
 
 y_pred = predictor.predict(test_data)
 perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
-
-ag.done() # Turn off autogluon's remote workers. You cannot call fit() with HPO after this in the same python session.
 

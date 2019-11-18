@@ -16,10 +16,10 @@ from tabular.ml.trainer.auto_trainer import AutoTrainer
 # TODO: Add cv / OOF generator option, so that AutoGluon can be used as a base model in an ensemble stacker
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
-    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=10,
+    def __init__(self, path_context: str, label: str, ignore_columns: list, feature_generator, label_count_threshold=10,
                  problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer, compute_feature_importance=False):
-        super().__init__(path_context=path_context, label=label, submission_columns=submission_columns, feature_generator=feature_generator,
-                         threshold=threshold, problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
+        super().__init__(path_context=path_context, label=label, ignore_columns=ignore_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold, 
+            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 

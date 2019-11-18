@@ -21,13 +21,13 @@ from tabular.ml.tuning.ensemble_selection import EnsembleSelection
 class AbstractLearner:
     save_file_name = 'learner.pkl'
 
-    def __init__(self, path_context: str, label: str, submission_columns: list, feature_generator, threshold=10, problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
+    def __init__(self, path_context: str, label: str, ignore_columns: list, feature_generator, label_count_threshold=10, 
+                 problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
         self.label = label
-        self.submission_columns = submission_columns
-
-        self.threshold = threshold
+        self.submission_columns = ignore_columns
+        self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.objective_func = objective_func
         self.is_trainer_present = is_trainer_present

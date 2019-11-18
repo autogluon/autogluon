@@ -1,8 +1,9 @@
-""" Example script for PredictTableColumn task, demonstrating simple use-case with mostly default settings. """
-import os
-from autogluon import PredictTableColumn as task
+""" Example script for PredictTableColumn task, demonstrating simple use-case with mostly default settings """
 
 # Download example dataset:
+
+import os
+
 data_dir = 'AdultIncomeBinaryClassification'
 data_url = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip'
 if (not os.path.exists(data_dir)) or (not os.path.exists(data_dir)):
@@ -11,10 +12,13 @@ if (not os.path.exists(data_dir)) or (not os.path.exists(data_dir)):
 train_file_path = data_dir+'/train_data.csv'
 test_file_path = data_dir+'/test_data.csv'
 savedir = data_dir+'/Output/'
-label_column = 'class' # name of column containing label to predict
+label_column = 'class' # specify name of column containing labels to predict
 
 
 # Training time:
+
+from autogluon import PredictTableColumn as task
+
 train_data = task.Dataset(file_path=train_file_path) # returns Pandas object, if user already has pandas object in python, can skip this step
 train_data = train_data.head(1000) # subsample for faster demo
 print(train_data.head())
