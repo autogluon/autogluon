@@ -1,4 +1,4 @@
-name: autogluon_docs
+name: autogluon_py3
 dependencies:
 - python=3.7
 - graphviz

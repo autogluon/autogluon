@@ -92,7 +92,7 @@ y = mynet.evaluate_latency(x)
 Show the latencies:
 
 ```{.python .input}
-print('Average latency is {}, latency of the current architecutre is {}'.format(mynet.avg_latency, mynet.latency))
+print('Average latency is {:.2f} ms, latency of the current architecutre is {:.2f} ms'.format(mynet.avg_latency, mynet.latency))
 ```
 
 We also provide number of params

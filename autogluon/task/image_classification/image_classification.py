@@ -32,17 +32,17 @@ class ImageClassification(BaseTask):
 
         Parameters
         ----------
-            name : str, optional
-                The name for built-in dataset, overrite other options.
-                The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-            train : bool, default True
-                Train or validation mode
-            train_path : str
-                The training data location
-            input_size : int
-                The input image size.
-            crop_ratio : float
-                Center crop ratio for evaluation only
+        name : str, optional
+            The name for built-in dataset, overrite other options.
+            The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+        train : bool, default True
+            Train or validation mode
+        train_path : str
+            The training data location
+        input_size : int
+            The input image size.
+        crop_ratio : float
+            Center crop ratio for evaluation only
         """
         return get_dataset(*args, **kwargs)
 
@@ -91,7 +91,6 @@ class ImageClassification(BaseTask):
             number of trials in the experiment.
         split_ratio : float, defaut 0.8
             train val split ratio.
-        time_limits : int
         time_limits : int
             training time limits in seconds.
         resources_per_trial : dict

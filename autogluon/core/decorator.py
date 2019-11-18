@@ -234,6 +234,9 @@ def obj(**kwvars):
                 return 'AutoGluonObject -- ' + Cls.__name__
 
         autogluonobject.kwvars = autogluonobject.__init__.kwvars
+        autogluonobject.__doc__ = Cls.__doc__
+        autogluonobject.__name__ = Cls.__name__
+        #autogluonobject.__bases__ = Cls.__bases__
         return autogluonobject
 
     return registered_class

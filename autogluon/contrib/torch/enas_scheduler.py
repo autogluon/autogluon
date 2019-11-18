@@ -51,39 +51,40 @@ class Torch_ENAS_Scheduler(ENAS_Scheduler):
         self.val_args['use_cuda'] = True if num_gpus > 0 else False
 
     def run(self):
-        self._prefetch_controller()
         tq = tqdm(range(self.epochs))
         for epoch in tq:
             # for recordio data
-            tbar = enumerate(self.train_data)
-            for i, (data, label) in tqdm(tbar):
+            tbar = tqdm(self.train_data)
+            idx = 0
+            for (data, label) in tbar:
                 # sample network configuration
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
-                self.train_fn(self.supernet, data, label, i, epoch, **self.train_args)
-                if epoch >= self.warmup_epochs and (i % self.update_arch_frequency) == 0:
+                self.train_fn(self.supernet, data, label, idx, epoch, **self.train_args)
+                if epoch >= self.warmup_epochs and (idx % self.update_arch_frequency) == 0:
                     self.train_controller()
-                if self.plot_frequency > 0 and i % self.plot_frequency == 0 and in_ipynb():
+                if self.plot_frequency > 0 and idx % self.plot_frequency == 0 and in_ipynb():
                     graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
                     tbar.set_svg(graph._repr_svg_())
-                tbar.set_description('avg reward: {}'.format(self.baseline))
+                tbar.set_description('avg reward: {:.2f}'.format(self.baseline))
+                idx += 1
             self.validation()
             self.save()
-            tq.set_description('epoch {}, val_acc: {}, avg reward: {}' \
+            tq.set_description('epoch {}, val_acc: {:.2f}, avg reward: {:.2f}' \
                         .format(epoch, self.val_acc, self.baseline))
 
     def validation(self):
         # data iter
-        tbar = enumerate(tqdm(self.val_data))
+        tbar = tqdm(self.val_data)
         # update network arc
         config = self.controller.inference()
         self.supernet.sample(**config)
         metric = AverageMeter()
-        for i, (data, label) in tbar:
+        for (data, label) in tbar:
             acc = self.eval_fn(self.supernet, data, label, metric=metric, **self.val_args)
             reward = metric.avg
-            tbar.set_description('Acc: {}'.format(reward))
+            tbar.set_description('Acc: {}'.format(reward.item()))
 
         self.val_acc = reward.item()
         self.training_history.append(reward)

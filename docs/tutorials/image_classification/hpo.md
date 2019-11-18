@@ -56,22 +56,6 @@ test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-Let's now dive deeper into the default settings of `fit` that an advanced user may wish to alter.
-
-Recall that rather than training image classification models from scratch, AutoGluon by default first loads networks that has already been pretrained on another image dataset and then continues training the networks on your provided dataset (after appropriately modifying the output layer for the current task). Let's inspect which pretrained neural network candidates are by default for image classification tasks:
-
-```{.python .input}
-print('Default Search Info:')
-print(classifier.results['metadata'])
-```
-
-In general, we can expect fairly strong predictive performance using the default configurations in `fit`, if given enough computing resources and runtime.
-In order to achieve superior performance with limited computation, we can manually specify different configurations in `fit` based on prior knowledge or research papers.
-One important aspect of this involves defining the space of hyperparameter values to search over.
-We will use `autogluon.Nets` and `autogluon.Optimizers` as
-examples to show how to specify a custom hyperparameter search space, and ensure it is used by the `fit` function.
-
-
 
 ## Specify which pretrained networks to try
 
@@ -92,8 +76,7 @@ print(nets)
 ## Specify which optimizers to try
 
 Similarly, we can manually specify which of optimizer candidates to try, in order to further improve the results.
-In AutoGluon, [autogluon.Optimizers](../api/autogluon.optimizer.html) 
-defines a list of optimization search_strategys, from which we can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
+We can construct another search space to identify which optimizer works best for our task (as well as what are the best hyperparameter configurations for this optimizer).
 
 Additionally, we can customize the optimizer-specific hyperparameters as another search space.
 As an example for both `Adam` and `SGD`, we can configure the learning rate and weight decay in a continuous-valued search space.
@@ -113,7 +96,7 @@ optimizers = ag.space.Categorical(sgd_opt, adam_opt)
 print(optimizers)
 ```
 
-Please refer to [log search space](../api/autogluon.space.html#autogluon.space.Log) and [linear search space](../api/autogluon.space.html#autogluon.space.Linear) for more details.
+Please refer to :class:`autogluon.space.Real` for more details.
 
 Besides, we could also specify the candidates of learning rate schedulers which are typically leveraged to achieve better results.
 We then put the new network and optimizer search space and the learning rate schedulers together in the call to `fit` and might expect better results if we have made smart choices:
@@ -136,11 +119,11 @@ For those of you familiar with Bayesian optimization, AutoGluon allows you to co
 
 ```{.python .input}
 classifier = task.fit(dataset,
-                   search_strategy='skopt', 
-                   search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   ngpus_per_trial=1)
+                      search_strategy='skopt', 
+                      search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      ngpus_per_trial=1)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 test_acc = classifier.evaluate(test_dataset)
@@ -166,13 +149,13 @@ and evaluate the resulting model on both validation and test datasets:
 
 ```{.python .input}
 classifier = task.fit(dataset,
-                   nets,
-                   optimizers,
-                   lr_scheduler=ag.space.Categorical('poly', 'cosine'),
-                   search_strategy=search_strategy,
-                   time_limits=time_limits,
-                   epochs=epochs,
-                   ngpus_per_trial=1)
+                      nets,
+                      optimizers,
+                      lr_scheduler=ag.space.Categorical('poly', 'cosine'),
+                      search_strategy=search_strategy,
+                      time_limits=time_limits,
+                      epochs=epochs,
+                      ngpus_per_trial=1)
 ```
 
 The validation and test top-1 accuracy are:

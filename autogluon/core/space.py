@@ -23,6 +23,28 @@ class SimpleSpace(Space):
             reprstr += ': value={}'.format(self.value)
         return reprstr
 
+    def get_hp(self, name):
+        raise NotImplemented
+
+    @property
+    def hp(self):
+        return self.get_hp(name='')
+
+    @property
+    def default(self):
+        default = self._default if self._default else self.hp.default_value
+        return default
+
+    @default.setter
+    def default(self, value):
+        self._default = value
+
+    @property
+    def rand(self):
+        cs = CS.ConfigurationSpace()
+        cs.add_hyperparameter(self.hp)
+        return cs.sample_configuration().get_dictionary()['']
+
 class NestedSpace(Space):
     """Nested Search Spaces
     """
@@ -31,12 +53,21 @@ class NestedSpace(Space):
 
     @property
     def cs(self):
-        return None
+        raise NotImplemented
 
     @property
     def kwspaces(self):
-        return None
+        raise NotImplemented
 
+    @property
+    def default(self):
+        config = self.cs.get_default_configuration().get_dictionary()
+        return self.sample(**config)
+
+    @property
+    def rand(self):
+        config = self.cs.sample_configuration().get_dictionary()
+        return self.sample(**config)
 
 class AutoGluonObject(NestedSpace):
     r"""Searchable Objects,
@@ -235,6 +266,7 @@ class Dict(NestedSpace):
 
     def sample(self, **config):
         ret = {}
+        ret.update(self.data)
         kwspaces = self.kwspaces
         kwspaces.update(config)
         striped_keys = [k.split('.')[0] for k in config.keys()]
@@ -340,11 +372,11 @@ class Real(SimpleSpace):
         self.lower = lower
         self.upper = upper
         self.log = log
-        self.default = default
+        self._default = default
 
     def get_hp(self, name):
         return CSH.UniformFloatHyperparameter(name=name, lower=self.lower, upper=self.upper,
-                                              default_value=self.default, log=self.log)
+                                              default_value=self._default, log=self.log)
 
 class Int(SimpleSpace):
     """integer search space.
@@ -366,11 +398,11 @@ class Int(SimpleSpace):
     def __init__(self, lower, upper, default=None):
         self.lower = lower
         self.upper = upper
-        self.default = default
+        self._default = default
 
     def get_hp(self, name):
         return CSH.UniformIntegerHyperparameter(name=name, lower=self.lower, upper=self.upper,
-                                                default_value=self.default)
+                                                default_value=self._default)
 
 class Bool(Int):
     """Bool Search Space
