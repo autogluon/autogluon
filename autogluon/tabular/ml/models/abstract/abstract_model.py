@@ -7,7 +7,6 @@ from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from sklearn.model_selection import RandomizedSearchCV
 
 from autogluon.core import *
-from autogluon.task.base import *
 
 # TODO: move these files
 import autogluon.tabular.metrics
