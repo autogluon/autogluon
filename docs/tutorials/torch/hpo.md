@@ -19,7 +19,7 @@ import torchvision.transforms as transforms
 
 ## Start with A CIFAR10 Example
 
-### Prepare Dataset
+### Data Transforms
 
 Standard data transforms during training and validation:
 
@@ -35,16 +35,10 @@ transform_test = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
-```
 
-Training and validation datasets and dataloaders:
-
-```{.python .input}
+# the datasets
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
-
 testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
 ```
 
 ### Main Training Loop
@@ -59,7 +53,7 @@ def train_cifar(args, reporter):
     # get varibles from args
     lr = args.lr
     wd = args.wd
-    epochs = args.epoch
+    epochs = args.epochs
     net = args.net
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -70,6 +64,13 @@ def train_cifar(args, reporter):
         net = nn.DataParallel(net)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=wd)
+
+    # datasets and dataloaders
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=False, transform=transform_train)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
 
     # Training
     def train(epoch):
@@ -109,24 +110,6 @@ def train_cifar(args, reporter):
         train(epoch)
         test(epoch)
 ```
-
-### Convert the Training Function to Be Searchable
-
-We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar`
-function to AutoGluon Searchable.
-
-```{.python .input}
-import autogluon as ag
-
-@ag.args(
-    lr = ag.space.Real(0.01, 0.2, log=True),
-    wd = ag.space.Real(1e-4, 5e-4, log=True),
-)
-def train_finetune(args, reporter):
-    return train_loop(args, reporter)
-```
-
-
 ## AutoGluon HPO
 
 In this sectin, we are talking about
@@ -141,6 +124,8 @@ layer and fully connected layer. More info about searchable space
 is available at :meth:`autogluon.space`.
 
 ```{.python .input}
+import autogluon as ag
+
 @ag.obj(
     hidden_conv=ag.space.Int(6, 12),
     hidden_fc=ag.space.Categorical(80, 120, 160),
@@ -165,12 +150,29 @@ class Net(nn.Module):
         return x
 ```
 
+### Convert the Training Function to Be Searchable
+
+We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar`
+function to AutoGluon Searchable.
+
+```{.python .input}
+@ag.args(
+    lr = ag.space.Real(0.01, 0.2, log=True),
+    wd = ag.space.Real(1e-4, 5e-4, log=True),
+    net = Net(),
+    epochs=20,
+)
+def ag_train_cifar(args, reporter):
+    return train_cifar(args, reporter)
+```
+
+
 
 ### Create the Scheduler and Launch the Experiment
 
 ```{.python .input}
-myscheduler = ag.scheduler.FIFOScheduler(train_finetune,
-                                         resource={'num_cpus': 16, 'num_gpus': 8},
+myscheduler = ag.scheduler.FIFOScheduler(ag_train_cifar,
+                                         resource={'num_cpus': 4, 'num_gpus': 1},
                                          num_trials=5,
                                          time_attr='epoch',
                                          reward_attr="accuracy")
@@ -179,15 +181,19 @@ print(myscheduler)
 ```
 
 ```{.python .input}
-# myscheduler.run()
-# myscheduler.join_tasks()
+myscheduler.run()
+myscheduler.join_jobs()
 ```
 
 Plot the results.
 
 ```{.python .input}
-# myscheduler.get_training_curves(plot=True,use_legend=False)
-# print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
-#                                                                myscheduler.get_best_reward()))
+myscheduler.get_training_curves(plot=True,use_legend=False)
+print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
+                                                               myscheduler.get_best_reward()))
 ```
 
+Finish and exit:
+```{.python .input}
+ag.done()
+```

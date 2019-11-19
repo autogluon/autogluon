@@ -48,7 +48,7 @@ class ImageClassification(BaseTask):
 
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
+            net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
             optimizer= SGD(learning_rate=Real(1e-4, 1e-2, log=True),
                            wd=Real(1e-5, 1e-3, log=True)),
             lr_scheduler='cosine',

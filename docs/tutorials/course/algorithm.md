@@ -25,11 +25,11 @@ configurations at the early/middle stages.
 ```{.python .input}
 import numpy as np
 import autogluon as ag
+
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),
     wd=ag.space.Real(1e-3, 1e-2))
 def train_fn(args, reporter):
-    print('lr: {}, wd: {}'.format(args.lr, args.wd))
     for e in range(10):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
@@ -45,6 +45,7 @@ scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                        time_attr='epoch')
 scheduler.run()
 scheduler.join_jobs()
+
 ```
 
 Visualize the results:
@@ -64,6 +65,7 @@ scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                             grace_period=1)
 scheduler.run()
 scheduler.join_jobs()
+
 ```
 
 Visualize the results:
@@ -121,8 +123,6 @@ We can simply define an AutoGluon searchable function with a decorator `ag.args`
 The `reporter` is used to communicate with AutoGluon search and scheduling algorithms.
 
 ```{.python .input}
-import autogluon as ag
-
 @ag.args(
     x=ag.space.Categorical(*list(range(100))),
     y=ag.space.Categorical(*list(range(100))),

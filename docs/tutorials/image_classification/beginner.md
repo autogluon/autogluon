@@ -3,7 +3,7 @@
 
 We adopt the task of Image Classification as a running example to illustrate basic usage of AutoGluon’s main APIs. This task involves a few steps which we demonstrate how to get started with AutoGluon. 
 
-In this tutorial, we will load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models and thousands of different hyperparameter configurations regarding to the training process and return the best model.
+In this tutorial, we will load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models with different hyperparameter configurations and return the best model.
 
 We begin by specifying `image_classification` as our task of interest:
 
@@ -15,7 +15,7 @@ from autogluon import ImageClassification as task
 ## Create AutoGluon Dataset
 
 Our image classification task is based on a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle. Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
-Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`. Note that we only use a small subset of the data to ensure quick runtimes in this tutorial; to obtain models that perform competitively will require using the full original dataset, we will cover this in the next tutorial.  
+Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`.
 
 We download the data subset and unzip it via the following commands:
 
@@ -32,7 +32,7 @@ dataset = task.Dataset('data/train')
 
 ## Use AutoGluon to Fit Models
 
-Now, we want to obtain a neural network classifier using AutoGluon:
+Now, we want to fit a classifier using AutoGluon:
 
 ```{.python .input}
 classifier = task.fit(dataset,
@@ -45,13 +45,13 @@ Within `fit`, the dataset is automatically splited into training and validation 
 The model with the best hyperparameter configuration is selected based on its performance on validation set.
 The best model is finally retrained on our entire dataset (ie. merging training+validation) using the best configuration.
 
-## Predict on A New Image
-
 The best Top-1 accuracy achieved on the validation set is:
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
+
+## Predict on A New Image
 
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 

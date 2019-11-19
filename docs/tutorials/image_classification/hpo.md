@@ -32,7 +32,7 @@ dataset = task.Dataset('data/train')
 
 We start with specifying the pretrained neural network candidates.
 Given such a list, AutoGluon will try training different networks from this list to identify the best-performing candidate.
-This is an example of a :class:`autogluon.space.Categorial` search space, in which there are a limited number of values to choose from.
+This is an example of a :class:`autogluon.space.Categorical` search space, in which there are a limited number of values to choose from.
 
 ```{.python .input}
 import gluoncv as gcv
@@ -43,9 +43,7 @@ import gluoncv as gcv
 def get_mobilenet(multiplier):
     return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
 
-
 net = ag.space.Categorical('resnet50_v1b', get_mobilenet())
-
 print(net)
 ```
 
@@ -68,7 +66,6 @@ class NAG(optim.NAG):
     pass
 
 optimizer = NAG()
-
 print(optimizer)
 ```
 
@@ -84,10 +81,10 @@ We currently support random search, Hyperband and Bayesian Optimization. Althoug
 
 Here is an example of using Bayesian Optimization using :class:`autogluon.searcher.SKoptSearcher`.
 
-Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration. This surrogate model can then be used to infer which hyperparameter configurations could plausibly lead to the best predictive performance.
+Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration.
 
-For those of you familiar with Bayesian optimization, AutoGluon allows you to control many aspects of the Bayesian optimization hyperparameter search process.  For instance, you can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
-Please see detail in :class:`autogluon.searcher.SKoptSearcher`
+You can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
+More detail in :class:`autogluon.searcher.SKoptSearcher`
 
 ```{.python .input}
 time_limits = 2*60

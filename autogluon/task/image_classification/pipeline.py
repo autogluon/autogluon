@@ -16,8 +16,6 @@ from ...utils.mxutils import collect_params
 from .nets import get_built_in_network
 from .utils import *
 
-#logger = logging.getLogger(__name__)
-
 __all__ = ['train_image_classification']
 
 

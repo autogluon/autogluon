@@ -107,8 +107,8 @@ class Classifier(BasePredictor):
         input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
         test_data, _, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, True, None)
-        tbar = tqdm(enumerate(test_data))
-        for i, batch in tbar:
+        tbar = tqdm(test_data)
+        for batch in tbar:
             self.eval_func(net, batch, batch_fn, metric, ctx)
             _, test_reward = metric.get()
             tbar.set_description('{}: {}'.format(args.metric, test_reward))
