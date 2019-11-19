@@ -102,7 +102,7 @@ class EnsembleSelection():
                     all_scoring_functions=False)
 
                 # scores[j] = -self.metric(y_true=labels, y_pred=fant_ensemble_prediction)
-            print('scores:', scores)
+            # print('scores:', scores)
             all_best = np.argwhere(scores == np.nanmin(scores)).flatten()
             best = self.random_state.choice(all_best)
 

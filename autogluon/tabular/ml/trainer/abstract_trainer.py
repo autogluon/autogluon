@@ -12,7 +12,7 @@ from autogluon.tabular.utils.loaders import load_pkl
 from autogluon.tabular.utils.savers import save_pkl
 from autogluon.tabular.ml.utils import get_pred_from_proba, generate_kfold
 from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.tabular.ml.tuning.autotune import AutoTune
+from autogluon.tabular.ml.tuning.feature_pruner import FeaturePruner
 
 from autogluon.tabular.metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from sklearn.model_selection import train_test_split
@@ -348,10 +348,10 @@ class AbstractTrainer:
         return self.score_with_y_pred_proba_weighted(y=y, y_pred_probas=oof_y_pred_probas, weights=weights)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
-        autotuner = AutoTune(model_base=model_base)
+        feature_pruner = FeaturePruner(model_base=model_base)
         X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
-        autotuner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=y_holdout)
-        features_to_keep = autotuner.features_in_iter[autotuner.best_iteration]
+        feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=y_holdout)
+        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
         print(features_to_keep)
         model_base.features = features_to_keep
         # autotune.evaluate()

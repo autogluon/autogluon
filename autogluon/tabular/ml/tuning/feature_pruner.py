@@ -5,11 +5,10 @@
 # warnings.filterwarnings('ignore')
 import pandas as pd
 import copy
-from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 # TODO: Rename to FeaturePruner
-class AutoTune:
+class FeaturePruner:
     def __init__(self, model_base, threshold_baseline=0.004):
         self.model_base = copy.deepcopy(model_base)
         self.threshold_baseline = threshold_baseline
@@ -154,6 +153,6 @@ class AutoTune:
 
             print('Adjusting threshold to', threshold_new)
 
-            return AutoTune.adjust_threshold(gain_df=gain_df, threshold=threshold_new)
+            return FeaturePruner.adjust_threshold(gain_df=gain_df, threshold=threshold_new)
         else:
             return threshold
