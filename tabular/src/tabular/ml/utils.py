@@ -34,6 +34,7 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False):
     return kfolds
 
 
+# TODO: Move to lgb
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
     # save_pd.save(path=location + '.csv', df=x, header=False)
     feature_list = list(x.columns.values)
@@ -54,6 +55,7 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
     return dataset
 
 
+# TODO: Move to lgb
 def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=None, params=None):
     cat_columns = list(X.select_dtypes(include='category').columns.values)
     # X = X.drop(columns_categorical, axis=1)
@@ -122,6 +124,7 @@ def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=No
     return xgtrain
 
 
+# TODO: Move to lgb
 @calculate_time
 def construct_dataset_lowest_memory(X: DataFrame, y: Series, location, reference=None, params=None):
 

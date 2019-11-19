@@ -1,5 +1,5 @@
 from collections import OrderedDict 
-import datetime, json, copy, warnings
+import datetime, json, warnings
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
@@ -8,7 +8,7 @@ import numpy as np
 from numpy import corrcoef
 
 from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from tabular.ml.label_cleaner import LabelCleaner
+from tabular.data.label_cleaner import LabelCleaner
 from tabular.ml.utils import get_pred_from_proba
 from tabular.utils.loaders import load_pkl, load_pd
 from tabular.utils.savers import save_pkl, save_pd

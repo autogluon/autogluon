@@ -11,15 +11,15 @@ from tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from tabular.utils.loaders import load_pkl
 from tabular.utils.savers import save_pkl
 from tabular.ml.utils import get_pred_from_proba, generate_kfold
-from tabular.ml.models.abstract_model import AbstractModel
+from tabular.ml.models.abstract.abstract_model import AbstractModel
 from tabular.ml.tuning.autotune import AutoTune
 
 import tabular.metrics
 from tabular.metrics import accuracy, root_mean_squared_error
 from sklearn.model_selection import train_test_split
 
+from tabular.ml.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from tabular.ml.tuning.ensemble_selection import EnsembleSelection
-from tabular.ml.models.bagged_ensemble_model import BaggedEnsembleModel
 
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'

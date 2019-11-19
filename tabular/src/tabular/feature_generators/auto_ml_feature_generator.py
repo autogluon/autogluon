@@ -1,6 +1,6 @@
 
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 import numpy as np
 import copy
 import traceback
@@ -8,8 +8,8 @@ import psutil
 
 from tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
-from tabular.ml.vectorizers import vectorizer_auto_ml_default
-from tabular.ml.vectorizers import get_ngram_freq, downscale_vectorizer
+from tabular.feature_generators.vectorizers import vectorizer_auto_ml_default
+from tabular.feature_generators.vectorizers import get_ngram_freq, downscale_vectorizer
 
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):

@@ -1,6 +1,10 @@
 
 from tabular.ml.trainer.abstract_trainer import AbstractTrainer
-from tabular.ml.models.model_presets.presets import get_preset_models
+from tabular.ml.trainer.model_presets.presets import get_preset_models
+from tabular.ml.constants import REGRESSION, BINARY, MULTICLASS
+from tabular.ml.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+import copy
+
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):

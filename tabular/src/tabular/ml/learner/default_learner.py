@@ -4,9 +4,8 @@ import pandas as pd
 import copy
 
 from tabular.ml.learner.abstract_learner import AbstractLearner
-from tabular.ml.constants import REGRESSION
-from tabular.ml.cleaner import Cleaner
-from tabular.ml.label_cleaner import LabelCleaner
+from tabular.data.cleaner import Cleaner
+from tabular.data.label_cleaner import LabelCleaner
 from tabular.ml.trainer.auto_trainer import AutoTrainer
 
 
