@@ -1,3 +1,3 @@
 from .base import BaseTask
 from .image_classification import ImageClassification
-from .predict_tabular import PredictTabular
+from .tabular_prediction import TabularPrediction

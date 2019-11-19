@@ -13,12 +13,12 @@ from autogluon.tabular.feature_generators.auto_ml_feature_generator import AutoM
 from autogluon.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
 
 
-__all__ = ['PredictTabular']
+__all__ = ['TabularPrediction']
 
 logger = logging.getLogger(__name__)
 
 
-class PredictTabular(BaseTask):
+class TabularPrediction(BaseTask):
     """AutoGluon task for predicting a column of tabular dataset (classification & regression)
     
     """
@@ -92,7 +92,7 @@ class PredictTabular(BaseTask):
                     These columns are ignored during fit(), but DataFrame of just these columns may be submitted in a ML competition.
         
         Example:
-            >>> from autogluon import PredictTabular as task
+            >>> from autogluon import TabularPrediction as task
             >>> train_data = task.Dataset(file_path='./training_data.csv')
             >>> label_column = 'class' # name of column in train_data
             >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)

@@ -1,7 +1,7 @@
 """ Example script for  for predicting columns of tables, demonstrating how to use hyperparameter optimization """
 
 import autogluon as ag
-from autogluon import PredictTabular as task
+from autogluon import TabularPrediction as task
 
 # Training time:
 train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns Pandas object.

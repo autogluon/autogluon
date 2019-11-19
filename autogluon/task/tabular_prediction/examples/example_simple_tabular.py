@@ -1,6 +1,6 @@
 """ Example script for predicting columns of tables, demonstrating simple use-case """
 
-from autogluon import PredictTabular as task
+from autogluon import TabularPrediction as task
 
 # Training time:
 train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns Pandas object.
