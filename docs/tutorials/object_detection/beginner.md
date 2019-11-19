@@ -17,16 +17,13 @@ We collect a toy dataset only for detecting motorbikes in images. From VOC datse
 We can download this dataset, which is only 23M, by commands below. The variable `root` specifies the path to store this dataset. The name of unzipped folder is called `tiny_motorbike`.
 
 ```{.python .input}
-import os
-root = './'
-filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip',
-                        path=root)
-ag.unzip(filename, root=root)
+filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip')
+ag.unzip(filename)
 ```
 
 Once we retrieve the dataset, we can create dataset instacne with its name and path.
 ```{.python .input}
-dataset = task.Dataset("tiny_motorbike", root=os.path.join(root, "tiny_motorbike"))
+dataset = task.Dataset('tiny_motorbike', root='./tiny_motorbike')
 ```
 
 ## Fit models by AutoGluon
@@ -48,15 +45,14 @@ detector = task.fit(dataset,
 After fitting, AutoGluon will automatically return the best model among all models in searching space. From output, we know the best model is the one trained with the second learning rate. Now, let's see how well the returned model perform on test dataset by simply calling detector.evaluate().
 
 ```{.python .input}
-test_acc = detector.evaluate(dataset) # it only evaluates on test dataset.
-print("mAP on test dataset: {}".format(test_acc[1][1]))
+test_map = detector.evaluate(dataset) # it only evaluates on test dataset.
+print("mAP on test dataset: {}".format(test_map[1][1]))
 ```
 
 The mAP is not bad after just 30 epochs. Let's see one visualization result. We randomly select an image from test dataset, and show predicted bbox and probability over the origin image.  
 
 ```{.python .input}
-image = '000467.jpg'
-image_path = os.path.join(root, 'tiny_motorbike/VOC2007/JPEGImages', image)
+image_path = './tiny_motorbike/VOC2007/JPEGImages/000467.jpg'
 
 ind, prob, loc = detector.predict(image_path)
 ```
