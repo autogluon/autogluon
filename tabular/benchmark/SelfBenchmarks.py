@@ -27,7 +27,7 @@ import numpy as np
 import mxnet as mx
 from random import seed
 
-from autogluon import PredictTableColumn as task
+from autogluon import PredictTabular as task
 import autogluon as ag
 
 # TODO: move this file
