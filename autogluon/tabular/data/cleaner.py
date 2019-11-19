@@ -1,5 +1,5 @@
 from pandas import DataFrame
-from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
+from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 # Cleaner cleans data prior to entering feature generation
@@ -11,8 +11,6 @@ class Cleaner:
         elif problem_type == MULTICLASS:
             return CleanerMulticlass(label=label, threshold=threshold)
         elif problem_type == REGRESSION:
-            return CleanerDummy()
-        elif problem_type == LANGUAGE_MODEL:
             return CleanerDummy()
         else:
             raise NotImplementedError

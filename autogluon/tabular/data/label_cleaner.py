@@ -1,6 +1,6 @@
-from pandas import Series, DataFrame
+from pandas import Series
 import numpy as np
-from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
+from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 # LabelCleaner cleans labels prior to entering feature generation
@@ -12,8 +12,6 @@ class LabelCleaner:
         elif problem_type == MULTICLASS:
             return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
-            return LabelCleanerDummy()
-        elif problem_type == LANGUAGE_MODEL:
             return LabelCleanerDummy()
         else:
             raise NotImplementedError

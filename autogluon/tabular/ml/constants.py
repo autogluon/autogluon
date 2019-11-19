@@ -2,7 +2,7 @@
 BINARY = 'binary'
 MULTICLASS = 'multiclass'
 REGRESSION = 'regression'
-LANGUAGE_MODEL = 'language_model'
+LANGUAGE_MODEL = 'language_model'  # TODO: Remove
 
 PROBLEM_TYPES_CLASSIFICATION = [BINARY, MULTICLASS]
 PROBLEM_TYPES_REGRESSION = [REGRESSION]

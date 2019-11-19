@@ -1,10 +1,8 @@
 # TODO: move these files
-from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, LANGUAGE_MODEL
+from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.ml.models.lgb.lgb_model import LGBModel
 
 from autogluon.tabular.ml.models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from autogluon.tabular.contrib.nn_nlp_lm_model import NNNLPLanguageModel
-from autogluon.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_nlp_param_baseline # TODO: remove
 
 
 def get_preset_models(path, problem_type, objective_func, num_classes=None,
@@ -16,8 +14,6 @@ def get_preset_models(path, problem_type, objective_func, num_classes=None,
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type,
                     objective_func=objective_func, hyperparameters=hyperparameters)
-    elif problem_type == LANGUAGE_MODEL:
-        return get_preset_models_language(path=path, hyperparameters=hyperparameters)
     else:
         raise NotImplementedError
 
@@ -51,13 +47,6 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type, 
                                   objective_func=objective_func, hyperparameters=nn_options.copy()),
         )
-    return models
-
-
-def get_preset_models_language(path, hyperparameters={'NN':{},'GBM':{}}):
-    models = [
-        NNNLPLanguageModel(path=path, name='LanguageModel', params=get_nlp_param_baseline()),
-    ]
     return models
 
 
