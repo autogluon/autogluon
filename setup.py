@@ -85,6 +85,7 @@ requirements = [
     'cython',
     'requests',
     'matplotlib==3.1.1', # TODO: version needed for tabular atm
+    'mxboard',
     'tornado',
     'paramiko==2.5.0',
     'ConfigSpace==0.4.10',
@@ -92,7 +93,7 @@ requirements = [
     'gluoncv',
     'gluonnlp',
     'graphviz',
-    'scikit-optimize',
+    'botocore==1.12.253',
     'boto3==1.9.187',
     'catboost',
     'fastparquet==0.3.1',
