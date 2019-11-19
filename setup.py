@@ -80,11 +80,11 @@ except(IOError, ImportError):
 
 requirements = [
     'tqdm',
-    'numpy',
+    'numpy==1.17.2', # TODO: version needed for tabular atm
     'scipy',
     'cython',
     'requests',
-    'matplotlib',
+    'matplotlib==3.1.1', # TODO: version needed for tabular atm
     'tornado',
     'paramiko==2.5.0',
     'ConfigSpace==0.4.10',
@@ -93,6 +93,20 @@ requirements = [
     'gluonnlp',
     'graphviz',
     'scikit-optimize',
+    'boto3==1.9.187',
+    'catboost',
+    'fastparquet==0.3.1',
+    'joblib==0.13.2',
+    'lightgbm==2.3.0',
+    'pandas==0.24.2',
+    'psutil',
+    'pyarrow==0.15.0',
+    's3fs==0.3.1',
+    'scikit-learn==0.21.2',
+    'scikit-optimize==0.5.2',
+    'spacy==2.1.4',
+    'fastai==1.0.55',
+    # 'torch'  # TODO: tabular needs torch==1.1.0 atm
 ]
 
 setup(
