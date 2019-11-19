@@ -1,7 +1,7 @@
 import copy, logging
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score
+from autogluon.tabular.metrics import accuracy
 from autogluon.tabular.ml.utils import get_pred_from_proba
 from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from sklearn.model_selection import RandomizedSearchCV
@@ -10,7 +10,7 @@ from autogluon.core import *
 from autogluon.task.base import *
 
 # TODO: move these files
-import tabular.metrics
+import autogluon.tabular.metrics
 from autogluon.tabular.utils.decorators import calculate_time
 from autogluon.tabular.utils.loaders import load_pkl
 from autogluon.tabular.utils.savers import save_pkl
@@ -47,7 +47,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy_score, features=None, debug=0):
+    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, features=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
@@ -60,9 +60,9 @@ class AbstractModel:
         self.objective_func = objective_func # Note: we require higher values = better performance
         self.feature_types_metadata = {}  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
-        if type(objective_func) == tabular.metrics._ProbaScorer:
+        if type(objective_func) == autogluon.tabular.metrics._ProbaScorer:
             self.metric_needs_y_pred = False
-        elif type(objective_func) == tabular.metrics._ThresholdScorer:
+        elif type(objective_func) == autogluon.tabular.metrics._ThresholdScorer:
             self.metric_needs_y_pred = False
         else:
             self.metric_needs_y_pred = True

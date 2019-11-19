@@ -14,8 +14,7 @@ from autogluon.tabular.ml.utils import get_pred_from_proba, generate_kfold
 from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.tabular.ml.tuning.autotune import AutoTune
 
-import tabular.metrics
-from autogluon.tabular.metrics import accuracy, root_mean_squared_error
+from autogluon.tabular.metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from sklearn.model_selection import train_test_split
 
 from autogluon.tabular.ml.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -39,7 +38,7 @@ class AbstractTrainer:
         else:
             self.objective_func = root_mean_squared_error
 
-        self.objective_func_expects_y_pred = tabular.metrics.scorer_expects_y_pred(scorer=self.objective_func)
+        self.objective_func_expects_y_pred = scorer_expects_y_pred(scorer=self.objective_func)
 
         self.num_classes = num_classes
         self.low_memory = low_memory

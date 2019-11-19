@@ -4,8 +4,7 @@ from autogluon.tabular.ml.constants import PROBLEM_TYPES
 
 from collections import Counter
 
-from autogluon.tabular.metrics import calculate_score
-import tabular.metrics
+from autogluon.tabular.metrics import calculate_score, _ProbaScorer, _ThresholdScorer
 
 from autogluon.tabular.ml.utils import get_pred_from_proba
 
@@ -29,9 +28,9 @@ class EnsembleSelection():
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
-        if type(metric) == tabular.metrics._ProbaScorer:
+        if type(metric) == _ProbaScorer:
             self.objective_func_expects_y_pred = False
-        elif type(metric) == tabular.metrics._ThresholdScorer:
+        elif type(metric) == _ThresholdScorer:
             self.objective_func_expects_y_pred = False
         else:
             self.objective_func_expects_y_pred = True
