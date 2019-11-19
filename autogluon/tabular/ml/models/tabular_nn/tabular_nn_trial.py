@@ -1,5 +1,4 @@
-import random
-import logging
+import random, logging
 import numpy as np
 import mxnet as mx
 from mxnet import nd, autograd
@@ -11,9 +10,9 @@ from autogluon.tabular.ml.models.tabular_nn.tabular_nn_dataset import TabularNND
 logger = logging.getLogger(__name__) # TODO: Currently unused
 EPS = 10e-8 # small number
 
-@autogluon_register_args()
-def train_tabularNN(args, reporter):
-    """ Training function used during HPO """
+@args()
+def tabular_nn_trial(args, reporter):
+    """ Training and evaluation function used during a single trial of HPO """
     tabNN = args.tabNN
     tabNN.params = tabNN.params.copy() # duplicate to make sure there are no remaining pointers across trials.
     tabNN.params.update(args) # Set params dict object == to args to explore in this trial.

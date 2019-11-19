@@ -31,7 +31,7 @@ from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.ml.models.tabular_nn.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from autogluon.tabular.ml.models.tabular_nn.tabular_nn_dataset import TabularNNDataset
 from autogluon.tabular.ml.models.tabular_nn.embednet import EmbedNet
-from autogluon.tabular.ml.models.tabular_nn.train_tabular_nn import train_tabularNN
+from autogluon.tabular.ml.models.tabular_nn.tabular_nn_trial import tabular_nn_trial
 
 # __all__ = ['TabularNeuralNetModel', 'EPS']
 
@@ -738,9 +738,9 @@ class TabularNeuralNetModel(AbstractModel):
         test_fileprefix = self.path + "validation"
         train_dataset.save(file_prefix=train_fileprefix) # TODO: cleanup after HPO?
         test_dataset.save(file_prefix=test_fileprefix)
-        train_tabularNN.register_args(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
+        tabular_nn_trial.register_args(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                       directory=directory, tabNN=self, **params_copy)
-        scheduler = scheduler_func(train_tabularNN, **scheduler_options)
+        scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
@@ -750,7 +750,7 @@ class TabularNeuralNetModel(AbstractModel):
             train_fileprefix = "train"
             test_fileprefix = "validation"
             directory = self.path # TODO: need to change to path to working directory on every remote machine
-            train_tabularNN.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
+            tabular_nn_trial.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                    directory=directory)
         
         scheduler.run()
@@ -765,7 +765,7 @@ class TabularNeuralNetModel(AbstractModel):
                        'training_history': scheduler.training_history,
                        'config_history': scheduler.config_history,
                        'reward_attr': scheduler._reward_attr,
-                       'args': train_tabularNN.args
+                       'args': tabular_nn_trial.args
                       }
         hpo_results = BasePredictor._format_results(hpo_results) # store results summarizing HPO for this model
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
