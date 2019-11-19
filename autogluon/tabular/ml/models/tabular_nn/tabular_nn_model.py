@@ -352,7 +352,7 @@ class TabularNeuralNetModel(AbstractModel):
         if test_dataset is None: # evaluate one final time:
             print("Best model found in epoch %d" % best_val_epoch)
         else:
-            final_val_metric = self.evaluate_metric(test_dataset)
+            final_val_metric = self.score(X=test_dataset, y=y_test)
             print("Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
