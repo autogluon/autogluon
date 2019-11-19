@@ -124,6 +124,7 @@ class BaseSearcher(object):
         return reprstr
 
 
+# TODO: Does not use default hyperparams for first run
 class RandomSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
 

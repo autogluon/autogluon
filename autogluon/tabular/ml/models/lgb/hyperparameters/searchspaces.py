@@ -22,7 +22,7 @@ def get_searchspace_multiclass_baseline(num_classes):
         'objective': 'multiclass',
         'metric': 'multi_error,multi_logloss',
         'num_classes': num_classes,
-        'learning_rate': Real(lower=1e-3, upper=1.0, default=0.1, log=True),
+        'learning_rate': Real(lower=1e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.25, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=100, default=20),
         'num_leaves': Int(lower=16, upper=96, default=31),
@@ -41,7 +41,7 @@ def get_searchspace_binary_baseline():
     params = {
         'objective': 'binary',
         'metric': 'binary_logloss,binary_error',
-        'learning_rate': Real(lower=1e-3, upper=1.0, default=0.1, log=True),
+        'learning_rate': Real(lower=1e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.25, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=100, default=20),
         'num_leaves': Int(lower=16, upper=96, default=31),
@@ -58,7 +58,7 @@ def get_searchspace_regression_baseline():
     params = {
         'objective': 'regression',
         'metric': 'l1',
-        'learning_rate': Real(lower=1e-3, upper=1.0, default=0.1, log=True),
+        'learning_rate': Real(lower=1e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.25, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=100, default=20),
         'num_leaves': Int(lower=16, upper=96, default=31),
