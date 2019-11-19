@@ -33,7 +33,7 @@ def train_lgb(args, reporter):
     elif lgb_model.problem_type == MULTICLASS:
         train_loss_name = 'multi_logloss'
     elif lgb_model.problem_type == REGRESSION:
-        train_loss_name = 'regression'
+        train_loss_name = 'l2'
     else:
         raise ValueError("unknown problem_type for LGBModel: %s" % lgb_model.problem_type)
     lgb_model.eval_results = {}

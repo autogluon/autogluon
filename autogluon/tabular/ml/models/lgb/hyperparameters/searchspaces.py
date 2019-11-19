@@ -57,7 +57,7 @@ def get_searchspace_binary_baseline():
 def get_searchspace_regression_baseline():
     params = {
         'objective': 'regression',
-        'metric': 'l1',
+        'metric': 'l2',
         'learning_rate': Real(lower=1e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.25, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=100, default=20),
