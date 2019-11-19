@@ -2,7 +2,7 @@ import math, warnings
 import numpy as np
 import pandas as pd 
 
-from tabular.utils.loaders import load_pd # TODO: move this
+from autogluon.tabular.utils.loaders import load_pd # TODO: move this
 from ...core import * # TODO: needed?
 
 __all__ = ['TabularDataset']
