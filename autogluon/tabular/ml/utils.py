@@ -156,8 +156,9 @@ def convert_categorical_to_int(X):
 
 def setup_outputdir(output_directory):
     if output_directory is None:
-        timestamp = datetime.now().strftime("%d-%b-%Y (%H:%M:%S.%f)")
-        output_directory = "autogluon-fit-" + timestamp
+        utcnow = datetime.utcnow()
+        timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
+        output_directory = "learners/ag-" + timestamp + '/'
         os.makedirs(output_directory)
         print("No output_directory specified. Models will be saved in: %s" % output_directory)
     output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists

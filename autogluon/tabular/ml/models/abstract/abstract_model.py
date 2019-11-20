@@ -72,7 +72,7 @@ class AbstractModel:
         if type(model) == str:
             self.model = self.load_model(model)
         self.child_models = []
-        self.params = None
+        self.params = hyperparameters.copy()
         self.nondefault_params = []
         if hyperparameters is not None:
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
@@ -217,11 +217,14 @@ class AbstractModel:
         return results
         # self.save_debug()
 
+    def _get_default_searchspace(self, problem_type):
+        return NotImplementedError
+
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
             default fixed value to default spearch space.
         """
-        def_search_space = get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes).copy()
+        def_search_space = self._get_default_searchspace(problem_type=self.problem_type).copy()
         # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = def_search_space.pop(key, None)

@@ -37,11 +37,6 @@ class LGBModel(AbstractModel):
         self.is_higher_better = True
         self.best_iteration = None
         self.eval_results = {}
-        self.model_name_checkpointing_0 = 'model_checkpoint_0.pkl'
-        self.model_name_checkpointing_1 = 'model_checkpoint_1.pkl'
-        self.model_name_trained = 'model_trained.pkl'
-        self.eval_result_path = 'eval_result.pkl'
-        self.latest_model_checkpoint = 'model_checkpoint_latest.pointer'
         self.num_classes = num_classes
 
     def get_eval_metric(self):
@@ -219,7 +214,7 @@ class LGBModel(AbstractModel):
         features_to_use = list(feature_importances_used['feature'].values)
         print(features_to_use)
         return features_to_use
-    
+
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
         start_time = time.time()
         print("Beginning hyperparameter tuning for Gradient Boosting Model...")
@@ -271,15 +266,15 @@ class LGBModel(AbstractModel):
                 if isinstance(params_copy[hyperparam], Space):
                     print(hyperparam + ":   " + str(params_copy[hyperparam]))
 
-        train_lgb.register_args(dataset_train_filename=dataset_train_filename,
+        lgb_trial.register_args(dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
             directory=directory, lgb_model=self, **params_copy)
-        scheduler = scheduler_func(train_lgb, **scheduler_options)
+        scheduler = scheduler_func(lgb_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             scheduler.upload_files([train_file, val_file]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
-            train_lgb.update(directory=directory)
+            lgb_trial.update(directory=directory)
 
         scheduler.run()
         scheduler.join_jobs()
@@ -293,7 +288,7 @@ class LGBModel(AbstractModel):
                        'training_history': scheduler.training_history,
                        'config_history': scheduler.config_history,
                        'reward_attr': scheduler._reward_attr,
-                       'args': train_lgb.args
+                       'args': lgb_trial.args
                       }
         hpo_results = BasePredictor._format_results(hpo_results) # results summarizing HPO for this model
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
@@ -321,7 +316,7 @@ class LGBModel(AbstractModel):
         # args.final_fit = True
         # final_model = scheduler.run_with_config(best_config)
         # save(final_model)
-    
+
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
             default fixed value to default spearch space.

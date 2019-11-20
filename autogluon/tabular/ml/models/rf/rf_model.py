@@ -5,15 +5,27 @@ from autogluon.tabular.ml.models.rf.hyperparameters.rf_spaces import RFSpaces
 
 # TODO: Pass in num_classes?
 class RFModel(SKLearnModel):
-    def __init__(self, path, name, model, problem_type, objective_func, debug=0):
-        super().__init__(path=path, name=name, model=model, problem_type=problem_type, objective_func=objective_func, debug=debug)
-
     def preprocess(self, X):
         X = super().preprocess(X)
         X = X.fillna(0)
         return X
 
-    def hyperparameter_tune(self, X, y, spaces=None):
-        if spaces is None:
-            spaces = RFSpaces(problem_type=self.problem_type, objective_func=self.objective_func, num_classes=None).get_hyperparam_spaces_baseline()
-        return super().hyperparameter_tune(X=X, y=y, spaces=spaces)
+    # TODO: Add in documentation that Categorical default is the first index
+    def _get_default_searchspace(self, problem_type):
+        spaces = {
+            # 'n_estimators': Int(lower=10, upper=1000, default=300),
+            # 'max_features': Categorical(['auto', 0.5, 0.25]),
+            # 'criterion': Categorical(['gini', 'entropy']),
+        }
+
+        return spaces
+
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
+
+        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test)
+        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
+        hpo_results = {}
+        self.save()
+        hpo_models = {self.name: self.path}
+
+        return hpo_models, hpo_model_performances, hpo_results

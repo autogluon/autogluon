@@ -3,24 +3,34 @@ from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.tabular.ml.models.catboost.catboost_utils import construct_custom_catboost_metric
 from catboost import CatBoostClassifier, CatBoostRegressor
 from autogluon.tabular.ml.constants import PROBLEM_TYPES_CLASSIFICATION
+from autogluon.core import Int, Categorical, Real
 
 
 # TODO: Catboost crashes on multiclass problems where only two classes have significant member count.
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 class CatboostModel(AbstractModel):
-    def __init__(self, path, name, problem_type, objective_func, options=None, debug=0):
+    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, debug=0):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, debug=debug)
-        if options is None:
-            options = {}
+        if hyperparameters is None:
+            hyperparameters = {}
 
-        if 'random_seed' not in options.keys():
-            options['random_seed'] = 0  # Remove randomness for reproducibility
-        options['eval_metric'] = construct_custom_catboost_metric(self.objective_func, True, not self.metric_needs_y_pred, self.problem_type)
+        if 'random_seed' not in hyperparameters.keys():
+            hyperparameters['random_seed'] = 0  # Remove randomness for reproducibility
+        hyperparameters['eval_metric'] = construct_custom_catboost_metric(self.objective_func, True, not self.metric_needs_y_pred, self.problem_type)
 
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
-        self.params = {**options}
+        self.params = {**hyperparameters}
 
         self.best_iteration = 0
+
+    def _get_default_searchspace(self, problem_type):
+        spaces = {
+            'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
+            'depth': Int(lower=5, upper=8, default=6),
+            'l2_leaf_reg': Real(lower=1, upper=5, default=3),
+        }
+
+        return spaces
 
     def preprocess(self, X):
         X = super().preprocess(X)
@@ -47,12 +57,19 @@ class CatboostModel(AbstractModel):
 
         cat_features = list(X_train.select_dtypes(include='category').columns)
 
+        invalid_params = ['num_threads', 'num_gpus']
+        for invalid in invalid_params:
+            if invalid in self.params:
+                self.params.pop(invalid)
+        print('Catboost Model params:')
+        print(self.params)
+
         self.model = self.model_type(
             **self.params,
         )
 
-        print('Catboost Model params:')
-        print(self.model.get_params())
+        # print('Catboost Model params:')
+        # print(self.model.get_params())
 
         # TODO: Add more control over these params (specifically verbose and early_stopping_rounds)
         self.model.fit(
