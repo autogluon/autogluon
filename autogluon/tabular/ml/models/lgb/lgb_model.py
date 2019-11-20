@@ -13,7 +13,7 @@ from autogluon.tabular.ml.models.lgb.callbacks import early_stopping_custom
 from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.tabular.ml.models.lgb import lgb_utils
 from autogluon.tabular.ml.models.lgb.hyperparameters.searchspaces import get_default_searchspace
-from autogluon.tabular.ml.models.lgb.hyperparameters.train_lgb_model import train_lgb
+from autogluon.tabular.ml.models.lgb.hyperparameters.lgb_trial import lgb_trial
 from autogluon.tabular.ml.models.lgb.hyperparameters.parameters import get_param_baseline
 
 # TODO:debug!  from autogluon.tabular.ml.tuning.train_lgb_model import train_lgb
@@ -219,7 +219,7 @@ class LGBModel(AbstractModel):
         features_to_use = list(feature_importances_used['feature'].values)
         print(features_to_use)
         return features_to_use
-
+    
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
         start_time = time.time()
         print("Beginning hyperparameter tuning for Gradient Boosting Model...")
@@ -277,7 +277,7 @@ class LGBModel(AbstractModel):
         scheduler = scheduler_func(train_lgb, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
-            scheduler.upload_files([dataset_train_file, dataset_val_file]) # TODO: currently does not work.
+            scheduler.upload_files([train_file, val_file]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             train_lgb.update(directory=directory)
 
@@ -321,7 +321,7 @@ class LGBModel(AbstractModel):
         # args.final_fit = True
         # final_model = scheduler.run_with_config(best_config)
         # save(final_model)
-
+    
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
             default fixed value to default spearch space.

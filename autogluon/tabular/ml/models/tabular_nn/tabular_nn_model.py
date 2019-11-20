@@ -743,6 +743,7 @@ class TabularNeuralNetModel(AbstractModel):
         scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
+            print("copying processed data to remote workers...")
             scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
                                 train_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX,
                                 test_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,

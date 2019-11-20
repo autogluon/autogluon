@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, time, pickle, os
 import numpy as np
 import pandas as pd
 from autogluon.tabular.metrics import accuracy
@@ -7,12 +7,12 @@ from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from sklearn.model_selection import RandomizedSearchCV
 
 from autogluon.core import *
-
-# TODO: move these files
+from autogluon.task.base import *
 import autogluon.tabular.metrics
 from autogluon.tabular.utils.decorators import calculate_time
 from autogluon.tabular.utils.loaders import load_pkl
 from autogluon.tabular.utils.savers import save_pkl
+from autogluon.tabular.ml.models.abstract.model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +46,12 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, features=None, debug=0):
+    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters={}, features=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
                 name (str): name of subdirectory inside path where model will be saved
+                hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values)
         """
         self.name = name
         self.path = self.create_contexts(path + name + '/')
@@ -72,6 +73,9 @@ class AbstractModel:
             self.model = self.load_model(model)
         self.child_models = []
         self.params = None
+        self.nondefault_params = []
+        if hyperparameters is not None:
+            self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -152,43 +156,6 @@ class AbstractModel:
             obj.set_contexts(path)
             return obj
 
-    # In trainer or model?
-    def hyperparameter_tune(self, X, y, spaces=None):
-        if spaces is None:
-            print('skipping hyperparameter tuning, no spaces specified...')
-            return {}
-
-        model = copy.deepcopy(self)
-        X = model.preprocess(X)
-
-        # Set the parameters by cross-validation
-        scorer = self.objective_func.sklearn_scorer()
-        clf = RandomizedSearchCV(model.model, param_distributions=spaces, n_iter=10, cv=5,
-                                 scoring=scorer)
-        clf.fit(X, y)
-
-        print("Best parameters set found on development set:")
-        print()
-        print(clf.best_params_)
-        print()
-        print("Grid scores on development set:")
-        print()
-        means = clf.cv_results_['mean_test_score']
-        stds = clf.cv_results_['std_test_score']
-        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
-            print("%0.3f (+/-%0.03f) for %r"
-                  % (mean, std * 2, params))
-        print()
-
-        print("Detailed classification report:")
-        print()
-        print("The model is trained on the full development set.")
-        print("The scores are computed on the full evaluation set.")
-        print()
-
-        self.model = self.model.__class__(**clf.best_params_)
-        return clf.best_params_
-
     @calculate_time
     def debug_feature_gain(self, X_test, Y_test, model, features_to_use=None):
         sample_size = 10000
@@ -249,3 +216,137 @@ class AbstractModel:
 
         return results
         # self.save_debug()
+
+    def _set_default_searchspace(self):
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default spearch space.
+        """
+        def_search_space = get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes).copy()
+        # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
+        for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
+            _ = def_search_space.pop(key, None)
+        if self.params is not None:
+            self.params.update(def_search_space)
+
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
+        start_time = time.time()
+        print("Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
+        self._set_default_searchspace()
+        params_copy = self.params.copy()
+        directory = self.path # also create model directory if it doesn't exist
+        # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        scheduler_func = scheduler_options[0] # Unpack tuple
+        scheduler_options = scheduler_options[1]
+        if scheduler_func is None or scheduler_options is None:
+            raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
+        self.params['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
+        self.params['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
+        dataset_train_filename = 'dataset_train.p'
+        train_path = directory+dataset_train_filename
+        pickle.dump((X_train,Y_train), open(train_path, 'wb'))
+        if (X_test is not None) and (Y_test is not None):
+            dataset_val_filename = 'dataset_val.p'
+            val_path = directory+dataset_val_filename
+            pickle.dump((X_test,Y_test), open(val_path, 'wb'))
+        else:
+            dataset_val_filename = None
+        if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
+            logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
+        else:
+            print("Hyperparameter search space for %s model: " % self.name)
+            for hyperparam in params_copy:
+                if isinstance(params_copy[hyperparam], Space):
+                    print(hyperparam + ":   " + str(params_copy[hyperparam]))
+
+        model_trial.register_args(dataset_train_filename=dataset_train_filename,
+            dataset_val_filename=dataset_val_filename, directory=directory, model=self, **params_copy)
+        scheduler = scheduler_func(model_trial, **scheduler_options)
+        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+            # This is multi-machine setting, so need to copy dataset to workers:
+            scheduler.upload_files([train_path, val_path]) # TODO: currently does not work.
+            directory = self.path # TODO: need to change to path to working directory used on every remote machine
+            model_trial.update(directory=directory)
+
+        scheduler.run()
+        scheduler.join_jobs()
+        # Store results / models from this HPO run:
+        best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
+        hpo_results = {'best_reward': scheduler.get_best_reward(),
+                       'best_config': best_hp,
+                       'total_time': time.time() - start_time,
+                       'metadata': scheduler.metadata,
+                       'training_history': scheduler.training_history,
+                       'config_history': scheduler.config_history,
+                       'reward_attr': scheduler._reward_attr,
+                       'args': model_trial.args
+                      }
+        hpo_results = BasePredictor._format_results(hpo_results) # results summarizing HPO for this model
+        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+            raise NotImplementedError("need to fetch model files from remote Workers")
+            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
+            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
+        hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
+        hpo_model_performances = {}
+        for trial in sorted(hpo_results['trial_info'].keys()):
+            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). Ask Hang how to ID these?
+            file_id = "trial_"+str(trial) # unique identifier to files from this trial
+            file_prefix = file_id + "_"
+            trial_model_name = self.name+"_"+file_id
+            trial_model_path = self.path + file_prefix
+            hpo_models[trial_model_name] = trial_model_path
+            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+
+        print("Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
+        self.params.update(best_hp)
+        # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
+        print("Best hyperparameter configuration for %s model: " % self.name)
+        print(best_hp)
+        return (hpo_models, hpo_model_performances, hpo_results)
+        # TODO: do final fit here?
+        # args.final_fit = True
+        # final_model = scheduler.run_with_config(best_config)
+        # save(final_model)
+
+"""
+## OLD hpo ##
+
+    def hyperparameter_tune(self, X, y, spaces=None):
+        if spaces is None:
+            print('skipping hyperparameter tuning, no spaces specified...')
+            return {}
+
+        model = copy.deepcopy(self)
+        X = model.preprocess(X)
+
+        # Set the parameters by cross-validation
+        scorer = self.objective_func.sklearn_scorer()
+        clf = RandomizedSearchCV(model.model, param_distributions=spaces, n_iter=10, cv=5,
+                                 scoring=scorer)
+        clf.fit(X, y)
+
+        print("Best parameters set found on development set:")
+        print()
+        print(clf.best_params_)
+        print()
+        print("Grid scores on development set:")
+        print()
+        means = clf.cv_results_['mean_test_score']
+        stds = clf.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, clf.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r"
+                  % (mean, std * 2, params))
+        print()
+
+        print("Detailed classification report:")
+        print()
+        print("The model is trained on the full development set.")
+        print("The scores are computed on the full evaluation set.")
+        print()
+
+        self.model = self.model.__class__(**clf.best_params_)
+        return clf.best_params_
+
+
+"""

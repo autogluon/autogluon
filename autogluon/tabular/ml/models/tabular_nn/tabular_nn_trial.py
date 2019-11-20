@@ -13,7 +13,7 @@ EPS = 10e-8 # small number
 @args()
 def tabular_nn_trial(args, reporter):
     """ Training and evaluation function used during a single trial of HPO """
-    tabNN = args.tabNN
+    tabNN = args.pop('tabNN')
     tabNN.params = tabNN.params.copy() # duplicate to make sure there are no remaining pointers across trials.
     tabNN.params.update(args) # Set params dict object == to args to explore in this trial.
     trial_id = args.task_id # Note may not start at 0 if HPO has been run for other models with same scheduler

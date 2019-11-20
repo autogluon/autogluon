@@ -37,7 +37,7 @@ from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 ############ Benchmark options you can set: ########################
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 fast_benchmark = True # False
-hyperparameter_tune = False
+hyperparameter_tune = True
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
 # performance_value warnings are disabled when fast_benchmark = True.
@@ -47,7 +47,7 @@ if fast_benchmark:
     subsample_size = 100
     nn_options = {'num_epochs': 5} 
     gbm_options = {'num_boost_round': 100}
-    hyperparameters = {'NN': nn_options, 'GBM': gbm_options}
+    hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
     num_trials = 5
     time_limits = 1*60
 ###################################################################
@@ -59,7 +59,7 @@ seed_val = 0 # random seed
 EPS = 1e-10
 
 # Information about each dataset in benchmark is stored in dict.
-# performance_val = expected performance on this dataset (lower = better), Should update based on previously run benchmarks
+# performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
 binary_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
                   'name': 'AdultIncomeBinaryClassification',
                   'problem_type': BINARY,
