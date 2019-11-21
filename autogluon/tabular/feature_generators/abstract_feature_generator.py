@@ -10,6 +10,7 @@ from autogluon.tabular.utils.savers import save_pkl
 
 
 # TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
+# TODO: Add feature of # of observation counts to high cardinality categorical features
 class AbstractFeatureGenerator:
     def __init__(self):
         self.features_init = []
@@ -89,7 +90,7 @@ class AbstractFeatureGenerator:
         return X
 
     @calculate_time
-    def fit_transform(self, X: DataFrame, banned_features=None, fix_categoricals=False, drop_duplicates=True):
+    def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
         self.fit = False
         X_len = len(X)
         if banned_features:

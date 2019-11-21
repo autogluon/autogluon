@@ -33,6 +33,9 @@ class AbstractLearner:
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator = feature_generator
+
+        self.feature_generators = [self.feature_generator]
+
         self.trainer: AbstractTrainer = None
         self.trainer_type = None
         self.trainer_path = None
@@ -63,7 +66,7 @@ class AbstractLearner:
         ##########
         trainer = self.load_trainer()
 
-        X_test = self.feature_generator.transform(X_test)
+        X_test = self.transform_features(X_test)
         y_pred_proba = trainer.predict_proba(X_test)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
@@ -111,10 +114,20 @@ class AbstractLearner:
 
         return y_pred.values
 
+    def fit_transform_features(self, X, y=None):
+        for feature_generator in self.feature_generators:
+            X = feature_generator.fit_transform(X, y)
+        return X
+
+    def transform_features(self, X):
+        for feature_generator in self.feature_generators:
+            X = feature_generator.transform(X)
+        return X
+
     def score(self, X: DataFrame, y=None):
         if y is None:
             X, y = self.extract_label(X)
-        X = self.feature_generator.transform(X)
+        X = self.transform_features(X)
         y = self.label_cleaner.transform(y)
         trainer = self.load_trainer()
         if self.problem_type == MULTICLASS:
@@ -133,7 +146,7 @@ class AbstractLearner:
     def score_debug(self, X: DataFrame, y=None):
         if y is None:
             X, y = self.extract_label(X)
-        X = self.feature_generator.transform(X)
+        X = self.transform_features(X)
         y = self.label_cleaner.transform(y)
         y = y.fillna(-1)
         trainer = self.load_trainer()
