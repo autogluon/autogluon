@@ -32,6 +32,8 @@ from autogluon.tabular.ml.models.tabular_nn.categorical_encoders import OneHotMe
 from autogluon.tabular.ml.models.tabular_nn.tabular_nn_dataset import TabularNNDataset
 from autogluon.tabular.ml.models.tabular_nn.embednet import EmbedNet
 from autogluon.tabular.ml.models.tabular_nn.tabular_nn_trial import tabular_nn_trial
+from autogluon.tabular.ml.models.tabular_nn.hyperparameters.parameters import get_default_param
+from autogluon.tabular.ml.models.tabular_nn.hyperparameters.searchspaces import get_default_searchspace
 
 # __all__ = ['TabularNeuralNetModel', 'EPS']
 
@@ -63,19 +65,6 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    # Search space we use by default (only specify non-fixed hyperparameters here):  # TODO: move to separate file
-    default_searchspace = {
-        'learning_rate': Real(1e-4, 3e-2, log=True),
-        'weight_decay': Real(1e-12, 0.5, log=True),
-        'dropout_prob': Real(0.0, 0.5),
-        'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
-        'embedding_size_factor': Real(0.5, 1.5),
-        'network_type': Categorical('widedeep','feedforward'), 
-        'use_batchnorm': Categorical(True, False),
-        'activation': Categorical('relu', 'softrelu', 'tanh'),
-        # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
-    }
-
     def __init__(self, path, name, problem_type, objective_func, features=None, hyperparameters={}):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features)
         """ Create new TabularNeuralNetModel object.
@@ -99,65 +88,10 @@ class TabularNeuralNetModel(AbstractModel):
     
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
-        
-        # Configuration-options that we never search over in HPO but user can specify:
-        self._use_default_value('num_dataloading_workers', 1) # will be overwritten by nthreads_per_trial
-        self._use_default_value('ctx', mx.gpu() if mx.test_utils.list_gpus() else mx.cpu() ) # will be overwritten by ngpus_per_trial
-        self._use_default_value('num_epochs', 300)  # maximum number of epochs for training NN
-        self._use_default_value('seed_value', None) # random seed for reproducibility (set = None to ignore)
-
-        # For data processing (currently preprocessors not searched during HPO):
-        self._use_default_value('proc.embed_min_categories', 4) # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
-        # Default search space: 3,4,10, 100, 1000
-        self._use_default_value('proc.impute_strategy', 'median') # strategy argument of SimpleImputer() used to impute missing numeric values
-        # Default search space: ['median', 'mean', 'most_frequent']
-        self._use_default_value('proc.max_category_levels', 500) # maximum number of allowed levels per categorical feature
-        # Default search space: [10, 100, 200, 300, 400, 500, 1000, 10000]
-        self._use_default_value('proc.skew_threshold', 0.99) # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-        # Default search space: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
-        
-        # Hyperparameters for neural net architecture:
-        self._use_default_value('network_type', 'widedeep') # Type of neural net used to produce predictions
-        # Search space: self._use_default_value('network_type', ag.space.Categorical('widedeep', 'feedforward') )
-        self._use_default_value('layers', None) # List of widths (num_units) for each hidden layer (Note: only specifies hidden layers. These numbers are not absolute, they will also be scaled based on number of training examples and problem type)
-        # Default search space: List of lists that are manually created
-        self._use_default_value('numeric_embed_dim', None) # Size of joint embedding for all numeric+one-hot features.
-        # Default search space: TBD
-        self._use_default_value('activation', 'relu')
-        # Default search space: self._use_default_value('activation', ag.space.Categorical('relu', 'elu', 'tanh') )
-        self._use_default_value('max_layer_width', 2056) # maximum number of hidden units in MLP layer
-        # Does not need to be searched by default
-        self._use_default_value('embedding_size_factor', 1.0)
-        # Default search space: [0.01 - 100] on log-scale
-        self._use_default_value('embed_exponent', 0.56)
-         # Does not need to be searched by default!
-        self._use_default_value('max_embedding_dim', 100)
-        self._use_default_value('use_batchnorm', True) # whether or not to utilize Batch-normalization
-        # Default search space: self._use_default_value('use_batchnorm', ag.space.bool() )
-
-        self._use_default_value('dropout_prob', 0.1) # 0 turns off Dropout!
-        # Default search space: self._use_default_value('dropout_prob', ag.space.Real(0.0, 0.5) )
-
-        # Regression-specific hyperparameters:
-        self._use_default_value('y_range', None) # Tuple specifying whether (min_y, max_y). Can be = (-np.inf, np.inf).
-        # If None, inferred based on training labels. Note: MUST be None for classification tasks!
-        self._use_default_value('y_range_extend', 0.05) # Only used to extend size of inferred y_range when y_range = None.
-
-        # Hyperparameters for neural net training:
-        self._use_default_value('batch_size', 512) # batch-size used for NN training
-        # Default search space: [32, 64, 128. 256, 512, 1024, 2048]
-        self._use_default_value('loss_function', None) # MXNet loss function minimized during training
-        self._use_default_value('optimizer', 'adam')
-        self._use_default_value('learning_rate', 3e-4) # learning rate used for NN training
-        # Default search space: self._use_default_value('learning_rate', ag.space.Real(1e-4, 1e-2, log = True))
-        self._use_default_value('weight_decay', 1e-6)
-        # Default search space: self._use_default_value('weight_decay', ag.space.Real(1e-6, 1e-2, log = True))
-        self._use_default_value('clip_gradient', 100.0)
-        self._use_default_value('momentum', 0.9) # only used for SGD
-        # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
-        self._use_default_value('epochs_wo_improve', max(5, min(20, int(self.params['num_epochs']/5.0)))) # we terminate training if val accuracy hasn't improved in the last 'epochs_wo_improve' # of epochs
-        # Note: Default params for original NNTabularModel were: weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
-
+        default_params = get_default_param(self.problem_type)
+        for key in default_params:
+            self._use_default_value(key, default_params[key])
+    
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
         if self.problem_type == MULTICLASS:
@@ -802,7 +736,7 @@ class TabularNeuralNetModel(AbstractModel):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from 
             default fixed value to default spearch space. 
         """
-        search_space = self.default_searchspace.copy()
+        search_space = get_default_searchspace(self.problem_type)
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = search_space.pop(key, None)
         self.params.update(search_space)

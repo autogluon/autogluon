@@ -1,4 +1,4 @@
-""" Lists the default (fixed) hyperparameter search spaces we use in our Gradient Boosting model. """
+""" Default hyperparameter search spaces used in Gradient Boosting model """
 from autogluon.core import *
 
 # TODO: move these files

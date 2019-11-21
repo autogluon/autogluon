@@ -1,4 +1,4 @@
-""" Lists the default (fixed) hyperparameter values we use in our Gradient Boosting model. """
+""" Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
 from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
