@@ -2,7 +2,18 @@
 
 from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
-DEFAULT_NUM_BOOST_ROUND = 10000 # default for single training run
+DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
+
+def get_param_baseline_custom(problem_type, num_classes=None):
+    if problem_type == BINARY:
+        return get_param_binary_baseline_custom()
+    elif problem_type == MULTICLASS:
+        return get_param_multiclass_baseline_custom(num_classes=num_classes)
+    elif problem_type == REGRESSION:
+        return get_param_regression_baseline_custom()
+    else:
+        return get_param_binary_baseline_custom()
+
 
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
@@ -15,18 +26,7 @@ def get_param_baseline(problem_type, num_classes=None):
         return get_param_binary_baseline()
 
 
-def get_param_baseline_dummy(problem_type, num_classes=None):
-    if problem_type == BINARY:
-        return get_param_binary_baseline_dummy()
-    elif problem_type == MULTICLASS:
-        return get_param_multiclass_baseline_dummy(num_classes=num_classes)
-    elif problem_type == REGRESSION:
-        return get_param_regression_baseline_dummy()
-    else:
-        return get_param_binary_baseline_dummy()
-
-
-def get_param_multiclass_baseline(num_classes):
+def get_param_multiclass_baseline_custom(num_classes):
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
@@ -47,7 +47,7 @@ def get_param_multiclass_baseline(num_classes):
     return params.copy()
 
 
-def get_param_binary_baseline_dummy():
+def get_param_binary_baseline():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
@@ -60,7 +60,7 @@ def get_param_binary_baseline_dummy():
     return params
 
 
-def get_param_multiclass_baseline_dummy(num_classes):
+def get_param_multiclass_baseline(num_classes):
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
@@ -75,7 +75,7 @@ def get_param_multiclass_baseline_dummy(num_classes):
     return params
 
 
-def get_param_regression_baseline_dummy():
+def get_param_regression_baseline():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
@@ -102,7 +102,7 @@ def get_param_binary_baseline_dummy_gpu():
     return params
 
 
-def get_param_binary_baseline():
+def get_param_binary_baseline_custom():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,
@@ -121,7 +121,7 @@ def get_param_binary_baseline():
     return params.copy()
 
 
-def get_param_regression_baseline():
+def get_param_regression_baseline_custom():
     params = {
         'num_boost_round': DEFAULT_NUM_BOOST_ROUND,
         'num_threads': -1,

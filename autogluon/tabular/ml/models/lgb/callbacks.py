@@ -169,11 +169,12 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
                 print(env.iteration - best_iter[i], env.evaluation_result_list[i])
-            if manual_stop_file:
-                if os.path.exists(manual_stop_file):
-                    print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
-                        best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
-                    raise EarlyStopException(best_iter[i], best_score_list[i])
+        if manual_stop_file:
+            if os.path.exists(manual_stop_file):
+                i = indices_to_check[0]
+                print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
+                    best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
+                raise EarlyStopException(best_iter[i], best_score_list[i])
 
         # TODO: Add toggle parameter to early_stopping to disable this
         # TODO: Identify optimal threshold values for early_stopping based on lack of memory

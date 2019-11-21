@@ -16,28 +16,25 @@ from autogluon.tabular.ml.models.lgb.hyperparameters.searchspaces import get_def
 from autogluon.tabular.ml.models.lgb.hyperparameters.lgb_trial import lgb_trial
 from autogluon.tabular.ml.models.lgb.hyperparameters.parameters import get_param_baseline
 
-# TODO:debug!  from autogluon.tabular.ml.tuning.train_lgb_model import train_lgb
 
 logger = logging.getLogger(__name__) # TODO: Currently
+
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func,
-                 num_classes=None, hyperparameters={}, features=None, debug=0):
-        model = None
-        super().__init__(path=path, name=name, model=model, problem_type=problem_type, objective_func=objective_func, features=features, debug=debug)
-        self.params = get_param_baseline(problem_type=problem_type, num_classes=num_classes) # get default hyperparameters
-        self.nondefault_params = []
-        if hyperparameters is not None:
-            self.params.update(hyperparameters.copy()) # update with user-specified settings
-            self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+                 num_classes=None, hyperparameters=None, features=None, debug=0):
+        self.num_classes = num_classes
+        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
 
-        self.metric_types = self.params['metric'].split(',')
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True
         self.best_iteration = None
-        self.eval_results = {}
-        self.num_classes = num_classes
+
+    def _set_default_params(self):
+        default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
 
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
@@ -66,7 +63,7 @@ class LGBModel(AbstractModel):
         if dataset_val is not None:
             callbacks += [
                 early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, 
-                                      ignore_dart_warning=True, verbose=False, manual_stop_file=self.path + 'stop.txt'),
+                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False),
                 ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
@@ -82,7 +79,6 @@ class LGBModel(AbstractModel):
             'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
             'valid_names': valid_names,
-            'evals_result': self.eval_results,
             'callbacks': callbacks,
             'verbose_eval': 20, # TODO: should depend on fit's verbosity level.
         }

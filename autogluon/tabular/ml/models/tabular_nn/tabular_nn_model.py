@@ -65,8 +65,8 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    def __init__(self, path, name, problem_type, objective_func, features=None, hyperparameters={}):
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features)
+    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None):
+        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
         """ Create new TabularNeuralNetModel object.
             Args:
                 params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
@@ -90,8 +90,8 @@ class TabularNeuralNetModel(AbstractModel):
         """ Specifies hyperparameter values to use by default """
         default_params = get_default_param(self.problem_type)
         for key in default_params:
-            self._use_default_value(key, default_params[key])
-    
+            self._set_default_param_value(key, default_params[key])
+
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
         if self.problem_type == MULTICLASS:
@@ -629,11 +629,7 @@ class TabularNeuralNetModel(AbstractModel):
         obj.model.load_parameters(path + cls.params_file_name)
         obj.summary_writer = SummaryWriter(logdir=obj.path, flush_secs=10)
         return obj
-    
-    def _use_default_value(self, param_name, param_value):
-        if param_name not in self.params:
-            self.params[param_name] = param_value
-    
+
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options):
         """ Performs HPO and sets self.params to best hyperparameter values """
         print("Beginning hyperparameter tuning for Tabular Neural Network...")

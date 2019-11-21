@@ -1,5 +1,6 @@
 
 from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
+from autogluon.tabular.ml.models.catboost.hyperparameters.parameters import get_param_baseline
 from autogluon.tabular.ml.models.catboost.catboost_utils import construct_custom_catboost_metric
 from catboost import CatBoostClassifier, CatBoostRegressor
 from autogluon.tabular.ml.constants import PROBLEM_TYPES_CLASSIFICATION
@@ -8,20 +9,20 @@ from autogluon.core import Int, Categorical, Real
 
 # TODO: Catboost crashes on multiclass problems where only two classes have significant member count.
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
+# TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, debug=0):
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, debug=debug)
-        if hyperparameters is None:
-            hyperparameters = {}
-
-        if 'random_seed' not in hyperparameters.keys():
-            hyperparameters['random_seed'] = 0  # Remove randomness for reproducibility
-        hyperparameters['eval_metric'] = construct_custom_catboost_metric(self.objective_func, True, not self.metric_needs_y_pred, self.problem_type)
+    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
+        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
 
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
-        self.params = {**hyperparameters}
-
         self.best_iteration = 0
+
+    def _set_default_params(self):
+        default_params = get_param_baseline(problem_type=self.problem_type)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+        self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
+        self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.objective_func, True, not self.metric_needs_y_pred, self.problem_type))
 
     def _get_default_searchspace(self, problem_type):
         spaces = {

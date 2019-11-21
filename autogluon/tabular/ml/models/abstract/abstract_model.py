@@ -46,7 +46,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters={}, features=None, debug=0):
+    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
@@ -72,10 +72,20 @@ class AbstractModel:
         if type(model) == str:
             self.model = self.load_model(model)
         self.child_models = []
-        self.params = hyperparameters.copy()
+
+        self.params = {}
+        self._set_default_params()
         self.nondefault_params = []
         if hyperparameters is not None:
+            self.params.update(hyperparameters.copy())
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+
+    def _set_default_params(self):
+        pass
+
+    def _set_default_param_value(self, param_name, param_value):
+        if param_name not in self.params:
+            self.params[param_name] = param_value
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
