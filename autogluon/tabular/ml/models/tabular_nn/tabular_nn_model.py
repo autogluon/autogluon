@@ -89,8 +89,8 @@ class TabularNeuralNetModel(AbstractModel):
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
         default_params = get_default_param(self.problem_type)
-        for key in default_params:
-            self._set_default_param_value(key, default_params[key])
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
 
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
