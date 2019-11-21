@@ -1,4 +1,4 @@
-# CIFAR Training in PyTorch
+# MNIST Training in PyTorch
 :label:`sec_customstorch`
 
 In this tutorial, we are showing an example of doing HPO using AutoGluon using PyTorch.
@@ -15,36 +15,30 @@ import torch.nn.functional as F
 
 import torchvision
 import torchvision.transforms as transforms
+from tqdm.auto import tqdm
 ```
 
-## Start with A CIFAR10 Example
+## Start with A MNIST Example
 
 ### Data Transforms
 
 Standard data transforms during training and validation:
 
 ```{.python .input}
-transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
-
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+transform = transforms.Compose([
+   transforms.ToTensor(),
+   transforms.Normalize((0.1307,), (0.3081,))
 ])
 
 # the datasets
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 ```
 
 ### Main Training Loop
 
 The following `train_cifar` function is a normal training code a user would write for
-training on CIFAR dataset. Python users typically use an argparser for conveniently
+training on MNIST dataset. Python users typically use an argparser for conveniently
 changing default values. The only extra component introduced is `reporter`,
 which we will discribe later.
 
@@ -55,6 +49,7 @@ def train_cifar(args, reporter):
     wd = args.wd
     epochs = args.epochs
     net = args.net
+    print('lr: {}, wd: {}'.format(lr, wd))
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # Model
@@ -66,11 +61,11 @@ def train_cifar(args, reporter):
     optimizer = torch.optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=wd)
 
     # datasets and dataloaders
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=False, transform=transform_train)
+    trainset = torchvision.datasets.MNIST(root='./data', train=True, download=False, transform=transform)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=False, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+    testset = torchvision.datasets.MNIST(root='./data', train=False, download=False, transform=transform)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=128, shuffle=False, num_workers=2)
 
     # Training
     def train(epoch):
@@ -106,7 +101,7 @@ def train_cifar(args, reporter):
         acc = 100.*correct/total
         reporter(epoch=epoch, accuracy=acc)
 
-    for epoch in range(0, epochs):
+    for epoch in tqdm(range(0, epochs)):
         train(epoch)
         test(epoch)
 ```
@@ -133,17 +128,17 @@ import autogluon as ag
 class Net(nn.Module):
     def __init__(self, hidden_conv, hidden_fc):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, hidden_conv, 5)
+        self.conv1 = nn.Conv2d(1, hidden_conv, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(hidden_conv, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, hidden_fc)
+        self.fc1 = nn.Linear(16 * 4 * 4, hidden_fc)
         self.fc2 = nn.Linear(hidden_fc, 84)
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
+        x = x.view(-1, 16 * 4 * 4)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -160,7 +155,7 @@ function to AutoGluon Searchable.
     lr = ag.space.Real(0.01, 0.2, log=True),
     wd = ag.space.Real(1e-4, 5e-4, log=True),
     net = Net(),
-    epochs=20,
+    epochs=5,
 )
 def ag_train_cifar(args, reporter):
     return train_cifar(args, reporter)
@@ -173,7 +168,7 @@ def ag_train_cifar(args, reporter):
 ```{.python .input}
 myscheduler = ag.scheduler.FIFOScheduler(ag_train_cifar,
                                          resource={'num_cpus': 4, 'num_gpus': 1},
-                                         num_trials=5,
+                                         num_trials=2,
                                          time_attr='epoch',
                                          reward_attr="accuracy")
 print(myscheduler)

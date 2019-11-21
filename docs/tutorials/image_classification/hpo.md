@@ -105,7 +105,7 @@ print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr
 Load the test dataset and evaluate:
 
 ```{.python .input}
-test_dataset = task.Dataset('~/data/test', train=False)
+test_dataset = task.Dataset('data/test', train=False)
 
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
@@ -129,7 +129,8 @@ classifier = task.fit(dataset,
                       num_trials=16,
                       verbose=False,
                       plot_results=True,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=1,
+                      grace_period=1)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```

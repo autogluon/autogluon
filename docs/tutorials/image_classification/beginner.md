@@ -70,7 +70,7 @@ We now evaluate the classifier on a test dataset:
 Load the test dataset:
 
 ```{.python .input}
-test_dataset = task.Dataset('~/data/test', train=False)
+test_dataset = task.Dataset('data/test', train=False)
 ```
 
 The validation and test top-1 accuracy are:

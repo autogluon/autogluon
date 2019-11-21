@@ -134,7 +134,6 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
     pre_current_map = 0
     tbar = tqdm(range(args.start_epoch, args.epochs))
     for epoch in tbar:
-        #tbar2.next()
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -195,7 +194,7 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
             # consider reduce the frequency of validation to save time
             map_name, mean_ap = validate(net, val_data, ctx, eval_metric)
             val_msg = ' '.join(['{}={:.3f}'.format(k, v) for k, v in zip(map_name, mean_ap)])
-            tbar.set_description('[Epoch {}] Validation: {}'.format(epoch, val_msg))
+            tbar.set_description('[Epoch {}] {}'.format(epoch, val_msg))
             current_map = float(mean_ap[-1])
             pre_current_map = current_map
         else:

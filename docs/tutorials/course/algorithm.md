@@ -35,7 +35,9 @@ def train_fn(args, reporter):
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 ```
 
-### FIFO Scheduler
+### First In First Out Scheduler
+
+This scheduler runs training trials in order.
 
 ```{.python .input}
 scheduler = ag.scheduler.FIFOScheduler(train_fn,
@@ -56,6 +58,8 @@ scheduler.get_training_curves(plot=True, use_legend=False)
 
 ### Hyperband Scheduler
 
+Early-terminates training trials which do not appear promising during the early stages to free compute resources for more promising hyperparameter-configurations
+
 ```{.python .input}
 scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                             resource={'num_cpus': 2, 'num_gpus': 0},
@@ -74,7 +78,7 @@ Visualize the results:
 scheduler.get_training_curves(plot=True, use_legend=False)
 ```
 
-## Random Search vs. Reinforce Learning
+## Random Search vs. Reinforcement Learning
 
 In this section, we will demonstate the behaviors of random search and reinforcement learning
 in a simple simulation environment.

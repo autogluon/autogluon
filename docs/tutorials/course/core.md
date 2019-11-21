@@ -17,7 +17,7 @@ import autogluon as ag
 #### Integer Space :class:`autogluon.space.Int`
 
 An integer will be chosen between lower and upper value during the
-searcher sampleing.
+searcher sampling.
 
 ```{.python .input}
 a = ag.space.Int(lower=0, upper=10)
@@ -207,11 +207,13 @@ j =ag.space.Dict(
         a=ag.Real(0, 10),
         obj1=MyObj(),
         obj2=myfunc(),
-    ),
+    )
 print(j)
 ```
 
 #### Customized Train Script using :func:`autogluon.args`
+
+`train_func` is where to put your model training script, which takes in various keyword `args` as its hyperparameters and reports the performance of the trained model using the provided `reporter`. Here, we show a dummy train_func that simply prints these objects.
 
 ```{.python .input}
 @ag.args(
@@ -236,6 +238,8 @@ def train_fn(args, reporter):
 ```
 
 ## Create Searcher and Sample A Configuration
+
+In this section, we create a Searcher object, which orchestrates a particular hyperparameter-tuning strategy.
 
 #### Create a searcher and sample configuration.
 
