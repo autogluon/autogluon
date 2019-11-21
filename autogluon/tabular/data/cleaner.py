@@ -15,7 +15,14 @@ class Cleaner:
         else:
             raise NotImplementedError
 
-    def clean(self, X: DataFrame) -> DataFrame:
+    def fit(self, X: DataFrame) -> DataFrame:
+        raise NotImplementedError
+
+    def fit_transform(self, X: DataFrame) -> DataFrame:
+        self.fit(X)
+        return self.transform(X)
+
+    def transform(self, X: DataFrame) -> DataFrame:
         raise NotImplementedError
 
 
@@ -23,7 +30,10 @@ class CleanerDummy(Cleaner):
     def __init__(self):
         pass
 
-    def clean(self, X: DataFrame) -> DataFrame:
+    def fit(self, X: DataFrame) -> DataFrame:
+        pass
+
+    def transform(self, X: DataFrame) -> DataFrame:
         return X
 
 
@@ -31,23 +41,19 @@ class CleanerMulticlass(Cleaner):
     def __init__(self, label: str, threshold: int):
         self.label = label
         self.threshold = threshold
+        self.valid_classes = None
 
-    def clean(self, X: DataFrame) -> DataFrame:
-        X = self.remove_rare_classes(X=X, label=self.label, threshold=self.threshold)
-        return X
+    def fit(self, X: DataFrame):
+        self.valid_classes = self.get_valid_classes(X=X, label=self.label, threshold=self.threshold)
+
+    def transform(self, X: DataFrame) -> DataFrame:
+        return self.remove_classes(X=X, label=self.label, valid_classes=self.valid_classes)
 
     @staticmethod
-    def remove_rare_classes(X, label, threshold):
+    def get_valid_classes(X, label, threshold):
         class_counts = X[label].value_counts()
-
-        class_counts_counts = class_counts / sum(class_counts)
-
-        class_counts_valid = class_counts[class_counts > threshold]
-
+        class_counts_valid = class_counts[class_counts >= threshold]
         valid_classes = list(class_counts_valid.index)
-
-        X = X[X[label].isin(valid_classes)]
-
         sum_prior = sum(class_counts)
         sum_after = sum(class_counts_valid)
 
@@ -55,5 +61,9 @@ class CleanerMulticlass(Cleaner):
 
         print('classes kept:', len(valid_classes), '/', len(class_counts))
         print('percent of data kept:', percent)
+        return valid_classes
 
+    @staticmethod
+    def remove_classes(X, label, valid_classes):
+        X = X[X[label].isin(valid_classes)]
         return X

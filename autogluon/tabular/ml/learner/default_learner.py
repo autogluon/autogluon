@@ -33,7 +33,7 @@ class DefaultLearner(AbstractLearner):
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None)
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
-        X, y, X_test, y_test = self.general_data_processing(X, X_test, sample=None)
+        X, y, X_test, y_test = self.general_data_processing(X, X_test)
 
         trainer = self.trainer_type(
             path=self.model_context,
@@ -54,14 +54,14 @@ class DefaultLearner(AbstractLearner):
                       hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)
 
-    def general_data_processing(self, X: DataFrame, X_test: DataFrame = None, sample=None):
+    def general_data_processing(self, X: DataFrame, X_test: DataFrame = None):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
         # if self.problem_type == MULTICLASS:
         #     X[self.label] = X[self.label].fillna('')
         # TODO(Nick): from original Grail code (it had an error for Regression tasks). I have replaced this by dropping all examples will missing labels below.  If this is no longer needed, delete.
-        
+
         # Remove all examples with missing labels from this dataset:
         n = len(X)
         missinglabel_indicators = X[self.label].isna().tolist()
@@ -69,7 +69,7 @@ class DefaultLearner(AbstractLearner):
         if len(missinglabel_inds) > 0:
             print("Dropping %s (out of %s) training examples for which the label value in column '%s' is missing" % (len(missinglabel_inds),n, self.label))
         X = X.drop(missinglabel_inds, axis=0)
-        
+
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
 
@@ -77,11 +77,14 @@ class DefaultLearner(AbstractLearner):
         y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
 
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
-        X = self.cleaner.clean(X)  # TODO: Consider merging cleaner into label_cleaner
-
-        if sample is not None:
-            X = X.sample(n=sample, random_state=self.random_state).reset_index(drop=True)
-            X = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold).clean(X=X)
+        # TODO: Most models crash if it is a multiclass problem with only two labels after thresholding, switch to being binary if this happens. Convert output from trainer to multiclass output preds in learner
+        # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
+        X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
+        if X_test is not None:
+            X_test = self.cleaner.transform(X_test)
+            if len(X_test) == 0:
+                print('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
+                X_test = None
 
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
 
