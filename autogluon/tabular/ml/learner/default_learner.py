@@ -80,22 +80,24 @@ class DefaultLearner(AbstractLearner):
         # TODO: Most models crash if it is a multiclass problem with only two labels after thresholding, switch to being binary if this happens. Convert output from trainer to multiclass output preds in learner
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
-        if X_test is not None:
-            X_test = self.cleaner.transform(X_test)
-            if len(X_test) == 0:
-                print('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
-                X_test = None
-
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
 
         X, y = self.extract_label(X)
         y = self.label_cleaner.transform(y)
+
         if X_test is not None and self.label in X_test.columns:
-            X_test, y_test = self.extract_label(X_test)
-            y_test = self.label_cleaner.transform(y_test)
+            X_test = self.cleaner.transform(X_test)
+            if len(X_test) == 0:
+                print('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
+                X_test = None
+                y_test = None
+            else:
+                X_test, y_test = self.extract_label(X_test)
+                y_test = self.label_cleaner.transform(y_test)
         else:
             y_test = None
 
+        # TODO: Move this up to top of data before removing data, this way our feature generator is better
         if X_test is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             print('Performing general data processing with merged train & test data. Validation performance may not accurately reflect performance on new test data.')
