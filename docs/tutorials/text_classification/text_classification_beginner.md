@@ -4,7 +4,7 @@
 
 We adopt the task of Text Classification as a running example to illustrate basic usage of AutoGluon’s NLP capbility.
 
-In this tutorial, we are using sentiment analysis as a text classification example, we will load sentences and the corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models and thousands of different hyperparameter configurations regarding to the training process and return the best model.
+In this tutorial, we are using sentiment analysis as a text classification example, we will load sentences and the corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
 
 We begin by specifying `TextClassification` as our task of interest:
 
@@ -19,8 +19,7 @@ logging.basicConfig(level=logging.INFO)
 
 ## Create AutoGluon Dataset
 The Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) consists of sentences from movie
-reviews and human annotations of their sentiment. The task is to predict the sentiment of a given
-sentence. We use the two-way (positive/negative) class split.
+reviews and human annotations of their sentiment. The task is to classify whether a given sentence has positive or negative sentiment (binary classification).
 
 ```python
 dataset = task.Dataset(name='SST')

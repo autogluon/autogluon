@@ -1,7 +1,7 @@
 Text classification
 ====================
 
-AutoGluon provides fit API which allows faster prototyping on text classification.
+AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
 
 .. toctree::
    :maxdepth: 1
