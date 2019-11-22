@@ -1,5 +1,5 @@
 """ MXNet neural networks for tabular data containing numerical, categorical, and text fields.
-    First performs neural network specific pre-processing of the data using sklearn tools.
+    First performs neural network specific pre-processing of the data.
     Contains separate input modules which are applied to different columns of the data depending on the type of values they contain:
     - Numeric columns are pased through single Dense layer (binary categorical variables are treated as numeric)
     - Categorical columns are passed through separate Embedding layers
@@ -43,15 +43,16 @@ logger = logging.getLogger(__name__)
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
 class TabularNeuralNetModel(AbstractModel):
-    """ Class for neural network models that operate on tabular data. These networks use different types of input layers to process different types of data in various columns.
+    """ Class for neural network models that operate on tabular data. 
+        These networks use different types of input layers to process different types of data in various columns.
     
         Attributes:
-            types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of dataframe corresponding to the features of this type
+            types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
             feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in processed_array corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
         
-        Note: This model always assumes higher values of self.objective_func indicate better performance
+        Note: This model always assumes higher values of self.objective_func indicate better performance.
         
     """
     
@@ -67,9 +68,17 @@ class TabularNeuralNetModel(AbstractModel):
     
     def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
-        """ Create new TabularNeuralNetModel object.
-            Args:
-                params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
+        """
+        TabularNeuralNetModel object.
+        
+        Parameters
+        ----------
+        path (str): file-path to directory where to save files associated with this model
+        name (str): name used to refer to this model
+        problem_type (str): what type of prediction problem is this model used for
+        objective_func (func): function used to evaluate performance (Note: we assume higher = better) 
+        hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
+        features (list): List of predictive features to use, other features are ignored by the model.
         """
         self.problem_type = problem_type
         self.objective_func = objective_func
@@ -737,24 +746,18 @@ class TabularNeuralNetModel(AbstractModel):
             _ = search_space.pop(key, None)
         self.params.update(search_space)
 
-"""  General TODOs:
+""" General TODOs:
 
+- Automatically decrease batch-size if memory issue arises
+
+- Retrain final NN on full dataset (train+val). How to ensure stability here?
 - OrdinalEncoder class in sklearn currently cannot handle rare categories or unknown ones at test-time, so we have created our own Encoder in category_encoders.py
 There is open PR in sklearn to address this: https://github.com/scikit-learn/scikit-learn/pull/13833/files
 Currently, our code uses category_encoders package (BSD license) instead: https://github.com/scikit-learn-contrib/categorical-encoding
 Once PR is merged into sklearn, may want to switch: category_encoders.Ordinal -> sklearn.preprocessing.OrdinalEncoder in preprocess_train_data()
 
-
-TODO: Save preprocessed data so that we can do HPO of neural net hyperparameters more efficiently, while also doing HPO of preprocessing hyperparameters?
+- Save preprocessed data so that we can do HPO of neural net hyperparameters more efficiently, while also doing HPO of preprocessing hyperparameters?
       Naive full HPO method requires redoing preprocessing in each trial even if we did not change preprocessing hyperparameters.
       Alternative is we save each proprocessed dataset & corresponding TabularNeuralNetModel object with its unique param names in the file. Then when we try a new HP-config, we first try loading from file if one exists.
-
-TODO: feature_types_metadata must be set outside of model class in trainer.
-
-TODO: benchmark 
-
-TODO: automatically decrease batch-size if memory issue arises
-
-TODO: retrain NN on full dataset (train+val)
 
 """

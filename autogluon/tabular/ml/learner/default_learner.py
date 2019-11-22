@@ -33,6 +33,7 @@ class DefaultLearner(AbstractLearner):
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None)
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
+        # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
         X, y, X_test, y_test = self.general_data_processing(X, X_test)
 
         trainer = self.trainer_type(

@@ -8,9 +8,11 @@ from ...core import * # TODO: needed?
 __all__ = ['TabularDataset']
 
 class TabularDataset(pd.DataFrame):
-    """The dataset in tabular format (rows = samples, columns = features).
-       This object is simply a pandas DataFrame (with extra slots) and thus all the same methods can be used 
     """
+    A dataset in tabular format (with rows = samples, columns = features/variables).
+    This object is essentially a pandas DataFrame (with extra slots) and all the Pandas methods can be applied to it. 
+    """
+    
     _metadata = ['name', 'file_path', 'feature_types'] # preserved properties that will be copied to a new instance of TabularDataset
     
     @property
@@ -21,16 +23,23 @@ class TabularDataset(pd.DataFrame):
     def _constructor_sliced(self):
         return pd.Series
     
-    """ Creates a new TabularDataset object. 
-    Args:
-        file_path (str): the location of the data file
-        name (str): a name to assign to dataset (has no effect)
-        df (DataFrame): pandas Dataframe can directly be provided (if available)
-        feature_types (dict): mapping from column_name -> str describing type of column (TODO: not used right now)
-        subsample (int): If specified, we only keep first K rows of the provided dataset
-    """
-    
     def __init__(self, *args, **kwargs):
+        """ 
+        Creates a new TabularDataset object.
+    Args:
+        file_path : (str)
+            Path to the data file.
+        name : (str)
+             Name to assign to dataset (has no effect beyond being accessible via Dataset.name).
+        df : (pandas DataFrame)
+            If you already have your data in a pandas Dataframe, you can directly provide it by specifying df.
+            At least one of file_path and df arguments must be specified when constructing new TabularDataset.
+        feature_types : (dict)
+            Mapping from column_name to str describing type of each column.
+            If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
+        subsample : (int, default = None)
+            If specified, we only keep first K rows of the provided dataset.
+    """
         file_path = kwargs.get('file_path', None)
         name = kwargs.get('name', None)
         feature_types = kwargs.get('feature_types', None)
@@ -63,7 +72,8 @@ class TabularDataset(pd.DataFrame):
             super().__init__(*args, **kwargs)
 
 
-"""    
+""" OLD Code.  # TODO: remove
+
     def __init__(self, name=None, file_path=None, df=None, feature_types=None, subsample=None):
         if df is not None:
             if type(df) != pd.DataFrame:
