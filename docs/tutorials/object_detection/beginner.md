@@ -29,7 +29,7 @@ Once we retrieve the dataset, we can create dataset instacne with its name and p
 dataset = task.Dataset("tiny_motorbike", root=os.path.join(root, "tiny_motorbike"))
 ```
 
-## Fit models by AutoGluon
+## Fit models using AutoGluon
 In this section, we will talk about how to apply AutoGluon to fit our detetion models. We use mobilenet as backbone for YOLO3 model. Two different learning rates will be used to finetune the network. The best model is the one that obtains the best performance on validation dataset. We can also try more networks and hyper-parameters to have a larger searching space. 
 
 In order to have results after you grab a cup of coffee, time_limits is set to 15mins for this task. In each experiment (one trial in our searching space), we train the model for 30 epoches. Let's start playing with AutoGluon.  
