@@ -36,6 +36,12 @@ Tutorials
 
       Dive into deep Tutorials.
 
+   .. card::
+      :title: Object Detection
+      :link: tutorials/object_detection/index.html
+
+      Dive into deep Tutorials.
+
 Advanced Topic
 ~~~~~~~~~~~~~~
 
@@ -58,6 +64,7 @@ Advanced Topic
    :hidden:
 
    tutorials/image_classification/index
+   tutorials/object_detection/index
    tutorials/course/index
    tutorials/nas/index
    api/index
