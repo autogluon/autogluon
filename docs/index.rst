@@ -34,7 +34,14 @@ Tutorials
       :title: Image Classification
       :link: tutorials/image_classification/index.html
 
-      Dive into deep Tutorials.
+      Image classification tutorials
+
+   .. card::
+      :title: Tabular Prediction
+      :link: tutorials/tabular_prediction/index.html
+
+      Tutorials for predicting with tabular datasets.
+
 
 Advanced Topic
 ~~~~~~~~~~~~~~
@@ -58,6 +65,7 @@ Advanced Topic
    :hidden:
 
    tutorials/image_classification/index
+   tutorials/tabular_prediction/index
    tutorials/course/index
    tutorials/nas/index
    api/index

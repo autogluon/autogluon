@@ -24,6 +24,22 @@ Image Classification
 
       Participate Kaggle competation.
 
+Tabular Prediction
+--------------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Using FIT
+      :link: tabular_prediction/tabular-quickstart.html
+
+      Quick tutorial on fitting models with tabular datasets.
+
+   .. card::
+      :title: In-depth FIT Tutorial
+      :link: tabular_prediction/tabular-indepth.html
+
+      In-depth tutorial on controlling various aspects of model fitting.
+
 Customize AutoGluon
 -------------------
 .. container:: cards
@@ -73,5 +89,6 @@ Neural Architecture Search
 
    course/index
    image_classification/index
+   tabular_prediction/index
    customize/index
    nas/index

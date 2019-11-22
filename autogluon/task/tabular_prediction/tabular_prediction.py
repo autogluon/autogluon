@@ -130,10 +130,10 @@ class TabularPrediction(BaseTask):
         
         Examples
         --------
-            >>> from autogluon import TabularPrediction as task
-            >>> train_data = task.Dataset(file_path='./training_data.csv')
-            >>> label_column = 'class' # name of column in train_data
-            >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
+        >>> from autogluon import TabularPrediction as task
+        >>> train_data = task.Dataset(file_path='./training_data.csv')
+        >>> label_column = 'class' # name of column in train_data
+        >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
         """
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
