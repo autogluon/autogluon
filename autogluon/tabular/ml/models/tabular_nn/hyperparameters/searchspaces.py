@@ -16,7 +16,7 @@ def get_default_searchspace(problem_type, num_classes=None):
         return get_searchspace_binary().copy()
 
 
-def get_searchspace_multiclass_baseline(num_classes):
+def get_searchspace_multiclass(num_classes):
     # Search space we use by default (only specify non-fixed hyperparameters here):  # TODO: move to separate file
     params = {
         'learning_rate': Real(1e-4, 3e-2, default=3e-4, log=True),
