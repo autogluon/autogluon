@@ -17,7 +17,6 @@ from .utils import *
 from ...utils import update_params
 
 from .detector import Detector
-import pdb
 
 __all__ = ['ObjectDetection']
 
@@ -162,11 +161,10 @@ class ObjectDetection(BaseTask):
                 
         results = BaseTask.run_fit(train_object_detection, search_strategy,
                                    scheduler_options)
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
+        logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
-        print('The best config:\n', results['best_config'])
+        logger.info('The best config:\n', results['best_config'])
 
-        #pdb.set_trace()
         model = get_network(args.net, dataset.init().get_classes(), mx.cpu(0))
         update_params(model, results.pop('model_params'))
         return Detector(model, results, checkpoint, args)
