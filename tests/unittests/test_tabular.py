@@ -31,7 +31,7 @@ from autogluon import TabularPrediction as task
 import autogluon as ag
 
 # TODO: move this file
-from autogluon.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
  
 ############ Benchmark options you can set: ########################
