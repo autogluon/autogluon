@@ -408,6 +408,33 @@ class AbstractTrainer:
         ensemble_selection.fit(predictions=pred_probas, labels=y_test, identifiers=None)
         return ensemble_selection.weights_
 
+    # TODO: Implement stacking
+    # def compute_optimal_stacking_ensemble(self, models, X, y):
+    #     pred_probas = []
+    #     model_names = []
+    #     for model in models:
+    #         if type(model) is str:
+    #             model = self.load_model(model)
+    #         pred_probas.append(model.oof_pred_proba)
+    #         model_names.append(model.name)
+    #
+    #     stacker_model = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
+    #     print(stacker_model)
+    #     bagged_stacker_model = BaggedEnsembleModel(path=stacker_model.path[:-(len(stacker_model.name) + 1)], name=stacker_model.name + '_BAGGED', model_base=stacker_model)
+    #
+    #     X_stacker = pd.DataFrame(data=np.asarray(pred_probas).T, columns=model_names)
+    #
+    #     bagged_stacker_model.fit(X=X_stacker, y=y, k_fold=5, random_state=1)
+    #     stacker_model_full = StackerEnsembleModel(path=self.path, name=bagged_stacker_model.name + '_STACKER', stacker_model=bagged_stacker_model, base_model_names=self.model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types)
+    #     print('bagged stacker fit!')
+    #     score = bagged_stacker_model.score_with_y_pred_proba(y=y, y_pred_proba=bagged_stacker_model.oof_pred_proba)
+    #     print('bagged_stacker_score:', score)
+    #
+    #     self.stacker_model_full = stacker_model_full
+    #
+    #
+    #     return bagged_stacker_model
+
     def save_model(self, model):
         if self.low_memory:
             model.save()
