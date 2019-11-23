@@ -88,13 +88,14 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.processor = None # data processor
-        self.params = {}
-        self.nondefault_params = []
-        self._set_default_params()
-        if hyperparameters is not None:
-            self.params.update(hyperparameters.copy())
-            self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
-    
+
+    # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
+    def create_unfit_copy(self):
+        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, features=self.features, hyperparameters=self.params)
+        new_model.path = self.path
+        new_model.params['tabNN'] = None
+        return new_model
+
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
         default_params = get_default_param(self.problem_type)

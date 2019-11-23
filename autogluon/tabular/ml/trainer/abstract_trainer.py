@@ -13,6 +13,7 @@ from autogluon.tabular.utils.savers import save_pkl
 from autogluon.tabular.ml.utils import get_pred_from_proba, generate_kfold
 from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.tabular.ml.tuning.feature_pruner import FeaturePruner
+from autogluon.tabular.ml.models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 
 from autogluon.tabular.metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from sklearn.model_selection import train_test_split
@@ -20,6 +21,8 @@ from sklearn.model_selection import train_test_split
 from autogluon.tabular.ml.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from autogluon.tabular.ml.tuning.ensemble_selection import EnsembleSelection
 
+
+# TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
@@ -146,7 +149,7 @@ class AbstractTrainer:
         if type(model) == BaggedEnsembleModel:
             X = pd.concat([X_train, X_test], ignore_index=True)  # TODO: Consider doing earlier so this isn't repeated for each model
             y = pd.concat([y_train, y_test], ignore_index=True)
-            model.fit(X=X, y=y, k_fold=5, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X, y=y, k_fold=10, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
 
@@ -202,8 +205,11 @@ class AbstractTrainer:
             self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         bagged_mode = type(models[0]) == BaggedEnsembleModel  # TODO: trainer parameter?
         if bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
+            # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
             for i, hpo_model_name in enumerate(self.hpo_model_names):
                 model_hpo = self.load_model(hpo_model_name)
+                if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
+                    model_hpo = model_hpo.create_unfit_copy()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED', model_base=model_hpo)
                 # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
                 self.train_and_save(X_train, y_train, X_test, y_test, model_bagged)
@@ -230,7 +236,7 @@ class AbstractTrainer:
 
         bagged_mode = self.model_types[self.model_names[0]] == BaggedEnsembleModel
         if bagged_mode:
-            X_test = None
+            X_test = pd.concat([X_train, X_test], ignore_index=True)
             y_test = pd.concat([y_train, y_test], ignore_index=True)
 
         if not bagged_mode:
