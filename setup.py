@@ -106,7 +106,7 @@ requirements = [
     'scikit-learn==0.21.2',
     'scikit-optimize==0.5.2',
     'spacy==2.1.4',
-    'fastai==1.0.55',
+    # 'fastai==1.0.55',
     # 'torch'  # TODO: tabular needs torch==1.1.0 atm
 ]
 
