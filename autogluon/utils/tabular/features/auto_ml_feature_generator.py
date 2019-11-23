@@ -6,10 +6,10 @@ import copy
 import traceback
 import psutil
 
-from autogluon.utils.tabular.feature_generators.abstract_feature_generator import AbstractFeatureGenerator
+from autogluon.utils.tabular.features.abstract_feature_generator import AbstractFeatureGenerator
 # from fastai.tabular.transform import add_datepart
-from autogluon.utils.tabular.feature_generators.vectorizers import vectorizer_auto_ml_default
-from autogluon.utils.tabular.feature_generators.vectorizers import get_ngram_freq, downscale_vectorizer
+from autogluon.utils.tabular.features.vectorizers import vectorizer_auto_ml_default
+from autogluon.utils.tabular.features.vectorizers import get_ngram_freq, downscale_vectorizer
 
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
