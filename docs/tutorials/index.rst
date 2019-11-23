@@ -24,12 +24,22 @@ Image Classification
 
       Participate Kaggle competation.
 
-Tabular Prediction
---------------------
+Object Detection
+----------------
 .. container:: cards
 
    .. card::
       :title: Quick Start Using FIT
+      :link: object_detection/beginner.html
+
+      Quick start tutorial.
+
+
+Tabular Prediction
+------------------
+.. container:: cards
+   
+   .. card::
       :link: tabular_prediction/tabular-quickstart.html
 
       Quick tutorial on fitting models with tabular datasets.
@@ -64,6 +74,7 @@ Customize AutoGluon
 
       Easily scale up training across multiple machines using
       automatic distributed search.
+
 
 Neural Architecture Search
 --------------------------

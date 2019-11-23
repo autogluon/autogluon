@@ -7,25 +7,19 @@ AutoGluon provides fit API which allows faster prototyping on image classificati
 
    .. card::
       :title: Quick Start Using FIT
-      :link: image_classification/beginner.html
+      :link: beginner.html
 
       Quick start tutorial.
 
    .. card::
       :title: Customized Search and HPO
-      :link: image_classification/hpo.html
+      :link: hpo.html
 
       Image classification HPO tutorial.
 
    .. card::
-      :title: Search Algorithms
-      :link: image_classification/algorithm.html
-
-      Change default search algorithms tutorial.
-
-   .. card::
       :title: Use Your Own Dataset
-      :link: image_classification/kaggle.html
+      :link: kaggle.html
 
       Participate Kaggle competation.
 

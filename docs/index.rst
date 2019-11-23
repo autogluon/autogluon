@@ -43,6 +43,12 @@ Tutorials
       Tutorials for predicting with tabular datasets.
 
 
+   .. card::
+      :title: Object Detection
+      :link: tutorials/object_detection/index.html
+
+      Dive into deep Tutorials.
+
 Advanced Topic
 ~~~~~~~~~~~~~~
 
@@ -65,6 +71,7 @@ Advanced Topic
    :hidden:
 
    tutorials/image_classification/index
+   tutorials/object_detection/index
    tutorials/tabular_prediction/index
    tutorials/course/index
    tutorials/nas/index

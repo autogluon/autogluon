@@ -25,51 +25,15 @@ def create_version_file():
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
 
-def try_and_install_mxnet():
-    """Install MXNet is not detected
-    """
-    try:
-        import mxnet as mx
-    except ImportError:
-        print("Automatically install MXNet cpu version.")
-        subprocess.check_call("pip install mxnet".split())
-    finally:
-        import mxnet as mx
-        print("MXNet {} detected.".format(mx.__version__))
-
-def uninstall_legacy_dask():
-    has_dask = True
-    try:
-        import dask
-    except ImportError:
-        has_dask = False
-    finally:
-        if has_dask:
-            subprocess.check_call("pip uninstall -y dask".split())
-    subprocess.check_call("pip install dask[complete]==2.6.0".split())
-    has_dist = True
-    try:
-        import distributed
-    except ImportError:
-        has_dist = False
-    finally:
-        if has_dist:
-            subprocess.check_call("pip uninstall -y distributed".split())
-    subprocess.check_call("pip install distributed==2.6.0".split())
-
 # run test scrip after installation
 class install(setuptools.command.install.install):
     def run(self):
         create_version_file()
-        try_and_install_mxnet()
-        uninstall_legacy_dask()
         setuptools.command.install.install.run(self)
 
 class develop(setuptools.command.develop.develop):
     def run(self):
         create_version_file()
-        try_and_install_mxnet()
-        uninstall_legacy_dask()
         setuptools.command.develop.develop.run(self)
 
 try:
@@ -79,15 +43,16 @@ except(IOError, ImportError):
     long_description = open('README.md').read()
 
 requirements = [
-    'tqdm',
     'numpy==1.17.2', # TODO: version needed for tabular atm
     'scipy',
     'cython',
+    'tornado',
     'requests',
     'matplotlib==3.1.1', # TODO: version needed for tabular atm
-    'mxboard',
     'tornado',
+    'tqdm>=4.38.0',
     'paramiko==2.5.0',
+    'distributed==2.6.0',
     'ConfigSpace==0.4.10',
     'nose',
     'gluoncv',
@@ -106,8 +71,6 @@ requirements = [
     'scikit-learn==0.21.2',
     'scikit-optimize==0.5.2',
     'spacy==2.1.4',
-    # 'fastai==1.0.55',
-    # 'torch'  # TODO: tabular needs torch==1.1.0 atm
 ]
 
 setup(
