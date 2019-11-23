@@ -24,6 +24,7 @@ class EnsembleSelection():
         self.metric = metric
         self.sorted_initialization = sorted_initialization
         self.bagging = bagging
+        self.use_best = True
         if random_state is not None:
             self.random_state = random_state
         else:
@@ -116,11 +117,22 @@ class EnsembleSelection():
             if len(predictions) == 1:
                 break
 
+        min_score = np.min(trajectory)
+        first_index_of_best = trajectory.index(min_score)
 
         self.indices_ = order
         self.trajectory_ = trajectory
         self.train_score_ = trajectory[-1]  # TODO: Select best iteration or select final iteration? Earlier iteration could have a better score!
-        print(order)
+
+        if self.use_best:
+            self.indices_ = order[:first_index_of_best+1]
+            self.trajectory_ = trajectory[:first_index_of_best+1]
+            self.train_score_ = trajectory[first_index_of_best]  # TODO: Select best iteration or select final iteration? Earlier iteration could have a better score!
+            self.ensemble_size = first_index_of_best + 1
+
+            print('ensemble_size:', self.ensemble_size)
+
+        print(self.indices_)
 
     def _calculate_weights(self):
         ensemble_members = Counter(self.indices_).most_common()
