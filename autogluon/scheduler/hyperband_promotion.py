@@ -111,10 +111,19 @@ class HyperbandPromotion_Manager(object):
             del self._task_info[task.task_id]
 
     def _sample_bracket(self):
-        sizes = np.array([len(b._rungs) for b in self._brackets])
-        probs = np.exp(sizes - sizes.max())
-        normalized = probs / probs.sum()
-        return np.random.choice(len(self._brackets), p=normalized)
+        # Brackets are sampled in proportion to the number of configs started
+        # in synchronous Hyperband in each bracket
+        num_brackets = len(self._brackets)
+        if num_brackets > 1:
+            smax_plus1 = len(self._brackets[0]._rungs)
+            rf = self._reduction_factor
+            probs = np.array([
+                (smax_plus1 / (smax_plus1 - s)) * (rf ** (smax_plus1 - s - 1))
+                for s in range(num_brackets)])
+            normalized = probs / probs.sum()
+            return np.random.choice(num_brackets, p=normalized)
+        else:
+            return 0
 
     def on_task_schedule(self):
         with HyperbandPromotion_Manager.LOCK:

@@ -37,6 +37,7 @@ AutoGluon Applications
    :nosignatures:
 
    ImageClassification
+   ObjectDetection
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -49,3 +50,58 @@ AutoGluon Applications
 
     .. autoautosummary:: ImageClassification
         :methods:
+
+:hidden:`ObjectDetection`
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ObjectDetection
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ObjectDetection
+        :methods:
+
+
+.. automodule:: autogluon.task.image_classification
+
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction::
+   get_dataset
+
+:hidden:`ImageFolderDataset`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ImageFolderDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ImageFolderDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: ImageFolderDataset
+        :attributes:
+
+:hidden:`RecordDataset`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RecordDataset
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RecordDataset
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: RecordDataset
+        :attributes:
