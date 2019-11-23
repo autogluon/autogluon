@@ -19,10 +19,8 @@ def rl_train_fn(args, reporter):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-
-@attr('sequential')
-class SequentialTestCase(TestCase):
-    def test_fifo_scheduler(self):
+def test_schedulers():
+    def test_fifo_scheduler():
         scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                                resource={'num_cpus': 2, 'num_gpus': 0},
                                                num_trials=10,
@@ -31,7 +29,7 @@ class SequentialTestCase(TestCase):
         scheduler.run()
         scheduler.join_jobs()
 
-    def test_hyperband_scheduler(self):
+    def test_hyperband_scheduler():
         scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                                     resource={'num_cpus': 2, 'num_gpus': 0},
                                                     num_trials=10,
@@ -41,7 +39,7 @@ class SequentialTestCase(TestCase):
         scheduler.run()
         scheduler.join_jobs()
 
-    def test_rl_scheduler(self):
+    def test_rl_scheduler():
         scheduler = ag.scheduler.RLScheduler(rl_train_fn,
                                              resource={'num_cpus': 2, 'num_gpus': 0},
                                              num_trials=10,
@@ -49,6 +47,10 @@ class SequentialTestCase(TestCase):
                                              time_attr='epoch')
         scheduler.run()
         scheduler.join_jobs()
+
+    test_fifo_scheduler()
+    test_hyperband_scheduler()
+    test_rl_scheduler()
 
 if __name__ == '__main__':
     import nose
