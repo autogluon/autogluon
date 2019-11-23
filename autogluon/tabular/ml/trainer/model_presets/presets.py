@@ -29,7 +29,6 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     nn_options = hyperparameters.get('NN', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
-    print(rf_options)
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
@@ -76,7 +75,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
     nn_options = hyperparameters.get('NN', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
-    if gbm_options is not None: 
+    if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
                      objective_func=objective_func, hyperparameters=gbm_options.copy())
