@@ -49,7 +49,7 @@ requirements = [
     'tornado',
     'requests',
     'matplotlib==3.1.1', # TODO: version needed for tabular atm
-    'tornado',
+    'mxboard',
     'tqdm>=4.38.0',
     'paramiko==2.5.0',
     'distributed==2.6.0',
@@ -60,7 +60,7 @@ requirements = [
     'graphviz',
     'botocore==1.12.253',
     'boto3==1.9.187',
-    'catboost',
+    # 'catboost',  # TODO: Fix CI issue to enable
     'fastparquet==0.3.1',
     'joblib==0.13.2',
     'lightgbm==2.3.0',
@@ -71,6 +71,8 @@ requirements = [
     'scikit-learn==0.21.2',
     'scikit-optimize==0.5.2',
     'spacy==2.1.4',
+    # 'fastai==1.0.55',  # TODO: Required for contrib PyTorch tabular NN
+    # 'torch'  # TODO: tabular needs torch==1.1.0 atm
 ]
 
 setup(
