@@ -6,7 +6,7 @@ from autogluon.core import *
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
-@autogluon_register_args()
+@args()
 def model_trial(args, reporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
         

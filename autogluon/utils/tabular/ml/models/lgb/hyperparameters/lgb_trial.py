@@ -10,7 +10,7 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
-@autogluon_register_args()
+@args()
 def lgb_trial(args, reporter):
     """ Training script for hyperparameter evaluation of Gradient Boosting model """
     # list of args which are not model hyperparameters:
