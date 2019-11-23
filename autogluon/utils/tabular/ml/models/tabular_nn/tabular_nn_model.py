@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import mxnet as mx
 from mxnet import nd, autograd, gluon
-from mxboard import SummaryWriter # TODO: Do we want to keep?
+from mxboard import SummaryWriter # TODO: Do we want to keep?  # TODO: (Jonas: Should we lazily import?)
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
