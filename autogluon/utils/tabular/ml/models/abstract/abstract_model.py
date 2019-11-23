@@ -1,10 +1,9 @@
-import copy, logging, time, pickle, os
+import logging, time, pickle, os
 import numpy as np
 import pandas as pd
 from autogluon.utils.tabular.metrics import accuracy
 from autogluon.utils.tabular.ml.utils import get_pred_from_proba
 from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from sklearn.model_selection import RandomizedSearchCV
 
 from autogluon.core import *
 from autogluon.task.base import *
