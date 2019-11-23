@@ -18,6 +18,13 @@ from autogluon.tabular.utils.loaders import load_pkl
 from autogluon.tabular.ml.constants import REGRESSION, BINARY
 from autogluon.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.tabular.utils.savers import save_pkl
+from autogluon.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_param_baseline
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from autogluon.tabular.ml.models.tabular_nn.categorical_encoders import OrdinalMergeRaresHandleUnknownEncoder
 
 #https://forums.fast.ai/t/runtimeerror-received-0-items-of-ancdata/48935
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -36,17 +43,40 @@ def make_temp_directory():
 # TODO: Add to contrib
 # TODO: Takes extremely long (infinite?) time prior to training start if many (10000) continuous features from ngrams, debug
 # TODO: Crashes when sent data to infer which has NaN's in a column that no NaN's existed during training
+# FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 class NNTabularModel(AbstractModel):
     model_internals_file_name = 'model-internals.pkl'
-
-    def __init__(self, path, name, params, problem_type, objective_func, features=None, debug=0, max_unique_categorical_values=10000):
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, features=features, debug=debug)
-        self.params = params
+    unique_category_str = '!missing!'
+    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0, max_unique_categorical_values=10000):
+        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
         self.procs = [FillMissing, Categorify, Normalize]
         self.cat_names = []
         self.cont_names = []
         self.max_unique_categorical_values = max_unique_categorical_values
         self.eval_result = None
+
+        self.col_after_transformer = None
+        self.col_transformer = None
+
+    def _set_default_params(self):
+        default_params = get_param_baseline(problem_type=self.problem_type)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self, problem_type):
+        spaces = {}
+        return spaces
+
+    def preprocess(self, X, fit=False):
+        if fit:
+            self.col_after_transformer = list(X.columns)
+            self.col_transformer = self._construct_transformer(X=X)
+            X = self.col_transformer.fit_transform(X)
+        else:
+            X = self.col_transformer.transform(X)
+        X = pd.DataFrame(data=X, columns=self.col_after_transformer)
+        X = super().preprocess(X)
+        return X
 
     def predict(self, X, preprocess=True):
         return super().predict(X, preprocess)
@@ -54,11 +84,21 @@ class NNTabularModel(AbstractModel):
     def __get_feature_type_if_present(self, feature_type):
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
+    def _construct_transformer(self, X):
+        transformers = []
+        if len(self.cont_names) > 0:
+            continuous_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='median')),
+                ('scaler', StandardScaler())])
+            transformers.append(('continuous', continuous_transformer, self.cont_names))
+        if len(self.cat_names) > 0:
+            ordinal_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
+                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=self.max_unique_categorical_values))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
+            transformers.append(('ordinal', ordinal_transformer, self.cat_names))
+        return ColumnTransformer(transformers=transformers)
+
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
-        X_train = self.preprocess(X_train)
-        if X_test is not None:
-            X_test = self.preprocess(X_test)
-        df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train, X_test, Y_test)
         self.cat_names = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
 
         try:
@@ -76,6 +116,11 @@ class NNTabularModel(AbstractModel):
         self.cont_names = [feature for feature in self.cont_names if feature in list(X_train.columns)]
         print(f'Using {len(self.cont_names)} cont features')
 
+        X_train = self.preprocess(X_train, fit=True)
+        if X_test is not None:
+            X_test = self.preprocess(X_test)
+
+        df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train, X_test, Y_test)
         label_class = FloatList if self.problem_type == REGRESSION else None
         data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs)
                 .split_by_idxs(train_idx, val_idx)
@@ -124,6 +169,8 @@ class NNTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def predict_proba(self, X, preprocess=True):
+        if preprocess:
+            X = self.preprocess(X)
         self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
