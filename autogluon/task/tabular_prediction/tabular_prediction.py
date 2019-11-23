@@ -7,10 +7,10 @@ from ..base import BaseTask
 from ..base.base_task import schedulers
 
 # TODO: Change these import locations once tabular has been fully integrated as a submodule of autogluon 
-from autogluon.tabular.ml.learner.default_learner import DefaultLearner as Learner
-from autogluon.tabular.ml.trainer.auto_trainer import AutoTrainer
-from autogluon.tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
-from autogluon.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
+from autogluon.utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
+from autogluon.utils.tabular.ml.trainer.auto_trainer import AutoTrainer
+from autogluon.utils.tabular.feature_generators.auto_ml_feature_generator import AutoMLFeatureGenerator
+from autogluon.utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
 
 
 __all__ = ['TabularPrediction']
