@@ -51,7 +51,7 @@ class CatboostModel(AbstractModel):
         if X_test is not None:
             X_test = self.preprocess(X_test)
             eval_set = (X_test, Y_test)
-            early_stopping_rounds = 50
+            early_stopping_rounds = 150
         else:
             eval_set = None
             early_stopping_rounds = None
@@ -77,7 +77,7 @@ class CatboostModel(AbstractModel):
             X_train, Y_train,
             cat_features=cat_features,
             eval_set=eval_set,
-            verbose=True,
+            verbose=20,
             early_stopping_rounds=early_stopping_rounds,
         )
 
