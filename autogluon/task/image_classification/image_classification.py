@@ -32,25 +32,25 @@ class ImageClassification(BaseTask):
 
         Parameters
         ----------
-            name : str, optional
-                The name for built-in dataset, overrite other options.
-                The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-            train : bool, default True
-                Train or validation mode
-            train_path : str
-                The training data location
-            input_size : int
-                The input image size.
-            crop_ratio : float
-                Center crop ratio for evaluation only
+        name : str, optional
+            The name for built-in dataset, overrite other options.
+            The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+        train : bool, default True
+            Train or validation mode
+        train_path : str
+            The training data location
+        input_size : int
+            The input image size.
+        crop_ratio : float
+            Center crop ratio for evaluation only
         """
         return get_dataset(*args, **kwargs)
 
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet18_v1b', 'ResNet50_v1b'),
-            optimizer= SGD(learning_rate=Real(1e-4, 1e-2, log=True),
-                           wd=Real(1e-5, 1e-3, log=True)),
+            net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
+            optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
+                           wd=Real(1e-4, 1e-3, log=True)),
             lr_scheduler='cosine',
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
@@ -62,6 +62,8 @@ class ImageClassification(BaseTask):
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
+            plot_results=False,
+            verbose=False,
             search_options={},
             time_limits=None,
             resume=False,
@@ -79,9 +81,9 @@ class ImageClassification(BaseTask):
         ----------
         dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
             Training dataset.
-        net : str or :class:`autogluon.AutoGluonObject`
+        net : str or :class:`autogluon.space.AutoGluonObject`
             Network candidates.
-        optimizer : str or :class:`autogluon.AutoGluonObject`
+        optimizer : str or :class:`autogluon.space.AutoGluonObject`
             optimizer candidates.
         metric : str or object
             observation metric.
@@ -91,7 +93,6 @@ class ImageClassification(BaseTask):
             number of trials in the experiment.
         split_ratio : float, defaut 0.8
             train val split ratio.
-        time_limits : int
         time_limits : int
             training time limits in seconds.
         resources_per_trial : dict
@@ -133,6 +134,7 @@ class ImageClassification(BaseTask):
             batch_size=batch_size,
             input_size=input_size,
             epochs=epochs,
+            verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
             final_fit=False)
@@ -149,6 +151,7 @@ class ImageClassification(BaseTask):
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
+            'plot_results': plot_results,
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({

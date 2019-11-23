@@ -15,7 +15,8 @@ AutoGluon provides fit API which allows faster prototyping on image classificati
       :title: Customized Search and HPO
       :link: hpo.html
 
-      Image classification HPO tutorial.
+      Image classification HPO tutorial,  
+      changing default search algorithms.
 
    .. card::
       :title: Use Your Own Dataset
