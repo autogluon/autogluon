@@ -46,7 +46,7 @@ class TabularPrediction(BaseTask):
             hyperparameters = {'NN': {'num_epochs': 300}, 
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
-                               'RF': {'n_estimators': 1500},
+                               'RF': {'n_estimators': 300},
                               },
             time_limits=None, num_trials=None, dist_ip_addrs=[], visualizer='none',
             nthreads_per_trial=None, ngpus_per_trial=None,

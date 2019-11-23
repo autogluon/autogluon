@@ -45,7 +45,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
         )
     if rf_options is not None:
-        params = {'n_estimators': 1500, 'n_jobs': -1}
+        params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
             RFModel(path=path, name='RandomForestClassifierLarge', model=RandomForestClassifier(**params), problem_type=problem_type,
@@ -91,7 +91,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
         )
     if rf_options is not None:
-        params = {'n_estimators': 1500, 'n_jobs': -1}
+        params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
             RFModel(path=path, name='RandomForestRegressorLarge', model=RandomForestRegressor(**params), problem_type=problem_type,
