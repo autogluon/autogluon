@@ -1,4 +1,4 @@
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
 from ...models.lgb.lgb_model import LGBModel
@@ -29,6 +29,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     nn_options = hyperparameters.get('NN', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
+    xt_options = hyperparameters.get('XT', None)
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
@@ -48,8 +49,15 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
-            RFModel(path=path, name='RandomForestClassifierLarge', model=RandomForestClassifier(**params), problem_type=problem_type,
+            RFModel(path=path, name='RandomForestClassifier', model=RandomForestClassifier(**params), problem_type=problem_type,
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
+        )
+    if xt_options is not None:
+        params = {'n_estimators': 100, 'n_jobs': -1}
+        params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+        models.append(
+            RFModel(path=path, name='ExtraTreesClassifier', model=ExtraTreesClassifier(**params), problem_type=problem_type,
+                    objective_func=objective_func, hyperparameters=xt_options.copy()),
         )
 
     models += [
@@ -59,7 +67,6 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
-        # RFModel(path=path, name='ExtraTreesClassifier', model=ExtraTreesClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # RFModel(path=path, name='LGBMClassifier', model=lgb.LGBMClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
         # LGBSKLearnModel(path=path, name='LGBMClassifierV2', model=lgb.LGBMClassifier(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
@@ -75,6 +82,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
     nn_options = hyperparameters.get('NN', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
+    xt_options = hyperparameters.get('XT', None)
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
@@ -94,8 +102,15 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
         params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
-            RFModel(path=path, name='RandomForestRegressorLarge', model=RandomForestRegressor(**params), problem_type=problem_type,
+            RFModel(path=path, name='RandomForestRegressor', model=RandomForestRegressor(**params), problem_type=problem_type,
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
+        )
+    if xt_options is not None:
+        params = {'n_estimators': 100, 'n_jobs': -1}
+        params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+        models.append(
+            RFModel(path=path, name='ExtraTreesRegressor', model=ExtraTreesRegressor(**params), problem_type=problem_type,
+                    objective_func=objective_func, hyperparameters=xt_options.copy()),
         )
     models += [
         # Good GBDT
