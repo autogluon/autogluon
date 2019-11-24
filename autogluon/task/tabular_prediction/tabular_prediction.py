@@ -103,7 +103,7 @@ class TabularPrediction(BaseTask):
         dist_ip_addrs : (list)
             List of IP addresses corresponding to remote workers.
         visualizer : (str)
-            Describes method to visualize training progress during fit(). TODO: options??
+            Describes method to visualize training progress during fit(). Options include: 'mxboard','tensorboard','none'
         nthreads_per_trial : (int)
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : (int)
@@ -150,8 +150,12 @@ class TabularPrediction(BaseTask):
         time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
         if holdout_frac is None:
             holdout_frac = 0.2 if hyperparameter_tune else 0.1
+        # Add visualizer to NN hyperparameters:
+        if ((visualizer is not None) and (visualizer != 'none') and 
+            ('NN' in hyperparameters)):
+            hyperparameters['NN']['visualizer'] = visualizer
         
-        # All models use this same scheduler:
+        # All models use the same scheduler:
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'num_trials': num_trials,

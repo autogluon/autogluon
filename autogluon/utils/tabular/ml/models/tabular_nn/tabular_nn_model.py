@@ -7,20 +7,19 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-import random, json, time
-import logging
+import random, json, time, logging, os
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import mxnet as mx
 from mxnet import nd, autograd, gluon
-from mxboard import SummaryWriter # TODO: Do we want to keep?  # TODO: (Jonas: Should we lazily import?)
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer  # PowerTransformer
 
 from ......core import Space
+from ......utils import try_import_mxboard
 from ......task.base import BasePredictor
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
@@ -87,6 +86,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_arraycol_map = None
         self.feature_type_map = None
         self.processor = None # data processor
+        self.summary_writer = None
 
     # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
     def create_unfit_copy(self):
@@ -216,6 +216,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.architecture_desc = net.architecture_desc # Description of network architecture
         self.net_filename = self.path + self.temp_file_name
         self.model = net
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
         return
     
     def train_net(self, params, train_dataset, test_dataset=None,
@@ -240,6 +242,12 @@ class TabularNeuralNetModel(AbstractModel):
             self.model.collect_params().initialize(ctx=self.ctx)
             self.model.hybridize()
         if setup_trainer:
+            # Also setup mxboard if visualizer has been specified:
+            visualizer = self.params.get('visualizer', 'none')
+            if visualizer == 'tensorboard' or visualizer == 'mxboard':
+                try_import_mxboard()
+                from mxboard import SummaryWriter
+                self.summary_writer = SummaryWriter(logdir=self.path, flush_secs=5, verbose=False)
             self.setup_trainer()
         best_val_metric = -np.inf # higher = better
         val_metric = None
@@ -291,12 +299,14 @@ class TabularNeuralNetModel(AbstractModel):
                 if verbose > 0 and (e % verbose) == 0:
                     print("Epoch %s.  Train loss: %s, Val %s: %s" %
                       (e, train_loss, self.eval_metric_name, val_metric))
-                self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
-                                               value=val_metric, global_step=e)
+                if self.summary_writer is not None:
+                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
+                                                   value=val_metric, global_step=e)
             else:
                 if verbose > 0 and (e % verbose) == 0:
                     print("Epoch %s.  Train loss: %s" % (e, train_loss))
-            self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
+            if self.summary_writer is not None:
+                self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
 
@@ -451,7 +461,6 @@ class TabularNeuralNetModel(AbstractModel):
             optimizer, loss, and summary writer (for mxboard).
             Network must first be initialized before this. 
         """
-        self.summary_writer = SummaryWriter(logdir=self.path, flush_secs=10)
         optimizer_opts = {'learning_rate': self.params['learning_rate'],  
             'wd': self.params['weight_decay'], 'clip_gradient': self.params['clip_gradient']}
         if self.params['optimizer'] == 'sgd':
@@ -645,7 +654,7 @@ class TabularNeuralNetModel(AbstractModel):
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc) # recreate network from architecture description
         # TODO: maybe need to initialize/hybridize??
         obj.model.load_parameters(path + cls.params_file_name)
-        obj.summary_writer = SummaryWriter(logdir=obj.path, flush_secs=10)
+        obj.summary_writer = None
         return obj
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options):
