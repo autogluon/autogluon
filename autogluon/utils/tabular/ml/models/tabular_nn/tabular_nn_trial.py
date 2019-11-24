@@ -3,11 +3,12 @@ import numpy as np
 import mxnet as mx
 from mxnet import nd, autograd
 
-from autogluon.core import *
-from autogluon.utils.tabular.ml.models.tabular_nn.tabular_nn_dataset import TabularNNDataset
+from ......core import args
+from .tabular_nn_dataset import TabularNNDataset
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 EPS = 10e-8 # small number
+
 
 @args()
 def tabular_nn_trial(args, reporter):
@@ -91,4 +92,3 @@ def tabular_nn_trial(args, reporter):
              modelobj_file = modelobj_file, netparams_file = netparams_file) # unused in reporter, only directory+file_prefix required to load model.
     
     # TODO: how to keep track of which filename corresponds to which performance?
-

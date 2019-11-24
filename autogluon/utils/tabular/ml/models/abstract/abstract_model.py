@@ -1,17 +1,17 @@
 import logging, time, pickle, os
 import numpy as np
 import pandas as pd
-from autogluon.utils.tabular.metrics import accuracy
-from autogluon.utils.tabular.ml.utils import get_pred_from_proba
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
-from autogluon.core import *
-from autogluon.task.base import *
-from autogluon.utils.tabular import metrics
-from autogluon.utils.tabular.utils.decorators import calculate_time
-from autogluon.utils.tabular.utils.loaders import load_pkl
-from autogluon.utils.tabular.utils.savers import save_pkl
-from autogluon.utils.tabular.ml.models.abstract.model_trial import model_trial
+from ....metrics import accuracy
+from ...utils import get_pred_from_proba
+from ...constants import BINARY, MULTICLASS, REGRESSION
+from ......core import Space, Categorical, List, NestedSpace
+from ......task.base import BasePredictor
+from .... import metrics
+from ....utils.decorators import calculate_time
+from ....utils.loaders import load_pkl
+from ....utils.savers import save_pkl
+from .model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 

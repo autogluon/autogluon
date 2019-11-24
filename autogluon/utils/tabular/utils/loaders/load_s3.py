@@ -1,9 +1,9 @@
-
 import boto3
 import os
 import pathlib
-from autogluon.utils.tabular.utils.loaders import load_pd
-from autogluon.utils.tabular.utils import s3_utils
+
+from . import load_pd
+from .. import s3_utils
 
 
 def list_bucket_s3(bucket):

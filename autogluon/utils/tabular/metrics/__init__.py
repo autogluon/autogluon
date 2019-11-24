@@ -1,15 +1,13 @@
 from abc import ABCMeta, abstractmethod
 import copy
 from functools import partial
-
 import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
-from . import classification_metrics
-from .util import sanitize_array
-
 import numpy as np
 
-from autogluon.utils.tabular.ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION
+from . import classification_metrics
+from .util import sanitize_array
+from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION
 
 
 class Scorer(object, metaclass=ABCMeta):

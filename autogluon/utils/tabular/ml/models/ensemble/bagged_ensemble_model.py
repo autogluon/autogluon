@@ -1,13 +1,11 @@
-
 import copy
 import numpy as np
 
-
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.utils import generate_kfold
-from autogluon.utils.tabular.ml.constants import MULTICLASS, REGRESSION
-from autogluon.utils.tabular.utils.loaders import load_pkl
-from autogluon.utils.tabular.utils.savers import save_pkl
+from ..abstract.abstract_model import AbstractModel
+from ...utils import generate_kfold
+from ...constants import MULTICLASS, REGRESSION
+from ....utils.loaders import load_pkl
+from ....utils.savers import save_pkl
 
 
 class BaggedEnsembleModel(AbstractModel):

@@ -1,11 +1,10 @@
-import math, warnings
-import numpy as np
-import pandas as pd 
+import warnings
+import pandas as pd
 
-from autogluon.utils.tabular.utils.loaders import load_pd # TODO: move this
-from ...core import * # TODO: needed?
+from ...utils.tabular.utils.loaders import load_pd
 
 __all__ = ['TabularDataset']
+
 
 class TabularDataset(pd.DataFrame):
     """

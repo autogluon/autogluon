@@ -1,7 +1,6 @@
-
 import numpy as np
 
-from autogluon.utils.tabular.ml.constants import MULTICLASS
+from ...constants import MULTICLASS
 
 
 def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):

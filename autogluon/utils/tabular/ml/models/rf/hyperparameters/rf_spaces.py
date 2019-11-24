@@ -1,7 +1,7 @@
 from scipy.stats import randint as sp_randint
 from scipy.stats import uniform
 
-from autogluon.utils.tabular.ml.models.abstract.abstract_spaces import AbstractSpaces
+from ...abstract.abstract_spaces import AbstractSpaces
 
 
 class RFSpaces(AbstractSpaces):

@@ -1,4 +1,3 @@
-
 from pandas import DataFrame, Series
 from typing import List
 import numpy as np
@@ -6,20 +5,19 @@ import pandas as pd
 import copy
 import time
 import traceback
-
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.utils.tabular.utils.loaders import load_pkl
-from autogluon.utils.tabular.utils.savers import save_pkl
-from autogluon.utils.tabular.ml.utils import get_pred_from_proba, generate_kfold
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.tuning.feature_pruner import FeaturePruner
-from autogluon.utils.tabular.ml.models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-
-from autogluon.utils.tabular.metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from sklearn.model_selection import train_test_split
 
-from autogluon.utils.tabular.ml.models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from autogluon.utils.tabular.ml.tuning.ensemble_selection import EnsembleSelection
+
+from ..constants import BINARY, MULTICLASS, REGRESSION
+from ...utils.loaders import load_pkl
+from ...utils.savers import save_pkl
+from ..utils import get_pred_from_proba, generate_kfold
+from ..models.abstract.abstract_model import AbstractModel
+from ..tuning.feature_pruner import FeaturePruner
+from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
+from ...metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
+from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
+from ..tuning.ensemble_selection import EnsembleSelection
 
 
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.

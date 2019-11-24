@@ -1,10 +1,10 @@
-
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.models.catboost.hyperparameters.parameters import get_param_baseline
-from autogluon.utils.tabular.ml.models.catboost.catboost_utils import construct_custom_catboost_metric
 from catboost import CatBoostClassifier, CatBoostRegressor
-from autogluon.utils.tabular.ml.constants import PROBLEM_TYPES_CLASSIFICATION
-from autogluon.core import Int, Categorical, Real
+
+from ..abstract.abstract_model import AbstractModel
+from .hyperparameters.parameters import get_param_baseline
+from .catboost_utils import construct_custom_catboost_metric
+from ...constants import PROBLEM_TYPES_CLASSIFICATION
+from ......core import Int, Real
 
 
 # TODO: Catboost crashes on multiclass problems where only two classes have significant member count.

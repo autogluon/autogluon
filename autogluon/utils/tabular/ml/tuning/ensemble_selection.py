@@ -1,15 +1,12 @@
-
 import numpy as np
-from autogluon.utils.tabular.ml.constants import PROBLEM_TYPES
-
 from collections import Counter
 
-from autogluon.utils.tabular.metrics import calculate_score, _ProbaScorer, _ThresholdScorer
+from ..constants import PROBLEM_TYPES
+from ...metrics import calculate_score, _ProbaScorer, _ThresholdScorer
+from ..utils import get_pred_from_proba
 
-from autogluon.utils.tabular.ml.utils import get_pred_from_proba
 
-
-class EnsembleSelection():
+class EnsembleSelection:
     def __init__(
             self,
             ensemble_size: int,

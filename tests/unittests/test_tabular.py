@@ -21,16 +21,13 @@
     - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
 """
-
 import warnings, shutil, os
 import numpy as np
 import mxnet as mx
 from random import seed
 
-from autogluon import TabularPrediction as task
 import autogluon as ag
-
-# TODO: move this file
+from autogluon import TabularPrediction as task
 from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
  

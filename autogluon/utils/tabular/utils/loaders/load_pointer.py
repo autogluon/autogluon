@@ -1,7 +1,7 @@
-
 import os
 import boto3
-from autogluon.utils.tabular.utils import s3_utils
+
+from .. import s3_utils
 
 
 def get_pointer_content(path, verbose=True):

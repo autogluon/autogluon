@@ -1,8 +1,9 @@
 """ Default hyperparameter search spaces used in Gradient Boosting model """
-from autogluon.core import *
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from .......core import Real, Int
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
-DEFAULT_NUM_BOOST_ROUND = 10000 # default for HPO
+DEFAULT_NUM_BOOST_ROUND = 10000  # default for HPO
+
 
 def get_default_searchspace(problem_type, num_classes=None):
     if problem_type == BINARY:

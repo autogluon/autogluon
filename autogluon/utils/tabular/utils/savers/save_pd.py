@@ -1,11 +1,11 @@
-
 from io import StringIO
 import multiprocessing
 import numpy as np
 import os
 import boto3
-from autogluon.utils.tabular.utils import s3_utils, multiprocessing_utils
 import json
+
+from .. import s3_utils, multiprocessing_utils
 
 
 # gzip compression produces random deflate issues on linux machines - use with caution

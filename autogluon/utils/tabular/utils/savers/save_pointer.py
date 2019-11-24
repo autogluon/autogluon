@@ -1,4 +1,3 @@
-
 import os
 
 POINTER_SUFFIX = '.pointer'

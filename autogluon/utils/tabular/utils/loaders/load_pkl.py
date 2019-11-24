@@ -1,11 +1,9 @@
-
 import io
 import pickle
-
 import boto3
 
-from autogluon.utils.tabular.utils.loaders import load_pointer
-from autogluon.utils.tabular.utils import s3_utils
+from . import load_pointer
+from .. import s3_utils
 
 
 def load(path, format=None):

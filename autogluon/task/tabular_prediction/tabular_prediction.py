@@ -2,16 +2,12 @@ import logging
 import numpy as np
 
 from .dataset import TabularDataset
-from ...core import *
 from ..base import BaseTask
 from ..base.base_task import schedulers
-
-# TODO: Change these import locations once tabular has been fully integrated as a submodule of autogluon 
-from autogluon.utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
-from autogluon.utils.tabular.ml.trainer.auto_trainer import AutoTrainer
-from autogluon.utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
-from autogluon.utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
-
+from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
+from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
+from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
+from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
 
 __all__ = ['TabularPrediction']
 
@@ -178,4 +174,3 @@ class TabularPrediction(BaseTask):
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
                       holdout_frac=holdout_frac, hyperparameters=hyperparameters)
         return predictor
-

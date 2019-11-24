@@ -7,13 +7,13 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 import numpy as np
 from numpy import corrcoef
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.utils.tabular.data.label_cleaner import LabelCleaner
-from autogluon.utils.tabular.ml.utils import get_pred_from_proba
-from autogluon.utils.tabular.utils.loaders import load_pkl, load_pd
-from autogluon.utils.tabular.utils.savers import save_pkl, save_pd
-from autogluon.utils.tabular.ml.trainer.abstract_trainer import AbstractTrainer
-from autogluon.utils.tabular.ml.tuning.ensemble_selection import EnsembleSelection
+from ..constants import BINARY, MULTICLASS, REGRESSION
+from ...data.label_cleaner import LabelCleaner
+from ..utils import get_pred_from_proba
+from ...utils.loaders import load_pkl, load_pd
+from ...utils.savers import save_pkl, save_pd
+from ..trainer.abstract_trainer import AbstractTrainer
+from ..tuning.ensemble_selection import EnsembleSelection
 
 
 # TODO: - Semi-supervised learning

@@ -3,7 +3,6 @@ Variant of the sklearn OneHotEncoder and OrdinalEncoder that can handle unknown 
 as well as binning of infrequent categories to limit the overall number of categories considered.
 Unknown categories are returned as None in inverse transforms. Always converts input list X to list of the same type elements first (string typically)
 """
-
 from numbers import Integral
 
 import numpy as np

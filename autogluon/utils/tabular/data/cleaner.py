@@ -1,5 +1,6 @@
 from pandas import DataFrame
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+
+from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 # Cleaner cleans data prior to entering feature generation

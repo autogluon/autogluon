@@ -3,10 +3,10 @@ from pandas import DataFrame
 import pandas as pd
 import copy
 
-from autogluon.utils.tabular.ml.learner.abstract_learner import AbstractLearner
-from autogluon.utils.tabular.data.cleaner import Cleaner
-from autogluon.utils.tabular.data.label_cleaner import LabelCleaner
-from autogluon.utils.tabular.ml.trainer.auto_trainer import AutoTrainer
+from .abstract_learner import AbstractLearner
+from ...data.cleaner import Cleaner
+from ...data.label_cleaner import LabelCleaner
+from ..trainer.auto_trainer import AutoTrainer
 
 
 # TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)

@@ -1,15 +1,13 @@
-
 import multiprocessing
-
 import pandas as pd
-
-from autogluon.utils.tabular.utils.loaders import load_pointer
-from autogluon.utils.tabular.utils.savers import save_pointer
-from autogluon.utils.tabular.utils import s3_utils, multiprocessing_utils
-from autogluon.utils.tabular.utils.loaders.load_s3 import list_bucket_prefix_suffix_s3
 from os import listdir
 from os.path import isfile, join
 from pandas import DataFrame
+
+from . import load_pointer
+from ..savers import save_pointer
+from .. import s3_utils, multiprocessing_utils
+from .load_s3 import list_bucket_prefix_suffix_s3
 
 
 def load(path, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None,

@@ -1,7 +1,6 @@
 """ Default hyperparameter search spaces used in Neural network model """
-
-from autogluon.core import *
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from .......core import Categorical, Real
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
 
 def get_default_searchspace(problem_type, num_classes=None):
@@ -59,5 +58,3 @@ def get_searchspace_regression():
         # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
     }
     return params
-
-

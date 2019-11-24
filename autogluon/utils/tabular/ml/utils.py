@@ -6,9 +6,10 @@ import os, multiprocessing
 import mxnet as mx
 from datetime import datetime
 from sklearn.model_selection import KFold, StratifiedKFold
-from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
-from autogluon.utils.tabular.utils.savers import save_pd
-from autogluon.utils.tabular.utils.decorators import calculate_time
+
+from .constants import BINARY, REGRESSION
+from ..utils.savers import save_pd
+from ..utils.decorators import calculate_time
 
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):

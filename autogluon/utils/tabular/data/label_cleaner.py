@@ -1,6 +1,7 @@
 from pandas import Series
 import numpy as np
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+
+from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 # LabelCleaner cleans labels prior to entering feature generation

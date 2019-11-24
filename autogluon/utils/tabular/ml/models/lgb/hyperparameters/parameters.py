@@ -1,8 +1,9 @@
 """ Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
+
 
 def get_param_baseline_custom(problem_type, num_classes=None):
     if problem_type == BINARY:

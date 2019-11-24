@@ -5,8 +5,8 @@ from pandas.api.types import CategoricalDtype
 import numpy as np
 from collections import defaultdict
 
-from autogluon.utils.tabular.utils.decorators import calculate_time
-from autogluon.utils.tabular.utils.savers import save_pkl
+from ..utils.decorators import calculate_time
+from ..utils.savers import save_pkl
 
 
 # TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary

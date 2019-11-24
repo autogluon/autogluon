@@ -2,6 +2,7 @@ import numpy as np
 import mxnet as mx
 from mxnet import nd, gluon
 
+
 class NumericBlock(gluon.HybridBlock):
     """ Single Dense layer that jointly embeds all numeric and one-hot features """
     def __init__(self, params, **kwargs):
@@ -11,6 +12,7 @@ class NumericBlock(gluon.HybridBlock):
             
     def hybrid_forward(self, F, x):
         return self.body(x)
+
 
 class EmbedBlock(gluon.HybridBlock):
     """ Used to embed a single embedding feature. """
@@ -22,6 +24,7 @@ class EmbedBlock(gluon.HybridBlock):
     
     def hybrid_forward(self, F, x):
         return self.body(x)
+
 
 class FeedforwardBlock(gluon.HybridBlock):
     """ Standard Feedforward layers """
@@ -47,6 +50,7 @@ class FeedforwardBlock(gluon.HybridBlock):
     
     def hybrid_forward(self, F, x):
         return self.body(x)
+
 
 class WideAndDeepBlock(gluon.HybridBlock):
     """ Standard feedforward layers with a single skip connection from output directly to input (ie. deep and wide network).
@@ -170,6 +174,7 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             else:
                 return nd.sigmoid(unscaled_pred) * self.y_span + self.y_lower
 
+
 """ OLD 
     def _create_embednet_from_architecture(architecture_desc):
         # Recreate network architecture based on provided description
@@ -195,6 +200,7 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
         self.from_logits = False
 """
 
+
 def getEmbedSizes(train_dataset, params, num_categs_per_feature):  
     """ Returns list of embedding sizes for each categorical variable.
         Selects this adaptively based on training_datset.
@@ -207,8 +213,3 @@ def getEmbedSizes(train_dataset, params, num_categs_per_feature):
                                       1.6 * num_categs_per_feature[i]**embed_exponent)))
                    for i in range(len(num_categs_per_feature))]
     return embed_dims
-
-
-
-
-

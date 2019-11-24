@@ -4,19 +4,18 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.core import *
-from autogluon.task.base import *
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from autogluon.utils.tabular.ml.utils import construct_dataset
-from autogluon.utils.tabular.ml.models.lgb.callbacks import early_stopping_custom
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.utils.tabular.ml.models.lgb import lgb_utils
-from autogluon.utils.tabular.ml.models.lgb.hyperparameters.searchspaces import get_default_searchspace
-from autogluon.utils.tabular.ml.models.lgb.hyperparameters.lgb_trial import lgb_trial
-from autogluon.utils.tabular.ml.models.lgb.hyperparameters.parameters import get_param_baseline
+from ......core import Int, Space
+from ......task.base import BasePredictor
+from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
+from ...utils import construct_dataset
+from .callbacks import early_stopping_custom
+from ...constants import BINARY, MULTICLASS, REGRESSION
+from . import lgb_utils
+from .hyperparameters.searchspaces import get_default_searchspace
+from .hyperparameters.lgb_trial import lgb_trial
+from .hyperparameters.parameters import get_param_baseline
 
-
-logger = logging.getLogger(__name__) # TODO: Currently
+logger = logging.getLogger(__name__)  # TODO: Currently
 
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.

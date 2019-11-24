@@ -1,15 +1,14 @@
 # TODO (Nick): Standardize / unify this code with ag.save()
-
 import os
 import pickle
 import tempfile
 import logging
-
 import boto3
 
-from autogluon.utils.tabular.utils import s3_utils
+from .. import s3_utils
 
 logger = logging.getLogger(__name__)
+
 
 def save(path, object, format=None):
     pickle_fn = lambda o, buffer: pickle.dump(o, buffer, protocol=4)

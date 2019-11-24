@@ -7,7 +7,6 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-
 import random, json, time
 import logging
 from collections import OrderedDict
@@ -21,24 +20,24 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer  # PowerTransformer
 
-# TODO these files should be moved eventually:
-from autogluon.core import *
-from autogluon.task.base import *
-from autogluon.utils.tabular.utils.loaders import load_pkl
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from autogluon.utils.tabular.utils.savers import save_pkl
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.utils.tabular.ml.models.tabular_nn.categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
-from autogluon.utils.tabular.ml.models.tabular_nn.tabular_nn_dataset import TabularNNDataset
-from autogluon.utils.tabular.ml.models.tabular_nn.embednet import EmbedNet
-from autogluon.utils.tabular.ml.models.tabular_nn.tabular_nn_trial import tabular_nn_trial
-from autogluon.utils.tabular.ml.models.tabular_nn.hyperparameters.parameters import get_default_param
-from autogluon.utils.tabular.ml.models.tabular_nn.hyperparameters.searchspaces import get_default_searchspace
+from ......core import Space
+from ......task.base import BasePredictor
+from ....utils.loaders import load_pkl
+from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
+from ....utils.savers import save_pkl
+from ...constants import BINARY, MULTICLASS, REGRESSION
+from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
+from .tabular_nn_dataset import TabularNNDataset
+from .embednet import EmbedNet
+from .tabular_nn_trial import tabular_nn_trial
+from .hyperparameters.parameters import get_default_param
+from .hyperparameters.searchspaces import get_default_searchspace
 
 # __all__ = ['TabularNeuralNetModel', 'EPS']
 
 EPS = 10e-8 # small number
 logger = logging.getLogger(__name__)
+
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.

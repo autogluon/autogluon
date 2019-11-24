@@ -1,12 +1,12 @@
-from autogluon.utils.tabular.utils.savers import save_pkl, save_pointer
 import collections
 import warnings
 from operator import gt, lt
-from lightgbm.compat import range_
 import time
 import os
 from lightgbm.callback import _format_eval_result, EarlyStopException
 import psutil
+
+from ....utils.savers import save_pkl, save_pointer
 
 
 # callback
@@ -363,6 +363,3 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
         # TODO: Add memory checks as in early_stopping_custom
     _callback.order = 30
     return _callback
-
-
-

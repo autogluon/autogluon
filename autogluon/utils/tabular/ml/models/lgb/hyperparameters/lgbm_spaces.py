@@ -1,5 +1,6 @@
 from skopt.space import Integer, Categorical, Real
-from autogluon.utils.tabular.ml.models.abstract.abstract_spaces import AbstractSpaces
+
+from ...abstract.abstract_spaces import AbstractSpaces
 
 
 class LGBMSpaces(AbstractSpaces):

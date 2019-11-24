@@ -1,5 +1,4 @@
-
-from autogluon.utils.tabular.ml.models.sklearn.sklearn_model import SKLearnModel
+from ..sklearn.sklearn_model import SKLearnModel
 
 
 # TODO: Pass in num_classes?

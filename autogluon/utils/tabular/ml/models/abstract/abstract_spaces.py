@@ -1,5 +1,4 @@
-
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION
 
 
 # TODO: Hyperparam tuning in here?

@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 # import warnings
 # warnings.filterwarnings('ignore')
 import pandas as pd
 import copy
 
 
-# TODO: Rename to FeaturePruner
 class FeaturePruner:
     def __init__(self, model_base, threshold_baseline=0.004):
         self.model_base = copy.deepcopy(model_base)
@@ -128,7 +124,6 @@ class FeaturePruner:
                 self.tuned = True
                 break
         self.tuned = True
-
 
     @staticmethod
     def adjust_threshold(gain_df, threshold):

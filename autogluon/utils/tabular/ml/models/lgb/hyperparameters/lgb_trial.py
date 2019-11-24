@@ -2,13 +2,12 @@ import logging, random
 import lightgbm as lgb
 import numpy as np
 
-# TODO: move these files
-from autogluon.core import * 
-from autogluon.utils.tabular.ml.models.lgb.callbacks import hpo_callback
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from .......core import args
+from ..callbacks import hpo_callback
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
+logger = logging.getLogger(__name__)  # TODO: Currently unused
 
-logger = logging.getLogger(__name__) # TODO: Currently unused
 
 @args()
 def lgb_trial(args, reporter):

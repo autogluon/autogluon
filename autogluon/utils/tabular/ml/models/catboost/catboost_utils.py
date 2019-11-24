@@ -1,7 +1,6 @@
-
 import numpy as np
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION
 
 
 # TODO: Add weight support?

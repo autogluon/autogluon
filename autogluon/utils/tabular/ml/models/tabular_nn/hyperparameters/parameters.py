@@ -1,8 +1,7 @@
 """ Default (fixed) hyperparameter values used in Neural network model """
-
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 import mxnet as mx
-from mxnet import nd, autograd, gluon
+
+from ....constants import BINARY, MULTICLASS, REGRESSION
 
 # Parameters that currently cannot be searched during HPO:
 fixed_params = {
@@ -58,9 +57,10 @@ hyper_params = {
     'epochs_wo_improve': 20, # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
     # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
 }
-# Note: params for original NNTabularModel were: 
-# weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
 
+
+# Note: params for original NNTabularModel were:
+# weight_decay=0.01, dropout_prob = 0.1, batch_size = 2048, lr = 1e-2, epochs=30, layers= [200, 100] (semi-equivalent to our layers = [100],numeric_embed_dim=200)
 def get_default_param(problem_type, num_classes=None):
     if problem_type == BINARY:
         return get_param_binary()
@@ -71,15 +71,18 @@ def get_default_param(problem_type, num_classes=None):
     else:
         return get_param_binary().copy()
 
+
 def get_param_multiclass(num_classes):
     params = fixed_params.copy()
     params.update(hyper_params.copy())
     return params
 
+
 def get_param_binary():
     params = fixed_params.copy()
     params.update(hyper_params.copy())
     return params
+
 
 def get_param_regression():
     params = fixed_params.copy()
