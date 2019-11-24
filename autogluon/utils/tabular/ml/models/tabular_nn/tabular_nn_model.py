@@ -249,6 +249,8 @@ class TabularNeuralNetModel(AbstractModel):
         num_epochs = self.params['num_epochs']
         if test_dataset is not None:
             y_test = test_dataset.get_labels()
+        else:
+            y_test = None
         
         loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
         loss_torescale = [key for key in self.rescale_losses if isinstance(self.loss_func, key)]
@@ -260,8 +262,11 @@ class TabularNeuralNetModel(AbstractModel):
                 loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS # variance of labels
             else:
                 raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale],self.loss_func))
+        verbose = 10  # Make this a parameter, prints losses every verbose epochs, Never if -1
         # Training Loop:
         for e in range(num_epochs):
+            if e == 0: # special actions during first epoch:
+                print(self.model)  # TODO: remove?
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
@@ -283,17 +288,18 @@ class TabularNeuralNetModel(AbstractModel):
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
                 # TODO: currently evaluate_metric is evaluating different metric...
-                print("Epoch %s.  Train loss: %s, Val %s: %s" %
-                  (e, train_loss, self.eval_metric_name, val_metric))
+                if verbose > 0 and (e % verbose) == 0:
+                    print("Epoch %s.  Train loss: %s, Val %s: %s" %
+                      (e, train_loss, self.eval_metric_name, val_metric))
                 self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
                                                value=val_metric, global_step=e)
             else:
-                print("Epoch %s.  Train loss: %s" % (e, train_loss))
-            self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e) # TODO: do we want to keep mxboard support?
+                if verbose > 0 and (e % verbose) == 0:
+                    print("Epoch %s.  Train loss: %s" % (e, train_loss))
+            self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
-            if e == 0: # special actions during first epoch:
-                print(self.model)  # TODO: remove?
+
         self.model.load_parameters(self.net_filename) # Revert back to best model
         if test_dataset is None: # evaluate one final time:
             print("Best model found in epoch %d" % best_val_epoch)
@@ -302,7 +308,7 @@ class TabularNeuralNetModel(AbstractModel):
             print("Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
-    
+
     def evaluate_metric(self, dataset, mx_metric=None):
         """ Evaluates metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
             If provided, mx_metric must be a function that follows the mxnet.metric API. Higher values = better!
@@ -324,7 +330,7 @@ class TabularNeuralNetModel(AbstractModel):
             return 1.0 - mx_metric.get()[1] / y_var
         else:
             return mx_metric.get()[1] # accuracy
-    
+
     def predict_proba(self, X, preprocess=True):
         """ To align predict wiht abstract_model API. 
             Preprocess here only refers to feature processing stesp done by all AbstractModel objects, 
@@ -340,8 +346,8 @@ class TabularNeuralNetModel(AbstractModel):
             return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
         else:
             raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
-        
-    def _predict_tabular_data(self, new_data, process=True, predict_proba=True): # TODO ensure API lines up with tabular.Model class.
+
+    def _predict_tabular_data(self, new_data, process=True, predict_proba=True):  # TODO ensure API lines up with tabular.Model class.
         """ Specific TabularNN method to produce predictions on new (unprocessed) data. 
             Returns 1D numpy array unless predict_proba=True and task is multi-class classification (not binary).
             Args:
@@ -375,7 +381,7 @@ class TabularNeuralNetModel(AbstractModel):
         elif self.problem_type == BINARY and predict_proba:
             return preds[:,1].asnumpy() # for binary problems, only return P(Y==1)
         return preds.asnumpy() # return 2D numpy array
-    
+
     def process_data(self, df, labels = None, is_test=True):
         """ Process train or test DataFrame into a form fit for neural network models.
         Args:
@@ -400,7 +406,7 @@ class TabularNeuralNetModel(AbstractModel):
         processed_array = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
         return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, 
                                 self.params, self.problem_type, labels=labels, is_test=True)
-    
+
     def process_train_data(self, df, labels):
         """ Preprocess training data and create self.processor object that can be used to process future data.
             This method should only be used once per TabularNeuralNetModel object, otherwise will produce Warning.
@@ -439,7 +445,7 @@ class TabularNeuralNetModel(AbstractModel):
         # print(self.feature_type_map)
         return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map,
                                 self.params, self.problem_type, labels=labels, is_test=False)
-    
+
     def setup_trainer(self):
         """ Set up stuff needed for training: 
             optimizer, loss, and summary writer (for mxboard).
@@ -461,9 +467,9 @@ class TabularNeuralNetModel(AbstractModel):
             else:
                 self.params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
         self.loss_func = self.params['loss_function']
-    
+
     # Helper functions for tabular NN:
-    
+
     def ensure_onehot_object(self, df):
         """ Converts all numerical one-hot columns to object-dtype. 
             Note: self.types_of_features must already exist! 
@@ -473,11 +479,11 @@ class TabularNeuralNetModel(AbstractModel):
             if df[feature].dtype != 'object':
                 new_df.loc[:,feature] = df.loc[:,feature].astype(str)
         return new_df
-    
+
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
-    
+
     def _get_types_of_features(self, df):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
@@ -522,7 +528,7 @@ class TabularNeuralNetModel(AbstractModel):
             elif feature in language_featnames:
                 types_of_features['language'].append(feature)
         return types_of_features
-    
+
     def _get_feature_arraycol_map(self):
         """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
         feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language']) # these transforms do not alter dimensionality of feature
@@ -551,7 +557,7 @@ class TabularNeuralNetModel(AbstractModel):
         if set(feature_arraycol_map.keys()) != set(self.features):
             raise ValueError("failed to account for all features when determining column indices in processed array") 
         return OrderedDict([(key, feature_arraycol_map[key]) for key in feature_arraycol_map])
-    
+
     def _get_feature_type_map(self):
         """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language') """
         if self.feature_arraycol_map is None:
@@ -568,7 +574,7 @@ class TabularNeuralNetModel(AbstractModel):
             else: 
                 raise ValueError("unknown feature type encountered")
         return feature_type_map
-    
+
     def _create_preprocessor(self):
         """ Defines data encoders used to preprocess different data types and creates instance variable which is sklearn ColumnTransformer object """
         if self.processor is not None:
@@ -603,7 +609,7 @@ class TabularNeuralNetModel(AbstractModel):
         if len(language_features) > 0:
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
-    
+
     def save(self, file_prefix="", directory = None, return_name=False):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
@@ -692,10 +698,10 @@ class TabularNeuralNetModel(AbstractModel):
                                 test_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX]) # TODO: currently does not work.
             train_fileprefix = "train"
             test_fileprefix = "validation"
-            directory = self.path # TODO: need to change to path to working directory on every remote machine
+            directory = self.path  # TODO: need to change to path to working directory on every remote machine
             tabular_nn_trial.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                    directory=directory)
-        
+
         scheduler.run()
         scheduler.join_jobs()
         scheduler.get_training_curves(plot=False, use_legend=False)
@@ -748,6 +754,7 @@ class TabularNeuralNetModel(AbstractModel):
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = search_space.pop(key, None)
         self.params.update(search_space)
+
 
 """ General TODOs:
 
