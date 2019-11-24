@@ -5,7 +5,7 @@ import gc
 import os, multiprocessing
 import mxnet as mx
 from datetime import datetime
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
 
 from .constants import BINARY, REGRESSION
 from ..utils.savers import save_pd
@@ -22,15 +22,22 @@ def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
     return y_pred
 
 
-def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False):
+def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_repeats=1):
     kfolds = []
     if stratified and (y is not None):
-        kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        if n_repeats > 1:
+            kf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+        else:
+            kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
         kf.get_n_splits(X, y)
         for train_index, test_index in kf.split(X, y):
             kfolds.append([train_index, test_index])
     else:
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        if n_repeats > 1:
+            kf = RepeatedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=random_state)
+        else:
+            kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
         kf.get_n_splits(X)
         for train_index, test_index in kf.split(X):
             kfolds.append([train_index, test_index])

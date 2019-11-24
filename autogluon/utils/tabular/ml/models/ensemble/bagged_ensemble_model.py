@@ -15,6 +15,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._model_names = None
         self._model_types = None
         self.oof_pred_proba = None  # TODO: Remove this? Move it internally into trainer
+        self.n_repeats = 1  # TODO: Add as param or move to fit
         super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, debug=debug)
 
     def preprocess(self, X):
@@ -32,7 +33,7 @@ class BaggedEnsembleModel(AbstractModel):
         # random_state = 0  # TODO: This should be a value sent in and shared across all bags. If stacking, it should be incremented by 1 for each stacking layer
 
         # TODO: Preprocess data here instead of repeatedly
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state, n_repeats=self.n_repeats)
 
         if self.problem_type == MULTICLASS:
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
@@ -50,7 +51,8 @@ class BaggedEnsembleModel(AbstractModel):
             fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **kwargs)
             pred_proba = fold_model.predict_proba(X_test)
             models.append(fold_model)
-            oof_pred_proba[test_index] = pred_proba
+            oof_pred_proba[test_index] += pred_proba
+        oof_pred_proba = oof_pred_proba / self.n_repeats
 
         self.models = models
         self.model_base = None
