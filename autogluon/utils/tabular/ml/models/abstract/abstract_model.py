@@ -45,7 +45,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, debug=0):
+    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
@@ -57,7 +57,7 @@ class AbstractModel:
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func # Note: we require higher values = better performance
-        self.feature_types_metadata = {}  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
+        self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
         if type(objective_func) == metrics._ProbaScorer:
             self.metric_needs_y_pred = False

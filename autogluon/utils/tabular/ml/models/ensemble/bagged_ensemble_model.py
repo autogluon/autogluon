@@ -17,10 +17,10 @@ class BaggedEnsembleModel(AbstractModel):
         self.oof_pred_proba = None  # TODO: Remove this? Move it internally into trainer
         self.n_repeats = 1  # TODO: Add as param or move to fit
         try:
-            self.feature_types_metadata = self.model_base.feature_types_metadata
+            feature_types_metadata = self.model_base.feature_types_metadata
         except:
-            self.feature_types_metadata = None
-        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, debug=debug)
+            feature_types_metadata = None
+        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, debug=debug)
 
     def preprocess(self, X):
         return self.models[0].preprocess(X)
