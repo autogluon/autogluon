@@ -12,11 +12,10 @@ from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
 import gluonnlp as nlp
 from gluonnlp.data import BERTTokenizer
-from gluonnlp.model import BERTClassifier, RoBERTaClassifier
+from .classification_models import BERTClassifier, RoBERTaClassifier, LMClassifier, get_model_instances
 from .dataset import *
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
-from .model_zoo import get_model_instances, LMClassifier, BERTClassifier
 from .transforms import BERTDatasetTransform
 from ...core import *
 
@@ -74,7 +73,7 @@ def get_vocab(ctx, *args):
     _, vocabulary = nlp.model.get_model(**get_model_params)
     return vocabulary
 
-def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,  pad=False):
+def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab, pad=False, *args):
     """Train/eval Data preparation function."""
     pool = multiprocessing.Pool()
 
@@ -110,7 +109,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
     # data loader for training
     loader_train = gluon.data.DataLoader(
         dataset=data_train,
-        num_workers=4,
+        num_workers=args.num_workers,
         batch_sampler=batch_sampler,
         batchify_fn=batchify_fn)
 
@@ -123,7 +122,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
         loader_dev = mx.gluon.data.DataLoader(
             data_dev,
             batch_size=dev_batch_size,
-            num_workers=4,
+            num_workers=args.num_workers,
             shuffle=False,
             batchify_fn=batchify_fn)
         loader_dev_list.append((segment, loader_dev))
@@ -148,7 +147,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
         loader_test = mx.gluon.data.DataLoader(
             data_test,
             batch_size=dev_batch_size,
-            num_workers=4,
+            num_workers=args.num_workers,
             shuffle=False,
             batchify_fn=test_batchify_fn)
         loader_test_list.append((segment, loader_test))
@@ -270,7 +269,7 @@ def train_text_classification(args, reporter=None):
     # Get the loader.
     logging.info('processing dataset...')
     train_data, dev_data_list, test_data_list, num_train_examples = preprocess_data(
-        bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary, args.pad)
+        bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary, args.pad, args)
 
     def _train_val_split(train_dataset):
         split = args.data.split

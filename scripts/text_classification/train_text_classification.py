@@ -9,45 +9,46 @@ from autogluon import TextClassification as task
 
 parser = argparse.ArgumentParser(description='AutoGluon text classification')
 parser.add_argument('--data', default='SST', type=str,
-                    help='options are SST, MRPC, QQP, QNLI, RTE, STS-B, CoLA, MNLI, WNLI, IMDB')
-parser.add_argument('--nets', default='bert_12_768_12', type=str,
-                    help='list of nets to run (default: bert_12_768_12)')
+                    help='options are SST, MRPC, QQP, QNLI, RTE, STS-B, CoLA, MNLI, WNLI, IMDB (default: SST)')
+parser.add_argument('--nets', default='bert_12_768_12,roberta_12_768_12', type=str,
+                    help='list of nets to run (default: bert_12_768_12,roberta_12_768_12)')
 parser.add_argument('--optimizers', default='bertadam', type=str,
                     help='list of optims to run, (default: bertadam)')
 parser.add_argument('--searcher', type=str, default='random',
                     help='searcher name (default: random)')
 parser.add_argument('--trial_scheduler', type=str, default='fifo',
-                    help='trial scheduler name (options: fifo or hyperband)')
+                    help='trial scheduler name (default: fifo)')
 parser.add_argument('--batch_size', default=64, type=int,
-                    help='batch_size')
+                    help='batch_size (default: 64)')
 parser.add_argument('--resume', action='store_true', default=False,
-                    help='resume from the checkpoint if needed')
+                    help='resume from the checkpoint if needed (default: False)')
 parser.add_argument('--savedir', type=str, default='checkpoint/exp1.ag',
-                    help='save and checkpoint path (default: None)')
-parser.add_argument('--visualizer', type=str, default='tensorboard',
-                    help='visualizer (default: tensorboard)')
+                    help='save and checkpoint path (default: checkpoint/exp1.ag)')
+parser.add_argument('--visualizer', type=str, default='none',
+                    help='visualizer (default: none)')
 parser.add_argument('--time_limits', default=1 * 60 * 60, type=int,
-                    help='time limits in seconds')
+                    help='time limits in seconds (default: 1 * 60 * 60)')
 parser.add_argument('--max_metric', default=1.0, type=float,
-                    help='the max metric that is used to stop the trials')
+                    help='the max metric that is used to stop the trials (default: 1.0)')
 parser.add_argument('--num_trials', default=6, type=int,
-                    help='number of experiment trials')
+                    help='number of experiment trials (default: 6)')
 parser.add_argument('--ngpus_per_trial', default=1, type=int,
-                    help='number of gpus per trial')
+                    help='number of gpus per trial (default: 1)')
 parser.add_argument('--nthreads_per_trial', default=4, type=int,
-                    help='number of threads per trial')
+                    help='number of threads per trial (default: 4)')
 parser.add_argument('--epochs', default=10, type=int,
-                    help='number of epochs per trial')
+                    help='number of epochs per trial (default: 10)')
 parser.add_argument('--lr_factor', default=0.75, type=float,
-                    help='learning rate decay ratio')
+                    help='learning rate decay ratio (default: 0.75)')
 parser.add_argument('--lr_step', default=20, type=int,
-                    help='list of learning rate decay epochs as in str')
+                    help='list of learning rate decay epochs as in str (default: 20)')
 parser.add_argument('--demo', action='store_true', default=False,
-                    help='demo if needed')
+                    help='run fast if necessary with only a smaller portion of the full training data '
+                         '(default: store_true)')
 parser.add_argument('--debug', action='store_true', default=False,
-                    help='debug if needed')
+                    help='debug if needed (default: store_true)')
 parser.add_argument('--seed', default=100, type=int,
-                    help='random seed')
+                    help='random seed (default: 100)')
 
 if __name__ == '__main__':
     args = parser.parse_args()
