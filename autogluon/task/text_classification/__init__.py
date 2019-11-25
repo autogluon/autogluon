@@ -1,5 +1,5 @@
 from .dataset import *
-from .model_zoo import *
+from .classification_models import *
 from .optimizers import *
 from .pipeline import *
 from .predictor import *

@@ -2,7 +2,7 @@ import mxnet
 
 __all__ = ['get_metric_instance']
 
-# TODO(cgraywang): abstract general metric shared across tasks
+# TODO(cgraywang,jonas): add AUC etc general metrics that can be shared across tasks
 metrics = {'Accuracy': mxnet.metric.Accuracy,
            'TopKAccuracy': mxnet.metric.TopKAccuracy,
            'F1': mxnet.metric.F1}

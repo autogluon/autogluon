@@ -6,7 +6,7 @@ from collections import OrderedDict
 import mxnet as mx
 import matplotlib.pyplot as plt
 
-from .model_zoo import *
+from .classification_models import *
 from ...utils import *
 from .pipeline import *
 from .metrics import get_metric_instance

@@ -154,7 +154,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
         loader_test_list.append((segment, loader_test))
     return loader_train, loader_dev_list, loader_test_list, len(data_train)
 
-@autogluon_register_args()
+@args()
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function

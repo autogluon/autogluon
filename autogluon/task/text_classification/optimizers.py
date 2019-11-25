@@ -1,8 +1,8 @@
 from gluonnlp import optimizer
-from ...core import autogluon_object
+from ..core import obj
 
 __all__ = ['BERTAdam']
 
-@autogluon_object()
+@obj()
 class BERTAdam(optimizer.BERTAdam):
     pass

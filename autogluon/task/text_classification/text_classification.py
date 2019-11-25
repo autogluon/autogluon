@@ -13,7 +13,7 @@ from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ...utils import update_params
 
-from .model_zoo import get_network
+from .classification_models import get_network
 from .dataset import TextClassificationDataset
 from .pipeline import *
 from .metrics import get_metric_instance
