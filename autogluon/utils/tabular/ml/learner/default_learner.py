@@ -51,7 +51,7 @@ class DefaultLearner(AbstractLearner):
             self.objective_func = trainer.objective_func
 
         self.save()
-        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)
 
