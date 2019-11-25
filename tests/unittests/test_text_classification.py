@@ -11,9 +11,8 @@ def test_text_classification():
     dataset = task.Dataset(name='SST')
     logger.debug(dataset)
     logger.debug('Finished.')
+    ag.done()
 
 
 if __name__ == '__main__':
-    import nose
-    nose.runmodule()
-    ag.done()
+    test_text_classification()
