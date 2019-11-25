@@ -154,8 +154,11 @@ class RandomSearcher(BaseSearcher):
         returns: (config, info_dict)
             must return a valid configuration and a (possibly empty) info dict
         """
-        new_config = self.configspace.sample_configuration().get_dictionary()
-        while pickle.dumps(new_config) in self._results.keys():
+        if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
+            new_config = self.configspace.get_default_configuration().get_dictionary()
+        else:
+            new_config = self.configspace.sample_configuration().get_dictionary()
+        while pickle.dumps(new_config) in self._results.keys(): # TODO: may never terminate
             new_config = self.configspace.sample_configuration().get_dictionary()
         self._results[pickle.dumps(new_config)] = 0
         return new_config

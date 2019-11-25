@@ -1,200 +1,234 @@
 import warnings
 import logging
+import os
+import time
 
-import random
-import mxnet as mx
 import numpy as np
-
-from mxnet import gluon, init, autograd, nd
+import mxnet as mx
 from mxnet.gluon import nn
-import gluoncv
-from gluoncv.model_zoo import get_model
+from mxnet import gluon, init, autograd, nd
 from mxnet.gluon.data.vision import transforms
+import gluoncv as gcv
+from gluoncv.model_zoo import get_model
+from gluoncv import utils as gutils
 
+from gluoncv.data.batchify import Tuple, Stack, Pad
+from gluoncv.data.transforms.presets.yolo import YOLO3DefaultTrainTransform
+from gluoncv.data.transforms.presets.yolo import YOLO3DefaultValTransform
+from gluoncv.data.dataloader import RandomTransformDataLoader
+from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
+from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
+from gluoncv.utils import LRScheduler, LRSequential
 
-from ...basic import autogluon_method
-from .dataset import get_transform_fn
-from .losses import get_loss_instance
-from .metrics import get_metric_instance
-from .model_zoo import get_norm_layer
+from ...core import *
+from ...utils.mxutils import collect_params
+from ...utils import tqdm
 
-__all__ = ['train_object_detection']
-
-logger = logging.getLogger(__name__)
-
-@autogluon_method
-def train_object_detection(args, reporter):
-    # Set Hyper-params
-    def _init_hparams():
-        ctx = [mx.gpu(i)
-               for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
-        return ctx
-    ctx = _init_hparams()
-
-    # Define Network
-    def _get_net_async_net(ctx):
-        if args.norm_layer == 'SyncBatchNorm' and len(ctx) > 1:
-            net = get_model(args.model,
-                            pretrained=args.pretrained,
-                            pretrained_base=args.pretrained_base,
-                            norm_layer=get_norm_layer(args.norm_layer),
-                            norm_kwargs={'num_devices': len(ctx)})
-            async_net = get_model(args.model, pretrained=args.pretrained, pretrained_base=False)
-        else:
-            net = get_model(args.model,
-                            pretrained=args.pretrained,
-                            pretrained_base=args.pretrained_base,
-                            norm_layer=get_norm_layer(args.norm_layer))
-            async_net = get_model(args.model, pretrained=args.pretrained, pretrained_base=False)
-        return net, async_net
-    net, async_net = _get_net_async_net(ctx)
-    net.reset_class(classes=args.data.train.classes)
-    if not args.pretrained:
-        net.collect_params().initialize(init.Xavier(), ctx=ctx)
+def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_workers, args):
+    """Get dataloader."""
+    width, height = data_shape, data_shape
+    batchify_fn = Tuple(*([Stack() for _ in range(6)] + [Pad(axis=0, pad_val=-1) for _ in range(1)]))  # stack image, all targets generated
+    if args.no_random_shape:
+        train_loader = gluon.data.DataLoader(
+            train_dataset.transform(YOLO3DefaultTrainTransform(width, height, net, mixup=args.mixup)),
+            batch_size, True, batchify_fn=batchify_fn, last_batch='rollover', num_workers=num_workers)
     else:
-        net.collect_params().reset_ctx(ctx)
+        transform_fns = [YOLO3DefaultTrainTransform(x * 32, x * 32, net, mixup=args.mixup) for x in range(10, 20)]
+        train_loader = RandomTransformDataLoader(
+            transform_fns, train_dataset, batch_size=batch_size, interval=10, last_batch='rollover',
+            shuffle=True, batchify_fn=batchify_fn, num_workers=num_workers)
+    val_batchify_fn = Tuple(Stack(), Pad(pad_val=-1))
+    val_loader = gluon.data.DataLoader(
+        val_dataset.transform(YOLO3DefaultValTransform(width, height)),
+        batch_size, False, batchify_fn=val_batchify_fn, last_batch='keep', num_workers=num_workers)
+    return train_loader, val_loader
 
-    # Define DataLoader
-    def _get_dataloader():
-        def _init_dataset(dataset, transform_fn, transform_list):
-            if transform_fn is not None:
-                dataset = dataset.transform(transform_fn)
-            if transform_list is not None:
-                dataset = dataset.transform_first(transforms.Compose(transform_list))
-            return dataset
-        def _get_width_height_achors():
-            data_shape = int(args.model.split('_')[1])
-            width, height = data_shape, data_shape
-            with autograd.train_mode():
-                _, _, anchors = async_net(mx.nd.zeros((1, 3, height, width)))
-            return width, height, anchors
-        width, height, anchors = _get_width_height_achors()
-        train_dataset = _init_dataset(args.data.train,
-                                      get_transform_fn(args.data.transform_train_fn,
-                                                       width, height, anchors),
-                                      args.data.transform_train_list)
-        val_dataset = _init_dataset(args.data.val,
-                                    get_transform_fn(args.data.transform_val_fn,
-                                                     width, height),
-                                    args.data.transform_val_list)
-        train_data = gluon.data.DataLoader(
-            train_dataset,
-            batch_size=args.data.batch_size,
-            shuffle=True,
-            batchify_fn=args.data.batchify_train_fn,
-            last_batch='rollover',
-            num_workers=args.data.num_workers)
-        val_data = gluon.data.DataLoader(
-            val_dataset,
-            batch_size=args.data.batch_size,
-            shuffle=False,
-            batchify_fn=args.data.batchify_val_fn,
-            last_batch='keep',
-            num_workers=args.data.num_workers)
-        return train_data, val_data
-    train_data, val_data = _get_dataloader()
+def validate(net, val_data, ctx, eval_metric):
+    """Test on validation dataset."""
+    eval_metric.reset()
+    # set nms threshold and topk constraint
+    net.set_nms(nms_thresh=0.45, nms_topk=400)
+    mx.nd.waitall()
+    net.hybridize()
+    for batch in val_data:
+        data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0, even_split=False)
+        label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0, even_split=False)
+        det_bboxes = []
+        det_ids = []
+        det_scores = []
+        gt_bboxes = []
+        gt_ids = []
+        gt_difficults = []
+        for x, y in zip(data, label):
+            # get prediction results
+            ids, scores, bboxes = net(x)
+            det_ids.append(ids)
+            det_scores.append(scores)
+            # clip to image size
+            det_bboxes.append(bboxes.clip(0, batch[0].shape[2]))
+            # split ground truths
+            gt_ids.append(y.slice_axis(axis=-1, begin=4, end=5))
+            gt_bboxes.append(y.slice_axis(axis=-1, begin=0, end=4))
+            gt_difficults.append(y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None)
 
-    # Define trainer
-    def _set_optimizer_params(args):
-        # TODO (cgraywang): a better way?
-        if args.optimizer == 'sgd' or args.optimizer == 'nag':
-            optimizer_params = {
-                'learning_rate': args.lr,
-                'momentum': args.momentum,
-                'wd': args.wd
-            }
-        elif args.optimizer == 'adam':
-            optimizer_params = {
-                'learning_rate': args.lr,
-                'wd': args.wd
-            }
-        else:
-            raise NotImplementedError
-        return optimizer_params
+        # update metric
+        eval_metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults)
+    return eval_metric.get()
 
-    optimizer_params = _set_optimizer_params(args)
-    trainer = gluon.Trainer(net.collect_params(),
-                            args.optimizer,
-                            optimizer_params)
 
-    def _print_debug_info(args):
-        logger.debug('Print debug info:')
-        for k, v in vars(args).items():
-            logger.debug('%s:%s' % (k, v))
+def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit):
+    """Training pipeline"""
+    net.collect_params().reset_ctx(ctx)
+    if args.no_wd:
+        for k, v in net.collect_params('.*beta|.*gamma|.*bias').items():
+            v.wd_mult = 0.0
 
-    _print_debug_info(args)
+    if args.label_smooth:
+        net._target_generator._label_smooth = True
 
-    # TODO (cgraywang): update with search space
-    L = get_loss_instance(args.loss)
-    metric = get_metric_instance(args.metric, 0.5, args.data.val.classes)
+    if args.lr_decay_period > 0:
+        lr_decay_epoch = list(range(args.lr_decay_period, args.epochs, args.lr_decay_period))
+    else:
+        lr_decay_epoch = [int(i) for i in args.lr_decay_epoch.split(',')]
+    lr_decay_epoch = [e - args.warmup_epochs for e in lr_decay_epoch]
+    num_batches = args.num_samples // args.batch_size
+    lr_scheduler = LRSequential([
+        LRScheduler('linear', base_lr=0, target_lr=args.lr,
+                    nepochs=args.warmup_epochs, iters_per_epoch=num_batches),
+        LRScheduler(args.lr_mode, base_lr=args.lr,
+                    nepochs=args.epochs - args.warmup_epochs,
+                    iters_per_epoch=num_batches,
+                    step_epoch=lr_decay_epoch,
+                    step_factor=args.lr_decay, power=2),
+    ])
 
-    def _demo_early_stopping(batch_id):
-        if 'demo' in vars(args):
-            if args.demo and batch_id == 3:
-                return True
-        return False
+    trainer = gluon.Trainer(
+        net.collect_params(), 'sgd',
+        {'wd': args.wd, 'momentum': args.momentum, 'lr_scheduler': lr_scheduler},
+        kvstore='local')
 
-    def train(epoch):
-        #TODO (cgraywang): change to lr scheduler
-        if hasattr(args, 'lr_step') and hasattr(args, 'lr_factor'):
-            if epoch % args.lr_step == 0:
-                trainer.set_learning_rate(trainer.learning_rate * args.lr_factor)
-        net.hybridize(static_alloc=True, static_shape=True)
-        for i, batch in enumerate(train_data):
-            data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
-            cls_targets = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
-            box_targets = gluon.utils.split_and_load(batch[2], ctx_list=ctx, batch_axis=0)
-            with autograd.record():
-                cls_preds = []
-                box_preds = []
-                for x in data:
-                    cls_pred, box_pred, _ = net(x)
-                    cls_preds.append(cls_pred)
-                    box_preds.append(box_pred)
-                sum_loss, cls_loss, box_loss = L(
-                    cls_preds, box_preds, cls_targets, box_targets)
-                autograd.backward(sum_loss)
-            trainer.step(1)
+    # targets
+    sigmoid_ce = gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False)
+    l1_loss = gluon.loss.L1Loss()
 
-            if _demo_early_stopping(i):
-                break
+    # metrics
+    obj_metrics = mx.metric.Loss('ObjLoss')
+    center_metrics = mx.metric.Loss('BoxCenterLoss')
+    scale_metrics = mx.metric.Loss('BoxScaleLoss')
+    cls_metrics = mx.metric.Loss('ClassLoss')
+
+    # set up logger
+    logging.basicConfig()
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    log_file_path = args.save_prefix + '_train.log'
+    log_dir = os.path.dirname(log_file_path)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    fh = logging.FileHandler(log_file_path)
+    logger.addHandler(fh)
+    logger.info(args)
+    #logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
+    best_map = [0]
+
+    pre_current_map = 0
+    tbar = tqdm(range(args.start_epoch, args.epochs))
+    for epoch in tbar:
+        #tbar2.next()
+        if args.mixup:
+            # TODO(zhreshold): more elegant way to control mixup during runtime
+            try:
+                train_data._dataset.set_mixup(np.random.beta, 1.5, 1.5)
+            except AttributeError:
+                train_data._dataset._data.set_mixup(np.random.beta, 1.5, 1.5)
+            if epoch >= args.epochs - args.no_mixup_epochs:
+                try:
+                    train_data._dataset.set_mixup(None)
+                except AttributeError:
+                    train_data._dataset._data.set_mixup(None)
+
+        tic = time.time()
+        btic = time.time()
         mx.nd.waitall()
+        net.hybridize()
+        for i, batch in enumerate(train_data):
+            batch_size = batch[0].shape[0]
+            data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
+            # objectness, center_targets, scale_targets, weights, class_targets
+            fixed_targets = [gluon.utils.split_and_load(batch[it], ctx_list=ctx, batch_axis=0) for it in range(1, 6)]
+            gt_boxes = gluon.utils.split_and_load(batch[6], ctx_list=ctx, batch_axis=0)
+            sum_losses = []
+            obj_losses = []
+            center_losses = []
+            scale_losses = []
+            cls_losses = []
+            with autograd.record():
+                for ix, x in enumerate(data):
+                    obj_loss, center_loss, scale_loss, cls_loss = net(x, gt_boxes[ix], *[ft[ix] for ft in fixed_targets])
+                    sum_losses.append(obj_loss + center_loss + scale_loss + cls_loss)
+                    obj_losses.append(obj_loss)
+                    center_losses.append(center_loss)
+                    scale_losses.append(scale_loss)
+                    cls_losses.append(cls_loss)
+                autograd.backward(sum_losses)
+            trainer.step(batch_size)
+            obj_metrics.update(0, obj_losses)
+            center_metrics.update(0, center_losses)
+            scale_metrics.update(0, scale_losses)
+            cls_metrics.update(0, cls_losses)
+            if args.log_interval and not (i + 1) % args.log_interval:
+                name1, loss1 = obj_metrics.get()
+                name2, loss2 = center_metrics.get()
+                name3, loss3 = scale_metrics.get()
+                name4, loss4 = cls_metrics.get()
+                logger.info('[Epoch {}][Batch {}], LR: {:.2E}, Speed: {:.3f} samples/sec, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
+                    epoch, i, trainer.learning_rate, batch_size/(time.time()-btic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
+            btic = time.time()
 
-    def test(epoch):
-        metric.reset()
-        net.set_nms(nms_thresh=0.45, nms_topk=400)
-        net.hybridize(static_alloc=True, static_shape=True)
-        for i, batch in enumerate(val_data):
-            data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0,
-                                              even_split=False)
-            label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0,
-                                               even_split=False)
-            det_bboxes = []
-            det_ids = []
-            det_scores = []
-            gt_bboxes = []
-            gt_ids = []
-            gt_difficults = []
-            for x, y in zip(data, label):
-                ids, scores, bboxes = net(x)
-                det_ids.append(ids)
-                det_scores.append(scores)
-                det_bboxes.append(bboxes.clip(0, batch[0].shape[2]))
-                gt_ids.append(y.slice_axis(axis=-1, begin=4, end=5))
-                gt_bboxes.append(y.slice_axis(axis=-1, begin=0, end=4))
-                gt_difficults.append(
-                    y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None)
-            metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults)
-            if _demo_early_stopping(i):
-                break
-        map_name, mean_ap = metric.get()
-        # TODO (cgraywang): add ray
-        reporter(epoch=epoch, map=float(mean_ap[-1]))
-
-    for epoch in range(1, args.epochs + 1):
-        train(epoch)
-        if hasattr(args, 'val_interval'):
-            if epoch % args.val_interval == 0:
-                test(epoch)
+        name1, loss1 = obj_metrics.get()
+        name2, loss2 = center_metrics.get()
+        name3, loss3 = scale_metrics.get()
+        name4, loss4 = cls_metrics.get()
+        #logger.info('[Epoch {}] Training cost: {:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
+        #    epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
+        if (not (epoch + 1) % args.val_interval) and not final_fit:
+            # consider reduce the frequency of validation to save time
+            map_name, mean_ap = validate(net, val_data, ctx, eval_metric)
+            val_msg = ' '.join(['{}={}'.format(k, v) for k, v in zip(map_name, mean_ap)])
+            tbar.set_description('[Epoch {}] Validation: {}'.format(epoch, val_msg))
+            current_map = float(mean_ap[-1])
+            pre_current_map = current_map
         else:
-            test(epoch)
+            current_map = pre_current_map
+        reporter(epoch=epoch, map_reward=current_map)
+
+@args()
+def train_object_detection(args, reporter):
+    # fix seed for mxnet, numpy and python builtin random generator.
+    gutils.random.seed(args.seed)
+
+    # training contexts
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+
+    net_name = '_'.join(('yolo3', args.net, 'custom'))
+    args.save_prefix += net_name
+
+    net = gcv.model_zoo.get_model(net_name, 
+                                  classes=args.dataset.get_classes(),
+                                  pretrained_base=False, 
+                                  transfer='coco')
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        net.initialize()
+
+    # training data
+    train_dataset, val_dataset, eval_metric = args.dataset.get_train_val_metric()
+    train_data, val_data = get_dataloader(net,
+        train_dataset, val_dataset, args.data_shape, args.batch_size, args.num_workers, args)
+
+    # training
+    train(net, train_data, val_data, eval_metric, ctx, args, reporter, args.final_fit)
+
+    if args.final_fit:
+        return {'model_params': collect_params(net)}
