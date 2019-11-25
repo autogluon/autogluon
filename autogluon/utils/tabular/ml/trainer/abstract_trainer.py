@@ -150,9 +150,7 @@ class AbstractTrainer:
         if self.bagged_mode:
             if type(model) != BaggedEnsembleModel:
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
-            X = pd.concat([X_train, X_test], ignore_index=True)  # TODO: Consider doing earlier so this isn't repeated for each model
-            y = pd.concat([y_train, y_test], ignore_index=True)
-            model.fit(X=X, y=y, k_fold=self.kfolds, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X_train, y=y_train, k_fold=self.kfolds, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
 
@@ -175,6 +173,8 @@ class AbstractTrainer:
         if hyperparameter_tune:
             if self.scheduler_func is None or self.scheduler_options is None:
                 raise ValueError("scheduler_options cannot be None when hyperparameter_tune = True")
+            if (X_test is None) or (y_test is None):
+                X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
@@ -228,24 +228,23 @@ class AbstractTrainer:
         if len(self.model_names) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
-        bagged_mode = self.model_types[self.model_names[0]] == BaggedEnsembleModel
-        if bagged_mode:
-            X_test = pd.concat([X_train, X_test], ignore_index=True)
-            y_test = pd.concat([y_train, y_test], ignore_index=True)
+        # TODO: Might want to remove this to avoid needless computation
+        # if self.bagged_mode:
+        #     ensemble_voting_score = self.score_bagged(y=y_train, weights='voting')
+        # else:
+        #     ensemble_voting_score = self.score(X=X_test, y=y_test, weights='voting')
+        # self.model_performance['ensemble.equal_weights'] = ensemble_voting_score
+        # print('Score of voting ensemble:', ensemble_voting_score)
 
-        if not bagged_mode:
-            ensemble_voting_score = self.score(X=X_test, y=y_test, weights='voting')  # TODO: Might want to remove this to avoid needless computation
+        if self.bagged_mode:
+            self.model_weights = self.compute_optimal_voting_ensemble_weights(models=self.model_names, X=X_train, y=y_train, bagged_mode=self.bagged_mode)
         else:
-            ensemble_voting_score = self.score_bagged(y=y_test, weights='voting')
+            self.model_weights = self.compute_optimal_voting_ensemble_weights(models=self.model_names, X=X_test, y=y_test, bagged_mode=self.bagged_mode)
 
-        self.model_performance['ensemble.equal_weights'] = ensemble_voting_score
-        print('Score of voting ensemble:', ensemble_voting_score)
-        self.model_weights = self.compute_optimal_voting_ensemble_weights(models=self.model_names, X_test=X_test, y_test=y_test, bagged_mode=bagged_mode)
-
-        if not bagged_mode:
+        if self.bagged_mode:
+            ensemble_weighted_score = self.score_bagged(y=y_train)
+        else:
             ensemble_weighted_score = self.score(X=X_test, y=y_test)
-        else:
-            ensemble_weighted_score = self.score_bagged(y=y_test)
 
         print('Score of weighted ensemble:', ensemble_weighted_score)
         self.model_performance['weighted_ensemble'] = ensemble_weighted_score
@@ -276,8 +275,7 @@ class AbstractTrainer:
             model = self.train_single(X_train, y_train, X_test, y_test, model, objective_func=self.objective_func)
             fit_end_time = time.time()
             if type(model) == BaggedEnsembleModel:
-                y = pd.concat([y_train, y_test], ignore_index=True)
-                score = model.score_with_y_pred_proba(y=y, y_pred_proba=model.oof_pred_proba)
+                score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
             else:
                 score = model.score(X=X_test, y=y_test)
             pred_end_time = time.time()
@@ -385,11 +383,11 @@ class AbstractTrainer:
         return y_pred_ensemble
 
     def predict_voting_ensemble_optimize(self, models, X_test, y_test):
-        optimal_weights = self.compute_optimal_voting_ensemble_weights(models=models, X_test=X_test, y_test=y_test)
+        optimal_weights = self.compute_optimal_voting_ensemble_weights(models=models, X=X_test, y=y_test)
         return self.predict_voting_ensemble(models=models, X_test=X_test, weights=optimal_weights)
 
     # Ensemble Selection (https://dl.acm.org/citation.cfm?id=1015432)
-    def compute_optimal_voting_ensemble_weights(self, models, X_test, y_test, bagged_mode=False):
+    def compute_optimal_voting_ensemble_weights(self, models, X, y, bagged_mode=False):
         if bagged_mode:
             pred_probas = []
             for model in models:
@@ -397,9 +395,9 @@ class AbstractTrainer:
                     model = self.load_model(model)
                 pred_probas.append(model.oof_pred_proba)
         else:
-            pred_probas = self.pred_proba_predictions(models=models, X_test=X_test)
+            pred_probas = self.pred_proba_predictions(models=models, X_test=X)
         ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
-        ensemble_selection.fit(predictions=pred_probas, labels=y_test, identifiers=None)
+        ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
         return ensemble_selection.weights_
 
     # TODO: Implement stacking
