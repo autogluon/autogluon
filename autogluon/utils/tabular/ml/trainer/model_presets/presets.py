@@ -56,7 +56,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
         )
     if xt_options is not None:
-        params = {'n_estimators': 100, 'n_jobs': -1}
+        params = {'n_estimators': 150, 'n_jobs': -1}
         params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
             RFModel(path=path, name='ExtraTreesClassifier', model=ExtraTreesClassifier(**params), problem_type=problem_type,
@@ -121,7 +121,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
         )
     if xt_options is not None:
-        params = {'n_estimators': 100, 'n_jobs': -1}
+        params = {'n_estimators': 150, 'n_jobs': -1}
         params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         models.append(
             RFModel(path=path, name='ExtraTreesRegressor', model=ExtraTreesRegressor(**params), problem_type=problem_type,
