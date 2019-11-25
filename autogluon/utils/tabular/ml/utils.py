@@ -178,7 +178,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
             ngpus_per_trial = 0
     if ngpus_per_trial > 1:
         ngpus_per_trial = 1
-        print("predict_table_column currently does not use more than 1 GPU per training run. ngpus_per_trial has been set = 1")
+        print("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
     return (nthreads_per_trial, ngpus_per_trial)
 
 

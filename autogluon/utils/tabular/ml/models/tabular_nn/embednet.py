@@ -72,7 +72,7 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
         and we create a new EmbedNet based on the provided architecture description 
         (thus ignoring train_dataset, params, num_net_outputs). 
     """
-    def __init__(self, train_dataset=None, params=None, num_net_outputs=None, architecture_desc=None, **kwargs):
+    def __init__(self, train_dataset=None, params=None, num_net_outputs=None, architecture_desc=None, ctx=None, **kwargs):
         if (architecture_desc is None) and (train_dataset is None or params is None or num_net_outputs is None):
             raise ValueError("train_dataset, params, num_net_outputs cannot = None if architecture_desc=None")
         super(EmbedNet, self).__init__(**kwargs)
@@ -126,8 +126,14 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 self.y_constraint = None
                 self.y_span = nd.array(params['y_range'][1] - params['y_range'][0])
                 self.y_lower = nd.array(params['y_range'][0])
-            self.y_range = (nd.array(params['y_range'][0]), nd.array(params['y_range'][1]))
-        
+                if ctx is not None:
+                    self.y_span = self.y_span.as_in_context(ctx) # TODO: this step doesn't work if ctx=gpu during HPO
+                    self.y_lower = self.y_lower.as_in_context(ctx)
+            if ctx is None:
+                self.y_range = (nd.array(params['y_range'][0]), nd.array(params['y_range'][1]))
+            else:
+                self.y_range = (nd.array(params['y_range'][0]).as_in_context(ctx),
+                                nd.array(params['y_range'][1]).as_in_context(ctx))
         if architecture_desc is None: # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features, 
                                   'has_embed_features': self.has_embed_features,

@@ -87,6 +87,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_type_map = None
         self.processor = None # data processor
         self.summary_writer = None
+        self.ctx = mx.cpu(0)
 
     # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
     def create_unfit_copy(self):
@@ -212,7 +213,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.set_net_defaults(train_dataset)
         self.ctx = self.params['ctx']
         net = EmbedNet(train_dataset=train_dataset, params=self.params,
-                       num_net_outputs=self.num_net_outputs)
+                       num_net_outputs=self.num_net_outputs, ctx=self.ctx)
         self.architecture_desc = net.architecture_desc # Description of network architecture
         self.net_filename = self.path + self.temp_file_name
         self.model = net
@@ -651,9 +652,9 @@ class TabularNeuralNetModel(AbstractModel):
         obj = load_pkl.load(path = path + cls.model_file_name)
         if reset_paths:
             obj.set_contexts(path)
-        obj.model = EmbedNet(architecture_desc=obj.architecture_desc) # recreate network from architecture description
+        obj.model = EmbedNet(architecture_desc=obj.architecture_desc, ctx=obj.ctx) # recreate network from architecture description
         # TODO: maybe need to initialize/hybridize??
-        obj.model.load_parameters(path + cls.params_file_name)
+        obj.model.load_parameters(path + cls.params_file_name, ctx=obj.ctx)
         obj.summary_writer = None
         return obj
 
@@ -674,7 +675,8 @@ class TabularNeuralNetModel(AbstractModel):
             self.params['ctx'] = mx.gpu() # TODO: currently does not use more than 1 GPU
         else:
             self.params['ctx'] = mx.cpu()
-
+        self.params['ctx'] = mx.cpu() # TODO: scheduler GPU as_in_context() not work right now. Error = tensor_gpu-inl.h:35: Check failed: e == cudaSuccess CUDA: initialization error
+        
         start_time = time.time()
         X_train = self.preprocess(X_train)
         if self.features is None:
