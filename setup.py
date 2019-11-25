@@ -53,7 +53,6 @@ requirements = [
     'paramiko==2.5.0',
     'distributed==2.6.0',
     'ConfigSpace==0.4.10',
-    'nose',
     'gluoncv',
     'gluonnlp',
     'graphviz',
