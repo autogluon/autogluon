@@ -1,5 +1,5 @@
 from gluonnlp import optimizer
-from ..core import obj
+from ...core import obj
 
 __all__ = ['BERTAdam']
 
