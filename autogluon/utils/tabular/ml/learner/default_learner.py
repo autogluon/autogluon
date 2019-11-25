@@ -23,14 +23,15 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
-            feature_prune=False, holdout_frac=0.1, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
+            feature_prune=False, holdout_frac=0.1, kfolds=0, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
-                holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None)
+                holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None, ignored if kfolds != 0)
+                kfolds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
@@ -43,6 +44,7 @@ class DefaultLearner(AbstractLearner):
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
             low_memory=True,
+            kfolds=kfolds,
             compute_feature_importance=self.compute_feature_importance,
             scheduler_options=scheduler_options)
 

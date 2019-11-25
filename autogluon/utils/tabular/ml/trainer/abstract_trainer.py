@@ -25,7 +25,7 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={},
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0,
                  compute_feature_importance=False):
         self.path = path
         self.problem_type = problem_type
@@ -44,6 +44,9 @@ class AbstractTrainer:
         self.num_classes = num_classes
         self.low_memory = low_memory
         self.compute_feature_importance = compute_feature_importance
+        self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
+        self.bagged_mode = True if self.kfolds >= 2 else False
+
         self.model_names = []
         self.model_performance = {}
         self.model_paths = {}
@@ -144,15 +147,18 @@ class AbstractTrainer:
         if self.scheduler_options is not None:
             model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
                 'num_gpus': self.scheduler_options['resource']['num_gpus'] } # Additional configurations for model.fit
-        if type(model) == BaggedEnsembleModel:
+        if self.bagged_mode:
+            if type(model) != BaggedEnsembleModel:
+                model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
             X = pd.concat([X_train, X_test], ignore_index=True)  # TODO: Consider doing earlier so this isn't repeated for each model
             y = pd.concat([y_train, y_test], ignore_index=True)
-            model.fit(X=X, y=y, k_fold=10, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X, y=y, k_fold=self.kfolds, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
 
         if self.compute_feature_importance:
             self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
+        return model
 
     def _compute_model_feature_importance(self, model, X_test, y_test):
         # Excluding vectorizers features from evaluation because usually there are too many of these
@@ -163,10 +169,7 @@ class AbstractTrainer:
         return feature_importance
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True):
-        bagged_mode = type(model) == BaggedEnsembleModel
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
-        if bagged_mode:  # TODO: Don't set feature_types_metadata here
-            model.model_base.feature_types_metadata = self.feature_types_metadata
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
@@ -175,14 +178,8 @@ class AbstractTrainer:
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
-                if bagged_mode:
-                    model = model.model_base
-                    # TODO: If HPO, do bagging at the end, current it just skips them.
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                                                                        Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
-                else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                        Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+                hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
+                    Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
                 print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')
@@ -201,8 +198,7 @@ class AbstractTrainer:
     def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         for i, model in enumerate(models):
             self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-        bagged_mode = type(models[0]) == BaggedEnsembleModel  # TODO: trainer parameter?
-        if bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
+        if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
             for i, hpo_model_name in enumerate(self.hpo_model_names):
                 model_hpo = self.load_model(hpo_model_name)
@@ -277,7 +273,7 @@ class AbstractTrainer:
         print('training', model.name)
         try:
             fit_start_time = time.time()
-            self.train_single(X_train, y_train, X_test, y_test, model, objective_func=self.objective_func)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, objective_func=self.objective_func)
             fit_end_time = time.time()
             if type(model) == BaggedEnsembleModel:
                 y = pd.concat([y_train, y_test], ignore_index=True)
