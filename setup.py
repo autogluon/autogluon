@@ -43,12 +43,12 @@ except(IOError, ImportError):
     long_description = open('README.md').read()
 
 requirements = [
-    'numpy==1.17.2', # TODO: version needed for tabular atm
+    'numpy',
     'scipy',
     'cython',
     'tornado',
     'requests',
-    'matplotlib==3.1.1', # TODO: version needed for tabular atm
+    'matplotlib',
     'mxboard',
     'tqdm>=4.38.0',
     'paramiko==2.5.0',
