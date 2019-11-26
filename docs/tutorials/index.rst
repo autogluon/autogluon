@@ -40,6 +40,7 @@ Tabular Prediction
 .. container:: cards
    
    .. card::
+      :title: Quick Start Tutorial
       :link: tabular_prediction/tabular-quickstart.html
 
       Quick tutorial on fitting models with tabular datasets.
