@@ -44,7 +44,7 @@ An example shell script to download the dataset to `~/data/twittersa/` can be fo
 
 After downloading this script to your machine, run it with:
 
-```python
+```{.python .input}
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/download_twittersa.sh')
 # os.system('sh download_twittersa.sh')
@@ -105,7 +105,7 @@ please click the download link of [prepare_twittersa.py](../../static/prepare_tw
 
 Since AutoGluon provides the automatic Training/HPO Validation split, we can skip the HPO Validation split by running the command:
 
-```python
+```{.python .input}
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_twittersa.py')
 # os.system('python prepare_twittersa.py --data ~/data/twittersa/ --split 0')
@@ -125,7 +125,7 @@ Now you have the datasets ready used in AutoGluon.
 
 To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/HPO Validation split, use:  
 
-```python
+```{.python .input}
 # from autogluon import TextClassification as task
 # dataset = task.Dataset(name='twittersa', train_path='~/data/twittersa/train.csv')
 ```
@@ -146,7 +146,7 @@ or if there are specific text that you're sure you want included in a certain pa
 
 If we want to manually specify the Training/HPO Validation split, we could construct by running the command:
 
-```python
+```{.python .input}
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_twittersa.py')
 # os.system('python prepare_twittersa.py --data ~/data/twittersa/ --split 9')
@@ -167,13 +167,13 @@ The resulting data should be looking as the following structure:
 We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
 Then tell AutoGluon where the training and hpo validation data is, which means we disable AutoGluon's automatic Training/HPO Validation split functionality, instead, we manually provide the Training/HPO Validation split via:
 
-```python
+```{.python .input}
 # import os
 # os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/twittersa/data_twittersa.zip')
 # os.system('unzip -o data_twittersa.zip -d ~/')
 ```
 
-```python
+```{.python .input}
 # from autogluon import TextClassification as task
 # dataset = task.Dataset(name='twittersa', path='~/data/twittersa/train.csv')
 # hpo_val_dataset = task.Dataset(path='~/data/twittersa/hpo_val.csv')
@@ -189,14 +189,14 @@ we don't recommend directly running `fit` here since it will take a while to exe
 
 On your own, please feel free to try running the following commands with small time limits (just uncomment the code):
 
-```python
+```{.python .input}
 # time_limits = 10 * 60 # 10mins
 # predictor = task.fit(train=dataset, hpo_val=hpo_val_dataset, time_limits=time_limits)
 ```
 
 The top-1 accuracy of the best model on the hpo validation set is:
 
-```python
+```{.python .input}
 # print('Top-1 acc: %.3f' % predictor.results['best_reward'])
 ```
 
@@ -205,7 +205,7 @@ The top-1 accuracy of the best model on the hpo validation set is:
 We can ask our final model to generate predictions on the provided test sentences.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
-```python
+```{.python .input}
 # test_dataset = task.Dataset(path='/home/ubuntu/data/twittersa/test.csv')
 # inds = predictor.predict(test_dataset)
 # probs = predictor.predict_proba(test_dataset)
@@ -217,7 +217,7 @@ We first load the test data as a `Dataset` object and then call [predict](../api
 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 
-```python
+```{.python .input}
 # import autogluon as ag
 # ag.utils.generate_csv(inds, '/home/ubuntu/data/twittersa/submission.csv')
 ```
@@ -232,6 +232,6 @@ and click the `Make Submission` button). Let's see how your model fares in this 
 
 At the end, please remember to safely exit to release all the resources:
 
-```python
+```{.python .input}
 # ag.done()
 ```

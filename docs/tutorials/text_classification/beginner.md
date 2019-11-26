@@ -8,7 +8,7 @@ In this tutorial, we are using sentiment analysis as a text classification examp
 
 We begin by specifying `TextClassification` as our task of interest:
 
-```python
+```{.python .input}
 import autogluon as ag
 from autogluon import TextClassification as task
 
@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 The Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) consists of sentences from movie
 reviews and human annotations of their sentiment. The task is to classify whether a given sentence has positive or negative sentiment (binary classification).
 
-```python
+```{.python .input}
 dataset = task.Dataset(name='SST')
 ```
 
@@ -36,7 +36,7 @@ While we stick with mostly default configurations in this Beginner tutorial, the
 
 However, neural network training can be quite time-costly. To ensure quick runtimes, we tell AutoGluon to obey strict limits: `num_training_epochs` specifies how much computational effort can be devoted to training any single network, while `time_limits` in seconds specifies how much time `fit` has to return a model. For demo purposes, we specify only small values for `time_limits`, `num_training_epochs`:
 
-```python
+```{.python .input}
 time_limits = 3*60 # 3mins
 epochs = 10
 predictor = task.fit(dataset,
@@ -48,7 +48,7 @@ Within `fit`, the model with the best hyperparameter configuration is selected b
 
 The best Top-1 accuracy achieved on the validation set is:
 
-```python
+```{.python .input}
 print('Top-1 val acc: %.3f' % predictor.results['best_reward'])
 ```
 
@@ -56,14 +56,14 @@ Within `fit`, this model is also finally fitted on our entire dataset (ie. mergi
 
 We now construct a test dataset similarly as we did with the train dataset, and then `evaluate` the final model produced by `fit` on the test data:
 
-```python
+```{.python .input}
 test_acc = predictor.evaluate(dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 Given an example sentence, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
-```python
+```{.python .input}
 sentence = 'I feel this is awesome!'
 ind = predictor.predict(sentence)
 print('The input sentence sentiment is classified as [%d].' % ind)
@@ -72,7 +72,7 @@ print('The input sentence sentiment is classified as [%d].' % ind)
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.
 For example, we can inspect the best hyperparameter configuration corresponding to the final model which achieved the above results:
 
-```python
+```{.python .input}
 print('The best configuration is:')
 print(predictor.results['best_config'])
 ```
@@ -81,6 +81,6 @@ This configuration is used to generate the above results.
 
 At the end, please remember to safely exit to release all the resources:
 
-```python
+```{.python .input}
 ag.done()
 ```
