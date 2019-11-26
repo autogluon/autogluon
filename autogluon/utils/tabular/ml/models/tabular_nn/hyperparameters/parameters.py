@@ -3,22 +3,27 @@ import mxnet as mx
 
 from ....constants import BINARY, MULTICLASS, REGRESSION
 
-# Parameters that currently cannot be searched during HPO:
-fixed_params = {
-    'num_epochs': 300, # maximum number of epochs for training NN
-    'num_dataloading_workers': 1, # will be overwritten by nthreads_per_trial
-    'ctx': (mx.gpu() if mx.test_utils.list_gpus() else mx.cpu()), # will be overwritten by ngpus_per_trial
-    'seed_value': None, # random seed for reproducibility (set = None to ignore)
-    # For data processing:
-    'proc.embed_min_categories': 4, # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
-    # Options: [3,4,10, 100, 1000]
-    'proc.impute_strategy': 'median', # # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
-   # Options: ['median', 'mean', 'most_frequent']
-    'proc.max_category_levels': 500, # maximum number of allowed levels per categorical feature
-    # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
-    'proc.skew_threshold': 0.99, # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-    # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
-}
+
+def get_fixed_params():
+    # Parameters that currently cannot be searched during HPO:
+    fixed_params = {
+        'num_epochs': 300, # maximum number of epochs for training NN
+        'num_dataloading_workers': 1, # will be overwritten by nthreads_per_trial
+        'ctx': (mx.gpu() if mx.test_utils.list_gpus() else mx.cpu()), # will be overwritten by ngpus_per_trial  # NOTE: Causes crash during GPU HPO if not wrapped in a function.
+        'seed_value': None, # random seed for reproducibility (set = None to ignore)
+        # For data processing:
+        'proc.embed_min_categories': 4, # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
+        # Options: [3,4,10, 100, 1000]
+        'proc.impute_strategy': 'median', # # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
+       # Options: ['median', 'mean', 'most_frequent']
+        'proc.max_category_levels': 500, # maximum number of allowed levels per categorical feature
+        # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
+        'proc.skew_threshold': 0.99, # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
+    }
+    return fixed_params
+
+
 # Parameters that can be tuned during HPO:
 hyper_params = {
     ## Hyperparameters for neural net architecture:
@@ -73,18 +78,18 @@ def get_default_param(problem_type, num_classes=None):
 
 
 def get_param_multiclass(num_classes):
-    params = fixed_params.copy()
+    params = get_fixed_params()
     params.update(hyper_params.copy())
     return params
 
 
 def get_param_binary():
-    params = fixed_params.copy()
+    params = get_fixed_params()
     params.update(hyper_params.copy())
     return params
 
 
 def get_param_regression():
-    params = fixed_params.copy()
+    params = get_fixed_params()
     params.update(hyper_params.copy())
     return params
