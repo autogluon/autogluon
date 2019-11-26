@@ -1,7 +1,6 @@
 from unittest import TestCase
 import numpy as np
 import autogluon as ag
-from nose.plugins.attrib import attr
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),
