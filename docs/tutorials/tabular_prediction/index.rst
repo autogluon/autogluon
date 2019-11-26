@@ -8,13 +8,13 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
    .. card::
       :title: Quick Start Using FIT
-      :link: tabular_prediction/tabular-quickstart.html
+      :link: tabular-quickstart.html
 
       Quick tutorial on fitting models with tabular datasets.
 
    .. card::
       :title: In-depth FIT Tutorial
-      :link: tabular_prediction/tabular-indepth.html
+      :link: tabular-indepth.html
 
       In-depth tutorial on controlling various aspects of model fitting.
 
