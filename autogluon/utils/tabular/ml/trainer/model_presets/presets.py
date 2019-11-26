@@ -64,13 +64,13 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         )
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = {'weights': 'uniform'}
+        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
         knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
             KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params), problem_type=problem_type,
                     objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
-        knn_dist_params = {'weights': 'distance'}
+        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
         knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
             KNNModel(path=path, name='KNeighborsClassifierDist', model=KNeighborsClassifier(**knn_dist_params), problem_type=problem_type,
@@ -129,13 +129,13 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
         )
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = {'weights': 'uniform'}
+        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
         knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
             KNNModel(path=path, name='KNeighborsRegressorUnif', model=KNeighborsRegressor(**knn_unif_params), problem_type=problem_type,
                     objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
-        knn_dist_params = {'weights': 'distance'}
+        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
         knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
             KNNModel(path=path, name='KNeighborsRegressorDist', model=KNeighborsRegressor(**knn_dist_params), problem_type=problem_type,
