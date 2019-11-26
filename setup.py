@@ -58,6 +58,7 @@ requirements = [
     'gluoncv',
     'gluonnlp',
     'graphviz',
+    'scikit-optimize',
     'botocore==1.12.253',
     'boto3==1.9.187',
     # 'catboost',  # TODO: Fix CI issue to enable
@@ -69,10 +70,9 @@ requirements = [
     'pyarrow==0.15.0',
     's3fs==0.3.1',
     'scikit-learn==0.21.2',
-    'scikit-optimize==0.5.2',
-    'spacy==2.1.4',
     # 'fastai==1.0.55',  # TODO: Required for contrib PyTorch tabular NN
     # 'torch'  # TODO: tabular needs torch==1.1.0 atm
+    # 'spacy==2.1.4',  # Used by fastai
 ]
 
 setup(
