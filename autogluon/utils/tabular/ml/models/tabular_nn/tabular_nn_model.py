@@ -672,7 +672,7 @@ class TabularNeuralNetModel(AbstractModel):
         num_gpus = scheduler_options['resource']['num_gpus']
         self.params['num_dataloading_workers'] = max(1, int(num_cpus/2.0))
         if num_gpus >= 1:
-            self.params['ctx'] = mx.gpu() # TODO: currently does not use more than 1 GPU
+            self.params['ctx'] = mx.gpu() # TODO: currently cannot use more than 1 GPU until scheduler works
         else:
             self.params['ctx'] = mx.cpu()
         self.params['ctx'] = mx.cpu() # TODO: scheduler GPU as_in_context() not work right now. Error = tensor_gpu-inl.h:35: Check failed: e == cudaSuccess CUDA: initialization error

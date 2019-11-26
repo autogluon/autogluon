@@ -10,6 +10,8 @@ from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, Repea
 from .constants import BINARY, REGRESSION
 from ..utils.savers import save_pd
 from ..utils.decorators import calculate_time
+from ....scheduler.resource import get_gpu_count
+
 
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
@@ -179,7 +181,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if nthreads_per_trial is None:
         nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
     if ngpus_per_trial is None:
-        if mx.test_utils.list_gpus():
+        if get_gpu_count():
             ngpus_per_trial = 1  # Single GPU / trial
         else:
             ngpus_per_trial = 0
