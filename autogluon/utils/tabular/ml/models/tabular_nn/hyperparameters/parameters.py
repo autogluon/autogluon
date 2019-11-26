@@ -2,6 +2,7 @@
 import mxnet as mx
 
 from ....constants import BINARY, MULTICLASS, REGRESSION
+from .......scheduler.resource import get_gpu_count
 
 
 def get_fixed_params():
@@ -9,7 +10,7 @@ def get_fixed_params():
     fixed_params = {
         'num_epochs': 300, # maximum number of epochs for training NN
         'num_dataloading_workers': 1, # will be overwritten by nthreads_per_trial
-        'ctx': (mx.gpu() if mx.test_utils.list_gpus() else mx.cpu()), # will be overwritten by ngpus_per_trial  # NOTE: Causes crash during GPU HPO if not wrapped in a function.
+        'ctx': (mx.gpu() if get_gpu_count() > 0 else mx.cpu()), # will be overwritten by ngpus_per_trial  # NOTE: Causes crash during GPU HPO if not wrapped in a function.
         'seed_value': None, # random seed for reproducibility (set = None to ignore)
         # For data processing:
         'proc.embed_min_categories': 4, # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
