@@ -1,7 +1,6 @@
 from unittest import TestCase
 import numpy as np
 import autogluon as ag
-from nose.plugins.attrib import attr
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),
@@ -51,8 +50,7 @@ def test_schedulers():
     test_fifo_scheduler()
     test_hyperband_scheduler()
     test_rl_scheduler()
+    ag.done()
 
 if __name__ == '__main__':
-    import nose
-    nose.runmodule()
-    ag.done()
+    test_schedulers()
