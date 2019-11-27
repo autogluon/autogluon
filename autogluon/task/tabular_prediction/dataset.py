@@ -1,7 +1,9 @@
 import warnings
 import pandas as pd
 
-from ...utils.tabular.utils.loaders import load_pd
+from ...utils import warning_filter
+with warning_filter():
+    from ...utils.tabular.utils.loaders import load_pd
 
 __all__ = ['TabularDataset']
 

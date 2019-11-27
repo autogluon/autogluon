@@ -61,7 +61,6 @@ requirements = [
     'scikit-optimize',
     'botocore==1.12.253',
     'boto3==1.9.187',
-    # 'catboost',  # TODO: Fix CI issue to enable
     'fastparquet==0.3.1',
     'joblib==0.13.2',
     'lightgbm==2.3.0',
@@ -70,9 +69,6 @@ requirements = [
     'pyarrow==0.15.0',
     's3fs==0.3.1',
     'scikit-learn==0.21.2',
-    # 'fastai==1.0.55',  # TODO: Required for contrib PyTorch tabular NN
-    # 'torch'  # TODO: tabular needs torch==1.1.0 atm
-    # 'spacy==2.1.4',  # Used by fastai
 ]
 
 setup(

@@ -304,6 +304,8 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
                         break
 
     def _callback(env):
+        try_import_lightgbm()
+        from lightgbm.callback import _format_eval_result, EarlyStopException
         cur_time = time.time()
         # if verbose:
         #     print(cur_time - timex[0])
