@@ -4,6 +4,7 @@ import numpy as np
 from .......core import args
 from ..callbacks import hpo_callback
 from ....constants import BINARY, MULTICLASS, REGRESSION
+from ......try_import import try_import_lightgbm
 
 logger = logging.getLogger(__name__)  # TODO: Currently unused
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)  # TODO: Currently unused
 @args()
 def lgb_trial(args, reporter):
     """ Training script for hyperparameter evaluation of Gradient Boosting model """
+    try_import_lightgbm()
     import lightgbm as lgb
     # list of args which are not model hyperparameters:
     nonparam_args = set(['directory', 'task_id', 'lgb_model', 'dataset_train_filename', 'dataset_val_filename'])

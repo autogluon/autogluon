@@ -1,4 +1,12 @@
-__all__ = ['try_import_mxboard', 'try_import_mxnet', 'try_import_cv2']
+__all__ = ['try_import_lightgbm', 'try_import_mxboard', 'try_import_mxnet',
+           'try_import_cv2']
+
+def try_import_lightgbm():
+    try:
+        import lightgbm
+    except OSError as e:
+        raise ImportError("Import lightgbm failed. If you are using Mac OSX, "
+                          "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
 
 def try_import_mxboard():
     try:
