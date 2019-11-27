@@ -3,10 +3,9 @@
 
 In this tutorial, we are showing an example of doing HPO using AutoGluon using PyTorch.
 AutoGluon is a framework agnostic HPO toolkit, which is compatible with
-any training code written in python. (Training code is adapted from
-[git repo](https://github.com/kuangliu/pytorch-cifar)).
+any training code written in python. (The Pytorch code used as an example in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own Pytorch code).
 
-Import the torch and torchvision:
+Import the packages:
 
 ```{.python .input}
 import torch
@@ -22,7 +21,7 @@ from tqdm.auto import tqdm
 
 ### Data Transforms
 
-Standard data transforms during training and validation:
+We first apply standard image transforms to our training and validation data:
 
 ```{.python .input}
 transform = transforms.Compose([
@@ -39,8 +38,7 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 
 The following `train_cifar` function is a normal training code a user would write for
 training on MNIST dataset. Python users typically use an argparser for conveniently
-changing default values. The only extra component introduced is `reporter`,
-which we will discribe later.
+changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
 
 ```{.python .input}
 def train_cifar(args, reporter):
@@ -147,8 +145,7 @@ class Net(nn.Module):
 
 ### Convert the Training Function to Be Searchable
 
-We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar`
-function to AutoGluon Searchable.
+We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
 
 ```{.python .input}
 @ag.args(
@@ -180,7 +177,7 @@ myscheduler.run()
 myscheduler.join_jobs()
 ```
 
-Plot the results.
+We plot the test accuracy achieved over the course of training under each hyperparameter configuration that AutoGluon tried out (represented as different colors).
 
 ```{.python .input}
 myscheduler.get_training_curves(plot=True,use_legend=False)
