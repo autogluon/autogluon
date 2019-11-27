@@ -46,18 +46,17 @@ def train_fn(args, reporter):
     assert g.obj.name in ['auto', 'gluon']
     assert hasattr(h, 'name') or h == 'test'
     assert i in ['mxnet', 'pytorch']
-    reporter(epoch=e, accuracy=0)
+    reporter(epoch=0, accuracy=0)
 
-def test_fifo_scheduler():
+def test_search_space():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 2, 'num_gpus': 0},
-                                           num_trials=20,
+                                           num_trials=10,
                                            reward_attr='accuracy',
                                            time_attr='epoch')
     scheduler.run()
     scheduler.join_jobs()
+    ag.done()
 
 if __name__ == '__main__':
-    import nose
-    nose.runmodule()
-    ag.done()
+    test_search_space()

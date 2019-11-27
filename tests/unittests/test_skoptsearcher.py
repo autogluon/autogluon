@@ -84,5 +84,4 @@ def toy_reward(config):
     return reward
 
 if __name__ == '__main__':
-    import nose
-    nose.runmodule()
+    test_skoptsearcher()
