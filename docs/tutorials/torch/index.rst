@@ -12,16 +12,9 @@ fast prototyping on any customized python code. Prior to this tutorial, we recom
 
       Use AutoGluon to automatically optimize hyperparameters of your Pytorch networks.
 
-   .. card::
-      :title: Neural Architecture Search
-      :link: enas_mnist.html
-
-      Efficient Neural Architecture Search for low latency model
-      on Target Hardware.
 
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    hpo
-   enas_mnist
