@@ -1,5 +1,4 @@
 import logging, random
-import lightgbm as lgb
 import numpy as np
 
 from .......core import args
@@ -12,6 +11,7 @@ logger = logging.getLogger(__name__)  # TODO: Currently unused
 @args()
 def lgb_trial(args, reporter):
     """ Training script for hyperparameter evaluation of Gradient Boosting model """
+    import lightgbm as lgb
     # list of args which are not model hyperparameters:
     nonparam_args = set(['directory', 'task_id', 'lgb_model', 'dataset_train_filename', 'dataset_val_filename'])
     trial_id = args.task_id # Note may not start at 0 if HPO has been run for other models with same scheduler
