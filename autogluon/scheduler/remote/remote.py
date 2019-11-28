@@ -41,7 +41,7 @@ class Remote(Client):
         self.close(timeout=2)
         if self.service:
             self.service.shutdown()
-        super().shutdown(self)
+        super().shutdown()
 
     def __enter__(self):
         return self
