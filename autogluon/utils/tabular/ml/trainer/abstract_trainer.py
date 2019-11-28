@@ -516,6 +516,7 @@ class AbstractTrainer:
                           for stacker_model in stacker_models]
         X_train_init = stacker_models[0].preprocess(X=X, fit=True, compute_base_preds=True)
         for stacker_model in stacker_models:
+            stacker_model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't do this here
             stacker_model.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=self.kfolds, random_state=level+1)
             # print('bagged stacker fit!')
             # score = bagged_stacker_model.score_with_y_pred_proba(y=y, y_pred_proba=bagged_stacker_model.oof_pred_proba)

@@ -27,7 +27,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
                       hyperparameters={'NN':{},'GBM':{}}):
     # TODO: Expand options to RF and NN
     model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
-        solver='liblinear', multi_class='auto',  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
+        solver='liblinear', multi_class='auto', max_iter=500,  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
     ), problem_type=problem_type, objective_func=objective_func)
     return model
 
