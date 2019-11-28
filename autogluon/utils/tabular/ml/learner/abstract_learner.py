@@ -312,13 +312,13 @@ class AbstractLearner:
         """
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")
-        y = y.dropna() # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
+        y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
         # print(unique_vals)
         print('First 10 unique y values:', unique_vals[:10])
         unique_count = len(unique_vals)
-        MULTICLASS_LIMIT = 1000 # if numeric and class count would be above this amount, assume it is regression
-        REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
+        MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
+        REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
@@ -344,12 +344,12 @@ class AbstractLearner:
             reason = "dtype of label-column == object"
         elif unique_vals.dtype == 'int':
             unique_ratio = len(unique_vals)/float(len(y))
-            if unique_ratio > REGRESS_THRESHOLD:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == int and many unique label-values observed"
-            else:
+            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
                 reason = "dtype of label-column == int, but few unique label-values observed"
+            else:
+                problem_type = REGRESSION
+                reason = "dtype of label-column == int and many unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
         print("\nAutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
