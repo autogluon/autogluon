@@ -26,7 +26,7 @@ filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaw
 ag.unzip(filename)
 ```
 
-Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
+Once the dataset resides on our machine, we load it into an AutoGluon `Dataset` object: 
 
 ```{.python .input}
 dataset = task.Dataset(train_path='data/train')

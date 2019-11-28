@@ -140,7 +140,7 @@ The resulting data should be converted into the following directory structure:
 
 Now you have a dataset ready used in AutoGluon.
 
-To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
+To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
 
 ```{.python .input}
 # from autogluon import ImageClassification as task

@@ -7,7 +7,7 @@ These options include: defining the search space of various hyperparameter value
 The advanced functionalities of AutoGluon allow you to leverage your external knowledge about your particular prediction problem and computing resources to guide the training process. If properly utilized, you may be able to achieve superior performance within less training time.
 
 
-We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
+We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
 
 ```{.python .input}
 import autogluon as ag
@@ -97,7 +97,7 @@ defines a list of optimization search_strategys, from which we can construct ano
 
 Additionally, we can customize the optimizer-specific hyperparameters as another search space.
 As an example for both `Adam` and `SGD`, we can configure the learning rate and weight decay in a continuous-valued search space.
-Below, we specify that this space should be searched on a log-linear scale, providing two numbers to be lower and upper bounds for the space of values to try.  
+Below, we specify that this space should be searched on a log-linear scale, providing two numbers to be lower and upper bounds for the space of values to try.  
 
 Additionally, the momentum in `SGD` is configured as another continuous search space on a linear scale, where the two numbers are also the lower and upper bounds of the space. Moreover, to achieve better results, we could also configure the learning rate scheduler as a categorical space, where in this example, we enable decay and cosine based learning rate schedulers for SGD optimizer.
 
