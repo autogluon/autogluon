@@ -25,7 +25,7 @@ Image Classification
       Participate Kaggle competation.
 
 Object Detection
---------------------
+----------------
 .. container:: cards
 
    .. card::
@@ -33,6 +33,23 @@ Object Detection
       :link: object_detection/beginner.html
 
       Quick start tutorial.
+
+
+Tabular Prediction
+------------------
+.. container:: cards
+   
+   .. card::
+      :title: Quick Start Tutorial
+      :link: tabular_prediction/tabular-quickstart.html
+
+      Quick tutorial on fitting models with tabular datasets.
+
+   .. card::
+      :title: In-depth FIT Tutorial
+      :link: tabular_prediction/tabular-indepth.html
+
+      In-depth tutorial on controlling various aspects of model fitting.
 
 Customize AutoGluon
 -------------------
@@ -85,5 +102,6 @@ Neural Architecture Search
    course/index
    image_classification/index
    text_classification/index
+   tabular_prediction/index
    customize/index
    nas/index
