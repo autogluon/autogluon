@@ -19,50 +19,8 @@ from .metrics import get_metric_instance
 from .transforms import BERTDatasetTransform
 from ...core import *
 
-__all__ = ['train_text_classification', 'evaluate', 'preprocess_data']
+__all__ = ['train_text_classification', 'preprocess_data']
 logger = logging.getLogger(__name__)
-
-#TODO: fix
-def evaluate(model, loader_dev, metric, ctx, *args):
-    """Evaluate the model on validation dataset."""
-    use_roberta = 'roberta' in args.net
-    metric.reset()
-    for batch_id, seqs in enumerate(loader_dev):
-        input_ids, valid_length, segment_ids, label = seqs
-        input_ids = input_ids.as_in_context(ctx)
-        valid_length = valid_length.as_in_context(ctx).astype('float32')
-        label = label.as_in_context(ctx)
-        if use_roberta:
-            out = model(input_ids, valid_length)
-        else:
-            out = model(input_ids, segment_ids.as_in_context(ctx), valid_length)
-        metric.update([label], [out])
-
-    metric_nm, metric_val = metric.get()
-    if not isinstance(metric_nm, list):
-        metric_nm, metric_val = [metric_nm], [metric_val]
-    mx.nd.waitall()
-    return metric_nm, metric_val
-
-def get_vocab(ctx, *args):
-    # model and loss
-    model_name = args.net
-    dataset = args.pretrained_dataset
-
-    use_roberta = 'roberta' in model_name
-    get_model_params = {
-        'name': model_name,
-        'dataset_name': dataset,
-        'pretrained': True,
-        'ctx': ctx,
-        'use_decoder': False,
-        'use_classifier': False,
-    }
-    # RoBERTa does not contain parameters for sentence pair classification
-    if not use_roberta:
-        get_model_params['use_pooler'] = True
-    _, vocabulary = nlp.model.get_model(**get_model_params)
-    return vocabulary
 
 def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab, pad=False, num_workers=1):
     """Train/eval Data preparation function."""
@@ -84,7 +42,6 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
     data_train_len = data_train.transform(
         lambda input_id, length, segment_id, label_id: length, lazy=False)
     # bucket sampler for training
-    # vocabulary = get_vocab(ctx, args)
     pad_val = vocab[vocab.padding_token]
     batchify_fn = nlp.data.batchify.Tuple(
         nlp.data.batchify.Pad(axis=0, pad_val=pad_val),  # input
@@ -240,42 +197,11 @@ def train_text_classification(args, reporter=None):
         bert_tokenizer = BERTTokenizer(vocabulary, lower=do_lower_case)
 
 
-
     # Get the loader.
     logging.info('processing dataset...')
     train_data, dev_data_list, test_data_list, num_train_examples = preprocess_data(
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary,
         True, args.num_workers)
-
-    def _train_val_split(train_dataset):
-        split = args.data.split
-        if split == 0:
-            return train_dataset, None
-        split_len = int(len(train_dataset) / 10)
-        if split == 1:
-            data = [train_dataset[i][0].expand_dims(0) for i in
-                    range(split * split_len, len(train_dataset))]
-            label = [np.array([train_dataset[i][1]]) for i in
-                     range(split * split_len, len(train_dataset))]
-        else:
-            data = [train_dataset[i][0].expand_dims(0) for i in
-                    range((split - 1) * split_len)] + \
-                   [train_dataset[i][0].expand_dims(0) for i in
-                    range(split * split_len, len(train_dataset))]
-            label = [np.array([train_dataset[i][1]]) for i in range((split - 1) * split_len)] + \
-                    [np.array([train_dataset[i][1]]) for i in
-                     range(split * split_len, len(train_dataset))]
-        train = gluon.data.dataset.ArrayDataset(
-            nd.concat(*data, dim=0),
-            np.concatenate(tuple(label), axis=0))
-        val_data = [train_dataset[i][0].expand_dims(0) for i in
-                    range((split - 1) * split_len, split * split_len)]
-        val_label = [np.array([train_dataset[i][1]]) for i in
-                     range((split - 1) * split_len, split * split_len)]
-        val = gluon.data.dataset.ArrayDataset(
-            nd.concat(*val_data, dim=0),
-            np.concatenate(tuple(val_label), axis=0))
-        return train, val
 
     def log_train(batch_id, batch_num, metric, step_loss, log_interval, epoch_id, learning_rate):
         """Generate and print out the log message for training. """
