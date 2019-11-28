@@ -37,17 +37,11 @@ class Remote(Client):
         for filename in files:
             self.upload_file(filename, **kwargs)
 
-    def shutdown(self):
-        self.close(timeout=2)
-        if self.service:
-            self.service.shutdown()
-        super().shutdown()
-
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        self.service.shutdown()
+        self.shutdown()
 
     @classmethod
     def create_local_node(cls, ip, port):
@@ -126,7 +120,7 @@ class DaskRemoteService(object):
 
         for process in all_processes:
             process["input_queue"].put("shutdown")
-            #process["thread"].join()
+            process["thread"].join()
 
     def __enter__(self):
         return self
