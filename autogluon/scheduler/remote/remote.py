@@ -37,6 +37,12 @@ class Remote(Client):
         for filename in files:
             self.upload_file(filename, **kwargs)
 
+    def shutdown(self):
+        if self.service:
+            self.service.shutdown()
+        super().shutdown()
+        self.close(timeout=2)
+
     def __enter__(self):
         return self
 
@@ -115,7 +121,6 @@ class DaskRemoteService(object):
             self.shutdown()
 
     def shutdown(self):
-        import tornado
         all_processes = [self.worker, self.scheduler]
 
         for process in all_processes:
