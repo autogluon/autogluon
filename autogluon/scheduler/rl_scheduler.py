@@ -14,7 +14,6 @@ from ..utils import (save, load, mkdir, try_import_mxboard, tqdm)
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
-from .scheduler import DistributedTaskScheduler
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 

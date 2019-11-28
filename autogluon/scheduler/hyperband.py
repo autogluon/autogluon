@@ -10,8 +10,7 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter, DistSemaphore
 from ..utils import DeprecationHelper
 
-__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler',
-           'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
+__all__ = ['HyperbandScheduler', 'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
 
 logger = logging.getLogger(__name__)
 
@@ -314,6 +313,3 @@ class HyperbandScheduler(FIFOScheduler):
         reprstr = self.__class__.__name__ + '(' +  \
             'terminator: ' + str(self.terminator)
         return reprstr
-
-
-DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler, 'DistributedHyperbandScheduler')

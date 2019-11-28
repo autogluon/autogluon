@@ -19,7 +19,7 @@ from ..utils import DeprecationHelper, in_ipynb
 
 from tqdm.auto import tqdm
 
-__all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
+__all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +371,3 @@ class FIFOScheduler(TaskScheduler):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
-
-
-DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')

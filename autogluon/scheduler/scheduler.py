@@ -16,9 +16,7 @@ from ..utils import DeprecationHelper, AutoGluonWarning
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['TaskScheduler', 'DistributedTaskScheduler']
-
-dummpy = TaskScheduler()
+__all__ = ['TaskScheduler']
 
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
@@ -230,6 +228,3 @@ class TaskScheduler(object):
         reprstr = self.__class__.__name__ + '(\n' + \
             str(self.RESOURCE_MANAGER) +')\n'
         return reprstr
-
-
-DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')

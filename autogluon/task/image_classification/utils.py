@@ -4,7 +4,7 @@ from mxnet import gluon
 import gluoncv as gcv
 from .nets import *
 from .dataset import *
-from ...utils import get_split_samplers, SampledDataset
+from ...utils.dataset import get_split_samplers, SampledDataset
 
 __all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn']
