@@ -38,7 +38,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None, 
-            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, kfolds=0,
+            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, kfolds=0, stack_levels=0,
             hyperparameters = {'NN': {'num_epochs': 300}, 
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
@@ -90,8 +90,12 @@ class TabularPrediction(BaseTask):
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if kfolds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used.
         kfolds : (int)
-            Kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+            Kfolds used for bagging of models. Roughly increases model training time by a factor of k (0: disabled)
             Default is 0 (disabled). Use values between 5-10 to improve model quality.
+        stack_levels : (int)
+            Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
+            Default is 0 (disabled). Use values between 1-3 to improve model quality.
+            Ignored unless kfolds is also set >= 2
         search_strategy : (str) 
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -181,5 +185,5 @@ class TabularPrediction(BaseTask):
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
-                      holdout_frac=holdout_frac, kfolds=kfolds, hyperparameters=hyperparameters)
+                      holdout_frac=holdout_frac, kfolds=kfolds, stack_levels=stack_levels, hyperparameters=hyperparameters)
         return predictor

@@ -1,5 +1,6 @@
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.linear_model import LogisticRegression
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
 from ...models.lgb.lgb_model import LGBModel
@@ -22,7 +23,16 @@ def get_preset_models(path, problem_type, objective_func, num_classes=None,
         raise NotImplementedError
 
 
-def get_preset_models_classification(path, problem_type, objective_func, num_classes=None, 
+def get_preset_stacker_model(path, problem_type, objective_func, num_classes=None,
+                      hyperparameters={'NN':{},'GBM':{}}):
+    # TODO: Expand options to RF and NN
+    model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
+        solver='liblinear', multi_class='auto',  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
+    ), problem_type=problem_type, objective_func=objective_func)
+    return model
+
+
+def get_preset_models_classification(path, problem_type, objective_func, num_classes=None,
                                      hyperparameters={'NN':{},'GBM':{}}):
     # TODO: define models based on additional keys in hyperparameters
 

@@ -7,10 +7,12 @@ from .model_presets.presets import get_preset_models
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, compute_feature_importance=False):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0, compute_feature_importance=False):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
-                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, compute_feature_importance=compute_feature_importance)
+                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_levels=stack_levels, compute_feature_importance=compute_feature_importance)
+        # # TODO TODO
+        self.hyperparameters = {}  # TODO: Remove or init in AbstractTrainer
 
     def get_models(self, hyperparameters={'NN':{},'GBM':{}}):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,
@@ -18,6 +20,7 @@ class AutoTrainer(AbstractTrainer):
 
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
               holdout_frac=0.1, hyperparameters= {'NN':{},'GBM':{}}):
+        self.hyperparameters = hyperparameters  # TODO: Remove
         models = self.get_models(hyperparameters)
         if self.bagged_mode:
             if (y_test is not None) and (X_test is not None):
