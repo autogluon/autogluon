@@ -1,27 +1,20 @@
+import time
 import numpy as np
 import mxnet as mx
+from distributed import Variable
 
 __all__ = ['SplitSampler', 'SampledDataset', 'get_split_samplers']
 
-split_consistency = {}
-
-#TODO FIXME this is hacky solution for tutorial on Nov, need to fix immediately 
-np.random.seed(0)
-num_samples = [800]
-for num in num_samples:
-    indices = list(range(num))
-    np.random.shuffle(indices)
-    split_consistency[num] = indices
+split_seed = Variable('x')
+split_seed.set(int(time.time()))
 
 def get_split_samplers(train_dataset, split_ratio=0.2):
     num_samples = len(train_dataset)
     split_idx = int(num_samples * split_ratio)
-    if num_samples in split_consistency:
-        indices = split_consistency[num_samples]
-    else:
-        indices = list(range(num_samples))
-        np.random.shuffle(indices)
-        split_consistency[num_samples] = indices
+    # numpy seed for consistency
+    indices = list(range(num_samples))
+    np.random.seed(int(split_seed.get()))
+    np.random.shuffle(indices)
     train_sampler = SplitSampler(indices[0: split_idx])
     val_sampler = SplitSampler(indices[split_idx:num_samples])
     return train_sampler, val_sampler
