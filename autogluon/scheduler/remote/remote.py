@@ -38,9 +38,10 @@ class Remote(Client):
             self.upload_file(filename, **kwargs)
 
     def shutdown(self):
-        self.close()
+        self.close(timeout=2)
         if self.service:
             self.service.shutdown()
+        super().shutdown(self)
 
     def __enter__(self):
         return self
@@ -125,7 +126,7 @@ class DaskRemoteService(object):
 
         for process in all_processes:
             process["input_queue"].put("shutdown")
-            process["thread"].join()
+            #process["thread"].join()
 
     def __enter__(self):
         return self
