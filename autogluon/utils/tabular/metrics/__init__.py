@@ -5,6 +5,7 @@ import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
 import numpy as np
 
+from ...miscs import warning_filter
 from . import classification_metrics
 from .util import sanitize_array
 from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION
@@ -37,7 +38,9 @@ class Scorer(object, metaclass=ABCMeta):
             needs_proba = False
             needs_threshold = False
 
-        return sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=needs_proba, needs_threshold=needs_threshold)
+        with warning_filter():
+            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=needs_proba, needs_threshold=needs_threshold)
+        return ret
 
 
 class _PredictScorer(Scorer):

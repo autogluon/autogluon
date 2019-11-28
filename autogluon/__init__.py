@@ -7,7 +7,8 @@ from .utils.try_import import *
 
 try_import_mxnet()
 
+from . import scheduler, searcher, nas, utils
+
 from .utils import *
 from .core import *
 from .task import *
-from . import scheduler, searcher, distributed, nas, utils

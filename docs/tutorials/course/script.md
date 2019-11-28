@@ -2,7 +2,8 @@
 :label:`sec_customscript`
 
 In this tutorial, we are showing the example of doing HPO using AutoGluon on any customized
-python scripts.
+python scripts. AutoGluon is a framework agnostic HPO toolkit, which is compatible with
+any training code written in python. See also :ref:`sec_customstorch`.
 
 ## Start with A Fine-tuning Example
 

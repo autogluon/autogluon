@@ -9,6 +9,7 @@ from .edict import EasyDict
 from .serialization import *
 from .data_analyzer import *
 from .dataloader import DataLoader
+from .dataset import *
 from .plots import *
 from .tqdm import tqdm
 from .custom_queue import Queue

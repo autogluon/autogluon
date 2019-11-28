@@ -15,9 +15,11 @@ def in_ipynb():
 class warning_filter(object):
     def __enter__(self):
         warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", category=FutureWarning)
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         return self
 
     def __exit__(self, *args):
         warnings.filterwarnings("default", category=UserWarning)
+        warnings.filterwarnings("default", category=FutureWarning)
         warnings.filterwarnings("default", category=DeprecationWarning)

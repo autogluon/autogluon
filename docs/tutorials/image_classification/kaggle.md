@@ -144,7 +144,7 @@ To tell AutoGluon where the training data is located, which means let AutoGluon
 
 ```{.python .input}
 # from autogluon import ImageClassification as task
-# dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train')
+# dataset = task.Dataset('data/shopeeiet/train')
 ```
 
 AutoGluon will automatically infer how many classes there are based on the directory structure. 
@@ -200,7 +200,7 @@ We have the processed dataset if you don't want to explore new Kaggle dataset, p
 
 ```{.python .input}
 # from autogluon import ImageClassification as task
-# dataset = task.Dataset(name='shopeeiet', train_path='~/data/shopeeiet/train', val_path='~/data/shopeeiet/val')
+# dataset = task.Dataset('data/shopeeiet/train')
 ```
 
 ## Step 3: Use AutoGluon fit to generate a classification model (Optional)
@@ -231,7 +231,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
 
 ```{.python .input}
-# inds, probs = classifier.predict('/home/ubuntu/data/shopeeiet/test')
+# inds, probs = classifier.predict('data/shopeeiet/test')
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.

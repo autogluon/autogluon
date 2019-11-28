@@ -22,7 +22,7 @@ from gluoncv.utils import LRScheduler, LRSequential
 
 from ...core import *
 from ...utils.mxutils import collect_params
-from ...utils import tqdm
+from ...utils import tqdm, mkdir
 
 def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_workers, args):
     """Get dataloader."""
@@ -123,8 +123,8 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
     logger.setLevel(logging.INFO)
     log_file_path = args.save_prefix + '_train.log'
     log_dir = os.path.dirname(log_file_path)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    if log_dir:
+        mkdir(log_dir)
     fh = logging.FileHandler(log_file_path)
     logger.addHandler(fh)
     logger.info(args)
@@ -134,7 +134,6 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
     pre_current_map = 0
     tbar = tqdm(range(args.start_epoch, args.epochs))
     for epoch in tbar:
-        #tbar2.next()
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -194,8 +193,8 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
         if (not (epoch + 1) % args.val_interval) and not final_fit:
             # consider reduce the frequency of validation to save time
             map_name, mean_ap = validate(net, val_data, ctx, eval_metric)
-            val_msg = ' '.join(['{}={}'.format(k, v) for k, v in zip(map_name, mean_ap)])
-            tbar.set_description('[Epoch {}] Validation: {}'.format(epoch, val_msg))
+            val_msg = ' '.join(['{}={:.3f}'.format(k, v) for k, v in zip(map_name, mean_ap)])
+            tbar.set_description('[Epoch {}] {}'.format(epoch, val_msg))
             current_map = float(mean_ap[-1])
             pre_current_map = current_map
         else:

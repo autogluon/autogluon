@@ -11,14 +11,13 @@ from .metrics import get_metric_instance
 from ...core.optimizer import SGD, NAG
 from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ...utils import tqdm
 from ...utils.mxutils import collect_params
 from .nets import get_built_in_network
-from .dataset import get_built_in_dataset
 from .utils import *
 
 __all__ = ['train_image_classification']
 
-logger = logging.getLogger(__name__)
 
 lr_schedulers = {
     'poly': mx.lr_scheduler.PolyScheduler,
@@ -27,6 +26,11 @@ lr_schedulers = {
 
 @args()
 def train_image_classification(args, reporter):
+    logging.basicConfig()
+    logger = logging.getLogger(__name__)
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+        logger.info(args)
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
 
@@ -36,8 +40,9 @@ def train_image_classification(args, reporter):
 
     input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
     train_data, val_data, batch_fn, num_batches = get_data_loader(
-            args.dataset, input_size, batch_size, args.num_workers, args.final_fit)
-    
+            args.dataset, input_size, batch_size, args.num_workers, args.final_fit,
+            args.split_ratio)
+ 
     if isinstance(args.lr_scheduler, str):
         lr_scheduler = lr_schedulers[args.lr_scheduler](num_batches * args.epochs,
                                                         base_lr=args.optimizer.lr)
@@ -59,11 +64,14 @@ def train_image_classification(args, reporter):
             default_val_fn(net, batch, batch_fn, metric, ctx)
         _, reward = metric.get()
         reporter(epoch=epoch, classification_reward=reward)
+        return reward
 
-    for epoch in range(1, args.epochs + 1):
+    tbar = tqdm(range(1, args.epochs + 1))
+    for epoch in tbar:
         train(epoch)
         if not args.final_fit:
-            test(epoch)
+            reward = test(epoch)
+            tbar.set_description('[Epoch {}] Validation: {:.3f}'.format(epoch, reward))
 
     if args.final_fit:
         return {'model_params': collect_params(net),

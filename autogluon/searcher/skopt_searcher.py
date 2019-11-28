@@ -24,7 +24,7 @@ class SKoptSearcher(BaseSearcher):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
-            please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
+        please see documentation at: `skopt.optimizer.Optimizer <http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer>`_
         These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
         which acquisition function to use, how to optimize the acquisition function, etc.
         The skopt library provides very comprehensive Bayesian optimization functionality,
@@ -37,21 +37,21 @@ class SKoptSearcher(BaseSearcher):
     
     Examples
     --------
-     >>> import autogluon as ag
-     >>> @ag.args(
-     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-     >>>     wd=ag.space.Real(1e-3, 1e-2))
-     >>> def train_fn(args, reporter):
-     >>>     pass
-     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
-     >>> searcher.get_config()
-     {'lr': 0.0031622777, 'wd': 0.0055}
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    >>>     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    >>>     pass
+    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+    >>> searcher.get_config()
+    {'lr': 0.0031622777, 'wd': 0.0055}
 
-     >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
-     >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
-     >>> next_config = searcher.get_config()
-     >>> next_reward = 10.0 # made-up value.
-     >>> searcher.update(next_config, next_reward)
+    >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
+    >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
+    >>> next_config = searcher.get_config()
+    >>> next_reward = 10.0 # made-up value.
+    >>> searcher.update(next_config, next_reward)
     
     .. note::
 

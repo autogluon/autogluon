@@ -170,8 +170,8 @@ def func(**kwvars):
                 self._inited = False
 
             def sample(self, **config):
-                kwargs = self.kwargs
-                kwspaces = autogluonobject.kwspaces
+                kwargs = copy.deepcopy(self.kwargs)
+                kwspaces = copy.deepcopy(autogluonobject.kwspaces)
                 for k, v in kwargs.items():
                     if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
                         sub_config = _strip_config_space(config, prefix=k)
@@ -179,7 +179,7 @@ def func(**kwvars):
                     elif k in config:
                         kwargs[k] = config[k]
                         
-                return self.func(*self.args, **self.kwargs)
+                return self.func(*self.args, **kwargs)
 
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
@@ -218,8 +218,8 @@ def obj(**kwvars):
                 self._inited = False
 
             def sample(self, **config):
-                kwargs = self._kwargs
-                kwspaces = autogluonobject.kwspaces
+                kwargs = copy.deepcopy(self._kwargs)
+                kwspaces = copy.deepcopy(autogluonobject.kwspaces)
                 for k, v in kwargs.items():
                     if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
                         sub_config = _strip_config_space(config, prefix=k)
@@ -234,6 +234,9 @@ def obj(**kwvars):
                 return 'AutoGluonObject -- ' + Cls.__name__
 
         autogluonobject.kwvars = autogluonobject.__init__.kwvars
+        autogluonobject.__doc__ = Cls.__doc__
+        autogluonobject.__name__ = Cls.__name__
+        #autogluonobject.__bases__ = Cls.__bases__
         return autogluonobject
 
     return registered_class
