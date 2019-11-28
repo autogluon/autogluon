@@ -277,45 +277,6 @@ def train_text_classification(args, reporter=None):
             np.concatenate(tuple(val_label), axis=0))
         return train, val
 
-    def test(loader_test, segment):
-        """Inference function on the test dataset."""
-        logging.info('Now we are doing testing on %s with %s.', segment, ctx)
-
-        tic = time.time()
-        results = []
-        for _, seqs in enumerate(loader_test):
-            input_ids, valid_length, segment_ids = seqs
-            input_ids = input_ids.as_in_context(ctx)
-            valid_length = valid_length.as_in_context(ctx).astype('float32')
-            if use_roberta:
-                out = model(input_ids, valid_length)
-            else:
-                out = model(input_ids, segment_ids.as_in_context(ctx), valid_length)
-            if not task.class_labels:
-                # regression task
-                for result in out.asnumpy().reshape(-1).tolist():
-                    results.append('{:.3f}'.format(result))
-            else:
-                # classification task
-                indices = mx.nd.topk(out, k=1, ret_typ='indices', dtype='int32').asnumpy()
-                for index in indices:
-                    results.append(task.class_labels[int(index)])
-
-        mx.nd.waitall()
-        toc = time.time()
-        logging.info('Time cost=%.2fs, throughput=%.2f samples/s', toc - tic,
-                     dev_batch_size * len(loader_test) / (toc - tic))
-        # write result to a file.
-        segment = segment.replace('_mismatched', '-mm')
-        segment = segment.replace('_matched', '-m')
-        segment = segment.replace('SST', 'SST-2')
-        filename = args.task_name + segment.replace('test', '') + '.tsv'
-        test_path = os.path.join(args.output_dir, filename)
-        with io.open(test_path, 'w', encoding='utf-8') as f:
-            f.write(u'index\tprediction\n')
-            for i, pred in enumerate(results):
-                f.write(u'%d\t%s\n' % (i, str(pred)))
-
     def log_train(batch_id, batch_num, metric, step_loss, log_interval, epoch_id, learning_rate):
         """Generate and print out the log message for training. """
         metric_nm, metric_val = metric.get()
@@ -495,7 +456,3 @@ def train_text_classification(args, reporter=None):
     metric_str = 'Best model at epoch {}. Validation metrics:'.format(epoch_id)
     metric_str += ','.join([i + ':%.4f' for i in metric_nm])
     logging.info(metric_str, *metric_val)
-
-    # inference on test data
-    for segment, test_data in test_data_list:
-        test(test_data, segment)
