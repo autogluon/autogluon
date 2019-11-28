@@ -62,7 +62,7 @@ class BERTDatasetTransform:
                 for key in label_alias:
                     self._label_map[key] = self._label_map[label_alias[key]]
         self._bert_xform = BERTSentenceTransform(
-            tokenizer, max_seq_length, vocab=vocab, pad=pad, pair=pair)
+            tokenizer, max_seq_length, pad=pad, pair=pair)
 
     def __call__(self, line):
         """Perform transformation for sequence pairs or single sequences.

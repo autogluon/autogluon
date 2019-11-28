@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 #TODO: fix
 def evaluate(model, loader_dev, metric, ctx, *args):
     """Evaluate the model on validation dataset."""
-    use_roberta = 'roberta' in args.bert_model
+    use_roberta = 'roberta' in args.net
     metric.reset()
     for batch_id, seqs in enumerate(loader_dev):
         input_ids, valid_length, segment_ids, label = seqs
@@ -46,23 +46,14 @@ def evaluate(model, loader_dev, metric, ctx, *args):
 
 def get_vocab(ctx, *args):
     # model and loss
-    only_inference = args.only_inference
-    model_name = args.bert_model
-    dataset = args.bert_dataset
-    pretrained_bert_parameters = args.pretrained_bert_parameters
-    model_parameters = args.model_parameters
-    if only_inference and not model_parameters:
-        warnings.warn('model_parameters is not set. '
-                      'Randomly initialized model will be used for inference.')
-
-    get_pretrained = not (pretrained_bert_parameters is not None
-                          or model_parameters is not None)
+    model_name = args.net
+    dataset = args.pretrained_dataset
 
     use_roberta = 'roberta' in model_name
     get_model_params = {
         'name': model_name,
         'dataset_name': dataset,
-        'pretrained': get_pretrained,
+        'pretrained': True,
         'ctx': ctx,
         'use_decoder': False,
         'use_classifier': False,
@@ -159,7 +150,7 @@ def train_text_classification(args, reporter=None):
     # at the beginning of the decorated function
     batch_size = args.batch_size
     dev_batch_size = args.dev_batch_size
-    task_name = args.task_name
+    task_name = args.dataset.name
     lr = args.lr
     epsilon = args.epsilon
     accumulate = args.accumulate
@@ -173,7 +164,7 @@ def train_text_classification(args, reporter=None):
     random.seed(args.seed)
     mx.random.seed(args.seed)
 
-    ctx = mx.cpu() if args.gpu is None else mx.gpu(0) # TODO: simple fix
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
 
     task = tasks[task_name]
 
@@ -195,23 +186,14 @@ def train_text_classification(args, reporter=None):
             exit()
 
     # model and loss
-    only_inference = args.only_inference
-    model_name = args.bert_model
-    dataset = args.bert_dataset
-    pretrained_bert_parameters = args.pretrained_bert_parameters
-    model_parameters = args.model_parameters
-    if only_inference and not model_parameters:
-        warnings.warn('model_parameters is not set. '
-                      'Randomly initialized model will be used for inference.')
-
-    get_pretrained = not (pretrained_bert_parameters is not None
-                          or model_parameters is not None)
+    model_name = args.net
+    dataset = args.pretrained_dataset
 
     use_roberta = 'roberta' in model_name
     get_model_params = {
         'name': model_name,
         'dataset_name': dataset,
-        'pretrained': get_pretrained,
+        'pretrained': True,
         'ctx': ctx,
         'use_decoder': False,
         'use_classifier': False,
@@ -239,18 +221,10 @@ def train_text_classification(args, reporter=None):
     else:
         model = BERTClassifier(bert, dropout=0.1, num_classes=num_classes)
     # initialize classifier
-    if not model_parameters:
-        model.classifier.initialize(init=initializer, ctx=ctx)
+    model.classifier.initialize(init=initializer, ctx=ctx)
 
     # load checkpointing
-    output_dir = args.output_dir
-    if pretrained_bert_parameters:
-        logging.info('loading bert params from %s', pretrained_bert_parameters)
-        nlp.utils.load_parameters(model.bert, pretrained_bert_parameters, ctx=ctx,
-                                  ignore_extra=True, cast_dtype=True)
-    if model_parameters:
-        logging.info('loading model params from %s', model_parameters)
-        nlp.utils.load_parameters(model, model_parameters, ctx=ctx, cast_dtype=True)
+    output_dir = 'checkpoints'
     nlp.utils.mkdir(output_dir)
 
     logging.debug(model)
@@ -269,7 +243,7 @@ def train_text_classification(args, reporter=None):
     # Get the loader.
     logging.info('processing dataset...')
     train_data, dev_data_list, test_data_list, num_train_examples = preprocess_data(
-        bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary, args.pad, args)
+        bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary)
 
     def _train_val_split(train_dataset):
         split = args.data.split
@@ -401,8 +375,7 @@ def train_text_classification(args, reporter=None):
     # Step 2: the training function in the original training script is added in the decorated function in autogluon for training.
 
     """Training function."""
-    if not only_inference:
-        logging.info('Now we are doing BERT classification training on %s!', ctx)
+    logging.info('Now we are doing BERT classification training on %s!', ctx)
 
     all_model_params = model.collect_params()
     optimizer_params = {'learning_rate': lr, 'epsilon': epsilon, 'wd': 0.01}
@@ -437,56 +410,55 @@ def train_text_classification(args, reporter=None):
         if args.early_stop and patience == 0:
             logging.info('Early stopping at epoch %d', epoch_id)
             break
-        if not only_inference:
-            task.metric.reset()
-            step_loss = 0
-            tic = time.time()
-            all_model_params.zero_grad()
+        task.metric.reset()
+        step_loss = 0
+        tic = time.time()
+        all_model_params.zero_grad()
 
-            for batch_id, seqs in enumerate(train_data):
-                # learning rate schedule
-                if step_num < num_warmup_steps:
-                    new_lr = lr * step_num / num_warmup_steps
+        for batch_id, seqs in enumerate(train_data):
+            # learning rate schedule
+            if step_num < num_warmup_steps:
+                new_lr = lr * step_num / num_warmup_steps
+            else:
+                non_warmup_steps = step_num - num_warmup_steps
+                offset = non_warmup_steps / (num_train_steps - num_warmup_steps)
+                new_lr = lr - offset * lr
+            trainer.set_learning_rate(new_lr)
+
+            # forward and backward
+            with mx.autograd.record():
+                input_ids, valid_length, segment_ids, label = seqs
+                input_ids = input_ids.as_in_context(ctx)
+                valid_length = valid_length.as_in_context(ctx).astype('float32')
+                label = label.as_in_context(ctx)
+                if use_roberta:
+                    out = model(input_ids, valid_length)
                 else:
-                    non_warmup_steps = step_num - num_warmup_steps
-                    offset = non_warmup_steps / (num_train_steps - num_warmup_steps)
-                    new_lr = lr - offset * lr
-                trainer.set_learning_rate(new_lr)
+                    out = model(input_ids, segment_ids.as_in_context(ctx), valid_length)
+                ls = loss_function(out, label).mean()
+                if args.dtype == 'float16':
+                    with amp.scale_loss(ls, trainer) as scaled_loss:
+                        mx.autograd.backward(scaled_loss)
+                else:
+                    ls.backward()
 
-                # forward and backward
-                with mx.autograd.record():
-                    input_ids, valid_length, segment_ids, label = seqs
-                    input_ids = input_ids.as_in_context(ctx)
-                    valid_length = valid_length.as_in_context(ctx).astype('float32')
-                    label = label.as_in_context(ctx)
-                    if use_roberta:
-                        out = model(input_ids, valid_length)
-                    else:
-                        out = model(input_ids, segment_ids.as_in_context(ctx), valid_length)
-                    ls = loss_function(out, label).mean()
-                    if args.dtype == 'float16':
-                        with amp.scale_loss(ls, trainer) as scaled_loss:
-                            mx.autograd.backward(scaled_loss)
-                    else:
-                        ls.backward()
+            # update
+            if not accumulate or (batch_id + 1) % accumulate == 0:
+                trainer.allreduce_grads()
+                nlp.utils.clip_grad_global_norm(params, 1)
+                trainer.update(accumulate if accumulate else 1)
+                step_num += 1
+                if accumulate and accumulate > 1:
+                    # set grad to zero for gradient accumulation
+                    all_model_params.zero_grad()
 
-                # update
-                if not accumulate or (batch_id + 1) % accumulate == 0:
-                    trainer.allreduce_grads()
-                    nlp.utils.clip_grad_global_norm(params, 1)
-                    trainer.update(accumulate if accumulate else 1)
-                    step_num += 1
-                    if accumulate and accumulate > 1:
-                        # set grad to zero for gradient accumulation
-                        all_model_params.zero_grad()
-
-                step_loss += ls.asscalar()
-                task.metric.update([label], [out])
-                if (batch_id + 1) % (args.log_interval) == 0:
-                    log_train(batch_id, len(train_data), task.metric, step_loss, args.log_interval,
-                              epoch_id, trainer.learning_rate)
-                    step_loss = 0
-            mx.nd.waitall()
+            step_loss += ls.asscalar()
+            task.metric.update([label], [out])
+            if (batch_id + 1) % (args.log_interval) == 0:
+                log_train(batch_id, len(train_data), task.metric, step_loss, args.log_interval,
+                          epoch_id, trainer.learning_rate)
+                step_loss = 0
+        mx.nd.waitall()
 
         # inference on dev data
         for segment, dev_data in dev_data_list:
@@ -501,28 +473,26 @@ def train_text_classification(args, reporter=None):
             if reporter is not None:
                 reporter(epoch=epoch_id, accuracy=metric_val[0])
 
-        if not only_inference:
-            # save params
-            ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
-            params_saved = os.path.join(output_dir, ckpt_name)
-
-            nlp.utils.save_parameters(model, params_saved)
-            logging.info('params saved in: %s', params_saved)
-            toc = time.time()
-            logging.info('Time cost=%.2fs', toc - tic)
-            tic = toc
-
-    if not only_inference:
-        # we choose the best model based on metric[0],
-        # assuming higher score stands for better model quality
-        metric_history.sort(key=lambda x: x[2][0], reverse=True)
-        epoch_id, metric_nm, metric_val = metric_history[0]
+        # save params
         ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
         params_saved = os.path.join(output_dir, ckpt_name)
-        nlp.utils.load_parameters(model, params_saved)
-        metric_str = 'Best model at epoch {}. Validation metrics:'.format(epoch_id)
-        metric_str += ','.join([i + ':%.4f' for i in metric_nm])
-        logging.info(metric_str, *metric_val)
+
+        nlp.utils.save_parameters(model, params_saved)
+        logging.info('params saved in: %s', params_saved)
+        toc = time.time()
+        logging.info('Time cost=%.2fs', toc - tic)
+        tic = toc
+
+    # we choose the best model based on metric[0],
+    # assuming higher score stands for better model quality
+    metric_history.sort(key=lambda x: x[2][0], reverse=True)
+    epoch_id, metric_nm, metric_val = metric_history[0]
+    ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
+    params_saved = os.path.join(output_dir, ckpt_name)
+    nlp.utils.load_parameters(model, params_saved)
+    metric_str = 'Best model at epoch {}. Validation metrics:'.format(epoch_id)
+    metric_str += ','.join([i + ':%.4f' for i in metric_nm])
+    logging.info(metric_str, *metric_val)
 
     # inference on test data
     for segment, test_data in test_data_list:
