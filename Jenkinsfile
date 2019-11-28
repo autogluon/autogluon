@@ -9,8 +9,7 @@ stage("Unit Test") {
         sh """#!/bin/bash
         set -ex
         # remove and create new env instead
-        conda env remove -n autogluon_py3
-        conda env create -n autogluon_py3 -f docs/build.yml
+        conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
