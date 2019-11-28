@@ -129,7 +129,7 @@ class TextClassification(BaseTask):
             'resume': resume,
             'visualizer': visualizer,
             'time_attr': 'epoch',
-            'reward_attr': 'classification_reward',
+            'reward_attr': 'accuracy',
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
