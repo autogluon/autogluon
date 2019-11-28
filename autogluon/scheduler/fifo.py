@@ -19,7 +19,7 @@ from ..utils import DeprecationHelper, in_ipynb
 
 from tqdm.auto import tqdm
 
-__all__ = ['FIFOScheduler', 'DistributedFIFOScheduler']
+__all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +205,7 @@ class FIFOScheduler(TaskScheduler):
         """Adding a training task to the scheduler.
 
         Args:
-            task (:class:`autogluon.scheduler.Task`): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new training task
 
         Relevant entries in kwargs:
             - bracket: HB bracket to be used. Has been sampled in _promote_config
@@ -371,6 +371,3 @@ class FIFOScheduler(TaskScheduler):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
         logger.debug('Loading Searcher State {}'.format(self.searcher))
-
-
-DistributedFIFOScheduler = DeprecationHelper(FIFOScheduler, 'DistributedFIFOScheduler')

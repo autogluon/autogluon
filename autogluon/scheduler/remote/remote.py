@@ -38,15 +38,16 @@ class Remote(Client):
             self.upload_file(filename, **kwargs)
 
     def shutdown(self):
-        self.close()
         if self.service:
             self.service.shutdown()
+        super().shutdown()
+        self.close(timeout=2)
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
-        self.service.shutdown()
+        self.shutdown()
 
     @classmethod
     def create_local_node(cls, ip, port):

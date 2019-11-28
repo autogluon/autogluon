@@ -1,10 +1,10 @@
 import gc, copy, random, time, logging, os
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
 from ......core import Int, Space
+from .....try_import import try_import_lightgbm
 from ......task.base import BasePredictor
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...utils import construct_dataset
@@ -66,6 +66,8 @@ class LGBModel(AbstractModel):
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
 
+        try_import_lightgbm()
+        import lightgbm as lgb
         callbacks += [
             # lgb.reset_parameter(learning_rate=lambda iter: alpha * (0.999 ** iter)),
         ]
@@ -131,6 +133,8 @@ class LGBModel(AbstractModel):
 
     def cv(self, X=None, y=None, k_fold=5, dataset_train=None):
         print("Warning: RUNNING GBM CROSS-VALIDATION")
+        try_import_lightgbm()
+        import lightgbm as lgb
         if dataset_train is None:
             dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
         gc.collect()

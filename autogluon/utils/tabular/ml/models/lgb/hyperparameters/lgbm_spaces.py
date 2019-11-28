@@ -1,4 +1,6 @@
-from skopt.space import Integer, Categorical, Real
+from ......miscs import warning_filter
+with warning_filter():
+    from skopt.space import Integer, Categorical, Real
 
 from ...abstract.abstract_spaces import AbstractSpaces
 

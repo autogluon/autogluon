@@ -1,6 +1,5 @@
 import numpy as np
 from pandas import DataFrame, Series
-import lightgbm as lgb
 import gc
 import os, multiprocessing
 import mxnet as mx
@@ -11,7 +10,7 @@ from .constants import BINARY, REGRESSION
 from ..utils.savers import save_pd
 from ..utils.decorators import calculate_time
 from ....scheduler.resource import get_gpu_count
-
+from ...try_import import try_import_lightgbm
 
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
@@ -48,6 +47,8 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
 
 # TODO: Move to lgb
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
+    try_import_lightgbm()
+    import lightgbm as lgb
     # save_pd.save(path=location + '.csv', df=x, header=False)
     feature_list = list(x.columns.values)
     # dataset = lgb.Dataset(data=location + '.csv', label=y, reference=reference, feature_name=feature_list)
@@ -69,6 +70,8 @@ def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, pa
 
 # TODO: Move to lgb
 def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=None, params=None):
+    try_import_lightgbm()
+    import lightgbm as lgb
     cat_columns = list(X.select_dtypes(include='category').columns.values)
     # X = X.drop(columns_categorical, axis=1)
 
@@ -140,6 +143,8 @@ def construct_dataset_low_memory(X: DataFrame, y: Series, location, reference=No
 @calculate_time
 def construct_dataset_lowest_memory(X: DataFrame, y: Series, location, reference=None, params=None):
 
+    try_import_lightgbm()
+    import lightgbm as lgb
     cat_columns = list(X.select_dtypes(include='category').columns.values)
 
     columns = list(X.columns)

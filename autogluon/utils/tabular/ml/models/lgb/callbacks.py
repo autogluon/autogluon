@@ -3,10 +3,10 @@ import warnings
 from operator import gt, lt
 import time
 import os
-from lightgbm.callback import _format_eval_result, EarlyStopException
 import psutil
 
 from ....utils.savers import save_pkl, save_pointer
+from .....try_import import try_import_lightgbm
 
 
 # callback
@@ -139,6 +139,8 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         init_mem_avail.append(psutil.virtual_memory().available)
 
     def _callback(env):
+        try_import_lightgbm()
+        from lightgbm.callback import _format_eval_result, EarlyStopException
         if not cmp_op:
             _init(env)
         if not enabled[0]:
@@ -302,6 +304,8 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
                         break
 
     def _callback(env):
+        try_import_lightgbm()
+        from lightgbm.callback import _format_eval_result, EarlyStopException
         cur_time = time.time()
         # if verbose:
         #     print(cur_time - timex[0])

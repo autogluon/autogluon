@@ -4,6 +4,7 @@ import mxnet as mx
 from abc import abstractmethod
 from ...scheduler import *
 from .base_predictor import *
+from ...utils import in_ipynb
 
 __all__ = ['BaseDataset', 'BaseTask']
 
@@ -35,6 +36,8 @@ class BaseTask(object):
             assert callable(search_strategy)
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
+        plot_results = scheduler_options.pop('plot_results') \
+                if 'plot_results' in scheduler_options else False
         scheduler = scheduler(train_fn, **scheduler_options)
         scheduler.run()
         scheduler.join_jobs()
@@ -47,6 +50,8 @@ class BaseTask(object):
         # final fit
         results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
+        if plot_results and in_ipynb():
+            scheduler.get_training_curves(plot=True, use_legend=False)
         results.update(best_reward=best_reward, best_config=best_config,
                        total_time=total_time, metadata=scheduler.metadata,
                        training_history=scheduler.training_history,
@@ -55,7 +60,6 @@ class BaseTask(object):
                        args=args)
         return results
 
-    @classmethod
     @abstractmethod
     def fit(cls, *args, **kwargs):
         pass

@@ -66,6 +66,12 @@ Advanced Topic
 
       Neural Architecture Search tutorials.
 
+   .. card::
+      :title: For PyTorch Users
+      :link: tutorials/torch/index.html
+
+      PyTorch HPO and NAS tutorials.
+
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -75,5 +81,11 @@ Advanced Topic
    tutorials/tabular_prediction/index
    tutorials/course/index
    tutorials/nas/index
-   api/index
+   tutorials/torch/index
+   api/autogluon.space
+   api/autogluon.core
+   api/autogluon.task
+   api/autogluon.scheduler
+   api/autogluon.searcher
+   api/autogluon.utils
    model_zoo/index

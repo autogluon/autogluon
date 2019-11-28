@@ -96,24 +96,6 @@ class BaseSearcher(object):
             else:
                 return {}
 
-    def is_best(self, config):
-        with self.LOCK:
-            best_config = max(self._results, key=self._results.get)
-            return pickle.dumps(config) == best_config
-
-    def get_best_state_path(self):
-        assert os.path.isfile(self._best_state_path), \
-            'Please use reporter.save_dict(model_params) during the training.'
-        return self._best_state_path
-
-    def get_best_state(self):
-        assert os.path.isfile(self._best_state_path), \
-            'Please use reporter.save_dict(model_params) during the training.'
-        return load(self._best_state_path)
-
-    def update_best_state(self, filepath):
-        self._best_state_path = filepath
-
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' +  \
             '\nConfigSpace: {}.'.format(str(self.configspace)) + \
