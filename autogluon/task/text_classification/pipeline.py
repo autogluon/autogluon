@@ -164,7 +164,8 @@ def train_text_classification(args, reporter=None):
     random.seed(args.seed)
     mx.random.seed(args.seed)
 
-    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+    # TODO support for multi-GPU
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)][0] if args.num_gpus > 0 else [mx.cpu()][0]
 
     task = tasks[task_name]
 
