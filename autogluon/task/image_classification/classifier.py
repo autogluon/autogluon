@@ -9,8 +9,6 @@ from .utils import *
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
 from ...utils import save, load, tqdm
-from ...core import AutoGluonObject
-
 class Classifier(BasePredictor):
     """
     Classifier returned by task.fit()
@@ -102,13 +100,10 @@ class Classifier(BasePredictor):
             >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
             >>> test_reward = classifier.evaluate(dataset)
         """
-        if isinstance(dataset, AutoGluonObject):
-            dataset = dataset.init()
         args = self.args
         net = self.model
         batch_size = args.batch_size * max(len(ctx), 1)
-
-        metric = dataset.metric
+        metric = get_metric_instance(args.metric)
         input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
         test_data, _, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, True, None)

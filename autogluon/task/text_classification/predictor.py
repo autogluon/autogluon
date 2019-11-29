@@ -10,6 +10,7 @@ from ...utils import *
 from .network import *
 from .pipeline import *
 from ..image_classification.classifier import Classifier
+from ...core import AutoGluonObject
 
 __all__ = ['TextClassificationPredictor']
 
@@ -55,10 +56,12 @@ class TextClassificationPredictor(Classifier):
             >>> dataset = task.Dataset(test_path='~/data/test')
             >>> test_reward = predictor.evaluate(dataset)
         """
+        if isinstance(dataset, AutoGluonObject):
+            dataset = dataset.init()
+
         args = self.args
         net = self.model
         batch_size = args.batch_size * max(len(ctx), 1)
-        #metric = get_metric_instance(args.metric)
         _, dev_data_list, _ = preprocess_data(
             args.bert_tokenizer, args.task, batch_size, args.dev_batch_size, args.max_len, args.vocabulary, args.pad)
         tbar = tqdm(enumerate(dev_data_list))
