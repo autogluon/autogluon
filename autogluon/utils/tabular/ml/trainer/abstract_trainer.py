@@ -423,11 +423,21 @@ class AbstractTrainer:
         ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
         return ensemble_selection.weights_
 
-    def get_inputs_to_stacker(self, X, level_start, level_end, fit=False):
+    def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
         if fit:
             model_names = self.models_level[level_end-1]
             dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
             X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
+        elif y_pred_probas is not None:
+            model_names = self.models_level[level_end-1]
+            dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+            X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas)
+            if dummy_stacker.use_orig_features:
+                X = pd.concat([X_stacker, X], axis=1)
+            else:
+                X = X_stacker
+            # TODO: Probably want to remove old stack columns somehow.
+            #  Use level start as the indicator for cols_to_drop, as done in the for loop.
         else:
             for level in range(level_start, level_end):
                 if level >= 1:

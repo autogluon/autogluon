@@ -154,14 +154,17 @@ class AbstractLearner:
 
         max_level_to_check = max(max_level, max_level_auxiliary)
         scores = {}
+        pred_probas = None
         for level in range(max_level_to_check+1):
-            model_names = trainer.models_level[level]
+            model_names_core = trainer.models_level[level]
             if level >= 1:
-                X = trainer.get_inputs_to_stacker(X, level_start=level-1, level_end=level)
+                X_stack = trainer.get_inputs_to_stacker(X, level_start=level-1, level_end=level, y_pred_probas=pred_probas)
+            else:
+                X_stack = X
 
-            if len(model_names) > 0:
-                pred_probas = self.get_pred_probas_models(X=X, trainer=trainer, model_names=model_names)
-                for i, model_name in enumerate(model_names):
+            if len(model_names_core) > 0:
+                pred_probas = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_core)
+                for i, model_name in enumerate(model_names_core):
                     pred_proba = pred_probas[i]
                     if trainer.objective_func_expects_y_pred:
                         pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
@@ -180,10 +183,10 @@ class AbstractLearner:
                 else:
                     scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
-            model_names_auxiliary = trainer.models_level_auxiliary[level]
-            if len(model_names_auxiliary) > 0:
-                pred_probas_auxiliary = self.get_pred_probas_models(X=X, trainer=trainer, model_names=model_names_auxiliary)
-                for i, model_name in enumerate(model_names_auxiliary):
+            model_names_aux = trainer.models_level_auxiliary[level]
+            if len(model_names_aux) > 0:
+                pred_probas_auxiliary = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_aux)
+                for i, model_name in enumerate(model_names_aux):
                     pred_proba = pred_probas_auxiliary[i]
                     if trainer.objective_func_expects_y_pred:
                         pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
