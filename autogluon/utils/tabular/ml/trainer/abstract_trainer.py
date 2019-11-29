@@ -176,6 +176,37 @@ class AbstractTrainer:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
         return model
 
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
+        try:
+            fit_start_time = time.time()
+            model = self.train_single(X_train, y_train, X_test, y_test, model, level=level)
+            fit_end_time = time.time()
+            if (type(model) == BaggedEnsembleModel) or (type(model) == StackerEnsembleModel):
+                score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
+            else:
+                score = model.score(X=X_test, y=y_test)
+            pred_end_time = time.time()
+        except Exception as err:
+            traceback.print_tb(err.__traceback__)
+            print('Warning: Exception caused ' + model.name + ' to fail during training... Skipping model.')
+            print(err)
+            del model
+        else:
+            self.models_level[level].append(model.name)
+            self.model_performance[model.name] = score
+            self.model_paths[model.name] = model.path
+            self.model_types[model.name] = type(model)
+            print('Score of ' + model.name + ':', score)
+            print('Fit Runtime:  ', model.name, '=', fit_end_time - fit_start_time, 's')
+            print('Score Runtime:', model.name, '=', pred_end_time - fit_end_time, 's')
+            # TODO: Should model have fit-time/pred-time information?
+            # TODO: Add to HPO
+            self.model_fit_times[model.name] = fit_end_time - fit_start_time
+            self.model_pred_times[model.name] = pred_end_time - fit_end_time
+            self.save_model(model=model)
+            if self.low_memory:
+                del model
+
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True, level=0):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
@@ -305,38 +336,6 @@ class AbstractTrainer:
         if stacker_model_lr.bagged_mode:
             score = stacker_model_lr.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
             self.model_performance[stacker_model_lr.name] = score
-
-    # TODO: Move above
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
-        try:
-            fit_start_time = time.time()
-            model = self.train_single(X_train, y_train, X_test, y_test, model, level=level)
-            fit_end_time = time.time()
-            if (type(model) == BaggedEnsembleModel) or (type(model) == StackerEnsembleModel):
-                score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
-            else:
-                score = model.score(X=X_test, y=y_test)
-            pred_end_time = time.time()
-        except Exception as err:
-            traceback.print_tb(err.__traceback__)
-            print('Warning: Exception caused ' + model.name + ' to fail during training... Skipping model.')
-            print(err)
-            del model
-        else:
-            self.models_level[level].append(model.name)
-            self.model_performance[model.name] = score
-            self.model_paths[model.name] = model.path
-            self.model_types[model.name] = type(model)
-            print('Score of ' + model.name + ':', score)
-            print('Fit Runtime:  ', model.name, '=', fit_end_time - fit_start_time, 's')
-            print('Score Runtime:', model.name, '=', pred_end_time - fit_end_time, 's')
-            # TODO: Should model have fit-time/pred-time information?
-            # TODO: Add to HPO
-            self.model_fit_times[model.name] = fit_end_time - fit_start_time
-            self.model_pred_times[model.name] = pred_end_time - fit_end_time
-            self.save_model(model=model)
-            if self.low_memory:
-                del model
 
     def predict(self, X):
         return self.predict_model(X, self.model_best)
