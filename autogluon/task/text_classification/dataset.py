@@ -10,27 +10,45 @@ from ...core import *
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask', 'tasks']
 
-class TextClassificationDataset(object):
-    """The text classification dataset.
-    Args:
-        name: the dataset name.
-        train_path: the training data location
-        hpo_val_path: the validation data location.
-    """
+built_in_tasks = {
+    'mrpc': MRPCTask(),
+    'qqp': QQPTask(),
+    'qnli': QNLITask(),
+    'rte': RTETask(),
+    'sts-b': STSBTask(),
+    'cola': CoLATask(),
+    'mnli': MNLITask(),
+    'wnli': WNLITask(),
+    'sst': SSTTask(),
+}
 
-    def __init__(self, name=None, train_path=None, hpo_val_path=None,
-                 **kwargs):
-        self.name = name
-        self.train_path = train_path
-        self.hpo_val_path = hpo_val_path
-        self._read_dataset(**kwargs)
+def get_dataset(path=None, name=None, *args, **kwargs):
+    if path is not None:
+        raise NotImplemented
+    if name is not None and name in built_in_tasks:
+        
 
-    def _read_dataset(self, **kwargs):
-        if self.name in tasks:
-            self.num_classes = len(tasks[self.name].class_labels)
-            return tasks[self.name]
-        else:
-            raise NotImplementedError
+#class TextClassificationDataset(object):
+#    """The text classification dataset.
+#    Args:
+#        name: the dataset name.
+#        train_path: the training data location
+#        hpo_val_path: the validation data location.
+#    """
+#
+#    def __init__(self, name=None, train_path=None, hpo_val_path=None,
+#                 **kwargs):
+#        self.name = name
+#        self.train_path = train_path
+#        self.hpo_val_path = hpo_val_path
+#        self._read_dataset(**kwargs)
+#
+#    def _read_dataset(self, **kwargs):
+#        if self.name in tasks:
+#            self.num_classes = len(tasks[self.name].class_labels)
+#            return tasks[self.name]
+#        else:
+#            raise NotImplementedError
 
 class GlueTask:
     """Abstract GLUE task class.
@@ -284,16 +302,3 @@ class MNLITask(GlueTask):
         """
         return [('test_matched', self.get_dataset(segment='test_matched')),
                 ('test_mismatched', self.get_dataset(segment='test_mismatched'))]
-
-tasks = {
-    'MRPC': MRPCTask(),
-    'QQP': QQPTask(),
-    'QNLI': QNLITask(),
-    'RTE': RTETask(),
-    'STS-B': STSBTask(),
-    'CoLA': CoLATask(),
-    'MNLI': MNLITask(),
-    'WNLI': WNLITask(),
-    'SST': SSTTask(),
-    'IMDB': nlp.data.IMDB(),  # TODO: metric in args not in the task
-}

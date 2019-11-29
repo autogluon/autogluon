@@ -14,7 +14,7 @@ from ..base import BaseTask
 from ...utils import update_params
 
 from .classification_models import get_network
-from .dataset import TextClassificationDataset
+from .dataset import get_dataset
 from .pipeline import *
 from .metrics import get_metric_instance
 from .optimizers import *
@@ -27,7 +27,10 @@ logger = logging.getLogger(__name__)
 class TextClassification(BaseTask):
     """AutoGluon TextClassification Task
     """
-    Dataset = TextClassificationDataset
+    @staticmethod
+    def Dataset():
+        return get_dataset(*args, **kwargs)
+
     @staticmethod
     def fit(dataset='SST',
             net=Categorical('bert_12_768_12'),
