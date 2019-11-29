@@ -97,6 +97,21 @@ class GlueTask:
         """
         return 'test', self.get_dataset(segment='test')
 
+class TSVClassificationTask(GlueTask):
+    def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
+        # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
+        self.args = args
+        self.kwargs = kwargs
+        is_pair = False
+        class_labels = ['0', '1']
+        metric = CompositeEvalMetric()
+        metric.add(F1())
+        metric.add(Accuracy())
+        super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
+
+    def get_dataset(self):
+        return nlp.data.TSVDataset(*self.args, **self.kwargs)
+
 class MRPCTask(GlueTask):
     """The MRPC task on GlueBenchmark."""
     def __init__(self):
@@ -295,5 +310,4 @@ tasks = {
     'MNLI': MNLITask(),
     'WNLI': WNLITask(),
     'SST': SSTTask(),
-    'IMDB': nlp.data.IMDB(),  # TODO: metric in args not in the task
 }
