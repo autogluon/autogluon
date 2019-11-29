@@ -11,22 +11,23 @@ from ...core import *
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask', 'tasks']
 
 built_in_tasks = {
-    'mrpc': MRPCTask(),
-    'qqp': QQPTask(),
-    'qnli': QNLITask(),
-    'rte': RTETask(),
-    'sts-b': STSBTask(),
-    'cola': CoLATask(),
-    'mnli': MNLITask(),
-    'wnli': WNLITask(),
-    'sst': SSTTask(),
+    'mrpc': MRPCTask,
+    'qqp': QQPTask,
+    'qnli': QNLITask,
+    'rte': RTETask,
+    'sts-b': STSBTask,
+    'cola': CoLATask,
+    'mnli': MNLITask,
+    'wnli': WNLITask,
+    'sst': SSTTask,
 }
 
+@func()
 def get_dataset(path=None, name=None, *args, **kwargs):
     if path is not None:
         raise NotImplemented
     if name is not None and name in built_in_tasks:
-        
+        return built_in_tasks[name](*args, **kwargs)
 
 #class TextClassificationDataset(object):
 #    """The text classification dataset.
@@ -49,6 +50,21 @@ def get_dataset(path=None, name=None, *args, **kwargs):
 #            return tasks[self.name]
 #        else:
 #            raise NotImplementedError
+
+class TSVClassificationTask(GlueTask):
+    def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
+        # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
+        self.args = args
+        self.kwargs = kwargs
+        is_pair = False
+        class_labels = ['0', '1']
+        metric = CompositeEvalMetric()
+        metric.add(F1())
+        metric.add(Accuracy())
+        super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
+
+    def get_dataset(self):
+        return nlp.data.TSVDataset(*self.args, **self.kwargs)
 
 class GlueTask:
     """Abstract GLUE task class.

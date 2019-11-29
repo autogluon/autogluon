@@ -28,7 +28,7 @@ class TextClassification(BaseTask):
     """AutoGluon TextClassification Task
     """
     @staticmethod
-    def Dataset():
+    def Dataset(*args, **kwargs):
         return get_dataset(*args, **kwargs)
 
     @staticmethod
