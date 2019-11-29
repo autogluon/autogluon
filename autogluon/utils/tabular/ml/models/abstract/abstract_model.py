@@ -147,11 +147,11 @@ class AbstractModel:
             return X[self.features]
         return X
 
-    def save(self, file_prefix ="", directory = None, return_filename=False):
+    def save(self, file_prefix ="", directory = None, return_filename=False, verbose=True):
         if directory is None:
             directory = self.path
         file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self)
+        save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name
 

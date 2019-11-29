@@ -109,7 +109,7 @@ class BaggedEnsembleModel(AbstractModel):
         obj._model_names = None
         return obj
 
-    def save(self, file_prefix ="", directory = None, return_filename=False):
+    def save(self, file_prefix="", directory = None, return_filename=False, verbose=True):
         if directory is None:
             directory = self.path
         directory = directory + file_prefix
@@ -119,7 +119,7 @@ class BaggedEnsembleModel(AbstractModel):
         for child in self.models:
             child = self.load_child(child)
             child.path = self.create_contexts(self.path + child.name + '/')
-            child.save()
+            child.save(verbose=False)
             self._model_types.append(type(child))
             self._model_names.append(child.name)
 
@@ -127,6 +127,6 @@ class BaggedEnsembleModel(AbstractModel):
 
         self.models = None
 
-        save_pkl.save(path=file_name, object=self)
+        save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name
