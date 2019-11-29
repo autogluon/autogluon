@@ -86,11 +86,22 @@ class AbstractTrainer:
 
     @property
     def model_names(self):
+        return self.model_names_core + self.model_names_aux
+
+    @property
+    def model_names_core(self):
         model_names = []
         levels = np.sort(list(self.models_level.keys()))
-        print(levels)
         for level in levels:
             model_names += self.models_level[level]
+        return model_names
+
+    @property
+    def model_names_aux(self):
+        model_names = []
+        levels = np.sort(list(self.models_level_auxiliary.keys()))
+        for level in levels:
+            model_names += self.models_level_auxiliary[level]
         return model_names
 
     @property
@@ -145,8 +156,7 @@ class AbstractTrainer:
 
         return X_train, X_test, y_train, y_test
 
-    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
-              holdout_frac=0.1, hyperparameters= {}):
+    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters= {}):
         raise NotImplementedError
 
     def train_single(self, X_train, y_train, X_test, y_test, model, level=0):
@@ -214,8 +224,7 @@ class AbstractTrainer:
         self.models_level[level] = unique_names # make unique and preserve order
 
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
-    def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel],
-                                 hyperparameter_tune=True, feature_prune=False):
+    def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         # if not hyperparameter_tune: # TODO: we store and print model_performance after HPO
         for model_name in self.models_level[0]:
@@ -229,12 +238,9 @@ class AbstractTrainer:
         # TODO: Add validation oof score!
         # TODO: Move up 1 level, use the preprocessing directly to get pred_proba! Will be much faster!
         if self.bagged_mode:
-            self.generate_weighted_ensemble(X=None, y=y_train, level=0)
-            X_train_init = self.get_inputs_to_stacker(X_train, level_start=0, level_end=1, fit=True)
-            self.generate_stack_log_reg(X=X_train_init, y=y_train, level=0, k_fold=0)
-            self.generate_stack_log_reg(X=X_train_init, y=y_train, level=0, k_fold=self.kfolds)
+            self.stack_new_level_aux(X=X_train, y=y_train, level=1)
         else:
-            self.generate_weighted_ensemble(X=X_test, y=y_test, level=0)
+            self.generate_weighted_ensemble(X=X_test, y=y_test, level=1)
 
         if self.stack_mode:
             self.stack_new_level(X=X_train, y=y_train, level=1)
@@ -251,7 +257,7 @@ class AbstractTrainer:
     # TODO:
     def stack_new_level(self, X, y, level):
         self.stack_new_level_core(X=X, y=y, level=level)
-        self.stack_new_level_aux(X=X, y=y, level=level)
+        self.stack_new_level_aux(X=X, y=y, level=level+1)
 
     def stack_new_level_core(self, X, y, level=1):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
@@ -273,40 +279,34 @@ class AbstractTrainer:
             self.model_types[stacker_model.name] = type(stacker_model)
             self.model_performance[stacker_model.name] = score
 
-    # TODO: Level - 1
     def stack_new_level_aux(self, X, y, level):
         self.generate_weighted_ensemble(X=None, y=y, level=level)
-        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level + 1, fit=True)
+        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0)
         self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds)
 
     def generate_weighted_ensemble(self, X, y, level):
         # TODO: Add validation oof score!
         # TODO: Move up 1 level, use the preprocessing directly to get pred_proba! Will be much faster!
-        model_weights = self.compute_optimal_voting_ensemble_weights(models=self.models_level[level], X=X, y=y, bagged_mode=self.bagged_mode)
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level+1), base_model_names=self.models_level[level], base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_weights=model_weights)
+        model_weights = self.compute_optimal_voting_ensemble_weights(models=self.models_level[level-1], X=X, y=y, bagged_mode=self.bagged_mode)
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1], base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_weights=model_weights)
         self.save_model(weighted_ensemble_model)
-        self.models_level_auxiliary[level].append(weighted_ensemble_model.name)  # TODO: level+1, update preprocessing!
+        self.models_level_auxiliary[level-1].append(weighted_ensemble_model.name)  # TODO: level+1, update preprocessing!
         self.model_paths[weighted_ensemble_model.name] = weighted_ensemble_model.path
         self.model_types[weighted_ensemble_model.name] = type(weighted_ensemble_model)
         self.model_best = weighted_ensemble_model.name
 
     def generate_stack_log_reg(self, X, y, level, k_fold=0):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
-        # base_model_names = copy.deepcopy(self.models_level[level])
-        # base_model_paths = copy.deepcopy(self.model_paths)
-        # base_model_types = copy.deepcopy(self.model_types)
+        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
-        name_new = stacker_model_lr.name + '_STACKER_l' + str(level+1) + '_k' + str(k_fold)
+        name_new = stacker_model_lr.name + '_STACKER_l' + str(level) + '_k' + str(k_fold)
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, stacker_model=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
                                                 num_classes=self.num_classes)
-        stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level + 1)
-        # score = stacker_model_lr.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
-        # print('log_reg_stacker_score:', score)
+        stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level)
         self.save_model(stacker_model_lr)
-        self.models_level_auxiliary[level+1].append(stacker_model_lr.name)
+        self.models_level_auxiliary[level].append(stacker_model_lr.name)
         self.model_paths[stacker_model_lr.name] = stacker_model_lr.path
         self.model_types[stacker_model_lr.name] = type(stacker_model_lr)
         if stacker_model_lr.bagged_mode:
