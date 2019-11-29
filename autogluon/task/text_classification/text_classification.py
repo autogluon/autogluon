@@ -5,7 +5,6 @@ import mxnet as mx
 from mxnet import gluon, nd
 import gluonnlp as nlp
 
-from ...core.optimizer import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
@@ -16,7 +15,6 @@ from ...utils import update_params
 from .network import get_network
 from .dataset import get_dataset
 from .pipeline import *
-from .metrics import get_metric_instance
 from .optimizers import *
 from .predictor import TextClassificationPredictor
 
@@ -49,7 +47,6 @@ class TextClassification(BaseTask):
             epochs=3,
             epsilon=1e-6,
             accumulate=1,
-            metric='accuracy',
             early_stop=False,
             nthreads_per_trial=4,
             ngpus_per_trial=1,
@@ -74,7 +71,6 @@ class TextClassification(BaseTask):
             dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
             net (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): Network candidates.
             optimizer (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): optimizer candidates.
-            metric (str or object): observation metric.
             loss (object): training loss function.
             num_trials (int): number of trials in the experiment.
             time_limits (int): training time limits in seconds.
@@ -116,7 +112,6 @@ class TextClassification(BaseTask):
             seed=seed,
             lr_scheduler=lr_scheduler,
             loss=loss,
-            metric=metric,
             num_gpus=ngpus_per_trial,
             batch_size=batch_size,
             dev_batch_size=dev_batch_size,

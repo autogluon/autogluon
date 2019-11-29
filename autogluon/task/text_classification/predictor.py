@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from ...utils import *
 from .network import *
 from .pipeline import *
-from .metrics import get_metric_instance
 from ..image_classification.classifier import Classifier
 
 __all__ = ['TextClassificationPredictor']
@@ -59,7 +58,7 @@ class TextClassificationPredictor(Classifier):
         args = self.args
         net = self.model
         batch_size = args.batch_size * max(len(ctx), 1)
-        metric = get_metric_instance(args.metric)
+        #metric = get_metric_instance(args.metric)
         _, dev_data_list, _ = preprocess_data(
             args.bert_tokenizer, args.task, batch_size, args.dev_batch_size, args.max_len, args.vocabulary, args.pad)
         tbar = tqdm(enumerate(dev_data_list))
