@@ -37,11 +37,7 @@ While we stick with mostly default configurations in this Beginner tutorial, the
 However, neural network training can be quite time-costly. To ensure quick runtimes, we tell AutoGluon to obey strict limits: `num_training_epochs` specifies how much computational effort can be devoted to training any single network, while `time_limits` in seconds specifies how much time `fit` has to return a model. For demo purposes, we specify only small values for `time_limits`, `num_training_epochs`:
 
 ```{.python .input}
-time_limits = 3*60 # 3mins
-epochs = 10
-predictor = task.fit(dataset,
-                     time_limits=time_limits,
-                     epochs=epochs)
+predictor = task.fit(dataset, epochs=1)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  

@@ -136,8 +136,7 @@ class ImageClassification(BaseTask):
             epochs=epochs,
             verbose=verbose,
             num_workers=nthreads_per_trial,
-            hybridize=hybridize,
-            final_fit=False)
+            hybridize=hybridize)
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},

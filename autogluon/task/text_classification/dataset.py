@@ -7,64 +7,18 @@ import gluonnlp as nlp
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 from ...core import *
+from ...utils.dataset import get_split_samplers, SampledDataset
 
-__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask', 'tasks']
-
-built_in_tasks = {
-    'mrpc': MRPCTask,
-    'qqp': QQPTask,
-    'qnli': QNLITask,
-    'rte': RTETask,
-    'sts-b': STSBTask,
-    'cola': CoLATask,
-    'mnli': MNLITask,
-    'wnli': WNLITask,
-    'sst': SSTTask,
-}
+__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask']
 
 @func()
-def get_dataset(path=None, name=None, *args, **kwargs):
+def get_dataset(path=None, name=None, train=True, *args, **kwargs):
     if path is not None:
         raise NotImplemented
-    if name is not None and name in built_in_tasks:
-        return built_in_tasks[name](*args, **kwargs)
-
-#class TextClassificationDataset(object):
-#    """The text classification dataset.
-#    Args:
-#        name: the dataset name.
-#        train_path: the training data location
-#        hpo_val_path: the validation data location.
-#    """
-#
-#    def __init__(self, name=None, train_path=None, hpo_val_path=None,
-#                 **kwargs):
-#        self.name = name
-#        self.train_path = train_path
-#        self.hpo_val_path = hpo_val_path
-#        self._read_dataset(**kwargs)
-#
-#    def _read_dataset(self, **kwargs):
-#        if self.name in tasks:
-#            self.num_classes = len(tasks[self.name].class_labels)
-#            return tasks[self.name]
-#        else:
-#            raise NotImplementedError
-
-class TSVClassificationTask(GlueTask):
-    def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
-        # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
-        self.args = args
-        self.kwargs = kwargs
-        is_pair = False
-        class_labels = ['0', '1']
-        metric = CompositeEvalMetric()
-        metric.add(F1())
-        metric.add(Accuracy())
-        super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
-
-    def get_dataset(self):
-        return nlp.data.TSVDataset(*self.args, **self.kwargs)
+    if name is not None and name.lower() in built_in_tasks:
+        return built_in_tasks[name.lower()](*args, **kwargs)
+    else:
+        raise NotImplemented
 
 class GlueTask:
     """Abstract GLUE task class.
@@ -130,6 +84,29 @@ class GlueTask:
         tuple of (str, TSVDataset), or list of tuple : the segment name, and the dataset.
         """
         return 'test', self.get_dataset(segment='test')
+
+class TSVClassificationTask(GlueTask):
+    def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
+        # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
+        self.args = args
+        self.kwargs = kwargs
+        is_pair = False
+        class_labels = ['0', '1']
+        metric = CompositeEvalMetric()
+        metric.add(F1())
+        metric.add(Accuracy())
+        super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
+        dataset = nlp.data.TSVDataset(*self.args, **self.kwargs)
+        # do the split 
+        train_sampler, val_sampler = get_split_samplers(dataset, split_ratio=0.8)
+        self.trainset = SampledDataset(train_dataset, train_sampler)
+        self.valset = SampledDataset(train_dataset, val_sampler)
+
+    def dataset_train(self):
+        return 'train', self.trainset
+
+    def dataset_dev(self):
+        return 'dev', self.valset
 
 class MRPCTask(GlueTask):
     """The MRPC task on GlueBenchmark."""
@@ -318,3 +295,17 @@ class MNLITask(GlueTask):
         """
         return [('test_matched', self.get_dataset(segment='test_matched')),
                 ('test_mismatched', self.get_dataset(segment='test_mismatched'))]
+
+built_in_tasks = {
+    'mrpc': MRPCTask,
+    'qqp': QQPTask,
+    'qnli': QNLITask,
+    'rte': RTETask,
+    'sts-b': STSBTask,
+    'cola': CoLATask,
+    'mnli': MNLITask,
+    'wnli': WNLITask,
+    'sst': SSTTask,
+}
+
+

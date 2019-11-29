@@ -12,7 +12,7 @@ from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
 import gluonnlp as nlp
 from gluonnlp.data import BERTTokenizer
-from .classification_models import BERTClassifier, RoBERTaClassifier, LMClassifier, get_model_instances
+from .network import BERTClassifier, RoBERTaClassifier, LMClassifier, get_model_instances
 from .dataset import *
 from .losses import get_loss_instance
 from .metrics import get_metric_instance
@@ -21,6 +21,7 @@ from ...core import *
 
 __all__ = ['train_text_classification', 'preprocess_data']
 logger = logging.getLogger(__name__)
+
 
 def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab, pad=False, num_workers=1):
     """Train/eval Data preparation function."""
@@ -87,33 +88,35 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
                                       has_label=False)
 
     # data test. For MNLI, more than one test set is available
-    test_tsv = task.dataset_test()
-    test_tsv_list = test_tsv if isinstance(test_tsv, list) else [test_tsv]
-    loader_test_list = []
-    for segment, data in test_tsv_list:
-        data_test = mx.gluon.data.SimpleDataset(pool.map(test_trans, data))
-        loader_test = mx.gluon.data.DataLoader(
-            data_test,
-            batch_size=dev_batch_size,
-            num_workers=num_workers,
-            shuffle=False,
-            batchify_fn=test_batchify_fn)
-        loader_test_list.append((segment, loader_test))
-    return loader_train, loader_dev_list, loader_test_list, len(data_train)
+    #test_tsv = task.dataset_test()
+    #test_tsv_list = test_tsv if isinstance(test_tsv, list) else [test_tsv]
+    #loader_test_list = []
+    #for segment, data in test_tsv_list:
+    #    data_test = mx.gluon.data.SimpleDataset(pool.map(test_trans, data))
+    #    loader_test = mx.gluon.data.DataLoader(
+    #        data_test,
+    #        batch_size=dev_batch_size,
+    #        num_workers=num_workers,
+    #        shuffle=False,
+    #        batchify_fn=test_batchify_fn)
+    #    loader_test_list.append((segment, loader_test))
+    return loader_train, loader_dev_list, len(data_train)
 
 @args()
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+        logger.info(args)
     batch_size = args.batch_size
     dev_batch_size = args.dev_batch_size
-    task_name = args.dataset.name
     lr = args.lr
     epsilon = args.epsilon
     accumulate = args.accumulate
     log_interval = args.log_interval * accumulate if accumulate else args.log_interval
     if accumulate:
-        logging.info('Using gradient accumulation. Effective batch size = ' \
+        logger.info('Using gradient accumulation. Effective batch size = ' \
                      'batch_size * accumulate = %d', accumulate * batch_size)
 
     # random seed
@@ -124,8 +127,7 @@ def train_text_classification(args, reporter=None):
     # TODO support for multi-GPU
     ctx = [mx.gpu(i) for i in range(args.num_gpus)][0] if args.num_gpus > 0 else [mx.cpu()][0]
 
-    task = tasks[task_name]
-
+    task = args.dataset
     # data type with mixed precision training
     if args.dtype == 'float16':
         try:
@@ -139,7 +141,7 @@ def train_text_classification(args, reporter=None):
             amp.init()
         except ImportError:
             # amp is not available
-            logging.info('Mixed precision training with float16 requires MXNet >= '
+            logger.info('Mixed precision training with float16 requires MXNet >= '
                          '1.5.0b20190627. Please consider upgrading your MXNet version.')
             exit()
 
@@ -185,7 +187,7 @@ def train_text_classification(args, reporter=None):
     output_dir = 'checkpoints'
     nlp.utils.mkdir(output_dir)
 
-    logging.debug(model)
+    logger.debug(model)
     model.hybridize(static_alloc=True)
     loss_function.hybridize(static_alloc=True)
 
@@ -198,8 +200,8 @@ def train_text_classification(args, reporter=None):
 
 
     # Get the loader.
-    logging.info('processing dataset...')
-    train_data, dev_data_list, test_data_list, num_train_examples = preprocess_data(
+    #logger.info('processing dataset...')
+    train_data, dev_data_list, num_train_examples = preprocess_data(
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary,
         True, args.num_workers)
 
@@ -211,7 +213,7 @@ def train_text_classification(args, reporter=None):
 
         train_str = '[Epoch %d Batch %d/%d] loss=%.4f, lr=%.7f, metrics:' + \
                     ','.join([i + ':%.4f' for i in metric_nm])
-        logging.info(train_str, epoch_id + 1, batch_id + 1, batch_num,
+        logger.info(train_str, epoch_id + 1, batch_id + 1, batch_num,
                      step_loss / log_interval, learning_rate, *metric_val)
 
     def log_eval(batch_id, batch_num, metric, step_loss, log_interval):
@@ -222,12 +224,12 @@ def train_text_classification(args, reporter=None):
 
         eval_str = '[Batch %d/%d] loss=%.4f, metrics:' + \
                    ','.join([i + ':%.4f' for i in metric_nm])
-        logging.info(eval_str, batch_id + 1, batch_num,
+        logger.info(eval_str, batch_id + 1, batch_num,
                      step_loss / log_interval, *metric_val)
 
     def evaluate(loader_dev, metric, segment):
         """Evaluate the model on validation dataset."""
-        logging.info('Now we are doing evaluation on %s with %s.', segment, ctx)
+        #logger.info('Now we are doing evaluation on %s with %s.', segment, ctx)
         metric.reset()
         step_loss = 0
         tic = time.time()
@@ -253,18 +255,17 @@ def train_text_classification(args, reporter=None):
         if not isinstance(metric_nm, list):
             metric_nm, metric_val = [metric_nm], [metric_val]
         metric_str = 'validation metrics:' + ','.join([i + ':%.4f' for i in metric_nm])
-        logging.info(metric_str, *metric_val)
+        logger.info(metric_str, *metric_val)
 
         mx.nd.waitall()
         toc = time.time()
-        logging.info('Time cost=%.2fs, throughput=%.2f samples/s', toc - tic,
+        logger.info('Time cost=%.2fs, throughput=%.2f samples/s', toc - tic,
                      dev_batch_size * len(loader_dev) / (toc - tic))
         return metric_nm, metric_val
 
     # Step 2: the training function in the original training script is added in the decorated function in autogluon for training.
-
     """Training function."""
-    logging.info('Now we are doing BERT classification training on %s!', ctx)
+    logger.info('Now we are doing BERT classification training on %s!', ctx)
 
     all_model_params = model.collect_params()
     optimizer_params = {'learning_rate': lr, 'epsilon': epsilon, 'wd': 0.01}
@@ -297,7 +298,7 @@ def train_text_classification(args, reporter=None):
     tic = time.time()
     for epoch_id in range(args.epochs):
         if args.early_stop and patience == 0:
-            logging.info('Early stopping at epoch %d', epoch_id)
+            logger.info('Early stopping at epoch %d', epoch_id)
             break
         task.metric.reset()
         step_loss = 0
@@ -365,11 +366,10 @@ def train_text_classification(args, reporter=None):
         # save params
         ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
         params_saved = os.path.join(output_dir, ckpt_name)
-
         nlp.utils.save_parameters(model, params_saved)
-        logging.info('params saved in: %s', params_saved)
+        logger.info('params saved in: %s', params_saved)
         toc = time.time()
-        logging.info('Time cost=%.2fs', toc - tic)
+        logger.info('Time cost=%.2fs', toc - tic)
         tic = toc
 
     # we choose the best model based on metric[0],
@@ -379,6 +379,7 @@ def train_text_classification(args, reporter=None):
     ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
     params_saved = os.path.join(output_dir, ckpt_name)
     nlp.utils.load_parameters(model, params_saved)
-    metric_str = 'Best model at epoch {}. Validation metrics:'.format(epoch_id)
-    metric_str += ','.join([i + ':%.4f' for i in metric_nm])
-    logging.info(metric_str, *metric_val)
+    if args.final_fit:
+        get_model_params.pop('ctx')
+        return {'model_params': collect_params(model),
+                'get_model_args': get_model_params}

@@ -13,7 +13,7 @@ from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ...utils import update_params
 
-from .classification_models import get_network
+from .network import get_network
 from .dataset import get_dataset
 from .pipeline import *
 from .metrics import get_metric_instance
@@ -63,6 +63,7 @@ class TextClassification(BaseTask):
             dist_ip_addrs=[],
             grace_period=None,
             auto_search=True,
+            verbose=False,
             **kwargs):
 
         """
@@ -121,7 +122,7 @@ class TextClassification(BaseTask):
             epochs=epochs,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
-            final_fit=False,
+            verbose=verbose,
             **kwargs)
 
         scheduler_options = {
@@ -145,6 +146,6 @@ class TextClassification(BaseTask):
         results = BaseTask.run_fit(train_text_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+        model = get_network(args.net, mx.cpu(0), **results['get_model_args'])
         update_params(model, results.pop('model_params'))
-        return TextClassificationPredictor(model, results, evaluate, checkpoint, args)
+        return TextClassificationPredictor(model, results, checkpoint, args)
