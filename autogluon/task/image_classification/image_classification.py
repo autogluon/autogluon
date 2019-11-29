@@ -72,7 +72,8 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True):
+            auto_search=True,
+            **kwargs):
 
         """
         Auto fit on image classification dataset
@@ -136,7 +137,9 @@ class ImageClassification(BaseTask):
             epochs=epochs,
             verbose=verbose,
             num_workers=nthreads_per_trial,
-            hybridize=hybridize)
+            hybridize=hybridize,
+            final_fit=False,
+            **kwargs)
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},

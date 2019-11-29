@@ -34,7 +34,8 @@ class TextClassification(BaseTask):
     @staticmethod
     def fit(dataset='SST',
             net=Categorical('bert_12_768_12'),
-            pretrained_dataset=Categorical('book_corpus_wiki_en_uncased'),
+            pretrained_dataset=Categorical('book_corpus_wiki_en_uncased',
+                                           'openwebtext_book_corpus_wiki_en_uncased'),
             lr=Real(2e-05, 2e-04, log=True),
             warmup_ratio=0.01,
             lr_scheduler='cosine',
@@ -123,6 +124,7 @@ class TextClassification(BaseTask):
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
             verbose=verbose,
+            final_fit=False,
             **kwargs)
 
         scheduler_options = {
