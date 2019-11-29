@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ..utils import get_pred_from_proba, generate_kfold
+from ..utils import get_pred_from_proba
 from ..models.abstract.abstract_model import AbstractModel
 from ..tuning.feature_pruner import FeaturePruner
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
@@ -291,6 +291,28 @@ class AbstractTrainer:
         self.model_types[weighted_ensemble_model.name] = type(weighted_ensemble_model)
         self.model_best = weighted_ensemble_model.name
 
+    def generate_stack_log_reg(self, X, y, level, k_fold=0):
+        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
+        # base_model_names = copy.deepcopy(self.models_level[level])
+        # base_model_paths = copy.deepcopy(self.model_paths)
+        # base_model_types = copy.deepcopy(self.model_types)
+        stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
+        name_new = stacker_model_lr.name + '_STACKER_l' + str(level+1) + '_k' + str(k_fold)
+
+        stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, stacker_model=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
+                                                use_orig_features=False,
+                                                num_classes=self.num_classes)
+        stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level + 1)
+        # score = stacker_model_lr.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
+        # print('log_reg_stacker_score:', score)
+        self.save_model(stacker_model_lr)
+        self.models_level_auxiliary[level+1].append(stacker_model_lr.name)
+        self.model_paths[stacker_model_lr.name] = stacker_model_lr.path
+        self.model_types[stacker_model_lr.name] = type(stacker_model_lr)
+        if stacker_model_lr.bagged_mode:
+            score = stacker_model_lr.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
+            self.model_performance[stacker_model_lr.name] = score
+
     def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
         print('training', model.name)
         try:
@@ -324,14 +346,10 @@ class AbstractTrainer:
                 del model
 
     def predict(self, X):
-          # TODO: Move to predict_model / predict_proba_model?
         return self.predict_model(X, self.model_best)
-        # return self.predict_voting_ensemble(models=self.models_level[0], X_test=X, weights=self.model_weights)
 
     def predict_proba(self, X):
-
         return self.predict_proba_model(X, self.model_best)
-        # return self.predict_proba_voting_ensemble(models=self.models_level[0], X_test=X, weights=self.model_weights)
 
     # TODO: Add level_start to params
     def predict_model(self, X, model):
@@ -390,29 +408,6 @@ class AbstractTrainer:
             preds.append(model_pred)
         return preds
 
-    def predict_proba_voting_ensemble(self, models, X_test, weights=None):
-        if weights is None:
-            weights = [1/len(models)]*len(models)
-        model_index_to_ignore = []
-        for index, weight in enumerate(weights):
-            if weight == 0:
-                model_index_to_ignore.append(index)
-        models_to_predict_on = [model for index, model in enumerate(models) if index not in model_index_to_ignore]
-        models_to_predict_on_weights = [weight for index, weight in enumerate(weights) if index not in model_index_to_ignore]
-        pred_probas = self.pred_proba_predictions(models=models_to_predict_on, X_test=X_test)
-        preds_norm = [pred * weight for pred, weight in zip(pred_probas, models_to_predict_on_weights)]
-        preds_ensemble = np.sum(preds_norm, axis=0)
-        return preds_ensemble
-
-    def predict_voting_ensemble(self, models, X_test, weights=None):
-        y_pred_proba_ensemble = self.predict_proba_voting_ensemble(models=models, X_test=X_test, weights=weights)
-        y_pred_ensemble = get_pred_from_proba(y_pred_proba=y_pred_proba_ensemble, problem_type=self.problem_type)
-        return y_pred_ensemble
-
-    def predict_voting_ensemble_optimize(self, models, X_test, y_test):
-        optimal_weights = self.compute_optimal_voting_ensemble_weights(models=models, X=X_test, y=y_test)
-        return self.predict_voting_ensemble(models=models, X_test=X_test, weights=optimal_weights)
-
     # Ensemble Selection (https://dl.acm.org/citation.cfm?id=1015432)
     def compute_optimal_voting_ensemble_weights(self, models, X, y, bagged_mode=False):
         if bagged_mode:
@@ -448,28 +443,6 @@ class AbstractTrainer:
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
-
-    def generate_stack_log_reg(self, X, y, level, k_fold=0):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
-        # base_model_names = copy.deepcopy(self.models_level[level])
-        # base_model_paths = copy.deepcopy(self.model_paths)
-        # base_model_types = copy.deepcopy(self.model_types)
-        stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
-        name_new = stacker_model_lr.name + '_STACKER_l' + str(level+1) + '_k' + str(k_fold)
-
-        stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, stacker_model=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
-                                                use_orig_features=False,
-                                                num_classes=self.num_classes)
-        stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level + 1)
-        # score = stacker_model_lr.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
-        # print('log_reg_stacker_score:', score)
-        self.save_model(stacker_model_lr)
-        self.models_level_auxiliary[level+1].append(stacker_model_lr.name)
-        self.model_paths[stacker_model_lr.name] = stacker_model_lr.path
-        self.model_types[stacker_model_lr.name] = type(stacker_model_lr)
-        if stacker_model_lr.bagged_mode:
-            score = stacker_model_lr.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
-            self.model_performance[stacker_model_lr.name] = score
 
     def save_model(self, model):
         if self.low_memory:
