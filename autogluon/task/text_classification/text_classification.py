@@ -148,6 +148,9 @@ class TextClassification(BaseTask):
         results = BaseTask.run_fit(train_text_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])
-        model = get_network(args.net, mx.cpu(0), **results['get_model_args'])
+        get_model_params = results.pop('get_model_args')
+        get_model_params['ctx'] = mx.cpu(0)
+        bert, _ = nlp.model.get_model(**get_model_params)
+        model = get_network(bert, results.pop('class_labels'), results.pop('use_roberta'))
         update_params(model, results.pop('model_params'))
         return TextClassificationPredictor(model, results, checkpoint, args)

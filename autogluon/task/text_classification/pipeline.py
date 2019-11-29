@@ -12,10 +12,8 @@ from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
 import gluonnlp as nlp
 from gluonnlp.data import BERTTokenizer
-from .network import BERTClassifier, RoBERTaClassifier, LMClassifier, get_model_instances
+from .network import get_network#BERTClassifier, RoBERTaClassifier, LMClassifier
 from .dataset import *
-from .losses import get_loss_instance
-from .metrics import get_metric_instance
 from .transforms import BERTDatasetTransform
 from ...core import *
 from ...utils import tqdm
@@ -165,31 +163,24 @@ def train_text_classification(args, reporter=None):
         get_model_params['use_pooler'] = True
 
     bert, vocabulary = nlp.model.get_model(**get_model_params)
-
-    # initialize the rest of the parameters
-    initializer = mx.init.Normal(0.02)
-    # STS-B is a regression task.
-    # STSBTask().class_labels returns None
-    do_regression = not task.class_labels
-    if do_regression:
-        num_classes = 1
-        loss_function = gluon.loss.L2Loss()
-    else:
-        num_classes = len(task.class_labels)
-        loss_function = gluon.loss.SoftmaxCELoss()
-    # reuse the BERTClassifier class with num_classes=1 for regression
-    if use_roberta:
-        model = RoBERTaClassifier(bert, dropout=0.0, num_classes=num_classes)
-    else:
-        model = BERTClassifier(bert, dropout=0.1, num_classes=num_classes)
+    model = get_network(bert, task.class_labels, use_roberta)
+    #do_regression = not task.class_labels
+    #if do_regression:
+    #    num_classes = 1
+    #    loss_function = gluon.loss.L2Loss()
+    #else:
+    #    num_classes = len(task.class_labels)
+    #    loss_function = gluon.loss.SoftmaxCELoss()
+    ## reuse the BERTClassifier class with num_classes=1 for regression
+    #if use_roberta:
+    #    model = RoBERTaClassifier(bert, dropout=0.0, num_classes=num_classes)
+    #else:
+    #    model = BERTClassifier(bert, dropout=0.1, num_classes=num_classes)
     # initialize classifier
+    loss_function = gluon.loss.SoftmaxCELoss() if task.class_labels else gluon.loss.L2Loss()
+    initializer = mx.init.Normal(0.02)
     model.classifier.initialize(init=initializer, ctx=ctx)
 
-    # load checkpointing
-    output_dir = 'checkpoints'
-    nlp.utils.mkdir(output_dir)
-
-    logger.debug(model)
     model.hybridize(static_alloc=True)
     loss_function.hybridize(static_alloc=True)
 
@@ -213,10 +204,9 @@ def train_text_classification(args, reporter=None):
         if not isinstance(metric_nm, list):
             metric_nm, metric_val = [metric_nm], [metric_val]
 
-        train_str = '[Epoch %d Batch %d/%d] loss=%.4f, lr=%.7f, metrics:' + \
+        train_str = '[Epoch %d] loss=%.4f, lr=%.7f, metrics:' + \
                     ','.join([i + ':%.4f' for i in metric_nm])
-        tbar.set_description(train_str % (epoch_id, batch_id + 1, batch_num,
-                             step_loss / log_interval, learning_rate, *metric_val))
+        tbar.set_description(train_str % (epoch_id, step_loss / log_interval, learning_rate, *metric_val))
 
     def log_eval(batch_id, batch_num, metric, step_loss, log_interval, tbar):
         """Generate and print out the log message for inference. """
@@ -224,10 +214,9 @@ def train_text_classification(args, reporter=None):
         if not isinstance(metric_nm, list):
             metric_nm, metric_val = [metric_nm], [metric_val]
 
-        eval_str = '[Batch %d/%d] loss=%.4f, metrics:' + \
+        eval_str = 'loss=%.4f, metrics:' + \
                    ','.join([i + ':%.4f' for i in metric_nm])
-        tbar.set_description(eval_str % (batch_id, batch_num,
-                             step_loss / log_interval, *metric_val))
+        tbar.set_description(eval_str % (step_loss / log_interval, *metric_val))
 
     def evaluate(loader_dev, metric, segment):
         """Evaluate the model on validation dataset."""
@@ -367,4 +356,6 @@ def train_text_classification(args, reporter=None):
     if args.final_fit:
         get_model_params.pop('ctx')
         return {'model_params': collect_params(model),
-                'get_model_args': get_model_params}
+                'get_model_args': get_model_params,
+                'class_labels': task.class_labels,
+                'use_roberta': use_roberta}
