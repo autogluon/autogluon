@@ -7,10 +7,10 @@ from .model_presets.presets import get_preset_models
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0, compute_feature_importance=False):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
-                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_levels=stack_levels, compute_feature_importance=compute_feature_importance)
+                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_levels=stack_levels)
         # # TODO TODO
         self.hyperparameters = {}  # TODO: Remove or init in AbstractTrainer
 

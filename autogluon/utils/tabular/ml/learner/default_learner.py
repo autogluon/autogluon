@@ -16,9 +16,9 @@ from ..trainer.auto_trainer import AutoTrainer
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer, compute_feature_importance=False):
+                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer):
         super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold, 
-            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
+            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
@@ -49,7 +49,6 @@ class DefaultLearner(AbstractLearner):
             low_memory=True,
             kfolds=kfolds,
             stack_levels=stack_levels,
-            compute_feature_importance=self.compute_feature_importance,
             scheduler_options=scheduler_options)
 
         self.trainer_path = trainer.path

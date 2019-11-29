@@ -22,7 +22,7 @@ class AbstractLearner:
     save_file_name = 'learner.pkl'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10, 
-                 problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
+                 problem_type=None, objective_func=None, is_trainer_present=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
@@ -40,7 +40,6 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
-        self.compute_feature_importance = compute_feature_importance
 
     def set_contexts(self, path_context):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)

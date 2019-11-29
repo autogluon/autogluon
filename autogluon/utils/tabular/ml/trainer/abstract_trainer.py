@@ -29,8 +29,7 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0,
-                 compute_feature_importance=False):
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
@@ -47,7 +46,6 @@ class AbstractTrainer:
 
         self.num_classes = num_classes
         self.low_memory = low_memory
-        self.compute_feature_importance = compute_feature_importance
         self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
         self.bagged_mode = True if self.kfolds >= 2 else False
         if self.bagged_mode:
@@ -73,7 +71,6 @@ class AbstractTrainer:
         self.models = {}
         self.model_weights = None
         self.reset_paths = False
-        self.feature_importance = {}
         # Things stored
         self.hpo_results = {} # Stores summary of HPO process
         self.hpo_model_names = defaultdict(list)  # stores additional models produced during HPO
@@ -148,40 +145,6 @@ class AbstractTrainer:
 
         return X_train, X_test, y_train, y_test
 
-    # Note: This should not be used for time-series data
-    @staticmethod
-    def get_cv(X, y, n_splits, model: AbstractModel, random_state=0):
-        kfolds = generate_kfold(X, n_splits, random_state)
-        models = []
-        oof = []
-
-        print('training models...')
-        for i, kfold in enumerate(kfolds):
-            name = model.name + '_cv_' + str(i+1) + '_of_' + str(n_splits)
-            path = model.path + 'cv_' + str(i + 1) + '_of_' + str(n_splits) + '/'
-
-            model_cv = copy.deepcopy(model)
-            model_cv.name = name
-            model_cv.path = path
-
-            # X_train, y_train, X_test, y_test = kfold
-            train_index, test_index = kfold
-            X_train, X_test = X.iloc[train_index], X.iloc[test_index]
-            y_train, y_test = y.iloc[train_index], y.iloc[test_index]
-
-            model_cv.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
-            print(model_cv.score(X=X_test, y=y_test))
-            models.append(model_cv)
-
-            y_pred_prob = model_cv.predict_proba(X=X_test)
-            y_pred = np.argmax(y_pred_prob, axis=1)
-            oof_part = pd.DataFrame(data=y_pred_prob, index=X_test.index)
-            oof.append(oof_part)
-        oof_pred_proba = pd.concat(oof, ignore_index=False)
-        oof_pred_proba = oof_pred_proba.reindex(X.index)
-        print(oof_pred_proba)
-        return oof_pred_proba, models
-
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
               holdout_frac=0.1, hyperparameters= {}):
         raise NotImplementedError
@@ -199,18 +162,7 @@ class AbstractTrainer:
             model.fit(X=X_train, y=y_train, k_fold=self.kfolds, random_state=level, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
-
-        if self.compute_feature_importance:
-            self.feature_importance[model.name] = self._compute_model_feature_importance(model, X_test, y_test)
         return model
-
-    def _compute_model_feature_importance(self, model, X_test, y_test):
-        # Excluding vectorizers features from evaluation because usually there are too many of these
-        vectorizer_cols = [] if 'vectorizers' not in model.feature_types_metadata else model.feature_types_metadata['vectorizers']
-        features_to_use = [col for col in X_test.columns if col not in vectorizer_cols]
-        print(f'Calculating feature importance for the following features: {features_to_use}')
-        feature_importance = model.debug_feature_gain(X_test=X_test, Y_test=y_test, model=model, features_to_use=features_to_use)
-        return feature_importance
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True, level=0):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
@@ -292,13 +244,6 @@ class AbstractTrainer:
         # self.model_performance['weighted_ensemble'] = ensemble_weighted_score
         # print('optimal weights:', self.model_weights)
 
-        # TODO: Consider having this be a separate call outside of train, to use on a fitted trainer object
-        if self.compute_feature_importance:
-            self._compute_ensemble_feature_importance()
-            with pd.option_context('display.max_rows', 10000, 'display.max_columns', 10):
-                print('Ensemble feature importance:')
-                print(self.feature_importance['weighted_ensemble'].sort_values(ascending=False))
-
         self.save()
 
     # TODO:
@@ -345,16 +290,6 @@ class AbstractTrainer:
         self.model_paths[weighted_ensemble_model.name] = weighted_ensemble_model.path
         self.model_types[weighted_ensemble_model.name] = type(weighted_ensemble_model)
         self.model_best = weighted_ensemble_model.name
-
-    # TODO: Remove all feature importance code, it is outdated and has to be reworked
-    def _compute_ensemble_feature_importance(self):
-        norm_model_weights = self.model_weights / np.sum(self.model_weights)
-        model_name_to_weight = {name: weight for name, weight in zip(self.models_level[0], norm_model_weights)}
-        models_feature_importance = pd.DataFrame()
-        for model in self.models_level[0]:
-            models_feature_importance[model] = self.feature_importance[model] * model_name_to_weight[model]
-        models_feature_importance.fillna(0, inplace=True)
-        self.feature_importance['weighted_ensemble'] = models_feature_importance.sum(axis=1)
 
     def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
         print('training', model.name)
@@ -422,17 +357,12 @@ class AbstractTrainer:
             X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level, fit=fit)
         return X
 
-    # TODO: REWORK, NOT ACCURATE! Use self.model_best
-    def score(self, X, y, weights=None):
-        if weights is None:
-            weights = self.model_weights
-        elif weights == 'voting':
-            weights = [1 / len(self.models_level[0])] * len(self.models_level[0])
+    def score(self, X, y):
         if self.objective_func_expects_y_pred:
-            y_pred_ensemble = self.predict_voting_ensemble(models=self.models_level[0], X_test=X, weights=weights)
+            y_pred_ensemble = self.predict(X=X)
             return self.objective_func(y, y_pred_ensemble)
         else:
-            y_pred_proba_ensemble = self.predict_proba_voting_ensemble(models=self.models_level[0], X_test=X, weights=weights)
+            y_pred_proba_ensemble = self.predict_proba(X=X)
             return self.objective_func(y, y_pred_proba_ensemble)
 
     def score_with_y_pred_proba(self, y, y_pred_proba):
@@ -441,27 +371,6 @@ class AbstractTrainer:
             return self.objective_func(y, y_pred)
         else:
             return self.objective_func(y, y_pred_proba)
-
-    def score_with_y_pred_proba_weighted(self, y, y_pred_probas, weights=None):
-        if weights is None:
-            weights = self.model_weights
-        elif weights == 'voting':
-            weights = [1 / len(self.models_level[0])] * len(self.models_level[0])
-        preds_norm = [pred * weight for pred, weight in zip(y_pred_probas, weights)]
-        preds_ensemble = np.sum(preds_norm, axis=0)
-        if self.objective_func_expects_y_pred:
-            y_pred = get_pred_from_proba(y_pred_proba=preds_ensemble, problem_type=self.problem_type)
-            return self.objective_func(y, y_pred)
-        else:
-            return self.objective_func(y, preds_ensemble)
-
-    # TODO: Remove
-    def score_bagged(self, y, weights=None):
-        oof_y_pred_probas = []
-        for model_name in self.models_level[0]:
-            model = self.load_model(model_name)
-            oof_y_pred_probas.append(model.oof_pred_proba)
-        return self.score_with_y_pred_proba_weighted(y=y, y_pred_probas=oof_y_pred_probas, weights=weights)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
         feature_pruner = FeaturePruner(model_base=model_base)
@@ -539,8 +448,6 @@ class AbstractTrainer:
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
-
-
 
     def generate_stack_log_reg(self, X, y, level, k_fold=0):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
