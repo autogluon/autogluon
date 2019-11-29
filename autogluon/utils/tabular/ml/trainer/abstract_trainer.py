@@ -267,13 +267,13 @@ class AbstractTrainer:
         use_orig_features = True
         stacker_models = self.get_models(self.hyperparameters)
 
-        stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), stacker_model=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
+        stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
                           for stacker_model in stacker_models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         for stacker_model in stacker_models:
             stacker_model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't do this here
             stacker_model.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=self.kfolds, random_state=level)
-            score = stacker_model.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model.oof_pred_proba)
+            score = stacker_model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model.oof_pred_proba)
 
             self.save_model(stacker_model)
             self.models_level[level].append(stacker_model.name)
@@ -303,7 +303,7 @@ class AbstractTrainer:
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
         name_new = stacker_model_lr.name + '_STACKER_l' + str(level) + '_k' + str(k_fold)
 
-        stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, stacker_model=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
+        stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
                                                 num_classes=self.num_classes)
         stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level)
@@ -427,20 +427,20 @@ class AbstractTrainer:
     def get_inputs_to_stacker(self, X, level_start, level_end, fit=False):
         if fit:
             model_names = self.models_level[level_end-1]
-            dummy_stacker = StackerEnsembleModel(path='', name='', stacker_model=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
-            X = dummy_stacker.preprocess(X=X, fit=True, compute_base_preds=True)
+            dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+            X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
         else:
             for level in range(level_start, level_end):
                 if level >= 1:
                     model_names_last = self.models_level[level-1]
-                    dummy_stacker_last = StackerEnsembleModel(path='', name='', stacker_model=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names_last, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+                    dummy_stacker_last = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names_last, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
                     cols_to_drop = dummy_stacker_last.stack_columns
                 else:
                     cols_to_drop = []
 
                 model_names = self.models_level[level]
-                dummy_stacker = StackerEnsembleModel(path='', name='', stacker_model=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
-                X = dummy_stacker.preprocess(X=X, fit=False, compute_base_preds=True)
+                dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+                X = dummy_stacker.preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
 
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
