@@ -245,8 +245,8 @@ class AbstractTrainer:
             self.generate_weighted_ensemble(X=X_test, y=y_test, level=1)
 
         if self.stack_mode:
-            self.stack_new_level(X=X_train, y=y_train, level=1)
-            self.stack_new_level(X=X_train, y=y_train, level=2)
+            for level in range(1, self.stack_levels+1):
+                self.stack_new_level(X=X_train, y=y_train, level=level)
 
         # print('Score of weighted ensemble:', ensemble_weighted_score)
         # self.model_performance['weighted_ensemble'] = ensemble_weighted_score
@@ -289,11 +289,10 @@ class AbstractTrainer:
 
     def generate_weighted_ensemble(self, X, y, level):
         # TODO: Add validation oof score!
-        # TODO: Move up 1 level, use the preprocessing directly to get pred_proba! Will be much faster!
         model_weights = self.compute_optimal_voting_ensemble_weights(models=self.models_level[level-1], X=X, y=y, bagged_mode=self.bagged_mode)
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1], base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_weights=model_weights)
         self.save_model(weighted_ensemble_model)
-        self.models_level_auxiliary[level-1].append(weighted_ensemble_model.name)  # TODO: level+1, update preprocessing!
+        self.models_level_auxiliary[level].append(weighted_ensemble_model.name)
         self.model_paths[weighted_ensemble_model.name] = weighted_ensemble_model.path
         self.model_types[weighted_ensemble_model.name] = type(weighted_ensemble_model)
         self.model_best = weighted_ensemble_model.name

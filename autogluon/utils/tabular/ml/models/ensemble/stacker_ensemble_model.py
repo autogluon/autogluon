@@ -19,8 +19,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         if self.problem_type == MULTICLASS:
             self.stack_columns = [model_name + '_' + str(cls) for model_name in self.base_model_names for cls in range(self.num_classes)]
+            self.num_pred_cols_per_model = self.num_classes
         else:
             self.stack_columns = self.base_model_names
+            self.num_pred_cols_per_model = 1
 
     def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None):
         if infer:
