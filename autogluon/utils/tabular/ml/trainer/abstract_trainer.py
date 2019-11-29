@@ -162,16 +162,16 @@ class AbstractTrainer:
         raise NotImplementedError
 
     def train_single(self, X_train, y_train, X_test, y_test, model, level=0):
-        print('fitting', model.name, '...')
+        print('Fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
                 'num_gpus': self.scheduler_options['resource']['num_gpus'] } # Additional configurations for model.fit
         if self.bagged_mode:
-            if type(model) != BaggedEnsembleModel:
+            if (type(model) != BaggedEnsembleModel) and (type(model) != StackerEnsembleModel):
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=self.kfolds, random_state=level, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X_train, y=y_train, k_fold=self.kfolds, random_state=level, compute_base_preds=False, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
         return model
@@ -270,16 +270,8 @@ class AbstractTrainer:
         stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
                           for stacker_model in stacker_models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
-        for stacker_model in stacker_models:
-            stacker_model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't do this here
-            stacker_model.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=self.kfolds, random_state=level)
-            score = stacker_model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model.oof_pred_proba)
 
-            self.save_model(stacker_model)
-            self.models_level[level].append(stacker_model.name)
-            self.model_paths[stacker_model.name] = stacker_model.path
-            self.model_types[stacker_model.name] = type(stacker_model)
-            self.model_performance[stacker_model.name] = score
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=None, y_test=None, models=stacker_models, hyperparameter_tune=False, feature_prune=False, level=level)
 
     def stack_new_level_aux(self, X, y, level):
         self.generate_weighted_ensemble(X=None, y=y, level=level)
@@ -314,13 +306,13 @@ class AbstractTrainer:
             score = stacker_model_lr.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
             self.model_performance[stacker_model_lr.name] = score
 
+    # TODO: Move above
     def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
-        print('training', model.name)
         try:
             fit_start_time = time.time()
             model = self.train_single(X_train, y_train, X_test, y_test, model, level=level)
             fit_end_time = time.time()
-            if type(model) == BaggedEnsembleModel:
+            if (type(model) == BaggedEnsembleModel) or (type(model) == StackerEnsembleModel):
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
             else:
                 score = model.score(X=X_test, y=y_test)
