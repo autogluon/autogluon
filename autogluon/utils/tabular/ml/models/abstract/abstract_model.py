@@ -156,12 +156,12 @@ class AbstractModel:
             return file_name
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
         load_path = path + file_prefix + cls.model_file_name
         if not reset_paths:
-            return load_pkl.load(path=load_path)
+            return load_pkl.load(path=load_path, verbose=verbose)
         else:
-            obj = load_pkl.load(path=load_path)
+            obj = load_pkl.load(path=load_path, verbose=verbose)
             obj.set_contexts(path)
             return obj
 

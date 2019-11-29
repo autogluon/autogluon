@@ -80,21 +80,19 @@ class BaggedEnsembleModel(AbstractModel):
 
         return pred_proba
 
-    def load_child(self, model):
+    def load_child(self, model, verbose=False):
         if type(model) == str:
             child_path = self.create_contexts(self.path + model + '/')
-            return self._child_type.load(path=child_path)
+            return self._child_type.load(path=child_path, verbose=verbose)
         else:
             return model
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, low_memory=True):
+    def load(cls, path, file_prefix="", reset_paths=False, low_memory=True, verbose=True):
         path = path + file_prefix
         load_path = path + cls.model_file_name
-        if not reset_paths:
-            obj = load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
+        obj = load_pkl.load(path=load_path, verbose=verbose)
+        if reset_paths:
             obj.set_contexts(path)
 
         if low_memory:
@@ -104,7 +102,7 @@ class BaggedEnsembleModel(AbstractModel):
             for i, model_name in enumerate(obj._model_names):
                 child_path = obj.create_contexts(obj.path + model_name + '/')
                 child_type = obj._model_types[i]
-                child_model = child_type.load(path=child_path, reset_paths=reset_paths)
+                child_model = child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                 obj.models.append(child_model)
 
         obj._model_types = None

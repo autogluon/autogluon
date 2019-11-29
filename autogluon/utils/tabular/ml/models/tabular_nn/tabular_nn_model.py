@@ -644,12 +644,12 @@ class TabularNeuralNetModel(AbstractModel):
             return (modelobj_filepath, params_filepath)
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name.
             If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
         path = path + file_prefix
-        obj = load_pkl.load(path = path + cls.model_file_name)
+        obj = load_pkl.load(path = path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc, ctx=obj.ctx) # recreate network from architecture description
