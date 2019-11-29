@@ -425,12 +425,10 @@ class AbstractTrainer:
 
     def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
         if fit:
-            model_names = self.models_level[level_end-1]
-            dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+            dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
             X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
-            model_names = self.models_level[level_end-1]
-            dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
+            dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
             X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas)
             if dummy_stacker.use_orig_features:
                 X = pd.concat([X_stacker, X], axis=1)
@@ -439,18 +437,16 @@ class AbstractTrainer:
             # TODO: Probably want to remove old stack columns somehow.
             #  Use level start as the indicator for cols_to_drop, as done in the for loop.
         else:
+            dummy_stackers = {}
+            for level in range(level_start, level_end+1):
+                if level >= 1:
+                    dummy_stackers[level] = self._get_dummy_stacker(level=level, use_orig_features=True)
             for level in range(level_start, level_end):
                 if level >= 1:
-                    model_names_last = self.models_level[level-1]
-                    dummy_stacker_last = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names_last, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
-                    cols_to_drop = dummy_stacker_last.stack_columns
+                    cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
-
-                model_names = self.models_level[level]
-                dummy_stacker = StackerEnsembleModel(path='', name='', model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func), base_model_names=model_names, base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, use_orig_features=True, num_classes=self.num_classes)
-                X = dummy_stacker.preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
-
+                X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
@@ -469,6 +465,16 @@ class AbstractTrainer:
             return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
         else:
             return self.models[model_name]
+
+    def _get_dummy_stacker(self, level, use_orig_features=True):
+        model_names = self.models_level[level - 1]
+        dummy_stacker = StackerEnsembleModel(
+            path='', name='',
+            model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func),
+            base_model_names=model_names, base_model_paths_dict=self.model_paths,
+            base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes
+        )
+        return dummy_stacker
 
     def get_models_info(self, model_names):
         model_names = copy.deepcopy(model_names)
