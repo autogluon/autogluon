@@ -18,6 +18,7 @@ from .losses import get_loss_instance
 from .metrics import get_metric_instance
 from .transforms import BERTDatasetTransform
 from ...core import *
+from ...utils import tqdm
 
 __all__ = ['train_text_classification', 'preprocess_data']
 logger = logging.getLogger(__name__)
@@ -205,7 +206,7 @@ def train_text_classification(args, reporter=None):
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary,
         True, args.num_workers)
 
-    def log_train(batch_id, batch_num, metric, step_loss, log_interval, epoch_id, learning_rate):
+    def log_train(batch_id, batch_num, metric, step_loss, log_interval, epoch_id, learning_rate, tbar):
         """Generate and print out the log message for training. """
         metric_nm, metric_val = metric.get()
         if not isinstance(metric_nm, list):
@@ -213,10 +214,10 @@ def train_text_classification(args, reporter=None):
 
         train_str = '[Epoch %d Batch %d/%d] loss=%.4f, lr=%.7f, metrics:' + \
                     ','.join([i + ':%.4f' for i in metric_nm])
-        logger.info(train_str, epoch_id + 1, batch_id + 1, batch_num,
-                     step_loss / log_interval, learning_rate, *metric_val)
+        tbar.set_description(train_str % (epoch_id, batch_id + 1, batch_num,
+                             step_loss / log_interval, learning_rate, *metric_val))
 
-    def log_eval(batch_id, batch_num, metric, step_loss, log_interval):
+    def log_eval(batch_id, batch_num, metric, step_loss, log_interval, tbar):
         """Generate and print out the log message for inference. """
         metric_nm, metric_val = metric.get()
         if not isinstance(metric_nm, list):
@@ -224,16 +225,16 @@ def train_text_classification(args, reporter=None):
 
         eval_str = '[Batch %d/%d] loss=%.4f, metrics:' + \
                    ','.join([i + ':%.4f' for i in metric_nm])
-        logger.info(eval_str, batch_id + 1, batch_num,
-                     step_loss / log_interval, *metric_val)
+        tbar.set_description(eval_str % (batch_id, batch_num,
+                             step_loss / log_interval, *metric_val))
 
     def evaluate(loader_dev, metric, segment):
         """Evaluate the model on validation dataset."""
         #logger.info('Now we are doing evaluation on %s with %s.', segment, ctx)
         metric.reset()
         step_loss = 0
-        tic = time.time()
-        for batch_id, seqs in enumerate(loader_dev):
+        tbar = tqdm(loader_dev)
+        for batch_id, seqs in enumerate(tbar):
             input_ids, valid_length, segment_ids, label = seqs
             input_ids = input_ids.as_in_context(ctx)
             valid_length = valid_length.as_in_context(ctx).astype('float32')
@@ -248,7 +249,7 @@ def train_text_classification(args, reporter=None):
             metric.update([label], [out])
 
             if (batch_id + 1) % (args.log_interval) == 0:
-                log_eval(batch_id, len(loader_dev), metric, step_loss, args.log_interval)
+                log_eval(batch_id, len(loader_dev), metric, step_loss, args.log_interval, tbar)
                 step_loss = 0
 
         metric_nm, metric_val = metric.get()
@@ -258,14 +259,11 @@ def train_text_classification(args, reporter=None):
         logger.info(metric_str, *metric_val)
 
         mx.nd.waitall()
-        toc = time.time()
-        logger.info('Time cost=%.2fs, throughput=%.2f samples/s', toc - tic,
-                     dev_batch_size * len(loader_dev) / (toc - tic))
         return metric_nm, metric_val
 
     # Step 2: the training function in the original training script is added in the decorated function in autogluon for training.
     """Training function."""
-    logger.info('Now we are doing BERT classification training on %s!', ctx)
+    #logger.info('Now we are doing BERT classification training on %s!', ctx)
 
     all_model_params = model.collect_params()
     optimizer_params = {'learning_rate': lr, 'epsilon': epsilon, 'wd': 0.01}
@@ -305,7 +303,8 @@ def train_text_classification(args, reporter=None):
         tic = time.time()
         all_model_params.zero_grad()
 
-        for batch_id, seqs in enumerate(train_data):
+        tbar = tqdm(train_data)
+        for batch_id, seqs in enumerate(tbar):
             # learning rate schedule
             if step_num < num_warmup_steps:
                 new_lr = lr * step_num / num_warmup_steps
@@ -346,7 +345,7 @@ def train_text_classification(args, reporter=None):
             task.metric.update([label], [out])
             if (batch_id + 1) % (args.log_interval) == 0:
                 log_train(batch_id, len(train_data), task.metric, step_loss, args.log_interval,
-                          epoch_id, trainer.learning_rate)
+                          epoch_id, trainer.learning_rate, tbar)
                 step_loss = 0
         mx.nd.waitall()
 
@@ -360,25 +359,10 @@ def train_text_classification(args, reporter=None):
                 if args.early_stop is not None:
                     patience -= 1
             metric_history.append((epoch_id, metric_nm, metric_val))
-            if reporter is not None:
-                reporter(epoch=epoch_id, accuracy=metric_val[0])
 
-        # save params
-        ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
-        params_saved = os.path.join(output_dir, ckpt_name)
-        nlp.utils.save_parameters(model, params_saved)
-        logger.info('params saved in: %s', params_saved)
-        toc = time.time()
-        logger.info('Time cost=%.2fs', toc - tic)
-        tic = toc
+        if reporter is not None:
+            reporter(epoch=epoch_id, accuracy=metric_val[0])
 
-    # we choose the best model based on metric[0],
-    # assuming higher score stands for better model quality
-    metric_history.sort(key=lambda x: x[2][0], reverse=True)
-    epoch_id, metric_nm, metric_val = metric_history[0]
-    ckpt_name = 'model_bert_{0}_{1}.params'.format(task_name, epoch_id)
-    params_saved = os.path.join(output_dir, ckpt_name)
-    nlp.utils.load_parameters(model, params_saved)
     if args.final_fit:
         get_model_params.pop('ctx')
         return {'model_params': collect_params(model),
