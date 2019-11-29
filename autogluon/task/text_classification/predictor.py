@@ -47,7 +47,7 @@ class TextClassificationPredictor(Classifier):
         pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
-    def evaluate(self, dataset, ctx=[mx.cpu()], *args):
+    def evaluate(self, dataset, ctx=[mx.cpu()]):
         """The task evaluation function given the test dataset.
          Args:
             dataset: test dataset
@@ -66,13 +66,13 @@ class TextClassificationPredictor(Classifier):
             args.bert_tokenizer, args.task, batch_size, args.dev_batch_size, args.max_len, args.vocabulary, args.pad)
         tbar = tqdm(enumerate(dev_data_list))
         for i, batch in tbar:
-            eval_func(net, batch, metric, ctx)
+            eval_func(net, batch, metric, ctx[0], args)
             _, test_reward = metric.get()
             tbar.set_description('{}: {}'.format(args.metric, test_reward))
         _, test_reward = metric.get()
         return test_reward
 
-def eval_func(model, loader_dev, metric, ctx, *args):
+def eval_func(model, loader_dev, metric, ctx, args):
     """Evaluate the model on validation dataset."""
     use_roberta = 'roberta' in args.bert_model
     metric.reset()
