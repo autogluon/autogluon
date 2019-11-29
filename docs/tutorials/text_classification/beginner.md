@@ -18,11 +18,12 @@ logging.basicConfig(level=logging.INFO)
 
 
 ## Create AutoGluon Dataset
-The Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)) consists of sentences from movie
-reviews and human annotations of their sentiment. The task is to classify whether a given sentence has positive or negative sentiment (binary classification).
+We are using a subset of the Stanford Sentiment Treebank ([SST](https://nlp.stanford.edu/sentiment/)).
+The original dataset consists of sentences from movie reviews and human annotations of their sentiment.
+The task is to classify whether a given sentence has positive or negative sentiment (binary classification).
 
 ```{.python .input}
-dataset = task.Dataset(name='SST')
+dataset = task.Dataset(name='ToySST')
 ```
 
 In the above call, we have the proper train/validation/test split of the SST dataset.

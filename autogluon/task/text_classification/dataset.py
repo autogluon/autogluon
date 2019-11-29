@@ -85,6 +85,26 @@ class GlueTask:
         """
         return 'test', self.get_dataset(segment='test')
 
+class ToySSTTask(GlueTask):
+    """The Stanford Sentiment Treebank task on GlueBenchmark."""
+    def __init__(self):
+        is_pair = False
+        class_labels = ['0', '1']
+        self.metric = Accuracy()
+        super(ToySSTTask, self).__init__(class_labels, self.metric, is_pair)
+
+    def get_dataset(self, segment='train'):
+        """Get the corresponding dataset for SST
+
+        Parameters
+        ----------
+        segment : str, default 'train'
+            Dataset segments. Options are 'train', 'dev', 'test'.
+        """
+        dataset = GlueSST2(segment=segment)
+        sampler, _ = get_split_samplers(dataset, split_ratio=0.2)
+        return SampledDataset(dataset, sampler)
+
 class TSVClassificationTask(GlueTask):
     def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
         # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
@@ -99,8 +119,8 @@ class TSVClassificationTask(GlueTask):
         dataset = nlp.data.TSVDataset(*self.args, **self.kwargs)
         # do the split 
         train_sampler, val_sampler = get_split_samplers(dataset, split_ratio=0.8)
-        self.trainset = SampledDataset(train_dataset, train_sampler)
-        self.valset = SampledDataset(train_dataset, val_sampler)
+        self.trainset = SampledDataset(dataset, train_sampler)
+        self.valset = SampledDataset(dataset, val_sampler)
 
     def dataset_train(self):
         return 'train', self.trainset
@@ -306,6 +326,5 @@ built_in_tasks = {
     'mnli': MNLITask,
     'wnli': WNLITask,
     'sst': SSTTask,
+    'toysst': ToySSTTask,
 }
-
-

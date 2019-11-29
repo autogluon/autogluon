@@ -11,12 +11,6 @@ AutoGluon will automatically train many models under thousands of different hype
 
       Quick start tutorial.
 
-   .. card::
-      :title: Use Your Own Dataset
-      :link: kaggle.html
-
-      Image classification HPO tutorial.
-
 .. toctree::
    :maxdepth: 1
 

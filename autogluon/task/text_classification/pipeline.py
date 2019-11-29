@@ -19,6 +19,7 @@ from .metrics import get_metric_instance
 from .transforms import BERTDatasetTransform
 from ...core import *
 from ...utils import tqdm
+from ...utils.mxutils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
 logger = logging.getLogger(__name__)
