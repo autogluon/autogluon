@@ -76,7 +76,7 @@ class AbstractTrainer:
         self.feature_importance = {}
         # Things stored
         self.hpo_results = {} # Stores summary of HPO process
-        self.hpo_model_names = [] # stores additional models produced during HPO
+        self.hpo_model_names = defaultdict(list)  # stores additional models produced during HPO
         # Scheduler attributes:
         if scheduler_options is not None:
             self.scheduler_func = scheduler_options[0] # unpack tuple
@@ -186,7 +186,7 @@ class AbstractTrainer:
               holdout_frac=0.1, hyperparameters= {}):
         raise NotImplementedError
 
-    def train_single(self, X_train, y_train, X_test, y_test, model, objective_func=accuracy):
+    def train_single(self, X_train, y_train, X_test, y_test, model, level=0):
         print('fitting', model.name, '...')
         model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
         model_fit_kwargs = {}
@@ -196,7 +196,7 @@ class AbstractTrainer:
         if self.bagged_mode:
             if type(model) != BaggedEnsembleModel:
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=self.kfolds, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
+            model.fit(X=X_train, y=y_train, k_fold=self.kfolds, random_state=level, **model_fit_kwargs)  # TODO: k_fold should be a parameter somewhere. Should it be a param to BaggedEnsembleModel?
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
 
@@ -212,7 +212,7 @@ class AbstractTrainer:
         feature_importance = model.debug_feature_gain(X_test=X_test, Y_test=y_test, model=model, features_to_use=features_to_use)
         return feature_importance
 
-    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True):
+    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True, level=0):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
@@ -232,34 +232,34 @@ class AbstractTrainer:
                 print(err)
                 del model
             else:
-                self.hpo_model_names += list(sorted(hpo_models.keys()))
+                self.hpo_model_names[level] += list(sorted(hpo_models.keys()))
                 self.model_paths.update(hpo_models)
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
                 self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
-            self.train_and_save(X_train, y_train, X_test, y_test, model)
+            self.train_and_save(X_train, y_train, X_test, y_test, model, level=level)
         self.save()
 
-    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
+    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level=0):
         for i, model in enumerate(models):
-            self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
+            self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level)
         if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
-            for i, hpo_model_name in enumerate(self.hpo_model_names):
+            for i, hpo_model_name in enumerate(self.hpo_model_names[level]):
                 model_hpo = self.load_model(hpo_model_name)
                 if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
                     model_hpo = model_hpo.create_unfit_copy()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED', model_base=model_hpo)
                 # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
-                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged)
+                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, level=level)
                 self.save()
         else:
-            self.models_level[0] += self.hpo_model_names  # Update model list with (potentially empty) list of new models created during HPO
+            self.models_level[level] += self.hpo_model_names[level]  # Update model list with (potentially empty) list of new models created during HPO
         unique_names = []
-        for item in self.models_level[0]:
+        for item in self.models_level[level]:
             if item not in unique_names: unique_names.append(item)
-        self.models_level[0] = unique_names # make unique and preserve order
+        self.models_level[level] = unique_names # make unique and preserve order
 
     # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel],
@@ -277,13 +277,16 @@ class AbstractTrainer:
         # TODO: Add validation oof score!
         # TODO: Move up 1 level, use the preprocessing directly to get pred_proba! Will be much faster!
         if self.bagged_mode:
-            self.generate_weighted_ensemble(X=X_train, y=y_train, level=0)
+            self.generate_weighted_ensemble(X=None, y=y_train, level=0)
+            X_train_init = self.get_inputs_to_stacker(X_train, level_start=0, level_end=1, fit=True)
+            self.generate_stack_log_reg(X=X_train_init, y=y_train, level=0, k_fold=0)
+            self.generate_stack_log_reg(X=X_train_init, y=y_train, level=0, k_fold=self.kfolds)
         else:
             self.generate_weighted_ensemble(X=X_test, y=y_test, level=0)
 
         if self.stack_mode:
-            self.compute_optimal_stacking_ensemble(models=self.models_level[0], X=X_train, y=y_train, level=0)
-            self.generate_weighted_ensemble(X=X_train, y=y_train, level=1)
+            self.stack_new_level(X=X_train, y=y_train, level=1)
+            self.stack_new_level(X=X_train, y=y_train, level=2)
 
         # print('Score of weighted ensemble:', ensemble_weighted_score)
         # self.model_performance['weighted_ensemble'] = ensemble_weighted_score
@@ -297,6 +300,40 @@ class AbstractTrainer:
                 print(self.feature_importance['weighted_ensemble'].sort_values(ascending=False))
 
         self.save()
+
+    # TODO:
+    # TODO: TRY MIDSTACK Semi-Supervised! Just take final models and re-train them, use bagged preds for SS rows! This would be super cheap and easy to try!!!!!!
+    # TODO:
+    def stack_new_level(self, X, y, level):
+        self.stack_new_level_core(X=X, y=y, level=level)
+        self.stack_new_level_aux(X=X, y=y, level=level)
+
+    def stack_new_level_core(self, X, y, level=1):
+        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
+
+        use_orig_features = True
+        stacker_models = self.get_models(self.hyperparameters)
+
+        stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), stacker_model=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
+                          for stacker_model in stacker_models]
+        X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+        for stacker_model in stacker_models:
+            stacker_model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't do this here
+            stacker_model.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=self.kfolds, random_state=level)
+            score = stacker_model.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model.oof_pred_proba)
+
+            self.save_model(stacker_model)
+            self.models_level[level].append(stacker_model.name)
+            self.model_paths[stacker_model.name] = stacker_model.path
+            self.model_types[stacker_model.name] = type(stacker_model)
+            self.model_performance[stacker_model.name] = score
+
+    # TODO: Level - 1
+    def stack_new_level_aux(self, X, y, level):
+        self.generate_weighted_ensemble(X=None, y=y, level=level)
+        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level + 1, fit=True)
+        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0)
+        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds)
 
     def generate_weighted_ensemble(self, X, y, level):
         # TODO: Add validation oof score!
@@ -319,11 +356,11 @@ class AbstractTrainer:
         models_feature_importance.fillna(0, inplace=True)
         self.feature_importance['weighted_ensemble'] = models_feature_importance.sum(axis=1)
 
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel):
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, level=0):
         print('training', model.name)
         try:
             fit_start_time = time.time()
-            model = self.train_single(X_train, y_train, X_test, y_test, model, objective_func=self.objective_func)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, level=level)
             fit_end_time = time.time()
             if type(model) == BaggedEnsembleModel:
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
@@ -336,7 +373,7 @@ class AbstractTrainer:
             print(err)
             del model
         else:
-            self.models_level[0].append(model.name)
+            self.models_level[level].append(model.name)
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
@@ -352,23 +389,27 @@ class AbstractTrainer:
                 del model
 
     def predict(self, X):
-        X = self.get_inputs_to_model(model_name=self.model_best, X=X, level_start=0, fit=False)  # TODO: Move to predict_model / predict_proba_model?
+          # TODO: Move to predict_model / predict_proba_model?
         return self.predict_model(X, self.model_best)
         # return self.predict_voting_ensemble(models=self.models_level[0], X_test=X, weights=self.model_weights)
 
     def predict_proba(self, X):
-        X = self.get_inputs_to_model(model_name=self.model_best, X=X, level_start=0, fit=False)
+
         return self.predict_proba_model(X, self.model_best)
         # return self.predict_proba_voting_ensemble(models=self.models_level[0], X_test=X, weights=self.model_weights)
 
+    # TODO: Add level_start to params
     def predict_model(self, X, model):
         if type(model) == str:
             model = self.load_model(model)
+        X = self.get_inputs_to_model(model_name=model.name, X=X, level_start=0, fit=False)
         return model.predict(X=X)
 
+    # TODO: Add level_start to params
     def predict_proba_model(self, X, model):
         if type(model) == str:
             model = self.load_model(model)
+        X = self.get_inputs_to_model(model_name=model.name, X=X, level_start=0, fit=False)
         return model.predict_proba(X=X)
 
     def get_inputs_to_model(self, model_name, X, level_start, fit=False):
@@ -499,44 +540,9 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
-    def compute_optimal_stacking_ensemble(self, models, X, y, level=0):
-        pred_probas = []
-        model_names = []
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
-        for model in models:
-            if type(model) is str:
-                model = self.load_model(model)
-            pred_probas.append(model.oof_pred_proba)
-            model_names.append(model.name)
 
-        use_orig_features = True
-        stacker_models = self.get_models(self.hyperparameters)
 
-        stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level+1), stacker_model=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
-                          for stacker_model in stacker_models]
-        X_train_init = stacker_models[0].preprocess(X=X, fit=True, compute_base_preds=True)
-        for stacker_model in stacker_models:
-            stacker_model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't do this here
-            stacker_model.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=self.kfolds, random_state=level+1)
-            # print('bagged stacker fit!')
-            # score = bagged_stacker_model.score_with_y_pred_proba(y=y, y_pred_proba=bagged_stacker_model.oof_pred_proba)
-            score = stacker_model.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model.oof_pred_proba)
-            # print('bagged_stacker_score:', score)
-
-            self.save_model(stacker_model)
-            self.models_level[level+1].append(stacker_model.name)
-            self.model_paths[stacker_model.name] = stacker_model.path
-            self.model_types[stacker_model.name] = type(stacker_model)
-            self.model_performance[stacker_model.name] = score
-
-        # TODO: MOVE THIS OUT
-        self.generate_stack_log_reg(X_train_init=X_train_init, y=y, level=0, k_fold=0)
-        self.generate_stack_log_reg(X_train_init=X_train_init, y=y, level=0, k_fold=self.kfolds)
-        X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=2, fit=True)
-        self.generate_stack_log_reg(X_train_init=X_train_init, y=y, level=1, k_fold=0)
-        self.generate_stack_log_reg(X_train_init=X_train_init, y=y, level=1, k_fold=self.kfolds)
-
-    def generate_stack_log_reg(self, X_train_init, y, level, k_fold=0):
+    def generate_stack_log_reg(self, X, y, level, k_fold=0):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level])
         # base_model_names = copy.deepcopy(self.models_level[level])
         # base_model_paths = copy.deepcopy(self.model_paths)
@@ -547,7 +553,7 @@ class AbstractTrainer:
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, stacker_model=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
                                                 num_classes=self.num_classes)
-        stacker_model_lr.fit(X=X_train_init, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level+1)
+        stacker_model_lr.fit(X=X, y=y, compute_base_preds=False, k_fold=k_fold, random_state=level + 1)
         # score = stacker_model_lr.model.score_with_y_pred_proba(y=y, y_pred_proba=stacker_model_lr.oof_pred_proba)
         # print('log_reg_stacker_score:', score)
         self.save_model(stacker_model_lr)
