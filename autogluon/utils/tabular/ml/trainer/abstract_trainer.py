@@ -24,6 +24,8 @@ from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 
 
+# TODO: Add post-fit cleanup function which loads all models and saves them after removing unnecessary variables such as oof_pred_probas to optimize load times and space usage
+#  Trainer will not be able to be fit further after this operation is done, but it will be able to predict.
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
