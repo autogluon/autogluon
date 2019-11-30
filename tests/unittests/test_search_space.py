@@ -56,7 +56,6 @@ def test_search_space():
                                            time_attr='epoch')
     scheduler.run()
     scheduler.join_jobs()
-    ag.done()
 
 if __name__ == '__main__':
     test_search_space()

@@ -177,7 +177,6 @@ def test_tabular():
     print("\n\n WARNINGS:")
     for w in caught_warnings:
         warnings.warn(w.message)
-    ag.done() # shutdown AutoGluon resource manager
 
 if __name__ == '__main__':
     test_tabular()
