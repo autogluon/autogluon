@@ -12,6 +12,7 @@ from mxnet.gluon.data.vision import ImageRecordDataset, transforms
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
+from ...utils.pil_transforms import *
 
 __all__ = ['get_dataset', 'ImageFolderDataset', 'RecordDataset']
 
@@ -51,24 +52,39 @@ def get_dataset(path=None, train=True, name=None,
     if name in built_in_datasets:
         return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
 
-    transform = transforms.Compose([
-            transforms.RandomResizedCrop(input_size),
-            transforms.RandomFlipLeftRight(),
-            transforms.RandomColorJitter(brightness=jitter_param,
-                                         contrast=jitter_param,
-                                         saturation=jitter_param),
-            transforms.RandomLighting(0.1),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]) if train else transforms.Compose([
-            transforms.Resize(resize),
-            transforms.CenterCrop(input_size),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-    dataset_cls = ImageFolderDataset if '.rec' not in path \
-            else RecordDataset
-    dataset = dataset_cls(path, transform=transform, *args, **kwargs)
+    if '.rec' in path:
+        transform = transforms.Compose([
+                transforms.RandomResizedCrop(input_size),
+                transforms.RandomFlipLeftRight(),
+                transforms.RandomColorJitter(brightness=jitter_param,
+                                             contrast=jitter_param,
+                                             saturation=jitter_param),
+                transforms.RandomLighting(0.1),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]) if train else transforms.Compose([
+                transforms.Resize(resize),
+                transforms.CenterCrop(input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        dataset = RecordDataset(path, *args, **kwargs)
+        dataset.transform_first(transform)
+    else:
+        # PIL Data Augmentation for users from Mac OSX
+        transform = Compose([
+                RandomResizedCrop(input_size),
+                RandomHorizontalFlip(),
+                ColorJitter(0.4, 0.4, 0.4),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]) if train else Compose([
+                Resize(resize),
+                CenterCrop(input_size),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
     return dataset.init()
 
 @obj()
@@ -85,10 +101,7 @@ class RecordDataset(ImageRecordDataset):
         If True, always convert images to greyscale. \
         If False, always convert images to colored (RGB).
     transform : function, default None
-        A user defined callback that transforms each sample. For example::
-
-            transform=lambda data, label: (data.astype(np.float32)/255, label)
-
+        A user defined callback that transforms each sample.
     """
     def __init__(self, filename, gray_scale=False, transform=None):
         flag = 0 if gray_scale else 1
@@ -102,8 +115,10 @@ class RecordDataset(ImageRecordDataset):
     def classes(self):
         raise NotImplemented
 
+#from torch.utils.data import Dataset as PTDataset
+
 @obj()
-class ImageFolderDataset(MXDataset):
+class ImageFolderDataset(object):
     """A generic data loader where the images are arranged in this way: ::
 
         root/dog/xxx.png
@@ -225,7 +240,7 @@ class ImageFolderDataset(MXDataset):
         """
         path, target = self.samples[index]
         sample = self.loader(path)
-        sample = self._sample_transform(sample)
+        #sample = self._sample_transform(sample)
         if self._transform is not None:
             sample = self._transform(sample)
 
