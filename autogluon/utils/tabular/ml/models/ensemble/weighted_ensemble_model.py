@@ -30,17 +30,18 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
         ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
         self.base_model_weights = ensemble_selection.weights_
-
-        base_models_to_keep = []
-        base_model_weights_to_keep = []
-        for i, weight in enumerate(self.base_model_weights):
-            if weight != 0:
-                base_models_to_keep.append(self.base_model_names[i])
-                base_model_weights_to_keep.append(weight)
-
-        self.base_model_names = base_models_to_keep
-        self.base_model_weights = base_model_weights_to_keep
         self.oof_pred_proba = self.predict_proba(X=X, preprocess=True)
+
+        # TODO: Fix things so only need the models that have weight
+        # base_models_to_keep = []
+        # base_model_weights_to_keep = []
+        # for i, weight in enumerate(self.base_model_weights):
+        #     if weight != 0:
+        #         base_models_to_keep.append(self.base_model_names[i])
+        #         base_model_weights_to_keep.append(weight)
+        #
+        # self.base_model_names = base_models_to_keep
+        # self.base_model_weights = base_model_weights_to_keep
 
     # TODO: Currently, if this is a weighted ensemble of stackers, it will be very slow due to each stacker needing to repeat computation on the base models.
     #  To solve this, this model must know full context of stacker, and only get preds once for each required model
