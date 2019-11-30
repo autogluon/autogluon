@@ -17,7 +17,6 @@ from ..tuning.feature_pruner import FeaturePruner
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from ..tuning.ensemble_selection import EnsembleSelection
 from ..trainer.model_presets.presets import get_preset_stacker_model
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
@@ -107,11 +106,17 @@ class AbstractTrainer:
 
     @property
     def max_level(self):
-        return np.sort(list(self.models_level.keys()))[-1]
+        try:
+            return np.sort(list(self.models_level.keys()))[-1]
+        except IndexError:
+            return -1
 
     @property
     def max_level_auxiliary(self):
-        return np.sort(list(self.models_level_auxiliary.keys()))[-1]
+        try:
+            return np.sort(list(self.models_level_auxiliary.keys()))[-1]
+        except IndexError:
+            return -1
 
     def get_models(self, hyperparameters):
         raise NotImplementedError
@@ -169,9 +174,9 @@ class AbstractTrainer:
         if self.scheduler_options is not None:
             model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
-        if self.bagged_mode:
-            if (type(model) != BaggedEnsembleModel) and (type(model) != StackerEnsembleModel):
-                model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
+        if self.bagged_mode or (type(model) == WeightedEnsembleModel):
+            if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
             model.fit(X=X_train, y=y_train, k_fold=kfolds, random_state=level, compute_base_preds=False, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **model_fit_kwargs)
@@ -184,7 +189,7 @@ class AbstractTrainer:
             fit_start_time = time.time()
             model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, level=level)
             fit_end_time = time.time()
-            if (type(model) == BaggedEnsembleModel) or (type(model) == StackerEnsembleModel):
+            if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
             else:
                 score = model.score(X=X_test, y=y_test)
@@ -248,7 +253,7 @@ class AbstractTrainer:
                 model_hpo = self.load_model(hpo_model_name)
                 if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
                     model_hpo = model_hpo.create_unfit_copy()
-                model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED', model_base=model_hpo)
+                model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
                 # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
                 self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_loc=stack_loc, kfolds=kfolds, level=level)
                 self.save()
@@ -269,11 +274,12 @@ class AbstractTrainer:
         if len(self.models_level[0]) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
-        # TODO: Add validation oof score!
         if self.bagged_mode:
             self.stack_new_level_aux(X=X_train, y=y_train, level=1)
         else:
-            self.generate_weighted_ensemble(X=X_test, y=y_test, level=1)
+            stack_loc = self.models_level_auxiliary
+            X_test_preds = self.get_inputs_to_stacker(X=X_test, level_start=0, level_end=1, fit=False)
+            self.generate_weighted_ensemble(X=X_test_preds, y=y_test, level=1, stack_loc=stack_loc)
 
         if self.stack_mode:
             for level in range(1, self.stack_levels+1):
@@ -309,25 +315,24 @@ class AbstractTrainer:
 
     def stack_new_level_aux(self, X, y, level):
         stack_loc = self.models_level_auxiliary
-        self.generate_weighted_ensemble(X=None, y=y, level=level)
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+        self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
+
         self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
         self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
 
-    def generate_weighted_ensemble(self, X, y, level):
-        # TODO: Add validation oof score!
-        model_weights = self.compute_optimal_voting_ensemble_weights(models=self.models_level[level-1], X=X, y=y, bagged_mode=self.bagged_mode)
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1], base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_weights=model_weights)
-        self.save_model(weighted_ensemble_model)
-        self.models_level_auxiliary[level].append(weighted_ensemble_model.name)
-        self.model_paths[weighted_ensemble_model.name] = weighted_ensemble_model.path
-        self.model_types[weighted_ensemble_model.name] = type(weighted_ensemble_model)
-        self.model_best = weighted_ensemble_model.name
+    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None):
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1],
+                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types,
+                                                        num_classes=self.num_classes)
+
+        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level)
+        self.model_best = weighted_ensemble_model.name  # TODO: Make it the max val score model!
 
     def generate_stack_log_reg(self, X, y, level, k_fold=0, stack_loc=None):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
-        name_new = stacker_model_lr.name + '_STACKER_l' + str(level) + '_k' + str(k_fold)
+        name_new = stacker_model_lr.name + '_STACKER_k' + str(k_fold) + '_l' + str(level)
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
@@ -397,20 +402,6 @@ class AbstractTrainer:
             model_pred = model.predict_proba(X_test)
             preds.append(model_pred)
         return preds
-
-    # Ensemble Selection (https://dl.acm.org/citation.cfm?id=1015432)
-    def compute_optimal_voting_ensemble_weights(self, models, X, y, bagged_mode=False):
-        if bagged_mode:
-            pred_probas = []
-            for model in models:
-                if type(model) is str:
-                    model = self.load_model(model)
-                pred_probas.append(model.oof_pred_proba)
-        else:
-            pred_probas = self.pred_proba_predictions(models=models, X_test=X)
-        ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
-        ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
-        return ensemble_selection.weights_
 
     def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
         if fit:

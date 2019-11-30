@@ -15,6 +15,7 @@ from .model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 
+
 # Methods useful for all models:
 def fixedvals_from_searchspaces(params):
     """ Converts any search space hyperparams in params dict into fixed default values. """
@@ -27,6 +28,7 @@ def fixedvals_from_searchspaces(params):
         return params
     else:
         return params
+
 
 def hp_default_value(hp_value):
     """ Extracts default fixed value from hyperparameter search space hp_value to use a fixed value instead of a search space.
@@ -41,6 +43,7 @@ def hp_default_value(hp_value):
         raise ValueError("Cannot extract default value from NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
     else:
         return hp_value.get_hp('dummy_name').default_value
+
 
 class AbstractModel:
     model_file_name = 'model.pkl'
