@@ -10,7 +10,7 @@ from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
-           'WNLITask', 'SSTTask', 'GlueTask']
+           'WNLITask', 'SSTTask', 'AbstractGlueTask']
 
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
@@ -21,7 +21,7 @@ def get_dataset(path=None, name=None, train=True, *args, **kwargs):
     else:
         raise NotImplemented
 
-class GlueTask:
+class AbstractGlueTask:
     """Abstract GLUE task class.
 
     Parameters
@@ -86,7 +86,7 @@ class GlueTask:
         """
         return 'test', self.get_dataset(segment='test')
 
-class ToySSTTask(GlueTask):
+class ToySSTTask(AbstractGlueTask):
     """The Stanford Sentiment Treebank task on GlueBenchmark."""
     def __init__(self):
         is_pair = False
@@ -106,7 +106,7 @@ class ToySSTTask(GlueTask):
         sampler, _ = get_split_samplers(dataset, split_ratio=0.2)
         return SampledDataset(dataset, sampler)
 
-class TSVClassificationTask(GlueTask):
+class TSVClassificationTask(AbstractGlueTask):
     def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
         # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
         self.args = args
@@ -129,7 +129,7 @@ class TSVClassificationTask(GlueTask):
     def dataset_dev(self):
         return 'dev', self.valset
 
-class MRPCTask(GlueTask):
+class MRPCTask(AbstractGlueTask):
     """The MRPC task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -149,7 +149,7 @@ class MRPCTask(GlueTask):
         """
         return GlueMRPC(segment=segment)
 
-class QQPTask(GlueTask):
+class QQPTask(AbstractGlueTask):
     """The Quora Question Pairs task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -170,7 +170,7 @@ class QQPTask(GlueTask):
         return GlueQQP(segment=segment)
 
 
-class RTETask(GlueTask):
+class RTETask(AbstractGlueTask):
     """The Recognizing Textual Entailment task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -188,7 +188,7 @@ class RTETask(GlueTask):
         """
         return GlueRTE(segment=segment)
 
-class QNLITask(GlueTask):
+class QNLITask(AbstractGlueTask):
     """The SQuAD NLI task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -206,7 +206,7 @@ class QNLITask(GlueTask):
         """
         return GlueQNLI(segment=segment)
 
-class STSBTask(GlueTask):
+class STSBTask(AbstractGlueTask):
     """The Sentence Textual Similarity Benchmark task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -224,7 +224,7 @@ class STSBTask(GlueTask):
         """
         return GlueSTSB(segment=segment)
 
-class CoLATask(GlueTask):
+class CoLATask(AbstractGlueTask):
     """The Warstdadt acceptability task on GlueBenchmark."""
     def __init__(self):
         is_pair = False
@@ -242,7 +242,7 @@ class CoLATask(GlueTask):
         """
         return GlueCoLA(segment=segment)
 
-class SSTTask(GlueTask):
+class SSTTask(AbstractGlueTask):
     """The Stanford Sentiment Treebank task on GlueBenchmark."""
     def __init__(self):
         is_pair = False
@@ -260,7 +260,7 @@ class SSTTask(GlueTask):
         """
         return GlueSST2(segment=segment)
 
-class WNLITask(GlueTask):
+class WNLITask(AbstractGlueTask):
     """The Winograd NLI task on GlueBenchmark."""
     def __init__(self):
         is_pair = True
@@ -278,7 +278,7 @@ class WNLITask(GlueTask):
         """
         return GlueWNLI(segment=segment)
 
-class MNLITask(GlueTask):
+class MNLITask(AbstractGlueTask):
     """The Multi-Genre Natural Language Inference task on GlueBenchmark."""
     def __init__(self):
         is_pair = True

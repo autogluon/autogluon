@@ -165,15 +165,13 @@ class BasePredictor(ABC):
         results['num_trials_completed'] = None  # number of trials completed during task.fit()
         results['best_hyperparameters'] = None  # hyperparameter values corresponding to the chosen model in self.model
         results['search_space'] = None  # hyperparameter search space considered in task.fit()
-        results[
-            'search_strategy'] = None  # HPO algorithm used (ie. Hyperband, random, BayesOpt). If the HPO algorithm used kwargs, then this should be tuple (HPO_algorithm_string, HPO_kwargs)
+        results['search_strategy'] = None  # HPO algorithm used (ie. Hyperband, random, BayesOpt). If the HPO algorithm used kwargs, then this should be tuple (HPO_algorithm_string, HPO_kwargs)
 
         results['metadata'] = {}  # dict containing other optional metadata with keys. For example:
         # latency = inference-time of self.model (time for feedforward pass)
         # memory = amount of memory required by self.model
 
-        results[
-            'trial_info'] = {}  # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
+        results['trial_info'] = {}  # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
         """ Example of what one element of this dict must look like: 
 
         results['trial_info'][trial_id] =  {

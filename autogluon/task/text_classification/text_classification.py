@@ -67,27 +67,23 @@ class TextClassification(BaseTask):
         """
         Fit networks on dataset
 
-        Args:
-            dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.Choice of AutoGluonObject): optimizer candidates.
-            loss (object): training loss function.
-            num_trials (int): number of trials in the experiment.
-            time_limits (int): training time limits in seconds.
-            resources_per_trial (dict): Machine resources to allocate per trial.
-            savedir (str): Local dir to save training results to.
-            search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
-            resume (bool): If checkpoint exists, the experiment will resume from there.
+        Parameters
+        ----------
+        dataset (str or autogluon.task.TextClassification.Dataset): Training dataset.
+        net (str): Network candidates.
+        loss (object): training loss function.
+        num_trials (int): number of trials in the experiment.
+        time_limits (int): training time limits in seconds.
+        resources_per_trial (dict): Machine resources to allocate per trial.
+        savedir (str): Local dir to save training results to.
+        search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
+        resume (bool): If checkpoint exists, the experiment will resume from there.
 
 
-        Example:
-            >>> dataset = task.Dataset(name='shopeeiet', train_path='data/train',
-            >>>                         test_path='data/test')
-            >>> predictor = task.fit(dataset,
-            >>>                      nets=ag.Choice['resnet18_v1', 'resnet34_v1'],
-            >>>                      time_limits=time_limits,
-            >>>                      num_gpus=1,
-            >>>                      num_trials = 4)
+        Examples
+        --------
+        >>> dataset = task.Dataset(name='ToySST')
+        >>> predictor = task.fit(dataset)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
