@@ -72,7 +72,7 @@ class TextClassificationPredictor(Classifier):
         net = self.model
         if isinstance(dataset, AutoGluonObject):
             dataset = dataset.init()
-        if isinstance(dataset, GlueTask):
+        if isinstance(dataset, AbstractGlueTask):
             dataset = dataset.get_dataset('dev')
         if isinstance(ctx, list):
             ctx = ctx[0]
