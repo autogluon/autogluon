@@ -11,9 +11,6 @@ We begin by specifying `TextClassification` as our task of interest:
 ```{.python .input}
 import autogluon as ag
 from autogluon import TextClassification as task
-
-import logging
-logging.basicConfig(level=logging.INFO)
 ```
 
 

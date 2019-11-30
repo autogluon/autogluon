@@ -103,7 +103,7 @@ class ToySSTTask(GlueTask):
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
         dataset = GlueSST2(segment=segment)
-        sampler, _ = get_split_samplers(dataset, split_ratio=0.05)
+        sampler, _ = get_split_samplers(dataset, split_ratio=0.2)
         return SampledDataset(dataset, sampler)
 
 class TSVClassificationTask(GlueTask):
