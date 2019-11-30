@@ -15,7 +15,6 @@ from ...utils import update_params
 from .network import get_network
 from .dataset import get_dataset
 from .pipeline import *
-from .optimizers import *
 from .predictor import TextClassificationPredictor
 
 __all__ = ['TextClassification']
