@@ -2,6 +2,7 @@ import os
 import math
 import pickle
 import copy
+import numpy as np
 from collections import OrderedDict
 import mxnet as mx
 import matplotlib.pyplot as plt
@@ -20,9 +21,10 @@ class TextClassificationPredictor(Classifier):
 
     Example user workflow:
     """
-    def __init__(self, model, transform, test_transform,
+    def __init__(self, model, use_roberta, transform, test_transform,
                  results, scheduler_checkpoint, args):
         self.model = model
+        self.use_roberta = use_roberta
         self.transform = transform
         self.test_transform = test_transform
         self.results = self._format_results(results)
@@ -36,7 +38,6 @@ class TextClassificationPredictor(Classifier):
          Example:
             >>> ind = predictor.predict('this is cool')
         """
-        X = self.test_transform(X)
         proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
         return ind
@@ -48,7 +49,12 @@ class TextClassificationPredictor(Classifier):
          Example:
             >>> prob = predictor.predict_proba('this is cool')
         """
-        pred = self.model(X.expand_dims(0))
+        inputs = self.test_transform(X)
+        X, valid_length, segment_id = [mx.nd.array(np.expand_dims(x, 0)) for x in inputs]
+        if self.use_roberta:
+            pred = self.model(X, valid_length)
+        else:
+            pred = self.model(X, segment_id, valid_length)
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, ctx=[mx.cpu()], *args):
