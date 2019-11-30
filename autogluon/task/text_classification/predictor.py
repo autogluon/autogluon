@@ -20,8 +20,11 @@ class TextClassificationPredictor(Classifier):
 
     Example user workflow:
     """
-    def __init__(self, model, results, scheduler_checkpoint, args):
+    def __init__(self, model, transform, test_transform,
+                 results, scheduler_checkpoint, args):
         self.model = model
+        self.transform = transform
+        self.test_transform = test_transform
         self.results = self._format_results(results)
         self.scheduler_checkpoint = scheduler_checkpoint
         self.args = args
@@ -33,6 +36,7 @@ class TextClassificationPredictor(Classifier):
          Example:
             >>> ind = predictor.predict('this is cool')
         """
+        X = self.test_transform(X)
         proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
         return ind

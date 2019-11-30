@@ -148,4 +148,6 @@ class TextClassification(BaseTask):
         bert, _ = nlp.model.get_model(**get_model_params)
         model = get_network(bert, results.pop('class_labels'), results.pop('use_roberta'))
         update_params(model, results.pop('model_params'))
-        return TextClassificationPredictor(model, results, checkpoint, args)
+        transform = results.pop('transform')
+        test_transform = results.pop('test_transform')
+        return TextClassificationPredictor(model, transform, test_transform, results, checkpoint, args)
