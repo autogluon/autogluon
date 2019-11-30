@@ -2,13 +2,16 @@ import os
 import math
 import pickle
 import copy
+import numpy as np
 from collections import OrderedDict
 import mxnet as mx
 import matplotlib.pyplot as plt
+import gluonnlp as nlp
 
 from ...utils import *
 from .network import *
 from .pipeline import *
+from .dataset import *
 from ..image_classification.classifier import Classifier
 from ...core import AutoGluonObject
 
@@ -23,6 +26,7 @@ class TextClassificationPredictor(Classifier):
     def __init__(self, model, transform, test_transform,
                  results, scheduler_checkpoint, args):
         self.model = model
+        self.use_roberta = 'roberta' in args.net
         self.transform = transform
         self.test_transform = test_transform
         self.results = self._format_results(results)
@@ -36,7 +40,6 @@ class TextClassificationPredictor(Classifier):
          Example:
             >>> ind = predictor.predict('this is cool')
         """
-        X = self.test_transform(X)
         proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
         return ind
@@ -48,7 +51,12 @@ class TextClassificationPredictor(Classifier):
          Example:
             >>> prob = predictor.predict_proba('this is cool')
         """
-        pred = self.model(X.expand_dims(0))
+        inputs = self.test_transform(X)
+        X, valid_length, segment_id = [mx.nd.array(np.expand_dims(x, 0)) for x in inputs]
+        if self.use_roberta:
+            pred = self.model(X, valid_length)
+        else:
+            pred = self.model(X, segment_id, valid_length)
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, ctx=[mx.cpu()]):
@@ -60,25 +68,37 @@ class TextClassificationPredictor(Classifier):
             >>> dataset = task.Dataset(test_path='~/data/test')
             >>> test_reward = predictor.evaluate(dataset)
         """
-        if isinstance(dataset, AutoGluonObject):
-            dataset = dataset.init()
-
         args = self.args
         net = self.model
-        batch_size = args.batch_size * max(len(ctx), 1)
-        _, dev_data_list, _ = preprocess_data(
-            args.bert_tokenizer, args.task, batch_size, args.dev_batch_size, args.max_len, args.vocabulary, args.pad)
-        tbar = tqdm(enumerate(dev_data_list))
-        for i, batch in tbar:
-            eval_func(net, batch, metric, ctx[0], args)
-            _, test_reward = metric.get()
-            tbar.set_description('{}: {}'.format(args.metric, test_reward))
+        if isinstance(dataset, AutoGluonObject):
+            dataset = dataset.init()
+        if isinstance(dataset, GlueTask):
+            dataset = dataset.get_dataset('dev')
+        if isinstance(ctx, list):
+            ctx = ctx[0]
+
+        metric = mx.metric.Accuracy()
+        dataset = dataset.transform(self.transform)
+        vocab = self.transform.vocab
+        pad_val = vocab[vocab.padding_token]
+        batchify_fn = nlp.data.batchify.Tuple(
+            nlp.data.batchify.Pad(axis=0, pad_val=pad_val),  # input
+            nlp.data.batchify.Stack(),  # length
+            nlp.data.batchify.Pad(axis=0, pad_val=0),  # segment
+            nlp.data.batchify.Stack('int32'))  # label
+        loader_dev = mx.gluon.data.DataLoader(
+            dataset,
+            batch_size=args.dev_batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            batchify_fn=batchify_fn)
+
+        eval_func(net, loader_dev, metric, ctx, self.use_roberta)
         _, test_reward = metric.get()
         return test_reward
 
-def eval_func(model, loader_dev, metric, ctx, args):
+def eval_func(model, loader_dev, metric, ctx, use_roberta):
     """Evaluate the model on validation dataset."""
-    use_roberta = 'roberta' in args.bert_model
     metric.reset()
     for batch_id, seqs in enumerate(loader_dev):
         input_ids, valid_length, segment_ids, label = seqs

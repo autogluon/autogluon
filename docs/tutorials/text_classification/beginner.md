@@ -63,7 +63,7 @@ Given an example sentence, we can easily use the final model to `predict` the la
 ```{.python .input}
 sentence = 'I feel this is awesome!'
 ind = predictor.predict(sentence)
-print('The input sentence sentiment is classified as [%d].' % ind)
+print('The input sentence sentiment is classified as [%d].' % ind.asscalar())
 ```
 
 The `results` object returned by `fit` contains summaries describing various aspects of the training process.

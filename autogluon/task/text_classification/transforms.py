@@ -54,6 +54,7 @@ class BERTDatasetTransform:
         self.class_labels = class_labels
         self.has_label = has_label
         self._label_dtype = 'int32' if class_labels else 'float32'
+        self.vocab = vocab
         if has_label and class_labels:
             self._label_map = {}
             for (i, label) in enumerate(class_labels):
