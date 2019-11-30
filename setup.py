@@ -56,7 +56,7 @@ requirements = [
     'ConfigSpace==0.4.10',
     'nose',
     'gluoncv',
-    'gluonnlp',
+    'gluonnlp==0.8.1',
     'graphviz',
     'scikit-optimize',
     'botocore==1.12.253',

@@ -121,7 +121,6 @@ class DaskRemoteService(object):
             self.shutdown()
 
     def shutdown(self):
-        import tornado
         all_processes = [self.worker, self.scheduler]
 
         for process in all_processes:

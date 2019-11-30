@@ -77,11 +77,6 @@ def train_cifar(args, reporter):
             loss.backward()
             optimizer.step()
 
-            train_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-
     def test(epoch):
         net.eval()
         test_loss, correct, total = 0, 0, 0
