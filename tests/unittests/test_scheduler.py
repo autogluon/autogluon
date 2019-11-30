@@ -50,7 +50,6 @@ def test_schedulers():
     test_fifo_scheduler()
     test_hyperband_scheduler()
     test_rl_scheduler()
-    ag.done()
 
 if __name__ == '__main__':
     test_schedulers()
