@@ -63,7 +63,10 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             index_start = i * self.num_pred_cols_per_model
             index_end = (i + 1) * self.num_pred_cols_per_model
             model_cols = self.stack_columns[index_start:index_end]
-            pred_probas.append(pred_probas_df[model_cols].values)
+            pred_proba = pred_probas_df[model_cols].values
+            if self.num_pred_cols_per_model == 1:
+                pred_proba = pred_proba.flatten()
+            pred_probas.append(pred_proba)
         return pred_probas
 
     @staticmethod
