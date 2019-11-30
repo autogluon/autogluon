@@ -74,11 +74,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.bagged_mode = True
         else:
             self.models = [copy.deepcopy(self.model_base)]
+            self.model_base = None
             self.bagged_mode = False
             self.models[0].set_contexts(path_context=self.path + self.models[0].name + '/')
             self.models[0].feature_types_metadata = self.feature_types_metadata  # TODO: Move this
             self.models[0].fit(X_train=X, Y_train=y)
-            self.oof_pred_proba = y  # TODO: Remove
-            self.model_base = None
+            self.oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
 
         return self.models, self.oof_pred_proba
