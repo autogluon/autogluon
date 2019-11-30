@@ -9,7 +9,8 @@ from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
-__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask', 'WNLITask', 'SSTTask']
+__all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
+           'WNLITask', 'SSTTask', 'GlueTask']
 
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
@@ -117,7 +118,7 @@ class TSVClassificationTask(GlueTask):
         metric.add(Accuracy())
         super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
         dataset = nlp.data.TSVDataset(*self.args, **self.kwargs)
-        # do the split 
+        # do the split
         train_sampler, val_sampler = get_split_samplers(dataset, split_ratio=0.8)
         self.trainset = SampledDataset(dataset, train_sampler)
         self.valset = SampledDataset(dataset, val_sampler)

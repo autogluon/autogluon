@@ -358,6 +358,5 @@ def train_text_classification(args, reporter=None):
         return {'model_params': collect_params(model),
                 'get_model_args': get_model_params,
                 'class_labels': task.class_labels,
-                'use_roberta': use_roberta,
                 'transform': trans,
                 'test_transform': test_trans}
