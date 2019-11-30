@@ -100,7 +100,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
     #        shuffle=False,
     #        batchify_fn=test_batchify_fn)
     #    loader_test_list.append((segment, loader_test))
-    return loader_train, loader_dev_list, len(data_train)
+    return loader_train, loader_dev_list, len(data_train), trans, test_trans
 
 @args()
 def train_text_classification(args, reporter=None):
@@ -194,7 +194,7 @@ def train_text_classification(args, reporter=None):
 
     # Get the loader.
     #logger.info('processing dataset...')
-    train_data, dev_data_list, num_train_examples = preprocess_data(
+    train_data, dev_data_list, num_train_examples, trans, test_trans = preprocess_data(
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary,
         True, args.num_workers)
 
@@ -358,4 +358,6 @@ def train_text_classification(args, reporter=None):
         return {'model_params': collect_params(model),
                 'get_model_args': get_model_params,
                 'class_labels': task.class_labels,
-                'use_roberta': use_roberta}
+                'use_roberta': use_roberta,
+                'transform': trans,
+                'test_transform': test_trans}
