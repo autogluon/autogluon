@@ -8,7 +8,6 @@ import traceback
 from collections import defaultdict
 from sklearn.model_selection import train_test_split
 
-
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
@@ -74,11 +73,11 @@ class AbstractTrainer:
         self.model_weights = None
         self.reset_paths = False
         # Things stored
-        self.hpo_results = {} # Stores summary of HPO process
+        self.hpo_results = {}  # Stores summary of HPO process
         self.hpo_model_names = defaultdict(list)  # stores additional models produced during HPO
         # Scheduler attributes:
         if scheduler_options is not None:
-            self.scheduler_func = scheduler_options[0] # unpack tuple
+            self.scheduler_func = scheduler_options[0]  # unpack tuple
             self.scheduler_options = scheduler_options[1]
         else:
             self.scheduler_func = None
@@ -165,11 +164,11 @@ class AbstractTrainer:
         if kfolds is None:
             kfolds = self.kfolds
         print('Fitting', model.name, '...')
-        model.feature_types_metadata = self.feature_types_metadata # TODO: move this into model creation process?
+        model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
-                'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
+                                'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode:
             if (type(model) != BaggedEnsembleModel) and (type(model) != StackerEnsembleModel):
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED', model_base=model)
@@ -224,7 +223,7 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
                 hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                    Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+                                                                                            Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
                 print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')
@@ -258,12 +257,10 @@ class AbstractTrainer:
         unique_names = []
         for item in self.models_level[level]:
             if item not in unique_names: unique_names.append(item)
-        self.models_level[level] = unique_names # make unique and preserve order
+        self.models_level[level] = unique_names  # make unique and preserve order
 
-    # TODO: Handle case where all models have negative weight, currently crashes due to pruning
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.train_multi(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
-        # if not hyperparameter_tune: # TODO: we store and print model_performance after HPO
         for model_name in self.models_level[0]:
             if model_name not in self.model_performance:
                 model = self.load_model(model_name)
@@ -273,7 +270,6 @@ class AbstractTrainer:
             raise ValueError('AutoGluon did not successfully train any models')
 
         # TODO: Add validation oof score!
-        # TODO: Move up 1 level, use the preprocessing directly to get pred_proba! Will be much faster!
         if self.bagged_mode:
             self.stack_new_level_aux(X=X_train, y=y_train, level=1)
         else:
@@ -302,8 +298,11 @@ class AbstractTrainer:
         use_orig_features = True
         stacker_models = self.get_models(self.hyperparameters)
 
-        stacker_models = [StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features, num_classes=self.num_classes)
-                          for stacker_model in stacker_models]
+        stacker_models = [
+            StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names,
+                                 base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
+                                 num_classes=self.num_classes)
+            for stacker_model in stacker_models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
 
         self.train_multi(X_train=X_train_init, y_train=y, X_test=None, y_test=None, models=stacker_models, hyperparameter_tune=False, feature_prune=False, level=level)
