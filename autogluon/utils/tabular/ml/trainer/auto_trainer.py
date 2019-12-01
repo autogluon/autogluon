@@ -7,10 +7,10 @@ from .model_presets.presets import get_preset_models
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_ensemble_levels=0):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
-                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_levels=stack_levels)
+                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_ensemble_levels=stack_ensemble_levels)
 
     def get_models(self, hyperparameters={'NN':{},'GBM':{}}):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,

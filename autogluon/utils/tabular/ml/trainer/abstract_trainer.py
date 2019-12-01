@@ -30,7 +30,7 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, stack_levels=0):
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, stack_ensemble_levels=0):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
@@ -50,11 +50,11 @@ class AbstractTrainer:
         self.bagged_mode = True if kfolds >= 2 else False
         if self.bagged_mode:
             self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
-            self.stack_levels = stack_levels
-            self.stack_mode = True if self.stack_levels >= 1 else False
+            self.stack_ensemble_levels = stack_ensemble_levels
+            self.stack_mode = True if self.stack_ensemble_levels >= 1 else False
         else:
             self.kfolds = 0
-            self.stack_levels = 0
+            self.stack_ensemble_levels = 0
             self.stack_mode = False
 
         self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
@@ -286,7 +286,7 @@ class AbstractTrainer:
             self.generate_weighted_ensemble(X=X_test_preds, y=y_test, level=1, stack_loc=stack_loc)
 
         if self.stack_mode:
-            for level in range(1, self.stack_levels+1):
+            for level in range(1, self.stack_ensemble_levels + 1):
                 self.stack_new_level(X=X_train, y=y_train, level=level)
 
         self.save()
