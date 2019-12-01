@@ -37,8 +37,8 @@ class TabularPrediction(BaseTask):
         return Learner.load(output_directory)
     
     @staticmethod
-    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None, 
-            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, kfolds=0,
+    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None,
+            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
             hyperparameters = {'NN': {'num_epochs': 300}, 
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
@@ -89,9 +89,13 @@ class TabularPrediction(BaseTask):
         holdout_frac : (float) 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if kfolds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used.
-        kfolds : (int)
-            Kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+        num_bagging_folds : (int)
+            Kfolds used for bagging of models. Roughly increases model training time by a factor of k (0: disabled)
             Default is 0 (disabled). Use values between 5-10 to improve model quality.
+        stack_ensemble_levels : (int)
+            Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
+            Default is 0 (disabled). Use values between 1-3 to improve model quality.
+            Ignored unless kfolds is also set >= 2
         search_strategy : (str) 
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -179,7 +183,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=objective_func, 
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
-        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
-                      hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
-                      holdout_frac=holdout_frac, kfolds=kfolds, hyperparameters=hyperparameters)
+        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
+                      hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, hyperparameters=hyperparameters)
         return predictor

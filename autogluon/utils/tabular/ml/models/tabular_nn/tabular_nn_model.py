@@ -620,7 +620,7 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory = None, return_name=False):
+    def save(self, file_prefix="", directory = None, return_name=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
             return_name (bool): return the file-names corresponding to this save as tuple (model_obj_file, net_params_file)
@@ -637,19 +637,19 @@ class TabularNeuralNetModel(AbstractModel):
         temp_sw = self.summary_writer
         self.model = None
         self.summary_writer = None
-        save_pkl.save(path = modelobj_filepath, object=self)
+        save_pkl.save(path=modelobj_filepath, object=self, verbose=verbose)
         self.model = temp_model
         self.summary_writer = temp_sw
         if return_name:
             return (modelobj_filepath, params_filepath)
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name.
             If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
         path = path + file_prefix
-        obj = load_pkl.load(path = path + cls.model_file_name)
+        obj = load_pkl.load(path = path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc, ctx=obj.ctx) # recreate network from architecture description

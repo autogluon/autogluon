@@ -22,7 +22,7 @@ class AbstractLearner:
     save_file_name = 'learner.pkl'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10, 
-                 problem_type=None, objective_func=None, is_trainer_present=False, compute_feature_importance=False):
+                 problem_type=None, objective_func=None, is_trainer_present=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
@@ -40,7 +40,6 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
-        self.compute_feature_importance = compute_feature_importance
 
     def set_contexts(self, path_context):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
@@ -150,40 +149,63 @@ class AbstractLearner:
         y = self.label_cleaner.transform(y)
         y = y.fillna(-1)
         trainer = self.load_trainer()
+        max_level = trainer.max_level
+        max_level_auxiliary = trainer.max_level_auxiliary
+
+        max_level_to_check = max(max_level, max_level_auxiliary)
         scores = {}
-        model_names = trainer.model_names
-        if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
-            # Handles case where we need to add empty columns to represent classes that were not used for training
-            y_pred_proba = trainer.predict_proba(X)
-            y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
-            scores['weighted_ensemble'] = self.objective_func(y, y_pred_proba)
+        pred_probas = None
+        for level in range(max_level_to_check+1):
+            model_names_core = trainer.models_level[level]
+            if level >= 1:
+                X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
+            else:
+                X_stack = X
 
-            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
-            pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
-            for i, model_name in enumerate(model_names):
-                scores[model_name] = self.objective_func(y, pred_probas[i])
+            if len(model_names_core) > 0:
+                pred_probas = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_core)
+                for i, model_name in enumerate(model_names_core):
+                    pred_proba = pred_probas[i]
+                    if trainer.objective_func_expects_y_pred:
+                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
+                        scores[model_name] = self.objective_func(y, pred)
+                    else:
+                        scores[model_name] = self.objective_func(y, pred_proba)
 
-        else:
-            scores['weighted_ensemble'] = trainer.score(X=X, y=y)
-            for model_name in model_names:
-                model = trainer.load_model(model_name)
-                scores[model_name] = model.score(X=X, y=y)
-            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
+                ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
+                ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
+                oracle_weights = ensemble_selection.weights_
+                oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
+                oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
+                if trainer.objective_func_expects_y_pred:
+                    oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
+                    scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_ensemble)
+                else:
+                    scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
-        ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
-        ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
-        oracle_weights = ensemble_selection.weights_
-        oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
-        oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
-        if trainer.objective_func_expects_y_pred:
-            oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
-            scores['oracle_ensemble'] = self.objective_func(y, oracle_pred_ensemble)
-        else:
-            scores['oracle_ensemble'] = self.objective_func(y, oracle_pred_proba_ensemble)
+            model_names_aux = trainer.models_level_auxiliary[level]
+            if len(model_names_aux) > 0:
+                pred_probas_auxiliary = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_aux)
+                for i, model_name in enumerate(model_names_aux):
+                    pred_proba = pred_probas_auxiliary[i]
+                    if trainer.objective_func_expects_y_pred:
+                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
+                        scores[model_name] = self.objective_func(y, pred)
+                    else:
+                        scores[model_name] = self.objective_func(y, pred_proba)
 
         print('MODEL SCORES:')
         print(scores)
         return scores
+
+    def get_pred_probas_models(self, X, trainer, model_names):
+        if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
+            # Handles case where we need to add empty columns to represent classes that were not used for training
+            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
+            pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
+        else:
+            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
+        return pred_probas
 
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
         """ Evaluate predictions. 
@@ -292,13 +314,17 @@ class AbstractLearner:
         """
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")
-        y = y.dropna() # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
+        y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
+        num_rows = len(y)
         # print(unique_vals)
         print('First 10 unique y values:', unique_vals[:10])
         unique_count = len(unique_vals)
-        MULTICLASS_LIMIT = 1000 # if numeric and class count would be above this amount, assume it is regression
-        REGRESS_THRESHOLD = 0.1 # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers 
+        MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
+        if num_rows > 1000:
+            REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+        else:
+            REGRESS_THRESHOLD = 0.1
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
@@ -324,12 +350,12 @@ class AbstractLearner:
             reason = "dtype of label-column == object"
         elif unique_vals.dtype == 'int':
             unique_ratio = len(unique_vals)/float(len(y))
-            if unique_ratio > REGRESS_THRESHOLD:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == int and many unique label-values observed"
-            else:
+            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
                 reason = "dtype of label-column == int, but few unique label-values observed"
+            else:
+                problem_type = REGRESSION
+                reason = "dtype of label-column == int and many unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
         print("\nAutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
