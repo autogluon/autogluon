@@ -9,14 +9,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         self.base_model_weights = base_model_weights
 
         if self.base_model_weights is not None:
-            base_models_to_keep = []
-            base_model_weights_to_keep = []
-            for i, weight in enumerate(self.base_model_weights):
-                if weight != 0:
-                    base_models_to_keep.append(base_model_names[i])
-                    base_model_weights_to_keep.append(weight)
-            self.base_model_weights = base_model_weights_to_keep
-            base_model_names = base_models_to_keep
+            base_model_names, self.base_model_weights = self.remove_zero_weight_models(self.base_model_names, self.base_model_weights)
 
         model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
         super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, use_orig_features=False, num_classes=num_classes, debug=debug)
@@ -32,30 +25,14 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         self.base_model_weights = ensemble_selection.weights_
         self.oof_pred_proba = self.predict_proba(X=X, preprocess=True)
 
-        # TODO: Fix things so only need the models that have weight
-        # base_models_to_keep = []
-        # base_model_weights_to_keep = []
-        # for i, weight in enumerate(self.base_model_weights):
-        #     if weight != 0:
-        #         base_models_to_keep.append(self.base_model_names[i])
-        #         base_model_weights_to_keep.append(weight)
-        #
-        # self.base_model_names = base_models_to_keep
-        # self.base_model_weights = base_model_weights_to_keep
+        self.base_model_names, self.base_model_weights = self.remove_zero_weight_models(self.base_model_names, self.base_model_weights)
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
 
-    # TODO: Currently, if this is a weighted ensemble of stackers, it will be very slow due to each stacker needing to repeat computation on the base models.
-    #  To solve this, this model must know full context of stacker, and only get preds once for each required model
-    #  This is already done in trainer, but could be moved internally.
     def predict_proba(self, X, preprocess=True):
-        # TODO: FILTER BASE_MODEL_NAMES / COLUMNS BASED ON WEIGHTS, if 0 WEIGHT THEN DON'T LOAD! DO THIS IN FIT ONCE CORE LOGIC IS MOVED INSIDE
         if preprocess:
             X = self.preprocess(X, preprocess=False, model=None)
-        model_index_to_ignore = []
-        models_to_predict_on_weights = [weight for index, weight in enumerate(self.base_model_weights) if index not in model_index_to_ignore]
-
         pred_probas = self.convert_pred_probas_df_to_list(X)
-
-        return self.weight_pred_probas(pred_probas, weights=models_to_predict_on_weights)
+        return self.weight_pred_probas(pred_probas, weights=self.base_model_weights)
 
     def convert_pred_probas_df_to_list(self, pred_probas_df) -> list:
         pred_probas = []
@@ -74,3 +51,13 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
         preds_ensemble = np.sum(preds_norm, axis=0)
         return preds_ensemble
+
+    @staticmethod
+    def remove_zero_weight_models(base_model_names, base_model_weights):
+        base_models_to_keep = []
+        base_model_weights_to_keep = []
+        for i, weight in enumerate(base_model_weights):
+            if weight != 0:
+                base_models_to_keep.append(base_model_names[i])
+                base_model_weights_to_keep.append(weight)
+        return base_models_to_keep, base_model_weights_to_keep

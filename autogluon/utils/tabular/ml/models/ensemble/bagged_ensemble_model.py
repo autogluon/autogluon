@@ -25,6 +25,8 @@ class BaggedEnsembleModel(AbstractModel):
 
     def preprocess(self, X, model=None):
         if model is None:
+            if len(self.models) == 0:
+                return X
             model = self.models[0]
         if type(model) == str:
             model = self.load_child(model)

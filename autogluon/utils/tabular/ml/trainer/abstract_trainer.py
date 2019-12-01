@@ -25,6 +25,7 @@ from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 # TODO: Add post-fit cleanup function which loads all models and saves them after removing unnecessary variables such as oof_pred_probas to optimize load times and space usage
 #  Trainer will not be able to be fit further after this operation is done, but it will be able to predict.
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
+# TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
@@ -46,14 +47,17 @@ class AbstractTrainer:
 
         self.num_classes = num_classes
         self.low_memory = low_memory
-        self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
-        self.bagged_mode = True if self.kfolds >= 2 else False
+        self.bagged_mode = True if kfolds >= 2 else False
         if self.bagged_mode:
+            self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
             self.stack_levels = stack_levels
-            self.stack_mode = True if self.stack_levels >= 1 else False  # TODO: Add as param, only do if bagged_mode = True
+            self.stack_mode = True if self.stack_levels >= 1 else False
         else:
+            self.kfolds = 0
             self.stack_levels = 0
             self.stack_mode = False
+
+        self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
 
         # self.models_level[0] # Includes base models
         # self.models_level[1] # Stacker level 1, includes weighted ensembles of level 0 (base)
@@ -285,15 +289,8 @@ class AbstractTrainer:
             for level in range(1, self.stack_levels+1):
                 self.stack_new_level(X=X_train, y=y_train, level=level)
 
-        # print('Score of weighted ensemble:', ensemble_weighted_score)
-        # self.model_performance['weighted_ensemble'] = ensemble_weighted_score
-        # print('optimal weights:', self.model_weights)
-
         self.save()
 
-    # TODO:
-    # TODO: TRY MIDSTACK Semi-Supervised! Just take final models and re-train them, use bagged preds for SS rows! This would be super cheap and easy to try!!!!!!
-    # TODO:
     def stack_new_level(self, X, y, level):
         self.stack_new_level_core(X=X, y=y, level=level)
         self.stack_new_level_aux(X=X, y=y, level=level+1)
@@ -346,28 +343,25 @@ class AbstractTrainer:
     def predict_proba(self, X):
         return self.predict_proba_model(X, self.model_best)
 
-    # TODO: Add level_start to params
-    def predict_model(self, X, model):
+    def predict_model(self, X, model, level_start=0):
         if type(model) == str:
             model = self.load_model(model)
-        X = self.get_inputs_to_model(model_name=model.name, X=X, level_start=0, fit=False)
-        return model.predict(X=X)
+        X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
+        return model.predict(X=X, preprocess=False)
 
-    # TODO: Add level_start to params
-    def predict_proba_model(self, X, model):
+    def predict_proba_model(self, X, model, level_start=0):
         if type(model) == str:
             model = self.load_model(model)
-        X = self.get_inputs_to_model(model_name=model.name, X=X, level_start=0, fit=False)
-        return model.predict_proba(X=X)
+        X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
+        return model.predict_proba(X=X, preprocess=False)
 
-    def get_inputs_to_model(self, model_name, X, level_start, fit=False):
-        model_level = self.get_model_level(model_name)
-        # if self.model_types[model_name] == WeightedEnsembleModel:
-            # TODO: Hack to get it working with WeightedEnsembleModel due to it being different from other models
-            #  Eventually convert WeightedEnsembleModel to same format as other stackers and remove
-            # model_level -= 1
+    def get_inputs_to_model(self, model, X, level_start, fit=False):
+        if type(model) == str:
+            model = self.load_model(model)
+        model_level = self.get_model_level(model.name)
         if model_level >= 1:
-            X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level, fit=fit)
+            X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level-1, fit=fit)
+        X = model.preprocess(X)
         return X
 
     def score(self, X, y):
@@ -405,17 +399,23 @@ class AbstractTrainer:
 
     def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
         if fit:
+            if level_start >= 1:
+                dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
+                cols_to_drop = dummy_stacker_start.stack_columns
+                X = X.drop(cols_to_drop, axis=1)
             dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
             X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
             dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
             X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas)
             if dummy_stacker.use_orig_features:
+                if level_start >= 1:
+                    dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
+                    cols_to_drop = dummy_stacker_start.stack_columns
+                    X = X.drop(cols_to_drop, axis=1)
                 X = pd.concat([X_stacker, X], axis=1)
             else:
                 X = X_stacker
-            # TODO: Probably want to remove old stack columns somehow.
-            #  Use level start as the indicator for cols_to_drop, as done in the for loop.
         else:
             dummy_stackers = {}
             for level in range(level_start, level_end+1):

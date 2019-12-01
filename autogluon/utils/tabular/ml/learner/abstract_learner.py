@@ -158,7 +158,7 @@ class AbstractLearner:
         for level in range(max_level_to_check+1):
             model_names_core = trainer.models_level[level]
             if level >= 1:
-                X_stack = trainer.get_inputs_to_stacker(X, level_start=level-1, level_end=level, y_pred_probas=pred_probas)
+                X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
             else:
                 X_stack = X
 

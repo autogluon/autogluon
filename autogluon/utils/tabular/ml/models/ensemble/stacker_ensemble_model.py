@@ -7,6 +7,9 @@ from .bagged_ensemble_model import BaggedEnsembleModel
 from ...constants import MULTICLASS
 
 
+# TODO: Currently, if this is a stacker above level 1, it will be very slow taking raw input due to each stacker needing to repeat computation on the base models.
+    #  To solve this, this model must know full context of stacker, and only get preds once for each required model
+    #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
     def __init__(self, path, name, model_base: AbstractModel, base_model_names, base_model_paths_dict, base_model_types_dict, use_orig_features=True, num_classes=None, debug=0):
         super().__init__(path=path, name=name, model_base=model_base, debug=debug)
@@ -17,12 +20,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.use_orig_features = use_orig_features
         self.num_classes = num_classes
 
-        if self.problem_type == MULTICLASS:
-            self.stack_columns = [model_name + '_' + str(cls) for model_name in self.base_model_names for cls in range(self.num_classes)]
-            self.num_pred_cols_per_model = self.num_classes
-        else:
-            self.stack_columns = self.base_model_names
-            self.num_pred_cols_per_model = 1
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
 
     def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None):
         if infer:
@@ -33,11 +31,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             for model_name in self.base_model_names:
                 model_type = self.base_model_types_dict[model_name]
                 model_path = self.base_model_paths_dict[model_name]
-                model = model_type.load(model_path)
+                model_loaded = model_type.load(model_path)
                 if fit:
-                    y_pred_proba = model.oof_pred_proba
+                    y_pred_proba = model_loaded.oof_pred_proba
                 else:
-                    y_pred_proba = model.predict_proba(X)
+                    y_pred_proba = model_loaded.predict_proba(X)
                 X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
             X_stacker = self.pred_probas_to_df(X_stacker)
             X_stacker.index = X.index
@@ -82,3 +80,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
 
         return self.models, self.oof_pred_proba
+
+    def set_stack_columns(self, base_model_names):
+        if self.problem_type == MULTICLASS:
+            stack_columns = [model_name + '_' + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
+            num_pred_cols_per_model = self.num_classes
+        else:
+            stack_columns = base_model_names
+            num_pred_cols_per_model = 1
+        return stack_columns, num_pred_cols_per_model
