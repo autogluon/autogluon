@@ -316,11 +316,15 @@ class AbstractLearner:
             raise ValueError("provided labels cannot have length = 0")
         y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
         unique_vals = y.unique()
+        num_rows = len(y)
         # print(unique_vals)
         print('First 10 unique y values:', unique_vals[:10])
         unique_count = len(unique_vals)
         MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-        REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+        if num_rows > 1000:
+            REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
+        else:
+            REGRESS_THRESHOLD = 0.1
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
