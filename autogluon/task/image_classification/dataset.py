@@ -14,7 +14,7 @@ from ..base import BaseDataset
 from ...utils import get_data_rec
 from ...utils.pil_transforms import *
 
-__all__ = ['get_dataset', 'ImageFolderDataset', 'RecordDataset']
+__all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset']
 
 built_in_datasets = [
     'mnist',
@@ -240,14 +240,10 @@ class ImageFolderDataset(object):
         """
         path, target = self.samples[index]
         sample = self.loader(path)
-        #sample = self._sample_transform(sample)
         if self._transform is not None:
             sample = self._transform(sample)
 
         return sample, target
-
-    def _sample_transform(self, img):
-        return nd.array(np.array(img), mx.cpu(0))
 
     def __len__(self):
         return len(self.samples)

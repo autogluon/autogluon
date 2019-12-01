@@ -13,7 +13,7 @@ from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...utils import tqdm
 from ...utils.mxutils import collect_params
-from .nets import get_built_in_network
+from .nets import get_network
 from .utils import *
 
 __all__ = ['train_image_classification']
@@ -34,7 +34,8 @@ def train_image_classification(args, reporter):
     batch_size = args.batch_size * max(args.num_gpus, 1)
     ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
 
-    net = get_network(args.net, args.dataset.num_classes, ctx)
+    num_classes = args.dataset.num_classes if hasattr(args.dataset, 'num_classes') else None
+    net = get_network(args.net, num_classes, ctx)
     if args.hybridize:
         net.hybridize(static_alloc=True, static_shape=True)
 
@@ -52,7 +53,6 @@ def train_image_classification(args, reporter):
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
 
     metric = get_metric_instance(args.metric)
-
     def train(epoch):
         for i, batch in enumerate(train_data):
             default_train_fn(net, batch, batch_size, args.loss, trainer, batch_fn, ctx)
@@ -75,4 +75,4 @@ def train_image_classification(args, reporter):
 
     if args.final_fit:
         return {'model_params': collect_params(net),
-                'num_classes': args.dataset.num_classes}
+                'num_classes': num_classes}

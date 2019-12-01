@@ -7,14 +7,10 @@ __all__ = ['get_metric_instance']
 
 metrics = {'accuracy': mxnet.metric.Accuracy,
            'topkaccuracy': mxnet.metric.TopKAccuracy,
-           'f1': mxnet.metric.F1,
-           'mcc': mxnet.metric.MCC,
-           'perplexity': mxnet.metric.Perplexity,
            'mae': mxnet.metric.MAE,
            'mse': mxnet.metric.MSE,
            'rmse': mxnet.metric.RMSE,
-           'crossentropy': mxnet.metric.CrossEntropy,
-           'pearsoncorrelation': mxnet.metric.PearsonCorrelation}
+           'crossentropy': mxnet.metric.CrossEntropy}
 
 def get_metric_instance(name, **kwargs):
     """Returns a metric instance by name
