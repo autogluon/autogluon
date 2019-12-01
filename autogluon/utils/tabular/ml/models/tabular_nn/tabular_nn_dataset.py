@@ -54,6 +54,23 @@ class TabularNNDataset:
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map) # number of features (!=dim(processed_array) because some features may be vector-valued, eg one-hot)
         self.batch_size = min(self.num_examples, params['batch_size'])
+        last_batch_size = self.num_examples % self.batch_size
+        if last_batch_size == 0:
+            last_batch_size = self.batch_size
+        # TODO: The code fixes the crash on mxnet gluon interpreting a single value in a batch incorrectly.
+        #  Comment out to see crash if data would have single row as final batch on test prediction (such as 1025 rows for batch size 512)
+        if (self.num_examples != 1) and self.is_test and (last_batch_size == 1):
+            init_batch_size = self.batch_size
+            while last_batch_size == 1:
+                self.batch_size = self.batch_size + 1
+                last_batch_size = self.num_examples % self.batch_size
+                if last_batch_size == 0:
+                    last_batch_size = self.batch_size
+                if self.batch_size > init_batch_size+10:
+                    # Hard set to avoid potential infinite loop, don't think its mathematically possible to reach this code however.
+                    self.batch_size = self.num_examples
+                    last_batch_size = 0
+
         if feature_arraycol_map.keys() != feature_type_map.keys():
             raise ValueError("feature_arraycol_map and feature_type_map must share same keys")
         self.feature_groups = {'vector': [], 'embed': [], 'language': []} # maps feature_type -> list of feature_names (order is preserved in list)
@@ -123,7 +140,7 @@ class TabularNNDataset:
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
         self.num_categories_per_embed_feature = None
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list) # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
-        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not is_test, 
+        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not is_test,
                                 last_batch = 'keep' if is_test else 'rollover',
                                 num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
         if not is_test: 
@@ -241,6 +258,11 @@ class TabularNNDataset:
                 formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
         if self.label_index is not None: # is None if there are no labels
             formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
+        if len(data_batch[0].shape) == 1:
+            data_batch[0] = data_batch[0].expand_dims(axis=0)
+            # FIXME: Dataset where this happens: nyc-sylvine with 1025 test rows, taking only 1 row it crashes because of this problem being unavoidable
+            # TODO: This will crash later on because mxnet incorrectly infers ex: Shape inconsistent, Provided = [378,20], inferred shape=(378,1), this happens regardless if this dim is added or not
+
         return formatted_batch
 
     def mask_features_batch(self, features, mask_value, data_batch):

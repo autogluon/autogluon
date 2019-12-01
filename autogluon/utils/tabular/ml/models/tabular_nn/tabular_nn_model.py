@@ -140,7 +140,7 @@ class TabularNeuralNetModel(AbstractModel):
             #  Perhaps we should add an order of magnitude to the pre-req with -3, or else scale based on feature count instead of row count.
             layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
             max_layer_width = self.params['max_layer_width']
-            self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize)) 
+            self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize))
                                      for defaultsize in default_layer_sizes]
         
         if train_dataset.has_vector_features() and self.params['numeric_embed_dim'] is None:
