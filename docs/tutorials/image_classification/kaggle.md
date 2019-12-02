@@ -128,10 +128,11 @@ The top-1 accuracy of the best model on the validation set is:
 ###  Using AutoGluon to generate predictions on test images 
 
 We can ask our final model to generate predictions on the provided test images.
-We first load the test data as a `Dataset` object and then call [predict](../api/autogluon.task.base.html#autogluon.task.base.BaseTask.predict):
+We first load the test data as a `Dataset` object and then call `predict`:
 
 ```{.python .input}
-# inds, probs = classifier.predict('data/shopeeiet/test')
+# test_dataset = task.Dataset('./data/shopeeiet/test')
+# inds, probs = classifier.predict(test_dataset)
 ```
 
 `inds` above contains the indices of the predicted class for each test image, while `probs` contains the confidence in these predictions.

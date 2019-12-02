@@ -183,7 +183,14 @@ class ImageFolderDataset(object):
             raise ValueError("Both extensions and is_valid_file cannot be None or not None at the same time")
         if extensions is not None:
             def is_valid_file(x):
-                return x.lower().endswith(extensions)
+                if not x.lower().endswith(extensions):
+                    return False
+                valid = True
+                try:
+                    self.loader(x)
+                except OSError:
+                    valid = False
+                return valid
         for target in sorted(class_to_idx.keys()):
             d = os.path.join(dir, target)
             if not os.path.isdir(d):
