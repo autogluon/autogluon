@@ -8,7 +8,7 @@ To see this in action, let's load first load training data from a CSV file into 
 import autogluon as ag
 from autogluon import TabularPrediction as task
 
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns Pandas object.
+train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns pd.Dataframe-like object.
 train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 ```

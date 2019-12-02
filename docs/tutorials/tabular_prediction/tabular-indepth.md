@@ -75,7 +75,8 @@ perf = predictor.evaluate(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
 ```{.python .input}
 datapoint = test_data.iloc[[0]] # Note: .iloc[0] will not work because it returns pandas Series instead of DataFrame
 print(datapoint)
-y_pred = predictor.predict(datapoint)
+y_singlepred = predictor.predict(datapoint)
+print(y_singlepred)
 ```
 
 In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things.
