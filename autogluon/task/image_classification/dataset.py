@@ -290,6 +290,10 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
         def transform(data, label):
             return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)
         return gluon.data.vision.MNIST(train=train, transform=transform)
+    elif name == 'fashionmnist':
+        def transform(data, label):
+            return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)
+        return gluon.data.vision.FashionMNIST(train=train, transform=transform)
     elif name == 'imagenet':
         # Please setup the ImageNet dataset following the tutorial from GluonCV
         if train:

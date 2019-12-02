@@ -1,4 +1,4 @@
-import ConfigSpace as CS
+import logging
 import mxnet as mx
 from mxnet import gluon, init
 from mxnet.gluon import nn
@@ -6,12 +6,13 @@ from gluoncv.model_zoo import get_model
 
 from ...core import *
 
+logger = logging.getLogger(__name__)
+
 __all__ = ['get_network', 'auto_suggest_network']
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
         return x
-
 class ConvBNReLU(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, kernel, stride):
         super().__init__()
@@ -52,10 +53,10 @@ def auto_suggest_network(dataset, net):
     elif isinstance(dataset, AutoGluonObject):
         dataset_name = dataset.kwargs['name']
     else:
-        return
+        return net
     dataset_name = dataset_name.lower()
-    if 'mnist' in dataset_name or isinstance(net, Categorical):
-        if isinstance(net, str):
+    if 'mnist' in dataset_name:
+        if isinstance(net, str) or isinstance(net, Categorical):
             net = mnist_net()
             logger.info('Auto suggesting network net for dataset {}'.format(net, dataset_name))
             return net
