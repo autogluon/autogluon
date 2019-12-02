@@ -87,7 +87,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_type_map = None
         self.processor = None # data processor
         self.summary_writer = None
-        self.ctx = mx.cpu(0)
+        self.ctx = mx.cpu()
 
     # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
     def create_unfit_copy(self):
@@ -171,12 +171,12 @@ class TabularNeuralNetModel(AbstractModel):
         # print('features: ', self.features)
         if 'num_cpus' in kwargs:
             self.params['num_dataloading_workers'] = max(1, int(kwargs['num_cpus']/2.0))
-        if 'num_gpus' in kwargs:
-            if kwargs['num_gpus'] >= 1:
-                self.params['ctx'] = mx.gpu()  # TODO: currently cannot use more than 1 GPU
-            else:
-                self.params['ctx'] = mx.cpu()
-
+        else:
+            self.params['num_dataloading_workers'] = 1
+        if 'num_gpus' in kwargs and kwargs['num_gpus'] >= 1: # Currently cannot use >1 GPU
+            self.params['ctx'] = mx.gpu() # Currently cannot use more than 1 GPU
+        else:
+            self.params['ctx'] = mx.cpu()
         train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -674,10 +674,10 @@ class TabularNeuralNetModel(AbstractModel):
         num_gpus = scheduler_options['resource']['num_gpus']
         self.params['num_dataloading_workers'] = max(1, int(num_cpus/2.0))
         if num_gpus >= 1:
-            self.params['ctx'] = mx.gpu() # TODO: currently cannot use more than 1 GPU until scheduler works
+            self.params['ctx'] = mx.gpu() # Currently cannot use more than 1 GPU until scheduler works
         else:
             self.params['ctx'] = mx.cpu()
-        self.params['ctx'] = mx.cpu() # TODO: scheduler GPU as_in_context() not work right now. Error = tensor_gpu-inl.h:35: Check failed: e == cudaSuccess CUDA: initialization error
+        # self.params['ctx'] = mx.cpu() # use this in case embedding layer complains during predict() for HPO with GPU
         
         start_time = time.time()
         X_train = self.preprocess(X_train)
