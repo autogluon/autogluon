@@ -15,6 +15,7 @@ from .model_trial import model_trial
 
 logger = logging.getLogger(__name__)
 
+
 # Methods useful for all models:
 def fixedvals_from_searchspaces(params):
     """ Converts any search space hyperparams in params dict into fixed default values. """
@@ -27,6 +28,7 @@ def fixedvals_from_searchspaces(params):
         return params
     else:
         return params
+
 
 def hp_default_value(hp_value):
     """ Extracts default fixed value from hyperparameter search space hp_value to use a fixed value instead of a search space.
@@ -41,6 +43,7 @@ def hp_default_value(hp_value):
         raise ValueError("Cannot extract default value from NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
     else:
         return hp_value.get_hp('dummy_name').default_value
+
 
 class AbstractModel:
     model_file_name = 'model.pkl'
@@ -147,21 +150,21 @@ class AbstractModel:
             return X[self.features]
         return X
 
-    def save(self, file_prefix ="", directory = None, return_filename=False):
+    def save(self, file_prefix ="", directory = None, return_filename=False, verbose=True):
         if directory is None:
             directory = self.path
         file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self)
+        save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
         load_path = path + file_prefix + cls.model_file_name
         if not reset_paths:
-            return load_pkl.load(path=load_path)
+            return load_pkl.load(path=load_path, verbose=verbose)
         else:
-            obj = load_pkl.load(path=load_path)
+            obj = load_pkl.load(path=load_path, verbose=verbose)
             obj.set_contexts(path)
             return obj
 

@@ -113,27 +113,24 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
         else:
             raise ValueError("unknown network_type specified: %s" % params['network_type'])
         
-        self.y_range = params['y_range'] # Used specifically for regression. = None for classification.
-        if self.y_range is not None:
-            self.y_range = (params['y_range'][0], params['y_range'][1])
-            if self.y_range[0] == -np.inf and self.y_range[1] == np.inf:
-                self.y_range = None # do not worry about Y-range in this case
-            elif self.y_range[0] >= 0 and self.y_range[1] == np.inf:
+        y_range = params['y_range'] # Used specifically for regression. = None for classification.
+        self.y_constraint = None # determines if Y-predictions should be constrained
+        if y_range is not None:
+            if y_range[0] == -np.inf and y_range[1] == np.inf:
+                self.y_constraint = None # do not worry about Y-range in this case
+            elif y_range[0] >= 0 and y_range[1] == np.inf:
                 self.y_constraint = 'nonnegative'
-            elif self.y_range[0] == -np.inf and self.y_range[1] <= 0:
+            elif y_range[0] == -np.inf and y_range[1] <= 0:
                 self.y_constraint = 'nonpositive'
             else:
-                self.y_constraint = None
-                self.y_span = nd.array(params['y_range'][1] - params['y_range'][0])
-                self.y_lower = nd.array(params['y_range'][0])
-                if ctx is not None:
-                    self.y_span = self.y_span.as_in_context(ctx) # TODO: this step doesn't work if ctx=gpu during HPO
-                    self.y_lower = self.y_lower.as_in_context(ctx)
-            if ctx is None:
-                self.y_range = (nd.array(params['y_range'][0]), nd.array(params['y_range'][1]))
-            else:
-                self.y_range = (nd.array(params['y_range'][0]).as_in_context(ctx),
-                                nd.array(params['y_range'][1]).as_in_context(ctx))
+                self.y_constraint = 'bounded'
+            self.y_lower = nd.array(params['y_range'][0]).reshape(1,)
+            self.y_upper = nd.array(params['y_range'][1]).reshape(1,)
+            if ctx is not None:
+                self.y_lower.as_in_context(ctx)
+                self.y_upper.as_in_context(ctx)
+            self.y_span = self.y_upper - self.y_lower
+        
         if architecture_desc is None: # Save Architecture description
             self.architecture_desc = {'has_vector_features': self.has_vector_features, 
                                   'has_embed_features': self.has_embed_features,
@@ -169,15 +166,23 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
                 input_activations = language_activations
             else:
                 input_activations = nd.concat(language_activations, input_activations)
-        if self.y_range is None:
+        if self.y_constraint is None:
             return self.output_block(input_activations)
         else:
             unscaled_pred = self.output_block(input_activations)
             if self.y_constraint == 'nonnegative':
-                return self.y_range[0] + nd.abs(unscaled_pred)
+                return self.y_lower + nd.abs(unscaled_pred)
             elif self.y_constraint == 'nonpositive':
-                return self.y_range[1] - nd.abs(unscaled_pred)
+                return self.y_upper - nd.abs(unscaled_pred)
             else:
+                """
+                print("unscaled_pred",unscaled_pred)
+                print("nd.sigmoid(unscaled_pred)", nd.sigmoid(unscaled_pred))
+                print("self.y_span", self.y_span)
+                print("self.y_lower", self.y_lower)
+                print("self.y_lower.shape", self.y_lower.shape)
+                print("nd.sigmoid(unscaled_pred).shape", nd.sigmoid(unscaled_pred).shape)
+                """
                 return nd.sigmoid(unscaled_pred) * self.y_span + self.y_lower
 
 

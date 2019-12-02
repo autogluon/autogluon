@@ -8,6 +8,8 @@ from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learne
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
 from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
+from ...utils.tabular.metrics import CLASSIFICATION_METRICS, REGRESSION_METRICS
+from ...utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 __all__ = ['TabularPrediction']
 
@@ -37,9 +39,9 @@ class TabularPrediction(BaseTask):
         return Learner.load(output_directory)
     
     @staticmethod
-    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None, 
-            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, kfolds=0,
-            hyperparameters = {'NN': {'num_epochs': 300}, 
+    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, objective_func=None,
+            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
+            hyperparameters = {'NN': {'num_epochs': 500}, 
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
                                'RF': {'n_estimators': 300},
@@ -70,9 +72,13 @@ class TabularPrediction(BaseTask):
         problem_type : (str) 
             Type of prediction problem, ie. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
             If problem_type = None, the prediction problem type will be automatically inferred based on target LABEL column in dataset.
-        objective_func : (function)
-            Metric by which performance will be evaluated on test data (for examples see: sklearn.metrics).
+        objective_func : (func or str)
+            Metric by which performance will be ultimately evaluated on test data.
+            AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
             If = None, objective_func is automatically chosen based on problem_type.
+            Otherwise options for classification include: 'accuracy', 'balanced_accuracy', 'f1', 'roc_auc', 'average_precision', 'precision', 'recall', 'log_loss', 'pac_score'
+            and options for regression include: 'r2', 'mean_squared_error', 'root_mean_squared_error' 'mean_absolute_error', 'median_absolute_error'
+            You can also pass your own function here as long as it follows the format of the functions defined in utils/tabular/metrics/.
         hyperparameter_tune : (bool)
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model
         feature_prune : (bool)
@@ -89,9 +95,13 @@ class TabularPrediction(BaseTask):
         holdout_frac : (float) 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if kfolds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used.
-        kfolds : (int)
-            Kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+        num_bagging_folds : (int)
+            Kfolds used for bagging of models. Roughly increases model training time by a factor of k (0: disabled)
             Default is 0 (disabled). Use values between 5-10 to improve model quality.
+        stack_ensemble_levels : (int)
+            Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
+            Default is 0 (disabled). Use values between 1-3 to improve model quality.
+            Ignored unless kfolds is also set >= 2
         search_strategy : (str) 
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -140,7 +150,12 @@ class TabularPrediction(BaseTask):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
             raise ValueError("Column names must match between training and tuning data")
-        
+
+        if feature_prune:
+            feature_prune = False  # TODO: Fix feature pruning to add back as an option
+            # Currently disabled, needs to be updated to align with new model class functionality
+            print('Warning: feature_prune was set to True, but feature_prune does not currently work. Setting to False.')
+
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
@@ -157,6 +172,19 @@ class TabularPrediction(BaseTask):
         if ((visualizer is not None) and (visualizer != 'none') and 
             ('NN' in hyperparameters)):
             hyperparameters['NN']['visualizer'] = visualizer
+        if objective_func is not None and isinstance(objective_func, str): # convert to function
+                if objective_func in CLASSIFICATION_METRICS:
+                    if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
+                        raise ValueError("objective_func=%s cannot be used for problem_type=%s" % 
+                            (objective_func, problem_type))
+                    objective_func = CLASSIFICATION_METRICS[objective_func]
+                elif objective_func in REGRESSION_METRICS:
+                    if problem_type is not None and problem_type != REGRESSION:
+                        raise ValueError("objective_func=%s cannot be used for problem_type=%s" % 
+                            (objective_func, problem_type))
+                    objective_func = REGRESSION_METRICS[objective_func]
+                else:
+                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own objective_func function")
         
         # All models use the same scheduler:
         scheduler_options = {
@@ -179,7 +207,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=objective_func, 
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
-        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options, 
-                      hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, 
-                      holdout_frac=holdout_frac, kfolds=kfolds, hyperparameters=hyperparameters)
+        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
+                      hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, hyperparameters=hyperparameters)
         return predictor

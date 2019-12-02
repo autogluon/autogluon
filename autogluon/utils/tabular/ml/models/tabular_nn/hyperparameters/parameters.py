@@ -1,16 +1,12 @@
 """ Default (fixed) hyperparameter values used in Neural network model """
+
 import mxnet as mx
-
 from ....constants import BINARY, MULTICLASS, REGRESSION
-from .......scheduler.resource import get_gpu_count
-
 
 def get_fixed_params():
     """ Parameters that currently cannot be searched during HPO """
     fixed_params = {
         'num_epochs': 300,  # maximum number of epochs for training NN
-        'num_dataloading_workers': 1,  # will be overwritten by nthreads_per_trial
-        'ctx': (mx.gpu() if get_gpu_count() > 0 else mx.cpu()),  # will be overwritten by ngpus_per_trial  # NOTE: Causes crash during GPU HPO if not wrapped in a function.
         'seed_value': None,  # random seed for reproducibility (set = None to ignore)
         # For data processing:
         'proc.embed_min_categories': 4,  # apply embedding layer to categorical features with at least this many levels. Features with fewer levels are one-hot encoded. Choose big value to avoid use of Embedding layers
@@ -21,6 +17,9 @@ def get_fixed_params():
         # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
         'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
+        # Old params: These are now set based off of nthreads_per_trial, ngpus_per_trial.
+        # 'num_dataloading_workers': 1,  # Will be overwritten by nthreads_per_trial, can be >= 1 
+        # 'ctx': mx.cpu(),  # Will be overwritten by ngpus_per_trial if unspecified (can alternatively be: mx.gpu())
     }
     return fixed_params
 

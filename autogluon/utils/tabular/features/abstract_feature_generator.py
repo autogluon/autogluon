@@ -11,6 +11,7 @@ from ..utils.savers import save_pkl
 
 # TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
 # TODO: Add feature of # of observation counts to high cardinality categorical features
+# TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractFeatureGenerator:
     def __init__(self):
         self.features_init = []
