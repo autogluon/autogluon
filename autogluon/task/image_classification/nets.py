@@ -51,7 +51,10 @@ def auto_suggest_network(dataset, net):
     if isinstance(dataset, str):
         dataset_name = dataset
     elif isinstance(dataset, AutoGluonObject):
-        dataset_name = dataset.kwargs['name']
+        if 'name' in dataset.kwargs:
+            dataset_name = dataset.kwargs['name']
+        else:
+            return net
     else:
         return net
     dataset_name = dataset_name.lower()
