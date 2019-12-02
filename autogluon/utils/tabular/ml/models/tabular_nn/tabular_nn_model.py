@@ -133,12 +133,14 @@ class TabularNeuralNetModel(AbstractModel):
                 default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
             elif self.problem_type == BINARY or self.problem_type == MULTICLASS:
                 default_sizes = [256, 128] # will be scaled adaptively
-                base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
+                # base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
+                base_size = max(1, min(self.num_net_outputs, 100) / 50)  # TODO: Updated because it improved model quality and made training far faster
                 default_layer_sizes = [defaultsize*base_size for defaultsize in default_sizes]
             # TODO: This gets really large on 100K+ rows... It takes hours on gpu for nyc-albert: 78 float/int features which get expanded to 1734, it also overfits and maxes accuracy on epoch
             #  LGBM takes 120 seconds on 4 cpu's and gets far better accuracy
             #  Perhaps we should add an order of magnitude to the pre-req with -3, or else scale based on feature count instead of row count.
-            layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
+            # layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
+            layer_expansion_factor = 1  # TODO: Hardcoded to 1 because it results in both better model quality and far faster training time
             max_layer_width = self.params['max_layer_width']
             self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize))
                                      for defaultsize in default_layer_sizes]
