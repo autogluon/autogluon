@@ -245,6 +245,9 @@ class TabularNNDataset:
         """
         if not isinstance(data_batch, list):
             data_batch = [data_batch] # Need to convert to list if dimension was dropped during batching
+
+        if len(data_batch[0].shape) == 1:
+            data_batch[0] = data_batch[0].expand_dims(axis=0)
         formatted_batch = {}
         if self.has_vector_features(): # None if there is no vector data
             formatted_batch['vector'] = data_batch[self.vectordata_index].as_in_context(ctx)
@@ -258,10 +261,7 @@ class TabularNNDataset:
                 formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
         if self.label_index is not None: # is None if there are no labels
             formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
-        if len(data_batch[0].shape) == 1:
-            data_batch[0] = data_batch[0].expand_dims(axis=0)
-            # FIXME: Dataset where this happens: nyc-sylvine with 1025 test rows, taking only 1 row it crashes because of this problem being unavoidable
-            # TODO: This will crash later on because mxnet incorrectly infers ex: Shape inconsistent, Provided = [378,20], inferred shape=(378,1), this happens regardless if this dim is added or not
+
 
         return formatted_batch
 
