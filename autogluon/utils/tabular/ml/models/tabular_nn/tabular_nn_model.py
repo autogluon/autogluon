@@ -111,8 +111,8 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_net_outputs = 1
             if self.params['y_range'] is None: # Infer default y-range
                 y_vals = train_dataset.dataset._data[train_dataset.label_index].asnumpy()
-                min_y = min(y_vals)
-                max_y = max(y_vals)
+                min_y = float(min(y_vals))
+                max_y = float(max(y_vals))
                 std_y = np.std(y_vals)
                 y_ext = self.params['y_range_extend']*std_y
                 if min_y >= 0: # infer y must be nonnegative
