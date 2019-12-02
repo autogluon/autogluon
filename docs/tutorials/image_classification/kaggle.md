@@ -42,25 +42,28 @@ and search using keyword `image classification` either under `Datasets` or `Comp
 For example, we find the `Shopee-IET Machine Learning Competition` under the `InClass` tab in `Competitions`.
 
 We then navigate to [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) to download the dataset using the Kaggle API.
+Please make sure to click the button of "I Understand and Accept" before downloading the data.
 
-An example shell script to download the dataset to `~/data/shopeeiet/` can be found here: [download_shopeeiet.sh](../static/download_shopeeiet.sh).
+An example shell script to download the dataset to `./data/shopeeiet/` can be found here: [download_shopeeiet.sh](https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/docs/tutorial/download_shopeeiet.sh?raw=True).
 
 After downloading this script to your machine, run it with:
 
 ```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/download_shopeeiet.sh')
-# os.system('sh download_shopeeiet.sh')
+# import autogluon as ag
+# ag.download('https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/docs/tutorial/download_shopeeiet.sh')
+# !sh download_shopeeiet.sh
 ```
 
-Now we have the desired directory structure under `~/data/shopeeiet/`, which in this case looks as follows:
+Now we have the desired directory structure under `./data/shopeeiet/train/`, which in this case looks as follows:
 
 ```
-    shopeeiet
-    ├── BabyBibs
-    ├── BabyHat
-    ├── BabyPants
-    ├── ...
+    shopeeiet/train
+        ├── BabyBibs
+        ├── BabyHat
+        ├── BabyPants
+        ├── ...
+    shopeeiet/test
+        ├── ...
 ```
 
 Here are some example images from this data:
@@ -68,8 +71,7 @@ Here are some example images from this data:
 ![](../../img/shopeeiet_example.png)
 
 
-
-## Step 2: Split data into training/validation/test sets
+## Step 2: Split data into training/validation sets
 
 A fundamental step in machine learning is to split the data into disjoint sets used for different purposes.
 
@@ -88,35 +90,18 @@ Test Set: A separate set of images, possibly without available labels. These dat
 
 AutoGluon automatically does Training/Validation split:
 
-The resulting data should be converted into the following directory structure:
-
-```
-    shopeeiet
-    ├── train
-        ├── BabyBibs
-        ├── BabyHat
-        ├── BabyPants
-        ├── ...
-    └── test
-```
-
-Now you have a dataset ready used in AutoGluon.
-
-To tell AutoGluon where the training data is located, which means let AutoGluon conduct the Training/Validation split, use:  
-
 ```{.python .input}
 # from autogluon import ImageClassification as task
-# dataset = task.Dataset('data/shopeeiet/train')
+# dataset = task.Dataset('./data/shopeeiet/train')
 ```
 
 AutoGluon will automatically infer how many classes there are based on the directory structure. 
 By default, AutoGluon automatically constructs the training/validation set split:
 
-- Training Set: 90% of images.
-- Validation Set: 10% of images.
+- Training Set: 80% of images.
+- Validation Set: 20% of images.
 
 where the images that fall into the validation set are randomly chosen from the training data based on the class.
-
 
 ## Step 3: Use AutoGluon fit to generate a classification model
 
@@ -165,10 +150,10 @@ If you wish to upload the model's predictions to Kaggle, here is how to convert 
 
 ```{.python .input}
 # import autogluon as ag
-# ag.utils.generate_csv(inds, '/home/ubuntu/data/shopeeiet/submission.csv')
+# ag.utils.generate_csv(inds, './data/shopeeiet/submission.csv')
 ```
 
-will produce a submission file located at: `~/data/shopeeiet/submission.csv`.
+will produce a submission file located at: `./data/shopeeiet/submission.csv`.
 
 To see an example submission, check out the file `sample submission.csv` at this link: [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data).
 

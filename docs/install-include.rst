@@ -12,7 +12,7 @@ Select your preferences and run the install command.
 
      :title:`OS:`
      :opt:`Linux`
-     :opt:`Mac`
+     :act:`Mac`
 
      .. raw:: html
 

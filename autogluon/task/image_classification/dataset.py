@@ -194,12 +194,17 @@ class ImageFolderDataset(object):
                     if is_valid_file(path):
                         item = (path, class_to_idx[target])
                         images.append(item)
-
+        if not class_to_idx:
+            for root, _, fnames in sorted(os.walk(dir)):
+                for fname in sorted(fnames):
+                    path = os.path.abspath(os.path.join(root, fname))
+                    if is_valid_file(path):
+                        item = (path, 0)
+                        images.append(item)
         return images
 
     @staticmethod
     def loader(path):
-        # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
         with open(path, 'rb') as f:
             img = Image.open(f)
             return img.convert('RGB')
