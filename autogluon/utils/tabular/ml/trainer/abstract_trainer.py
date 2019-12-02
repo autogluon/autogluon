@@ -66,6 +66,7 @@ class AbstractTrainer:
         self.models_level_auxiliary = defaultdict(list)
 
         self.model_best = None
+        self.model_best_core = None
 
         self.model_performance = {}
         self.model_paths = {}
@@ -216,6 +217,15 @@ class AbstractTrainer:
             self.model_fit_times[model.name] = fit_end_time - fit_start_time
             self.model_pred_times[model.name] = pred_end_time - fit_end_time
             self.save_model(model=model)
+            if self.model_best_core is None:
+                self.model_best_core = model.name
+            else:
+                best_score = self.model_performance[self.model_best_core]
+                cur_score = self.model_performance[model.name]
+                if cur_score > best_score:
+                    # new best core model
+                    self.model_best_core = model.name
+
             if self.low_memory:
                 del model
 
@@ -338,10 +348,20 @@ class AbstractTrainer:
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level)
 
     def predict(self, X):
-        return self.predict_model(X, self.model_best)
+        if self.model_best is not None:
+            return self.predict_model(X, self.model_best)
+        elif self.model_best_core is not None:
+            return self.predict_model(X, self.model_best_core)
+        else:
+            raise Exception('Trainer has no fit models to predict with.')
 
     def predict_proba(self, X):
-        return self.predict_proba_model(X, self.model_best)
+        if self.model_best is not None:
+            return self.predict_proba_model(X, self.model_best)
+        elif self.model_best_core is not None:
+            return self.predict_proba_model(X, self.model_best_core)
+        else:
+            raise Exception('Trainer has no fit models to predict with.')
 
     def predict_model(self, X, model, level_start=0):
         if type(model) == str:
@@ -461,6 +481,67 @@ class AbstractTrainer:
         model_paths = {model_name: self.model_paths[model_name] for model_name in model_names}
         model_types = {model_name: self.model_types[model_name] for model_name in model_names}
         return model_names, model_paths, model_types
+
+    def leaderboard(self):
+        model_names = self.model_names
+        score_val = []
+        fit_time = []
+        pred_time = []
+        stack_level = []
+        for model_name in model_names:
+            score_val.append(self.model_performance.get(model_name))
+            fit_time.append(self.model_fit_times.get(model_name))
+            pred_time.append(self.model_pred_times.get(model_name))
+            stack_level.append(self.get_model_level(model_name))
+        df = pd.DataFrame(data={
+            'model': model_names,
+            'score_val': score_val,
+            'fit_time': fit_time,
+            'pred_time': pred_time,
+            'stack_level': stack_level,
+        })
+        df_sorted = df.sort_values(by=['score_val', 'model'], ascending=False)
+        return df_sorted
+
+    def info(self):
+        model_count = len(self.model_names)
+        if self.model_best is not None:
+            best_model = self.model_best
+        else:
+            best_model = self.model_best_core
+        best_model_score_val = self.model_performance.get(best_model)
+        # fit_time = None
+        stack_levels = self.max_level
+        problem_type = self.problem_type
+        objective_func = self.objective_func.name
+        # TODO:
+        #  Disk size of models
+        #  Raw feature count
+        #  Train row count
+        #  num_classes
+        #  Kfolds
+        #  HPO time
+        #  Bag time
+        #  Feature prune time
+        #  Exception count / models failed count
+        #  True model count (models * kfold)
+        #  Best Model Error
+        #  AutoGluon version fit on
+        #  Max memory usage
+        #  CPU count used / GPU count used
+        #  Date of fit
+
+        info = {
+            'model_count': model_count,
+            'best_model': best_model,
+            'best_model_score_val': best_model_score_val,
+            # 'fit_time': fit_time,
+            'stack_levels': stack_levels,
+            'problem_type': problem_type,
+            'objective_func': objective_func,
+        }
+
+        return info
 
     @classmethod
     def load(cls, path, reset_paths=False):

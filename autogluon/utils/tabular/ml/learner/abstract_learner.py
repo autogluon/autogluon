@@ -290,7 +290,6 @@ class AbstractLearner:
         submission[self.label] = y_pred
         submission[self.label] = self.label_cleaner.inverse_transform(submission[self.label])
 
-        submission_proba = pd.DataFrame(y_pred_proba)
 
         if save:
             utcnow = datetime.datetime.utcnow()
@@ -299,6 +298,7 @@ class AbstractLearner:
             path_submission_proba = self.model_context + 'submissions/submission_proba_' + timestamp_str_now + '.csv'
             save_pd.save(path=path_submission, df=submission)
             if save_proba:
+                submission_proba = pd.DataFrame(y_pred_proba)  # TODO: Fix for multiclass
                 save_pd.save(path=path_submission_proba, df=submission_proba)
 
         return submission
@@ -306,6 +306,14 @@ class AbstractLearner:
     def predict_and_submit(self, X_test: DataFrame, save=True, save_proba=False):
         y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
         return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
+
+    def leaderboard(self):
+        trainer = self.load_trainer()
+        return trainer.leaderboard()
+
+    def info(self):
+        trainer = self.load_trainer()
+        return trainer.info()
 
     @staticmethod
     def get_problem_type(y: Series):
