@@ -144,7 +144,12 @@ class TabularPrediction(BaseTask):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
             raise ValueError("Column names must match between training and tuning data")
-        
+
+        if feature_prune:
+            feature_prune = False  # TODO: Fix feature pruning to add back as an option
+            # Currently disabled, needs to be updated to align with new model class functionality
+            print('Warning: feature_prune was set to True, but feature_prune does not currently work. Setting to False.')
+
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
