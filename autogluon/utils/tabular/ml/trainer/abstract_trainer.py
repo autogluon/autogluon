@@ -66,6 +66,7 @@ class AbstractTrainer:
         self.models_level_auxiliary = defaultdict(list)
 
         self.model_best = None
+        self.model_best_core = None
 
         self.model_performance = {}
         self.model_paths = {}
@@ -216,6 +217,15 @@ class AbstractTrainer:
             self.model_fit_times[model.name] = fit_end_time - fit_start_time
             self.model_pred_times[model.name] = pred_end_time - fit_end_time
             self.save_model(model=model)
+            if self.model_best_core is None:
+                self.model_best_core = model.name
+            else:
+                best_score = self.model_performance[self.model_best_core]
+                cur_score = self.model_performance[model.name]
+                if cur_score > best_score:
+                    # new best core model
+                    self.model_best_core = model.name
+
             if self.low_memory:
                 del model
 
@@ -338,10 +348,20 @@ class AbstractTrainer:
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level)
 
     def predict(self, X):
-        return self.predict_model(X, self.model_best)
+        if self.model_best is not None:
+            return self.predict_model(X, self.model_best)
+        elif self.model_best_core is not None:
+            return self.predict_model(X, self.model_best_core)
+        else:
+            raise Exception('Trainer has no fit models to predict with.')
 
     def predict_proba(self, X):
-        return self.predict_proba_model(X, self.model_best)
+        if self.model_best is not None:
+            return self.predict_proba_model(X, self.model_best)
+        elif self.model_best_core is not None:
+            return self.predict_proba_model(X, self.model_best_core)
+        else:
+            raise Exception('Trainer has no fit models to predict with.')
 
     def predict_model(self, X, model, level_start=0):
         if type(model) == str:
