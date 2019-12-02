@@ -42,9 +42,12 @@ try:
 except(IOError, ImportError):
     long_description = open('README.md').read()
 
+MIN_PYTHON_VERSION = '>=3.6.*'
+
 requirements = [
-    'numpy',
-    'scipy',
+    'numpy>=1.15.0',
+    'scipy>=1.3.0',
+    'pynvml>=8.0.0'
     'cython',
     'tornado',
     'requests',
@@ -59,15 +62,15 @@ requirements = [
     'gluonnlp==0.8.1',
     'graphviz',
     'scikit-optimize',
-    'botocore==1.12.253',
+    #'botocore==1.12.253',
     'boto3==1.9.187',
-    'fastparquet==0.3.1',
-    'joblib==0.13.2',
+    #'fastparquet==0.3.1',
+    #'joblib==0.13.2',
     'lightgbm==2.3.0',
     'pandas==0.24.2',
     'psutil',
-    'pyarrow==0.15.0',
-    's3fs==0.3.1',
+    #'pyarrow==0.15.0',
+    #'s3fs==0.3.1',
     'scikit-learn==0.21.2',
 ]
 
@@ -86,6 +89,7 @@ setup(
     zip_safe=True,
     include_package_data=True,
     install_requires=requirements,
+    python_requires=MIN_PYTHON_VERSION,
     package_data={'autogluon': [
         'LICENSE',
     ]},

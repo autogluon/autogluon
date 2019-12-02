@@ -276,7 +276,7 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
                          shuffle=True, **kwargs):
     """Built-in image classification dataset.
     """
-    logger.info('get_built_in_dataset', name)
+    logger.info('get_built_in_dataset {}'.format(name))
     name = name.lower()
     if name in ['cifar10', 'cifar']:
         import gluoncv.data.transforms as gcv_transforms
