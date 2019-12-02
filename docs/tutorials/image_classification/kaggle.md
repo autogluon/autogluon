@@ -84,47 +84,9 @@ each neural network requires the user to specify many hyperparameters (eg. learn
 
 Test Set: A separate set of images, possibly without available labels. These data are never used during any part of the model construction or learning process. If unlabeled, these may correspond to images whose labels we would like to predict. If labeled, these images may correspond to images we reserve for estimating the performance of our final model.
 
-
-### Dataset format after splitting
-
-The following directory format is used by AutoGluon's `image_classification` task:
-
-```
-    data/
-    ├── train/
-        ├── class1/
-        ├── class2/
-        ├── class3/
-        ├── ...
-    ├── val(optional)/
-        ├── class1/
-        ├── class2/
-        ├── class3/
-        ├── ...
-    └── test/
-```
-
-Here, the `train` directory has the same format as the `data` directory described in Step 1.
-
-When there are no labels available for test images, the `test` directory simply contains a collection of image files.
-Otherwise, `test` should have the same format as the `data` directory described in Step 1 (ie. same format as `train`) if we wish to evaluate the accuracy of our model on the test data using AutoGluon.
-
-We show an example below on how to convert data source obtained in Step 1
-to Training/Validation/Test split with the required format.  
-In this example, we provide a script to split the Kaggle data into the required format;
-please click the download link of [prepare_shopeeiet.py](../static/prepare_shopeeiet.py).
-
 ### Automatic training/validation split
 
-Since AutoGluon provides the automatic Training/Validation split, we can skip the Validation split by running the command:
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
-# os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 0')
-```
-
-where `--split 0` would skip the validation split, therefore all the data in `data` directory would be used as `train` data, later on the AutoGluon `Dataset` would automatically split into Training (90% of the data) and Validation (10% of the data).
+AutoGluon automatically does Training/Validation split:
 
 The resulting data should be converted into the following directory structure:
 
@@ -155,55 +117,8 @@ By default, AutoGluon automatically constructs the training/validation set split
 
 where the images that fall into the validation set are randomly chosen from the training data based on the class.
 
-### Manually-specified training/validation split
 
-Instead, you can also split your labeled data manually into training and validation sets.
-Manually splitting your data is a good choice when you want to exercise more control over the process
-or if there are specific images that you're sure you want included in a certain part of your model training lifecycle.
-
-If we want to manually specify the Training/Validation split, we could construct by running the command:
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
-# os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9')
-```
-
-where `--split 9` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.
-
-The resulting data should be looking as the following structure:
-
-```
-    shopeeiet
-    ├── train
-        ├── BabyBibs
-        ├── BabyHat
-        ├── BabyPants
-        ├── ...
-    ├── val
-        ├── BabyBibs
-        ├── BabyHat
-        ├── BabyPants
-        ├── ...
-    └── test
-```
-
-Then tell AutoGluon where the training and validation data is, which means we disable AutoGluon's automatic Training/Validation split functionality, instead, we manually provide the Training/Validation split via:
-
-We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
-# os.system('unzip -o data_shopeeiet.zip -d ~/')
-```
-
-```{.python .input}
-# from autogluon import ImageClassification as task
-# dataset = task.Dataset('data/shopeeiet/train')
-```
-
-## Step 3: Use AutoGluon fit to generate a classification model (Optional)
+## Step 3: Use AutoGluon fit to generate a classification model
 
 Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model.
 All you have to do is simply call the `fit` function. 
@@ -244,7 +159,7 @@ Here are the results of AutoGluon's default `fit` and `predict` under different 
 - The validation top-1 accuracy within 72h is 0.852, and ranks 9th place in Kaggle competition.
 
 
-## Step 4: Submit test predictions to Kaggle (Optional)
+## Step 4: Submit test predictions to Kaggle
 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 

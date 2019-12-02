@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import logging
 import numpy as np
 from PIL import Image
 
@@ -16,18 +17,21 @@ from ...utils.pil_transforms import *
 
 __all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset']
 
+logger = logging.getLogger(__name__)
+
 built_in_datasets = [
     'mnist',
     'cifar',
     'cifar10',
     'cifar100',
     'imagenet',
+    'fashionmnist',
 ]
 
 @func()
 def get_dataset(path=None, train=True, name=None,
-               input_size=224, crop_ratio=0.875, jitter_param=0.4,
-               *args, **kwargs):
+                input_size=224, crop_ratio=0.875, jitter_param=0.4,
+                *args, **kwargs):
     """A convenient function for image classification dataset, supported datasets given by
     built-in datasets ('mnist', 'cifar10', 'cifar100', 'imagenet'),
     :class:`ImageFolderDataset` and :class:`RecordioDataset`.
@@ -49,7 +53,7 @@ def get_dataset(path=None, train=True, name=None,
             Center crop ratio for evaluation only
     """
     resize = int(math.ceil(input_size / crop_ratio))
-    if name in built_in_datasets:
+    if isinstance(name, str) and name.lower() in built_in_datasets:
         return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
 
     if '.rec' in path:
@@ -261,7 +265,8 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
                          shuffle=True, **kwargs):
     """Built-in image classification dataset.
     """
-    print('get_built_in_dataset', name)
+    logger.info('get_built_in_dataset', name)
+    name = name.lower()
     if name in ['cifar10', 'cifar']:
         import gluoncv.data.transforms as gcv_transforms
         transform_split = transforms.Compose([
