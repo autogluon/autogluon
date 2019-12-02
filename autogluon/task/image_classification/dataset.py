@@ -175,8 +175,7 @@ class ImageFolderDataset(object):
         self.targets = [s[1] for s in samples]
         self.imgs = self.samples
 
-    @staticmethod
-    def make_dataset(dir, class_to_idx, extensions=None, is_valid_file=None):
+    def make_dataset(self, dir, class_to_idx, extensions=None, is_valid_file=None):
         images = []
         dir = os.path.expanduser(dir)
         if not ((extensions is None) ^ (is_valid_file is None)):
