@@ -77,7 +77,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
         )
     if xt_options is not None:
-        params = {'n_estimators': 150, 'n_jobs': -1}
+        params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         params_gini = params.copy()
         params_gini['criterion'] = 'gini'
@@ -158,7 +158,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
                     objective_func=objective_func, hyperparameters=rf_options.copy()),
         )
     if xt_options is not None:
-        params = {'n_estimators': 150, 'n_jobs': -1}
+        params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
         params_mse = params.copy()
         params_mse['criterion'] = 'mse'
