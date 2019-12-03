@@ -4,7 +4,7 @@
 autogluon.task
 ===============
 
-.. admonition:: Example for image classification applications:
+.. admonition:: Example (image classification task):
    
    Tell AutoGluon that task is image classification:
    
@@ -16,16 +16,16 @@ autogluon.task
    >>> filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
-
+   
    Fit classification models:
-
+   
    >>> classifier = task.fit(dataset, epochs=2)
-
+   
    Evaluate predictions on test data:
    
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
-   
+
 
 .. automodule:: autogluon.task
 
@@ -118,3 +118,4 @@ AutoGluon Applications
     .. autoautosummary:: TabularPrediction
         :methods:
 
+.. automodule:: autogluon.task.tabular_prediction
