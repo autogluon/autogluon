@@ -1,17 +1,22 @@
 AutoGluon: AutoML Toolkit with MXNet Gluon
 ==========================================
 
-`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on deep learning, and making AutoML deploy in real-world applications. Feature includes:
+`AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on deep learning and real-world applications spanning image, text, or tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 
-- Fast prototyping on deep learning applications.
-- Automatic Hyper-parameter Optimization.
-- Leveraging state-of-the-art deep learning techniques.
-- Easy customization for advanced usage.
-- Painless setup using distributed computations.
+- Quickly prototype deep learning solutions for your data with few lines of code.
+- Leverage automatic hyperparameter tuning, model selection / architecture search, and data processing.
+- Automatically utilize state-of-the-art deep learning techniques without expert knowledge.
+- Easily improve existing bespoke models and data pipelines, or customize `AutoGluon` for your use-case.
 
 .. note::
+Here's a basic example using AutoGluon to train and deploy a high-performance model on a tabular dataset:
+```
+from autogluon import TabularPrediction as task
+predictor = task.fit(train_data=task.Dataset(file_path=<TRAINING_DATA_TABLE_CSV>), label_column=<VARIABLE_TO_PREDICT>)
+predictions = predictor.predict(task.Dataset(file_path=<TEST_DATA_TABLE_CSV>))
+```
+AutoGluon can be applied just as easily for prediction tasks involving images or text data.
 
-   Placeholder for a small demo code using tabular data
 
 Installation
 ------------
@@ -31,33 +36,32 @@ Tutorials
 .. container:: cards
 
    .. card::
-      :title: Image Classification
-      :link: tutorials/image_classification/index.html
-
-      Image classification tutorials
-
-   .. card::
       :title: Tabular Prediction
       :link: tutorials/tabular_prediction/index.html
 
-      Tutorials for predicting with tabular datasets.
+      Tutorials for predicting variables in tabular datasets.
 
+   .. card::
+      :title: Image Classification
+      :link: tutorials/image_classification/index.html
 
+      Tutorials for image classification tasks.
+    
    .. card::
       :title: Object Detection
       :link: tutorials/object_detection/index.html
 
-      Dive into deep Tutorials.
+      Tutorials for object detection tasks.
 
    .. card::
       :title: Text Classification
       :link: tutorials/text_classification/index.html
 
-      Text Classification Tutorials.
+      Tutorials for text classification tasks.
 
 
-Advanced Topic
-~~~~~~~~~~~~~~
+Advanced Topics
+~~~~~~~~~~~~~~~
 
 .. container:: cards
 
@@ -65,28 +69,28 @@ Advanced Topic
       :title: Customize AutoGluon
       :link: tutorials/course/index.html
 
-      Advanced Usage & APIs in AutoGluon.
+      Advanced usage of AutoGluon APIs.
 
    .. card::
       :title: Neural Architecture Search
       :link: tutorials/nas/index.html
 
-      Neural Architecture Search tutorials.
+      Tutorials on neural architecture search.
 
    .. card::
       :title: For PyTorch Users
       :link: tutorials/torch/index.html
 
-      PyTorch HPO and NAS tutorials.
+      Hyperparameter-tuning/architecture-search with PyTorch models.
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
+   tutorials/tabular_prediction/index
    tutorials/image_classification/index
    tutorials/object_detection/index
    tutorials/text_classification/index
-   tutorials/tabular_prediction/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index

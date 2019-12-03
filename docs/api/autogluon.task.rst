@@ -4,29 +4,28 @@
 autogluon.task
 ===============
 
-.. admonition:: Example
+.. admonition:: Example for image classification applications:
    
-   Import AutoGluon and Image Classification task:
+   Tell AutoGluon that task is image classification:
    
    >>> import autogluon as ag
    >>> from autogluon import ImageClassification as task
    
-   Download a toy dataset:
+   Load a toy image dataset:
    
    >>> filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
 
-   Start Fitting:
+   Fit classification models:
 
    >>> classifier = task.fit(dataset, epochs=2)
 
-   Evaluate on Test Dataset:
+   Evaluate predictions on test data:
    
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
-   >>> print('Top-1 test acc: %.3f' % test_acc)
-   Top-1 test acc: 0.506
+   
 
 .. automodule:: autogluon.task
 
@@ -38,6 +37,7 @@ AutoGluon Applications
 
    ImageClassification
    ObjectDetection
+   TabularPrediction
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,3 +105,16 @@ AutoGluon Applications
 
     .. autoautosummary:: RecordDataset
         :attributes:
+
+:hidden:`TabularPrediction`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPrediction
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TabularPrediction
+        :methods:
+

@@ -4,11 +4,11 @@
 autogluon.core
 ==============
 
-Decorators for customizing AutoGluon. Allows hyperparameter search on user-defined objects and functions.
+Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary user-defined objects and functions.
 
-.. admonition:: Example
+.. admonition:: Toy Example
 
-   Create dummy class and function with searchable spaces:
+   Create class and function with searchable spaces for hyperparameters `name` and `idx`:
 
    >>> import autogluon as ag
    >>> @ag.obj(
@@ -36,7 +36,7 @@ Decorators for customizing AutoGluon. Allows hyperparameter search on user-defin
    ...     assert i in ['mxnet', 'pytorch']
    ...     reporter(epoch=e, accuracy=0)
 
-   Create a scheduler and run the dummy experiment:
+   Create a scheduler and run trials to find best values of the hyperparameters:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
