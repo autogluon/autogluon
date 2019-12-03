@@ -42,17 +42,15 @@ gbm_options = { # specifies non-default hyperparameter values for lightGBM gradi
 hyperparameters = {'NN': nn_options, 'GBM': gbm_options} # hyperparameters of each model type
 # If one of these keys is missing from hyperparameters dict, then no models of that type are trained.
 
-feature_prune = False # whether or not to perform feature selection (fit may take a while if True)
 time_limits = 2*60 # train various models for under ~2 min
 num_trials = 3 # try at most 3 different hyperparameter configurations for each type of model
-nthreads_per_trial = 1 # use this many CPU threads per training trial (ie. evaluation of one hyperparameter configuration)
 search_strategy = 'skopt' # to tune hyperparameters using SKopt Bayesian optimization routine
 output_directory = 'agModels-predictOccupation' # folder where to store trained models
 
-predictor = task.fit(train_data=train_data, tuning_data=val_data, label=label_column, output_directory=output_directory, 
-                     time_limits=time_limits, num_trials=num_trials, nthreads_per_trial=nthreads_per_trial,
-                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                     hyperparameters=hyperparameters, search_strategy=search_strategy)
+predictor = task.fit(train_data=train_data, tuning_data=val_data, label=label_column,
+                     output_directory=output_directory, time_limits=time_limits, num_trials=num_trials, 
+                     hyperparameter_tune=hyperparameter_tune, hyperparameters=hyperparameters, 
+                     search_strategy=search_strategy)
 ```
 
 For posteriority, we again demonstrate how to use the trained models to predict on the validation data. We caution again that performance estimates from this data may be biased since it was used to tune hyperparameters.
@@ -80,3 +78,10 @@ print(y_singlepred)
 ```
 
 In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things.
+
+
+Finally, don't forget to shutdown AutoGluon's remote workers:
+
+```{.python .input}
+ag.done()
+```
