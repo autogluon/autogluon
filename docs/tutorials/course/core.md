@@ -203,7 +203,7 @@ print(i)
 We can also make them inside a nested space:
 
 ```{.python .input}
-j =ag.space.Dict(
+j = ag.space.Dict(
         a=ag.Real(0, 10),
         obj1=MyObj(),
         obj2=myfunc(),

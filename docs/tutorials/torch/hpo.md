@@ -36,7 +36,7 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 
 ### Main Training Loop
 
-The following `train_mnist` function is a normal training code a user would write for
+The following `train_mnist` function represents normal training code a user would write for
 training on MNIST dataset. Python users typically use an argparser for conveniently
 changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
 

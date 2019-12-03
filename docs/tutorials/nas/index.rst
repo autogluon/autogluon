@@ -4,6 +4,8 @@ Neural Architecture Search
 AutoGluon enables easy nerual architecture search, with API for fast prototyping and
 state-of-the-art built-in methods.
 
+.. container:: cards
+
    .. card::
       :title: Reinforcement Learing
       :link: rl_searcher.html

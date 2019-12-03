@@ -45,20 +45,19 @@ except(IOError, ImportError):
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
-    'numpy>=1.15.0',
-    'scipy>=1.3.0',
+    'numpy>=1.16.0',
+    'scipy>=1.3.3',
     'pynvml>=8.0.0'
     'cython',
     'tornado',
     'requests',
     'matplotlib',
-    'mxboard',
+    #'mxboard',
     'tqdm>=4.38.0',
-    'paramiko==2.5.0',
-    'distributed==2.6.0',
-    'ConfigSpace==0.4.10',
-    'nose',
-    'gluoncv',
+    'paramiko>=2.5.0',
+    'distributed>=2.6.0',
+    'ConfigSpace<=0.4.10',
+    'gluoncv>=0.5.0',
     'gluonnlp==0.8.1',
     'graphviz',
     'scikit-optimize',
