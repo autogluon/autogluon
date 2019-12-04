@@ -190,19 +190,17 @@ class TabularPrediction(BaseTask):
         if ((visualizer is not None) and (visualizer != 'none') and 
             ('NN' in hyperparameters)):
             hyperparameters['NN']['visualizer'] = visualizer
-        if objective_func is not None and isinstance(objective_func, str): # convert to function
-                if objective_func in CLASSIFICATION_METRICS:
+        if eval_metric is not None and isinstance(eval_metric, str): # convert to function
+                if eval_metric in CLASSIFICATION_METRICS:
                     if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
-                        raise ValueError("objective_func=%s cannot be used for problem_type=%s" % 
-                            (objective_func, problem_type))
-                    objective_func = CLASSIFICATION_METRICS[objective_func]
-                elif objective_func in REGRESSION_METRICS:
+                        raise ValueError("eval_metric=%s can only be used for classification problems" % eval_metric)
+                    eval_metric = CLASSIFICATION_METRICS[eval_metric]
+                elif eval_metric in REGRESSION_METRICS:
                     if problem_type is not None and problem_type != REGRESSION:
-                        raise ValueError("objective_func=%s cannot be used for problem_type=%s" % 
-                            (objective_func, problem_type))
-                    objective_func = REGRESSION_METRICS[objective_func]
+                        raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
+                    eval_metric = REGRESSION_METRICS[eval_metric]
                 else:
-                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own objective_func function")
+                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function")
         
         # All models use the same scheduler:
         scheduler_options = {
@@ -223,7 +221,7 @@ class TabularPrediction(BaseTask):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
-        predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=objective_func, 
+        predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
         predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
