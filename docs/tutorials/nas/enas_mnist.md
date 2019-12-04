@@ -144,13 +144,3 @@ The resulting architecture is:
 ```{.python .input}
 mynet.graph
 ```
-
-## Defining a Complicated Network
-
-Can we define a more complicated network than just sequential?
-
-
-Finish and exit:
-```{.python .input}
-ag.done()
-```

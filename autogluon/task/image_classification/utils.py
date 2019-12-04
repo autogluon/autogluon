@@ -4,9 +4,10 @@ from mxnet import gluon
 import gluoncv as gcv
 from .nets import *
 from .dataset import *
-from ...utils.dataset import get_split_samplers, SampledDataset
+from ...core import AutoGluonObject
+from ...utils import get_split_samplers, SampledDataset, DataLoader
 
-__all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
+__all__ = ['get_data_loader', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn']
 
 def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, split_ratio):
@@ -30,24 +31,17 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, spl
         num_batches = imagenet_samples // batch_size
     else:
         num_workers = 0
-        train_data = gluon.data.DataLoader(
+        train_data = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True,
-            last_batch="rollover", num_workers=num_workers)
+            last_batch="discard", num_workers=num_workers)
         val_data = None
         if not final_fit:
-            val_data = gluon.data.DataLoader(
+            val_data = DataLoader(
                 val_dataset, batch_size=batch_size,
                 shuffle=False, num_workers=num_workers)
         batch_fn = default_batch_fn
         num_batches = len(train_data)
     return train_data, val_data, batch_fn, num_batches
-
-def get_network(net, num_classes, ctx):
-    if type(net) == str:
-        net = get_built_in_network(net, num_classes, ctx=ctx)
-    else:
-        net.initialize(ctx=ctx)
-    return net
 
 def imagenet_batch_fn(batch, ctx):
     data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)

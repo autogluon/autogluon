@@ -5,6 +5,7 @@ import mxnet as mx
 from mxnet import gluon, nd
 
 from ...core.optimizer import *
+from ...core.loss import *
 from ...core import *
 from ...searcher import *
 from ...scheduler import *
@@ -15,6 +16,7 @@ from ...utils import update_params
 from .dataset import get_dataset
 from .pipeline import train_image_classification
 from .utils import *
+from .nets import *
 from .classifier import Classifier
 
 __all__ = ['ImageClassification']
@@ -54,7 +56,7 @@ class ImageClassification(BaseTask):
             optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
                            wd=Real(1e-4, 1e-3, log=True)),
             lr_scheduler='cosine',
-            loss=gluon.loss.SoftmaxCrossEntropyLoss(),
+            loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
             batch_size=64,
             input_size=224,
@@ -75,7 +77,6 @@ class ImageClassification(BaseTask):
             dist_ip_addrs=[],
             grace_period=None,
             auto_search=True):
-
         """
         Auto fit on image classification dataset
 
@@ -119,7 +120,7 @@ class ImageClassification(BaseTask):
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics
-            pass
+            net = auto_suggest_network(dataset, net)
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial

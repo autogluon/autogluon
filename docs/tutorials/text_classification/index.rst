@@ -15,4 +15,4 @@ AutoGluon will automatically train many models under thousands of different hype
    :maxdepth: 1
    :hidden:
 
-    beginner
+   beginner

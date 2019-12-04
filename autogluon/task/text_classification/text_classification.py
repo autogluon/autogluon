@@ -36,7 +36,6 @@ class TextClassification(BaseTask):
             lr=Real(2e-05, 2e-04, log=True),
             warmup_ratio=0.01,
             lr_scheduler='cosine',
-            loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             log_interval=100,
             seed=0,
             batch_size=32,
@@ -70,7 +69,6 @@ class TextClassification(BaseTask):
         ----------
         dataset (str or autogluon.task.TextClassification.Dataset): Training dataset.
         net (str): Network candidates.
-        loss (object): training loss function.
         num_trials (int): number of trials in the experiment.
         time_limits (int): training time limits in seconds.
         resources_per_trial (dict): Machine resources to allocate per trial.
@@ -106,7 +104,6 @@ class TextClassification(BaseTask):
             accumulate=accumulate,
             seed=seed,
             lr_scheduler=lr_scheduler,
-            loss=loss,
             num_gpus=ngpus_per_trial,
             batch_size=batch_size,
             dev_batch_size=dev_batch_size,

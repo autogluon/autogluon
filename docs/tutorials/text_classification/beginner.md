@@ -72,9 +72,3 @@ print(predictor.results['best_config'])
 ```
 
 This configuration is used to generate the above results.
-
-At the end, please remember to safely exit to release all the resources:
-
-```{.python .input}
-ag.done()
-```

@@ -20,7 +20,6 @@ from ...utils import tqdm
 from ...utils.mxutils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
-logger = logging.getLogger(__name__)
 
 
 def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab, pad=False, num_workers=1):
@@ -106,6 +105,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function
+    logger = logging.getLogger(__name__)
     if args.verbose:
         logger.setLevel(logging.INFO)
         logger.info(args)
@@ -193,7 +193,6 @@ def train_text_classification(args, reporter=None):
 
 
     # Get the loader.
-    #logger.info('processing dataset...')
     train_data, dev_data_list, num_train_examples, trans, test_trans = preprocess_data(
         bert_tokenizer, task, batch_size, dev_batch_size, args.max_len, vocabulary,
         True, args.num_workers)
@@ -220,7 +219,6 @@ def train_text_classification(args, reporter=None):
 
     def evaluate(loader_dev, metric, segment):
         """Evaluate the model on validation dataset."""
-        #logger.info('Now we are doing evaluation on %s with %s.', segment, ctx)
         metric.reset()
         step_loss = 0
         tbar = tqdm(loader_dev)
@@ -253,7 +251,6 @@ def train_text_classification(args, reporter=None):
 
     # Step 2: the training function in the original training script is added in the decorated function in autogluon for training.
     """Training function."""
-    #logger.info('Now we are doing BERT classification training on %s!', ctx)
 
     all_model_params = model.collect_params()
     optimizer_params = {'learning_rate': lr, 'epsilon': epsilon, 'wd': 0.01}
