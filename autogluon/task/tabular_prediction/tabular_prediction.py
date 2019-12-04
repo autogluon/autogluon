@@ -2,6 +2,8 @@ import logging
 import numpy as np
 
 from .dataset import TabularDataset
+from .predictor import TabularPredictor
+
 from ..base import BaseTask
 from ..base.base_task import schedulers
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
@@ -22,6 +24,7 @@ class TabularPrediction(BaseTask):
     """
     
     Dataset = TabularDataset
+    Predictor = TabularPredictor
     
     @staticmethod
     def load(output_directory):
@@ -35,12 +38,13 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-        DefaultLearner object # TODO: link/describe.
+        TabularPredictor object.
         """
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
         output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
-        return Learner.load(output_directory)
+        learner = Learner.load(output_directory)
+        return TabularPredictor(learner=learner)
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
@@ -221,9 +225,9 @@ class TabularPrediction(BaseTask):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
-        predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
+        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
             id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
-        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
+        learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                       holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, hyperparameters=hyperparameters)
-        return predictor
+        return TabularPredictor(learner=learner)
