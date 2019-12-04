@@ -10,6 +10,17 @@ Select your preferences and run the install command.
 
   .. container:: opt-group
 
+     :title:`OS:`
+     :opt:`Linux`
+     :act:`Mac`
+
+     .. raw:: html
+
+        <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
+
+  .. container:: opt-group
+
      :title:`Version:`
      :act:`PIP`
      :opt:`Source`
@@ -33,39 +44,78 @@ Select your preferences and run the install command.
 
   .. admonition:: Command:
 
-     .. container:: pip
+     .. container:: linux
 
-        .. container:: cpu
+        .. container:: pip
 
-           .. code-block:: bash
+           .. container:: cpu
 
-              pip install --upgrade mxnet autogluon
+              .. code-block:: bash
 
-        .. container:: cuda
+                 pip install --upgrade mxnet
+                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
 
-           .. code-block:: bash
+           .. container:: cuda
 
-              # Here we assume CUDA 10.0 is installed. You can change the number
-              # according to your own CUDA version.
-              pip install --upgrade mxnet-cu100 autogluon
+              .. code-block:: bash
 
-     .. container:: source
+                 # Here we assume CUDA 10.0 is installed. You can change the number
+                 # according to your own CUDA version.
+                 pip install --upgrade mxnet-cu100
+                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
 
-        .. container:: cpu
+        .. container:: source
 
-           .. code-block:: bash
+           .. container:: cpu
 
-              pip install --pre --upgrade mxnet
-              git clone https://github.com/awslabs/autogluon
-              cd autogluon && python setup.py install --user
+              .. code-block:: bash
 
-        .. container:: cuda
+                 pip install --pre --upgrade mxnet
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
 
-           .. code-block:: bash
+           .. container:: cuda
 
-              # Here we assume CUDA 10.0 is installed. You can change the number
-              # according to your own CUDA version.
-              pip install --pre --upgrade mxnet-cu100
-              git clone https://github.com/awslabs/autogluon
-              cd autogluon && python setup.py install --user
+              .. code-block:: bash
+
+                 # Here we assume CUDA 10.0 is installed. You can change the number
+                 # according to your own CUDA version.
+                 pip install --pre --upgrade mxnet-cu100
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
+
+     .. container:: mac
+
+        .. container:: pip
+
+           .. container:: cpu
+
+              .. code-block:: bash
+
+                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
+                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
+
+           .. container:: cuda
+
+              .. code-block:: bash
+
+                  This option is only available by building from source.
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. code-block:: bash
+
+                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
+
+           .. container:: cuda
+
+              .. code-block:: bash
+
+                 # Please build mxnet from source manually
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
 

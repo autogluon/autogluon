@@ -213,12 +213,12 @@ def obj(**kwvars):
         class autogluonobject(AutoGluonObject):
             @_autogluon_kwargs(**kwvars)
             def __init__(self, *args, **kwargs):
-                self._args = args
-                self._kwargs = kwargs
+                self.args = args
+                self.kwargs = kwargs
                 self._inited = False
 
             def sample(self, **config):
-                kwargs = copy.deepcopy(self._kwargs)
+                kwargs = copy.deepcopy(self.kwargs)
                 kwspaces = copy.deepcopy(autogluonobject.kwspaces)
                 for k, v in kwargs.items():
                     if k in kwspaces and isinstance(kwspaces[k], NestedSpace):
@@ -227,7 +227,7 @@ def obj(**kwvars):
                     elif k in config:
                         kwargs[k] = config[k]
 
-                args = self._args
+                args = self.args
                 return Cls(*args, **kwargs)
 
             def __repr__(self):

@@ -185,9 +185,3 @@ Plot the results:
 ```{.python .input}
 plt.plot(range(len(results1)), results1, range(len(results2)), results2)
 ```
-
-Exit AutoGluon:
-
-```{.python .input}
-ag.done()
-```

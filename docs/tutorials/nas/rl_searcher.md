@@ -44,13 +44,13 @@ plt.show()
 
 ### Customize Train Function
 
-We can simply define any function with a decorator `autogluon_register_args` whichs converts the function to
+We can simply define any function with a decorator `@ag.args` whichs converts the function to
 AutoGluon searchable. The `reporter` is used to communicate with AutoGluon search algorithms.
 
 ```{.python .input}
 import autogluon as ag
 
-@ag.autogluon_register_args(
+@ag.args(
     x=ag.space.Categorical(*list(range(100))),
     y=ag.space.Categorical(*list(range(100))),
 )

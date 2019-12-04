@@ -12,7 +12,7 @@ from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...utils import tqdm
 from ...utils.mxutils import collect_params
-from .nets import get_built_in_network
+from .nets import get_network
 from .utils import *
 from .tricks import *
 from ...utils.learning_rate import LR_params
@@ -31,6 +31,8 @@ def train_image_classification(args, reporter):
     target_params = Sample_params(args.batch_size, args.num_gpus, args.num_workers)
     batch_size = target_params.get_batchsize
     ctx = target_params.get_context
+    num_classes = args.dataset.num_classes if hasattr(args.dataset, 'num_classes') else None
+
 
     # params
     target_kwargs = Getmodel_kwargs(ctx,
@@ -93,6 +95,7 @@ def train_image_classification(args, reporter):
         lr_scheduler = args.lr_scheduler
     args.optimizer.lr_scheduler = lr_scheduler
 
+
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
 
     def train(epoch, num_epochs, metric):
@@ -128,4 +131,5 @@ def train_image_classification(args, reporter):
 
     if args.final_fit:
         return {'model_params': collect_params(net),
-                'num_classes': args.classes}
+                'num_classes': num_classes}
+

@@ -14,13 +14,13 @@ from .dataset import get_built_in_dataset
 from ...utils import get_split_samplers, SampledDataset
 
 from .dataset import *
-from ...utils.dataset import get_split_samplers, SampledDataset
+from ...core import AutoGluonObject
+from ...utils import get_split_samplers, SampledDataset, DataLoader
 
-
-__all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
+__all__ = ['get_data_loader', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn',
-           'config_choice',
-           'get_network_origin']
+           'config_choice', 'get_network_origin']
+
 
 def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, split_ratio):
     if isinstance(dataset, AutoGluonObject):
@@ -43,12 +43,12 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, spl
         num_batches = imagenet_samples // batch_size
     else:
         num_workers = 0
-        train_data = gluon.data.DataLoader(
+        train_data = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True,
-            last_batch="rollover", num_workers=num_workers)
+            last_batch="discard", num_workers=num_workers)
         val_data = None
         if not final_fit:
-            val_data = gluon.data.DataLoader(
+            val_data = DataLoader(
                 val_dataset, batch_size=batch_size,
                 shuffle=False, num_workers=num_workers)
         batch_fn = default_batch_fn

@@ -36,12 +36,12 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 
 ### Main Training Loop
 
-The following `train_cifar` function is a normal training code a user would write for
+The following `train_mnist` function represents normal training code a user would write for
 training on MNIST dataset. Python users typically use an argparser for conveniently
 changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
 
 ```{.python .input}
-def train_cifar(args, reporter):
+def train_mnist(args, reporter):
     # get varibles from args
     lr = args.lr
     wd = args.wd
@@ -147,7 +147,7 @@ class Net(nn.Module):
 
 ### Convert the Training Function to Be Searchable
 
-We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
+We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
 
 ```{.python .input}
 @ag.args(
@@ -156,8 +156,8 @@ We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar
     net = Net(),
     epochs=5,
 )
-def ag_train_cifar(args, reporter):
-    return train_cifar(args, reporter)
+def ag_train_mnist(args, reporter):
+    return train_mnist(args, reporter)
 ```
 
 
@@ -165,7 +165,7 @@ def ag_train_cifar(args, reporter):
 ### Create the Scheduler and Launch the Experiment
 
 ```{.python .input}
-myscheduler = ag.scheduler.FIFOScheduler(ag_train_cifar,
+myscheduler = ag.scheduler.FIFOScheduler(ag_train_mnist,
                                          resource={'num_cpus': 4, 'num_gpus': 1},
                                          num_trials=2,
                                          time_attr='epoch',

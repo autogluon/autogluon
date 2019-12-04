@@ -52,10 +52,3 @@ The mAP is not bad after just 30 epochs. Let's see one visualization result. We 
 image_path = './tiny_motorbike/VOC2007/JPEGImages/000467.jpg'
 ind, prob, loc = detector.predict(image_path)
 ```
-
-We have tried models with various settings. Finally, showdown the whole processs via following command. 
-
-```{.python .input}
-ag.done()
-```
-
