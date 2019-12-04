@@ -28,23 +28,25 @@ class ImageClassification(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
-        """A convenient function for image classification dataset, supported datasets given by
-        built-in datasets ('mnist', 'cifar10', 'cifar100', 'imagenet'),
-        :class:`ImageFolderDataset` and :class:`RecordioDataset`.
+        """Dataset for AutoGluon image classification tasks, can either be a 
+    :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
+    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
         ----------
         name : str, optional
-            The name for built-in dataset, overrite other options.
+            Which built-in dataset to use, will override all other options if specified.
             The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
         train : bool, default True
-            Train or validation mode
+            Whether this dataset should be used for training or validation.
         train_path : str
-            The training data location
+            The training data location. If using :class:`ImageFolderDataset`,
+            image folder`path/to/the/folder` should be provided. 
+            If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
         input_size : int
             The input image size.
         crop_ratio : float
-            Center crop ratio for evaluation only
+            Center crop ratio (for evaluation only)
         """
         return get_dataset(*args, **kwargs)
 
