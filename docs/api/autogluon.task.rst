@@ -29,8 +29,8 @@ autogluon.task
 
 .. automodule:: autogluon.task
 
-AutoGluon Applications
-----------------------
+AutoGluon Tasks
+-----------------
 
 .. autosummary::
    :nosignatures:
@@ -69,7 +69,8 @@ AutoGluon Applications
 
 .. autoclass:: TabularPrediction
    :members:
-   :inherited-members:
+   :no-inherited-members:
+   :exclude-members: run_fit
 
     .. rubric:: Methods
 
@@ -130,12 +131,6 @@ Tabular Datasets
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
-   :members:
    :no-inherited-members:
 
-    .. autoautosummary:: TabularDataset
-        :methods:
-
-    .. autoautosummary:: TabularDataset
-        :attributes:
 

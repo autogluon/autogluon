@@ -27,17 +27,17 @@ built_in_datasets = [
 def get_dataset(path=None, train=True, name=None,
                input_size=224, crop_ratio=0.875, jitter_param=0.4,
                *args, **kwargs):
-    """A convenient function for image classification dataset, supported datasets given by
-    built-in datasets ('mnist', 'cifar10', 'cifar100', 'imagenet'),
-    :class:`ImageFolderDataset` and :class:`RecordioDataset`.
+    """ Method to produce image classification dataset for AutoGluon, can either be a 
+    :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
+    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
     Parameters
     ----------
         name : str, optional
-            The name for built-in dataset, overrite other options.
+            Which built-in dataset to use, will override all other options if specified.
             The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
         train : bool, default True
-            Train or validation mode
+            Whether this dataset should be used for training or validation.
         path : str
             The training data location. If using :class:`ImageFolderDataset`,
             image folder`path/to/the/folder` should be provided.
@@ -45,7 +45,7 @@ def get_dataset(path=None, train=True, name=None,
         input_size : int
             The input image size.
         crop_ratio : float
-            Center crop ratio for evaluation only
+            Center crop ratio (for evaluation only)
     """
     resize = int(math.ceil(input_size / crop_ratio))
     if name in built_in_datasets:
@@ -80,7 +80,7 @@ class RecordDataset(ImageRecordDataset):
     Parameters
     ----------
     filename : str
-        Path to rec file.
+        Path to .rec file.
     gray_scale : False
         If True, always convert images to greyscale. \
         If False, always convert images to colored (RGB).
@@ -248,7 +248,7 @@ class ImageFolderDataset(MXDataset):
 
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
                          shuffle=True, **kwargs):
-    """Built-in image classification dataset.
+    """Returns built-in popular image classification dataset baed on provided string name ('cifar10', 'cifar100','mnist','imagenet').
     """
     print('get_built_in_dataset', name)
     if name in ['cifar10', 'cifar']:

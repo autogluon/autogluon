@@ -28,7 +28,7 @@ class TabularDataset(pd.DataFrame):
             Mapping from column_names to string describing data type of each column. 
             If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
         subsample : (int, optional)
-            If specified, we only keep first K rows of the provided dataset.
+            If specified = k, we only keep first k rows of the provided dataset.
             
     Attributes
     ----------
@@ -41,7 +41,7 @@ class TabularDataset(pd.DataFrame):
         subsample: (int) 
             Describes size of subsample retained in this TabularDataset (None if this is original dataset).
     
-    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe listed below. 
+    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe. 
     For detailed information, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
     Examples
