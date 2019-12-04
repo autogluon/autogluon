@@ -10,39 +10,39 @@ __all__ = ['TabularDataset']
 
 class TabularDataset(pd.DataFrame):
     """
-    A dataset in tabular format (with rows = samples, columns = features/variables).
-    This object is essentially a pandas DataFrame (with some extra slots) and all the Pandas methods can be applied to it.
+    A dataset in tabular format (with rows = samples, columns = features/variables). 
+    This object is essentially a pandas DataFrame (with some extra slots) and all the Pandas methods can be applied to it. 
     For details, see documentation for pandas Dataframe: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
-    
     
     Parameters
     ----------
-        file_path : (str)
+        file_path : (str, optional)
             Path to the data file. 
-            At least one of file_path and df arguments must be specified when constructing new TabularDataset.
-        name : (str)
-             Name to assign to dataset (has no effect beyond being accessible via Dataset.name).
-        df : (pandas DataFrame)
-            If you already have your data in a pandas Dataframe, you can directly provide it by specifying df.
-            At least one of file_path and df arguments must be specified when constructing new TabularDataset.
-        feature_types : (dict)
-            Mapping from column_name to str describing type of each column.
+            At least one of `file_path` and `df` arguments must be specified when constructing a new TabularDataset.
+        name : (str, optional)
+             Optional name to assign to dataset (has no effect beyond being accessible via TabularDataset.name).
+        df : (pandas.DataFrame, optional)
+            If you already have your data in a pandas Dataframe, you can directly provide it by specifying `df`. 
+            At least one of `file_path` and `df` arguments must be specified when constructing new TabularDataset.
+        feature_types : (dict, optional)
+            Mapping from column_names to string describing data type of each column. 
             If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
-        subsample : (int, default = None)
+        subsample : (int, optional)
             If specified, we only keep first K rows of the provided dataset.
             
     Attributes
     ----------
         name: (str)
-            Name assigned to this TabularDataset.
+            An optional name assigned to this TabularDataset.
         file_path: (str)
             Path to data file from which this TabularDataset was created.
         feature_types: (dict) 
-            Maps column-names to str describing the data type of each column in this TabularDataset.
+            Maps column-names to string describing the data type of each column in this TabularDataset.
         subsample: (int) 
             Describes size of subsample retained in this TabularDataset (None if this is original dataset).
     
-    Note: in addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe.
+    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe: 
+    https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
     Examples
     --------
@@ -92,31 +92,3 @@ class TabularDataset(pd.DataFrame):
             self.subsample = subsample
         else:
             super().__init__(*args, **kwargs)
-
-
-""" OLD Code.  # TODO: remove
-
-    def __init__(self, name=None, file_path=None, df=None, feature_types=None, subsample=None):
-        if df is not None:
-            if type(df) != pd.DataFrame:
-                raise ValueError("'df' must be existing pandas DataFrame. To read dataset from file instead, use 'file_path' string argument.")
-            if file_path is not None:
-                warnings.warn("Both 'df' and 'file_path' supplied. Creating dataset based on DataFrame 'df' rather than reading from file_path.")
-            df = df.copy()
-        elif file_path is not None:
-            if type(file_path) != str:
-                raise ValueError("'file_path' must be a string specifying location of data file")
-            df = load_pd.load(file_path)
-        # Dataset df will be empty if neither 'file_path' nor 'df' arguments are specified
-        # else:
-        #    raise ValueError("One of 'file_path' and 'df' arguments must be specified")
-        if subsample is not None:
-            if type(subsample) != int:
-                raise ValueError("'subsample' must be of type int")
-            df = df.head(subsample)
-        super().__init__(df)
-        # Set attributes:
-        self.name = name
-        self.file_path = file_path
-        self.feature_types = feature_types
-"""    

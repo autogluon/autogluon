@@ -131,9 +131,9 @@ Tabular Datasets
 
 .. autoclass:: TabularDataset
    :members:
-   :inherited-members:
+   :no-inherited-members:
 
-    .. rubric:: Methods
-
-    .. rubric:: Attributes
+   .. autoautosummary:: TabularDataset
+        :methods:
+        :attributes:
 
