@@ -7,7 +7,7 @@ from ...models.lgb.lgb_model import LGBModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
-# from ...models.catboost.catboost_model import CatboostModel
+from ...models.catboost.catboost_model import CatboostModel
 
 
 def get_preset_models(path, problem_type, objective_func, num_classes=None,
@@ -56,11 +56,11 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
                                   objective_func=objective_func, hyperparameters=nn_options.copy()),
         )
-    # if cat_options is not None:
-    #     models.append(
-    #         CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-    #                       objective_func=objective_func, hyperparameters=cat_options.copy()),
-    #     )
+    if cat_options is not None:
+        models.append(
+            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
+                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
     if rf_options is not None:
         params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
@@ -137,11 +137,11 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
             TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
                                   objective_func=objective_func, hyperparameters=nn_options.copy())
         )
-    # if cat_options is not None:
-    #     models.append(
-    #         CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
-    #                       objective_func=objective_func, hyperparameters=cat_options.copy()),
-    #     )
+    if cat_options is not None:
+        models.append(
+            CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
+                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
     if rf_options is not None:
         params = {'n_estimators': 300, 'n_jobs': -1}
         params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
