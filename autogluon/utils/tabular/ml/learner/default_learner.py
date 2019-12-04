@@ -16,14 +16,14 @@ from ..trainer.auto_trainer import AutoTrainer
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer, compute_feature_importance=False):
+                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer):
         super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold, 
-            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present, compute_feature_importance=compute_feature_importance)
+            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
-    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
-            feature_prune=False, holdout_frac=0.1, kfolds=0, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
+    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -31,7 +31,10 @@ class DefaultLearner(AbstractLearner):
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None, ignored if kfolds != 0)
-                kfolds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+                num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+                stack_ensemble_levels : (int) Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
+                    Default is 0 (disabled). Use values between 1-3 to improve model quality.
+                    Ignored unless kfolds is also set >= 2
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
@@ -44,8 +47,8 @@ class DefaultLearner(AbstractLearner):
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
             low_memory=True,
-            kfolds=kfolds,
-            compute_feature_importance=self.compute_feature_importance,
+            kfolds=num_bagging_folds,
+            stack_ensemble_levels=stack_ensemble_levels,
             scheduler_options=scheduler_options)
 
         self.trainer_path = trainer.path

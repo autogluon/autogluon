@@ -152,7 +152,8 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
             mem_avail = psutil.virtual_memory().available
             mem_rss = psutil.Process().memory_info().rss
-            max_memory_percentage = 0.25  # TODO: Finetune this, or find a better metric, this mostly hinges on LightGBM, as it expands all features to float32 upon training start, which causes a huge memory spike. 0.20 is safe, higher might be unsafe
+            # TODO: 0.25 causes OOM error with 72 GB ram on nyc-wendykan-lending-club-loan-data, fails on NN or Catboost, distributed.worker spams logs with memory warnings
+            max_memory_percentage = 0.2  # TODO: Finetune this, or find a better metric, this mostly hinges on LightGBM, as it expands all features to float32 upon training start, which causes a huge memory spike. 0.20 is safe, higher might be unsafe
             predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
             predicted_percentage = predicted_rss / mem_avail
             if not self.fit:

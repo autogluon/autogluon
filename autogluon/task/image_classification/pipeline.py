@@ -14,7 +14,6 @@ from ...utils import tqdm
 from ...utils.mxutils import collect_params
 from .nets import get_built_in_network
 from .utils import *
-
 from .tricks import *
 from ...utils.learning_rate import LR_params
 

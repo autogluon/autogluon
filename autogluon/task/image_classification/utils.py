@@ -8,14 +8,14 @@ from mxnet import gluon, nd
 import gluoncv as gcv
 
 from .nets import *
-# from .nets import get_built_in_network
 
-# from .dataset import *
-from autogluon.core import AutoGluonObject
-
+from autogluon.core import AutoGluonObject #
 from .dataset import get_built_in_dataset
-# from ...utils.dataset import get_split_samplers, SampledDataset
 from ...utils import get_split_samplers, SampledDataset
+
+from .dataset import *
+from ...utils.dataset import get_split_samplers, SampledDataset
+
 
 __all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn',
@@ -54,6 +54,7 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, spl
         batch_fn = default_batch_fn
         num_batches = len(train_data)
     return train_data, val_data, batch_fn, num_batches
+
 
 def get_network_origin(net, num_classes, ctx):
     if type(net) == str:
@@ -128,7 +129,7 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
     elif label_smoothing:
         hard_label = label
         label = smooth(label, classes)
-
+        
     with mx.autograd.record():
     # with ag.record():
         outputs = [net(X.astype(dtype, copy=False)) for X in data]
@@ -246,3 +247,4 @@ def config_choice(dataset, root):
     kaggle_choice['tricks'] = tricks
     kaggle_choice['lr_config'] = lr_config
     return kaggle_choice
+
