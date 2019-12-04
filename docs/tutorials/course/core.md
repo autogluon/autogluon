@@ -254,9 +254,3 @@ print(config)
 ```{.python .input}
 train_fn(train_fn.args, config)
 ```
-
-Exit AutoGluon:
-
-```{.python .input}
-ag.done()
-```

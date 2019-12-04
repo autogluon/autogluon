@@ -52,7 +52,6 @@ requirements = [
     'tornado',
     'requests',
     'matplotlib',
-    #'mxboard',
     'tqdm>=4.38.0',
     'paramiko>=2.5.0',
     'distributed>=2.6.0',
@@ -62,15 +61,10 @@ requirements = [
     'graphviz',
     'scikit-optimize',
     'catboost',
-    #'botocore==1.12.253',
     'boto3==1.9.187',
-    #'fastparquet==0.3.1',
-    #'joblib==0.13.2',
     'lightgbm==2.3.0',
     'pandas==0.24.2',
     'psutil',
-    #'pyarrow==0.15.0',
-    #'s3fs==0.3.1',
     'scikit-learn==0.21.2',
 ]
 

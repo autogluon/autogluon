@@ -92,9 +92,3 @@ The validation and test top-1 accuracy are:
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
-
-
-Finish and exit:
-```{.python .input}
-ag.done()
-```

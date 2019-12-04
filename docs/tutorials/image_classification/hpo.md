@@ -144,8 +144,3 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 Please see comparison of different search algorithms and scheduling strategies :ref:`course_alg`.
 More options using fit is available at :class:`autogluon.task.ImageClassification`.
-
-Finish and exit:
-```{.python .input}
-ag.done()
-```
