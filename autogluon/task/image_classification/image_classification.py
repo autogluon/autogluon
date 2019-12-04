@@ -48,6 +48,9 @@ class ImageClassification(BaseTask):
 
     @staticmethod
     def fit(dataset,
+            tricks,
+            lr_config,
+            classes=10,
             net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
             optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
                            wd=Real(1e-4, 1e-3, log=True)),
@@ -124,6 +127,7 @@ class ImageClassification(BaseTask):
 
         train_image_classification.register_args(
             dataset=dataset,
+            classes=classes,
             net=net,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
@@ -137,7 +141,9 @@ class ImageClassification(BaseTask):
             verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
-            final_fit=False)
+            final_fit=False,
+            tricks = tricks,
+            lr_config = lr_config)
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
@@ -163,6 +169,9 @@ class ImageClassification(BaseTask):
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
 
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+        # plan origin -> ok,  mx.cpu(0)
+        model = get_network_origin(args.net, results['num_classes'], mx.cpu(0))
+
         update_params(model, results.pop('model_params'))
+
         return Classifier(model, results, default_val_fn, checkpoint, args)

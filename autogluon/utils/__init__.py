@@ -15,3 +15,5 @@ from .tqdm import tqdm
 from .custom_queue import Queue
 from .defaultdict import keydefaultdict
 from .util_decorator import classproperty
+
+from .learning_rate import *

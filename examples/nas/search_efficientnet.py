@@ -13,10 +13,10 @@ class EfficientNetB1(ag.nas.EfficientNet):
         super().__init__(width_coefficient=width_coefficient,
                          depth_coefficient=depth_coefficient,
                          input_size=input_size)
-
-results = task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
+results = task.fit('imagenet',
+                   classes=1000,
+                   net=EfficientNetB1(), search_strategy='grid',
                    optimizer=ag.optimizer.SGD(learning_rate=1e-1,momentum=0.9,wd=1e-4),
                    batch_size=32)
-
 print(results)
 ag.done()
