@@ -44,7 +44,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
-            hyperparameter_tune=True, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
+            hyperparameter_tune=False, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
             hyperparameters = {'NN': {'num_epochs': 500}, 
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
