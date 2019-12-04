@@ -10,19 +10,13 @@ AutoGluon: AutoML Toolkit with MXNet Gluon
 
 .. note::
 
-  Example using AutoGluon to train and deploy high-performance model on a tabular dataset:
-
-  `
-  
-  from autogluon import TabularPrediction as task
-  
-  predictor = task.fit(train_data=task.Dataset(file_path=<TRAINING_DATA_TABLE_CSV>), label_column=<VARIABLE_TO_PREDICT>)
-  
-  predictions = predictor.predict(task.Dataset(file_path=<TEST_DATA_TABLE_CSV>))
-  
-  `
-  
-  AutoGluon can be applied just as easily for prediction tasks involving images or text data.
+   Example using AutoGluon to train and deploy high-performance model on a tabular dataset:
+   
+   >>> from autogluon import TabularPrediction as task
+   >>> predictor = task.fit(train_data=task.Dataset(file_path=[TRAINING_DATA_TABLE.csv]), label_column=[VARIABLE_TO_PREDICT])
+   >>> predictions = predictor.predict(task.Dataset(file_path=TEST_DATA_TABLE.csv))
+   
+   AutoGluon can be applied just as easily for prediction tasks involving images or text data.
 
 
 Installation

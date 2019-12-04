@@ -11,25 +11,15 @@ __all__ = ['TabularDataset']
 class TabularDataset(pd.DataFrame):
     """
     A dataset in tabular format (with rows = samples, columns = features/variables).
-    This object is essentially a pandas DataFrame (with extra slots) and all the Pandas methods can be applied to it. 
-    """
+    This object is essentially a pandas DataFrame (with some extra slots) and all the Pandas methods can be applied to it.
+    For details, see documentation for pandas Dataframe: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
-    _metadata = ['name', 'file_path', 'feature_types'] # preserved properties that will be copied to a new instance of TabularDataset
     
-    @property
-    def _constructor(self):
-        return TabularDataset
-    
-    @property
-    def _constructor_sliced(self):
-        return pd.Series
-    
-    def __init__(self, *args, **kwargs):
-        """ 
-        Creates a new TabularDataset object.
-    Args:
+    Parameters
+    ----------
         file_path : (str)
-            Path to the data file.
+            Path to the data file. 
+            At least one of file_path and df arguments must be specified when constructing new TabularDataset.
         name : (str)
              Name to assign to dataset (has no effect beyond being accessible via Dataset.name).
         df : (pandas DataFrame)
@@ -40,7 +30,38 @@ class TabularDataset(pd.DataFrame):
             If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
         subsample : (int, default = None)
             If specified, we only keep first K rows of the provided dataset.
+            
+    Attributes
+    ----------
+        name: (str)
+            Name assigned to this TabularDataset.
+        file_path: (str)
+            Path to data file from which this TabularDataset was created.
+        feature_types: (dict) 
+            Maps column-names to str describing the data type of each column in this TabularDataset.
+        subsample: (int) 
+            Describes size of subsample retained in this TabularDataset (None if this is original dataset).
+    
+    Note: in addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe.
+    
+    Examples
+    --------
+    >>> from autogluon import TabularPrediction as task  # Note: TabularPrediction.Dataset == TabularDataset.
+    >>> train_data = task.Dataset(file_path=''https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
+    >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')
     """
+    
+    _metadata = ['name', 'file_path', 'feature_types', 'subsample'] # preserved properties that will be copied to a new instance of TabularDataset
+    
+    @property
+    def _constructor(self):
+        return TabularDataset
+    
+    @property
+    def _constructor_sliced(self):
+        return pd.Series
+    
+    def __init__(self, *args, **kwargs):
         file_path = kwargs.get('file_path', None)
         name = kwargs.get('name', None)
         feature_types = kwargs.get('feature_types', None)

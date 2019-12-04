@@ -139,12 +139,22 @@ class TabularPrediction(BaseTask):
                 Banned subset of column names that model may not use as predictive features (eg. contains label, user-ID, etc), default = [].
                 These columns are ignored during fit(), but DataFrame of just these columns with appended predictions may be submitted for a ML competition.
         
+        Returns
+        -------
+            DefaultLearner object with methods: predict(), predict_proba(), score(), evaluate(), load(), save()
+            # TODO: document Learner object.
+        
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='./training_data.csv')
-        >>> label_column = 'class' # name of column in train_data
+        >>> train_data = task.Dataset(file_path=''https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
+        >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
+        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv') # Another Pandas object
+        >>> y_test = test_data[label_column]
+        >>> test_data = test_data.drop(labels=[label_column], axis=1)
+        >>> y_pred = predictor.predict(test_data)
+        >>> perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
         """
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")

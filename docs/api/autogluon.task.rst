@@ -62,7 +62,22 @@ AutoGluon Applications
 
     .. autoautosummary:: ObjectDetection
         :methods:
+        
 
+:hidden:`TabularPrediction`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPrediction
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TabularPrediction
+        :methods:
+
+Image Classification Datasets
+-----------------------------
 
 .. automodule:: autogluon.task.image_classification
 
@@ -106,16 +121,19 @@ AutoGluon Applications
     .. autoautosummary:: RecordDataset
         :attributes:
 
-:hidden:`TabularPrediction`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tabular Datasets
+-----------------------------
 
-.. autoclass:: TabularPrediction
+.. automodule:: autogluon.task.tabular_prediction
+
+:hidden:`TabularDataset`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularDataset
    :members:
    :inherited-members:
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TabularPrediction
-        :methods:
+    .. rubric:: Attributes
 
-.. automodule:: autogluon.task.tabular_prediction
