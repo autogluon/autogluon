@@ -46,19 +46,19 @@ Tutorials
       :title: Image Classification
       :link: tutorials/image_classification/index.html
 
-      How to do image classification.
+      How to classify images into various categories.
     
    .. card::
       :title: Object Detection
       :link: tutorials/object_detection/index.html
 
-      How to do object detection.
+      How to detect objects and their location in images.
 
    .. card::
       :title: Text Classification
       :link: tutorials/text_classification/index.html
 
-      How to do text classification tasks.
+      How to make predictions based on text data.
 
 
 Advanced Topics
