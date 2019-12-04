@@ -61,6 +61,7 @@ requirements = [
     'gluonnlp==0.8.1',
     'graphviz',
     'scikit-optimize',
+    'catboost',
     #'botocore==1.12.253',
     'boto3==1.9.187',
     #'fastparquet==0.3.1',
