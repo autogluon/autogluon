@@ -70,7 +70,7 @@ class TabularPrediction(BaseTask):
             If tuning_data = None, fit() will automatically hold out some random validation examples from train_data. 
         output_directory : (str) 
             Path to directory where models and intermediate outputs should be saved.
-            If unspecified, a time-stamped folder called 'autogluon-fit-TIMESTAMP" will be created in the working directory to store all models. 
+            If unspecified, a time-stamped folder called "autogluon-fit-TIMESTAMP" will be created in the working directory to store all models. 
             Note: To call fit() twice and save all results of each fit, you must specify different locations for output_directory. 
                   Otherwise files from first fit() will be overwritten by second fit(). 
         problem_type : (str) 
@@ -122,7 +122,7 @@ class TabularPrediction(BaseTask):
         dist_ip_addrs : (list)
             List of IP addresses corresponding to remote workers. 
         visualizer : (str)
-            Describes method to visualize training progress during fit(). Options: ['mxboard','tensorboard','none']. 
+            Describes method to visualize training progress during fit(). Options: ['mxboard', 'tensorboard', 'none']. 
         nthreads_per_trial : (int)
             How many CPUs to use in each trial (ie. single training run of a model). 
         ngpus_per_trial : (int)
@@ -135,15 +135,14 @@ class TabularPrediction(BaseTask):
             feature_generator_kwargs : (dict, default={}) 
                 Keyword arguments dictionary to pass into FeatureGenerator constructor. 
             trainer_type : (Trainer class, default=AutoTrainer)
-                A Trainer class (see AbstractTrainer) that controls training/ensembling of many models, default = AutoTrainer. 
-                Note: class file must be imported into Python session in order to use custom class. 
-                # TODO(Nick): does trainer constructor ever require kwargs? If so should have trainer_type_kwargs dict used similarly as feature_generator_kwargs
+                A class inheritng from AbstractTrainer that controls training/ensembling of many models (default is AutoTrainer class). 
+                Note: In order to use a custom Trainer class, you must import your class file into current Python session.  
             label_count_threshold : (int, default = 10)
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class. 
-                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (ie. will never predict them), default = 10. 
+                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (ie. will never predict them). 
             id_columns : (list)
                 Banned subset of column names that model may not use as predictive features (eg. contains label, user-ID, etc), default = []. 
-                These columns are ignored during fit(), but DataFrame of just these columns with appended predictions may be submitted for a ML competition.
+                These columns are ignored during fit(), but DataFrame of just these columns with appended predictions may be submitted for a ML competition. # TODO: describe how.
         
         Returns
         -------

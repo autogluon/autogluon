@@ -133,7 +133,9 @@ Tabular Datasets
    :members:
    :no-inherited-members:
 
-   .. autoautosummary:: TabularDataset
+    .. autoautosummary:: TabularDataset
         :methods:
+
+    .. autoautosummary:: TabularDataset
         :attributes:
 

@@ -41,8 +41,8 @@ class TabularDataset(pd.DataFrame):
         subsample: (int) 
             Describes size of subsample retained in this TabularDataset (None if this is original dataset).
     
-    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe: 
-    https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe listed below. 
+    For detailed information, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
     Examples
     --------
