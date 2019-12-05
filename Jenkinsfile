@@ -41,6 +41,7 @@ stage("Build Docs") {
         export PYTHONPATH=\${PWD}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export AG_DOCS=1
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop

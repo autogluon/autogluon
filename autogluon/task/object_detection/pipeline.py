@@ -119,14 +119,16 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
 
     # set up logger
     logging.basicConfig()
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    log_file_path = args.save_prefix + '_train.log'
-    log_dir = os.path.dirname(log_file_path)
-    if log_dir:
-        mkdir(log_dir)
-    fh = logging.FileHandler(log_file_path)
-    logger.addHandler(fh)
+    logger = logging.getLogger(__name__)
+    if args.verbose:
+        logger.setLevel(logging.INFO)
+        log_file_path = args.save_prefix + '_train.log'
+        log_dir = os.path.dirname(log_file_path)
+        if log_dir:
+            mkdir(log_dir)
+        fh = logging.FileHandler(log_file_path)
+        logger.addHandler(fh)
+
     logger.info(args)
     #logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
     best_map = [0]
