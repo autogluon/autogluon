@@ -46,6 +46,7 @@ class AbstractTrainer:
         self.objective_func_expects_y_pred = scorer_expects_y_pred(scorer=self.objective_func)
 
         self.num_classes = num_classes
+        self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
         self.bagged_mode = True if kfolds >= 2 else False
         if self.bagged_mode:
