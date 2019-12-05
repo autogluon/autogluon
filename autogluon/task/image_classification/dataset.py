@@ -186,7 +186,8 @@ class ImageFolderDataset(object):
                     return False
                 valid = True
                 try:
-                    self.loader(x)
+                    with open(x, 'rb') as f:
+                        img = Image.open(f)
                 except OSError:
                     valid = False
                 return valid
