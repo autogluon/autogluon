@@ -136,7 +136,7 @@ training functions.
 In AutoGluon searchable object can be returned by a user defined class with a decorator.
 
 ```{.python .input}
-@ag.obj(eifjccgihnttnluhcevjckngcdrcruduvgtjnndvjvhi
+@ag.obj(
 
     name=ag.space.Categorical('auto', 'gluon'),
     static_value=10,
