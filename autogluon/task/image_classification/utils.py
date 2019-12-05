@@ -211,13 +211,15 @@ def config_choice(dataset, root):
                          'ngpus_per_trial': 4,
                          'num_trials': 5}
 
+
+
     elif dataset == 'aerial-cactus-identification/':
         kaggle_choice = {'classes': 2, 'net': net_18, 'optimizer': optimizer, 'lr_scheduler': lr_scheduler,
                          'dataset': dataset_path,
-                         'batch_size': 64,
-                         'epochs': 30,
-                         'ngpus_per_trial': 4,
-                         'num_trials': 20}
+                         'batch_size': 32,
+                         'epochs': 1,
+                         'ngpus_per_trial': 1,
+                         'num_trials': 1}
 
     elif dataset == 'plant-seedlings-classification/':
         kaggle_choice = {'classes': 12, 'net': net_18, 'optimizer': optimizer, 'lr_scheduler': lr_scheduler,
@@ -242,6 +244,23 @@ def config_choice(dataset, root):
                          'epochs': 80,
                          'ngpus_per_trial': 4,
                          'num_trials': 15}
+
+
+    elif dataset == 'shopee-iet-machine-learning-competition/':
+        kaggle_choice = {'classes': 18, 'net': net_18, 'optimizer': optimizer, 'lr_scheduler': lr_scheduler,
+                         'dataset': dataset_path,
+                         'batch_size': 64,
+                         'epochs': 1,
+                         'ngpus_per_trial': 1,
+                         'num_trials': 1}
+
+    elif dataset == 'shopee-iet/':
+        kaggle_choice = {'classes': 4, 'net': net_18, 'optimizer': optimizer, 'lr_scheduler': lr_scheduler,
+                         'dataset': dataset_path,
+                         'batch_size': 64,
+                         'epochs': 10,
+                         'ngpus_per_trial': 1,
+                         'num_trials': 1}
 
     kaggle_choice['tricks'] = tricks
     kaggle_choice['lr_config'] = lr_config
