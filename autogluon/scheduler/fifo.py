@@ -330,6 +330,7 @@ class FIFOScheduler(TaskScheduler):
         import matplotlib.pyplot as plt
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
+        plt.title("Performance vs Training-Time in each HPO Trial")
         with self.log_lock:
             for task_id, task_res in self.training_history.items():
                 rewards = [x[self._reward_attr] for x in task_res]

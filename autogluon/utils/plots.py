@@ -11,7 +11,7 @@ from .miscs import warning_filter
 __all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'plot_tabular_models', 'mousover_plot']
 
 
-def plot_performance_vs_trials(results, output_directory, filename="PerformanceVsTrials.png", plot_title=""):
+def plot_performance_vs_trials(results, output_directory, save_file="PerformanceVsTrials.png", plot_title=""):
     try:
         import matplotlib.pyplot as plt
         matplotlib_imported = True
@@ -32,7 +32,7 @@ def plot_performance_vs_trials(results, output_directory, filename="PerformanceV
     ax.plot(x, y)
     ax.set(xlabel='Completed Trials', ylabel='Best Performance', title = plot_title)
     if output_directory is not None:
-        outputfile = output_directory + filename
+        outputfile = output_directory + save_file
         fig.savefig(outputfile)
         print("Plot of HPO performance saved to file: %s" % outputfile)
     plt.show()
@@ -46,7 +46,7 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     datadict = {'trial_id': sorted(results['trial_info'].keys())}
     datadict['performance'] = [results['trial_info'][trial_id][results['reward_attr']] for trial_id in datadict['trial_id']]
     datadict['hyperparameters'] = [_formatDict(results['trial_info'][trial_id]['config']) for trial_id in datadict['trial_id']]
-    
+    hidden_keys = []
     # Determine x-axis attribute:
     if 'latency' in results['metadata']:
         datadict['latency'] = [results['trial_info'][trial_id]['metadata']['latency'] for trial_id in datadict['trial_id']]
@@ -54,7 +54,7 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     else:
         attr_x = list(results['best_config'].keys())[0]
         datadict[attr_x] = [results['trial_info'][trial_id]['config'][attr_x] for trial_id in datadict['trial_id']]
-    
+        hidden_keys.append(attr_x)
     # Determine size attribute:
     if 'memory' in results['metadata']:
         datadict['memory'] = [results['trial_info'][trial_id]['metadata']['memory'] for trial_id in datadict['trial_id']]
@@ -67,7 +67,7 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     
     save_path = output_directory + save_file if output_directory else None
     mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
-                  attr_size=attr_size, save_file=save_path, plot_title=plot_title)
+        attr_size=attr_size, save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
     if save_path is not None:
         print("Plot summary of models saved to file: %s" % save_file)
 
@@ -78,15 +78,18 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
                 Dict created during TabularPredictor.fit_summary().
                 Must at least contain key: 'model_performance'.
     """
+    hidden_keys = []
     model_performancedict = results['model_performance']
     model_names = list(model_performancedict.keys())
     val_perfs = [model_performancedict[key] for key in model_names]
     model_types = [results['model_types'][key] for key in model_names]
+    hidden_keys.append(model_types)
     model_hyperparams = [_formatDict(results['model_hyperparams'][key]) for key in model_names]
     datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types,
                 'hyperparameters': model_hyperparams}
     save_path = output_directory + save_file if output_directory else None
-    mousover_plot(datadict, attr_x='model_type', attr_y='performance', save_file=save_path, plot_title=plot_title)
+    mousover_plot(datadict, attr_x='model_type', attr_y='performance',
+                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
     if save_path is not None:
         print("Plot summary of models saved to file: %s" % save_file)
 
