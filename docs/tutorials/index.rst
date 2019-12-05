@@ -1,5 +1,5 @@
-Tutorial
-========
+Tutorials
+=========
 
 
 Image Classification
@@ -101,6 +101,8 @@ Neural Architecture Search
 
    course/index
    image_classification/index
+   object_detection/index
+   text_classification/index
    tabular_prediction/index
    customize/index
    nas/index

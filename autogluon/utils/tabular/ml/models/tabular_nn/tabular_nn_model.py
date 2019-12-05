@@ -87,7 +87,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_type_map = None
         self.processor = None # data processor
         self.summary_writer = None
-        self.ctx = mx.cpu(0)
+        self.ctx = mx.cpu()
 
     # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
     def create_unfit_copy(self):
@@ -111,8 +111,8 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_net_outputs = 1
             if self.params['y_range'] is None: # Infer default y-range
                 y_vals = train_dataset.dataset._data[train_dataset.label_index].asnumpy()
-                min_y = min(y_vals)
-                max_y = max(y_vals)
+                min_y = float(min(y_vals))
+                max_y = float(max(y_vals))
                 std_y = np.std(y_vals)
                 y_ext = self.params['y_range_extend']*std_y
                 if min_y >= 0: # infer y must be nonnegative
@@ -133,14 +133,16 @@ class TabularNeuralNetModel(AbstractModel):
                 default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
             elif self.problem_type == BINARY or self.problem_type == MULTICLASS:
                 default_sizes = [256, 128] # will be scaled adaptively
-                base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
+                # base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
+                base_size = max(1, min(self.num_net_outputs, 100) / 50)  # TODO: Updated because it improved model quality and made training far faster
                 default_layer_sizes = [defaultsize*base_size for defaultsize in default_sizes]
             # TODO: This gets really large on 100K+ rows... It takes hours on gpu for nyc-albert: 78 float/int features which get expanded to 1734, it also overfits and maxes accuracy on epoch
             #  LGBM takes 120 seconds on 4 cpu's and gets far better accuracy
             #  Perhaps we should add an order of magnitude to the pre-req with -3, or else scale based on feature count instead of row count.
-            layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
+            # layer_expansion_factor = np.log10(max(train_dataset.num_examples, 1000)) - 2 # scale layers based on num_training_examples
+            layer_expansion_factor = 1  # TODO: Hardcoded to 1 because it results in both better model quality and far faster training time
             max_layer_width = self.params['max_layer_width']
-            self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize)) 
+            self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize))
                                      for defaultsize in default_layer_sizes]
         
         if train_dataset.has_vector_features() and self.params['numeric_embed_dim'] is None:
@@ -169,12 +171,12 @@ class TabularNeuralNetModel(AbstractModel):
         # print('features: ', self.features)
         if 'num_cpus' in kwargs:
             self.params['num_dataloading_workers'] = max(1, int(kwargs['num_cpus']/2.0))
-        if 'num_gpus' in kwargs:
-            if kwargs['num_gpus'] >= 1:
-                self.params['ctx'] = mx.gpu()  # TODO: currently cannot use more than 1 GPU
-            else:
-                self.params['ctx'] = mx.cpu()
-
+        else:
+            self.params['num_dataloading_workers'] = 1
+        if 'num_gpus' in kwargs and kwargs['num_gpus'] >= 1: # Currently cannot use >1 GPU
+            self.params['ctx'] = mx.gpu() # Currently cannot use more than 1 GPU
+        else:
+            self.params['ctx'] = mx.cpu()
         train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -620,7 +622,7 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory = None, return_name=False):
+    def save(self, file_prefix="", directory = None, return_name=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
             return_name (bool): return the file-names corresponding to this save as tuple (model_obj_file, net_params_file)
@@ -637,19 +639,19 @@ class TabularNeuralNetModel(AbstractModel):
         temp_sw = self.summary_writer
         self.model = None
         self.summary_writer = None
-        save_pkl.save(path = modelobj_filepath, object=self)
+        save_pkl.save(path=modelobj_filepath, object=self, verbose=verbose)
         self.model = temp_model
         self.summary_writer = temp_sw
         if return_name:
             return (modelobj_filepath, params_filepath)
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name.
             If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
         path = path + file_prefix
-        obj = load_pkl.load(path = path + cls.model_file_name)
+        obj = load_pkl.load(path = path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
         obj.model = EmbedNet(architecture_desc=obj.architecture_desc, ctx=obj.ctx) # recreate network from architecture description
@@ -672,10 +674,10 @@ class TabularNeuralNetModel(AbstractModel):
         num_gpus = scheduler_options['resource']['num_gpus']
         self.params['num_dataloading_workers'] = max(1, int(num_cpus/2.0))
         if num_gpus >= 1:
-            self.params['ctx'] = mx.gpu() # TODO: currently cannot use more than 1 GPU until scheduler works
+            self.params['ctx'] = mx.gpu() # Currently cannot use more than 1 GPU until scheduler works
         else:
             self.params['ctx'] = mx.cpu()
-        self.params['ctx'] = mx.cpu() # TODO: scheduler GPU as_in_context() not work right now. Error = tensor_gpu-inl.h:35: Check failed: e == cudaSuccess CUDA: initialization error
+        # self.params['ctx'] = mx.cpu() # use this in case embedding layer complains during predict() for HPO with GPU
         
         start_time = time.time()
         X_train = self.preprocess(X_train)

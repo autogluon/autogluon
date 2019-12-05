@@ -12,11 +12,19 @@ from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...utils import tqdm
 from ...utils.mxutils import collect_params
+<<<<<<< HEAD
 from .nets import get_built_in_network
 from .utils import *
 
 from .tricks import *
 from ...utils.learning_rate import LR_params
+=======
+from .nets import get_network
+from .utils import *
+
+__all__ = ['train_image_classification']
+
+>>>>>>> origin/master
 
 __all__ = ['train_image_classification']
 
@@ -27,11 +35,21 @@ def train_image_classification(args, reporter):
     if args.verbose:
         logger.setLevel(logging.INFO)
         logger.info(args)
+<<<<<<< HEAD
 
     # batch_size & ctx
     target_params = Sample_params(args.batch_size, args.num_gpus, args.num_workers)
     batch_size = target_params.get_batchsize
     ctx = target_params.get_context
+=======
+    batch_size = args.batch_size * max(args.num_gpus, 1)
+    ctx = [mx.gpu(i) for i in range(args.num_gpus)] if args.num_gpus > 0 else [mx.cpu()]
+
+    num_classes = args.dataset.num_classes if hasattr(args.dataset, 'num_classes') else None
+    net = get_network(args.net, num_classes, ctx)
+    if args.hybridize:
+        net.hybridize(static_alloc=True, static_shape=True)
+>>>>>>> origin/master
 
     # params
     target_kwargs = Getmodel_kwargs(ctx,
@@ -49,6 +67,7 @@ def train_image_classification(args, reporter):
     distillation = target_kwargs.distillation
     net = target_kwargs.get_net
     input_size = net.input_size if hasattr(net, 'input_size') else args.input_size
+<<<<<<< HEAD
 
     if args.tricks.no_wd:
         for k, v in net.collect_params('.*beta|.*gamma|.*bias').items():
@@ -82,6 +101,12 @@ def train_image_classification(args, reporter):
     train_data, val_data, batch_fn, num_batches = \
         get_data_loader(args.dataset, input_size, batch_size, args.num_workers, args.final_fit, args.split_ratio)
 
+=======
+    train_data, val_data, batch_fn, num_batches = get_data_loader(
+            args.dataset, input_size, batch_size, args.num_workers, args.final_fit,
+            args.split_ratio)
+ 
+>>>>>>> origin/master
     if isinstance(args.lr_scheduler, str):
         target_lr = LR_params(args.optimizer.lr, args.lr_scheduler, args.epochs, num_batches,
                              args.lr_config.lr_decay_epoch,
@@ -94,9 +119,14 @@ def train_image_classification(args, reporter):
         lr_scheduler = args.lr_scheduler
     args.optimizer.lr_scheduler = lr_scheduler
 
+<<<<<<< HEAD
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
 
     def train(epoch, num_epochs, metric):
+=======
+    metric = get_metric_instance(args.metric)
+    def train(epoch):
+>>>>>>> origin/master
         for i, batch in enumerate(train_data):
             metric = default_train_fn(epoch, num_epochs, net, batch, batch_size, L, trainer,
                                       batch_fn, ctx, args.tricks.mixup, args.tricks.label_smoothing,
@@ -114,6 +144,7 @@ def train_image_classification(args, reporter):
 
         reporter(epoch=epoch, classification_reward=reward)
         return reward
+<<<<<<< HEAD
 
     tbar = tqdm(range(1, args.epochs + 1))
 
@@ -123,10 +154,20 @@ def train_image_classification(args, reporter):
         train_metric_name, train_metric_score = metric.get()
         tbar.set_description('[Epoch %d] training: %s=%.3f' %(epoch, train_metric_name, train_metric_score))
 
+=======
+
+    tbar = tqdm(range(1, args.epochs + 1))
+    for epoch in tbar:
+        train(epoch)
+>>>>>>> origin/master
         if not args.final_fit:
             reward = test(epoch)
             tbar.set_description('[Epoch {}] Validation: {:.3f}'.format(epoch, reward))
 
     if args.final_fit:
         return {'model_params': collect_params(net),
+<<<<<<< HEAD
                 'num_classes': args.classes}
+=======
+                'num_classes': num_classes}
+>>>>>>> origin/master

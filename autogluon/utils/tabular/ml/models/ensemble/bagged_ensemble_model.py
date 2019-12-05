@@ -11,6 +11,7 @@ from ....utils.savers import save_pkl
 class BaggedEnsembleModel(AbstractModel):
     def __init__(self, path, name, model_base: AbstractModel, debug=0):
         self.model_base = model_base
+        self._child_type = type(self.model_base)
         self.models = []
         self._model_names = None
         self._model_types = None
@@ -22,13 +23,19 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = None
         super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, debug=debug)
 
-    def preprocess(self, X):
-        return self.models[0].preprocess(X)
+    def preprocess(self, X, model=None):
+        if model is None:
+            if len(self.models) == 0:
+                return X
+            model = self.models[0]
+        if type(model) == str:
+            model = self.load_child(model)
+        return model.preprocess(X)
 
     # TODO: Likely will caues issues involving memory since later models will have earlier models still in memory during training.
     #  Add option for low_memory to save models as they are trained, and only load model for prediction.
-    def fit(self, X, y, k_fold=5, random_state=0, **kwargs):
-        print('BAGGING', self.name)
+    # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
+    def fit(self, X, y, k_fold=5, random_state=0, compute_base_preds=False, **kwargs):
         self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         if self.problem_type == REGRESSION:
             stratified = False
@@ -64,35 +71,47 @@ class BaggedEnsembleModel(AbstractModel):
         return self.models, oof_pred_proba
 
     def predict_proba(self, X, preprocess=True):
-        X = self.preprocess(X)
-        pred_proba = self.models[0].predict_proba(X=X, preprocess=False)
+        model = self.load_child(self.models[0])
+        if preprocess:
+            X = self.preprocess(X, model=model)
+        pred_proba = model.predict_proba(X=X, preprocess=False)
         for model in self.models[1:]:
+            model = self.load_child(model)
             pred_proba += model.predict_proba(X=X, preprocess=False)
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
 
+    def load_child(self, model, verbose=False):
+        if type(model) == str:
+            child_path = self.create_contexts(self.path + model + '/')
+            return self._child_type.load(path=child_path, verbose=verbose)
+        else:
+            return model
+
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False):
+    def load(cls, path, file_prefix="", reset_paths=False, low_memory=True, verbose=True):
         path = path + file_prefix
         load_path = path + cls.model_file_name
-        if not reset_paths:
-            obj = load_pkl.load(path=load_path)
-        else:
-            obj = load_pkl.load(path=load_path)
+        obj = load_pkl.load(path=load_path, verbose=verbose)
+        if reset_paths:
             obj.set_contexts(path)
-        obj.models = []
-        for i, model_name in enumerate(obj._model_names):
-            child_path = obj.create_contexts(obj.path + model_name + '/')
-            child_type = obj._model_types[i]
-            child_model = child_type.load(path=child_path, reset_paths=reset_paths)
-            obj.models.append(child_model)
+
+        if low_memory:
+            obj.models = copy.deepcopy(obj._model_names)
+        else:
+            obj.models = []
+            for i, model_name in enumerate(obj._model_names):
+                child_path = obj.create_contexts(obj.path + model_name + '/')
+                child_type = obj._model_types[i]
+                child_model = child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
+                obj.models.append(child_model)
 
         obj._model_types = None
         obj._model_names = None
         return obj
 
-    def save(self, file_prefix ="", directory = None, return_filename=False):
+    def save(self, file_prefix="", directory = None, return_filename=False, verbose=True):
         if directory is None:
             directory = self.path
         directory = directory + file_prefix
@@ -100,8 +119,9 @@ class BaggedEnsembleModel(AbstractModel):
         self._model_types = []
         self._model_names = []
         for child in self.models:
+            child = self.load_child(child)
             child.path = self.create_contexts(self.path + child.name + '/')
-            child.save()
+            child.save(verbose=False)
             self._model_types.append(type(child))
             self._model_names.append(child.name)
 
@@ -109,6 +129,6 @@ class BaggedEnsembleModel(AbstractModel):
 
         self.models = None
 
-        save_pkl.save(path=file_name, object=self)
+        save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name

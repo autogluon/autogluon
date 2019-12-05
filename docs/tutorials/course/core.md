@@ -121,6 +121,7 @@ print(g)
 ```
 
 Get one example configuration:
+<<<<<<< HEAD
 
 ```{.python .input}
 g.rand
@@ -128,6 +129,15 @@ g.rand
 
 ### Decorators for Searchbale Object and Customized Training Scripts
 
+=======
+
+```{.python .input}
+g.rand
+```
+
+### Decorators for Searchbale Object and Customized Training Scripts
+
+>>>>>>> origin/master
 In this section, we show how to insert search space into customized objects and
 training functions.
 
@@ -203,7 +213,7 @@ print(i)
 We can also make them inside a nested space:
 
 ```{.python .input}
-j =ag.space.Dict(
+j = ag.space.Dict(
         a=ag.Real(0, 10),
         obj1=MyObj(),
         obj2=myfunc(),
@@ -253,10 +263,4 @@ print(config)
 
 ```{.python .input}
 train_fn(train_fn.args, config)
-```
-
-Exit AutoGluon:
-
-```{.python .input}
-ag.done()
 ```

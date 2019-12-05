@@ -8,6 +8,7 @@ from mxnet import gluon, nd
 import gluoncv as gcv
 
 from .nets import *
+<<<<<<< HEAD
 # from .nets import get_built_in_network
 
 # from .dataset import *
@@ -21,6 +22,14 @@ __all__ = ['get_data_loader', 'get_network', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn',
            'config_choice',
            'get_network_origin']
+=======
+from .dataset import *
+from ...core import AutoGluonObject
+from ...utils import get_split_samplers, SampledDataset, DataLoader
+
+__all__ = ['get_data_loader', 'imagenet_batch_fn',
+           'default_batch_fn', 'default_val_fn', 'default_train_fn']
+>>>>>>> origin/master
 
 def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, split_ratio):
     if isinstance(dataset, AutoGluonObject):
@@ -43,18 +52,23 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, spl
         num_batches = imagenet_samples // batch_size
     else:
         num_workers = 0
+<<<<<<< HEAD
         train_data = gluon.data.DataLoader(
+=======
+        train_data = DataLoader(
+>>>>>>> origin/master
             train_dataset, batch_size=batch_size, shuffle=True,
-            last_batch="rollover", num_workers=num_workers)
+            last_batch="discard", num_workers=num_workers)
         val_data = None
         if not final_fit:
-            val_data = gluon.data.DataLoader(
+            val_data = DataLoader(
                 val_dataset, batch_size=batch_size,
                 shuffle=False, num_workers=num_workers)
         batch_fn = default_batch_fn
         num_batches = len(train_data)
     return train_data, val_data, batch_fn, num_batches
 
+<<<<<<< HEAD
 def get_network_origin(net, num_classes, ctx):
     if type(net) == str:
         net = get_built_in_network_origin(net, num_classes, ctx=ctx)
@@ -69,6 +83,8 @@ def get_network(net, **kwargs):
         net.initialize(ctx=kwargs['ctx'])
     return net
 
+=======
+>>>>>>> origin/master
 def imagenet_batch_fn(batch, ctx):
     data = gluon.utils.split_and_load(batch.data[0], ctx_list=ctx, batch_axis=0)
     label = gluon.utils.split_and_load(batch.label[0], ctx_list=ctx, batch_axis=0)
@@ -113,6 +129,7 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
                      mixup_alpha, mixup_off_epoch, classes,
                      dtype, metric, teacher_prob):
     data, label = batch_fn(batch, ctx)
+<<<<<<< HEAD
     #outputs = [net(X) for X in data]
     if mixup:
         #
@@ -129,6 +146,9 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
         hard_label = label
         label = smooth(label, classes)
 
+=======
+    outputs = [net(X) for X in data]
+>>>>>>> origin/master
     with mx.autograd.record():
     # with ag.record():
         outputs = [net(X.astype(dtype, copy=False)) for X in data]
@@ -156,6 +176,7 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
 def _train_val_split(train_dataset, split_ratio=0.2):
     train_sampler, val_sampler = get_split_samplers(train_dataset, split_ratio)
     return SampledDataset(train_dataset, train_sampler), SampledDataset(train_dataset, val_sampler)
+<<<<<<< HEAD
 
 def config_choice(dataset, root):
     ## data
@@ -265,3 +286,5 @@ def config_choice(dataset, root):
     kaggle_choice['tricks'] = tricks
     kaggle_choice['lr_config'] = lr_config
     return kaggle_choice
+=======
+>>>>>>> origin/master

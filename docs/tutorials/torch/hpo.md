@@ -36,12 +36,20 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 
 ### Main Training Loop
 
+<<<<<<< HEAD
 The following `train_cifar` function is a normal training code a user would write for
+=======
+The following `train_mnist` function represents normal training code a user would write for
+>>>>>>> origin/master
 training on MNIST dataset. Python users typically use an argparser for conveniently
 changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
 
 ```{.python .input}
+<<<<<<< HEAD
 def train_cifar(args, reporter):
+=======
+def train_mnist(args, reporter):
+>>>>>>> origin/master
     # get varibles from args
     lr = args.lr
     wd = args.wd
@@ -77,11 +85,14 @@ def train_cifar(args, reporter):
             loss.backward()
             optimizer.step()
 
+<<<<<<< HEAD
             train_loss += loss.item()
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
+=======
+>>>>>>> origin/master
     def test(epoch):
         net.eval()
         test_loss, correct, total = 0, 0, 0
@@ -145,7 +156,11 @@ class Net(nn.Module):
 
 ### Convert the Training Function to Be Searchable
 
+<<<<<<< HEAD
 We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
+=======
+We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
+>>>>>>> origin/master
 
 ```{.python .input}
 @ag.args(
@@ -154,8 +169,13 @@ We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar
     net = Net(),
     epochs=5,
 )
+<<<<<<< HEAD
 def ag_train_cifar(args, reporter):
     return train_cifar(args, reporter)
+=======
+def ag_train_mnist(args, reporter):
+    return train_mnist(args, reporter)
+>>>>>>> origin/master
 ```
 
 
@@ -163,7 +183,11 @@ def ag_train_cifar(args, reporter):
 ### Create the Scheduler and Launch the Experiment
 
 ```{.python .input}
+<<<<<<< HEAD
 myscheduler = ag.scheduler.FIFOScheduler(ag_train_cifar,
+=======
+myscheduler = ag.scheduler.FIFOScheduler(ag_train_mnist,
+>>>>>>> origin/master
                                          resource={'num_cpus': 4, 'num_gpus': 1},
                                          num_trials=2,
                                          time_attr='epoch',

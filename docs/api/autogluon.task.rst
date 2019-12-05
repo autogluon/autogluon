@@ -4,40 +4,43 @@
 autogluon.task
 ===============
 
-.. admonition:: Example
+.. admonition:: Example (image classification task):
    
-   Import AutoGluon and Image Classification task:
+   Tell AutoGluon that task is image classification:
    
    >>> import autogluon as ag
    >>> from autogluon import ImageClassification as task
    
-   Download a toy dataset:
+   Load a toy image dataset:
    
    >>> filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
-
-   Start Fitting:
-
-   >>> classifier = task.fit(dataset, epochs=2)
-
-   Evaluate on Test Dataset:
    
+   Fit classification models:
+   
+   >>> classifier = task.fit(dataset, epochs=2)
+   
+<<<<<<< HEAD
+=======
+   Evaluate predictions on test data:
+   
+>>>>>>> origin/master
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
-   >>> print('Top-1 test acc: %.3f' % test_acc)
-   Top-1 test acc: 0.506
+
 
 .. automodule:: autogluon.task
 
-AutoGluon Applications
-----------------------
+AutoGluon Tasks
+-----------------
 
 .. autosummary::
    :nosignatures:
 
    ImageClassification
    ObjectDetection
+   TabularPrediction
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,7 +65,27 @@ AutoGluon Applications
 
     .. autoautosummary:: ObjectDetection
         :methods:
+<<<<<<< HEAD
 
+=======
+        
+
+:hidden:`TabularPrediction`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPrediction
+   :members:
+   :no-inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TabularPrediction
+        :methods:
+
+Image Classification Datasets
+-----------------------------
+>>>>>>> origin/master
 
 .. automodule:: autogluon.task.image_classification
 
@@ -105,3 +128,19 @@ AutoGluon Applications
 
     .. autoautosummary:: RecordDataset
         :attributes:
+<<<<<<< HEAD
+=======
+
+Tabular Datasets
+-----------------------------
+
+.. automodule:: autogluon.task.tabular_prediction
+
+:hidden:`TabularDataset`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularDataset
+   :no-inherited-members:
+
+
+>>>>>>> origin/master
