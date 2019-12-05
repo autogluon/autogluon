@@ -82,7 +82,7 @@ namely the weights of the neural network classifier.
 
 Validation Set: A separate validation set (sometimes also called the dev set)
 is also used during AutoGluon's training process. While neural network weights are updated based on the training data, 
-each neural network requires the user to specify many hyperparameters (eg. learning rates, etc.) that will greatly affect the training process.  AutoGluon automatically tries many different values of these hyperparameters and evaluates each hyperparameter setting by measuring the performance of the resulting network on the validation set.
+each neural network requires the user to specify many hyperparameters (e.g., learning rates, etc.) that will greatly affect the training process.  AutoGluon automatically tries many different values of these hyperparameters and evaluates each hyperparameter setting by measuring the performance of the resulting network on the validation set.
 
 Test Set: A separate set of images, possibly without available labels. These data are never used during any part of the model construction or learning process. If unlabeled, these may correspond to images whose labels we would like to predict. If labeled, these images may correspond to images we reserve for estimating the performance of our final model.
 
@@ -95,7 +95,7 @@ AutoGluon automatically does Training/Validation split:
 # dataset = task.Dataset('./data/shopeeiet/train')
 ```
 
-AutoGluon will automatically infer how many classes there are based on the directory structure. 
+AutoGluon automatically infers how many classes there are based on the directory structure. 
 By default, AutoGluon automatically constructs the training/validation set split:
 
 - Training Set: 80% of images.
@@ -111,7 +111,7 @@ All you have to do is simply call the `fit` function.
 Due to the large size of the Kaggle dataset and time constraints of this demo,
 we don't recommend directly running `fit` here since it will take a while to execute.
 
-On your own, please feel free to try running the following commands with small time limits (just uncomment the code):
+On your own, try running the following commands with small time limits (just uncomment the code):
 
 ```{.python .input}
 # time_limits = 10 * 60 # 10mins
@@ -125,7 +125,7 @@ The top-1 accuracy of the best model on the validation set is:
 # print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
-###  Using AutoGluon to generate predictions on test images 
+###  Using AutoGluon to Generate Predictions on Test Images 
 
 We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
@@ -154,7 +154,7 @@ If you wish to upload the model's predictions to Kaggle, here is how to convert 
 # ag.utils.generate_csv(inds, './data/shopeeiet/submission.csv')
 ```
 
-will produce a submission file located at: `./data/shopeeiet/submission.csv`.
+This produces a submission file located at: `./data/shopeeiet/submission.csv`.
 
 To see an example submission, check out the file `sample submission.csv` at this link: [Data](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data).
 

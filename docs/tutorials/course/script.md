@@ -5,9 +5,9 @@ In this tutorial, we are showing the example of doing HPO using AutoGluon on any
 python scripts. AutoGluon is a framework agnostic HPO toolkit, which is compatible with
 any training code written in python. See also :ref:`sec_customstorch`.
 
-## Start with A Fine-tuning Example
+## Start with a Fine-tuning Example
 
-Import the basic packages, such as numpy, mxnet and gluoncv.
+Import the basic packages, such as numpy, mxnet and gluoncv:
 
 ```{.python .input}
 import os
@@ -18,7 +18,7 @@ from mxnet import gluon, init
 from autogluon.task.image_classification.nets import get_built_in_network
 ```
 
-Define a function for dataset meta data
+Define a function for dataset meta data:
 
 ```{.python .input}
 def get_dataset_meta(dataset, basedir='./datasets'):
@@ -33,7 +33,7 @@ def get_dataset_meta(dataset, basedir='./datasets'):
     return num_classes, rec_train, rec_train_idx, rec_val, rec_val_idx
 ```
 
-Define the test/evaluation function
+Define the test/evaluation function:
 
 
 ```{.python .input}
@@ -48,7 +48,7 @@ def test(net, val_data, ctx, batch_fn):
     return metric.get()
 ```
 
-Define the training loop.  This is a transfer learning script adapted from gluoncv tutorial:
+Define the training loop. This is a transfer learning script adapted from gluoncv tutorial:
 
 
 ```{.python .input}
@@ -92,14 +92,14 @@ def train_loop(args, reporter):
         _, val_acc = test(net, val_data, ctx, batch_fn)
 
         if reporter is not None:
-            # reporter enables communicatons with autogluon
+            # reporter enables communications with autogluon
             reporter(epoch=epoch, accuracy=val_acc)
         else:
             print('[Epoch %d] Train-acc: %.3f | Val-acc: %.3f' %
                   (epoch, train_acc, val_acc))
 ```
 
-### How to do HPO using AutoGluon on any training function?
+### How to Do HPO Using AutoGluon on any Training Function
 
 ```{.python .input}
 import autogluon as ag
@@ -125,7 +125,7 @@ def train_finetune(args, reporter):
     return train_loop(args, reporter)
 ```
 
-### Create the scheduler and launch the experiment
+### Create the Scheduler and Launch the Experiment
 
 ```{.python .input}
 myscheduler = ag.scheduler.FIFOScheduler(train_finetune,

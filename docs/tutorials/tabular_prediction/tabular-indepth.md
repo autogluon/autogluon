@@ -45,7 +45,7 @@ hyperparameters = {'NN': nn_options, 'GBM': gbm_options} # hyperparameters of ea
 feature_prune = False # whether or not to perform feature selection (fit may take a while if True)
 time_limits = 2*60 # train various models for under ~2 min
 num_trials = 3 # try at most 3 different hyperparameter configurations for each type of model
-nthreads_per_trial = 1 # use this many CPU threads per training trial (ie. evaluation of one hyperparameter configuration)
+nthreads_per_trial = 1 # use this many CPU threads per training trial (i.e., evaluation of one hyperparameter configuration)
 search_strategy = 'skopt' # to tune hyperparameters using SKopt Bayesian optimization routine
 output_directory = 'agModels-predictOccupation' # folder where to store trained models
 
@@ -78,4 +78,4 @@ print(datapoint)
 y_pred = predictor.predict(datapoint)
 ```
 
-In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things.
+In the previous example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things.

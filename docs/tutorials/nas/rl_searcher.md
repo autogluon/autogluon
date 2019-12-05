@@ -44,7 +44,7 @@ plt.show()
 
 ### Customize Train Function
 
-We can simply define any function with a decorator `@ag.args` whichs converts the function to
+We can define any function with a decorator `@ag.args`, which converts the function to
 AutoGluon searchable. The `reporter` is used to communicate with AutoGluon search algorithms.
 
 ```{.python .input}
@@ -89,7 +89,7 @@ rl_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), rl_scheduler.get_best_reward()))
 ```
 
-### Compare the performance
+### Compare the Performance
 
 Get the result history:
 
