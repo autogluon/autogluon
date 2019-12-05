@@ -1,4 +1,3 @@
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
@@ -8,6 +7,7 @@ from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
+from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
 
 
 def get_preset_models(path, problem_type, objective_func, num_classes=None,
@@ -62,35 +62,9 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
         )
     if rf_options is not None:
-        params = {'n_estimators': 300, 'n_jobs': -1}
-        params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
-        params_gini = params.copy()
-        params_gini['criterion'] = 'gini'
-        models.append(
-            RFModel(path=path, name='RandomForestClassifierGini', model=RandomForestClassifier(**params_gini), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=rf_options.copy()),
-        )
-        params_entro = params.copy()
-        params_entro['criterion'] = 'entropy'
-        models.append(
-            RFModel(path=path, name='RandomForestClassifierEntr', model=RandomForestClassifier(**params_entro), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=rf_options.copy()),
-        )
+        models += rf_classifiers(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if xt_options is not None:
-        params = {'n_estimators': 300, 'n_jobs': -1}
-        params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
-        params_gini = params.copy()
-        params_gini['criterion'] = 'gini'
-        models.append(
-            RFModel(path=path, name='ExtraTreesClassifierGini', model=ExtraTreesClassifier(**params_gini), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=xt_options.copy()),
-        )
-        params_entro = params.copy()
-        params_entro['criterion'] = 'entropy'
-        models.append(
-            RFModel(path=path, name='ExtraTreesClassifierEntr', model=ExtraTreesClassifier(**params_entro), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=xt_options.copy()),
-        )
+        models += xt_classifiers(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
         knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
@@ -105,7 +79,21 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             KNNModel(path=path, name='KNeighborsClassifierDist', model=KNeighborsClassifier(**knn_dist_params), problem_type=problem_type,
                      objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
-
+    if gbm_options is not None:
+        models.append(
+            LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
+                     objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
+        )
+    if nn_options is not None:
+        models.append(
+            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
+                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
+        )
+    if cat_options is not None:
+        models.append(
+            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
+                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
     models += [
         # LGBModel(path=path, name='LGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, num_classes=num_classes, hyperparameters=lgb_get_param_baseline(problem_type, num_classes=num_classes)),
         # NNTabularModel(path=path, name='GrailNNTabularModel', params=nn_get_param_baseline(problem_type), problem_type=problem_type, objective_func=objective_func),  # OG fast.ai model. TODO: remove!
@@ -127,6 +115,24 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
     rf_options = hyperparameters.get('RF', None)
     xt_options = hyperparameters.get('XT', None)
     knn_options = hyperparameters.get('KNN', None)
+    if rf_options is not None:
+        models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
+    if xt_options is not None:
+        models += xt_regressors(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
+    if knn_options is not None:
+        # TODO: Combine uniform and distance into one model when doing HPO
+        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
+        knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        models.append(
+            KNNModel(path=path, name='KNeighborsRegressorUnif', model=KNeighborsRegressor(**knn_unif_params), problem_type=problem_type,
+                    objective_func=objective_func, hyperparameters=knn_options.copy()),
+        )
+        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
+        knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        models.append(
+            KNNModel(path=path, name='KNeighborsRegressorDist', model=KNeighborsRegressor(**knn_dist_params), problem_type=problem_type,
+                     objective_func=objective_func, hyperparameters=knn_options.copy()),
+        )
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
@@ -141,50 +147,6 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
         models.append(
             CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
-        )
-    if rf_options is not None:
-        params = {'n_estimators': 300, 'n_jobs': -1}
-        params.update(rf_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
-        params_mse = params.copy()
-        params_mse['criterion'] = 'mse'
-        models.append(
-            RFModel(path=path, name='RandomForestRegressorMSE', model=RandomForestRegressor(**params_mse), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=rf_options.copy()),
-        )
-        params_mae = params.copy()
-        params_mae['criterion'] = 'mae'
-        models.append(
-            RFModel(path=path, name='RandomForestRegressorMAE', model=RandomForestRegressor(**params_mae), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=rf_options.copy()),
-        )
-    if xt_options is not None:
-        params = {'n_estimators': 300, 'n_jobs': -1}
-        params.update(xt_options.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
-        params_mse = params.copy()
-        params_mse['criterion'] = 'mse'
-        models.append(
-            RFModel(path=path, name='ExtraTreesRegressorMSE', model=ExtraTreesRegressor(**params_mse), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=xt_options.copy()),
-        )
-        params_mae = params.copy()
-        params_mae['criterion'] = 'mae'
-        models.append(
-            RFModel(path=path, name='ExtraTreesRegressorMAE', model=ExtraTreesRegressor(**params_mae), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=xt_options.copy()),
-        )
-    if knn_options is not None:
-        # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
-        knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
-        models.append(
-            KNNModel(path=path, name='KNeighborsRegressorUnif', model=KNeighborsRegressor(**knn_unif_params), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=knn_options.copy()),
-        )
-        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
-        knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
-        models.append(
-            KNNModel(path=path, name='KNeighborsRegressorDist', model=KNeighborsRegressor(**knn_dist_params), problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
     models += [
         # Good GBDT
