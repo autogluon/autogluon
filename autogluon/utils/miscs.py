@@ -1,8 +1,11 @@
+import os
 import warnings
 
 __all__ = ['in_ipynb', 'warning_filter']
 
 def in_ipynb():
+    if 'AG_DOCS' in os.environ and os.environ['AG_DOCS']:
+        return False
     try:
         cfg = get_ipython().config 
         if 'IPKernelApp' in cfg:

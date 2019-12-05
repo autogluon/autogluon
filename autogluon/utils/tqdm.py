@@ -1,4 +1,3 @@
-import os
 import sys
 from .miscs import in_ipynb
 
@@ -247,11 +246,5 @@ class mytqdm(base):
         # void -> avoid extraneous `\n` in IPython output cell
         return
 
-def use_my_tqdm():
-    if 'AG_DOCS' in os.environ and os.environ['AG_DOCS']:
-        return False
-    elif in_ipynb():
-        return True
-    return False
 
-tqdm = mytqdm if use_my_tqdm() else base
+tqdm = mytqdm if in_ipynb() else base
