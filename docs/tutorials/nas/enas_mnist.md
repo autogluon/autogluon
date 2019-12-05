@@ -92,7 +92,7 @@ y = mynet.evaluate_latency(x)
 Show the latencies:
 
 ```{.python .input}
-print('Average latency is {}, latency of the current architecutre is {}'.format(mynet.avg_latency, mynet.latency))
+print('Average latency is {:.2f} ms, latency of the current architecutre is {:.2f} ms'.format(mynet.avg_latency, mynet.latency))
 ```
 
 We also provide number of params
@@ -112,7 +112,7 @@ Construct experiment scheduler, which automatically cretes a RL controller based
 
 ```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn, batch_size=128,
+                           reward_fn=reward_fn, batch_size=128, num_gpus=1,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
                            plot_frequency=10, update_arch_frequency=5)
 ```
@@ -134,7 +134,7 @@ mynet.graph
 reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.8)
 mynet.initialize(force_reinit=True)
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',
-                           reward_fn=reward_fn, batch_size=128,
+                           reward_fn=reward_fn, batch_size=128, num_gpus=1,
                            warmup_epochs=0, epochs=1, controller_lr=3e-3,
                            plot_frequency=10, update_arch_frequency=5)
 scheduler.run()
@@ -143,14 +143,4 @@ scheduler.run()
 The resulting architecture is:
 ```{.python .input}
 mynet.graph
-```
-
-## Defining a Complicated Network
-
-Can we define a more complicated network than just sequential?
-
-
-Finish and exit:
-```{.python .input}
-ag.done()
 ```

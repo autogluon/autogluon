@@ -75,27 +75,42 @@ class ObjectDetection(BaseTask):
             ):
 
         """
-        Auto fit on image object detection dataset
-        Args:
-            dataset (str or autogluon.task.ImageClassification.Dataset): Training dataset.
-            net (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): Network candidates.
-            optimizer (str, autogluon.AutoGluonObject, or ag.space.Categorical of AutoGluonObject): optimizer candidates.
-            metric (str or object): observation metric.
-            loss (object): training loss function.
-            num_trials (int): number of trials in the experiment.
-            time_limits (int): training time limits in seconds.
-            resources_per_trial (dict): Machine resources to allocate per trial.
-            savedir (str): Local dir to save training results to.
-            search_strategy (str): Search Algorithms ('random', 'bayesopt' and 'hyperband')
-            resume (bool): If checkpoint exists, the experiment will resume from there.
-        Example:
-            >>> dataset = task.Dataset(train_path='~/data/train',
-            >>>                        test_path='data/test')
-            >>> results = task.fit(dataset,
-            >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-            >>>                    time_limits=time_limits,
-            >>>                    ngpus_per_trial=1,
-            >>>                    num_trials = 4)
+        Auto fit on object detection dataset
+
+        Parameters
+        ----------
+        dataset : str or :meth:`autogluon.task.ObjectDectection.Dataset`
+            Training dataset.
+        net : str, :class:`autogluon.AutoGluonObject`
+            Network candidates.
+        optimizer : str, :class:`autogluon.AutoGluonObject`
+            optimizer candidates.
+         metric : str or object
+            observation metric.
+        loss : mxnet.gluon.loss
+            training loss function.
+        num_trials : int
+            number of trials in the experiment.
+        time_limits : int
+            training time limits in seconds.
+        resources_per_trial : dict
+            Machine resources to allocate per trial.
+        savedir : str
+            Local dir to save training results to.
+        search_strategy : str or callable
+            Search Algorithms ('random', 'bayesopt' and 'hyperband')
+        resume : bool, default False
+            If checkpoint exists, the experiment will resume from there.
+
+        Examples
+        --------
+        >>> dataset = task.Dataset(train_path='~/data/train',
+        >>>                        test_path='data/test')
+        >>> results = task.fit(dataset,
+        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                    time_limits=time_limits,
+        >>>                    ngpus_per_trial=1,
+        >>>                    num_trials = 4)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps

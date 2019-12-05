@@ -1,14 +1,22 @@
 import os
 import math
 import pickle
+import numpy as np
+from PIL import Image
+
 import mxnet as mx
 import matplotlib.pyplot as plt
 from mxnet.gluon.data.vision import transforms
 
+from ...core import AutoGluonObject
 from .utils import *
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
 from ...utils import save, load, tqdm
+from ...utils.pil_transforms import *
+
+__all__ = ['Classifier']
+
 class Classifier(BasePredictor):
     """
     Classifier returned by task.fit()
@@ -54,35 +62,55 @@ class Classifier(BasePredictor):
 
     def predict(self, X, input_size=224, plot=True):
         """ This method should be able to produce predictions regardless if:
-            X = single data example (e.g. single image, single document),
-            X = batch of many examples, X = task.Dataset object
+            X = single data example (e.g. single image),
+            X = task.Dataset object
         """
         """The task predict function given an input.
-         Args:
-            img: the input
-         Example:
-            >>> ind, prob = classifier.predict('example.jpg')
+        Parameters
+        ----------
+            X : str or :func:`autogluon.task.ImageClassification.Dataset`
+                path to the input image or dataset
+        Example:
+        >>> ind, prob = classifier.predict('example.jpg')
         """
-        # load and display the image
-        img = mx.image.imread(X) if isinstance(X, str) and os.path.isfile(X) else X
-        if plot:
-            plt.imshow(img.asnumpy())
-            plt.show()
         # model inference
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
         resize = int(math.ceil(input_size / 0.875))
-        transform_fn = transforms.Compose([
-                transforms.Resize(resize),
-                transforms.CenterCrop(input_size),
-                transforms.ToTensor(),
+        transform_fn = Compose([
+                Resize(resize),
+                CenterCrop(input_size),
+                ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
-        img = transform_fn(img)
-        proba = self.predict_proba(img)
-        ind = mx.nd.argmax(proba, axis=1).astype('int')
-        idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
-                          ind.astype('float32'))
-        return ind, mx.nd.gather_nd(proba, idx)
+        def predict_img(img):
+            # load and display the image
+            proba = self.predict_proba(img)
+            ind = mx.nd.argmax(proba, axis=1).astype('int')
+            idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
+                              ind.astype('float32'))
+            probai = mx.nd.gather_nd(proba, idx)
+            return ind, probai
+        if isinstance(X, str) and os.path.isfile(X):
+            img = self.loader(X)
+            if plot:
+                plt.imshow(np.array(img))
+                plt.show()
+            img = transform_fn(img)
+            return predict_img(img)
+        if isinstance(X, AutoGluonObject):
+            X = X.init()
+        inds, probas = [], []
+        for x in X:
+            ind, proba = predict_img(x)
+            inds.append(ind)
+            probas.append(proba)
+        return inds, probas
+
+    @staticmethod
+    def loader(path):
+        with open(path, 'rb') as f:
+            img = Image.open(f)
+            return img.convert('RGB')
 
     def predict_proba(self, X):
         """ Produces predicted class probabilities if we are dealing with a classification task.
@@ -106,9 +134,9 @@ class Classifier(BasePredictor):
         metric = get_metric_instance(args.metric)
         input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
-        _, test_data, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, False)
-        tbar = tqdm(enumerate(test_data))
-        for i, batch in tbar:
+        test_data, _, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, True, None)
+        tbar = tqdm(test_data)
+        for batch in tbar:
             self.eval_func(net, batch, batch_fn, metric, ctx)
             _, test_reward = metric.get()
             tbar.set_description('{}: {}'.format(args.metric, test_reward))
@@ -122,7 +150,7 @@ class Classifier(BasePredictor):
         raise NotImplemented
 
     @staticmethod
-    def _format_results(results):
+    def _format_results(results): # TODO: remove since this has been moved to base_predictor.py
         def _merge_scheduler_history(training_history, config_history, reward_attr):
             trial_info = {}
             for tid, config in config_history.items():
@@ -141,8 +169,8 @@ class Classifier(BasePredictor):
         training_history = results.pop('training_history')
         config_history = results.pop('config_history')
         results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                              results['reward_attr'])
-        results[results['reward_attr']] = results.pop('best_reward')
+                                                         results['reward_attr'])
+        results[results['reward_attr']] = results['best_reward']
         results['search_space'] = results['metadata'].pop('search_space')
         results['search_strategy'] = results['metadata'].pop('search_strategy')
         return results

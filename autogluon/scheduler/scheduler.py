@@ -16,24 +16,20 @@ from ..utils import DeprecationHelper, AutoGluonWarning
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['TaskScheduler', 'DistributedTaskScheduler']
+__all__ = ['TaskScheduler']
 
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
     """
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
-    REMOTE_MANAGER = None
+    REMOTE_MANAGER = RemoteManager()
     def __init__(self, dist_ip_addrs=None):
         if dist_ip_addrs is None:
             dist_ip_addrs=[]
         cls = TaskScheduler
-        if cls.REMOTE_MANAGER is None:
-            cls.REMOTE_MANAGER = RemoteManager()
-            cls.RESOURCE_MANAGER.add_remote(
-                cls.REMOTE_MANAGER.get_remotes())
         remotes = cls.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
-        cls.RESOURCE_MANAGER.add_remote(remotes)
+        cls.RESOURCE_MANAGER.add_remote(cls.REMOTE_MANAGER.get_remotes())
         self.scheduled_tasks = []
         self.finished_tasks = []
         self.env_sem = DistSemaphore(1)
@@ -70,7 +66,7 @@ class TaskScheduler(object):
         """Adding a training task to the scheduler.
 
         Args:
-            task (:class:`autogluon.scheduler.Task`): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new training task
 
         Relevant entries in kwargs:
         - bracket: HB bracket to be used. Has been sampled in _promote_config
@@ -232,6 +228,3 @@ class TaskScheduler(object):
         reprstr = self.__class__.__name__ + '(\n' + \
             str(self.RESOURCE_MANAGER) +')\n'
         return reprstr
-
-
-DistributedTaskScheduler = DeprecationHelper(TaskScheduler, 'DistributedTaskScheduler')
