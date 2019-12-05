@@ -123,7 +123,7 @@ class AbstractTrainer:
         except IndexError:
             return -1
 
-    def get_models(self, hyperparameters):
+    def get_models(self, hyperparameters, hyperparameter_tune=False):
         raise NotImplementedError
 
     def get_model_level(self, model_name):
