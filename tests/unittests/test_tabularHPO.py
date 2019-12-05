@@ -34,7 +34,7 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 ############ Benchmark options you can set: ########################
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 fast_benchmark = True # False
-hyperparameter_tune = False
+hyperparameter_tune = True
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
 # performance_value warnings are disabled when fast_benchmark = True.
@@ -97,7 +97,7 @@ toyclassif_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datas
  # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
 datasets = [toyregres_dataset, toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
 
-def test_tabular():
+def test_tabularHPO():
     # Aggregate performance summaries obtained in previous benchmark run:
     prev_perf_vals = [dataset['performance_val'] for dataset in datasets]
     previous_avg_performance = np.mean(prev_perf_vals)
@@ -180,4 +180,4 @@ def test_tabular():
         warnings.warn(w.message)
 
 if __name__ == '__main__':
-    test_tabular()
+    test_tabularHPO()
