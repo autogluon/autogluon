@@ -33,16 +33,16 @@ stage("Build Docs") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         conda env remove -n autogluon_docs
         conda env create -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         export PYTHONPATH=\${PWD}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export AG_DOCS=1
         git clean -fx
-        pip install git+https://github.com/zhanghang1989/d2l-book
         pip install --upgrade --force-reinstall .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
