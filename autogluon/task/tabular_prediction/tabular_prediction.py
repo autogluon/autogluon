@@ -61,7 +61,7 @@ class TabularPrediction(BaseTask):
                                'RF': {'n_estimators': 1000},
                                'XT': {'n_estimators': 1000},
                                'KNN': {},
-                               'custom': {'GBM'},
+                               'custom': ['GBM'],
                               },
             time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
@@ -103,12 +103,28 @@ class TabularPrediction(BaseTask):
             Whether or not to perform feature selection
         hyperparameters : (dict) 
             Keys are strings that indicate which model types to train.
-                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest).
-                If certain key is missing from hyperparameters, then fit() will not train any models of that type.
+                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees)
+                If certain key is missing from hyperparameters, then fit() will not train any models of that type. 
+                Set `hyperparameters = { 'NN':{...} }` if say you only want to train a neural network and no other types of models.
             Values = dict of hyperparameter settings for each model type. 
                 Each hyperparameter can be fixed value or search space. For full list of options, please see # TODO: link. # TODO: create documentation file describing all models and  all hyperparameters. 
                 Hyperparameters not specified will be set to default values (or default search spaces if hyperparameter_tune=True). 
                 Caution: Any provided search spaces will be overriden by fixed defauls if hyperparameter_tune=False. 
+            
+            Note: `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
+            If `hyperparameter_tune = False`, then these additional models will also be trained using custom pre-specified hyperparameter settings that often work well.
+            
+            Details regarding the hyperparameters you can specify for each model:
+                NN: See file autogluon/utils/tabular/ml/models/tabular_nn/hyperparameters/parameters.py
+                GBM: See file autogluon/utils/tabular/ml/models/lgb/hyperparameters/parameters.py 
+                     and the lightGBM docs: https://lightgbm.readthedocs.io/en/latest/Parameters.html
+                CAT: See file autogluon/utils/tabular/ml/models/catboost/hyperparameters/parameters.py 
+                     and the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
+                RF: n_estimators is currently the only hyperparameter you can specify, 
+                    see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html 
+                XT: n_estimators is currently the only hyperparameter you can specify, 
+                    see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
+        
         holdout_frac : (float) 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if num_bagging_folds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used. 
