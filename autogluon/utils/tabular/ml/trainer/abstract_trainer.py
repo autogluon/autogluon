@@ -333,8 +333,8 @@ class AbstractTrainer:
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
 
-        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
-        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
+        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
+        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
 
     def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None):
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1],
