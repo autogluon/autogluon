@@ -6,7 +6,7 @@ In this tutorial, we are going to compare RL searcher with random search in a si
 ## A Toy Reward Space
 
 Input Space `x = [0: 99], y = [0: 99]`.
-The rewards is a combination of 2 gaussians as shown in the following figure:
+The rewards are a combination of 2 gaussians as shown in the following figure:
 
 ```{.python .input}
 import numpy as np
