@@ -5,7 +5,6 @@ dependencies:
 - pip:
   - jupyter-sphinx>=0.2.2
   - mxnet-cu100==1.5.0b20190331
-  - https://github.com/zhanghang1989/d2l-book
   - portalocker
   - nose
   - docutils
