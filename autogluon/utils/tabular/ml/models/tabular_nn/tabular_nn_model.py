@@ -280,7 +280,7 @@ class TabularNeuralNetModel(AbstractModel):
         if self.verbosity <= 1:
             verbose_eval = -1  # Print losses every verbose epochs, Never if -1
         elif self.verbosity == 2:
-            verbose_eval = 20
+            verbose_eval = 50
         elif self.verbosity == 3:
             verbose_eval = 10
         else:

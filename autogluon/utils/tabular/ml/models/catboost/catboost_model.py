@@ -75,12 +75,22 @@ class CatboostModel(AbstractModel):
         # print('Catboost Model params:')
         # print(self.model.get_params())
 
-        # TODO: Add more control over these params (specifically verbose and early_stopping_rounds)
+        # TODO: Add more control over these params (specifically early_stopping_rounds)
+        verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 1:
+            verbose = False
+        elif verbosity == 2:
+            verbose = 50
+        elif verbosity == 3:
+            verbose = 10
+        else:
+            verbose = True
+
         self.model.fit(
             X_train, Y_train,
             cat_features=cat_features,
             eval_set=eval_set,
-            verbose=20,
+            verbose=verbose,
             early_stopping_rounds=early_stopping_rounds,
         )
 

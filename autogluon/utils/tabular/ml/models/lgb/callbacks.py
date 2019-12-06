@@ -188,8 +188,8 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
 
             model_size_memory_ratio = estimated_model_size_mb / available_mb
             if verbose or (model_size_memory_ratio > 0.25):
-                logging.debug('Available Memory:', available_mb, 'MB')
-                logging.debug('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                logging.debug('Available Memory: '+str(available_mb)+' MB')
+                logging.debug('Estimated Model Size: '+str(estimated_model_size_mb)+' MB')
 
             early_stop = False
             if model_size_memory_ratio > 1.0:
