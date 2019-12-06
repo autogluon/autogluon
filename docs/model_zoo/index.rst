@@ -1,5 +1,5 @@
-NAS Model-Zoo
-=============
+autogluon.model_zoo
+===================
 
 Pretrained Models discovered via Neural Architecture Search
 
@@ -12,7 +12,7 @@ How to load pretrained 'efficientnet_b0'.
 .. code-block:: python
 
    import autogluon as ag
-   model = ag.nas.get_model('efficientnet_b0', pretrained=True)
+   model = ag.model_zoo.get_model('efficientnet_b0', pretrained=True)
 
 
 EfficientNet
@@ -57,7 +57,7 @@ How to reproduce search on EfficientNet?
        width_coefficient=ag.space.Categorical(1.1, 1.2),
        depth_coefficient=ag.space.Categorical(1.1, 1.2),
    )
-   class EfficientNetB1(ag.nas.EfficientNet):
+   class EfficientNetB1(ag.model_zoo.EfficientNet):
        def __init__(self, width_coefficient, depth_coefficient):
            input_factor = 2.0 / width_coefficient / depth_coefficient
            input_size = math.ceil((224 * input_factor) / 32) * 32
