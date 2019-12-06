@@ -12,14 +12,14 @@ class AutoTrainer(AbstractTrainer):
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
                          feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_ensemble_levels=stack_ensemble_levels)
 
-    def get_models(self, hyperparameters={'NN':{},'GBM':{}}):
+    def get_models(self, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,
-                                 num_classes=self.num_classes, hyperparameters=hyperparameters)
+                                 num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
 
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False,
               holdout_frac=0.1, hyperparameters={'NN':{},'GBM':{}}):
         self.hyperparameters = hyperparameters
-        models = self.get_models(hyperparameters)
+        models = self.get_models(hyperparameters, hyperparameter_tune=hyperparameter_tune)
         if self.bagged_mode:
             if (y_test is not None) and (X_test is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_test preds while still bagging? Doubt a user would want this.
