@@ -78,10 +78,3 @@ print(y_singlepred)
 ```
 
 In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things.
-
-
-Finally, don't forget to shutdown AutoGluon's remote workers:
-
-```{.python .input}
-ag.done()
-```
