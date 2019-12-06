@@ -1,6 +1,7 @@
 # Predicting Columns in a Table - In Depth
 
-This tutorial describes how you can exert greater control over `fit()` by specifying the appropriate arguments. Let's start by loading the same census data table, and try to predict the `occupation` variable in order to demonstrate a multi-class classification problem.
+This tutorial describes how you can exert greater control over `fit()` by specifying the appropriate arguments. 
+Let's start by loading the same census data table, and try to predict the `occupation` variable in order to demonstrate a multi-class classification problem.
 
 ```{.python .input}
 import autogluon as ag
@@ -18,8 +19,8 @@ print("Summary of occupation column: \n", train_data['occupation'].describe())
 
 Let's use AutoGluon to train some models, this time exerting greater control over the process via user-specified arguments. To demonstrate how you can provide your own validation dataset against which AutoGluon tunes hyperparameters, we'll use the previous test dataset as validation data this time. If you do not have any particular validation dataset of interest, we recommend omitting the `tuning_data` argument and letting AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation. 
 
-**Caution:** Since AutoGluon tunes internal knobs based on this validation data, performance estimates reported on this data may be over-optimistic. For unbiased performance estimates, you should always call `predict()` on an entirely separate dataset (that was never given to `fit()`), as we did in the previous **Quick-Start** tutorial. 
-
+**Caution:** Since AutoGluon tunes internal knobs based on this validation data, performance estimates reported on this data may be over-optimistic. For unbiased performance estimates, you should always call `predict()` on an entirely separate dataset (that was never given to `fit()`), as we did in the previous **Quick-Start** tutorial. We also emphasize that most options specified in this tutorial are chosen to minimize runtime for the purposes of demonstration and you should select more reasonable values in order to obtain high-quality models.
+ 
 `fit()` trains neural networks and various types of tree ensembles by default, and we can specify various hyperparameter values for each type of model. For each hyperparameter, we can either specify a single fixed value, or a search space of values to consider during the hyperparameter optimization. Hyperparameters which we do not specify are left at default settings chosen by AutoGluon, which may be fixed values or search spaces, depending on the particular hyperparameter and the setting of `hyperparameter_tune`.
 
 ```{.python .input}
@@ -91,7 +92,8 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
 performance = predictor.evaluate(val_data)
 ```
 
-Beyond hyperparameter-tuning and specifying the correct metric, two other methods to boost predictive performance are bagging and stack-ensembling.  You'll often see performance improve if you specify `num_bagging_folds` = 5-10, `stack_ensemble_levels` = 1 or 2 in the call to `fit()`, but this will increase training times.
+Beyond hyperparameter-tuning with a correctly-specified metric, two other methods to boost predictive performance are bagging and stack-ensembling.  You'll often see performance improve if you specify `num_bagging_folds` = 5-10, `stack_ensemble_levels` = 1 or 2 in the call to `fit()`, but this will increase training times.
 
-predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric, num_bagging_folds=5, stack_ensemble_levels=1)
-
+```
+predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric, num_bagging_folds=5, stack_ensemble_levels=1, hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}})
+```
