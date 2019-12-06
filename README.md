@@ -17,7 +17,7 @@ See the [AutoGluon Website](http://autogluon.mxnet.io.s3.amazonaws.com/index.htm
 - [Learning with image data](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/image_classification/beginner.html)
 - [Learning with text data](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/text_classification/beginner.html)
 - [Learning with data in tabular format](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/tabular_prediction/tabular-quickstart.html)
-- And more advanced topics like [Neural Architecture Search](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/nas/index.html)
+- More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/nas/index.html)
 
 
 
