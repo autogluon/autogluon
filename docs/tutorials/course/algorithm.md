@@ -8,7 +8,7 @@
 AutoGluon system includes Searcher, Scheduler and Resource Manager:
 
 - The Searcher suggests configurations for the next training jobs.
-- Scheduler schedule the training job when the computation resources are available.
+- Scheduler schedules the training job when the computation resources are available.
 
 In this tutorial, we illustrate how the search algorithm works and
 compare the performance on a toy experiments.
