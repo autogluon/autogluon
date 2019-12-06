@@ -31,7 +31,8 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
                       hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
     # TODO: Expand options to RF and NN
     if problem_type == REGRESSION:
-        model = RFModel(path=path, name='LinearRegression', model=LinearRegression(), problem_type=problem_type, objective_func=objective_func)
+        model = RFModel(path=path, name='LinearRegression', model=LinearRegression(), 
+                        problem_type=problem_type, objective_func=objective_func)
     else:
         model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
             solver='liblinear', multi_class='auto', max_iter=500,  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
@@ -40,7 +41,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
 
 
 def get_preset_models_classification(path, problem_type, objective_func, num_classes=None,
-                                     hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
     # TODO: define models based on additional keys in hyperparameters
 
     models = []
@@ -50,6 +51,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     rf_options = hyperparameters.get('RF', None)
     xt_options = hyperparameters.get('XT', None)
     knn_options = hyperparameters.get('KNN', None)
+    custom_options = hyperparameters.get('custom', None)
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
@@ -74,8 +76,8 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
         knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
-            KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=knn_options.copy()),
+            KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params), 
+                     problem_type=problem_type, objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
         knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
         knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
@@ -83,30 +85,17 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             KNNModel(path=path, name='KNeighborsClassifierDist', model=KNeighborsClassifier(**knn_dist_params), problem_type=problem_type,
                      objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
-    if gbm_options is not None:
-        models.append(
-            LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
-                     objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
-        )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
-        )
-    if cat_options is not None:
-        models.append(
-            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-                          objective_func=objective_func, hyperparameters=cat_options.copy()),
-        )
-    if not hyperparameter_tune:
-        models += [
-            LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes)),
-
-            # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
-            # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
-            # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
-            # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func),
-        ]
+    
+    if (not hyperparameter_tune) and (custom_options is not None): 
+        # Consider additional models with custom pre-specified hyperparameter settings:
+        if 'GBM' in custom_options:
+            models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, 
+                                num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes))
+                      ]
+        # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
+        # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
+        # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
+        # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func)
 
     return models
 
