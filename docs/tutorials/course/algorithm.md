@@ -58,7 +58,7 @@ scheduler.get_training_curves(plot=True, use_legend=False)
 
 ### Hyperband Scheduler
 
-the Hyperband Scheduler terminates training trials that don't appear promising during the early stages to free up compute resources for more promising hyperparameter configurations.
+The Hyperband Scheduler terminates training trials that don't appear promising during the early stages to free up compute resources for more promising hyperparameter configurations.
 
 ```{.python .input}
 scheduler = ag.scheduler.HyperbandScheduler(train_fn,
