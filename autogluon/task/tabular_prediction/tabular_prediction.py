@@ -49,7 +49,7 @@ class TabularPrediction(BaseTask):
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
                                'RF': {'n_estimators': 300},
-                               'XT': {'n_estimators': 150},
+                               'XT': {'n_estimators': 300},
                                'KNN': {},
                               },
             time_limits=None, num_trials=None, dist_ip_addrs=[], visualizer='none',

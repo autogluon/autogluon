@@ -18,6 +18,8 @@ stage("Unit Test") {
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip uninstall -y autogluon
+        pip uninstall -y numpy
+        pip install numpy>=1.17.0
         python setup.py develop
         bash tests/run_all.sh
         """
@@ -42,6 +44,8 @@ stage("Build Docs") {
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
+        pip uninstall -y numpy
+        pip install numpy>=1.17.0
         pip install git+https://github.com/zhanghang1989/d2l-book
         python setup.py develop
         cd docs && bash build_doc.sh

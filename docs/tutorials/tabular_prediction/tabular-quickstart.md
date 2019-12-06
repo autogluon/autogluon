@@ -8,7 +8,7 @@ To see this in action, let's load first load training data from a CSV file into 
 import autogluon as ag
 from autogluon import TabularPrediction as task
 
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns Pandas object.
+train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv') # can be local CSV file as well, returns pd.Dataframe-like object.
 train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 ```
@@ -58,6 +58,7 @@ from autogluon import TabularPrediction as task
 predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
 ```
 
+
 ## Description of fit():
 
 Here we provide more details about what happened during `fit()`. 
@@ -67,7 +68,7 @@ AutoGluon automatically infers all this as well as the type of each feature (ie.
 
 As we did not specify separate validation data, AutoGluon automatically choses a random training/validation split of the data. 
 Rather than just a single model, AutoGluon trains many models and ensembles them together to ensure superior predictive performance. 
-By default, AutoGluon tries to fit neural networks and tree ensembles.
+By default, AutoGluon tries to fit various types of models including neural networks and tree ensembles.
 Each type of model has various hyperparameters, which the user would normally need to manually specify, but AutoGluon automatically finds values of these hyperparameters which produce the best performance on the validation data. This involves repeatedly training models under different hyperparameter settings and evaluating their performance, which can get computationally-intensive, so `fit()` can parallelize this process across multiple threads (and machines if distributed resources are available). To control runtimes, you can specify various arguments in fit(): `time_limits` which stops training new models after the specified amount of time (sec) has passed, `num_trials` which specifies how many hyperparameter configurations to try for each type of model. You can also make an individual training run of each model quicker by specifying appropriate arguments as demonstrated in the subsequent **In-Depth** tutorial.
 
 
@@ -90,8 +91,8 @@ print("AutoGluon categorized the features as: ", trainer.feature_types_metadata)
 
 We can also view extremely detailed information about the hyperparameter optimization process, including what was the best hyperparameter configuration for each type of model and how well each hyperparameter configuration performed on the validation data:
 
-```{.python .input}
-import pprint
+```
+import pprint  # will print tons of information so command isn't executed here:
 pprint.PrettyPrinter(indent=2).pprint(trainer.hpo_results)
 ```
 
@@ -105,6 +106,8 @@ print(train_data[label_column].describe())
 predictor_educ = task.fit(train_data=train_data, output_directory="agModels-predictEducation", 
                           label=label_column, hyperparameter_tune=False)
 ```
+
+Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data.
 
 Finally, we need to shutdown AutoGluon's remote workers which `fit()` uses to train multiple models simultaneously in multi-thread / distributed settings. 
 **Important:** you must always execute `ag.done()` after you are done with using AutoGluon in a Python session or Jupyter notebook, as it may not work properly in a new session/notebook otherwise.  After executing `ag.done()` you cannot call `fit()` anymore  without starting a new Python session or notebook. 
