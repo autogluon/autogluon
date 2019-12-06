@@ -117,7 +117,7 @@ class HyperbandScheduler(FIFOScheduler):
     >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
-                 searcher='random', search_options=None,
+                 searcher=None, search_options=None,
                  checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None,
                  time_out=None, max_reward=1.0,
