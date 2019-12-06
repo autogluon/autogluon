@@ -1,4 +1,5 @@
-from catboost import CatBoostClassifier, CatBoostRegressor
+import logging
+from .....try_import import try_import_catboost
 
 from ..abstract.abstract_model import AbstractModel
 from .hyperparameters.parameters import get_param_baseline
@@ -6,6 +7,7 @@ from .catboost_utils import construct_custom_catboost_metric
 from ...constants import PROBLEM_TYPES_CLASSIFICATION
 from ......core import Int, Real
 
+logger = logging.getLogger(__name__)
 
 # TODO: Catboost crashes on multiclass problems where only two classes have significant member count.
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
@@ -13,7 +15,8 @@ from ......core import Int, Real
 class CatboostModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
-
+        try_import_catboost()
+        from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         self.best_iteration = 0
 
@@ -62,8 +65,8 @@ class CatboostModel(AbstractModel):
         for invalid in invalid_params:
             if invalid in self.params:
                 self.params.pop(invalid)
-        print('Catboost Model params:')
-        print(self.params)
+        logger.log(15, 'Catboost model hyperparameters:')
+        logger.log(15, self.params)
 
         self.model = self.model_type(
             **self.params,
@@ -72,12 +75,22 @@ class CatboostModel(AbstractModel):
         # print('Catboost Model params:')
         # print(self.model.get_params())
 
-        # TODO: Add more control over these params (specifically verbose and early_stopping_rounds)
+        # TODO: Add more control over these params (specifically early_stopping_rounds)
+        verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 1:
+            verbose = False
+        elif verbosity == 2:
+            verbose = False
+        elif verbosity == 3:
+            verbose = 20
+        else:
+            verbose = True
+
         self.model.fit(
             X_train, Y_train,
             cat_features=cat_features,
             eval_set=eval_set,
-            verbose=20,
+            verbose=verbose,
             early_stopping_rounds=early_stopping_rounds,
         )
 

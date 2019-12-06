@@ -89,12 +89,11 @@ class BasePredictor(ABC):
         results_file = output_directory + RESULTS_FILENAME
         json.dump(self.results, open(results_file, 'w'))
 
-    @abstractmethod
     def _save_model(self, output_directory):
         """ Internal helper function: Save self.model object to file located in output_directory.
             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def predict(self, X):

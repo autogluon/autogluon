@@ -1,5 +1,8 @@
+import logging
+
 from ..sklearn.sklearn_model import SKLearnModel
 
+logger = logging.getLogger(__name__)
 
 # TODO: Pass in num_classes?
 class KNNModel(SKLearnModel):
@@ -13,9 +16,9 @@ class KNNModel(SKLearnModel):
         spaces = {}
         return spaces
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
-
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test)
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        # verbosity = kwargs.get('verbosity', 2)
+        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
         hpo_model_performances = {self.name: self.score(X_test, Y_test)}
         hpo_results = {}
         self.save()

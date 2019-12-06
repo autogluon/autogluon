@@ -1,10 +1,8 @@
-from pandas import DataFrame, Series
+import copy, time, traceback, logging
 from typing import List
 import numpy as np
 import pandas as pd
-import copy
-import time
-import traceback
+from pandas import DataFrame, Series
 from collections import defaultdict
 from sklearn.model_selection import train_test_split
 
@@ -21,6 +19,7 @@ from ..trainer.model_presets.presets import get_preset_stacker_model
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 
+logger = logging.getLogger(__name__)
 
 # TODO: Add post-fit cleanup function which loads all models and saves them after removing unnecessary variables such as oof_pred_probas to optimize load times and space usage
 #  Trainer will not be able to be fit further after this operation is done, but it will be able to predict.
@@ -30,10 +29,12 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, stack_ensemble_levels=0):
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, 
+                 stack_ensemble_levels=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
+        self.verbosity = verbosity
         if objective_func is not None:
             self.objective_func = objective_func
         elif self.problem_type == BINARY:
@@ -44,8 +45,13 @@ class AbstractTrainer:
             self.objective_func = root_mean_squared_error
 
         self.objective_func_expects_y_pred = scorer_expects_y_pred(scorer=self.objective_func)
+        logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.objective_func.name)
+        if not self.objective_func_expects_y_pred:
+            logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
+        logger.log(20, "To change this, specify the eval_metric argument of fit()")
         self.num_classes = num_classes
+        self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
         self.bagged_mode = True if kfolds >= 2 else False
         if self.bagged_mode:
@@ -123,7 +129,7 @@ class AbstractTrainer:
         except IndexError:
             return -1
 
-    def get_models(self, hyperparameters):
+    def get_models(self, hyperparameters, hyperparameter_tune=False):
         raise NotImplementedError
 
     def get_model_level(self, model_name):
@@ -173,11 +179,12 @@ class AbstractTrainer:
     def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, level=0):
         if kfolds is None:
             kfolds = self.kfolds
-        print('Fitting', model.name, '...')
+        logging.log(20, 'Fitting model: '+str(model.name)+' ...')
         model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
-            model_fit_kwargs = {'num_cpus': self.scheduler_options['resource']['num_cpus'],
+            model_fit_kwargs = {'verbosity': self.verbosity, 
+                                'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
@@ -201,17 +208,17 @@ class AbstractTrainer:
             pred_end_time = time.time()
         except Exception as err:
             traceback.print_tb(err.__traceback__)
-            print('Warning: Exception caused ' + model.name + ' to fail during training... Skipping model.')
-            print(err)
+            logger.exception('Warning: Exception caused ' +str(model.name)+' to fail during training... Skipping this model.')
+            logger.debug(err)
             del model
         else:
             stack_loc[level].append(model.name)
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
-            print('Score of ' + model.name + ':', score)
-            print('Fit Runtime:  ', model.name, '=', fit_end_time - fit_start_time, 's')
-            print('Score Runtime:', model.name, '=', pred_end_time - fit_end_time, 's')
+            logger.log(15, 'Performance of ' +str(model.name)+': '+str(score))
+            logger.log(15, 'Training runtime of '+str(model.name)+ ' = '+str(fit_end_time - fit_start_time)+' s')
+            logger.log(15, 'Evaluation runtime of '+str(model.name)+ ' = '+str(pred_end_time - fit_end_time)+' s')
             # TODO: Should model have fit-time/pred-time information?
             # TODO: Add to HPO
             self.model_fit_times[model.name] = fit_end_time - fit_start_time
@@ -229,7 +236,8 @@ class AbstractTrainer:
             if self.low_memory:
                 del model
 
-    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, hyperparameter_tune=True, stack_loc=None, kfolds=None, level=0):
+    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
+                          hyperparameter_tune=True, stack_loc=None, kfolds=None, level=0):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
@@ -242,11 +250,11 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
                 hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                                                                                            Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options))
+                    Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
             except Exception as err:
                 traceback.print_tb(err.__traceback__)
-                print('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping model.')
-                print(err)
+                logger.exception('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping this model.')
+                logger.debug(err)
                 del model
             else:
                 self.hpo_model_names[level] += list(sorted(hpo_models.keys()))
@@ -284,7 +292,7 @@ class AbstractTrainer:
             if model_name not in self.model_performance:
                 model = self.load_model(model_name)
                 self.model_performance[model_name] = model.score(X_test, y_test)
-            print("Performance of %s model: %s" % (model_name, self.model_performance[model_name]))
+            logger.log(15, "Performance of %s model: %s" % (model_name, self.model_performance[model_name]))
         if len(self.models_level[0]) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
@@ -325,8 +333,8 @@ class AbstractTrainer:
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
 
-        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
-        self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
+        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
+        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
 
     def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None):
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1],
@@ -404,7 +412,7 @@ class AbstractTrainer:
         X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
         feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=y_holdout)
         features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
-        print(features_to_keep)
+        logger.debug(str(features_to_keep))
         model_base.features = features_to_keep
         # autotune.evaluate()
 
