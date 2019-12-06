@@ -90,6 +90,8 @@ Select your preferences and run the install command.
 
            .. container:: cpu
 
+              The following MXNet package requires a Python 3.7 environment.
+
               .. code-block:: bash
 
                  pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
@@ -105,6 +107,8 @@ Select your preferences and run the install command.
 
            .. container:: cpu
 
+              The following MXNet package requires a Python 3.7 environment.
+
               .. code-block:: bash
 
                  pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
@@ -118,4 +122,3 @@ Select your preferences and run the install command.
                  # Please build mxnet from source manually
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
-
