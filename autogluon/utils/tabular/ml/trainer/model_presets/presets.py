@@ -52,21 +52,6 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     xt_options = hyperparameters.get('XT', None)
     knn_options = hyperparameters.get('KNN', None)
     custom_options = hyperparameters.get('custom', None)
-    if gbm_options is not None:
-        models.append(
-            LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
-                     objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
-        )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
-        )
-    if cat_options is not None:
-        models.append(
-            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-                          objective_func=objective_func, hyperparameters=cat_options.copy()),
-        )
     if rf_options is not None:
         models += rf_classifiers(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if xt_options is not None:
@@ -85,8 +70,22 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             KNNModel(path=path, name='KNeighborsClassifierDist', model=KNeighborsClassifier(**knn_dist_params), problem_type=problem_type,
                      objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
-    
-    if (not hyperparameter_tune) and (custom_options is not None): 
+    if gbm_options is not None:
+        models.append(
+            LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
+                     objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
+        )
+    if nn_options is not None:
+        models.append(
+            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
+                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
+        )
+    if cat_options is not None:
+        models.append(
+            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
+                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
+    if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
         if 'GBM' in custom_options:
             models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, 
@@ -100,7 +99,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     return models
 
 
-def get_preset_models_regression(path, problem_type, objective_func, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+def get_preset_models_regression(path, problem_type, objective_func, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
     models = []
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
@@ -108,6 +107,7 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
     rf_options = hyperparameters.get('RF', None)
     xt_options = hyperparameters.get('XT', None)
     knn_options = hyperparameters.get('KNN', None)
+    custom_options = hyperparameters.get('custom', None)
     if rf_options is not None:
         models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if xt_options is not None:
@@ -141,13 +141,9 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
             CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
         )
-    if not hyperparameter_tune:
-        models += [
-            # Good GBDT
-            LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, hyperparameters=get_param_baseline_custom(problem_type)),
-            # NNTabularModel(path=path, name='GrailNNTabularModel', problem_type=problem_type, objective_func=objective_func),
-
-            # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
-        ]
+    if (not hyperparameter_tune) and (custom_options is not None):
+        if 'GBM' in custom_options:
+            models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, hyperparameters=get_param_baseline_custom(problem_type))]
+        # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
 
     return models
