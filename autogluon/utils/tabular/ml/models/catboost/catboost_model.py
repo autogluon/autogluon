@@ -1,3 +1,5 @@
+from .....try_import import try_import_catboost
+try_import_catboost()
 from catboost import CatBoostClassifier, CatBoostRegressor
 
 from ..abstract.abstract_model import AbstractModel
