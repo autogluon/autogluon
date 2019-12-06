@@ -1,5 +1,8 @@
 import logging
+import platform
 from multiprocessing import cpu_count
+
+_is_osx = platform.system() == "Darwin"
 
 __all__ = ['Resources', 'DistributedResource',
            'get_cpu_count', 'get_gpu_count', 
@@ -91,6 +94,9 @@ def get_cpu_count():
     return cpu_count()
 
 def get_gpu_count():
+    if _is_osx:
+        import pynvx
+        return pynvx.cudaDeviceGetCount()
     from .nvutil import cudaInit, cudaDeviceGetCount, cudaShutdown
     if not cudaInit(): return 0
     gpu_count = cudaDeviceGetCount()
