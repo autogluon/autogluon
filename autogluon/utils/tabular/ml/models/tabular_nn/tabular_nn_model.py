@@ -417,6 +417,7 @@ class TabularNeuralNetModel(AbstractModel):
         Returns:
             Dataset object
         """
+        warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
         if set(df.columns) != set(self.features):
             raise ValueError("Column names in provided Dataframe do not match self.features")
         if labels is not None and len(labels) != len(df):

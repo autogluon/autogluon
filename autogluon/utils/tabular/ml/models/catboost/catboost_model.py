@@ -80,7 +80,7 @@ class CatboostModel(AbstractModel):
         if verbosity <= 1:
             verbose = False
         elif verbosity == 2:
-            verbose = 200
+            verbose = False
         elif verbosity == 3:
             verbose = 20
         else:
