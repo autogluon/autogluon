@@ -1,5 +1,5 @@
+import datetime, json, warnings, logging
 from collections import OrderedDict 
-import datetime, json, warnings
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
@@ -15,6 +15,7 @@ from ...utils.savers import save_pkl, save_pd
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 
+logger = logging.getLogger(__name__)
 
 # TODO: - Semi-supervised learning
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
@@ -33,7 +34,6 @@ class AbstractLearner:
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator = feature_generator
-
         self.feature_generators = [self.feature_generator]
 
         self.trainer: AbstractTrainer = None
@@ -53,13 +53,13 @@ class AbstractLearner:
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
-            feature_prune=False, holdout_frac=0.1, hyperparameters={}):
+            feature_prune=False, holdout_frac=0.1, hyperparameters={}, verbosity=2):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
     def predict_proba(self, X_test: DataFrame, inverse_transform=True, sample=None):
         ##########
-        # Enable below for local testing
+        # Enable below for local testing # TODO: do we want to keep sample option?
         if sample is not None:
             X_test = X_test.head(sample)
         ##########
@@ -85,7 +85,7 @@ class AbstractLearner:
             X_id = X_test[self.submission_columns]
             X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
             X_test_cache_miss = X_test[~X_test.index.isin(X_in_cache_with_pred.index)]
-            print('found', len(X_in_cache_with_pred), '/', len(X_test), 'rows with cached prediction')
+            logger.log(20, 'Using cached predictions for '+str(len(X_in_cache_with_pred))+' out of '+str(len(X_test))+' rows, which have already been predicted previously. To make new predictions, set use_pred_cache=False')
         else:
             X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
             X_test_cache_miss = X_test
@@ -96,7 +96,7 @@ class AbstractLearner:
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_test_cache_miss.index
         else:
-            print('all X_test rows found in cache, no need to load model...')
+            logger.debug('All X_test rows found in cache, no need to load model')
             return X_in_cache_with_pred[self.label].values
             
         if add_to_pred_cache:
@@ -136,7 +136,7 @@ class AbstractLearner:
             else:
                 # Log loss
                 if -1 in y.unique():
-                    raise ValueError('Multiclass scoring with ' + self.objective_func.name + ' does not support unknown classes.')
+                    raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
                 return trainer.score(X=X, y=y)
         else:
             return trainer.score(X=X, y=y)
@@ -194,8 +194,8 @@ class AbstractLearner:
                     else:
                         scores[model_name] = self.objective_func(y, pred_proba)
 
-        print('MODEL SCORES:')
-        print(scores)
+        logger.debug('MODEL SCORES:')
+        logger.debug(str(scores))
         return scores
 
     def get_pred_probas_models(self, X, trainer, model_names):
@@ -234,7 +234,7 @@ class AbstractLearner:
         perf = self.objective_func(y_true, y_pred)
         metric = self.objective_func.name
         if not silent:
-            print("Evaluation: %s on test data: %f" % (metric, perf))
+            logger.log(20, "Evaluation: %s on test data: %f" % (metric, perf))
         if not auxiliary_metrics:
             return perf
         # Otherwise compute auxiliary metrics:
@@ -265,8 +265,8 @@ class AbstractLearner:
                 if metric_name not in perf_dict:
                     perf_dict[metric_name] = cl_metric(y_true, y_pred)
         if not silent:
-            print("Evaluations on test data:")
-            print(json.dumps(perf_dict, indent=4))
+            logger.log(20, "Evaluations on test data:")
+            logger.log(20, json.dumps(perf_dict, indent=4))
         if detailed_report and (self.problem_type != REGRESSION):
             # One final set of metrics to report
             cl_metric = lambda y_true,y_pred: classification_report(y_true,y_pred, output_dict=True)
@@ -274,8 +274,8 @@ class AbstractLearner:
             if metric_name not in perf_dict:
                 perf_dict[metric_name] = cl_metric(y_true, y_pred)
                 if not silent:
-                    print("Detailed (per-class) classification report:")
-                    print(json.dumps(perf_dict[metric_name], indent=4))
+                    logger.log(20, "Detailed (per-class) classification report:")
+                    logger.log(20, json.dumps(perf_dict[metric_name], indent=4))
         return perf_dict
 
     def extract_label(self, X):
@@ -326,7 +326,7 @@ class AbstractLearner:
         unique_vals = y.unique()
         num_rows = len(y)
         # print(unique_vals)
-        print('First 10 unique y values:', unique_vals[:10])
+        logger.log(20, 'Here are the first 10 unique label values in your data:  '+str(unique_vals[:10]))
         unique_count = len(unique_vals)
         MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
         if num_rows > 1000:
@@ -366,8 +366,8 @@ class AbstractLearner:
                 reason = "dtype of label-column == int and many unique label-values observed"
         else:
             raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
-        print("\nAutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
-        print("If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s'])\n" % (BINARY, MULTICLASS, REGRESSION))
+        logger.log(25, "AutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
+        logger.log(25, "If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s'])\n" % (BINARY, MULTICLASS, REGRESSION))
         return problem_type
 
     def save(self):

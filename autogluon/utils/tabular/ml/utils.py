@@ -1,16 +1,17 @@
+import gc, os, multiprocessing, logging
 import numpy as np
 from pandas import DataFrame, Series
-import gc
-import os, multiprocessing
-import mxnet as mx
 from datetime import datetime
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
+import mxnet as mx
 
 from .constants import BINARY, REGRESSION
 from ..utils.savers import save_pd
 from ..utils.decorators import calculate_time
 from ....scheduler.resource import get_gpu_count
 from ...try_import import try_import_lightgbm
+
+logger = logging.getLogger(__name__)
 
 
 def get_pred_from_proba(y_pred_proba, problem_type=BINARY):
@@ -152,7 +153,7 @@ def construct_dataset_lowest_memory(X: DataFrame, y: Series, location, reference
 
     cat_columns_index = [columns.index(cat) for cat in cat_columns]
 
-    print('saving...', location + '.csv')
+    logger.log(15, 'Saving... '+str(location)+'.csv')
     save_pd.save(path=location + '.csv', df=X, header=False, index=True)
 
     xgtrain = lgb.Dataset(location + '.csv', label=y, params=params, reference=reference, categorical_feature=cat_columns_index,
@@ -173,9 +174,9 @@ def setup_outputdir(output_directory):
     if output_directory is None:
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
-        output_directory = "learners/ag-" + timestamp + '/'
+        output_directory = "AutogluonModels/ag-" + timestamp + '/'
         os.makedirs(output_directory)
-        print("No output_directory specified. Models will be saved in: %s" % output_directory)
+        logger.log(25, "No output_directory specified. Models will be saved in: %s" % output_directory)
     output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists
     if output_directory[-1] != '/':
         output_directory = output_directory + '/'
@@ -189,7 +190,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
             ngpus_per_trial = 0 # do not use GPU by default
     if ngpus_per_trial > 1:
         ngpus_per_trial = 1
-        print("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
+        logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
     return (nthreads_per_trial, ngpus_per_trial)
 
 

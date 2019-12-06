@@ -1,7 +1,8 @@
-import os
+import os, logging
 
 POINTER_SUFFIX = '.pointer'
 
+logger = logging.getLogger(__name__)
 
 # TODO: Add S3 support
 def save(path, content_path, verbose=True):
@@ -12,4 +13,4 @@ def save(path, content_path, verbose=True):
     f.close()
 
     if verbose:
-        print('Saved pointer file to', path, 'pointing to', content_path)
+        logger.log(15, 'Saved pointer file to '+str(path)+' pointing to '+str(content_path))

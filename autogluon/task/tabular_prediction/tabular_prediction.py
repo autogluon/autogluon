@@ -3,7 +3,6 @@ import numpy as np
 
 from .dataset import TabularDataset
 from .predictor import TabularPredictor
-
 from ..base import BaseTask
 from ..base.base_task import schedulers
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
@@ -12,11 +11,11 @@ from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGen
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
 from ...utils.tabular.metrics import CLASSIFICATION_METRICS, REGRESSION_METRICS
 from ...utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from ...utils import verbosity2loglevel
 
 __all__ = ['TabularPrediction']
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger() # return root logger
 
 class TabularPrediction(BaseTask):
     """ 
@@ -27,7 +26,7 @@ class TabularPrediction(BaseTask):
     Predictor = TabularPredictor
     
     @staticmethod
-    def load(output_directory):
+    def load(output_directory, verbosity=2):
         """ 
         Load a predictor object previously produced by fit() from file and returns this object.
         
@@ -35,13 +34,20 @@ class TabularPrediction(BaseTask):
         ----------
         output_directory : (str)
             Path to directory where trained models are stored (ie. the output_directory specified in previous call to fit()).
+        verbosity : (int, default = 2)
+            Verbosity levels range from 0 to 4 and control how much information is generally printed by the loaded Predictor.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
         
         Returns
         -------
         TabularPredictor object.
         """
+        logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
+        
         output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
         return TabularPredictor(learner=learner)
@@ -56,9 +62,9 @@ class TabularPrediction(BaseTask):
                                'XT': {'n_estimators': 300},
                                'KNN': {},
                               },
-            time_limits=None, num_trials=None, dist_ip_addrs=[], visualizer='none',
-            nthreads_per_trial=None, ngpus_per_trial=None,
-            search_strategy='random', search_options={}, **kwargs):
+            time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
+            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
+            verbosity=2, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
         
@@ -112,28 +118,33 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of stack_ensemble_levels+1 (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
             To prevent overfitting, this argument is ignored unless num_bagging_folds is also set >= 2. 
+        time_limits : (int)
+            Approximately how long fit() should run for (wallclock time in seconds). 
+            fit() will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+        num_trials : (int) 
+            Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
+            If both time_limits and num_trials are specified, time_limits takes precedent. 
+            If neither is specified, AutoGluon runs for some fixed amount of time. 
         search_strategy : (str) 
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : (dict)
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
-        time_limits : (int)
-            Approximately how long fit() should run for (wallclock time in seconds). 
-            fit() will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
-        num_trials : (int) 
-            Maximal number of different hyperparameter settings of each model type to evaluate. 
-            If both time_limits and num_trials are specified, time_limits takes precedent. 
-            If neither is specified, AutoGluon runs for some fixed amount of time. 
-        dist_ip_addrs : (list)
-            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        visualizer : (str)
-            Describes method to visualize training progress during fit(). Options: ['mxboard', 'tensorboard', 'none']. 
         nthreads_per_trial : (int)
             How many CPUs to use in each trial (ie. single training run of a model).
             Automatically determined by AutoGluon when = None.
         ngpus_per_trial : (int)
             How many GPUs to use in each trial (ie. single training run of a model). 
             Automatically determined by AutoGluon when = None. 
+        dist_ip_addrs : (list)
+            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+        visualizer : (str)
+            Describes method to visualize training progress during fit(). Options: ['mxboard', 'tensorboard', 'none']. 
+        verbosity: (int, default = 2)
+            Verbosity levels range from 0 to 4 and control how much information is printed during fit().
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
         
         Kwargs can include addtional arguments for advanced users:
             feature_generator_type : (FeatureGenerator class, default=AutoMLFeatureGenerator)
@@ -168,6 +179,19 @@ class TabularPrediction(BaseTask):
         >>> y_pred = predictor.predict(test_data)
         >>> perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
         """
+        if verbosity < 0:
+            verbosity = 0
+        elif verbosity > 4:
+            verbosity = 4
+        
+        logger.setLevel(verbosity2loglevel(verbosity))
+        allowed_kwarg_names = set(['feature_generator_type', 'feature_generator_kwargs', 'trainer_type', 
+                                   'label_count_threshold', 'id_columns'])
+        kwarg_names = list(kwargs.keys())
+        for kwarg_name in kwarg_names:
+            if kwarg_name not in allowed_kwarg_names:
+                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
+        
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
@@ -176,7 +200,7 @@ class TabularPrediction(BaseTask):
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
             # Currently disabled, needs to be updated to align with new model class functionality
-            print('Warning: feature_prune was set to True, but feature_prune does not currently work. Setting to False.')
+            logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
@@ -226,8 +250,10 @@ class TabularPrediction(BaseTask):
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
-            id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
+                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, 
+                          label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, hyperparameters=hyperparameters)
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
+                      hyperparameters=hyperparameters, verbosity=verbosity)
         return TabularPredictor(learner=learner)

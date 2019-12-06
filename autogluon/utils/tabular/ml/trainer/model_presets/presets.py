@@ -1,3 +1,4 @@
+import logging
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
@@ -9,6 +10,8 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
+
+logger = logging.getLogger(__name__)
 
 
 def get_preset_models(path, problem_type, objective_func, num_classes=None,

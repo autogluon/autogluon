@@ -36,6 +36,3 @@ test_data = test_data.drop(labels=[label_column],axis=1) # Delete labels from te
 predictor = task.load(savedir) # Unnecessary, we reload predictor here just to demonstrate how to load previously-trained predictor from file.
 y_pred = predictor.predict(test_data)
 perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
-
-# TODO: remove?
-ag.done() # Turn off autogluon's remote workers. You cannot call fit() with HPO after this within the same python session.

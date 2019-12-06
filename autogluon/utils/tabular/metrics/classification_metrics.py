@@ -1,8 +1,9 @@
+import logging
 import numpy as np
 import scipy as sp
-
 from sklearn.metrics.classification import _check_targets, type_of_target
 
+logger = logging.getLogger(__name__)
 
 def balanced_accuracy(solution, prediction):
     y_type, solution, prediction = _check_targets(solution, prediction)
@@ -86,7 +87,7 @@ def pac_score(solution, prediction):
         maxi = np.nanmax(sol[np.isfinite(sol)])
         mini = np.nanmin(sol[np.isfinite(sol)])
         if maxi == mini:
-            print('Warning, cannot normalize')
+            logger.debug('Warning: cannot normalize array')
             return [solution, prediction]
         diff = maxi - mini
         mid = (maxi + mini) / 2.

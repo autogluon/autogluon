@@ -1,4 +1,4 @@
-import copy
+import copy, logging
 import numpy as np
 
 from ..abstract.abstract_model import AbstractModel
@@ -7,6 +7,7 @@ from ...constants import MULTICLASS, REGRESSION
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
 
+logger = logging.getLogger(__name__)
 
 class BaggedEnsembleModel(AbstractModel):
     def __init__(self, path, name, model_base: AbstractModel, debug=0):

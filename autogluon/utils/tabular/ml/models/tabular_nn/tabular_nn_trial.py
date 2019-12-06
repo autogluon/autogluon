@@ -9,7 +9,6 @@ from .tabular_nn_dataset import TabularNNDataset
 logger = logging.getLogger(__name__) # TODO: Currently unused
 EPS = 10e-8 # small number
 
-
 @args()
 def tabular_nn_trial(args, reporter):
     """ Training and evaluation function used during a single trial of HPO """
