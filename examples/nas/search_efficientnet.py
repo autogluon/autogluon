@@ -19,4 +19,3 @@ results = task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
                    batch_size=32)
 
 print(results)
-ag.done()

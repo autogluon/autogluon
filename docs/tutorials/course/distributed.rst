@@ -84,7 +84,6 @@ A Toy Example
     Plot the results and exit.
 
     >>> scheduler.get_training_curves()
-    >>> ag.done()
 
     .. image:: https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/docs/tutorial/course.distributed.png?raw=true
 

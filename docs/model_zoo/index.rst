@@ -68,4 +68,3 @@ How to reproduce search on EfficientNet?
    task.fit('imagenet', net=EfficientNetB1(), search_strategy='grid',
             optimizer=ag.optimizer.SGD(learning_rate=1e-1, momentum=0.9, wd=1e-4))
 
-   ag.done()

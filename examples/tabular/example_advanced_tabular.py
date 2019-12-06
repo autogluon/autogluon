@@ -12,7 +12,6 @@ savedir = 'ag_hpo_models/' # where to save trained models
 
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, hyperparameter_tune=True, num_trials=10, time_limits=10*60)
 
-ag.done() # Turn off autogluon's remote workers. You cannot call fit() with HPO after this within the same python session.
 trainer = predictor.load_trainer() # use to show summary of training / HPO processes
 print(trainer.hpo_results)
 print(trainer.model_performance)

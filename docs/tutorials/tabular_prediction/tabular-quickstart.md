@@ -107,4 +107,3 @@ predictor_educ = task.fit(train_data=train_data, output_directory="agModels-pred
 ```
 
 Finally, we need to shutdown AutoGluon's remote workers which `fit()` uses to train multiple models simultaneously in multi-thread / distributed settings. 
-**Important:** you must always execute `ag.done()` after you are done with using AutoGluon in a Python session or Jupyter notebook, as it may not work properly in a new session/notebook otherwise.  After executing `ag.done()` you cannot call `fit()` anymore  without starting a new Python session or notebook. 
