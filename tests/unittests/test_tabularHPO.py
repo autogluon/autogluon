@@ -1,25 +1,7 @@
 """ Runs autogluon.tabular on multiple benchmark datasets. 
-    Run this benchmark to assess whether major chances make autogluon better or worse overall.
+    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
-    
-    # TODO: assess that Autogluon has correctly inferred the type of each feature (continuous vs categorical vs text)
-    
-    # TODO: suppress internal AutoGluon print statements, so that only benchmark-info is printed
-    
-    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
-    
-    # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand 
-    - test dataset with just one data point
-    - test dataset where order of columns different than in training data (same column names)
-    - extreme-multiclass classification (500+ classes)
-    - high-dimensional features + low-sample size
-    - high levels of missingness in test data only, no missingness in train data
-    - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
-    - text features in dataset
 """
 import warnings, shutil, os
 import numpy as np
@@ -35,6 +17,7 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 fast_benchmark = True # False
 hyperparameter_tune = True
+verbosity = 2
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
 # performance_value warnings are disabled when fast_benchmark = True.
@@ -134,10 +117,10 @@ def test_tabularHPO():
             if fast_benchmark:
                 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
                     hyperparameter_tune=hyperparameter_tune, hyperparameters=hyperparameters,
-                    time_limits=time_limits, num_trials=num_trials)
+                    time_limits=time_limits, num_trials=num_trials, verbosity=verbosity)
             else:
                 predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                                     hyperparameter_tune=hyperparameter_tune)
+                                     hyperparameter_tune=hyperparameter_tune, verbosity=verbosity)
             results = predictor.fit_summary(verbosity=0)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
