@@ -1,4 +1,4 @@
-from catboost import CatBoostClassifier, CatBoostRegressor
+from .....try_import import try_import_catboost
 
 from ..abstract.abstract_model import AbstractModel
 from .hyperparameters.parameters import get_param_baseline
@@ -13,7 +13,8 @@ from ......core import Int, Real
 class CatboostModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
-
+        try_import_catboost()
+        from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         self.best_iteration = 0
 
