@@ -18,6 +18,8 @@ stage("Unit Test") {
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip uninstall -y autogluon
+        pip uninstall -y numpy
+        pip install numpy>=1.17.0
         python setup.py develop
         bash tests/run_all.sh
         """
