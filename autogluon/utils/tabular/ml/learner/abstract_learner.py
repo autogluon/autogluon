@@ -207,12 +207,14 @@ class AbstractLearner:
             pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
         return pred_probas
 
-    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
+    def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions. 
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
-                detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True) 
+                detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
+                high_always_good (bool): If True, this means higher values of returned metric are ALWAYS superior (so metrics like MSE should be returned negated)
+            
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
@@ -233,6 +235,9 @@ class AbstractLearner:
         
         perf = self.objective_func(y_true, y_pred)
         metric = self.objective_func.name
+        if not high_always_good:
+            sign = self.objective_func._sign
+            perf = perf * sign # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
             logger.log(20, "Evaluation: %s on test data: %f" % (metric, perf))
         if not auxiliary_metrics:

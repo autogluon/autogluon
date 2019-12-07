@@ -19,7 +19,7 @@ logger = logging.getLogger() # return root logger
 
 class TabularPrediction(BaseTask):
     """ 
-    AutoGluon Task for predicting a column of tabular dataset (classification or regression).
+    AutoGluon Task for predicting a column of tabular dataset (classification or regression)
     """
     
     Dataset = TabularDataset
@@ -103,9 +103,9 @@ class TabularPrediction(BaseTask):
             Whether or not to perform feature selection
         hyperparameters : (dict) 
             Keys are strings that indicate which model types to train.
-                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees)
+                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
                 If certain key is missing from hyperparameters, then fit() will not train any models of that type. 
-                Set `hyperparameters = { 'NN':{...} }` if say you only want to train a neural network and no other types of models.
+                Set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type. 
                 Each hyperparameter can be fixed value or search space. For full list of options, please see # TODO: link. # TODO: create documentation file describing all models and  all hyperparameters. 
                 Hyperparameters not specified will be set to default values (or default search spaces if hyperparameter_tune=True). 
@@ -124,7 +124,8 @@ class TabularPrediction(BaseTask):
                     see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html 
                 XT: n_estimators is currently the only hyperparameter you can specify, 
                     see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
-        
+                KNN: Currently no hyperparameters may be specified for k-nearest-neighbors models
+                
         holdout_frac : (float) 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if num_bagging_folds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used. 
@@ -181,20 +182,20 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-            DefaultLearner object. # TODO: link/describe.
-             # TODO: document Learner object with methods: predict(), predict_proba(), score(), evaluate(), load(), save()
+            TabularPredictor object which can make predictions on new data and summarize what happened during fit().
         
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
+        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
         >>> label_column = 'class'
-        >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv') # Another Pandas object
+        >>> predictor = task.fit(train_data=train_data, label=label_column)
+        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
-        >>> perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
+        >>> perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred)
+        >>> results = predictor.fit_summary()
         """
         if verbosity < 0:
             verbosity = 0
