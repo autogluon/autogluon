@@ -175,8 +175,3 @@ myscheduler.get_training_curves(plot=True,use_legend=False)
 print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                myscheduler.get_best_reward()))
 ```
-
-Finish and exit:
-```{.python .input}
-ag.done()
-```

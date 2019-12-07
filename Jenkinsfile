@@ -8,7 +8,8 @@ stage("Unit Test") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_py3 -f docs/build.yml
+        conda env remove -n autogluon_py3
+        conda env create -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -38,6 +39,7 @@ stage("Build Docs") {
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export AG_DOCS=1
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
         pip install --upgrade --force-reinstall -e .

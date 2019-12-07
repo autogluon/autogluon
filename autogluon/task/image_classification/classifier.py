@@ -101,7 +101,7 @@ class Classifier(BasePredictor):
             X = X.init()
         inds, probas = [], []
         for x in X:
-            ind, proba = predict_img(x)
+            ind, proba = predict_img(x[0])
             inds.append(ind)
             probas.append(proba)
         return inds, probas

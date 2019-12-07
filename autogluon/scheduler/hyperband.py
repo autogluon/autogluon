@@ -114,7 +114,6 @@ class HyperbandScheduler(FIFOScheduler):
     >>> scheduler.run()
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
-    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,

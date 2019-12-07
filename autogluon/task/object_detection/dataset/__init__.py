@@ -4,8 +4,7 @@ from .voc import *
 from .coco import *
 
 import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('dataset init info')
+logger = logging.getLogger(__name__)
 
 def get_dataset(dataset_name, *args, **kwargs):
     if dataset_name=="voc":

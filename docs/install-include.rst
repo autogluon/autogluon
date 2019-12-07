@@ -53,7 +53,7 @@ Select your preferences and run the install command.
               .. code-block:: bash
 
                  pip install --upgrade mxnet
-                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
+                 pip install autogluon
 
            .. container:: cuda
 
@@ -62,7 +62,7 @@ Select your preferences and run the install command.
                  # Here we assume CUDA 10.0 is installed. You can change the number
                  # according to your own CUDA version.
                  pip install --upgrade mxnet-cu100
-                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
+                 pip install autogluon
 
         .. container:: source
 
@@ -92,14 +92,16 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
-                 pip install https://autogluon.s3.amazonaws.com/dist/autogluon-0.0.1-py3-none-any.whl
+                 pip install --upgrade mxnet-osx
+                 pip install autogluon
 
            .. container:: cuda
 
+              Please build MXNet from source manually, details in `MXNet Docs<https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
+
               .. code-block:: bash
 
-                  This option is only available by building from source.
+                 pip install autogluon
 
         .. container:: source
 
@@ -107,15 +109,16 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
+                 pip install --upgrade mxnet-osx
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
            .. container:: cuda
 
+              Please build MXNet from source manually, details in `MXNet Docs<https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
+
               .. code-block:: bash
 
-                 # Please build mxnet from source manually
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 

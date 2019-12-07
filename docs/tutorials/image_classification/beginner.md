@@ -53,7 +53,7 @@ Now, we fit a classifier using AutoGluon as follows:
 classifier = task.fit(dataset,
                       epochs=10,
                       ngpus_per_trial=1,
-                      verbose=True)
+                      verbose=False)
 ```
 
 Within `fit`, the dataset is automatically split into training and validation sets.

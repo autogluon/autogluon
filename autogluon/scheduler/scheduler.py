@@ -178,12 +178,15 @@ class TaskScheduler(object):
              AutoGluonWarning)
         self.join_jobs()
 
-    def join_jobs(self):
+    def join_jobs(self, timeout=None):
         """Wait all scheduled jobs to finish
         """
         self._cleaning_tasks()
         for task_dict in self.scheduled_tasks:
-            task_dict['Job'].result()
+            try:
+                task_dict['Job'].result(timeout=timeout)
+            except TimeoutError as e:
+                logger.error(str(e))
             self._clean_task_internal(task_dict)
         self._cleaning_tasks()
 
