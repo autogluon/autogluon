@@ -32,10 +32,10 @@ stage("Build Docs") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
-        export PYTHONPATH=\${PWD}
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
