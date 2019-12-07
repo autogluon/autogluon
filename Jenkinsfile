@@ -8,8 +8,7 @@ stage("Unit Test") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env remove -n autogluon_py3
-        conda env create -n autogluon_py3 -f docs/build.yml
+        conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
@@ -17,7 +16,7 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        pip install --upgrade --force-reinstall .
+        pip install --upgrade --force-reinstall -e .
         bash tests/run_all.sh
         """
       }
@@ -34,15 +33,14 @@ stage("Build Docs") {
         sh """#!/bin/bash
         set -ex
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
-        conda env remove -n autogluon_docs
-        conda env create -n autogluon_docs -f docs/build_contrib.yml
+        conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
         export PYTHONPATH=\${PWD}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
-        pip install --upgrade --force-reinstall .
+        pip install --upgrade --force-reinstall -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
