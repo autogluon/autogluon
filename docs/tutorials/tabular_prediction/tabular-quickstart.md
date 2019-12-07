@@ -13,7 +13,7 @@ train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 ```
 
-Note that we loaded data from a CSV file stored in the cloud (AWS s3 bucket), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (eg. using `wget`).
+Note that we loaded data from a CSV file stored in the cloud (AWS s3 bucket), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using `wget`).
 Each row in the table `train_data` corresponds to a single training example. In this particular dataset, each row corresponds to an individual person, and the columns contain various features reported during a census. 
 
 Let's first try to use these features to predict whether the person's income exceeds 50K or not, which is recorded in the `class` column of this table.
@@ -61,7 +61,7 @@ predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_colum
 
 Here we discuss what happened during `fit()`. 
 Since there are only two possible values of the `class` variable, this was a binary classification problem, for which an appropriate performance metric is *accuracy*.
-AutoGluon automatically infers all this as well as the type of each feature (ie. which columns contain continuous numbers vs. discrete categories), and can also automatically handle common issues like missing data and rescaling feature values.
+AutoGluon automatically infers all this as well as the type of each feature (i.e., which columns contain continuous numbers vs. discrete categories), and can also automatically handle common issues like missing data and rescaling feature values.
 
 
 As we did not specify separate validation data, AutoGluon automatically choses a random training/validation split of the data (the validation data is held-out during training of the individual models and is used to make decisions such as what models/hyperparameter-values are best).  Rather than just a single model, AutoGluon trains many models and ensembles them together to ensure superior predictive performance. 

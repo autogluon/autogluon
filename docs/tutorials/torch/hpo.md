@@ -1,9 +1,9 @@
 # MNIST Training in PyTorch
 :label:`sec_customstorch`
 
-In this tutorial, we are showing an example of doing HPO using AutoGluon using PyTorch.
+In this tutorial, we show an example of how to do HPO using AutoGluon with PyTorch.
 AutoGluon is a framework agnostic HPO toolkit, which is compatible with
-any training code written in python. (The Pytorch code used as an example in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own Pytorch code).
+any training code written in python. (The PyTorch code used as an example in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own PyTorch code).
 
 Import the packages:
 
@@ -17,7 +17,7 @@ import torchvision.transforms as transforms
 from tqdm.auto import tqdm
 ```
 
-## Start with A MNIST Example
+## Start with an MNIST Example
 
 ### Data Transforms
 
@@ -38,11 +38,11 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 
 The following `train_mnist` function represents normal training code a user would write for
 training on MNIST dataset. Python users typically use an argparser for conveniently
-changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
+changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings.
 
 ```{.python .input}
 def train_mnist(args, reporter):
-    # get varibles from args
+    # get variables from args
     lr = args.lr
     wd = args.wd
     epochs = args.epochs
@@ -100,9 +100,9 @@ def train_mnist(args, reporter):
 ```
 ## AutoGluon HPO
 
-In this sectin, we are talking about
+In this section, we cover how to define a searchable network architecture, convert the training function to be searchable, create the scheduler, and then launch the experiment.
 
-### Define A Searchable Network Achitecture
+### Define a Searchable Network Achitecture
 
 Let's define a 'dynamic' network with searchable 
 configurations by simply adding a decorator :func:`autogluon.obj`.
@@ -140,7 +140,7 @@ class Net(nn.Module):
 
 ### Convert the Training Function to Be Searchable
 
-We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
+We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon always selects an actual floating point value to assign to lr so you do not need to make any special modifications to your existing code to accommodate the hyperparameter search.
 
 ```{.python .input}
 @ag.args(

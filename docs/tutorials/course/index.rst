@@ -9,14 +9,14 @@ Tutorials for customizing AutoGluon using advanced APIs.
       :title: Search Space and Decorator
       :link: core.html
 
-      Learn AutoGluon Core API for customized search spaces,
+      Learn how to use the AutoGluon Core API for customized search spaces,
       customize searchable objects, and training functions.
 
    .. card::
       :title: Search Algorithms
       :link: algorithm.html
 
-      Learning AutoGluon built-in search algorithms and
+      Learn how to use AutoGluon built-in search algorithms and
       early-stopping scheduling strategy.
 
    .. card::
@@ -24,7 +24,7 @@ Tutorials for customizing AutoGluon using advanced APIs.
       :link: object.html
 
       Hyperparameter search in customized objects, such as network,
-      dataset and etc.
+      dataset, and etc.
 
    .. card::
       :title: Bring Your Own Training Scripts

@@ -1,7 +1,7 @@
 Text classification
 ===================
 
-AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
+AutoGluon automatically trains many models under thousands of different hyperparameter configurations and then return the best model.
 
 .. container:: cards
 
@@ -9,7 +9,7 @@ AutoGluon will automatically train many models under thousands of different hype
       :title: Quick Start Using FIT
       :link: beginner.html
 
-      Quick start tutorial.
+      Quick start tutorial for text classification.
 
 .. toctree::
    :maxdepth: 1
