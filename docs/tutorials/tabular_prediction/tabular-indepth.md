@@ -1,7 +1,11 @@
 # Predicting Columns in a Table - In Depth
+:label:`sec_tabularadvanced`
 
-This tutorial describes how you can exert greater control over `fit()` by specifying the appropriate arguments. 
-Let's start by loading the same census data table, and try to predict the `occupation` variable in order to demonstrate a multi-class classification problem.
+**Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
+
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` by specifying the appropriate arguments. Using the same census data table as :ref:`sec_tabularquick`, we will try to predict the `occupation` of an individual - a multi-class classification problem. 
+
+Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data. 
 
 ```{.python .input}
 import autogluon as ag
@@ -17,11 +21,13 @@ label_column = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 ```
 
-Let's use AutoGluon to train some models, this time exerting greater control over the process via user-specified arguments. To demonstrate how you can provide your own validation dataset against which AutoGluon tunes hyperparameters, we'll use the previous test dataset as validation data this time. If you do not have any particular validation dataset of interest, we recommend omitting the `tuning_data` argument and letting AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation. 
-
-**Caution:** Since AutoGluon tunes internal knobs based on this validation data, performance estimates reported on this data may be over-optimistic. For unbiased performance estimates, you should always call `predict()` on an entirely separate dataset (that was never given to `fit()`), as we did in the previous **Quick-Start** tutorial. We also emphasize that most options specified in this tutorial are chosen to minimize runtime for the purposes of demonstration and you should select more reasonable values in order to obtain high-quality models.
+ To demonstrate how you can provide your own validation dataset against which AutoGluon tunes hyperparameters, we'll use the test dataset from the previous tutorial as validation data. 
  
-`fit()` trains neural networks and various types of tree ensembles by default, and we can specify various hyperparameter values for each type of model. For each hyperparameter, we can either specify a single fixed value, or a search space of values to consider during the hyperparameter optimization. Hyperparameters which we do not specify are left at default settings chosen by AutoGluon, which may be fixed values or search spaces, depending on the particular hyperparameter and the setting of `hyperparameter_tune`.
+ If you do not wish to provide a validation dataset, it is recommended that you omit the `tuning_data` argument. This lets AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation. 
+
+**Caution:** Since AutoGluon tunes internal knobs based on this validation data, performance estimates reported on this data may be over-optimistic. For unbiased performance estimates, you should always call `predict()` on a separate dataset (that was never passed to `fit()`), as we did in the previous **Quick-Start** tutorial. We also emphasize that most options specified in this tutorial are chosen to minimize runtime for the purposes of demonstration and you should select more reasonable values in order to obtain high-quality models.
+ 
+`fit()` trains neural networks and various types of tree ensembles by default. You can specify various hyperparameter values for each type of model. For each hyperparameter, you can either specify a single fixed value, or a search space of values to consider during the hyperparameter optimization. Hyperparameters which you do not specify are left at default settings chosen by AutoGluon, which may be fixed values or search spaces, depending on the particular hyperparameter and the setting of `hyperparameter_tune`.
 
 ```{.python .input}
 hp_tune = True  # whether or not to do hyperparameter optimization
@@ -54,7 +60,7 @@ predictor = task.fit(train_data=train_data, tuning_data=val_data, label=label_co
                      search_strategy=search_strategy)
 ```
 
-We again demonstrate how to use the trained models to predict on the validation data. We caution again that performance estimates from this data may be biased since it was used to tune hyperparameters.
+We again demonstrate how to use the trained models to predict on the validation data. We caution again that performance estimates from this data may be biased because the same data was used to tune hyperparameters.
 
 ```{.python .input}
 test_data = val_data.copy()
@@ -66,7 +72,7 @@ print("Predictions:  ", list(y_pred)[:5])
 perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=False)
 ```
 
-`predictor` can also make a prediction on just an individual example rather than a full dataset:
+`predictor` can also make a prediction on an individual example rather than a full dataset:
 
 ```{.python .input}
 datapoint = test_data.iloc[[0]]  # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
@@ -74,14 +80,13 @@ print(datapoint)
 print("Prediction:", predictor.predict(datapoint))
 ```
 
-We again view a summary of what happened during fit, which this time shows details of the hyperparameter-tuning process for each type of model:
+Use the following to view a summary of what happened during fit. This command will shows details of the hyperparameter-tuning process for each type of model:
 
 ```{.python .input}
 results = predictor.fit_summary()
 ```
 
-In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times playing with the above settings to better understand how these choices affect things (first comment out the `train_data.head` command to play with a larger dataset). To see more detailed output during `fit()`, you can also pass in the argument: `verbosity = 3`.
-
+In the above example, the predictive performance may be poor because we specified very little training to ensure quick runtimes.  You can call `fit()` multiple times while modifying the above settings to better understand how these choices affect performance outcomes. For example, start by commenting out the `train_data.head` command to train using a larger dataset. To see more detailed output during the execution of `fit()`, you can also pass in the argument: `verbosity = 3`.
 
 Performance in certain applications may be measured by different metrics than the ones AutoGluon optimizes for by default. If you know the metric that counts most in your application, you can specify it as done below:
 
