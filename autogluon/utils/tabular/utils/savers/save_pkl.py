@@ -1,9 +1,5 @@
 # TODO (Nick): Standardize / unify this code with ag.save()
-import os
-import pickle
-import tempfile
-import logging
-import boto3
+import os, pickle, tempfile, logging, boto3
 
 from .. import s3_utils
 
@@ -17,7 +13,7 @@ def save(path, object, format=None, verbose=True):
 
 def save_with_fn(path, object, pickle_fn, format=None, verbose=True):
     if verbose:
-        print('Saving', path)
+        logger.log(15, 'Saving '+str(path))
     if s3_utils.is_s3_url(path):
         format = 's3'
     if format == 's3':
@@ -42,5 +38,5 @@ def save_s3(path: str, obj, pickle_fn, verbose=True):
             config = boto3.s3.transfer.TransferConfig()   # enable multipart uploading for files larger than 8MB
             response = s3_client.upload_fileobj(f, bucket, key, Config=config)
         except:
-            logger.exception('failed to save object')
+            logger.exception('Failed to save object to s3')
             raise

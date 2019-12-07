@@ -8,10 +8,10 @@ from collections import OrderedDict
 
 from .miscs import warning_filter
 
-__all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'mousover_plot']
+__all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'plot_tabular_models', 'mousover_plot']
 
 
-def plot_performance_vs_trials(results, output_directory, filename="PerformanceVsTrials.png"):
+def plot_performance_vs_trials(results, output_directory, save_file="PerformanceVsTrials.png", plot_title=""):
     try:
         import matplotlib.pyplot as plt
         matplotlib_imported = True
@@ -30,9 +30,11 @@ def plot_performance_vs_trials(results, output_directory, filename="PerformanceV
         y.append(max([ordered_val_perfs[j] for j in range(i)])) # best validation performance in trials up until ith one (assuming higher = better)
     fig, ax = plt.subplots()
     ax.plot(x, y)
-    ax.set(xlabel='Completed Trials', ylabel='Best Performance')
+    ax.set(xlabel='Completed Trials', ylabel='Best Performance', title = plot_title)
     if output_directory is not None:
-        fig.savefig(output_directory + filename)
+        outputfile = output_directory + save_file
+        fig.savefig(outputfile)
+        print("Plot of HPO performance saved to file: %s" % outputfile)
     plt.show()
 
 def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels.html', plot_title="Models produced during fit()"):
@@ -43,8 +45,8 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     attr_size = None
     datadict = {'trial_id': sorted(results['trial_info'].keys())}
     datadict['performance'] = [results['trial_info'][trial_id][results['reward_attr']] for trial_id in datadict['trial_id']]
-    datadict['hyperparameters'] = [str(results['trial_info'][trial_id]['config']) for trial_id in datadict['trial_id']]
-    
+    datadict['hyperparameters'] = [_formatDict(results['trial_info'][trial_id]['config']) for trial_id in datadict['trial_id']]
+    hidden_keys = []
     # Determine x-axis attribute:
     if 'latency' in results['metadata']:
         datadict['latency'] = [results['trial_info'][trial_id]['metadata']['latency'] for trial_id in datadict['trial_id']]
@@ -52,7 +54,7 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     else:
         attr_x = list(results['best_config'].keys())[0]
         datadict[attr_x] = [results['trial_info'][trial_id]['config'][attr_x] for trial_id in datadict['trial_id']]
-    
+        hidden_keys.append(attr_x)
     # Determine size attribute:
     if 'memory' in results['metadata']:
         datadict['memory'] = [results['trial_info'][trial_id]['metadata']['memory'] for trial_id in datadict['trial_id']]
@@ -65,8 +67,39 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     
     save_path = output_directory + save_file if output_directory else None
     mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
-                  attr_size=attr_size, save_file=save_path, plot_title=plot_title)
+        attr_size=attr_size, save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+    if save_path is not None:
+        print("Plot summary of models saved to file: %s" % save_file)
 
+def plot_tabular_models(results, output_directory=None, save_file="SummaryOfModels.html", plot_title="Models produced during fit()"):
+    """ Plot dynamic scatterplot of every single model trained during tabular_prediction.fit()
+        Args:
+            results: 
+                Dict created during TabularPredictor.fit_summary().
+                Must at least contain key: 'model_performance'.
+    """
+    hidden_keys = []
+    model_performancedict = results['model_performance']
+    model_names = list(model_performancedict.keys())
+    val_perfs = [model_performancedict[key] for key in model_names]
+    model_types = [results['model_types'][key] for key in model_names]
+    hidden_keys.append(model_types)
+    model_hyperparams = [_formatDict(results['model_hyperparams'][key]) for key in model_names]
+    datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types,
+                'hyperparameters': model_hyperparams}
+    save_path = output_directory + save_file if output_directory else None
+    mousover_plot(datadict, attr_x='model_type', attr_y='performance',
+                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+    if save_path is not None:
+        print("Plot summary of models saved to file: %s" % save_file)
+
+def _formatDict(d):
+    """ Returns dict as string with HTML new-line tags <br> between key-value pairs. """
+    s = ''
+    for key in d:
+        new_s = str(key) + ": " + str(d[key]) + "<br>"
+        s += new_s
+    return s[:-4]
 
 def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, save_file=None, plot_title="",
                   point_transparency = 0.5, point_size=20, default_color="#2222aa", hidden_keys = []):
@@ -74,6 +107,7 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         Args:
             datadict (dict): keys contain attributes, values of lists of data from each attribute to plot (each list index corresponds to datapoint).
                              The values of all extra keys in this dict are considered (string) labels to assign to datapoints when they are moused over.
+                             Apply _formatDict() to any entries in datadict which are themselves dicts.
             attr_x (str): name of column in dataframe whose values are shown on x-axis (eg. 'latency'). Can be categorical or numeric values
             attr_y (str): name of column in dataframe whose values are shown on y-axis (eg. 'validation performance'). Must be numeric values.
             attr_size (str): name of column in dataframe whose values determine size of dots (eg. 'memory consumption'). Must be numeric values.
@@ -108,7 +142,7 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
     if attr_x_is_string:
         attr_x_levels = list(set(datadict[attr_x])) # use this to translate between int-indices and x-values
         og_x_vals = datadict[attr_x][:]
-        attr_x2 = attr_x + "___"
+        attr_x2 = attr_x + "___" # this key must not already be in datadict.
         hidden_keys.append(attr_x2)
         datadict[attr_x2] = [attr_x_levels.index(category) for category in og_x_vals] # convert to ints
     
@@ -146,13 +180,13 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
     else:
         circ = p.circle(attr_x, attr_y, line_color=default_color, line_alpha = point_transparency,
                 fill_color = default_color, fill_alpha=point_transparency, size=point_size, source=source)
-    hover =p.select(dict(type=HoverTool))
-    hover.tooltips = OrderedDict([(key,'@'+key) for key in datadict.keys() if key not in hidden_keys])
+    hover = p.select(dict(type=HoverTool))
+    hover.tooltips = OrderedDict([(key,'@'+key+'{safe}') for key in datadict.keys() if key not in hidden_keys])
     # Format axes:
     p.xaxis.axis_label = attr_x
     p.yaxis.axis_label = attr_y
     if attr_x_is_string: # add x-ticks:
-        p.xaxis.ticker = range(len(attr_x_levels))
+        p.xaxis.ticker = list(range(len(attr_x_levels)))
         p.xaxis.major_label_overrides = {i: attr_x_levels[i] for i in range(len(attr_x_levels))}
     
     # Legend additions:

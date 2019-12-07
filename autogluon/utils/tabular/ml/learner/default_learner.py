@@ -1,13 +1,13 @@
-
+import copy, logging
 from pandas import DataFrame
 import pandas as pd
-import copy
 
 from .abstract_learner import AbstractLearner
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 from ..trainer.auto_trainer import AutoTrainer
 
+logger = logging.getLogger(__name__)
 
 # TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)
 # TODO: - Differentiate between advanced generators that require fit (stateful, gl_code_matrix) and those that do not (bucket label averaging in SCOT GC 2019)
@@ -23,7 +23,8 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0, hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}):
+            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0, 
+            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -49,7 +50,9 @@ class DefaultLearner(AbstractLearner):
             low_memory=True,
             kfolds=num_bagging_folds,
             stack_ensemble_levels=stack_ensemble_levels,
-            scheduler_options=scheduler_options)
+            scheduler_options=scheduler_options,
+            verbosity = verbosity
+        )
 
         self.trainer_path = trainer.path
         if self.objective_func is None:
@@ -73,7 +76,7 @@ class DefaultLearner(AbstractLearner):
         missinglabel_indicators = X[self.label].isna().tolist()
         missinglabel_inds = [i for i,j in enumerate(missinglabel_indicators) if j]
         if len(missinglabel_inds) > 0:
-            print("Dropping %s (out of %s) training examples for which the label value in column '%s' is missing" % (len(missinglabel_inds),n, self.label))
+            logger.warning("Warning: Ignoring %s (out of %s) training examples for which the label value in column '%s' is missing" % (len(missinglabel_inds),n, self.label))
         X = X.drop(missinglabel_inds, axis=0)
 
         if self.problem_type is None:
@@ -94,7 +97,7 @@ class DefaultLearner(AbstractLearner):
         if X_test is not None and self.label in X_test.columns:
             X_test = self.cleaner.transform(X_test)
             if len(X_test) == 0:
-                print('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
+                logger.debug('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
                 X_test = None
                 y_test = None
             else:
@@ -106,7 +109,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         if X_test is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
-            print('Performing general data processing with merged train & test data. Validation performance may not accurately reflect performance on new test data.')
+            logger.log(15, 'Performing general data preprocessing with merged train & valiation data, so validation performance may not accurately reflect performance on new test data')
             X_super = pd.concat([X, X_test], ignore_index=True)
             X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
             X = X_super.head(len(X)).set_index(X.index)

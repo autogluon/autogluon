@@ -205,7 +205,7 @@ class AbstractModel:
             if indice + compute_count > feature_count:
                 compute_count = feature_count - indice
 
-            print(indice)
+            logger.debug(indice)
             x = [X_test.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
             for j, val in enumerate(x):
                 feature = features[indice+j]
@@ -243,9 +243,10 @@ class AbstractModel:
         if self.params is not None:
             self.params.update(def_search_space)
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        # verbosity = kwargs.get('verbosity', 2)
         start_time = time.time()
-        print("Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
+        logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         self._set_default_searchspace()
         params_copy = self.params.copy()
         directory = self.path # also create model directory if it doesn't exist
@@ -270,19 +271,21 @@ class AbstractModel:
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
         else:
-            print("Hyperparameter search space for %s model: " % self.name)
+            logger.log(15, "Hyperparameter search space for %s model: " % self.name)
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
-                    print(hyperparam + ":   " + str(params_copy[hyperparam]))
+                    logger.log(15, str(hyperparam)+ ":   " +str(params_copy[hyperparam]))
 
         model_trial.register_args(dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename, directory=directory, model=self, **params_copy)
         scheduler = scheduler_func(model_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
+            logger.log(15, "Uploading data to remote workers...")
             scheduler.upload_files([train_path, val_path]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             model_trial.update(directory=directory)
+            logger.log(15, "uploaded")
 
         scheduler.run()
         scheduler.join_jobs()
@@ -313,11 +316,11 @@ class AbstractModel:
             hpo_models[trial_model_name] = trial_model_path
             hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
-        print("Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
+        logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
-        print("Best hyperparameter configuration for %s model: " % self.name)
-        print(best_hp)
+        logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
+        logger.log(15, str(best_hp))
         return (hpo_models, hpo_model_performances, hpo_results)
         # TODO: do final fit here?
         # args.final_fit = True
