@@ -1,11 +1,12 @@
+import copy, logging
 import numpy as np
 import pandas as pd
-import copy
 
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ...constants import MULTICLASS
 
+logger = logging.getLogger(__name__)
 
 # TODO: Currently, if this is a stacker above level 1, it will be very slow taking raw input due to each stacker needing to repeat computation on the base models.
     #  To solve this, this model must know full context of stacker, and only get preds once for each required model

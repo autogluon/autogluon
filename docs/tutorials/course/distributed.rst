@@ -99,11 +99,11 @@ AutoGluon distributed schedulers monitors the training process and gather the re
 Any files (such as python scripts and dataset) beyond the main training script need to
 be made accessible. We recommand the following practice:
 
-- Use ``scheduler.upload_files(files_list)`` to upload individual python scripts or small datasets to the excecution folder, so that the main script can import or load.
+- Use ``scheduler.upload_files(files_list)`` to upload individual python scripts or small datasets to the execution folder, so that the main script can import or load.
 
 - Make a python library for many files in the same folder and install it manually on different machine.
 
-- Upload large files (such as dataset) mannually to different machines and share the same absolute filepath, because the tasks can be scheduled to different machines.
+- Upload large files (such as dataset) manually to different machines and share the same absolute filepath, because the tasks can be scheduled to different machines.
 
 
 Distributed Training Setup on AWS EC2
