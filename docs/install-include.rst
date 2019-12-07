@@ -92,7 +92,7 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install mxnet-osx
+                 pip install --upgrade mxnet-osx
                  pip install autogluon
 
            .. container:: cuda
@@ -109,7 +109,7 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install mxnet-osx
+                 pip install --upgrade mxnet-osx
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
