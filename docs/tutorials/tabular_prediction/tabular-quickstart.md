@@ -79,7 +79,7 @@ AutoGluon automatically and iteratively tests values for hyperparameters to prod
 For tabular problems, `fit()` returns a `Predictor` object. Besides inference, this object can also be used to view a summary of what happened during fit.
 
 ```{.python .input}
-predictor.fit_summary()
+results = predictor.fit_summary()
 ```
 
 From this summary, we can see that AutoGluon trained many different types of models as well as an ensemble of the best-performing models.  The summary also describes the actual models that were trained during fit and how well each model performed on the held-out validation data.  We can also view what properties AutoGluon automatically inferred about our prediction task:
@@ -91,6 +91,7 @@ print("AutoGluon categorized the features as: ", predictor.feature_types)
 
 AutoGluon correctly recognized our prediction problem to be a binary classification task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects.
 
+## Regression (predicting numeric table columns):
 
 To demonstrate that `fit()` can also automatically handle regression tasks, we now try to predict the numeric `age` variable in the same table based on the other features:
 

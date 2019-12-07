@@ -50,7 +50,7 @@ def train_fn(args, reporter):
 
 def test_search_space():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
-                                           resource={'num_cpus': 4, 'num_gpus': 0},
+                                           resource={'num_cpus': 8, 'num_gpus': 0},
                                            num_trials=10,
                                            reward_attr='accuracy',
                                            time_attr='epoch')

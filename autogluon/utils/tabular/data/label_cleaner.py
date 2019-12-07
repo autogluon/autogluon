@@ -113,7 +113,7 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {'f': 0, 't': 1}
         else:
             self.inv_map: dict = {self.unique_values[0]: 0, self.unique_values[1]: 1}
-            # logger.log(20, 'Note: Your binary classification problem has no recognized values in dependent variable. AutoGluon arbitrarily selects which y-value represents positive vs negative class...')
+            logger.log(15, 'Note: For your binary classification, AutoGluon arbitrarily selects which label-value represents positive vs negative class')
         poslabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 1][0]
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
         logger.log(20, 'Selected class <--> label mapping:  class 1 = %s, class 0 = %s' % (poslabel, neglabel))
