@@ -6,8 +6,10 @@ from .abstract_learner import AbstractLearner
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 from ..trainer.auto_trainer import AutoTrainer
+from ..constants import BINARY
 
 logger = logging.getLogger(__name__)
+
 
 # TODO: Add functionality for advanced feature generators such as gl_code_matrix_generator (inter-row dependencies, apply to train differently than test, etc., can only run after train/test split, rerun for each cv fold)
 # TODO: - Differentiate between advanced generators that require fit (stateful, gl_code_matrix) and those that do not (bucket label averaging in SCOT GC 2019)
@@ -43,7 +45,7 @@ class DefaultLearner(AbstractLearner):
 
         trainer = self.trainer_type(
             path=self.model_context,
-            problem_type=self.problem_type,
+            problem_type=self.trainer_problem_type,
             objective_func=self.objective_func,
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
@@ -90,6 +92,10 @@ class DefaultLearner(AbstractLearner):
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
+        if (self.label_cleaner.num_classes is not None) and (self.label_cleaner.num_classes == 2):
+            self.trainer_problem_type = BINARY
+        else:
+            self.trainer_problem_type = self.problem_type
 
         X, y = self.extract_label(X)
         y = self.label_cleaner.transform(y)

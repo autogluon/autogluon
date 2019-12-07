@@ -29,6 +29,7 @@ class AbstractLearner:
         self.submission_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
+        self.trainer_problem_type = None
         self.objective_func = objective_func
         self.is_trainer_present = is_trainer_present
         self.cleaner = None
@@ -40,6 +41,13 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
+
+    @property
+    def class_labels(self):
+        if self.problem_type == MULTICLASS:
+            return self.label_cleaner.ordered_class_labels
+        else:
+            return None
 
     def set_contexts(self, path_context):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
@@ -57,7 +65,7 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, inverse_transform=True, sample=None):
+    def predict_proba(self, X_test: DataFrame, as_pandas=False, inverse_transform=True, sample=None):
         ##########
         # Enable below for local testing # TODO: do we want to keep sample option?
         if sample is not None:
@@ -69,12 +77,17 @@ class AbstractLearner:
         y_pred_proba = trainer.predict_proba(X_test)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
+        if as_pandas:
+            if self.problem_type == MULTICLASS:
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels)
+            else:
+                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label)
         return y_pred_proba
 
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, sample=None, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X_test: DataFrame, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
@@ -92,13 +105,20 @@ class AbstractLearner:
 
         if len(X_test_cache_miss) > 0:
             y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, inverse_transform=False, sample=sample)
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+            if self.trainer_problem_type is not None:
+                problem_type = self.trainer_problem_type
+            else:
+                problem_type = self.problem_type
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_test_cache_miss.index
         else:
             logger.debug('All X_test rows found in cache, no need to load model')
-            return X_in_cache_with_pred[self.label].values
-            
+            y_pred = X_in_cache_with_pred[self.label].values
+            if as_pandas:
+                y_pred = pd.Series(data=y_pred, name=self.label)
+            return y_pred
+
         if add_to_pred_cache:
             X_id_with_y_pred = X_test_cache_miss[self.submission_columns].copy()
             X_id_with_y_pred[self.label] = y_pred
@@ -107,11 +127,14 @@ class AbstractLearner:
             else:
                 pred_cache = pd.concat([X_id_with_y_pred, pred_cache]).drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
             save_pd.save(path=self.pred_cache_path, df=pred_cache)
-        
+
         if len(X_in_cache_with_pred) > 0:
             y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X_test.index)
 
-        return y_pred.values
+        y_pred = y_pred.values
+        if as_pandas:
+            y_pred = pd.Series(data=y_pred, name=self.label)
+        return y_pred
 
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
@@ -147,8 +170,12 @@ class AbstractLearner:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
         y = self.label_cleaner.transform(y)
-        y = y.fillna(-1)
         trainer = self.load_trainer()
+        if self.problem_type == MULTICLASS:
+            y = y.fillna(-1)
+            if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
+                # Log loss
+                raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
         max_level = trainer.max_level
         max_level_auxiliary = trainer.max_level_auxiliary
 
@@ -166,17 +193,21 @@ class AbstractLearner:
                 pred_probas = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_core)
                 for i, model_name in enumerate(model_names_core):
                     pred_proba = pred_probas[i]
+                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
                     if trainer.objective_func_expects_y_pred:
                         pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                         scores[model_name] = self.objective_func(y, pred)
                     else:
                         scores[model_name] = self.objective_func(y, pred_proba)
 
-                ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
+                ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.objective_func)
                 ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
                 oracle_weights = ensemble_selection.weights_
                 oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
                 oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
+                if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                    oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
                 if trainer.objective_func_expects_y_pred:
                     oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
                     scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_ensemble)
@@ -188,6 +219,8 @@ class AbstractLearner:
                 pred_probas_auxiliary = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_aux)
                 for i, model_name in enumerate(model_names_aux):
                     pred_proba = pred_probas_auxiliary[i]
+                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
                     if trainer.objective_func_expects_y_pred:
                         pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                         scores[model_name] = self.objective_func(y, pred)
