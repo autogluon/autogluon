@@ -32,14 +32,11 @@ class TabularPredictor(BasePredictor):
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path=''https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
-        >>> label_column = 'class'
-        >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
-        >>> predictor.fit_summary()
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv') # Another Pandas object
-        >>> predictions = predictor.predict(test_data)
-        >>> performance = predictor.score(test_data)
-        
+        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+        >>> predictor = task.fit(train_data=train_data, label='class')
+        >>> results = predictor.fit_summary()
+        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+        >>> perf = predictor.evaluate(test_data)
     """
     
     def __init__(self, learner):
@@ -123,6 +120,8 @@ class TabularPredictor(BasePredictor):
             Predictive performance value on the given dataset, based on the eval_matric used by this Predictor.
         """
         perf = self._learner.score(dataset)
+        sign = self._learner.objective_func._sign
+        perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
             print("Predictive performance on given dataset: %s = %s" % (self.eval_metric, perf))
         return perf

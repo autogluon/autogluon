@@ -122,7 +122,7 @@ Image Classification Datasets
     .. autoautosummary:: RecordDataset
         :attributes:
 
-Tabular Datasets
+Tabular Data Objects
 -----------------------------
 
 .. automodule:: autogluon.task.tabular_prediction
@@ -133,4 +133,9 @@ Tabular Datasets
 .. autoclass:: TabularDataset
    :no-inherited-members:
 
+:hidden:`TabularPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPredictor
+   :no-inherited-members:
 
