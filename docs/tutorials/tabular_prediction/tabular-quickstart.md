@@ -76,7 +76,6 @@ AutoGluon automates this process.
 
 AutoGluon automatically and iteratively tests values for hyperparameters to produce the best performance on the validation data. This involves repeatedly training models under different hyperparameter settings and evaluating their performance. This process can be computationally-intensive, so `fit()` can parallelize this process across multiple threads (and machines if distributed resources are available). To control runtimes, you can specify various arguments in fit() as demonstrated in the subsequent **In-Depth** tutorial. 
 
-
 For tabular problems, `fit()` returns a `Predictor` object. Besides inference, this object can also be used to view a summary of what happened during fit.
 
 ```{.python .input}
