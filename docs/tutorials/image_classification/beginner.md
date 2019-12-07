@@ -3,9 +3,9 @@
 
 In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs. 
 
-In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to `AutoGluon`'s `fit` function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the best model.
+In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to `AutoGluon`'s [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
-We begin by specifying `image_classification` as our task of interest as follows:
+We begin by specifying [`ImageClassification`](/api/autogluon.task.html#autogluon.task.ImageClassification) as our task of interest as follows:
 
 ```{.python .input}
 import autogluon as ag
@@ -25,7 +25,7 @@ filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.z
 ag.unzip(filename)
 ```
 
-After the dataset is downloaded, we load it into a `Dataset` object: 
+After the dataset is downloaded, we load it into a [`Dataset`](/api/autogluon.task.html#autogluon.task.ImageClassification.Dataset) object: 
 
 ```{.python .input}
 dataset = task.Dataset('data/train')
@@ -83,7 +83,6 @@ if ag.get_gpu_count() > 0:
 ## Evaluate on Test Dataset
 
 We now evaluate the classifier on a test dataset.
-
 
 The validation and test top-1 accuracy are:
 

@@ -1,9 +1,8 @@
 # MNIST Training in PyTorch
 :label:`sec_customstorch`
 
-In this tutorial, we show an example of how to do HPO using AutoGluon with PyTorch.
-AutoGluon is a framework agnostic HPO toolkit, which is compatible with
-any training code written in python. (The PyTorch code used as an example in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own PyTorch code).
+In this tutorial, we demonstrate how to do Hyperparameter Optimization (HPO) using AutoGluon with PyTorch.
+AutoGluon is a framework agnostic HPO toolkit, which is compatible with any training code written in python. The PyTorch code used in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own PyTorch code.
 
 Import the packages:
 
@@ -37,8 +36,8 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 ### Main Training Loop
 
 The following `train_mnist` function represents normal training code a user would write for
-training on MNIST dataset. Python users typically use an argparser for conveniently
-changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings.
+training on MNIST dataset. Python users typically use an argparser to conveniently
+change default values. The only additional argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings.
 
 ```{.python .input}
 def train_mnist(args, reporter):
@@ -104,12 +103,9 @@ In this section, we cover how to define a searchable network architecture, conve
 
 ### Define a Searchable Network Achitecture
 
-Let's define a 'dynamic' network with searchable 
-configurations by simply adding a decorator :func:`autogluon.obj`.
-In this example, we only search two arguments `hidden_conv` and
-`hidden_fc`, which represent the hidden channels in convolutional
-layer and fully connected layer. More info about searchable space
-is available at :meth:`autogluon.space`.
+Let's define a 'dynamic' network with searchable configurations by simply adding a decorator :func:`autogluon.obj`. In this example, we only search two arguments `hidden_conv` and
+`hidden_fc`, which represent the hidden channels in convolutional layer and fully connected layer. 
+More info about searchable space is available at :meth:`autogluon.space`.
 
 ```{.python .input}
 import autogluon as ag
