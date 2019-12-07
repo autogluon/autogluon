@@ -3,11 +3,16 @@
 
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.
 
-These options include: defining the search space of various hyperparameter values regarding to the training of neural networks, specifying how to actually search through this hyperparameter space, and how to schedule each particular job which actually train a network under a particular hyperparameter configuration.
+These options include: 
+- Defining the search space of various hyperparameter values for the training of neural networks
+- Specifying how to search through your choosen hyperparameter space
+- Specifying how to schedule jobs to train a network under a particular hyperparameter configuration.
+
 The advanced functionalities of AutoGluon enable you to use your external knowledge about your particular prediction problem and computing resources to guide the training process. If properly used, you may be able to achieve superior performance within less training time.
 
+**Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We again begin by letting AutoGluon know that `ImageClassification` is the task of interest: 
+We begin by letting AutoGluon know that [`ImageClassification`](/api/autogluon.task.html#autogluon.task.ImageClassification) is the task of interest: 
 
 ```{.python .input}
 import autogluon as ag
@@ -16,7 +21,7 @@ from autogluon import ImageClassification as task
 
 ## Create AutoGluon Dataset
 
-Let's first create the dataset using the same subset of the `Shopee-IET` dataset as before.
+Let's first create the dataset using the same subset of the `Shopee-IET` dataset as the :ref:`sec_imgquick` tutorial.
 Recall that because we only specify the `train_path`, a 90/10 train/validation split is automatically performed.
 
 ```{.python .input}
