@@ -1,6 +1,6 @@
-import copy, sys, re, warnings
-from pandas import DataFrame, Series
+import copy, sys, re, warnings, logging
 import pandas as pd
+from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 import numpy as np
 from collections import defaultdict
@@ -8,6 +8,7 @@ from collections import defaultdict
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
 
+logger = logging.getLogger(__name__)
 
 # TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
 # TODO: Add feature of # of observation counts to high cardinality categorical features
@@ -80,11 +81,10 @@ class AbstractFeatureGenerator:
 
     @staticmethod
     def train_vectorizer(text_list, vectorizer):
-        print('fitting vectorizer...')
+        logger.log(15, 'Fitting vectorizer...')
         transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
         vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
-
-        print('vectorizer fit with', len(vectorizer.vocabulary_), 'vocabulary size')
+        logger.log(15, 'Vectorizer fit with vocabulary size = '+str(len(vectorizer.vocabulary_)))
         return vectorizer, transform_matrix
 
     def preprocess(self, X: DataFrame):
@@ -125,16 +125,16 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
-        print('Feature Generator processed ', X_len, 'data points with', len(self.features), 'features')
-        print('Original Features:')
+        logger.log(15, 'Feature Generator processed '+str(X_len)+' data points with '+str(len(self.features))+' features')
+        logger.log(15, 'Original Features:')
         for key, val in self.feature_type_family.items():
-            print('\t' + key + ' features:', len(val))
-        print('Generated Features:')
+            logger.log(15, '\t ' +str(key) +' features: '+str(len(val)))
+        logger.log(15, 'Generated Features:')
         for key, val in self.feature_types_metadata_generated.items():
-            print('\t' + key + ' features:', len(val))
-        print('All Features:')
+            logger.log(15, '\t ' + str(key) +' features: '+str(len(val)))
+        logger.log(15, 'All Features:')
         for key, val in self.feature_types_metadata_full.items():
-            print('\t' + key + ' features:', len(val))
+            logger.log(15, '\t ' +str(key)+' features: '+str(len(val)))
 
         return X_features
 
@@ -289,13 +289,13 @@ class AbstractFeatureGenerator:
                 type_family = 'datetime'  # TODO: Verify
                 dtype = 'datetime'
                 self.features_datetime.append(column)
-                print('date:', column)
-                print(unique_counts.head(5))
+                logger.debug('date: '+str(column))
+                logger.debug(unique_counts.head(5))
             elif self.check_if_nlp_feature(col_val):
                 self.features_nlp.append(column)
                 self.features_nlp_ratio.append(column)
-                print('nlp:', column)
-                print(unique_counts.head(5))
+                logger.debug('nlp: ' +str(column))
+                logger.debug(unique_counts.head(5))
             # print(is_nlp, '\t', column)
 
             if mark_for_removal:
@@ -378,7 +378,7 @@ class AbstractFeatureGenerator:
             if len(val_list) == 1:
                 self.features_to_remove_post.append(column)
                 self.features_categorical_final = [feature for feature in self.features_categorical_final if feature != column]
-                print('dropping', column)
+                logger.debug('Dropping '+str(column))
             else:
                 X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
         return X_features
@@ -453,8 +453,7 @@ class AbstractFeatureGenerator:
     @staticmethod
     def drop_duplicate_features(X):
         X_without_dups = X.T.drop_duplicates().T
-
-        print(X_without_dups.shape)
+        logger.debug("X_without_dups.shape: "+str(X_without_dups.shape))
 
         columns_orig = X.columns.values
         columns_new = X_without_dups.columns.values
@@ -462,9 +461,9 @@ class AbstractFeatureGenerator:
 
         del X_without_dups
 
-        print('COLUMNS REMOVED')
-        print(columns_removed)
-        print('removed', len(columns_removed), 'duplicate columns...')
+        logger.log(15, 'Warning: duplicate columns removed ')
+        logger.log(15, columns_removed)
+        logger.log(15, 'Removed '+str(len(columns_removed))+' duplicate columns before training models')
 
         return X[columns_new]
 

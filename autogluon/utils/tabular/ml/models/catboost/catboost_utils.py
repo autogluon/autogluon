@@ -2,7 +2,6 @@ import numpy as np
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
 
-
 # TODO: Add weight support?
 # TODO: Can these be optimized? What computational cost do they have compared to the default catboost versions?
 class CustomMetric:

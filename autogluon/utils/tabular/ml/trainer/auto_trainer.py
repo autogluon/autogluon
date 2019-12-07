@@ -1,16 +1,19 @@
+import logging
 import pandas as pd
 
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models
 
+logger = logging.getLogger(__name__)
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_ensemble_levels=0):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, stack_ensemble_levels=0, verbosity=2):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
-                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, stack_ensemble_levels=stack_ensemble_levels)
+                         feature_types_metadata=feature_types_metadata, kfolds=kfolds, 
+                         stack_ensemble_levels=stack_ensemble_levels, verbosity=verbosity)
 
     def get_models(self, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,
@@ -23,7 +26,7 @@ class AutoTrainer(AbstractTrainer):
         if self.bagged_mode:
             if (y_test is not None) and (X_test is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_test preds while still bagging? Doubt a user would want this.
-                print('Warning: Training AutoGluon in Bagged Mode but X_test is specified, concatenating X_train and X_test for CV')
+                logger.debug('Warning: Training AutoGluon in Bagged Mode but X_test is specified, concatenating X_train and X_test for cross-validation')
                 X_train = pd.concat([X_train, X_test], ignore_index=True)
                 y_train = pd.concat([y_train, y_test], ignore_index=True)
             X_test = None

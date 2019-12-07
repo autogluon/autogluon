@@ -1,15 +1,14 @@
+import logging, copy, traceback, psutil
 import pandas as pd
 from pandas import DataFrame
 import numpy as np
-import copy
-import traceback
-import psutil
-# from fastai.tabular.transform import add_datepart
+# from fastai.tabular.transform import add_datepart # TODO: remove
 
 from .abstract_feature_generator import AbstractFeatureGenerator
 from .vectorizers import vectorizer_auto_ml_default
 from .vectorizers import get_ngram_freq, downscale_vectorizer
 
+logger = logging.getLogger(__name__)
 
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, enable_nlp_vectorizer_features=True, enable_nlp_ratio_features=True, enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
@@ -80,8 +79,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
             if not self.fit:
                 features_nlp_to_remove = []
-                print('fitting vectorizer for nlp features:', self.features_nlp)
-
+                logger.log(15, 'Fitting vectorizer for nlp features: '+str(self.features_nlp))
                 for nlp_feature in features_nlp_current:
                     # TODO: Preprocess text?
                     # print('fitting vectorizer for', nlp_feature, '...')
@@ -91,7 +89,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         vectorizer_fit, _ = self.train_vectorizer(text_list, vectorizer_raw)
                         self.vectorizers.append(vectorizer_fit)
                     except ValueError:
-                        print('removing nlp feature')
+                        logger.debug('Removing nlp features due to error')
                         features_nlp_to_remove = self.features_nlp
                     except:
                         raise
@@ -114,7 +112,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 except Exception as err:
                     nlp_failure_count += 1
                     if self.fit:
-                        print('Error: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
+                        logger.exception('Error: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
                         raise
                     traceback.print_tb(err.__traceback__)
 
@@ -128,16 +126,16 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                     if nlp_failure_count >= 3:
                         skip_nlp = True
                     if skip_nlp:
-                        print('Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
-                        print(err)
+                        logger.log(15, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        logger.debug(str(err))
                         self.vectorizers = []
                         self.features_nlp = []
                         self.features_vectorizers = []
                         self.enable_nlp_features = False
                         keep_trying_nlp = False
                     else:
-                        print('Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
-                        print(err)
+                        logger.log(15, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
+                        logger.debug(str(err))
                         downsample_ratio = 0.25
 
         return X_features
@@ -160,14 +158,14 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 if downsample_ratio is None:
                     if predicted_percentage > max_memory_percentage:
                         downsample_ratio = max_memory_percentage / predicted_percentage
-                        print('Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+                        logger.log(15, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
 
                 if downsample_ratio is not None:
                     if (downsample_ratio >= 1) or (downsample_ratio <= 0):
                         raise ValueError('downsample_ratio must be <1 and >0, but downsample_ratio is ' + str(downsample_ratio))
                     vocab_size = len(vectorizer_fit.vocabulary_)
                     downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
-                    print('Reducing Vectorizer vocab size from', vocab_size, 'to', downsampled_vocab_size, 'to avoid OOM error.')
+                    logger.debug('Reducing Vectorizer vocab size from '+str(vocab_size)+' to '+str(downsampled_vocab_size)+' to avoid OOM error')
                     ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
                     downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
                     # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform

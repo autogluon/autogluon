@@ -1,23 +1,7 @@
 """ Runs autogluon.tabular on multiple benchmark datasets. 
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
+    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
-    
-    # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
-    
-    # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
-    
-    # TODO: We'd like to add extra benchmark datasets with the following properties:
-    - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand 
-    - test dataset with just one data point
-    - test dataset where order of columns different than in training data (same column names)
-    - extreme-multiclass classification (500+ classes)
-    - high-dimensional features + low-sample size
-    - high levels of missingness in test data only, no missingness in train data
-    - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
-    - text features in dataset
 """
 import warnings, shutil, os
 import numpy as np
@@ -32,7 +16,7 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 ############ Benchmark options you can set: ########################
 perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
 fast_benchmark = True # False
-hyperparameter_tune = False
+hyperparameter_tune = True
 verbosity = 2
 # If True, run a faster benchmark (subsample training sets, less epochs, etc),
 # otherwise we run full benchmark with default AutoGluon settings.
@@ -96,7 +80,7 @@ toyclassif_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datas
  # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
 datasets = [toyregres_dataset, toyclassif_dataset, binary_dataset, regression_dataset, multi_dataset]
 
-def test_tabular():
+def test_tabularHPO():
     # Aggregate performance summaries obtained in previous benchmark run:
     prev_perf_vals = [dataset['performance_val'] for dataset in datasets]
     previous_avg_performance = np.mean(prev_perf_vals)
@@ -179,4 +163,4 @@ def test_tabular():
         warnings.warn(w.message)
 
 if __name__ == '__main__':
-    test_tabular()
+    test_tabularHPO()
