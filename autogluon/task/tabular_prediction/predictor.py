@@ -90,7 +90,7 @@ class TabularPredictor(BasePredictor):
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
-        return self._learner.predict(X_test=dataset, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X_test=dataset, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
     
     def predict_proba(self, dataset, as_pandas=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -111,7 +111,7 @@ class TabularPredictor(BasePredictor):
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
-        return self._learner.predict_proba(dataset)
+        return self._learner.predict_proba(X_test=dataset, as_pandas=as_pandas)
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.
