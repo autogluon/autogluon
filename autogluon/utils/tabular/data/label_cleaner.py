@@ -6,6 +6,7 @@ from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 
+
 # LabelCleaner cleans labels prior to entering feature generation
 class LabelCleaner:
     @staticmethod
@@ -13,7 +14,10 @@ class LabelCleaner:
         if problem_type == BINARY:
             return LabelCleanerBinary(y)
         elif problem_type == MULTICLASS:
-            return LabelCleanerMulticlass(y, y_uncleaned)
+            if len(y.unique()) == 2:
+                return LabelCleanerMulticlassToBinary(y, y_uncleaned)
+            else:
+                return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
             return LabelCleanerDummy()
         else:
@@ -124,6 +128,28 @@ class LabelCleanerBinary(LabelCleaner):
     def inverse_transform(self, y: Series) -> Series:
         y = y.map(self.cat_mappings_dependent_var)
         return y
+
+
+class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
+    def __init__(self, y: Series, y_uncleaned: Series):
+        super().__init__(y=y, y_uncleaned=y_uncleaned)
+        self.label_cleaner_binary = LabelCleanerBinary(y=y.map(self.inv_map))
+
+    def transform(self, y: Series) -> Series:
+        y = super().transform(y)
+        y = self.label_cleaner_binary.transform(y)
+        return y
+
+    def inverse_transform_proba(self, y):
+        y = self.convert_binary_proba_to_multiclass_proba(y=y)
+        return super().inverse_transform_proba(y)
+
+    @staticmethod
+    def convert_binary_proba_to_multiclass_proba(y):
+        y_transformed = np.zeros([len(y), 2])
+        y_transformed[:, 0] = 1 - y
+        y_transformed[:, 1] = y
+        return y_transformed
 
 
 class LabelCleanerDummy(LabelCleaner):
