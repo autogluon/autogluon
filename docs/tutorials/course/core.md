@@ -137,6 +137,7 @@ In AutoGluon searchable object can be returned by a user defined class with a de
 
 ```{.python .input}
 @ag.obj(
+
     name=ag.space.Categorical('auto', 'gluon'),
     static_value=10,
     rank=ag.space.Int(2, 5),
