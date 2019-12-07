@@ -92,7 +92,7 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
+                 pip install mxnet-osx
                  pip install autogluon
 
            .. container:: cuda
@@ -109,7 +109,7 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install https://autogluon.s3.amazonaws.com/dist/mxnet-1.6.0b20191125-cp37-cp37m-macosx_10_13_x86_64.whl
+                 pip install mxnet-osx
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
