@@ -41,6 +41,7 @@ stage("Build Docs") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
+        pip uninstall -y autogluon
         pip install -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
