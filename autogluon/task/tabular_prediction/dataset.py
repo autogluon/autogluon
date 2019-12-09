@@ -11,8 +11,8 @@ __all__ = ['TabularDataset']
 class TabularDataset(pd.DataFrame):
     """
     A dataset in tabular format (with rows = samples, columns = features/variables). 
-    This object is essentially a pandas DataFrame (with some extra slots) and all the Pandas methods can be applied to it. 
-    For details, see documentation for pandas Dataframe: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+    This object is essentially a pandas DataFrame (with some extra attributes) and all existing pandas methods can be applied to it. 
+    For full list of methods/attributes, see pandas Dataframe documentation: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
     Parameters
     ----------
@@ -42,7 +42,7 @@ class TabularDataset(pd.DataFrame):
             Describes size of subsample retained in this TabularDataset (None if this is original dataset).
     
     Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe. 
-    For detailed information, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+    For detailed list, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
     
     Examples
     --------

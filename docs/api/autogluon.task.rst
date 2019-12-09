@@ -68,7 +68,7 @@ AutoGluon Tasks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularPrediction
-   :members:
+   :members: fit, load
    :no-inherited-members:
    :exclude-members: run_fit
 
@@ -127,15 +127,26 @@ Tabular Data Objects
 
 .. automodule:: autogluon.task.tabular_prediction
 
+:hidden:`TabularPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPredictor
+   :no-inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TabularPredictor
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: TabularPredictor
+        :attributes:
+
 :hidden:`TabularDataset`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularDataset
    :no-inherited-members:
 
-:hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabularPredictor
-   :no-inherited-members:
 
