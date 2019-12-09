@@ -231,12 +231,12 @@ class TabularPrediction(BaseTask):
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
-        if num_bagging_folds >= 2:
+        if num_bagging_folds >= 2 and (time_limits_hpo is not None):
             time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
-            logger.log(30, 'Warning: Specified time_limits is too small for hyperparameter_tune, setting to False.')
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
             holdout_frac = 0.2 if hyperparameter_tune else 0.1
         # Add visualizer to NN hyperparameters:
