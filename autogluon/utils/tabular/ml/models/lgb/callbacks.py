@@ -53,7 +53,7 @@ def record_evaluation_custom(path, eval_result, interval, offset=0, early_stoppi
 
 
 # TODO: Add option to stop if current run's metric value is X% lower, such as min 30%, current 40% -> Stop
-def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_use=None, verbose=True, max_diff=None, ignore_dart_warning=False, manual_stop_file=None):
+def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_use=None, start_time=None, time_limit=None, verbose=True, max_diff=None, ignore_dart_warning=False, manual_stop_file=None):
     """Create a callback that activates early stopping.
 
     Note
@@ -172,6 +172,15 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
             if os.path.exists(manual_stop_file):
                 i = indices_to_check[0]
                 logger.log(20, 'Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
+                    best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
+                raise EarlyStopException(best_iter[i], best_score_list[i])
+        if time_limit:
+            time_elapsed = time.time() - start_time
+            time_left = time_limit - time_elapsed
+            # print('time left:', time_left)
+            if time_left <= 0:
+                i = indices_to_check[0]
+                logger.log(20, '\tRan out of time, early stopping on iteration ' + str(env.iteration+1) + '. Best iteration is:\n\t[%d]\t%s' % (
                     best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
 

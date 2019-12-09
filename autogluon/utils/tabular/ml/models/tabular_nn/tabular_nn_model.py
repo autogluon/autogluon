@@ -156,13 +156,14 @@ class TabularNeuralNetModel(AbstractModel):
                                                     self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
     
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_test (pd.DataFrame): test data features (should have same column names as Xtrain)
             Y_train (pd.Series): 
             Y_test (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
+        start_time = time.time()
         self.verbosity = kwargs.get('verbosity', 2)
         self.params = fixedvals_from_searchspaces(self.params)
         if self.feature_types_metadata is None:
@@ -194,7 +195,12 @@ class TabularNeuralNetModel(AbstractModel):
         # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
         
         self.get_net(train_dataset)
-        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
+
+        if time_limit:
+            time_elapsed = time.time() - start_time
+            time_limit = time_limit - time_elapsed
+
+        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True, time_limit=time_limit)
         """
         # TODO: if we don't want to save intermediate network parameters, need to do something like saving in temp directory to clean up after training:
         with make_temp_directory() as temp_dir:
@@ -226,7 +232,7 @@ class TabularNeuralNetModel(AbstractModel):
         return
     
     def train_net(self, params, train_dataset, test_dataset=None,
-                  initialize=True, setup_trainer=True, file_prefix=""):
+                  initialize=True, setup_trainer=True, file_prefix="", time_limit=None):
         """ Trains neural net on given train dataset, early stops based on test_dataset.
             Args:
                 params (dict): various hyperparameter values
@@ -236,6 +242,7 @@ class TabularNeuralNetModel(AbstractModel):
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
                 file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
+        start_time = time.time()
         logger.log(15, "Training neural network for up to %s epochs..." % self.params['num_epochs'])
         seed_value = self.params.get('seed_value')
         if seed_value is not None: # Set seed
@@ -324,6 +331,12 @@ class TabularNeuralNetModel(AbstractModel):
                 self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
+            if time_limit:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                if time_left <= 0:
+                    logger.log(20, "\tRan out of time, stopping training early.")
+                    break
 
         self.model.load_parameters(self.net_filename) # Revert back to best model
         if test_dataset is None: # evaluate one final time:

@@ -1,4 +1,4 @@
-import logging
+import copy, logging
 import numpy as np
 
 from .dataset import TabularDataset
@@ -229,7 +229,14 @@ class TabularPrediction(BaseTask):
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
-        time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
+        time_limits_orig = copy.deepcopy(time_limits)
+        time_limits_hpo = copy.deepcopy(time_limits)
+        if num_bagging_folds >= 2:
+            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+        time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
+            hyperparameter_tune = False
+            logger.log(30, 'Warning: Specified time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
             holdout_frac = 0.2 if hyperparameter_tune else 0.1
         # Add visualizer to NN hyperparameters:
@@ -252,7 +259,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'num_trials': num_trials,
-            'time_out': time_limits,
+            'time_out': time_limits_hpo,
             'visualizer': visualizer,
             'time_attr': 'epoch',  # For tree ensembles, each new tree (ie. boosting round) is considered one epoch
             'reward_attr': 'validation_performance',
@@ -273,5 +280,5 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                       holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
-                      hyperparameters=hyperparameters, verbosity=verbosity)
+                      hyperparameters=hyperparameters, time_limit=time_limits_orig, verbosity=verbosity)
         return TabularPredictor(learner=learner)

@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, time
 import numpy as np
 import pandas as pd
 
@@ -58,8 +58,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba = pd.DataFrame(data=np.asarray(pred_proba).T, columns=self.stack_columns)
         return pred_proba
 
-    def fit(self, X, y, k_fold=5, random_state=1, compute_base_preds=True, **kwargs):
+    def fit(self, X, y, k_fold=5, random_state=1, compute_base_preds=True, time_limit=None, **kwargs):
+        start_time = time.time()
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        if time_limit is not None:
+            time_limit = time_limit - (time.time() - start_time)
         if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
             self.feature_types_metadata = {'float': self.stack_columns}
         else:
@@ -69,7 +72,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             else:
                 self.feature_types_metadata['float'] = self.stack_columns
         if k_fold >= 2:
-            super().fit(X=X, y=y, k_fold=k_fold, random_state=random_state)
+            super().fit(X=X, y=y, k_fold=k_fold, random_state=random_state, time_limit=time_limit)
             self.bagged_mode = True
         else:
             self.models = [copy.deepcopy(self.model_base)]

@@ -39,19 +39,21 @@ class LGBModel(AbstractModel):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
 
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
-    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, **kwargs):
+    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
+        start_time = time.time()
+        params = self.params.copy()
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         verbosity = kwargs.get('verbosity', 2)
-        self.params = fixedvals_from_searchspaces(self.params)
-        if 'min_data_in_leaf' in self.params:
-            if self.params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
-                self.params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
+        params = fixedvals_from_searchspaces(params)
+        if 'min_data_in_leaf' in params:
+            if params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
+                params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
 
-        num_boost_round = self.params.pop('num_boost_round', 1000)
+        num_boost_round = params.pop('num_boost_round', 1000)
         logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
         logger.log(15, "with the following hyperparameter settings:")
-        logger.log(15, self.params)
-        seed_val = self.params.pop('seed_value', None)
+        logger.log(15, params)
+        seed_val = params.pop('seed_value', None)
 
         eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
@@ -72,7 +74,7 @@ class LGBModel(AbstractModel):
         valid_sets = [dataset_train]
         if dataset_val is not None:
             callbacks += [
-                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, 
+                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=verbose_eval, manual_stop_file=False),
                 ]
             valid_names = ['valid_set'] + valid_names
@@ -87,7 +89,7 @@ class LGBModel(AbstractModel):
         # alpha = 0.1
         
         train_params = {
-            'params': self.params.copy(),
+            'params': params.copy(),
             'train_set': dataset_train,
             'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
@@ -109,9 +111,9 @@ class LGBModel(AbstractModel):
         # gc.collect()
         # print('ran garbage collection...')
         self.best_iteration = self.model.best_iteration
-        self.params['num_boost_round'] = num_boost_round
+        params['num_boost_round'] = num_boost_round
         if seed_val is not None:
-            self.params['seed_value'] = seed_val
+            params['seed_value'] = seed_val
         # self.model.save_model(self.path + 'model.txt')
         # model_json = self.model.dump_model()
         #
