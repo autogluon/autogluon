@@ -24,7 +24,8 @@ def test_schedulers():
                                                resource={'num_cpus': 8, 'num_gpus': 0},
                                                num_trials=10,
                                                reward_attr='accuracy',
-                                               time_attr='epoch')
+                                               time_attr='epoch',
+                                               checkpoint=None)
         scheduler.run()
         scheduler.join_jobs()
 
@@ -34,7 +35,8 @@ def test_schedulers():
                                                     num_trials=10,
                                                     reward_attr='accuracy',
                                                     time_attr='epoch',
-                                                    grace_period=1)
+                                                    grace_period=1,
+                                                    checkpoint=None)
         scheduler.run()
         scheduler.join_jobs()
 
@@ -43,7 +45,8 @@ def test_schedulers():
                                              resource={'num_cpus': 8, 'num_gpus': 0},
                                              num_trials=10,
                                              reward_attr='accuracy',
-                                             time_attr='epoch')
+                                             time_attr='epoch',
+                                             checkpoint=None)
         scheduler.run()
         scheduler.join_jobs()
 

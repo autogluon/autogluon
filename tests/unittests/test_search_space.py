@@ -53,7 +53,8 @@ def test_search_space():
                                            resource={'num_cpus': 8, 'num_gpus': 0},
                                            num_trials=10,
                                            reward_attr='accuracy',
-                                           time_attr='epoch')
+                                           time_attr='epoch',
+                                           checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
 
