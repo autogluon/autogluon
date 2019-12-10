@@ -42,7 +42,7 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-        :class:`~autogluon.task.predictor.TabularPredictor` object that can be used to make predictions.
+        :class:`autogluon.task.tabular_prediction.TabularPredictor` object that can be used to make predictions.
         """
         logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
         if output_directory is None:
@@ -71,11 +71,11 @@ class TabularPrediction(BaseTask):
         
         Parameters
         ----------
-        train_data : (:class:`TabularDataset` object)
+        train_data : (:class:`autogluon.task.tabular_prediction.TabularDataset` object)
             Table of the training data, which is similar to pandas DataFrame.
         label : (str)
             Name of column that contains the target variable to predict.
-        tuning_data : (:class:`TabularDataset` object, default = None)
+        tuning_data : (:class:`autogluon.task.tabular_prediction.TabularDataset` object, default = None)
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data). 
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your test data here! 
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
@@ -181,7 +181,7 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-            :class:`TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
+            :class:`autogluon.task.tabular_prediction.TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
         
         Examples
         --------

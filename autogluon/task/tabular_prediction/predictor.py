@@ -71,7 +71,7 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset: (:class:`TabularDataset` or pandas.DataFrame object)
+            dataset: (:class:`autogluon.task.tabular_prediction.TabularDataset` or pandas.DataFrame object)
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
             as_pandas: (bool, optional)
