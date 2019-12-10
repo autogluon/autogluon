@@ -38,8 +38,8 @@ class Remote(Client):
             self.upload_file(filename, **kwargs)
 
     def shutdown(self):
-        super().shutdown()
         self.close(timeout=2)
+        super().shutdown()
         if self.service:
             self.service.shutdown()
 
