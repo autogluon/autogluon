@@ -74,7 +74,7 @@ Select your preferences and run the install command.
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
-           .. container:: cpu
+           .. container:: gpu
 
               .. code-block:: bash
 
@@ -162,7 +162,7 @@ Select your preferences and run the install command.
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
-  .. note::
+  ..
 
      AutoGluon is only supported for [Python](https://www.python.org/downloads/release/python-370/) versions >= 3.6. Make sure [CUDA](https://developer.nvidia.com/cuda-downloads) and [cuDNN](https://developer.nvidia.com/cudnn) are installed if you want to use GPU.
 
