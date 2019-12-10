@@ -24,7 +24,7 @@ class SimpleSpace(Space):
         return reprstr
 
     def get_hp(self, name):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def hp(self):
@@ -53,11 +53,11 @@ class NestedSpace(Space):
 
     @property
     def cs(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def kwspaces(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def default(self):
@@ -106,7 +106,7 @@ class AutoGluonObject(NestedSpace):
         return cls.__init__.kwspaces
 
     def sample(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def __repr__(self):
         return 'AutoGluonObject'
