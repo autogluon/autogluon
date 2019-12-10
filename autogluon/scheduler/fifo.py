@@ -154,8 +154,9 @@ class FIFOScheduler(TaskScheduler):
             else:
                 checkpoint = self._checkpoint
         if checkpoint is not None:
-            mkdir(os.path.dirname(checkpoint))
-            save(self.state_dict(), checkpoint)
+            with self.LOCK:
+                mkdir(os.path.dirname(checkpoint))
+                save(self.state_dict(), checkpoint)
 
     def schedule_next(self):
         """Schedule next searcher suggested task
