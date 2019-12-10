@@ -93,7 +93,7 @@ Select your preferences and run the install command.
               .. note::
               
                  If you don't have them, you must first install the following packages: 
-                 [XCode](https://developer.apple.com/xcode/), [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
+                 `XCode <https://developer.apple.com/xcode/>`_, [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
                  Once you have Homebrew, the latter two packages can be installed via:
 
                  .. code-block:: bash
