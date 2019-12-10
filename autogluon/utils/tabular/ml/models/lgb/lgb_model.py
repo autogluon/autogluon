@@ -1,4 +1,4 @@
-import gc, copy, random, time, logging, os
+import gc, copy, random, time, os, logging, warnings
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
@@ -15,6 +15,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 
+warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version") # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)  # TODO: Currently
 
 
@@ -38,30 +39,43 @@ class LGBModel(AbstractModel):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
 
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
-    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, **kwargs):
+    def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
+        start_time = time.time()
+        params = self.params.copy()
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
-        self.params = fixedvals_from_searchspaces(self.params)
-        if 'min_data_in_leaf' in self.params:
-            if self.params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
-                self.params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
+        verbosity = kwargs.get('verbosity', 2)
+        params = fixedvals_from_searchspaces(params)
+        if 'min_data_in_leaf' in params:
+            if params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
+                params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
 
-        num_boost_round = self.params.pop('num_boost_round', 1000)
-        print('Training Gradient Boosting Model for %s rounds...' % num_boost_round)
-        print("with the following hyperparameter settings:")
-        print(self.params)
-        seed_val = self.params.pop('seed_value', None)
+        num_boost_round = params.pop('num_boost_round', 1000)
+        logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
+        logger.log(15, "with the following hyperparameter settings:")
+        logger.log(15, params)
+        seed_val = params.pop('seed_value', None)
 
         eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
+        
+        if verbosity <= 1:
+            verbose_eval = False
+        elif verbosity == 2:
+            verbose_eval = 1000
+        elif verbosity == 3:
+            verbose_eval = 50
+        else:
+            verbose_eval = True
+        
         self.eval_results = {}
         callbacks = []
         valid_names = ['train_set']
         valid_sets = [dataset_train]
         if dataset_val is not None:
             callbacks += [
-                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, 
-                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False),
+                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
+                                      ignore_dart_warning=True, verbose=verbose_eval, manual_stop_file=False),
                 ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
@@ -73,14 +87,15 @@ class LGBModel(AbstractModel):
         ]
         # lr_over_time = lambda iter: 0.05 * (0.99 ** iter)
         # alpha = 0.1
+        
         train_params = {
-            'params': self.params.copy(),
+            'params': params.copy(),
             'train_set': dataset_train,
             'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
             'valid_names': valid_names,
             'callbacks': callbacks,
-            'verbose_eval': 20, # TODO: should depend on fit's verbosity level.
+            'verbose_eval': verbose_eval,
         }
         if type(eval_metric) != str:
             train_params['feval'] = eval_metric
@@ -96,9 +111,9 @@ class LGBModel(AbstractModel):
         # gc.collect()
         # print('ran garbage collection...')
         self.best_iteration = self.model.best_iteration
-        self.params['num_boost_round'] = num_boost_round
+        params['num_boost_round'] = num_boost_round
         if seed_val is not None:
-            self.params['seed_value'] = seed_val
+            params['seed_value'] = seed_val
         # self.model.save_model(self.path + 'model.txt')
         # model_json = self.model.dump_model()
         #
@@ -132,7 +147,7 @@ class LGBModel(AbstractModel):
                 return y_pred_proba[:, 1]
 
     def cv(self, X=None, y=None, k_fold=5, dataset_train=None):
-        print("Warning: RUNNING GBM CROSS-VALIDATION")
+        logger.warning("Warning: Running GBM cross-validation. This is currently unstable.")
         try_import_lightgbm()
         import lightgbm as lgb
         if dataset_train is None:
@@ -147,7 +162,7 @@ class LGBModel(AbstractModel):
             'num_boost_round': self.num_boost_round,
             'nfold': k_fold,
             'early_stopping_rounds': 150,
-            'verbose_eval': 10,
+            'verbose_eval': 1000,
             'seed': 0,
         }
         if type(eval_metric) != str:
@@ -158,15 +173,16 @@ class LGBModel(AbstractModel):
         if self.problem_type == REGRESSION:
             cv_params['stratified'] = False
 
-        print('Current parameters:\n', params)
+        logger.log(15, 'Current parameters:')
+        logger.log(15, params)
         eval_hist = lgb.cv(**cv_params)  # TODO: Try to use customer early stopper to enable dart
         best_score = eval_hist[self.eval_metric_name + '-mean'][-1]
-        print('Best num_boost_round:', len(eval_hist[self.eval_metric_name + '-mean']))
-        print('Best CV score:', best_score)
+        logger.log(15, 'Best num_boost_round: %s ', len(eval_hist[self.eval_metric_name+'-mean']))
+        logger.log(15, 'Best CV score: %s' % best_score)
         return best_score
 
     def convert_to_weight(self, X: DataFrame):
-        print(X)
+        logger.debug(X)
         w = X['count']
         X = X.drop(['count'], axis=1)
         return X, w
@@ -205,17 +221,18 @@ class LGBModel(AbstractModel):
         feature_importances['splits'] = feature_splits
         feature_importances_unused = feature_importances[feature_importances['splits'] == 0]
         feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits/feature_count)]
-        print(feature_importances_unused)
-        print(feature_importances_used)
-        print('feature_importances_unused:', len(feature_importances_unused))
-        print('feature_importances_used:', len(feature_importances_used))
+        logger.debug(feature_importances_unused)
+        logger.debug(feature_importances_used)
+        logger.debug('feature_importances_unused: %s' % len(feature_importances_unused))
+        logger.debug('feature_importances_used: %s' % len(feature_importances_used))
         features_to_use = list(feature_importances_used['feature'].values)
-        print(features_to_use)
+        logger.debug(str(features_to_use))
         return features_to_use
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None):
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        # verbosity = kwargs.get('verbosity', 2)
         start_time = time.time()
-        print("Beginning hyperparameter tuning for Gradient Boosting Model...")
+        logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
         self._set_default_searchspace()
         if isinstance(self.params['min_data_in_leaf'], Int):
             upper_minleaf = self.params['min_data_in_leaf'].upper
@@ -259,10 +276,10 @@ class LGBModel(AbstractModel):
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
         else:
-            print("Hyperparameter search space for Gradient Boosting Model: ")
+            logger.log(15, "Hyperparameter search space for Gradient Boosting Model: ")
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
-                    print(hyperparam + ":   " + str(params_copy[hyperparam]))
+                    logger.log(15, str(hyperparam)+":   " + str(params_copy[hyperparam]))
 
         lgb_trial.register_args(dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
@@ -270,9 +287,11 @@ class LGBModel(AbstractModel):
         scheduler = scheduler_func(lgb_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
+            logger.log(15, "Uploading data to remote workers...")
             scheduler.upload_files([train_file, val_file]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             lgb_trial.update(directory=directory)
+            logger.log(15, "uploaded")
 
         scheduler.run()
         scheduler.join_jobs()
@@ -304,11 +323,11 @@ class LGBModel(AbstractModel):
             hpo_models[trial_model_name] = trial_model_path
             hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
-        print("Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
+        logger.log(15, "Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
-        print("Best hyperparameter configuration for Gradient Boosting Model: ")
-        print(best_hp)
+        logger.log(15, "Best hyperparameter configuration for Gradient Boosting Model: ")
+        logger.log(15, best_hp)
         return (hpo_models, hpo_model_performances, hpo_results)
         # TODO: do final fit here?
         # args.final_fit = True

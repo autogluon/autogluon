@@ -1,7 +1,8 @@
-import time
+import time, logging
 
+logger = logging.getLogger(__name__)
 
-# decorator to calculate duration taken by any function.
+# decorator to calculate duration taken by any function. Logs times at debug level (logging level 10).
 def calculate_time(func):
     # added arguments inside the inner1,
     # if function takes any arguments,
@@ -14,7 +15,7 @@ def calculate_time(func):
 
         # storing time after function execution
         end = time.time()
-        print("Total time taken in : ", func.__name__, end - begin)
+        logger.debug("Total time taken in " + str(func.__name__)+": "+str(end - begin))
 
         return output
 

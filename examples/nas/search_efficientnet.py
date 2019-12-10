@@ -19,4 +19,3 @@ results = task.fit('imagenet',
                    optimizer=ag.optimizer.SGD(learning_rate=1e-1,momentum=0.9,wd=1e-4),
                    batch_size=32)
 print(results)
-ag.done()

@@ -285,7 +285,7 @@ class TabularNNDataset:
         self.dataloader = None
         save_pkl.save(path=dataobj_file, object=self)
         mx.nd.save(datalist_file, data_list)
-        # print("TabularNN Dataset saved to files: \n %s \n %s" % (dataobj_file, datalist_file))
+        logger.debug("TabularNN Dataset saved to files: \n %s \n %s" % (dataobj_file, datalist_file))
 
     @classmethod
     def load(cls, file_prefix=""):
@@ -297,4 +297,5 @@ class TabularNNDataset:
         tabNNdataset.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)
         tabNNdataset.dataloader = mx.gluon.data.DataLoader(tabNNdataset.dataset, tabNNdataset.batch_size, shuffle= not tabNNdataset.is_test, 
                                    last_batch = 'keep' if tabNNdataset.is_test else 'rollover', num_workers=tabNNdataset.params['num_dataloading_workers'])
+        logger.debug("TabularNN Dataset loaded from files: \n %s \n %s" % (dataobj_file, datalist_file))
         return tabNNdataset

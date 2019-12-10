@@ -73,7 +73,6 @@ class FIFOScheduler(TaskScheduler):
     >>> scheduler.run()
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
-    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
                  searcher='random', search_options=None,
@@ -100,11 +99,6 @@ class FIFOScheduler(TaskScheduler):
         self.metadata = {}
         self.metadata['search_space'] = train_fn.kwspaces
         keys = copy.deepcopy(list(self.metadata['search_space'].keys()))
-        #for k in keys:
-        #    if '.' in k:
-        #        v = self.metadata['search_space'].pop(k)
-        #        new_k = k.split('.')[-1]
-        #        self.metadata['search_space'][new_k] = v
         self.metadata['search_strategy'] = searcher
         self.metadata['stop_criterion'] = {'time_limits': time_out, 'max_reward': max_reward}
         self.metadata['resources_per_trial'] = resource
@@ -330,6 +324,7 @@ class FIFOScheduler(TaskScheduler):
         import matplotlib.pyplot as plt
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
+        plt.title("Performance vs Training-Time in each HPO Trial")
         with self.log_lock:
             for task_id, task_res in self.training_history.items():
                 rewards = [x[self._reward_attr] for x in task_res]

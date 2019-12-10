@@ -1,9 +1,8 @@
 # MNIST Training in PyTorch
 :label:`sec_customstorch`
 
-In this tutorial, we are showing an example of doing HPO using AutoGluon using PyTorch.
-AutoGluon is a framework agnostic HPO toolkit, which is compatible with
-any training code written in python. (The Pytorch code used as an example in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own Pytorch code).
+In this tutorial, we demonstrate how to do Hyperparameter Optimization (HPO) using AutoGluon with PyTorch.
+AutoGluon is a framework agnostic HPO toolkit, which is compatible with any training code written in python. The PyTorch code used in this tutorial is adapted from this [git repo](https://github.com/kuangliu/pytorch-cifar). In your applications, this code can be replaced with your own PyTorch code.
 
 Import the packages:
 
@@ -17,7 +16,7 @@ import torchvision.transforms as transforms
 from tqdm.auto import tqdm
 ```
 
-## Start with A MNIST Example
+## Start with an MNIST Example
 
 ### Data Transforms
 
@@ -40,17 +39,26 @@ testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, 
 The following `train_cifar` function is a normal training code a user would write for
 =======
 The following `train_mnist` function represents normal training code a user would write for
+<<<<<<< HEAD
 >>>>>>> origin/master
 training on MNIST dataset. Python users typically use an argparser for conveniently
 changing default values. The only extra argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings
+=======
+training on MNIST dataset. Python users typically use an argparser to conveniently
+change default values. The only additional argument you need to add to your existing python function is a reporter object that is used to store performance achieved under different hyperparameter settings.
+>>>>>>> origin/master
 
 ```{.python .input}
 <<<<<<< HEAD
 def train_cifar(args, reporter):
 =======
 def train_mnist(args, reporter):
+<<<<<<< HEAD
 >>>>>>> origin/master
     # get varibles from args
+=======
+    # get variables from args
+>>>>>>> origin/master
     lr = args.lr
     wd = args.wd
     epochs = args.epochs
@@ -116,16 +124,13 @@ def train_mnist(args, reporter):
 ```
 ## AutoGluon HPO
 
-In this sectin, we are talking about
+In this section, we cover how to define a searchable network architecture, convert the training function to be searchable, create the scheduler, and then launch the experiment.
 
-### Define A Searchable Network Achitecture
+### Define a Searchable Network Achitecture
 
-Let's define a 'dynamic' network with searchable 
-configurations by simply adding a decorator :func:`autogluon.obj`.
-In this example, we only search two arguments `hidden_conv` and
-`hidden_fc`, which represent the hidden channels in convolutional
-layer and fully connected layer. More info about searchable space
-is available at :meth:`autogluon.space`.
+Let's define a 'dynamic' network with searchable configurations by simply adding a decorator :func:`autogluon.obj`. In this example, we only search two arguments `hidden_conv` and
+`hidden_fc`, which represent the hidden channels in convolutional layer and fully connected layer. 
+More info about searchable space is available at :meth:`autogluon.space`.
 
 ```{.python .input}
 import autogluon as ag
@@ -157,9 +162,13 @@ class Net(nn.Module):
 ### Convert the Training Function to Be Searchable
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 We can simply add a decorator :func:`autogluon.args` to convert the `train_cifar` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
 =======
 We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon will always select an actual floating point value to assign to lr and thus you do not need to make any special modifications to your existing code to accomadate the hyperparameter search.
+>>>>>>> origin/master
+=======
+We can simply add a decorator :func:`autogluon.args` to convert the `train_mnist` function argument values to be tuned by AutoGluon's hyperparameter optimizer. In the example below, we specify that the lr argument is a real-value that should be searched on a log-scale in the range 0.01 - 0.2. Before passing lr to your train function, AutoGluon always selects an actual floating point value to assign to lr so you do not need to make any special modifications to your existing code to accommodate the hyperparameter search.
 >>>>>>> origin/master
 
 ```{.python .input}
@@ -207,9 +216,4 @@ We plot the test accuracy achieved over the course of training under each hyperp
 myscheduler.get_training_curves(plot=True,use_legend=False)
 print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                myscheduler.get_best_reward()))
-```
-
-Finish and exit:
-```{.python .input}
-ag.done()
 ```

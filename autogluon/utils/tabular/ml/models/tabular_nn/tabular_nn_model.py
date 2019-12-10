@@ -7,7 +7,7 @@
     Vectors produced by different input layers are then concatenated and passed to multi-layer MLP model with problem_type determined output layer.
     Hyperparameters are passed as dict params, including options for preprocessing stages.
 """
-import random, json, time, logging, os
+import random, json, time, os, logging, warnings
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -34,8 +34,9 @@ from .hyperparameters.searchspaces import get_default_searchspace
 
 # __all__ = ['TabularNeuralNetModel', 'EPS']
 
-EPS = 10e-8 # small number
+warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
+EPS = 10e-8 # small number
 
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
@@ -155,13 +156,15 @@ class TabularNeuralNetModel(AbstractModel):
                                                     self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
     
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_test (pd.DataFrame): test data features (should have same column names as Xtrain)
             Y_train (pd.Series): 
             Y_test (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
+        start_time = time.time()
+        self.verbosity = kwargs.get('verbosity', 2)
         self.params = fixedvals_from_searchspaces(self.params)
         if self.feature_types_metadata is None:
             raise ValueError("Trainer class must set feature_types_metadata for this model")
@@ -183,7 +186,7 @@ class TabularNeuralNetModel(AbstractModel):
             test_dataset = self.process_data(X_test, Y_test, is_test=True) # Dataset object to use for validation
         else:
             test_dataset = None
-        print("Training data has: %d examples, %d features (%d vector, %d embedding, %d language)" % 
+        logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" % 
               (train_dataset.num_examples, train_dataset.num_features, 
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
                len(train_dataset.feature_groups['language']) ))
@@ -192,7 +195,12 @@ class TabularNeuralNetModel(AbstractModel):
         # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
         
         self.get_net(train_dataset)
-        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True)
+
+        if time_limit:
+            time_elapsed = time.time() - start_time
+            time_limit = time_limit - time_elapsed
+
+        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True, time_limit=time_limit)
         """
         # TODO: if we don't want to save intermediate network parameters, need to do something like saving in temp directory to clean up after training:
         with make_temp_directory() as temp_dir:
@@ -224,7 +232,7 @@ class TabularNeuralNetModel(AbstractModel):
         return
     
     def train_net(self, params, train_dataset, test_dataset=None,
-                  initialize=True, setup_trainer=True, file_prefix=""):
+                  initialize=True, setup_trainer=True, file_prefix="", time_limit=None):
         """ Trains neural net on given train dataset, early stops based on test_dataset.
             Args:
                 params (dict): various hyperparameter values
@@ -234,16 +242,18 @@ class TabularNeuralNetModel(AbstractModel):
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
                 file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
-        print("Training tabular Neural Network for up to %s epochs..." 
-              % self.params['num_epochs'])
+        start_time = time.time()
+        logger.log(15, "Training neural network for up to %s epochs..." % self.params['num_epochs'])
         seed_value = self.params.get('seed_value')
         if seed_value is not None: # Set seed
             random.seed(seed_value)
             np.random.seed(seed_value)
             mx.random.seed(seed_value)
         if initialize: # Initialize the weights of network
+            logging.debug("initializing neural network...")
             self.model.collect_params().initialize(ctx=self.ctx)
             self.model.hybridize()
+            logging.debug("initialized")
         if setup_trainer:
             # Also setup mxboard if visualizer has been specified:
             visualizer = self.params.get('visualizer', 'none')
@@ -273,11 +283,21 @@ class TabularNeuralNetModel(AbstractModel):
                 loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS # variance of labels
             else:
                 raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale],self.loss_func))
-        verbose = 10  # Make this a parameter, prints losses every verbose epochs, Never if -1
+        
+        if self.verbosity <= 1:
+            verbose_eval = -1  # Print losses every verbose epochs, Never if -1
+        elif self.verbosity == 2:
+            verbose_eval = 50
+        elif self.verbosity == 3:
+            verbose_eval = 10
+        else:
+            verbose_eval = 1
+        
         # Training Loop:
         for e in range(num_epochs):
             if e == 0: # special actions during first epoch:
-                print(self.model)  # TODO: remove?
+                logger.log(15, "Neural network architecture:")
+                logger.log(15, str(self.model))  # TODO: remove?
             cumulative_loss = 0
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
@@ -298,27 +318,32 @@ class TabularNeuralNetModel(AbstractModel):
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
-                # TODO: currently evaluate_metric is evaluating different metric...
-                if verbose > 0 and (e % verbose) == 0:
-                    print("Epoch %s.  Train loss: %s, Val %s: %s" %
+                if verbose_eval > 0 and e % verbose_eval == 0:
+                    logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
                       (e, train_loss, self.eval_metric_name, val_metric))
                 if self.summary_writer is not None:
                     self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
                                                    value=val_metric, global_step=e)
             else:
-                if verbose > 0 and (e % verbose) == 0:
-                    print("Epoch %s.  Train loss: %s" % (e, train_loss))
+                if verbose_eval > 0 and e % verbose_eval == 0:
+                    logger.log(15, "Epoch %s.  Train loss: %s" % (e, train_loss))
             if self.summary_writer is not None:
                 self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
+            if time_limit:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                if time_left <= 0:
+                    logger.log(20, "\tRan out of time, stopping training early.")
+                    break
 
         self.model.load_parameters(self.net_filename) # Revert back to best model
         if test_dataset is None: # evaluate one final time:
-            print("Best model found in epoch %d" % best_val_epoch)
+            logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:
             final_val_metric = self.score(X=test_dataset, y=y_test)
-            print("Best model found in epoch %d. Val %s: %s" %
+            logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
 
@@ -405,6 +430,7 @@ class TabularNeuralNetModel(AbstractModel):
         Returns:
             Dataset object
         """
+        warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
         if set(df.columns) != set(self.features):
             raise ValueError("Column names in provided Dataframe do not match self.features")
         if labels is not None and len(labels) != len(df):
@@ -446,9 +472,9 @@ class TabularNeuralNetModel(AbstractModel):
             raise ValueError("Attempting process training data without labels")
         self.types_of_features = self._get_types_of_features(df) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
         df = df[self.features]
-        print("AutoGluon infers your features are of the following types:")
-        print(json.dumps(self.types_of_features, indent=4))
-        print("\n\n")
+        logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
+        logger.log(15, json.dumps(self.types_of_features, indent=4))
+        logger.log(15, "\n")
         df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor()
         processed_array = self.processor.fit_transform(df) # 2D numpy array
@@ -622,15 +648,18 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory = None, return_name=False, verbose=True):
+    def save(self, file_prefix="", directory = None, return_name=False, verbose=None):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
             return_name (bool): return the file-names corresponding to this save as tuple (model_obj_file, net_params_file)
         """
+        if verbose is None:
+            verbose = self.verbosity >= 3
         if directory is not None:
             path = directory + file_prefix
         else:
             path = self.path + file_prefix
+        
         params_filepath = path + self.params_file_name
         modelobj_filepath = path + self.model_file_name
         if self.model is not None:
@@ -660,9 +689,10 @@ class TabularNeuralNetModel(AbstractModel):
         obj.summary_writer = None
         return obj
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options):
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
         """ Performs HPO and sets self.params to best hyperparameter values """
-        print("Beginning hyperparameter tuning for Tabular Neural Network...")
+        self.verbosity = kwargs.get('verbosity', 2)
+        logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace() # changes non-specified default hyperparams from fixed values to search-spaces.
         if self.feature_types_metadata is None:
             raise ValueError("Trainer class must set feature_types_metadata for this model")
@@ -685,12 +715,12 @@ class TabularNeuralNetModel(AbstractModel):
             self.features = list(X_train.columns)
         params_copy = self.params.copy()
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
-            logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
+            logger.warning("Warning: Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
         else:
-            print("Hyperparameter search space for Tabular Neural Network: ")
+            logger.log(15, "Hyperparameter search space for Neural Network: ")
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
-                    print(hyperparam + ":   " + str(params_copy[hyperparam]))
+                    logger.log(15, str(hyperparam)+ ":   "+str(params_copy[hyperparam]))
         directory = self.path # path to directory where all remote workers store things
         train_dataset = self.process_data(X_train, Y_train, is_test=False) # Dataset object
         X_test = self.preprocess(X_test)
@@ -704,7 +734,7 @@ class TabularNeuralNetModel(AbstractModel):
         scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
-            print("copying processed data to remote workers...")
+            logger.log(15, "Uploading preprocessed data to remote workers...")
             scheduler.upload_files([train_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
                                 train_fileprefix+TabularNNDataset.DATAVALUES_SUFFIX,
                                 test_fileprefix+TabularNNDataset.DATAOBJ_SUFFIX,
@@ -714,6 +744,7 @@ class TabularNeuralNetModel(AbstractModel):
             directory = self.path  # TODO: need to change to path to working directory on every remote machine
             tabular_nn_trial.update(train_fileprefix=train_fileprefix, test_fileprefix=test_fileprefix,
                                    directory=directory)
+            logger.log(15, "uploaded")
 
         scheduler.run()
         scheduler.join_jobs()
@@ -746,11 +777,11 @@ class TabularNeuralNetModel(AbstractModel):
             hpo_models[trial_model_name] = trial_model_path
             hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
-        print("Time for TabularNN hyperparameter optimization: %s" % str(hpo_results['total_time']))
+        logger.log(15, "Time for Neural Network hyperparameter optimization: %s" % str(hpo_results['total_time']))
         self.params.update(best_hp)
         # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
-        print("Best hyperparameter configuration for Tabular Neural Network: ")
-        print(best_hp)
+        logger.log(15, "Best hyperparameter configuration for Tabular Neural Network: ")
+        logger.log(15, str(best_hp))
         return (hpo_models, hpo_model_performances, hpo_results)
         """
         # TODO: do final fit here?

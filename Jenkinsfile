@@ -17,8 +17,7 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        pip uninstall -y autogluon
-        python setup.py develop
+        pip install --upgrade --force-reinstall -e .
         bash tests/run_all.sh
         """
       }
@@ -34,6 +33,7 @@ stage("Build Docs") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+<<<<<<< HEAD
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
 <<<<<<< HEAD
         conda env update -n autogluon_docs -f docs/build_contrib.yml
@@ -41,13 +41,18 @@ stage("Build Docs") {
         conda env remove -n autogluon_docs
         conda env create -n autogluon_docs -f docs/build_contrib.yml
 >>>>>>> origin/master
+=======
+        conda env update -n autogluon_docs -f docs/build_contrib.yml
+>>>>>>> origin/master
         conda activate autogluon_docs
-        export PYTHONPATH=\${PWD}
+        conda list
+        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export AG_DOCS=1
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
-        python setup.py develop
+        pip install --upgrade --force-reinstall -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200

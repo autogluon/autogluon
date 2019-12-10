@@ -1,7 +1,7 @@
 # Search Space and Decorator
 
 This tutorial explains the supported search spaces and how to use them, including
-simple search spaces (Int, Real and Categorical) and nested search spaces
+simple search spaces (Int, Real, and Categorical) and nested search spaces
 (Categorical, List, Dict).
 AutoGluon also enables search spaces in user-defined objects using the decorator
 `ag.obj` and user-defined functions using the decorator `ag.func`.
@@ -16,7 +16,7 @@ import autogluon as ag
 
 #### Integer Space :class:`autogluon.space.Int`
 
-An integer will be chosen between lower and upper value during the
+An integer is chosen between lower and upper value during the
 searcher sampling.
 
 ```{.python .input}
@@ -46,8 +46,8 @@ a.rand
 
 #### Real Space :class:`autogluon.space.Real`
 
-An real number will be chosen between lower and upper value during the
-searcher sampleing.
+A real number is chosen between lower and upper value during the
+searcher sampling.
 
 ```{.python .input}
 b = ag.space.Real(lower=1e-4, upper=1e-2)
@@ -63,7 +63,7 @@ print(c)
 
 #### Categorical Space :class:`autogluon.space.Categorical`
 
-Categorical Space will chooce one choice from all the possible values during
+Categorical Space chooses one value from all the possible values during
 the searcher sampling.
 
 ```{.python .input}
@@ -76,7 +76,7 @@ print(d)
 #### Categorical Space :class:`autogluon.space.Categorical`
 
 Categorical Space can also be used as a nested search space.
-See example at NestedExampleObj_.
+For an example, see NestedExampleObj_.
 
 
 #### List Space :class:`autogluon.space.List`
@@ -141,12 +141,13 @@ g.rand
 In this section, we show how to insert search space into customized objects and
 training functions.
 
-#### Searchable space in customized class :func:`autogluon.obj`
+#### Searchable Space in Customized Class :func:`autogluon.obj`
 
 In AutoGluon searchable object can be returned by a user defined class with a decorator.
 
 ```{.python .input}
 @ag.obj(
+
     name=ag.space.Categorical('auto', 'gluon'),
     static_value=10,
     rank=ag.space.Int(2, 5),
@@ -173,7 +174,7 @@ h.rand
 .. _NestedExampleObj:
 
 We can also use it within a Nested Space such as :class:`autogluon.space.Categorical`.
-In this example, the resulting nested space will be sampled from 
+In this example, the resulting nested space will be sampled from: 
 
 ```{.python .input}
 nested = ag.space.Categorical(
@@ -196,7 +197,7 @@ for _ in range(5):
     print(result)
 ```
 
-#### Searchable space in customized function :func:`autogluon.obj`
+#### Searchable Space in Customized Function :func:`autogluon.obj`
 
 We can also insert searchable space in a customized function:
 
@@ -221,7 +222,7 @@ j = ag.space.Dict(
 print(j)
 ```
 
-#### Customized Train Script using :func:`autogluon.args`
+#### Customized Train Script Using :func:`autogluon.args`
 
 `train_func` is where to put your model training script, which takes in various keyword `args` as its hyperparameters and reports the performance of the trained model using the provided `reporter`. Here, we show a dummy train_func that simply prints these objects.
 
@@ -247,11 +248,11 @@ def train_fn(args, reporter):
     print('args: {}'.format(args))
 ```
 
-## Create Searcher and Sample A Configuration
+## Create Searcher and Sample a Configuration
 
 In this section, we create a Searcher object, which orchestrates a particular hyperparameter-tuning strategy.
 
-#### Create a searcher and sample configuration.
+#### Create a Searcher and Sample Configuration
 
 ```{.python .input}
 searcher = ag.searcher.RandomSearcher(train_fn.cs)

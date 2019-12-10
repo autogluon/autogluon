@@ -1,13 +1,10 @@
-import collections
-import warnings
+import collections, warnings, time, os, psutil, logging
 from operator import gt, lt
-import time
-import os
-import psutil
 
 from ....utils.savers import save_pkl, save_pointer
 from .....try_import import try_import_lightgbm
 
+logger = logging.getLogger(__name__)
 
 # callback
 def save_model_callback(path, latest_model_checkpoint, interval, offset):
@@ -56,7 +53,7 @@ def record_evaluation_custom(path, eval_result, interval, offset=0, early_stoppi
 
 
 # TODO: Add option to stop if current run's metric value is X% lower, such as min 30%, current 40% -> Stop
-def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_use=None, verbose=True, max_diff=None, ignore_dart_warning=False, manual_stop_file=None):
+def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_use=None, start_time=None, time_limit=None, verbose=True, max_diff=None, ignore_dart_warning=False, manual_stop_file=None):
     """Create a callback that activates early stopping.
 
     Note
@@ -109,9 +106,9 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
 
         if verbose:
             msg = "Training until validation scores don't improve for {} rounds."
-            print(msg.format(stopping_rounds))
+            logger.debug(msg.format(stopping_rounds))
             if manual_stop_file:
-                print('Manually stop training by creating file at location: ', manual_stop_file)
+                logger.debug('Manually stop training by creating file at location: ', manual_stop_file)
 
         for eval_ret in env.evaluation_result_list:
             best_iter.append(0)
@@ -154,27 +151,36 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                 best_score_list[i] = env.evaluation_result_list
             elif env.iteration - best_iter[i] >= stopping_rounds:
                 if verbose:
-                    print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                    logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             elif (max_diff is not None) and (abs(score - best_score[i]) > max_diff):
                 if verbose:
-                    print('max_diff breached!')
-                    print(abs(score - best_score[i]))
-                    print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                    logger.debug('max_diff breached!')
+                    logger.debug(abs(score - best_score[i]))
+                    logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if env.iteration == env.end_iteration - 1:
                 if verbose:
-                    print('Did not meet early stopping. Best iteration is:\n[%d]\t%s' % (
+                    logger.log(15, 'Did not meet early stopping criterion. Best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
-                print(env.iteration - best_iter[i], env.evaluation_result_list[i])
+                logger.debug((env.iteration - best_iter[i], env.evaluation_result_list[i]))
         if manual_stop_file:
             if os.path.exists(manual_stop_file):
                 i = indices_to_check[0]
-                print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
+                logger.log(20, 'Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
+                    best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
+                raise EarlyStopException(best_iter[i], best_score_list[i])
+        if time_limit:
+            time_elapsed = time.time() - start_time
+            time_left = time_limit - time_elapsed
+            # print('time left:', time_left)
+            if time_left <= 0:
+                i = indices_to_check[0]
+                logger.log(20, '\tRan out of time, early stopping on iteration ' + str(env.iteration+1) + '. Best iteration is:\n\t[%d]\t%s' % (
                     best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
 
@@ -191,26 +197,26 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
 
             model_size_memory_ratio = estimated_model_size_mb / available_mb
             if verbose or (model_size_memory_ratio > 0.25):
-                print('Available Memory:', available_mb, 'MB')
-                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                logging.debug('Available Memory: '+str(available_mb)+' MB')
+                logging.debug('Estimated Model Size: '+str(estimated_model_size_mb)+' MB')
 
             early_stop = False
             if model_size_memory_ratio > 1.0:
-                print('Warning: Large model size may cause OOM error during saving if training continues')
-                print('Available Memory:', available_mb, 'MB')
-                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                logger.warning('Warning: Large GBM model size may cause OOM error if training continues')
+                logger.warning('Available Memory: '+str(available_mb)+' MB')
+                logger.warning('Estimated GBM model size: '+str(estimated_model_size_mb)+' MB')
                 early_stop = True
 
             # TODO: We will want to track size of model as well, even if we early stop before OOM, we will still crash when saving if the model is large enough
             if available_mb < 512:  # Less than 500 MB
-                print('Warning: Low available memory may cause OOM error if training continues')
-                print('Available Memory:', available_mb, 'MB')
-                print('Estimated Model Size:', estimated_model_size_mb, 'MB')
+                logger.warning('Warning: Low available memory may cause OOM error if training continues')
+                logger.warning('Available Memory: '+str(available_mb)+' MB')
+                logger.warning('Estimated GBM model size: '+str(estimated_model_size_mb)+' MB')
                 early_stop = True
 
             if early_stop:
-                print('Warning: Early stopping prior to optimal result to avoid OOM error, increase memory allocation to maximize model quality.')
-                print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                logger.warning('Warning: Early stopped GBM model prior to optimal result to avoid OOM error. Please increase available memory to avoid subpar model quality.')
+                logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[0] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[0]])))
                 raise EarlyStopException(best_iter[0], best_score_list[0])
 
@@ -275,10 +281,10 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
                              'at least one dataset and eval metric is required for evaluation')
 
         if verbose:
-            msg = "Training until validation scores don't improve for {} rounds."
-            print(msg.format(stopping_rounds))
+            # msg = "Training until validation scores don't improve for {} rounds."
+            logger.log(15, "Training GBM model until validation scores don't improve for %s rounds" % stopping_rounds)
             if manual_stop_file:
-                print('Manually stop training by creating file at location: ', manual_stop_file)
+                logger.log(15, 'You can manually stop training by creating a temp file at location: %s' % manual_stop_file)
         
         for eval_ret in env.evaluation_result_list:
             best_iter.append(0)
@@ -334,27 +340,27 @@ def hpo_callback(reporter, stopping_rounds, first_metric_only=False, metrics_to_
                     best_trainloss[i] = train_loss_val # same for all i
             elif env.iteration - best_iter[i] >= stopping_rounds:
                 if verbose:
-                    print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                    logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             elif (max_diff is not None) and (abs(score - best_score[i]) > max_diff):
                 if verbose:
-                    print('max_diff breached!')
-                    print(abs(score - best_score[i]))
-                    print('Early stopping, best iteration is:\n[%d]\t%s' % (
+                    logger.debug('max_diff breached!')
+                    logger.debug(str(abs(score - best_score[i])))
+                    logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if env.iteration == env.end_iteration - 1:
                 if verbose:
-                    print('Did not meet early stopping. Best iteration is:\n[%d]\t%s' % (
+                    logger.log(15, 'Did not meet early stopping criterion. Best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                 raise EarlyStopException(best_iter[i], best_score_list[i])
             if verbose:
-                print(env.iteration - best_iter[i], env.evaluation_result_list[i])
+                logger.debug(str(env.iteration - best_iter[i], env.evaluation_result_list[i]))
             if manual_stop_file:
                 if os.path.exists(manual_stop_file):
-                    print('Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
+                    logger.log(20, 'Found manual stop file, early stopping. Best iteration is:\n[%d]\t%s' % (
                         best_iter[i] + 1, '\t'.join([_format_eval_result(x) for x in best_score_list[i]])))
                     raise EarlyStopException(best_iter[i], best_score_list[i])
         # TODO: This should be moved inside for loop at the start, otherwise it won't record the final iteration

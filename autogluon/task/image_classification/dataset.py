@@ -7,7 +7,12 @@ from PIL import Image
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon.data import Dataset as MXDataset
+<<<<<<< HEAD
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms
+=======
+from mxnet.gluon.data.vision import ImageRecordDataset, transforms, ImageFolderDataset as MXImageFolderDataset
+
+>>>>>>> origin/master
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
@@ -117,7 +122,19 @@ class RecordDataset(ImageRecordDataset):
     def classes(self):
         raise NotImplemented
 
-#from torch.utils.data import Dataset as PTDataset
+@obj()
+class NativeImageFolderDataset(MXImageFolderDataset):
+    def __init__(self, root, gray_scale=False, transform=None):
+        flag = 0 if gray_scale else 1
+        super().__init__(root, flag=flag, transform=transform)
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
 
 @obj()
 class ImageFolderDataset(object):
@@ -185,7 +202,8 @@ class ImageFolderDataset(object):
                     return False
                 valid = True
                 try:
-                    self.loader(x)
+                    with open(x, 'rb') as f:
+                        img = Image.open(f)
                 except OSError:
                     valid = False
                 return valid

@@ -33,7 +33,6 @@ autogluon.scheduler
    Visiualize the results and exit:
 
    >>> scheduler.get_training_curves(plot=True)
-   >>> ag.done()
 
    .. image:: https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon.1.png
       :width: 400

@@ -1,5 +1,5 @@
-AutoGluon: AutoML Toolkit with MXNet Gluon
-==========================================
+AutoGluon: AutoML Toolkit for Deep Learning
+===========================================
 
 `AutoGluon` enables easy-to-use and easy-to-extend AutoML with a focus on deep learning and real-world applications spanning image, text, or tabular data. Intended for both ML beginners and experts, `AutoGluon` enables you to:
 

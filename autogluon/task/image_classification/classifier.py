@@ -110,12 +110,16 @@ class Classifier(BasePredictor):
         inds, probas, probals_all = [], [],[]
         # for x in X.imgs:
         for x in X:
+<<<<<<< HEAD
             # x = self.loader(x[0])
             # x = transform_fn(x)
             x = x[0]
             ind, proba ,proba_all= predict_img(x)
 
             #ind, proba = predict_img(x[0])
+=======
+            ind, proba = predict_img(x[0])
+>>>>>>> origin/master
             inds.append(ind)
             probas.append(proba)
             probals_all.append(proba_all)
@@ -165,11 +169,8 @@ class Classifier(BasePredictor):
         _, test_reward = metric.get()
         return test_reward
 
-    def _save_model(self, *args, **kwargs):
-        raise NotImplemented
-
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplemented
+        raise NotImplementedError # TODO
 
     @staticmethod
     def _format_results(results): # TODO: remove since this has been moved to base_predictor.py

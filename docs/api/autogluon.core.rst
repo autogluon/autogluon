@@ -45,9 +45,6 @@ Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary
    ...                                        time_attr='epoch')
    >>> scheduler.run()
 
-   Exit:
-
-   >>> ag.done()
 
 Core APIs
 ---------

@@ -1,8 +1,10 @@
+import logging
 import numpy as np
 
 from .stacker_ensemble_model import StackerEnsembleModel
 from ...tuning.ensemble_selection import EnsembleSelection
 
+logger = logging.getLogger(__name__)
 
 class WeightedEnsembleModel(StackerEnsembleModel):
     def __init__(self, path, name, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_weights=None, num_classes=None, debug=0):

@@ -8,19 +8,19 @@
 AutoGluon system includes Searcher, Scheduler and Resource Manager:
 
 - The Searcher suggests configurations for the next training jobs.
-- Scheduler schedule the training job when the computation resources are available.
+- Scheduler schedules the training job when the computation resources are available.
 
-In this tutorial, we will illustrate how the search algorithm works and
+In this tutorial, we illustrate how the search algorithm works and
 compare the performance on a toy experiments.
 
 ## FIFO Scheduling vs. Early Stopping
 
-In this section, we will compare the different behaviors of a sequential FIFO scheduling
-using :class:`autogluon.scheduler.FIFOScheduler` vs a preemptive scheduling algorithm
-:class:`autogluon.scheduler.HyperbandScheduler` which terminates the trial with bad
+In this section, we compare the different behaviors of a sequential First In, First Out (FIFO) scheduling
+using :class:`autogluon.scheduler.FIFOScheduler` vs. a preemptive scheduling algorithm
+:class:`autogluon.scheduler.HyperbandScheduler` that terminates the trial with bad
 configurations at the early/middle stages.
 
-### Create A Dummy Training Function
+### Create a Dummy Training Function
 
 ```{.python .input}
 import numpy as np
@@ -35,7 +35,7 @@ def train_fn(args, reporter):
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 ```
 
-### First In First Out Scheduler
+### FIFO Scheduler
 
 This scheduler runs training trials in order.
 
@@ -58,7 +58,7 @@ scheduler.get_training_curves(plot=True, use_legend=False)
 
 ### Hyperband Scheduler
 
-Early-terminates training trials which do not appear promising during the early stages to free compute resources for more promising hyperparameter-configurations
+The Hyperband Scheduler terminates training trials that don't appear promising during the early stages to free up compute resources for more promising hyperparameter configurations.
 
 ```{.python .input}
 scheduler = ag.scheduler.HyperbandScheduler(train_fn,
@@ -80,10 +80,10 @@ scheduler.get_training_curves(plot=True, use_legend=False)
 
 ## Random Search vs. Reinforcement Learning
 
-In this section, we will demonstate the behaviors of random search and reinforcement learning
+In this section, we demonstrate the behaviors of random search and reinforcement learning
 in a simple simulation environment.
 
-### Create A Reward Function for Toy Experiments
+### Create a Reward Function for Toy Experiments
 
 Import the packages:
 
