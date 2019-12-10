@@ -62,11 +62,8 @@ requirements = [
     'scikit-optimize',
     'catboost',
     'boto3==1.9.187',
-<<<<<<< HEAD
     'fastparquet==0.3.1',
     'joblib==0.13.2',
-=======
->>>>>>> origin/master
     'lightgbm==2.3.0',
     'pandas==0.24.2',
     'psutil',

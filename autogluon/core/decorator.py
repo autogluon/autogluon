@@ -218,11 +218,7 @@ def obj(**kwvars):
                 self._inited = False
 
             def sample(self, **config):
-<<<<<<< HEAD
-                kwargs = copy.deepcopy(self._kwargs)
-=======
                 kwargs = copy.deepcopy(self.kwargs)
->>>>>>> origin/master
                 kwspaces = copy.deepcopy(autogluonobject.kwspaces)
                 for k, v in kwargs.items():
                     if k in kwspaces and isinstance(kwspaces[k], NestedSpace):

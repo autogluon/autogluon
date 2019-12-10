@@ -4,24 +4,17 @@ import math
 import logging
 import numpy as np
 from PIL import Image
-
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon.data import Dataset as MXDataset
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms
-
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
 from ...utils.pil_transforms import *
 
-<<<<<<< HEAD
-__all__ = ['get_dataset', 'ImageFolderDataset', 'RecordDataset']
-=======
 __all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset']
-
 logger = logging.getLogger(__name__)
->>>>>>> origin/master
 
 built_in_datasets = [
     'mnist',
@@ -34,34 +27,20 @@ built_in_datasets = [
 
 @func()
 def get_dataset(path=None, train=True, name=None,
-<<<<<<< HEAD
-               input_size=224, crop_ratio=0.875, jitter_param=0.4,
-               *args, **kwargs):
-    """A convenient function for image classification dataset, supported datasets given by
-    built-in datasets ('mnist', 'cifar10', 'cifar100', 'imagenet'),
-    :class:`ImageFolderDataset` and :class:`RecordioDataset`.
-=======
                 input_size=224, crop_ratio=0.875, jitter_param=0.4,
                 *args, **kwargs):
     """ Method to produce image classification dataset for AutoGluon, can either be a 
     :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
->>>>>>> origin/master
+
 
     Parameters
     ----------
         name : str, optional
-<<<<<<< HEAD
-            The name for built-in dataset, overrite other options.
-            The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-        train : bool, default True
-            Train or validation mode
-=======
             Which built-in dataset to use, will override all other options if specified.
             The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
         train : bool, default True
             Whether this dataset should be used for training or validation.
->>>>>>> origin/master
         path : str
             The training data location. If using :class:`ImageFolderDataset`,
             image folder`path/to/the/folder` should be provided.
@@ -69,97 +48,6 @@ def get_dataset(path=None, train=True, name=None,
         input_size : int
             The input image size.
         crop_ratio : float
-<<<<<<< HEAD
-            Center crop ratio for evaluation only
-    """
-    resize = int(math.ceil(input_size / crop_ratio))
-    if name in built_in_datasets:
-        return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
-
-    transform = transforms.Compose([
-            transforms.RandomResizedCrop(input_size),
-            transforms.RandomFlipLeftRight(),
-            transforms.RandomColorJitter(brightness=jitter_param,
-                                         contrast=jitter_param,
-                                         saturation=jitter_param),
-            transforms.RandomLighting(0.1),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]) if train else transforms.Compose([
-            transforms.Resize(resize),
-            transforms.CenterCrop(input_size),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-    dataset_cls = ImageFolderDataset if '.rec' not in path \
-            else RecordDataset
-    dataset = dataset_cls(path, transform=transform, *args, **kwargs)
-    return dataset.init()
-
-@obj()
-class RecordDataset(ImageRecordDataset):
-    """A dataset wrapping over a RecordIO file containing images.
-
-    Each sample is an image and its corresponding label.
-
-    Parameters
-    ----------
-    filename : str
-        Path to rec file.
-    gray_scale : False
-        If True, always convert images to greyscale. \
-        If False, always convert images to colored (RGB).
-    transform : function, default None
-        A user defined callback that transforms each sample. For example::
-
-            transform=lambda data, label: (data.astype(np.float32)/255, label)
-
-    """
-    def __init__(self, filename, gray_scale=False, transform=None):
-        flag = 0 if gray_scale else 1
-        super().__init__(filename, flag=flag, transform=transform)
-
-    @property
-    def num_classes(self):
-        raise NotImplemented
-
-    @property
-    def classes(self):
-        raise NotImplemented
-
-@obj()
-class ImageFolderDataset(MXDataset):
-    """A generic data loader where the images are arranged in this way: ::
-
-        root/dog/xxx.png
-        root/dog/xxy.png
-        root/dog/xxz.png
-
-        root/cat/123.png
-        root/cat/nsdf3.png
-        root/cat/asd932_.png
-
-    Parameters
-    ----------
-    root : string
-        Root directory path.
-    transform : callable, optional
-        A function/transform that  takes in an PIL image
-        and returns a transformed version. E.g, ``transforms.RandomCrop``
-    is_valid_file : callable, optional
-        A function that takes path of an Image file
-        and check if the file is a valid file (used to check of corrupt files)
-
-    Attributes
-    ----------
-    classes : list
-        List of the class names.
-    class_to_idx : dict
-        Dict with items (class_name, class_index).
-    imgs : list
-        List of (image path, class_index) tuples
-    """
-=======
             Center crop ratio (for evaluation only)
     """
     resize = int(math.ceil(input_size / crop_ratio))
@@ -263,7 +151,6 @@ class ImageFolderDataset(object):
     imgs : list
         List of (image path, class_index) tuples
     """
->>>>>>> origin/master
     _repr_indent = 4
     IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
     def __init__(self, root, extensions=None, transform=None, is_valid_file=None):
@@ -286,21 +173,14 @@ class ImageFolderDataset(object):
         self.targets = [s[1] for s in samples]
         self.imgs = self.samples
 
-<<<<<<< HEAD
-    @staticmethod
-    def make_dataset(dir, class_to_idx, extensions=None, is_valid_file=None):
-=======
+
     def make_dataset(self, dir, class_to_idx, extensions=None, is_valid_file=None):
->>>>>>> origin/master
         images = []
         dir = os.path.expanduser(dir)
         if not ((extensions is None) ^ (is_valid_file is None)):
             raise ValueError("Both extensions and is_valid_file cannot be None or not None at the same time")
         if extensions is not None:
             def is_valid_file(x):
-<<<<<<< HEAD
-                return x.lower().endswith(extensions)
-=======
                 if not x.lower().endswith(extensions):
                     return False
                 valid = True
@@ -309,7 +189,6 @@ class ImageFolderDataset(object):
                 except OSError:
                     valid = False
                 return valid
->>>>>>> origin/master
         for target in sorted(class_to_idx.keys()):
             d = os.path.join(dir, target)
             if not os.path.isdir(d):
@@ -320,9 +199,7 @@ class ImageFolderDataset(object):
                     if is_valid_file(path):
                         item = (path, class_to_idx[target])
                         images.append(item)
-<<<<<<< HEAD
 
-=======
         if not class_to_idx:
             for root, _, fnames in sorted(os.walk(dir)):
                 for fname in sorted(fnames):
@@ -330,15 +207,10 @@ class ImageFolderDataset(object):
                     if is_valid_file(path):
                         item = (path, 0)
                         images.append(item)
->>>>>>> origin/master
         return images
 
     @staticmethod
     def loader(path):
-<<<<<<< HEAD
-        # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-=======
->>>>>>> origin/master
         with open(path, 'rb') as f:
             img = Image.open(f)
             return img.convert('RGB')
@@ -383,21 +255,11 @@ class ImageFolderDataset(object):
         """
         path, target = self.samples[index]
         sample = self.loader(path)
-<<<<<<< HEAD
-        sample = self._sample_transform(sample)
-=======
->>>>>>> origin/master
         if self._transform is not None:
             sample = self._transform(sample)
 
         return sample, target
 
-<<<<<<< HEAD
-    def _sample_transform(self, img):
-        return nd.array(np.array(img), mx.cpu(0))
-
-=======
->>>>>>> origin/master
     def __len__(self):
         return len(self.samples)
 
@@ -412,16 +274,10 @@ class ImageFolderDataset(object):
 
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
                          shuffle=True, **kwargs):
-<<<<<<< HEAD
-    """Built-in image classification dataset.
-    """
-    print('get_built_in_dataset', name)
-=======
     """Returns built-in popular image classification dataset baed on provided string name ('cifar10', 'cifar100','mnist','imagenet').
     """
     logger.info('get_built_in_dataset {}'.format(name))
     name = name.lower()
->>>>>>> origin/master
     if name in ['cifar10', 'cifar']:
         import gluoncv.data.transforms as gcv_transforms
         transform_split = transforms.Compose([
@@ -450,13 +306,11 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
         def transform(data, label):
             return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)
         return gluon.data.vision.MNIST(train=train, transform=transform)
-<<<<<<< HEAD
-=======
+
     elif name == 'fashionmnist':
         def transform(data, label):
             return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)
         return gluon.data.vision.FashionMNIST(train=train, transform=transform)
->>>>>>> origin/master
     elif name == 'imagenet':
         # Please setup the ImageNet dataset following the tutorial from GluonCV
         if train:

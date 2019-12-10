@@ -10,7 +10,8 @@ metrics = {'accuracy': mxnet.metric.Accuracy,
            'mae': mxnet.metric.MAE,
            'mse': mxnet.metric.MSE,
            'rmse': mxnet.metric.RMSE,
-           'crossentropy': mxnet.metric.CrossEntropy}
+           'crossentropy': mxnet.metric.CrossEntropy,
+           'MeanFScore': mxnet.metric.F1}
 
 def get_metric_instance(name, **kwargs):
     """Returns a metric instance by name

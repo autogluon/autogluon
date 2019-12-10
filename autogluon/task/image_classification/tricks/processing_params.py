@@ -25,7 +25,9 @@ class Sample_params(object):
 
 
 class Getmodel_kwargs():
-    def __init__(self, context, classes, model_name, model_teacher,
+    def __init__(self, context,
+                 classes,
+                 model_name, model_teacher,
                  hard_weight,
                  multi_precision,
                  hybridize,
@@ -80,6 +82,7 @@ class Getmodel_kwargs():
         net.cast(self._dtype)
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
+
         return net
 
     @property

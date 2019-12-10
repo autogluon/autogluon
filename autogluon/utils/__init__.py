@@ -8,17 +8,10 @@ from .deprecate import *
 from .try_import import *
 from .edict import EasyDict
 from .serialization import *
+from .file_helper import *
+from .learning_rate import *
 from .dataloader import DataLoader
-<<<<<<< HEAD
-from .dataset import *
-from .plots import *
-from .tqdm import tqdm
-=======
->>>>>>> origin/master
 from .custom_queue import Queue
-from .file_helper import generate_csv
 from .plot_network import plot_network
 from .defaultdict import keydefaultdict
 from .util_decorator import classproperty
-
-from .learning_rate import *

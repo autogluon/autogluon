@@ -15,6 +15,9 @@ from ..base.base_predictor import BasePredictor
 from ...utils import save, load, tqdm
 from ...utils.pil_transforms import *
 
+# from collections import OrderedDict
+# from mxnet.gluon.block import collect_params
+
 __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
@@ -85,11 +88,14 @@ class Classifier(BasePredictor):
         def predict_img(img):
             # load and display the image
             proba = self.predict_proba(img)
+            # extract probability
+
             ind = mx.nd.argmax(proba, axis=1).astype('int')
             idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
                               ind.astype('float32'))
             probai = mx.nd.gather_nd(proba, idx)
-            return ind, probai
+            return ind, probai, proba
+
         if isinstance(X, str) and os.path.isfile(X):
             img = self.loader(X)
             if plot:
@@ -97,14 +103,23 @@ class Classifier(BasePredictor):
                 plt.show()
             img = transform_fn(img)
             return predict_img(img)
+
         if isinstance(X, AutoGluonObject):
             X = X.init()
-        inds, probas = [], []
+
+        inds, probas, probals_all = [], [],[]
+        # for x in X.imgs:
         for x in X:
-            ind, proba = predict_img(x)
+            # x = self.loader(x[0])
+            # x = transform_fn(x)
+            x = x[0]
+            ind, proba ,proba_all= predict_img(x)
+
+            #ind, proba = predict_img(x[0])
             inds.append(ind)
             probas.append(proba)
-        return inds, probas
+            probals_all.append(proba_all)
+        return inds, probas, probals_all
 
     @staticmethod
     def loader(path):
@@ -117,7 +132,9 @@ class Classifier(BasePredictor):
             In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
         """
         pred = self.model(X.expand_dims(0))
+        # fix multi
         return mx.nd.softmax(pred)
+
 
     def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
         """The task evaluation function given the test dataset.
@@ -134,10 +151,15 @@ class Classifier(BasePredictor):
         metric = get_metric_instance(args.metric)
         input_size = net.input_size if hasattr(net, 'input_size') else input_size
 
+        if args.optimizer.multi_precision:
+            dtype = 'float16'
+        else:
+            dtype = 'float32'
+
         test_data, _, batch_fn, _ = get_data_loader(dataset, input_size, batch_size, args.num_workers, True, None)
         tbar = tqdm(test_data)
         for batch in tbar:
-            self.eval_func(net, batch, batch_fn, metric, ctx)
+            self.eval_func(net, batch, batch_fn, metric, ctx, dtype)
             _, test_reward = metric.get()
             tbar.set_description('{}: {}'.format(args.metric, test_reward))
         _, test_reward = metric.get()

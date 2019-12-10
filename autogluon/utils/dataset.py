@@ -6,11 +6,8 @@ __all__ = ['SplitSampler', 'SampledDataset', 'get_split_samplers']
 
 SPLIT_SEED = int(time.time())
 
-<<<<<<< HEAD
-def get_split_samplers(train_dataset, split_ratio=0.2):
-=======
+
 def get_split_samplers(train_dataset, split_ratio=0.8):
->>>>>>> origin/master
     num_samples = len(train_dataset)
     split_idx = int(num_samples * split_ratio)
     # numpy seed for consistency
