@@ -130,7 +130,7 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-            Predictive performance value on the given dataset, based on the `eval_matric` used by this Predictor.
+            Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
         perf = self._learner.score(dataset)
         sign = self._learner.objective_func._sign
@@ -166,7 +166,7 @@ class TabularPredictor(BasePredictor):
 
     def fit_summary(self, verbosity=3):
         """
-            Output summary of information about models preoduced during `fit()`.
+            Output summary of information about models produced during `fit()`.
             May create various generated summary plots and store them in folder: `Predictor.output_directory`.
 
             Parameters
@@ -267,7 +267,7 @@ class TabularPredictor(BasePredictor):
     def load(cls, output_directory, verbosity=2):
         """ 
         Load a predictor object previously produced by `fit()` from file and returns this object. 
-        Is functionally equivalent to :method:`TabularPrediction.load` method.
+        Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.load`.
 
         Parameters
         ----------

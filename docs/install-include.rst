@@ -92,8 +92,8 @@ Select your preferences and run the install command.
            
               .. note::
               
-                 If you don't have them, you must first install the following packages: 
-                 `XCode <https://developer.apple.com/xcode/>`_, [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, the latter two packages can be installed via:
 
                  .. code-block:: bash
@@ -109,15 +109,15 @@ Select your preferences and run the install command.
 
               .. note::
               
-                 If you don't have them, you must first install the following packages: 
-                 [XCode](https://developer.apple.com/xcode/), [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, the latter two packages can be installed via:
 
                  .. code-block:: bash
 
                      brew install libomp opencv
 
-              Please build MXNet from source to utilize GPU, following detailed instructions from the [MXNet Docs](https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu).
+              Please build MXNet from source to utilize GPU, following detailed instructions from the `MXNet Docs <https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
 
               .. code-block:: bash
 
@@ -129,8 +129,8 @@ Select your preferences and run the install command.
 
               .. note::
               
-                 If you don't have them, you must first install the following packages: 
-                 [XCode](https://developer.apple.com/xcode/), [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, the latter two packages can be installed via:
 
                  .. code-block:: bash
@@ -147,22 +147,22 @@ Select your preferences and run the install command.
 
               .. note::
               
-                 If you don't have them, you must first install the following packages: 
-                 [XCode](https://developer.apple.com/xcode/), [Homebrew](https://brew.sh/), [opencv](https://opencv.org/), [LibOMP](https://formulae.brew.sh/formula/libomp)
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
                  Once you have Homebrew, the latter two packages can be installed via:
 
                  .. code-block:: bash
 
                      brew install libomp opencv
 
-              Please build MXNet from source to utilize GPU, following detailed instructions from the [MXNet Docs](https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu).
+              Please build MXNet from source to utilize GPU, following detailed instructions from the `MXNet Docs <https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
 
               .. code-block:: bash
 
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
-  ..
+  .. note::
 
-     AutoGluon is only supported for [Python](https://www.python.org/downloads/release/python-370/) versions >= 3.6. Make sure [CUDA](https://developer.nvidia.com/cuda-downloads) and [cuDNN](https://developer.nvidia.com/cudnn) are installed if you want to use GPU.
+     AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ versions >= 3.6, and `CUDA <https://developer.nvidia.com/cuda-downloads>`_ + `cuDNN <https://developer.nvidia.com/cudnn>`_ to use GPU.
 

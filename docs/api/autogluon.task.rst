@@ -45,6 +45,7 @@ AutoGluon Tasks
 .. autoclass:: ImageClassification
    :members:
    :inherited-members:
+   :exclude-members: run_fit
 
     .. rubric:: Methods
 
@@ -57,6 +58,7 @@ AutoGluon Tasks
 .. autoclass:: ObjectDetection
    :members:
    :inherited-members:
+   :exclude-members: run_fit
 
     .. rubric:: Methods
 
@@ -68,7 +70,7 @@ AutoGluon Tasks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularPrediction
-   :members: fit, load
+   :members: fit, load, Predictor, Dataset
    :no-inherited-members:
    :exclude-members: run_fit
 
@@ -131,6 +133,7 @@ Tabular Data Objects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TabularPredictor
+   :members:
    :no-inherited-members:
 
     .. rubric:: Methods

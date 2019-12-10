@@ -33,7 +33,7 @@ def get_dataset(path=None, train=True, name=None,
                 input_size=224, crop_ratio=0.875, jitter_param=0.4,
                 *args, **kwargs):
     """ Method to produce image classification dataset for AutoGluon, can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
+    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
     Parameters

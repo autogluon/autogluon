@@ -42,7 +42,7 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-        :class:`TabularPredictor` object that can be used to make predictions.
+        :class:`~autogluon.task.predictor.TabularPredictor` object that can be used to make predictions.
         """
         logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
         if output_directory is None:
@@ -161,7 +161,7 @@ class TabularPrediction(BaseTask):
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`, 
-            where `L` ranges from 0 to 50 (Note: higher values `L` correspond to fewer print statements, opposite of verbosity levels)
+            where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         
         Kwargs can include addtional arguments for advanced users:
             feature_generator_type : (`FeatureGenerator` class, default=`AutoMLFeatureGenerator`)
