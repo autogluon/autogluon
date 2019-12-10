@@ -21,11 +21,8 @@ autogluon.task
    
    >>> classifier = task.fit(dataset, epochs=2)
    
-<<<<<<< HEAD
-=======
    Evaluate predictions on test data:
-   
->>>>>>> origin/master
+
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
 
@@ -65,10 +62,7 @@ AutoGluon Tasks
 
     .. autoautosummary:: ObjectDetection
         :methods:
-<<<<<<< HEAD
 
-=======
-        
 
 :hidden:`TabularPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,7 +79,6 @@ AutoGluon Tasks
 
 Image Classification Datasets
 -----------------------------
->>>>>>> origin/master
 
 .. automodule:: autogluon.task.image_classification
 
@@ -128,8 +121,6 @@ Image Classification Datasets
 
     .. autoautosummary:: RecordDataset
         :attributes:
-<<<<<<< HEAD
-=======
 
 Tabular Data Objects
 -----------------------------
@@ -148,4 +139,3 @@ Tabular Data Objects
 .. autoclass:: TabularPredictor
    :no-inherited-members:
 
->>>>>>> origin/master

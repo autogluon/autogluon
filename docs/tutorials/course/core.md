@@ -121,7 +121,6 @@ print(g)
 ```
 
 Get one example configuration:
-<<<<<<< HEAD
 
 ```{.python .input}
 g.rand
@@ -129,15 +128,6 @@ g.rand
 
 ### Decorators for Searchbale Object and Customized Training Scripts
 
-=======
-
-```{.python .input}
-g.rand
-```
-
-### Decorators for Searchbale Object and Customized Training Scripts
-
->>>>>>> origin/master
 In this section, we show how to insert search space into customized objects and
 training functions.
 

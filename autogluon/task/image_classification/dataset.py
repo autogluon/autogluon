@@ -36,7 +36,10 @@ def get_dataset(path=None, train=True, name=None,
     """ Method to produce image classification dataset for AutoGluon, can either be a 
     :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/kaggle_benchmark
 
     Parameters
     ----------
@@ -180,15 +183,12 @@ class ImageFolderDataset(object):
         if len(samples) == 0:
             raise (RuntimeError("Found 0 files in subfolders of: " + self.root + "\n"
                                 "Supported extensions are: " + ",".join(extensions)))
-
         self.extensions = extensions
-
         self.classes = classes
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
         self.imgs = self.samples
-
 
     def make_dataset(self, dir, class_to_idx, extensions=None, is_valid_file=None):
         images = []
@@ -216,7 +216,6 @@ class ImageFolderDataset(object):
                     if is_valid_file(path):
                         item = (path, class_to_idx[target])
                         images.append(item)
-
         if not class_to_idx:
             for root, _, fnames in sorted(os.walk(dir)):
                 for fname in sorted(fnames):
@@ -323,7 +322,6 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
         def transform(data, label):
             return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)
         return gluon.data.vision.MNIST(train=train, transform=transform)
-
     elif name == 'fashionmnist':
         def transform(data, label):
             return nd.transpose(data.astype(np.float32), (2,0,1))/255, label.astype(np.float32)

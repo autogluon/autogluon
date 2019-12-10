@@ -84,12 +84,6 @@ Advanced Topics
 
       How to do hyperparameter tuning or architecture search for any PyTorch model.
 
-   .. card::
-      :title: For PyTorch Users
-      :link: tutorials/torch/index.html
-
-      PyTorch HPO and NAS tutorials.
-
 .. toctree::
    :maxdepth: 2
    :hidden:

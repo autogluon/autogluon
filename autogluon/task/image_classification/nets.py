@@ -8,10 +8,7 @@ from ...core import *
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['get_built_in_network',
-           'auto_suggest_network']
-
-# __all__ = ['get_network', 'auto_suggest_network']
+__all__ = ['get_built_in_network','auto_suggest_network']
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):

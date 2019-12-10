@@ -9,13 +9,12 @@ from gluoncv.utils import makedirs
 local_path = os.path.dirname(__file__)
 # data_path = '/your_path/'
 data_path = '/home/ubuntu/workspace/data/dataset/'
-# dataset = 'dogs-vs-cats-redux-kernels-edition/' #sub ok
-# dataset = 'aerial-cactus-identification/' # ok
-dataset = 'plant-seedlings-classification/' # sub ok
-# dataset = 'fisheries_Monitoring/' # sub ok
+# dataset = 'dogs-vs-cats-redux-kernels-edition/'
+# dataset = 'aerial-cactus-identification/'
+dataset = 'plant-seedlings-classification/'
+# dataset = 'fisheries_Monitoring/'
 # dataset = 'dog-breed-identification/'
-# dataset = 'shopee-iet-machine-learning-competition/' #ok
-# dataset = 'shopee-iet/'
+# dataset = 'shopee-iet-machine-learning-competition/'
 
 makedirs(dataset)
 logging_file = os.path.join(dataset ,'summary.log')

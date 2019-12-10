@@ -32,7 +32,6 @@ def train_image_classification(args, reporter):
     batch_size = target_params.get_batchsize
     ctx = target_params.get_context
     classes = args.dataset.num_classes if hasattr(args.dataset, 'num_classes') else None
-
     target_kwargs = Getmodel_kwargs(ctx,
                                     classes,
                                     args.net,

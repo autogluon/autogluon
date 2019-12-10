@@ -41,7 +41,6 @@ This is an example of a :class:`autogluon.space.Categorical` search space, in wh
 
 ```{.python .input}
 import gluoncv as gcv
-<<<<<<< HEAD
 
 @ag.func(
     multiplier=ag.Categorical(0.25, 1.0),
@@ -49,15 +48,6 @@ import gluoncv as gcv
 def get_mobilenet(multiplier):
     return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
 
-=======
-
-@ag.func(
-    multiplier=ag.Categorical(0.25, 1.0),
-)
-def get_mobilenet(multiplier):
-    return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
-
->>>>>>> origin/master
 net = ag.space.Categorical('resnet50_v1b', get_mobilenet())
 print(net)
 ```
@@ -93,26 +83,13 @@ This process of finding good hyperparameters from a given search space is common
 We currently support random search, Hyperband, and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
 
 ### Bayesian Optimization
-<<<<<<< HEAD
 
 Here is an example of using Bayesian Optimization using :class:`autogluon.searcher.SKoptSearcher`.
 
 Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration.
 
-<<<<<<< HEAD
-=======
-
-Here is an example of using Bayesian Optimization using :class:`autogluon.searcher.SKoptSearcher`.
-
-Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration.
-
->>>>>>> origin/master
-You can specify what kind of surrogate model to use (Gaussian Process, Random Forest, etc), as well as which acquisition function to employ (eg. Expected Improvement, Lower Confidence Bound, etc).  Below, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
-More detail in :class:`autogluon.searcher.SKoptSearcher`
-=======
 You can specify what kind of surrogate model to use (e.g., Gaussian Process, Random Forest, etc.), in addition to which acquisition function to employ (e.g., Expected Improvement, Lower Confidence Bound, etc.).  In the following, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
 For more information, see :class:`autogluon.searcher.SKoptSearcher`.
->>>>>>> origin/master
 
 ```{.python .input}
 time_limits = 2*60
@@ -131,17 +108,10 @@ print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr
 ```
 
 Load the test dataset and evaluate:
-<<<<<<< HEAD
 
 ```{.python .input}
 test_dataset = task.Dataset('data/test', train=False)
 
-=======
-
-```{.python .input}
-test_dataset = task.Dataset('data/test', train=False)
-
->>>>>>> origin/master
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
@@ -177,18 +147,5 @@ test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
 
-<<<<<<< HEAD
-Please see comparison of different search algorithms and scheduling strategies :ref:`course_alg`.
-More options using fit is available at :class:`autogluon.task.ImageClassification`.
-<<<<<<< HEAD
-
-Finish and exit:
-```{.python .input}
-ag.done()
-```
-=======
->>>>>>> origin/master
-=======
 For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.
 For more options using `fit`, see :class:`autogluon.task.ImageClassification`.
->>>>>>> origin/master

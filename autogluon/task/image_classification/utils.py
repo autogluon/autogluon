@@ -109,7 +109,6 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
     elif label_smoothing:
         hard_label = label
         label = smooth(label, classes)
-
     with mx.autograd.record():
         outputs = [net(X.astype(dtype, copy=False)) for X in data]
         if distillation:

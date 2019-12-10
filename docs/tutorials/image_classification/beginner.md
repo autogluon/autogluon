@@ -14,16 +14,8 @@ from autogluon import ImageClassification as task
 
 ## Create AutoGluon Dataset
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-Our image classification task is based on a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle. Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
-=======
-For demo purpose, we will use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
-=======
 For demonstration purpose, we use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
->>>>>>> origin/master
 Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
->>>>>>> origin/master
 Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`.
 
 We download the data subset and unzip it using the following commands:
@@ -39,13 +31,7 @@ After the dataset is downloaded, we load it into a [`Dataset`](/api/autogluon.t
 dataset = task.Dataset('data/train')
 ```
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-Load the test dataset:
-=======
 Load the test dataset as follows:
->>>>>>> origin/master
 
 ```{.python .input}
 test_dataset = task.Dataset('data/test', train=False)
@@ -59,7 +45,6 @@ if ag.get_gpu_count() == 0:
     test_dataset = task.Dataset(name='FashionMNIST', train=False)
 ```
 
->>>>>>> origin/master
 ## Use AutoGluon to Fit Models
 
 Now, we fit a classifier using AutoGluon as follows:
@@ -86,32 +71,6 @@ print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
 ```{.python .input}
-<<<<<<< HEAD
-image = 'data/test/BabyShirt/BabyShirt_323.jpg'
-ind, prob = classifier.predict(image)
-
-print('The input picture is classified as [%s], with probability %.2f.' %
-      (dataset.init().classes[ind.asscalar()], prob.asscalar()))
-```
-
-## Evaluate on Test Dataset
-
-We now evaluate the classifier on a test dataset:
-
-Load the test dataset:
-
-```{.python .input}
-test_dataset = task.Dataset('data/test', train=False)
-```
-
-The validation and test top-1 accuracy are:
-
-```{.python .input}
-test_acc = classifier.evaluate(test_dataset)
-print('Top-1 test acc: %.3f' % test_acc)
-```
-
-=======
 # skip this if training FashionMNIST on CPU.
 if ag.get_gpu_count() > 0:
     image = 'data/test/BabyShirt/BabyShirt_323.jpg'
@@ -126,7 +85,6 @@ if ag.get_gpu_count() > 0:
 We now evaluate the classifier on a test dataset.
 
 The validation and test top-1 accuracy are:
->>>>>>> origin/master
 
 ```{.python .input}
 test_acc = classifier.evaluate(test_dataset)

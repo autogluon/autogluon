@@ -90,19 +90,9 @@ each neural network requires the user to specify many hyperparameters (e.g., lea
 
 AutoGluon automatically does Training/Validation split:
 
-<<<<<<< HEAD
-```{.python .input}
-# from autogluon import ImageClassification as task
-<<<<<<< HEAD
-# dataset = task.Dataset('data/shopeeiet/train')
-=======
-# dataset = task.Dataset('./data/shopeeiet/train')
->>>>>>> origin/master
-=======
 ```
 from autogluon import ImageClassification as task
 dataset = task.Dataset('./data/shopeeiet/train')
->>>>>>> origin/master
 ```
 
 AutoGluon automatically infers how many classes there are based on the directory structure. 
@@ -113,59 +103,7 @@ By default, AutoGluon automatically constructs the training/validation set split
 
 where the images that fall into the validation set are randomly chosen from the training data based on the class.
 
-<<<<<<< HEAD
-### Manually-specified training/validation split
-
-Instead, you can also split your labeled data manually into training and validation sets.
-Manually splitting your data is a good choice when you want to exercise more control over the process
-or if there are specific images that you're sure you want included in a certain part of your model training lifecycle.
-
-If we want to manually specify the Training/Validation split, we could construct by running the command:
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/static/prepare_shopeeiet.py')
-# os.system('python prepare_shopeeiet.py --data ~/data/shopeeiet/ --split 9')
-```
-
-where `--split 9` would sample 10% data from the `data` directory as Validation set, and the rest 90% data would be Training set.
-
-The resulting data should be looking as the following structure:
-
-```
-    shopeeiet
-    ├── train
-        ├── BabyBibs
-        ├── BabyHat
-        ├── BabyPants
-        ├── ...
-    ├── val
-        ├── BabyBibs
-        ├── BabyHat
-        ├── BabyPants
-        ├── ...
-    └── test
-```
-
-Then tell AutoGluon where the training and validation data is, which means we disable AutoGluon's automatic Training/Validation split functionality, instead, we manually provide the Training/Validation split via:
-
-We have the processed dataset if you don't want to explore new Kaggle dataset, please simply download it and try the larger dataset.
-
-```{.python .input}
-# import os
-# os.system('wget http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/shopeeiet/data_shopeeiet.zip')
-# os.system('unzip -o data_shopeeiet.zip -d ~/')
-```
-
-```{.python .input}
-# from autogluon import ImageClassification as task
-# dataset = task.Dataset('data/shopeeiet/train')
-```
-
-## Step 3: Use AutoGluon fit to generate a classification model (Optional)
-=======
 ## Step 3: Use AutoGluon fit to generate a classification model
->>>>>>> origin/master
 
 Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function.
 
@@ -190,19 +128,9 @@ print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
 
-<<<<<<< HEAD
-```{.python .input}
-<<<<<<< HEAD
-# inds, probs = classifier.predict('data/shopeeiet/test')
-=======
-# test_dataset = task.Dataset('./data/shopeeiet/test')
-# inds, probs = classifier.predict(test_dataset)
->>>>>>> origin/master
-=======
 ```
 test_dataset = task.Dataset('./data/shopeeiet/test')
 inds, probs = classifier.predict(test_dataset)
->>>>>>> origin/master
 ```
 
 `inds` above contains the indices of the predicted class for each test image. `probs` contains the confidence in these class predictions.
