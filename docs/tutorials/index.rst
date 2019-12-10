@@ -22,7 +22,7 @@ Image Classification
       :title: Use Your Own Dataset
       :link: image_classification/kaggle.html
 
-      Participate Kaggle competation.
+      Participate Kaggle competition.
 
 Object Detection
 ----------------

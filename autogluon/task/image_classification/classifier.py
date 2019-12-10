@@ -101,7 +101,7 @@ class Classifier(BasePredictor):
             X = X.init()
         inds, probas = [], []
         for x in X:
-            ind, proba = predict_img(x)
+            ind, proba = predict_img(x[0])
             inds.append(ind)
             probas.append(proba)
         return inds, probas
@@ -143,11 +143,8 @@ class Classifier(BasePredictor):
         _, test_reward = metric.get()
         return test_reward
 
-    def _save_model(self, *args, **kwargs):
-        raise NotImplemented
-
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplemented
+        raise NotImplementedError # TODO
 
     @staticmethod
     def _format_results(results): # TODO: remove since this has been moved to base_predictor.py

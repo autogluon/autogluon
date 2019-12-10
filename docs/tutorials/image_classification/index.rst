@@ -1,7 +1,7 @@
 Image classification
 ====================
 
-AutoGluon provides fit API which allows faster prototyping on image classification.
+AutoGluon provides the `fit` API, which enables faster prototyping on image classification.
 
 .. container:: cards
 
@@ -22,7 +22,7 @@ AutoGluon provides fit API which allows faster prototyping on image classificati
       :title: Use Your Own Dataset
       :link: kaggle.html
 
-      Participate Kaggle competation.
+      Participate in the Kaggle competition.
 
 .. toctree::
    :maxdepth: 1

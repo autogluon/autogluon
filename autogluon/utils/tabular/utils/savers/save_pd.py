@@ -1,11 +1,10 @@
+import multiprocessing, os, boto3, json, logging
 from io import StringIO
-import multiprocessing
 import numpy as np
-import os
-import boto3
-import json
 
 from .. import s3_utils, multiprocessing_utils
+
+logger = logging.getLogger(__name__)
 
 
 # gzip compression produces random deflate issues on linux machines - use with caution
@@ -44,14 +43,14 @@ def save(path, df, index=False, verbose=True, type=None, sep=',', compression='g
             s3_resource = boto3.resource('s3')
             s3_resource.Object(bucket, prefix).put(Body=buffer.getvalue(), ACL='bucket-owner-full-control')
         if verbose:
-            print("Saved " + path, "| Columns =", column_count, "| Rows =", row_count)
+            logger.log(15, "Saved " +str(path)+" | Columns = "+str(column_count)+" | Rows = "+str(row_count))
     elif type == 'parquet':
         try:
             df.to_parquet(path, compression=compression, engine='fastparquet')  # TODO: Might be slower than pyarrow in multiprocessing
         except:
             df.to_parquet(path, compression=compression, engine='pyarrow')
         if verbose:
-            print("Saved " + path, "| Columns =", column_count, "| Rows =", row_count)
+            logger.log(15, "Saved "+str(path)+" | Columns = "+str(column_count)+" | Rows = "+str(row_count))
     elif type == 'multipart_s3':
         bucket, prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3_utils.delete_s3_prefix(bucket=bucket, prefix=prefix)  # TODO: Might only delete the first 1000!
@@ -64,7 +63,7 @@ def save(path, df, index=False, verbose=True, type=None, sep=',', compression='g
                     if os.path.isfile(file_path):
                         os.unlink(file_path)
                 except Exception as e:
-                    print(e)
+                    logger.exception(e)
         save_multipart(path=path, df=df, index=index, verbose=verbose, type='parquet', sep=sep, compression=compression, header=header, json_dump_columns=None)
     else:
         raise Exception('Unknown save type: ' + type)
@@ -80,7 +79,7 @@ def save_multipart(path, df, index=False, verbose=True, type=None, sep=',', comp
     workers_count = int(round(cpu_count))
     parts = workers_count
 
-    print('running pool with', workers_count, 'workers')
+    logger.log(15, 'Save_multipart running pool with '+str(workers_count)+' workers')
 
     paths = [path + 'part-' + '0' * (5 - min(5, len(str(i)))) + str(i) + '.parquet' for i in range(parts)]
     df_parts = np.array_split(df, parts)
@@ -91,4 +90,4 @@ def save_multipart(path, df, index=False, verbose=True, type=None, sep=',', comp
 
     multiprocessing_utils.execute_multiprocessing(workers_count=workers_count, transformer=save_multipart_child, chunks=full_chunks)
 
-    print("Saved multipart file to", path)
+    logger.log(15, "Saved multipart file to "+str(path))

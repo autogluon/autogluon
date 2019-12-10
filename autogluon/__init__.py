@@ -7,7 +7,7 @@ from .utils.try_import import *
 
 try_import_mxnet()
 
-from . import scheduler, searcher, nas, utils
+from . import scheduler, searcher, utils
 from .scheduler import get_cpu_count, get_gpu_count
 
 from .utils import *

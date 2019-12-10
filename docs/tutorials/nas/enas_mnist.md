@@ -1,19 +1,16 @@
-# How to Use ENAS in 10 mins
+# How to Use ENAS in Ten Minutes
 :label:`sec_proxyless`
 
-## What is the key idea of ENAS and ProxylessNAS
+## What is the Key Idea of ENAS and ProxylessNAS?
 
-Traditional reinforcement learning based neural architecture search learns a architecture controller
-by teratively sampling the architecture and training the model to get final reward to update the controller.
-It is extremely expensive process due to training CNN.
+Traditional reinforcement learning-based neural architecture search learns an architecture controller
+by iteratively sampling the architecture and training the model to get final reward to update the controller. It is extremely expensive process due to training CNN.
 
 ![ProxylessNAS](https://autogluon.s3.amazonaws.com/_images/proxyless.png)
 
-Recent work of ENAS and ProxylessNAS construct an over-parameterized network (supernet) and share the weights
-across different architecutre to speed up the search speed. The reward is calculated every few iters instead
-of every entire training period.
+Recent work of ENAS and ProxylessNAS construct an over-parameterized network (supernet) and share the weights across different architecture to speed up the search speed. The reward is calculated every few iterations instead of every training period.
 
-import MXNet and AutoGluon:
+Import MXNet and AutoGluon:
 
 ```{.python .input}
 import autogluon as ag
@@ -21,7 +18,7 @@ import mxnet as mx
 import mxnet.gluon.nn as nn
 ```
 
-## How to construct a SuperNet?
+## How to Construct a SuperNet
 
 Basic NN blocks for CNN.
 
@@ -62,7 +59,7 @@ class ResUnit(mx.gluon.HybridBlock):
 
 ### AutoGluon Sequntial
 
-Creating a ENAS network using Sequential Block
+Creating a ENAS network using Sequential Block:
 
 ```{.python .input}
 mynet = ENAS_Sequential(
@@ -92,7 +89,7 @@ y = mynet.evaluate_latency(x)
 Show the latencies:
 
 ```{.python .input}
-print('Average latency is {:.2f} ms, latency of the current architecutre is {:.2f} ms'.format(mynet.avg_latency, mynet.latency))
+print('Average latency is {:.2f} ms, latency of the current architecture is {:.2f} ms'.format(mynet.avg_latency, mynet.latency))
 ```
 
 We also provide number of params
@@ -100,7 +97,7 @@ We also provide number of params
 mynet.nparams
 ```
 
-Defind the reward function:
+Define the reward function:
 
 ```{.python .input}
 reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1)
@@ -108,7 +105,7 @@ reward_fn = lambda metric, net: metric * ((net.avg_latency / net.latency) ** 0.1
 
 ## Start the Training
 
-Construct experiment scheduler, which automatically cretes a RL controller based on user defined search space.
+Construct experiment scheduler, which automatically creates an RL controller based on user-defined search space.
 
 ```{.python .input}
 scheduler = ENAS_Scheduler(mynet, train_set='mnist',

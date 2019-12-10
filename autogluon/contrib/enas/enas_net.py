@@ -1,7 +1,7 @@
 import mxnet as mx
 from mxnet import gluon
-from ...nas.models.utils import *
-from ...nas.models.mbconv import MBConvBlock
+from ...model_zoo.models.utils import *
+from ...model_zoo.models.mbconv import MBConvBlock
 from ...core.space import *
 from .enas import enas_unit, ENAS_Sequential
 

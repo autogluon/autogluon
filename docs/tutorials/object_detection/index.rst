@@ -1,7 +1,7 @@
 Object detection
 ====================
 
-AutoGluon provides fit API which allows faster prototyping on object detection
+AutoGluon provides the `fit` API, which enables faster prototyping on object detection.
 
 .. container:: cards
 
@@ -9,7 +9,7 @@ AutoGluon provides fit API which allows faster prototyping on object detection
       :title: Quick Start Using FIT
       :link: beginner.html
 
-      Quick start tutorial.
+      Quick start tutorial on using the `fit` API.
 
 .. toctree::
    :maxdepth: 1

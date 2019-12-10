@@ -1,7 +1,9 @@
+import logging
 from pandas import DataFrame
 
 from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
+logger = logging.getLogger(__name__)
 
 # Cleaner cleans data prior to entering feature generation
 class Cleaner:
@@ -57,11 +59,12 @@ class CleanerMulticlass(Cleaner):
         valid_classes = list(class_counts_valid.index)
         sum_prior = sum(class_counts)
         sum_after = sum(class_counts_valid)
-
         percent = sum_after / sum_prior
-
-        print('classes kept:', len(valid_classes), '/', len(class_counts))
-        print('percent of data kept:', percent)
+        if len(valid_classes) < len(class_counts):
+            logger.log(25, 'Warning: Some classes in data were not valid. AutoGluon will only keep '+str(len(valid_classes))+
+                   ' out of '+str(len(class_counts))+ ' classes')
+        if percent < 1.0:
+            logger.log(25, 'Fraction of data that will be kept for training models: '+str(percent))
         return valid_classes
 
     @staticmethod

@@ -1,10 +1,10 @@
 # Customize User Objects
 :label:`sec_customobj`
 
-User may want to define some customized objects with search spaces, such as network architectures,
+A user may want to define some customized objects with search spaces, such as network architectures,
 or specialized optimizers. We provide an API to do that.
 
-## Example for Constructing A Network
+## Example for Constructing a Network
 
 This is an example of doing architecture search as HPO. If you are interested in efficient neural
 architecture search, please refer another tutorial `sec_proxyless`_ .
@@ -21,14 +21,14 @@ channels = [16, 16, 32, 64]
 net = CIFARResNetV1(CIFARBasicBlockV1, layers, channels)
 ```
 
-We can visidualize the network:
+We can visualize the network:
 
 ```{.python .input}
 import autogluon as ag
 ag.utils.plot_network(net, (1, 3, 32, 32))
 ```
 
-### Searchable Network Architecture using AutoGluon Object
+### Searchable Network Architecture Using AutoGluon Object
 
 :func:`autogluon.obj` enables customized search space to any user defined class. It can also be used within `autogluon.Categorical()` if you have multiple networks to choose from.
 
@@ -81,7 +81,7 @@ myoptim = Adam(learning_rate=ag.Real(1e-2, 1e-1, log=True), wd=ag.Real(1e-5, 1e-
 print(myoptim.cs)
 ```
 
-### Launch Experiments using AutoGluon Object
+### Launch Experiments Using AutoGluon Object
 
 AutoGluon Object is compatible with Fit API in AutoGluon tasks, and also works with user-defined training
 scripts using :func:`autogluon.autogluon_register_args`. We can start fitting:

@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from collections import Counter
 
@@ -5,6 +6,7 @@ from ..constants import PROBLEM_TYPES
 from ...metrics import calculate_score, _ProbaScorer, _ThresholdScorer
 from ..utils import get_pred_from_proba
 
+logger = logging.getLogger(__name__)
 
 class EnsembleSelection:
     def __init__(
@@ -44,18 +46,16 @@ class EnsembleSelection:
 
         self._fit(predictions=predictions, labels=labels)
         self._calculate_weights()
-        print('weights:')
-        print(self.weights_)
+        logger.log(15, 'Ensemble weights: ')
+        logger.log(15, self.weights_)
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
     def _fit(self, predictions, labels):
         ensemble_size = self.ensemble_size
         self.num_input_models_ = len(predictions)
-
         ensemble = []
         trajectory = []
         order = []
-
 
         # if self.sorted_initialization:
         #     n_best = 20
@@ -126,10 +126,9 @@ class EnsembleSelection:
             self.trajectory_ = trajectory[:first_index_of_best+1]
             self.train_score_ = trajectory[first_index_of_best]  # TODO: Select best iteration or select final iteration? Earlier iteration could have a better score!
             self.ensemble_size = first_index_of_best + 1
+            logger.log(15, 'Ensemble size: %s' % self.ensemble_size)
 
-            print('ensemble_size:', self.ensemble_size)
-
-        print(self.indices_)
+        logger.debug("Ensemble indices: "+str(self.indices_))
 
     def _calculate_weights(self):
         ensemble_members = Counter(self.indices_).most_common()

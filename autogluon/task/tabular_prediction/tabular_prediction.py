@@ -1,7 +1,8 @@
-import logging
+import copy, logging
 import numpy as np
 
 from .dataset import TabularDataset
+from .predictor import TabularPredictor
 from ..base import BaseTask
 from ..base.base_task import schedulers
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
@@ -10,21 +11,22 @@ from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGen
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
 from ...utils.tabular.metrics import CLASSIFICATION_METRICS, REGRESSION_METRICS
 from ...utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from ...utils import verbosity2loglevel
 
 __all__ = ['TabularPrediction']
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger() # return root logger
 
 class TabularPrediction(BaseTask):
     """ 
-    AutoGluon Task for predicting a column of tabular dataset (classification or regression).
+    AutoGluon Task for predicting a column of tabular dataset (classification or regression)
     """
     
     Dataset = TabularDataset
+    Predictor = TabularPredictor
     
     @staticmethod
-    def load(output_directory):
+    def load(output_directory, verbosity=2):
         """ 
         Load a predictor object previously produced by fit() from file and returns this object.
         
@@ -32,15 +34,23 @@ class TabularPrediction(BaseTask):
         ----------
         output_directory : (str)
             Path to directory where trained models are stored (ie. the output_directory specified in previous call to fit()).
+        verbosity : (int, default = 2)
+            Verbosity levels range from 0 to 4 and control how much information is generally printed by the loaded Predictor.
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
         
         Returns
         -------
-        DefaultLearner object # TODO: link/describe.
+        TabularPredictor object.
         """
+        logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
+        
         output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
-        return Learner.load(output_directory)
+        learner = Learner.load(output_directory)
+        return TabularPredictor(learner=learner)
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
@@ -49,12 +59,13 @@ class TabularPrediction(BaseTask):
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
                                'RF': {'n_estimators': 300},
-                               'XT': {'n_estimators': 150},
+                               'XT': {'n_estimators': 300},
                                'KNN': {},
+                               'custom': ['GBM'],
                               },
-            time_limits=None, num_trials=None, dist_ip_addrs=[], visualizer='none',
-            nthreads_per_trial=None, ngpus_per_trial=None,
-            search_strategy='random', search_options={}, **kwargs):
+            time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
+            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
+            verbosity=2, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
         
@@ -92,12 +103,29 @@ class TabularPrediction(BaseTask):
             Whether or not to perform feature selection
         hyperparameters : (dict) 
             Keys are strings that indicate which model types to train.
-                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest).
-                If certain key is missing from hyperparameters, then fit() will not train any models of that type.
+                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
+                If certain key is missing from hyperparameters, then fit() will not train any models of that type. 
+                Set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type. 
                 Each hyperparameter can be fixed value or search space. For full list of options, please see # TODO: link. # TODO: create documentation file describing all models and  all hyperparameters. 
                 Hyperparameters not specified will be set to default values (or default search spaces if hyperparameter_tune=True). 
                 Caution: Any provided search spaces will be overriden by fixed defauls if hyperparameter_tune=False. 
+            
+            Note: `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
+            If `hyperparameter_tune = False`, then these additional models will also be trained using custom pre-specified hyperparameter settings that often work well.
+            
+            Details regarding the hyperparameters you can specify for each model:
+                NN: See file autogluon/utils/tabular/ml/models/tabular_nn/hyperparameters/parameters.py
+                GBM: See file autogluon/utils/tabular/ml/models/lgb/hyperparameters/parameters.py 
+                     and the lightGBM docs: https://lightgbm.readthedocs.io/en/latest/Parameters.html
+                CAT: See file autogluon/utils/tabular/ml/models/catboost/hyperparameters/parameters.py 
+                     and the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
+                RF: n_estimators is currently the only hyperparameter you can specify, 
+                    see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html 
+                XT: n_estimators is currently the only hyperparameter you can specify, 
+                    see sklearn docs: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
+                KNN: Currently no hyperparameters may be specified for k-nearest-neighbors models
+                
         holdout_frac : (float) 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless tuning_data=None, ignored if num_bagging_folds != 0).
             Default value is 0.2 if hyperparameter_tune = True, otherwise 0.1 is used. 
@@ -108,28 +136,33 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of stack_ensemble_levels+1 (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
             To prevent overfitting, this argument is ignored unless num_bagging_folds is also set >= 2. 
+        time_limits : (int)
+            Approximately how long fit() should run for (wallclock time in seconds). 
+            fit() will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+        num_trials : (int) 
+            Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
+            If both time_limits and num_trials are specified, time_limits takes precedent. 
+            If neither is specified, AutoGluon runs for some fixed amount of time. 
         search_strategy : (str) 
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : (dict)
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
-        time_limits : (int)
-            Approximately how long fit() should run for (wallclock time in seconds). 
-            fit() will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
-        num_trials : (int) 
-            Maximal number of different hyperparameter settings of each model type to evaluate. 
-            If both time_limits and num_trials are specified, time_limits takes precedent. 
-            If neither is specified, AutoGluon runs for some fixed amount of time. 
-        dist_ip_addrs : (list)
-            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        visualizer : (str)
-            Describes method to visualize training progress during fit(). Options: ['mxboard', 'tensorboard', 'none']. 
         nthreads_per_trial : (int)
             How many CPUs to use in each trial (ie. single training run of a model).
             Automatically determined by AutoGluon when = None.
         ngpus_per_trial : (int)
             How many GPUs to use in each trial (ie. single training run of a model). 
             Automatically determined by AutoGluon when = None. 
+        dist_ip_addrs : (list)
+            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+        visualizer : (str)
+            Describes method to visualize training progress during fit(). Options: ['mxboard', 'tensorboard', 'none']. 
+        verbosity: (int, default = 2)
+            Verbosity levels range from 0 to 4 and control how much information is printed during fit().
+            Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
+            where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
         
         Kwargs can include addtional arguments for advanced users:
             feature_generator_type : (FeatureGenerator class, default=AutoMLFeatureGenerator)
@@ -149,21 +182,34 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-            DefaultLearner object. # TODO: link/describe.
-             # TODO: document Learner object with methods: predict(), predict_proba(), score(), evaluate(), load(), save()
+            TabularPredictor object which can make predictions on new data and summarize what happened during fit().
         
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path=''https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
+        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
         >>> label_column = 'class'
-        >>> predictor = task.fit(train_data=train_data, label=label_column, hyperparameter_tune=False)
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv') # Another Pandas object
+        >>> predictor = task.fit(train_data=train_data, label=label_column)
+        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
-        >>> perf = predictor.evaluate(y_true=y_test, y_pred=y_pred)
+        >>> perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred)
+        >>> results = predictor.fit_summary()
         """
+        if verbosity < 0:
+            verbosity = 0
+        elif verbosity > 4:
+            verbosity = 4
+        
+        logger.setLevel(verbosity2loglevel(verbosity))
+        allowed_kwarg_names = set(['feature_generator_type', 'feature_generator_kwargs', 'trainer_type', 
+                                   'label_count_threshold', 'id_columns'])
+        kwarg_names = list(kwargs.keys())
+        for kwarg_name in kwarg_names:
+            if kwarg_name not in allowed_kwarg_names:
+                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
+        
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
@@ -172,7 +218,7 @@ class TabularPrediction(BaseTask):
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
             # Currently disabled, needs to be updated to align with new model class functionality
-            print('Warning: feature_prune was set to True, but feature_prune does not currently work. Setting to False.')
+            logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
@@ -183,7 +229,14 @@ class TabularPrediction(BaseTask):
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
-        time_limits, num_trials = setup_trial_limits(time_limits, num_trials, hyperparameters)
+        time_limits_orig = copy.deepcopy(time_limits)
+        time_limits_hpo = copy.deepcopy(time_limits)
+        if num_bagging_folds >= 2 and (time_limits_hpo is not None):
+            time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+        time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+        if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
+            hyperparameter_tune = False
+            logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
             holdout_frac = 0.2 if hyperparameter_tune else 0.1
         # Add visualizer to NN hyperparameters:
@@ -206,7 +259,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
             'num_trials': num_trials,
-            'time_out': time_limits,
+            'time_out': time_limits_hpo,
             'visualizer': visualizer,
             'time_attr': 'epoch',  # For tree ensembles, each new tree (ie. boosting round) is considered one epoch
             'reward_attr': 'validation_performance',
@@ -221,9 +274,11 @@ class TabularPrediction(BaseTask):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
-        predictor = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
-            id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, label_count_threshold=label_count_threshold)
-        predictor.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
+        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
+                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, 
+                          label_count_threshold=label_count_threshold)
+        learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, hyperparameters=hyperparameters)
-        return predictor
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
+                      hyperparameters=hyperparameters, time_limit=time_limits_orig, verbosity=verbosity)
+        return TabularPredictor(learner=learner)

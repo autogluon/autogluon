@@ -246,4 +246,5 @@ class mytqdm(base):
         # void -> avoid extraneous `\n` in IPython output cell
         return
 
+
 tqdm = mytqdm if in_ipynb() else base

@@ -1,10 +1,13 @@
-from catboost import CatBoostClassifier, CatBoostRegressor
+import logging, time
+from .....try_import import try_import_catboost
 
 from ..abstract.abstract_model import AbstractModel
 from .hyperparameters.parameters import get_param_baseline
 from .catboost_utils import construct_custom_catboost_metric
 from ...constants import PROBLEM_TYPES_CLASSIFICATION
 from ......core import Int, Real
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Catboost crashes on multiclass problems where only two classes have significant member count.
@@ -13,9 +16,14 @@ from ......core import Int, Real
 class CatboostModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
         super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
-
+        try_import_catboost()
+        from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         self.best_iteration = 0
+        if type(self.params['eval_metric']) == str:
+            self.metric_name = self.params['eval_metric']
+        else:
+            self.metric_name = type(self.params['eval_metric']).__name__
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
@@ -46,7 +54,8 @@ class CatboostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories('__NaN__').fillna('__NaN__')
         return X
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+        start_time = time.time()
         X_train = self.preprocess(X_train)
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -62,23 +71,86 @@ class CatboostModel(AbstractModel):
         for invalid in invalid_params:
             if invalid in self.params:
                 self.params.pop(invalid)
-        print('Catboost Model params:')
-        print(self.params)
+        logger.log(15, 'Catboost model hyperparameters:')
+        logger.log(15, self.params)
 
-        self.model = self.model_type(
-            **self.params,
-        )
+        # TODO: Add more control over these params (specifically early_stopping_rounds)
+        verbosity = kwargs.get('verbosity', 2)
+        if verbosity <= 1:
+            verbose = False
+        elif verbosity == 2:
+            verbose = False
+        elif verbosity == 3:
+            verbose = 20
+        else:
+            verbose = True
 
-        # print('Catboost Model params:')
-        # print(self.model.get_params())
+        init_model = None
+        init_model_tree_count = None
+        init_model_best_iteration = None
+        init_model_best_score = None
 
-        # TODO: Add more control over these params (specifically verbose and early_stopping_rounds)
-        self.model.fit(
-            X_train, Y_train,
-            cat_features=cat_features,
-            eval_set=eval_set,
-            verbose=20,
-            early_stopping_rounds=early_stopping_rounds,
-        )
+        if time_limit:
+            time_left_start = time_limit - (time.time() - start_time)
+            params_init = self.params.copy()
+            num_sample_iter = min(100, params_init['iterations'])
+            params_init['iterations'] = num_sample_iter
+            self.model = self.model_type(
+                **params_init,
+            )
+            self.model.fit(
+                X_train, Y_train,
+                cat_features=cat_features,
+                eval_set=eval_set,
+                use_best_model=True,
+                verbose=verbose,
+                # early_stopping_rounds=early_stopping_rounds,
+            )
+
+            init_model_tree_count = self.model.tree_count_
+            init_model_best_iteration = self.model.get_best_iteration()
+            init_model_best_score = self.model.get_best_score()['validation'][self.metric_name]
+
+            time_left_end = time_limit - (time.time() - start_time)
+            time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
+            estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
+            init_model = self.model
+
+            params_final = self.params.copy()
+            params_final['iterations'] = min(self.params['iterations'] - num_sample_iter, estimated_iters_in_time)
+
+        else:
+            params_final = self.params.copy()
+
+        if params_final['iterations'] > 0:
+            self.model = self.model_type(
+                **params_final,
+            )
+
+            # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
+            self.model.fit(
+                X_train, Y_train,
+                cat_features=cat_features,
+                eval_set=eval_set,
+                verbose=verbose,
+                early_stopping_rounds=early_stopping_rounds,
+                # use_best_model=True,
+                init_model=init_model,
+            )
+
+            if init_model is not None:
+                final_model_best_score = self.model.get_best_score()['validation'][self.metric_name]
+                if self.objective_func._optimum > final_model_best_score:
+                    if final_model_best_score > init_model_best_score:
+                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
+                    else:
+                        best_iteration = init_model_best_iteration
+                else:
+                    if final_model_best_score < init_model_best_score:
+                        best_iteration = init_model_tree_count + self.model.get_best_iteration()
+                    else:
+                        best_iteration = init_model_best_iteration
+
+                self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
 
         self.best_iteration = self.model.tree_count_ - 1

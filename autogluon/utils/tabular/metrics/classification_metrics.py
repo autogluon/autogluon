@@ -1,8 +1,9 @@
+import logging
 import numpy as np
 import scipy as sp
-
 from sklearn.metrics.classification import _check_targets, type_of_target
 
+logger = logging.getLogger(__name__)
 
 def balanced_accuracy(solution, prediction):
     y_type, solution, prediction = _check_targets(solution, prediction)
@@ -37,8 +38,8 @@ def balanced_accuracy(solution, prediction):
     tp = np.sum(np.multiply(solution, prediction), axis=0, dtype=float)
     # Bounding to avoid division by 0
     eps = 1e-15
-    tp = sp.maximum(eps, tp)
-    pos_num = sp.maximum(eps, tp + fn)
+    tp = np.maximum(eps, tp)
+    pos_num = np.maximum(eps, tp + fn)
     tpr = tp / pos_num  # true positive rate (sensitivity)
 
     if y_type in ('binary', 'multilabel-indicator'):
@@ -46,8 +47,8 @@ def balanced_accuracy(solution, prediction):
                     axis=0, dtype=float)
         fp = np.sum(np.multiply((1 - solution), prediction), axis=0,
                     dtype=float)
-        tn = sp.maximum(eps, tn)
-        neg_num = sp.maximum(eps, tn + fp)
+        tn = np.maximum(eps, tn)
+        neg_num = np.maximum(eps, tn + fp)
         tnr = tn / neg_num  # true negative rate (specificity)
         bac = 0.5 * (tpr + tnr)
     elif y_type == 'multiclass':
@@ -86,7 +87,7 @@ def pac_score(solution, prediction):
         maxi = np.nanmax(sol[np.isfinite(sol)])
         mini = np.nanmin(sol[np.isfinite(sol)])
         if maxi == mini:
-            print('Warning, cannot normalize')
+            logger.debug('Warning: cannot normalize array')
             return [solution, prediction]
         diff = maxi - mini
         mid = (maxi + mini) / 2.
@@ -117,7 +118,7 @@ def pac_score(solution, prediction):
             # Make sure the lines add up to one for multi-class classification
             norma = np.sum(prediction, axis=1)
             for k in range(sample_num):
-                prediction[k, :] /= sp.maximum(norma[k], eps)
+                prediction[k, :] /= np.maximum(norma[k], eps)
 
             sample_num = solution.shape[0]
             for i in range(sample_num):
@@ -130,7 +131,7 @@ def pac_score(solution, prediction):
             # multi-label case
 
             # Bounding of predictions to avoid log(0),1/0,...
-        prediction = sp.minimum(1 - eps, sp.maximum(eps, prediction))
+        prediction = np.minimum(1 - eps, np.maximum(eps, prediction))
         # Compute the log loss
         pos_class_log_loss = -np.mean(solution * np.log(prediction), axis=0)
         if (task != 'multiclass') or (label_num == 1):
@@ -158,10 +159,10 @@ def pac_score(solution, prediction):
         For multiplr classes ot labels return the volues for each column
         """
         eps = 1e-15
-        frac_pos_ = sp.maximum(eps, frac_pos)
+        frac_pos_ = np.maximum(eps, frac_pos)
         if task != 'multiclass':  # binary case
             frac_neg = 1 - frac_pos
-            frac_neg_ = sp.maximum(eps, frac_neg)
+            frac_neg_ = np.maximum(eps, frac_neg)
             pos_class_log_loss_ = -frac_pos * np.log(frac_pos_)
             neg_class_log_loss_ = -frac_neg * np.log(frac_neg_)
             base_log_loss = pos_class_log_loss_ + neg_class_log_loss_
@@ -236,6 +237,6 @@ def pac_score(solution, prediction):
     pac = np.mean(np.exp(-the_log_loss))
     base_pac = np.mean(np.exp(-the_base_log_loss))
     # Normalize: 0 for random, 1 for perfect
-    score = (pac - base_pac) / sp.maximum(eps, (1 - base_pac))
+    score = (pac - base_pac) / np.maximum(eps, (1 - base_pac))
 
     return score

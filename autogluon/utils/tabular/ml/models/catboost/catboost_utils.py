@@ -2,7 +2,6 @@ import numpy as np
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
 
-
 # TODO: Add weight support?
 # TODO: Can these be optimized? What computational cost do they have compared to the default catboost versions?
 class CustomMetric:
@@ -31,6 +30,7 @@ class BinaryCustomMetric(CustomMetric):
     def evaluate(self, approxes, target, weight):
         y_pred_proba = self._get_y_pred_proba(approxes=approxes)
 
+        # TODO: Binary log_loss doesn't work for some reason
         if self.needs_pred_proba:
             score = self.metric(np.array(target), y_pred_proba)
         else:
@@ -84,5 +84,7 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'MultiClass'
     if metric.name == 'accuracy':
         return 'Accuracy'
+    if (metric.name == 'log_loss') and (problem_type == BINARY) and needs_pred_proba:
+        return 'Logloss'
     metric_class = metric_classes_dict[problem_type]
     return metric_class(metric=metric, is_higher_better=is_higher_better, needs_pred_proba=needs_pred_proba)

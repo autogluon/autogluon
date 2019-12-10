@@ -1,11 +1,11 @@
 # Image Classification - Quick Start
 :label:`sec_imgquick`
 
-We adopt the task of Image Classification as a running example to illustrate basic usage of AutoGluon’s main APIs. This task involves a few steps which we demonstrate how to get started with AutoGluon. 
+In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs. 
 
-In this tutorial, we will load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models with different hyperparameter configurations and return the best model.
+In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to `AutoGluon`'s [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
-We begin by specifying `image_classification` as our task of interest:
+We begin by specifying [`ImageClassification`](/api/autogluon.task.html#autogluon.task.ImageClassification) as our task of interest as follows:
 
 ```{.python .input}
 import autogluon as ag
@@ -14,31 +14,30 @@ from autogluon import ImageClassification as task
 
 ## Create AutoGluon Dataset
 
-For demo purpose, we will use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
+For demonstration purpose, we use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
 Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
 Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`.
 
-We download the data subset and unzip it via the following commands:
+We download the data subset and unzip it using the following commands:
 
 ```{.python .input}
 filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip')
 ag.unzip(filename)
 ```
 
-Once the dataset resides on our machine, we load it into a `Dataset` object: 
+After the dataset is downloaded, we load it into a [`Dataset`](/api/autogluon.task.html#autogluon.task.ImageClassification.Dataset) object: 
 
 ```{.python .input}
 dataset = task.Dataset('data/train')
 ```
 
-Load the test dataset:
+Load the test dataset as follows:
 
 ```{.python .input}
 test_dataset = task.Dataset('data/test', train=False)
 ```
 
-If you do not do not have a GPU, we will change the dataset to 'FashionMNIST' for demo purpose.
-Otherwise, it will take forever to run:
+If you don't have a GPU, change the dataset to 'FashionMNIST' to ensure that it doesn't take too long to run:
 
 ```{.python .input}
 if ag.get_gpu_count() == 0:
@@ -48,26 +47,26 @@ if ag.get_gpu_count() == 0:
 
 ## Use AutoGluon to Fit Models
 
-Now, we want to fit a classifier using AutoGluon:
+Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
 classifier = task.fit(dataset,
                       epochs=10,
                       ngpus_per_trial=1,
-                      verbose=True)
+                      verbose=False)
 ```
 
-Within `fit`, the dataset is automatically splited into training and validation sets.
-The model with the best hyperparameter configuration is selected based on its performance on validation set.
-The best model is finally retrained on our entire dataset (ie. merging training+validation) using the best configuration.
+Within `fit`, the dataset is automatically split into training and validation sets.
+The model with the best hyperparameter configuration is selected based on its performance on the validation set.
+The best model is finally retrained on our entire dataset (i.e., merging training+validation) using the best configuration.
 
-The best Top-1 accuracy achieved on the validation set is:
+The best Top-1 accuracy achieved on the validation set is as follows:
 
 ```{.python .input}
 print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
 ```
 
-## Predict on A New Image
+## Predict on a New Image
 
 Given an example image, we can easily use the final model to `predict` the label (and the conditional class-probability):
 
@@ -83,8 +82,7 @@ if ag.get_gpu_count() > 0:
 
 ## Evaluate on Test Dataset
 
-We now evaluate the classifier on a test dataset:
-
+We now evaluate the classifier on a test dataset.
 
 The validation and test top-1 accuracy are:
 
