@@ -41,7 +41,7 @@ class RLSearcher(BaseSearcher):
         elif controller_type == 'atten':
             self.controller = AttenController(kwspaces, ctx=ctx, **kwargs)
         else:
-            raise NotImplemented
+            raise NotImplementedError
         self.controller.initialize(ctx=mx.cpu())
         for _ in range(self.controller._nprefetch):
             self.controller._prefetch()
@@ -86,7 +86,7 @@ class BaseController(mx.gluon.Block):
         self._nprefetch = prefetch
 
     def sample(self, *args, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def _prefetch(self):
         async_ret = self._worker_pool.apply_async(self.sample, ())

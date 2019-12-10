@@ -52,7 +52,7 @@ def enas_unit(**kwvars):
                     if isinstance(v, Categorical):
                         param_grid[k] = v.data
                     elif isinstance(v, Space):
-                        raise NotImplemented
+                        raise NotImplementedError
                     else:
                         constants[k] = v
                 from sklearn.model_selection import ParameterGrid

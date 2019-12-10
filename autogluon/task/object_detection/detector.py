@@ -148,19 +148,19 @@ class Detector(BasePredictor):
         
 
     def load(cls, checkpoint):
-        raise NotImplemented
+        raise NotImplementedError
     
     def save(self, checkpoint):
-        raise NotImplemented
+        raise NotImplementedError
 
     
     def predict_proba(self, X):
-        raise NotImplemented
+        raise NotImplementedError
     
     def _save_model(self, *args, **kwargs):
-        raise NotImplemented
+        raise NotImplementedError
 
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplemented
+        raise NotImplementedError
         
 
