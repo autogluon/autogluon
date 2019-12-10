@@ -169,6 +169,7 @@ class TabularPredictor(BasePredictor):
             dataset: (TabularDataset object, optional)
                 This Dataset must also contain the label-column with the same column-name as specified during fit().
                 If specified, then the leaderboard returned will contain an additional column 'score_test'
+                'score_test' is the score of the model on the validation_metric for the dataset provided
             silent: (bool, optional)
                 Should leaderboard DataFrame be printed?
 
@@ -177,7 +178,6 @@ class TabularPredictor(BasePredictor):
             Pandas DataFrame of model performance summary information.
         """
         return self._learner.leaderboard(X=dataset, silent=silent)
-
 
     def fit_summary(self, verbosity=3):
         """
