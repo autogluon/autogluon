@@ -11,8 +11,6 @@ stage("Unit Test") {
         conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
-        pip uninstall -y gluonnlp
-        pip install gluonnlp
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
@@ -37,8 +35,6 @@ stage("Build Docs") {
         conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
         conda list
-        pip uninstall -y gluonnlp
-        pip install gluonnlp
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
