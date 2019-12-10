@@ -15,11 +15,11 @@ __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask',
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
     if path is not None:
-        raise NotImplemented
+        raise NotImplementedError
     if name is not None and name.lower() in built_in_tasks:
         return built_in_tasks[name.lower()](*args, **kwargs)
     else:
-        raise NotImplemented
+        raise NotImplementedError
 
 class AbstractGlueTask:
     """Abstract GLUE task class.
@@ -57,7 +57,7 @@ class AbstractGlueTask:
         -------
         TSVDataset : the dataset of target segment.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def dataset_train(self):
         """Get the training segment of the dataset for the task.

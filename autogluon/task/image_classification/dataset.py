@@ -113,11 +113,11 @@ class RecordDataset(ImageRecordDataset):
 
     @property
     def num_classes(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     def classes(self):
-        raise NotImplemented
+        raise NotImplementedError
 
 @obj()
 class NativeImageFolderDataset(MXImageFolderDataset):
@@ -336,4 +336,4 @@ def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_w
                                    **kwargs)
         return data_loader
     else:
-        raise NotImplemented
+        raise NotImplementedError
