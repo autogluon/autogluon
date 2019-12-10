@@ -12,25 +12,26 @@ logger = logging.getLogger()  # return root logger
 
 
 class TabularPredictor(BasePredictor):
-    """ Object returned by fit() in tabular_prediction tasks,you should not construct TabularPredictor objects yourself.
-        Use for making predictions on new data and viewing information about models trained during fit().
+    """ Object returned by `fit()` in tabular_prediction tasks. 
+        Use for making predictions on new data and viewing information about models trained during `fit()`. 
 
         Attributes
         ----------
         output_directory: (str)
-            Path to directory where all models used by this predictor are stored.
+            Path to directory where all models used by this Predictor are stored.
         problem_type: (str)
             What type of prediction problem this Predictor has been trained for.
         eval_metric: (func)
             What metric is used to evaluate predictive performance.
         label_column: (str)
-            Name of table column that contains data from the variable to predict (referred to as the: labels, response variable, target variable, y, etc).
-        feature_types: ??
-            Inferred data type of each predictive variable (i.e. column of training data table used to predict label_column).
+            Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
+        feature_types: (dict)
+            Inferred data type of each predictive variable (i.e. column of training data table used to predict `label_column`).
         model_performance: (dict)
-            Maps names of trained models to their predictive performance values attained on the validation dataset during fit().
+            Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
         class_labels: (list)
-            Class labels in sorted order of predict_proba() output. List if problem_type == 'multiclass', otherwise None.
+            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is None for problems that are not multiclass.
+            For example if `pred = predict_proba(x)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
 
         Examples
         --------
@@ -40,20 +41,23 @@ class TabularPredictor(BasePredictor):
         >>> results = predictor.fit_summary()
         >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
         >>> perf = predictor.evaluate(test_data)
+        
     """
 
     def __init__(self, learner):
-        """ Create TabularPredictor object from Learner object. 
+        """ Creates TabularPredictor object. 
+            You should not construct a TabularPredictor yourself, it is only intended to be produced during fit().
 
             Parameters
             ----------
-            learner (AbstractLearner):
-                Object that implements the AbstractLearner APIs. 
-                To access any learner method func() from this Predictor, use: predictor._learner.func().
-                To access any trainer method func() from this Predictor, use: predictor._trainer.func().
+            learner (`AbstractLearner` object):
+                Object that implements the `AbstractLearner` APIs. 
+                
+            To access any learner method `func()` from this Predictor, use: `predictor._learner.func()`.
+            To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
-        self._learner = learner # AbstractLearner object
-        self._trainer = self._learner.load_trainer()
+        self._learner = learner # Learner object
+        self._trainer = self._learner.load_trainer() # Trainer object
         self.output_directory = self._learner.path_context
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.objective_func
@@ -67,21 +71,21 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset: (TabularDataset or pandas.DataFrame object)
+            dataset: (:class:`autogluon.task.tabular_prediction.TabularDataset` or pandas.DataFrame object)
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
             as_pandas: (bool, optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache: (bool, optional)
                 Whether to used previously-cached predictions for table rows we have already predicted on before 
-                (can speedup repeated runs of predict() on many overlapping datasets). 
+                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them). 
             add_to_pred_cache: (bool, optional)
-                Whether these predictions should be cached for reuse in future predict() calls on the same table rows 
-                (can speedup repeated runs of predict() on many overlapping datasets).
+                Whether these predictions should be cached for reuse in future `predict()` calls on the same table rows 
+                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them).
 
             Returns
             -------
-            Numpy array of predictions, one corresponding to each row in given dataset.
+            Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series depending on `as_pandas` argument.
 
         """
         if isinstance(dataset, pd.Series):
@@ -94,16 +98,17 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset: (TabularDataset or pandas.DataFrame object)
+            dataset: (:class:`TabularDataset` or pandas.DataFrame object)
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
             as_pandas: (bool, optional)
-                Whether to return the output as a pandas object (True) or numpy array (False)
-                Pandas object is a DataFrame if multiclass, otherwise a Series
+                Whether to return the output as a pandas object (True) or numpy array (False). 
+                Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
 
             Returns
             -------
-            Numpy array of predicted class-probabilities, corresponding to each row in the given dataset.
+            Array of predicted class-probabilities, corresponding to each row in the given dataset. 
+            May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
         """
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
@@ -112,20 +117,20 @@ class TabularPredictor(BasePredictor):
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.
-            This is basically a shortcut for: pred = predict(dataset), evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False) 
-            that appropriately uses predict_proba() instead of predict() when appropriate.
+            This is basically a shortcut for: `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)` 
+            that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
             Parameters
             ----------
-            dataset: (TabularDataset object)
-                This Dataset must also contain the label-column with the same column-name as specified during fit().
+            dataset: (:class:`TabularDataset` object)
+                This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
 
             silent: (bool, optional)
                 Should performance results be printed?
 
             Returns
             -------
-            Predictive performance value on the given dataset, based on the eval_matric used by this Predictor.
+            Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
         perf = self._learner.score(dataset)
         sign = self._learner.objective_func._sign
@@ -140,21 +145,21 @@ class TabularPredictor(BasePredictor):
             Parameters
             ----------
             y_true: (list or numpy.array)
-                The ordered collection of ground-truth labels
+                The ordered collection of ground-truth labels. 
             y_pred: (list of numpy.array)
                 The ordered collection of predictions. 
-                For certain types of predictor.eval_metric (such as AUC), y_pred must be predicted-probabilities rather than predicted labels.
+                For certain types of `eval_metric` (such as AUC), `y_pred` must be predicted-probabilities rather than predicted labels.
             silent: (bool, optional)
                 Should performance results be printed?
             auxiliary_metrics: (bool, optional)
-                Should we compute other (problem_type specific) metrics in addition to the default metric?
+                Should we compute other (`problem_type` specific) metrics in addition to the default metric?
             detailed_report (bool, optional): 
-                Should we computed more detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True) 
+                Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
 
             Returns
             -------
-            Scalar performance value if auxiliary_metrics=False. 
-            If auxiliary_metrics=True, returns dict where keys = metrics, values = performance along each metric.
+            Scalar performance value if `auxiliary_metrics = False`. 
+            If `auxiliary_metrics = True`, returns dict where keys = metrics, values = performance along each metric.
         """
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent, 
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
@@ -181,8 +186,8 @@ class TabularPredictor(BasePredictor):
 
     def fit_summary(self, verbosity=3):
         """
-            Output summary of information about models produced during fit().
-            May create various generated summary plots and store them in folder: Predictor.output_directory.
+            Output summary of information about models produced during `fit()`.
+            May create various generated summary plots and store them in folder: `Predictor.output_directory`.
 
             Parameters
             ----------
@@ -193,7 +198,7 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-            Large dict containing various information.
+            Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
@@ -281,22 +286,22 @@ class TabularPredictor(BasePredictor):
     @classmethod
     def load(cls, output_directory, verbosity=2):
         """ 
-        Load a predictor object previously produced by fit() from file and returns this object. 
-        Equivalent to TabularPrediction.load(output_directory). 
+        Load a predictor object previously produced by `fit()` from file and returns this object. 
+        Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.load`.
 
         Parameters
         ----------
         output_directory : (str)
-            Path to directory where trained models are stored (ie. the output_directory specified in previous call to fit()).
+            Path to directory where trained models are stored (i.e. the `output_directory` specified in previous call to `fit()`).
         verbosity : (int, default = 2)
             Verbosity levels range from 0 to 4 and control how much information is generally printed by this Predictor.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            If using logging, you can alternatively control amount of information printed via logger.setLevel(L), 
-            where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`, 
+            where `L` ranges from 0 to 50 (Note: higher values `L` correspond to fewer print statements, opposite of verbosity levels)
 
         Returns
         -------
-        TabularPredictor object.
+        :class:`TabularPredictor` object
         """
         logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (may be in new Python session)
         if output_directory is None:
@@ -307,9 +312,9 @@ class TabularPredictor(BasePredictor):
         return cls(learner=learner)
 
     def save(self):
-        """ Save this predictor to file in directory specified by self.output_directory. 
-            Note that fit() already saves the predictor object automatically 
-            (we don't recommend modifying predictor object yourself as it keeps track of various trained models).
+        """ Save this predictor to file in directory specified by this Predictor's `output_directory`. 
+            Note that `fit()` already saves the predictor object automatically 
+            (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         self._learner.save()
         logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(%s)" % self.output_directory)

@@ -23,7 +23,7 @@ __all__ = ['ObjectDetection']
 logger = logging.getLogger(__name__)
 
 class ObjectDetection(BaseTask):
-    """AutoGluon ImageClassification Task
+    """AutoGluon ObjectDetection Task
     """
     @staticmethod
     def Dataset(*args, **kwargs):
@@ -76,7 +76,7 @@ class ObjectDetection(BaseTask):
             ):
 
         """
-        Auto fit on object detection dataset
+        Fit object detection models.
 
         Parameters
         ----------
