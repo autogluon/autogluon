@@ -6,6 +6,7 @@ from ...tuning.ensemble_selection import EnsembleSelection
 
 logger = logging.getLogger(__name__)
 
+# TODO: Do Kfold to determine if its overfit, observing the val score is way overly optimistic on AUC at l2, despite being worse on test than l1 (OpenML Amazon_employee_access)
 class WeightedEnsembleModel(StackerEnsembleModel):
     def __init__(self, path, name, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_weights=None, num_classes=None, debug=0):
         self.base_model_weights = base_model_weights

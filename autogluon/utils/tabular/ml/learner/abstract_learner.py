@@ -1,5 +1,5 @@
 import datetime, json, warnings, logging
-from collections import OrderedDict 
+from collections import OrderedDict
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
@@ -176,6 +176,7 @@ class AbstractLearner:
             if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
                 # Log loss
                 raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
+        # TODO: Move below into trainer, should not live in learner
         max_level = trainer.max_level
         max_level_auxiliary = trainer.max_level_auxiliary
 
@@ -227,9 +228,25 @@ class AbstractLearner:
                     else:
                         scores[model_name] = self.objective_func(y, pred_proba)
 
-        logger.debug('MODEL SCORES:')
+        logger.debug('Model scores:')
         logger.debug(str(scores))
-        return scores
+        model_names = []
+        scores_test = []
+        for model in scores.keys():
+            model_names.append(model)
+            scores_test.append(scores[model])
+        df = pd.DataFrame(data={
+            'model': model_names,
+            'score_test': scores_test,
+        })
+
+        df = df.sort_values(by='score_test', ascending=False).reset_index(drop=True)
+
+        leaderboard_df = self.leaderboard()
+
+        df_merged = pd.merge(df, leaderboard_df, on='model')
+
+        return df_merged
 
     def get_pred_probas_models(self, X, trainer, model_names):
         if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
@@ -345,9 +362,16 @@ class AbstractLearner:
         y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
         return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
-    def leaderboard(self):
-        trainer = self.load_trainer()
-        return trainer.leaderboard()
+    def leaderboard(self, X=None, y=None, silent=False):
+        if X is not None:
+            leaderboard = self.score_debug(X=X, y=y)
+        else:
+            trainer = self.load_trainer()
+            leaderboard = trainer.leaderboard()
+        if not silent:
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+                print(leaderboard)
+        return leaderboard
 
     def info(self):
         trainer = self.load_trainer()
