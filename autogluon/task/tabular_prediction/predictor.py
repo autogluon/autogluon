@@ -159,9 +159,29 @@ class TabularPredictor(BasePredictor):
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent, 
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
+    def leaderboard(self, dataset=None, silent=False):
+        """
+            Output summary of information about models produced during fit() as a pandas DataFrame.
+            Includes information on test and validation scores for all models, model training times and stack levels.
+
+            Parameters
+            ----------
+            dataset: (TabularDataset object, optional)
+                This Dataset must also contain the label-column with the same column-name as specified during fit().
+                If specified, then the leaderboard returned will contain an additional column 'score_test'
+            silent: (bool, optional)
+                Should leaderboard DataFrame be printed?
+
+            Returns
+            -------
+            Pandas DataFrame of model performance summary information.
+        """
+        return self._learner.leaderboard(X=dataset, silent=silent)
+
+
     def fit_summary(self, verbosity=3):
         """
-            Output summary of information about models preoduced during fit().
+            Output summary of information about models produced during fit().
             May create various generated summary plots and store them in folder: Predictor.output_directory.
 
             Parameters
@@ -173,7 +193,7 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-                Large dict containing various information.
+            Large dict containing various information.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
