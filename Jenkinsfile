@@ -1,17 +1,16 @@
 max_time = 180
 
 stage("Unit Test") {
-  node('linux-gpu') {
+  node('linux-cpu') {
     ws('workspace/autugluon-py3') {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
-        VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda env update -n autogluon_py3 -f docs/build.yml
+        conda env remove -n autogluon_py3
+        conda env create -n autogluon_py3 -f docs/build_cpu.yml
         conda activate autogluon_py3
         conda list
-        export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
