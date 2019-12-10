@@ -5,6 +5,7 @@ from ..sklearn.sklearn_model import SKLearnModel
 logger = logging.getLogger(__name__)
 
 # TODO: Pass in num_classes?
+# TODO: Normalize data!
 class KNNModel(SKLearnModel):
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns

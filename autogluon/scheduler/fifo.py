@@ -13,7 +13,8 @@ from ..utils import save, load, mkdir, try_import_mxboard
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from .scheduler import TaskScheduler
-from ..searcher import *
+from ..searcher.searcher_factory import searcher_factory
+from ..searcher import BaseSearcher
 from .reporter import DistStatusReporter, FakeReporter
 from ..utils import DeprecationHelper, in_ipynb
 
@@ -23,11 +24,6 @@ __all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
-searchers = {
-    'random': RandomSearcher,
-    'skopt': SKoptSearcher,
-    'grid': GridSearcher,
-}
 
 class FIFOScheduler(TaskScheduler):
     r"""Simple scheduler that just runs trials in submission order.
@@ -75,7 +71,7 @@ class FIFOScheduler(TaskScheduler):
     >>> scheduler.get_training_curves(plot=True)
     """
     def __init__(self, train_fn, args=None, resource=None,
-                 searcher='random', search_options=None,
+                 searcher=None, search_options=None,
                  checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None,
                  time_out=None, max_reward=1.0, time_attr='epoch',
@@ -84,6 +80,8 @@ class FIFOScheduler(TaskScheduler):
         super(FIFOScheduler,self).__init__(dist_ip_addrs)
         if resource is None:
             resource = {'num_cpus': 1, 'num_gpus': 0}
+        if searcher is None:
+            searcher = 'random'  # Default: Random searcher
         if search_options is None:
             search_options = dict()
         assert isinstance(train_fn, _autogluon_method)
@@ -91,7 +89,9 @@ class FIFOScheduler(TaskScheduler):
         self.args = args if args else train_fn.args
         self.resource = resource
         if isinstance(searcher, str):
-            self.searcher = searchers[searcher](train_fn.cs, **search_options)
+            kwargs = search_options.copy()
+            kwargs['configspace'] = train_fn.cs
+            self.searcher = searcher_factory(searcher, **kwargs)
         else:
             assert isinstance(searcher, BaseSearcher)
             self.searcher = searcher
@@ -133,14 +133,14 @@ class FIFOScheduler(TaskScheduler):
         """Run multiple number of trials
         """
         start_time = time.time()
-        self.num_trials = kwargs.get('num_trials', self.num_trials)
-        self.time_out = kwargs.get('time_out', self.time_out)
+        num_trials = kwargs.get('num_trials', self.num_trials)
+        time_out = kwargs.get('time_out', self.time_out)
         logger.info('Starting Experiments')
         logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
-        logger.info('Num of Pending Tasks is {}'.format(self.num_trials - self.num_finished_tasks))
-        tbar = tqdm(range(self.num_finished_tasks, self.num_trials))
+        logger.info('Num of Pending Tasks is {}'.format(num_trials - self.num_finished_tasks))
+        tbar = tqdm(range(self.num_finished_tasks, num_trials))
         for _ in tbar:
-            if self.time_out and time.time() - start_time >= self.time_out \
+            if time_out and time.time() - start_time >= time_out \
                     or self.max_reward and self.get_best_reward() >= self.max_reward:
                 break
             self.schedule_next()
