@@ -180,7 +180,7 @@ class ObjectDetection(BaseTask):
                                    scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
-        logger.info('The best config:\n', results['best_config'])
+        logger.info('The best config: {}'.format(results['best_config']))
 
         model = get_network(args.net, dataset.init().get_classes(), mx.cpu(0))
         update_params(model, results.pop('model_params'))
