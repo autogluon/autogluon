@@ -39,7 +39,7 @@ class Remote(Client):
 
     def shutdown(self):
         self.close(timeout=2)
-        super().shutdown()
+        #super().shutdown()
         if self.service:
             self.service.shutdown()
 
