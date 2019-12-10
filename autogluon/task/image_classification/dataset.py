@@ -7,12 +7,11 @@ from PIL import Image
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon.data import Dataset as MXDataset
-<<<<<<< HEAD
-from mxnet.gluon.data.vision import ImageRecordDataset, transforms
-=======
+
+# from mxnet.gluon.data.vision import ImageRecordDataset, transforms
+
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms, ImageFolderDataset as MXImageFolderDataset
 
->>>>>>> origin/master
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec

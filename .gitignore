@@ -9,6 +9,7 @@
 *.npz
 *.json
 *.ag
+*.dirlock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

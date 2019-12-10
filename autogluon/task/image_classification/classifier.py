@@ -108,18 +108,8 @@ class Classifier(BasePredictor):
             X = X.init()
 
         inds, probas, probals_all = [], [],[]
-        # for x in X.imgs:
         for x in X:
-<<<<<<< HEAD
-            # x = self.loader(x[0])
-            # x = transform_fn(x)
-            x = x[0]
-            ind, proba ,proba_all= predict_img(x)
-
-            #ind, proba = predict_img(x[0])
-=======
-            ind, proba = predict_img(x[0])
->>>>>>> origin/master
+            ind, proba ,proba_all= predict_img(x[0])
             inds.append(ind)
             probas.append(proba)
             probals_all.append(proba_all)

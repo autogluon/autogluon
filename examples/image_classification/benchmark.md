@@ -9,9 +9,9 @@
 
 1. Assume your instance can visit S3.
 
-2. `aws s3 cp s3://zhiz-data/datasets/sy_dataset.zip /your_path/`
+2. `aws s3 cp s3://zhiz-data/datasets/a.zip /your_path/`
 
-3. `unzip sy_dataset.zip -d sy_dataset`
+3. `unzip a.zip -d dataset`
 
 ## Train the dataset with fit function:
 
@@ -19,7 +19,9 @@
 
 2. `python autogluon/examples/image_classification/benchmark.py`
 
-## Generate csv
+3. `kaggle competitions submit -c dogs-vs-cats-redux-kernels-edition -f submission.csv -m "Message"`
+
+
 
 
 
