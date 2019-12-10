@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, time
 from pandas import DataFrame
 import pandas as pd
 
@@ -26,7 +26,7 @@ class DefaultLearner(AbstractLearner):
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0, 
-            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, verbosity=2):
+            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -41,7 +41,20 @@ class DefaultLearner(AbstractLearner):
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
+        if time_limit:
+            logger.log(20, 'Beginning AutoGluon training ... Time limit = ' + str(time_limit) + 's')
+        else:
+            logger.log(20, 'Beginning AutoGluon training ...')
+        time_preprocessing_start = time.time()
+        logger.log(20, 'Preprocessing data ...')
         X, y, X_test, y_test = self.general_data_processing(X, X_test)
+        time_preprocessing_end = time.time()
+        time_preprocessing = time_preprocessing_end - time_preprocessing_start
+        logger.log(20, '\tData preprocessing and feature engineering runtime = ' + str(round(time_preprocessing, 2)) + 's ...')
+        if time_limit:
+            time_limit_trainer = time_limit - time_preprocessing
+        else:
+            time_limit_trainer = None
 
         trainer = self.trainer_type(
             path=self.model_context,
@@ -53,7 +66,8 @@ class DefaultLearner(AbstractLearner):
             kfolds=num_bagging_folds,
             stack_ensemble_levels=stack_ensemble_levels,
             scheduler_options=scheduler_options,
-            verbosity = verbosity
+            time_limit=time_limit_trainer,
+            verbosity=verbosity
         )
 
         self.trainer_path = trainer.path
@@ -64,6 +78,9 @@ class DefaultLearner(AbstractLearner):
         trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)
+        time_end = time.time()
+        time_total = time_end - time_preprocessing_start
+        logger.log(20, 'AutoGluon training complete, total runtime = ' + str(round(time_total, 2)) + 's ...')
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None):
         """ General data processing steps used for all models. """

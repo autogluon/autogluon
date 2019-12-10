@@ -61,7 +61,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
         knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
         models.append(
-            KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params), 
+            KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params),
                      problem_type=problem_type, objective_func=objective_func, hyperparameters=knn_options.copy()),
         )
         knn_dist_params = {'weights': 'distance', 'n_jobs': -1}

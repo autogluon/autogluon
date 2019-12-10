@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, time
 import numpy as np
 
 from ..abstract.abstract_model import AbstractModel
@@ -6,8 +6,10 @@ from ...utils import generate_kfold
 from ...constants import MULTICLASS, REGRESSION
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
+from ....utils.exceptions import TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
+
 
 class BaggedEnsembleModel(AbstractModel):
     def __init__(self, path, name, model_base: AbstractModel, debug=0):
@@ -33,7 +35,8 @@ class BaggedEnsembleModel(AbstractModel):
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
-    def fit(self, X, y, k_fold=5, random_state=0, compute_base_preds=False, **kwargs):
+    def fit(self, X, y, k_fold=5, random_state=0, compute_base_preds=False, time_limit=None, **kwargs):
+        start_time = time.time()
         self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         if self.problem_type == REGRESSION:
             stratified = False
@@ -49,14 +52,29 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_proba = np.zeros(shape=len(X))
 
         models = []
+        num_folds = len(kfolds)
+        time_limit_fold = None
         for i, fold in enumerate(kfolds):
+            if time_limit:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                required_time_per_fold = time_left / (num_folds - i)
+                time_limit_fold = required_time_per_fold * 0.8
+                if i > 0:
+                    expected_time_required = time_elapsed * (num_folds / i)
+                    expected_remaining_time_required = expected_time_required / (num_folds / (num_folds - i))
+                    if expected_remaining_time_required > time_left:
+                        raise TimeLimitExceeded
+                if time_left <= 0:
+                    raise TimeLimitExceeded
+
             train_index, test_index = fold
             X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
             y_train, y_test = y.iloc[train_index], y.iloc[test_index]
             fold_model = copy.deepcopy(self.model_base)
             fold_model.name = fold_model.name + '_fold_' + str(i)
             fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
-            fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, **kwargs)
+            fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
             pred_proba = fold_model.predict_proba(X_test)
             if self.low_memory:
                 self.save_child(fold_model, verbose=False)
