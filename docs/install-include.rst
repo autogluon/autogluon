@@ -1,5 +1,10 @@
 Select your preferences and run the install command.
 
+.. note::
+
+  Now only Linux installation is supported. Installation instructions on Mac OSX and Windows will be available soon.
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ versions >= 3.6.
+
 .. role:: title
 .. role:: opt
    :class: option
@@ -11,13 +16,11 @@ Select your preferences and run the install command.
   .. container:: opt-group
 
      :title:`OS:`
-     :opt:`Linux`
-     :act:`Mac`
+     :act:`Linux`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
-        <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
 
   .. container:: opt-group
 
@@ -83,86 +86,3 @@ Select your preferences and run the install command.
                  pip install --pre --upgrade mxnet-cu100
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
-
-     .. container:: mac
-
-        .. container:: pip
-
-           .. container:: cpu
-           
-              .. note::
-              
-                 If you don't have them, please first install: 
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, the latter two packages can be installed via:
-
-                 .. code-block:: bash
-
-                     brew install libomp opencv
-
-              .. code-block:: bash
-
-                 pip install --upgrade mxnet-osx
-                 pip install autogluon
-
-           .. container:: gpu
-
-              .. note::
-              
-                 If you don't have them, please first install: 
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, the latter two packages can be installed via:
-
-                 .. code-block:: bash
-
-                     brew install libomp opencv
-
-              Please build MXNet from source to utilize GPU, following detailed instructions from the `MXNet Docs <https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
-
-              .. code-block:: bash
-
-                 pip install autogluon
-
-        .. container:: source
-
-           .. container:: cpu
-
-              .. note::
-              
-                 If you don't have them, please first install: 
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, the latter two packages can be installed via:
-
-                 .. code-block:: bash
-
-                     brew install libomp opencv
-
-              .. code-block:: bash
-
-                 pip install --upgrade mxnet-osx
-                 git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py install --user
-
-           .. container:: gpu
-
-              .. note::
-              
-                 If you don't have them, please first install: 
-                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `opencv <https://opencv.org>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
-                 Once you have Homebrew, the latter two packages can be installed via:
-
-                 .. code-block:: bash
-
-                     brew install libomp opencv
-
-              Please build MXNet from source to utilize GPU, following detailed instructions from the `MXNet Docs <https://mxnet.apache.org/get_started?version=v1.5.1&platform=macos&language=python&environ=build-from-source&processor=gpu>`_.
-
-              .. code-block:: bash
-
-                 git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py install --user
-
-  .. note::
-
-     AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ versions >= 3.6, and `CUDA <https://developer.nvidia.com/cuda-downloads>`_ + `cuDNN <https://developer.nvidia.com/cudnn>`_ to use GPU.
-
