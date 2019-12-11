@@ -18,11 +18,7 @@ losses = {'SoftmaxCrossEntropyLoss': gluon.loss.SoftmaxCrossEntropyLoss,
           'CosineEmbeddingLoss': gluon.loss.CosineEmbeddingLoss,
           'PoissonNLLLoss': gluon.loss.SoftmaxCrossEntropyLoss,
           'DistillationSoftmaxCrossEntropyLoss': gluoncv.loss.SoftmaxCrossEntropyLoss,
-          'MixSoftmaxCrossEntropyLoss': gluoncv.loss.SoftmaxCrossEntropyLoss,
-          # params
-          'DistillationSoftmaxCrossEntropyLoss_params': gluoncv.loss.SoftmaxCrossEntropyLoss,
-          'MixSoftmaxCrossEntropyLoss_params': gluoncv.loss.SoftmaxCrossEntropyLoss,
-
+          'MixSoftmaxCrossEntropyLoss': gluoncv.loss.SoftmaxCrossEntropyLoss
           }
 
 def get_loss_instance(name, **kwargs):

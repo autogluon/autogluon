@@ -4,7 +4,6 @@ class LR_params:
     def __init__(self, *args):
         lr, lr_mode, num_epochs, num_batches, lr_decay_epoch, \
         lr_decay, lr_decay_period, warmup_epochs, warmup_lr= args
-
         self._num_batches = num_batches
         self._lr_decay = lr_decay
         self._lr_decay_period = lr_decay_period
@@ -13,7 +12,6 @@ class LR_params:
         self._num_epochs = num_epochs
         self._lr = lr
         self._lr_mode = lr_mode
-        # self._model_name = model_name
         if lr_decay_period > 0:
             lr_decay_epoch = list(range(lr_decay_period, num_epochs, lr_decay_period))
         else:

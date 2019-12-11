@@ -85,7 +85,6 @@ def get_network(net, num_classes, ctx):
 
 def get_built_in_network(name, *args, **kwargs):
     def _get_finetune_network(model_name, num_classes, ctx, **kwargs):
-        # finetune_net = get_model(model_name, *args, pretrained=True, **kwargs)
         kwargs['pretrained'] = True
         finetune_net = get_model(model_name, **kwargs)
         # change the last fully connected layer to match the number of classes
@@ -97,8 +96,6 @@ def get_built_in_network(name, *args, **kwargs):
                 assert hasattr(finetune_net, 'fc')
                 finetune_net.fc = gluon.nn.Dense(num_classes)
                 finetune_net.fc.initialize(init.Xavier(), ctx=ctx)
-
-        # initialize and context
         finetune_net.collect_params().reset_ctx(ctx)
         finetune_net.hybridize()
         return finetune_net

@@ -89,18 +89,13 @@ def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_p
     test_path = csv_path.replace('sample_submission.csv', 'test')
     imgs = glob.glob(test_path + "/*." + csv_config['style'])
     df = pd.read_csv(csv_path)
-
-    # if csv_config['value'] == 'probability':
-    #     target_dataset = load_dataset.init()
     target_dataset = load_dataset.init()
-
     for imgname in imgs:
         midname = imgname[imgname.rindex("/") + 1:]
         start_path = os.path.join(test_path, midname)
         ind, prob, prob_all = classifier.predict(start_path, plot=False)
         if not csv_config['fullname']:
             midname = midname[:-4]
-
         if csv_config['content'] == 'str':
             row_index = df[df[csv_config['image_column_name']] == str(midname)].index.tolist()
         elif csv_config['content'] == 'empty':
@@ -109,7 +104,6 @@ def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_p
             row_index = df[df[csv_config['image_column_name']] == int(midname)].index.tolist()
         elif csv_config['content'] == 'special':
             row_index = df[df[csv_config['image_column_name']] == int(midname[5:])].index.tolist()
-
         if csv_config['value'] == 'category':
             value = target_dataset.classes[ind.asscalar()]
         elif csv_config['value'] == 'probability': # fix
@@ -119,7 +113,6 @@ def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_p
             value = prob_all # cat/dog
         else: #index # fix
             value = ind.asscalar()
-
         if csv_config['output'] == 'ab':
             df.loc[int(row_index[0]), csv_config['class_column_name']] = value
         elif csv_config['output'] == 'multi':
@@ -130,10 +123,8 @@ def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_p
         else:
             df.loc[int(row_index[0]), 1:] = 0# onehot
             df.loc[int(row_index[0]), value] = 1
-
-        # print("midname:", midname, ",row_index:", row_index, ",value:", value)
-    df.to_csv(os.path.join(local_path, dataset, 'predict_2.csv'), index=False)
-    print('predict_2.csv is done')
+    df.to_csv(os.path.join(local_path, dataset, 'predict.csv'), index=False)
+    print('predict.csv is done')
 
 def generate_csv(inds, path):
     with open(path, 'w') as csvFile:

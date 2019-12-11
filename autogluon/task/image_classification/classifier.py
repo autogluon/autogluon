@@ -71,7 +71,6 @@ class Classifier(BasePredictor):
         Example:
         >>> ind, prob = classifier.predict('example.jpg')
         """
-        # model inference
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
         resize = int(math.ceil(input_size / 0.875))
         transform_fn = Compose([
@@ -81,16 +80,12 @@ class Classifier(BasePredictor):
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
         def predict_img(img):
-            # load and display the image
             proba = self.predict_proba(img)
-            # extract probability
-
             ind = mx.nd.argmax(proba, axis=1).astype('int')
             idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
                               ind.astype('float32'))
             probai = mx.nd.gather_nd(proba, idx)
             return ind, probai, proba
-
         if isinstance(X, str) and os.path.isfile(X):
             img = self.loader(X)
             if plot:
@@ -98,10 +93,8 @@ class Classifier(BasePredictor):
                 plt.show()
             img = transform_fn(img)
             return predict_img(img)
-
         if isinstance(X, AutoGluonObject):
             X = X.init()
-
         inds, probas, probals_all = [], [],[]
         for x in X:
             ind, proba ,proba_all= predict_img(x[0])
@@ -121,7 +114,6 @@ class Classifier(BasePredictor):
             In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
         """
         pred = self.model(X.expand_dims(0))
-        # fix multi
         return mx.nd.softmax(pred)
 
 

@@ -73,7 +73,6 @@ class ImageClassification(BaseTask):
             dist_ip_addrs=[],
             grace_period=None,
             auto_search=True,
-            # Customize parameter configuration
             lr_config = {'lr_mode': 'cosine',
                          'lr_decay': 0.1,
                          'lr_decay_period': 0,
@@ -83,7 +82,7 @@ class ImageClassification(BaseTask):
             tricks = {'last_gamma': True,
                       'use_pretrained': True,
                       'use_se': False,
-                      'mixup': False,  # bug
+                      'mixup': False,
                       'mixup_alpha': 0.2,
                       'mixup_off_epoch': 0,
                       'label_smoothing': True,
