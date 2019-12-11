@@ -11,44 +11,44 @@ __all__ = ['TabularDataset']
 class TabularDataset(pd.DataFrame):
     """
     A dataset in tabular format (with rows = samples, columns = features/variables). 
-    This object is essentially a pandas DataFrame (with some extra slots) and all the Pandas methods can be applied to it. 
-    For details, see documentation for pandas Dataframe: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
-    
+    This object is essentially a pandas DataFrame (with some extra attributes) and all existing pandas methods can be applied to it. 
+    For full list of methods/attributes, see pandas Dataframe documentation: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+
     Parameters
     ----------
-        file_path : (str, optional)
-            Path to the data file. 
-            At least one of `file_path` and `df` arguments must be specified when constructing a new TabularDataset.
-        name : (str, optional)
-             Optional name to assign to dataset (has no effect beyond being accessible via TabularDataset.name).
-        df : (pandas.DataFrame, optional)
-            If you already have your data in a pandas Dataframe, you can directly provide it by specifying `df`. 
-            At least one of `file_path` and `df` arguments must be specified when constructing new TabularDataset.
-        feature_types : (dict, optional)
-            Mapping from column_names to string describing data type of each column. 
-            If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
-        subsample : (int, optional)
-            If specified = k, we only keep first k rows of the provided dataset.
-            
+    file_path : (str, optional)
+        Path to the data file (may be on local filesystem or URL to cloud s3 bucket). 
+        At least one of `file_path` and `df` arguments must be specified when constructing a new TabularDataset.
+    df : (pandas.DataFrame, optional)
+        If you already have your data in a pandas Dataframe, you can directly provide it by specifying `df`. 
+        At least one of `file_path` and `df` arguments must be specified when constructing new TabularDataset.
+    feature_types : (dict, optional)
+        Mapping from column_names to string describing data type of each column. 
+        If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
+    subsample : (int, optional)
+        If specified = k, we only keep first k rows of the provided dataset.
+    name : (str, optional)
+         Optional name to assign to dataset (has no effect beyond being accessible via TabularDataset.name).
+
     Attributes
     ----------
-        name: (str)
-            An optional name assigned to this TabularDataset.
-        file_path: (str)
-            Path to data file from which this TabularDataset was created.
-        feature_types: (dict) 
-            Maps column-names to string describing the data type of each column in this TabularDataset.
-        subsample: (int) 
-            Describes size of subsample retained in this TabularDataset (None if this is original dataset).
+    name: (str)
+        An optional name assigned to this TabularDataset.
+    file_path: (str)
+        Path to data file from which this TabularDataset was created.
+    feature_types: (dict) 
+        Maps column-names to string describing the data type of each column in this TabularDataset.
+    subsample: (int) 
+        Describes size of subsample retained in this TabularDataset (None if this is original dataset).
     
     Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe. 
-    For detailed information, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
-    
+    For detailed list, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+
     Examples
     --------
     >>> from autogluon import TabularPrediction as task  # Note: TabularPrediction.Dataset == TabularDataset.
-    >>> train_data = task.Dataset(file_path=''https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')
-    >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')
+    >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+    >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
     """
     
     _metadata = ['name', 'file_path', 'feature_types', 'subsample'] # preserved properties that will be copied to a new instance of TabularDataset

@@ -26,7 +26,7 @@ class ImageClassification(BaseTask):
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks, can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordioDataset`, or a 
+    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters

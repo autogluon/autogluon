@@ -169,10 +169,10 @@ class DistStatusReporter(object):
         self._last_report_time = time.time()
 
     def save_dict(self, **state_dict):
-        raise NotImplemented
+        raise NotImplementedError
 
     def get_dict(self):
-        raise NotImplemented
+        raise NotImplementedError
 
     def __repr__(self):
         reprstr = self.__class__.__name__
