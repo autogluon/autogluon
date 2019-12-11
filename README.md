@@ -6,18 +6,18 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:  pip install mxnet autogluon
 
 from autogluon import TabularPrediction as task
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
-test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 predictor = task.fit(train_data=train_data, label='class')
 performance = predictor.evaluate(test_data)
 ```
 
-See the [AutoGluon Website](http://autogluon.mxnet.io.s3.amazonaws.com/index.html) for instructions on: 
-- [Installing AutoGluon](http://autogluon.mxnet.io.s3.amazonaws.com/index.html#installation)
-- [Learning with image data](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/image_classification/beginner.html)
-- [Learning with text data](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/text_classification/beginner.html)
-- [Learning with data in tabular format](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/tabular_prediction/tabular-quickstart.html)
-- More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io.s3.amazonaws.com/tutorials/nas/index.html)
+See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for instructions on:
+- [Installing AutoGluon](http://autogluon.mxnet.io/index.html#installation)
+- [Learning with image data](http://autogluon.mxnet.io/tutorials/image_classification/beginner.html)
+- [Learning with text data](http://autogluon.mxnet.io/tutorials/text_classification/beginner.html)
+- [Learning with data in tabular format](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
+- More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io/tutorials/nas/index.html)
 
 
 
