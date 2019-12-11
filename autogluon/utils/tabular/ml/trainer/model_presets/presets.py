@@ -75,15 +75,15 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
             LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
                      objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
         )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
-        )
     if cat_options is not None:
         models.append(
             CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
+    if nn_options is not None:
+        models.append(
+            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
+                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
@@ -131,15 +131,15 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
             LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
                      objective_func=objective_func, hyperparameters=gbm_options.copy())
         )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy())
-        )
     if cat_options is not None:
         models.append(
             CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
                           objective_func=objective_func, hyperparameters=cat_options.copy()),
+        )
+    if nn_options is not None:
+        models.append(
+            TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
+                                  objective_func=objective_func, hyperparameters=nn_options.copy())
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         if 'GBM' in custom_options:

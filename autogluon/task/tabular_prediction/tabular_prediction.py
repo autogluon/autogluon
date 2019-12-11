@@ -55,7 +55,8 @@ class TabularPrediction(BaseTask):
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
             hyperparameter_tune=False, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
-            hyperparameters = {'NN': {'num_epochs': 500}, 
+            hyperparameters = {
+                               # 'NN': {'num_epochs': 500},  # TODO: Disabled by default due to defect recently discovered causing process to hang
                                'GBM': {'num_boost_round': 10000},
                                'CAT': {'iterations': 10000},
                                'RF': {'n_estimators': 300},
@@ -237,7 +238,14 @@ class TabularPrediction(BaseTask):
             hyperparameter_tune = False
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
-            holdout_frac = 0.2 if hyperparameter_tune else 0.1
+            num_train_rows = len(train_data)
+            # Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples
+            if num_train_rows < 5000:
+                holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
+            else:
+                holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
+            if hyperparameter_tune:
+                holdout_frac = min(0.2, holdout_frac*2)  # We want to allocate more validation data for HPO to avoid overfitting
         # Add visualizer to NN hyperparameters:
         if ((visualizer is not None) and (visualizer != 'none') and 
             ('NN' in hyperparameters)):

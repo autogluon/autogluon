@@ -165,7 +165,7 @@ class AbstractLearner:
             return trainer.score(X=X, y=y)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None):
+    def score_debug(self, X: DataFrame, y=None, silent=False):
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -242,7 +242,7 @@ class AbstractLearner:
 
         df = df.sort_values(by='score_test', ascending=False).reset_index(drop=True)
 
-        leaderboard_df = self.leaderboard()
+        leaderboard_df = self.leaderboard(silent=silent)
 
         df_merged = pd.merge(df, leaderboard_df, on='model')
 
@@ -364,7 +364,7 @@ class AbstractLearner:
 
     def leaderboard(self, X=None, y=None, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y)
+            leaderboard = self.score_debug(X=X, y=y, silent=silent)
         else:
             trainer = self.load_trainer()
             leaderboard = trainer.leaderboard()
