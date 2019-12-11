@@ -7,11 +7,7 @@ from PIL import Image
 import mxnet as mx
 from mxnet import gluon, nd
 from mxnet.gluon.data import Dataset as MXDataset
-
-# from mxnet.gluon.data.vision import ImageRecordDataset, transforms
-
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms, ImageFolderDataset as MXImageFolderDataset
-
 from ...core import *
 from ..base import BaseDataset
 from ...utils import get_data_rec
@@ -36,10 +32,6 @@ def get_dataset(path=None, train=True, name=None,
     """ Method to produce image classification dataset for AutoGluon, can either be a 
     :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/kaggle_benchmark
 
     Parameters
     ----------

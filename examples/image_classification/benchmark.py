@@ -49,4 +49,7 @@ logger.info(summary)
 csv_path = target['dataset'].replace('train', 'sample_submission.csv')
 ag.utils.generate_csv_submission(csv_path, opt.dataset, load_dataset, classifier, local_path)
 
+
+
+ag.download('https://github.com/aptsunny/AutoGluonWebdata/blob/master/dog_label.py')
 ag.done()

@@ -3,20 +3,15 @@ import math
 import pickle
 import numpy as np
 from PIL import Image
-
 import mxnet as mx
 import matplotlib.pyplot as plt
 from mxnet.gluon.data.vision import transforms
-
 from ...core import AutoGluonObject
 from .utils import *
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
 from ...utils import save, load, tqdm
 from ...utils.pil_transforms import *
-
-# from collections import OrderedDict
-# from mxnet.gluon.block import collect_params
 
 __all__ = ['Classifier']
 
