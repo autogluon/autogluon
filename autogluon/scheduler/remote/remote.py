@@ -39,7 +39,7 @@ class Remote(Client):
 
     def shutdown(self):
         self.close(timeout=2)
-        #super().shutdown()
+        super().shutdown()
         if self.service:
             self.service.shutdown()
 
@@ -94,7 +94,7 @@ class DaskRemoteService(object):
             self.remote_python,
             self.remote_dask_worker,
         )
-        self.start_monitoring()
+        #self.start_monitoring()
 
     def start_monitoring(self):
         if self.monitor_thread.is_alive():
