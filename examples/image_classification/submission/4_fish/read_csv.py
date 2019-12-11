@@ -9,8 +9,8 @@ kaggle = 'fisheries_Monitoring/'
 # kaggle = 'shopee-iet-machine-learning-competition/'
 
 # csv_path = os.path.join('/home/ubuntu/workspace/data/dataset/', kaggle,'sample_submission.csv')
-# csv_path = os.path.join('/home/ubuntu/workspace/train_script/autogluon_1208/examples/image_classification/, kaggle,'predict.csv')
-csv_path = os.path.join('predict.csv')
+# csv_path = os.path.join('/home/ubuntu/workspace/train_script/autogluon_1208/examples/image_classification/, kaggle,'predict_2.csv')
+csv_path = os.path.join('predict_2.csv')
 
 df = pd.read_csv(csv_path)
 

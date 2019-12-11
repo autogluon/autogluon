@@ -136,7 +136,7 @@ def _train_val_split(train_dataset, split_ratio=0.2):
     return SampledDataset(train_dataset, train_sampler), SampledDataset(train_dataset, val_sampler)
 
 def config_choice(dataset, data_path):
-    if dataset == 'dogs-vs-cats-redux-kernels-edition/':
+    if dataset == 'dogs-vs-cats-redux-kernels-edition':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_cat = ag.space.Categorical('resnet50_v1b')
         @ag.obj(
@@ -154,7 +154,7 @@ def config_choice(dataset, data_path):
                          'epochs': 60,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'aerial-cactus-identification/':
+    elif dataset == 'aerial-cactus-identification':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_aeri = ag.space.Categorical('resnet18_v1')
         @ag.obj(
@@ -172,7 +172,7 @@ def config_choice(dataset, data_path):
                          'epochs': 30,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'plant-seedlings-classification/':
+    elif dataset == 'plant-seedlings-classification':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_test = ag.space.Categorical('resnet50_v1b')
         @ag.obj(
@@ -190,7 +190,7 @@ def config_choice(dataset, data_path):
                          'epochs': 40,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'fisheries_Monitoring/':
+    elif dataset == 'fisheries_Monitoring':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_fish = ag.space.Categorical('resnet18_v1')
         @ag.obj(
@@ -208,7 +208,7 @@ def config_choice(dataset, data_path):
                          'epochs': 40,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'dog-breed-identification/':
+    elif dataset == 'dog-breed-identification':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_dog = ag.space.Categorical('resnext101_64x4d')
         @ag.obj(
@@ -226,7 +226,7 @@ def config_choice(dataset, data_path):
                          'epochs': 120,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'shopee-iet-machine-learning-competition/':
+    elif dataset == 'shopee-iet-machine-learning-competition':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_shopee = ag.space.Categorical('resnet101_v1c')
         net_18 = ag.space.Categorical('resnet18_v1', 'resnet50_v1b', 'resnet101_v1c')
@@ -246,7 +246,7 @@ def config_choice(dataset, data_path):
                          'epochs': 120,
                          'ngpus_per_trial': 2,
                          'num_trials': 1}
-    elif dataset == 'shopee-iet/':
+    elif dataset == 'shopee-iet':
         dataset_path = os.path.join(data_path, dataset, 'train')
         net_shopee = ag.space.Categorical('resnet101_v1c')
         @ag.obj(
@@ -264,5 +264,6 @@ def config_choice(dataset, data_path):
                          'epochs': 1,
                          'ngpus_per_trial': 1,
                          'num_trials': 1}
+
     return kaggle_choice
 

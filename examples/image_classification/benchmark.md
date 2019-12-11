@@ -1,11 +1,7 @@
 # Documents for Kaggle Benchmark
 
-## How to build
+## Prepare the dataset by shell
 
-1. `pip uninstall autogluon`
-2. `python setup.py develop`
-
-## Prepare the dataset
 
 1. Assume your instance can visit S3.
 
@@ -13,11 +9,19 @@
 
 3. `unzip a.zip -d dataset`
 
+
 ## Train the dataset with fit function:
 
-1. ```dataset = 'dogs-vs-cats-redux-kernels-edition/'```
+`python autogluon/examples/image_classification/benchmark.py --data-dir /your_path/ --dataset ()`
 
-2. `python autogluon/examples/image_classification/benchmark.py`
+```()
+dataset = 'dogs-vs-cats-redux-kernels-edition'
+dataset = 'aerial-cactus-identification'
+dataset = 'plant-seedlings-classification'
+dataset = 'fisheries_Monitoring'
+dataset = 'dog-breed-identification'
+dataset = 'shopee-iet-machine-learning-competition'
+```
 
 3. `kaggle competitions submit -c dogs-vs-cats-redux-kernels-edition -f submission.csv -m "Message"`
 

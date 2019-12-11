@@ -16,7 +16,7 @@ AutoGluon: AutoML Toolkit for Deep Learning
    >>> predictor = task.fit(train_data=task.Dataset(file_path=TRAIN_DATA.csv), label_column=COLUMN_NAME)
    >>> predictions = predictor.predict(task.Dataset(file_path=TEST_DATA.csv))
    
-   AutoGluon can be applied just as easily for prediction tasks involving images or text data.
+   AutoGluon can be applied just as easily for prediction tasks with image or text data.
 
 
 Installation

@@ -6,8 +6,8 @@ __all__ = ['generate_csv', 'generate_csv_submission']
 def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_path, csv_config = None):
     """
     Generate_csv for submission :
-    save predict.csv for submission with different formats.
-    :param csv_path: save predict.csv file
+    save predict_2.csv for submission with different formats.
+    :param csv_path: save predict_2.csv file
     :param dataset: the dataset's name
     :param load_dataset: task.Dataset Object
     :param classifier: fit Object #
@@ -132,8 +132,8 @@ def generate_csv_submission(csv_path, dataset, load_dataset, classifier, local_p
             df.loc[int(row_index[0]), value] = 1
 
         # print("midname:", midname, ",row_index:", row_index, ",value:", value)
-    df.to_csv(os.path.join(local_path, dataset, 'predict.csv'), index=False)
-    print('predict.csv is done')
+    df.to_csv(os.path.join(local_path, dataset, 'predict_2.csv'), index=False)
+    print('predict_2.csv is done')
 
 def generate_csv(inds, path):
     with open(path, 'w') as csvFile:
