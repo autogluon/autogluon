@@ -11,7 +11,8 @@
 *.ag
 *.dirlock
 *.csv
-.html
+*.html
+*.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
