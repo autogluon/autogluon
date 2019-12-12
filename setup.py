@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.2'
+version = '0.0.3'
 try:
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
         cwd=cwd).decode('ascii').strip()
