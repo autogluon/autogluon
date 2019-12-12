@@ -11,11 +11,11 @@ Start by importing AutoGluon, specifying TabularPrediction as the task, and load
 import autogluon as ag
 from autogluon import TabularPrediction as task
 
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 
-val_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+val_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 
 label_column = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
