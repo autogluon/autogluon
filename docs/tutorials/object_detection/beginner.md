@@ -56,7 +56,7 @@ After fitting, AutoGluon automatically returns the best model among all models i
 dataset_test = task.Dataset(data_root, index_file_name='test', classes=('motorbike',))
 
 test_map = detector.evaluate(dataset_test)
-print("mAP on test dataset: {}".format(test_map[1][1])
+print("mAP on test dataset: {}".format(test_map[1][1]))
 ```
 
 Below, we randomly select an image from test dataset and show the predicted box and probability over the origin image.  

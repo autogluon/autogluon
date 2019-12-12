@@ -121,7 +121,7 @@ class ObjectDetection(BaseTask):
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         if ngpus_per_trial > get_gpu_count():
-            logger.warning("The number of requested GPUs is greater than the number availabe GPUs.")
+            logger.warning("The number of requested GPUs is greater than the number of available GPUs.")
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
 
         train_object_detection.register_args(
