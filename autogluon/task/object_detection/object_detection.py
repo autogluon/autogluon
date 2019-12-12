@@ -34,9 +34,10 @@ class ObjectDetection(BaseTask):
             net=Categorical('mobilenet1.0'),
             lr=Categorical(5e-4, 1e-4),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
+            split_ratio=0.2,
             batch_size=16,
             epochs=200,
-            num_trials=2,
+            num_trials=1,
             nthreads_per_trial=12,
             num_workers=32,
             ngpus_per_trial=1,
@@ -45,7 +46,7 @@ class ObjectDetection(BaseTask):
             search_options={},
             time_limits=None,
             verbose=False,
-            resume=False,
+            resume='',
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
             dist_ip_addrs=[],
@@ -119,6 +120,8 @@ class ObjectDetection(BaseTask):
             pass
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
+        if ngpus_per_trial > get_gpu_count():
+            logger.warning("The number of requested GPUs is greater than the number availabe GPUs.")
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
 
         train_object_detection.register_args(
@@ -128,6 +131,7 @@ class ObjectDetection(BaseTask):
             loss=loss,
             num_gpus=ngpus_per_trial,
             batch_size=batch_size,
+            split_ratio=split_ratio,
             epochs=epochs,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,

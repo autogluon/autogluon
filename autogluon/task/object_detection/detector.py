@@ -102,7 +102,7 @@ class Detector(BasePredictor):
 
         if isinstance(dataset, AutoGluonObject):
             dataset = dataset.init()
-        test_dataset, eval_metric = dataset.get_test_metric()
+        test_dataset, eval_metric = dataset.get_dataset_and_metric()
         test_data = _get_dataloader(net, test_dataset, args.data_shape, args.batch_size, args.num_workers, args)
         return _validate(net, test_data, ctx, eval_metric)
     
@@ -132,7 +132,7 @@ class Detector(BasePredictor):
         results['search_strategy'] = results['metadata'].pop('search_strategy')
         return results
     
-    def predict(self, X, input_size=224, plot=True):
+    def predict(self, X, input_size=224, thresh=0.15, plot=True):
         net = self.model
         net.set_nms(0.45, 200)
         net.collect_params().reset_ctx(ctx = mx.cpu())
@@ -141,26 +141,26 @@ class Detector(BasePredictor):
         ids, scores, bboxes = [xx[0].asnumpy() for xx in net(x)]
 
         if plot:
-            ax = gcv.utils.viz.plot_bbox(img, bboxes, scores, ids, thresh=0.15,
+            ax = gcv.utils.viz.plot_bbox(img, bboxes, scores, ids, thresh=thresh,
                                         class_names=net.classes, ax=None)
             plt.show()
         return ids, scores, bboxes
         
 
     def load(cls, checkpoint):
-        raise NotImplementedError
+        raise NotImplemented
     
     def save(self, checkpoint):
-        raise NotImplementedError
+        raise NotImplemented
 
     
     def predict_proba(self, X):
-        raise NotImplementedError
+        raise NotImplemented
     
     def _save_model(self, *args, **kwargs):
-        raise NotImplementedError
+        raise NotImplemented
 
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplementedError
+        raise NotImplemented
         
 
