@@ -15,11 +15,8 @@ def get_dataset(root, index_file_name='trainval', name=None, classes=None, \
         return CustomVOCDetection(root, splits, name, classes, **kwargs)
 
     elif format=='coco':
-        if dataset_name=="coco":
-            logger.info(">>> create dataset(COOC format)")
-            return COCO(*args, **kwargs)
-        else:
-            raise NotImplementedError('Dataset: {} not implemented.'.format(dataset))
+        logger.info(">>> create dataset(COOC format)")
+        return COCO(*args, **kwargs)
     else:
-        raise NotImplementedError('Dataset: {} not implemented.'.format(dataset))
+        raise NotImplementedError('Other data formats are not implemented.')
 
