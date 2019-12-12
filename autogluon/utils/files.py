@@ -22,7 +22,7 @@ def unzip(zip_file_path, root=os.path.expanduser('./')):
             folder = Path(name).parts[0]
             if folder not in folders:
                 folders.append(folder)
-    folders = folders[0] if len(folders) == 1 else tuple(folder)
+    folders = folders[0] if len(folders) == 1 else tuple(folders)
     return folders
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
