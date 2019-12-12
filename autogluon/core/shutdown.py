@@ -1,5 +1,5 @@
-from ..scheduler.remote.remote_manager import RemoteManager
 import logging
+from ..scheduler.remote.remote_manager import RemoteManager
 
 logger = logging.getLogger(__name__)
 

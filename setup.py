@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.1'
+version = '0.0.2'
 try:
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
         cwd=cwd).decode('ascii').strip()
@@ -42,21 +42,30 @@ try:
 except(IOError, ImportError):
     long_description = open('README.md').read()
 
+MIN_PYTHON_VERSION = '>=3.6.*'
+
 requirements = [
-    'numpy',
-    'scipy',
+    'numpy>=1.16.0',
+    'scipy>=1.3.3',
+    'pynvml>=8.0.0'
     'cython',
     'tornado',
     'requests',
     'matplotlib',
     'tqdm>=4.38.0',
-    'paramiko==2.5.0',
-    'distributed==2.6.0',
-    'ConfigSpace==0.4.10',
-    'gluoncv',
-    'gluonnlp',
+    'paramiko>=2.5.0',
+    'distributed>=2.6.0',
+    'ConfigSpace<=0.4.10',
+    'gluoncv>=0.5.0',
+    'gluonnlp==0.8.1',
     'graphviz',
     'scikit-optimize',
+    'catboost',
+    'boto3==1.9.187',
+    'lightgbm==2.3.0',
+    'pandas==0.24.2',
+    'psutil',
+    'scikit-learn==0.21.2',
 ]
 
 setup(
@@ -74,6 +83,7 @@ setup(
     zip_safe=True,
     include_package_data=True,
     install_requires=requirements,
+    python_requires=MIN_PYTHON_VERSION,
     package_data={'autogluon': [
         'LICENSE',
     ]},

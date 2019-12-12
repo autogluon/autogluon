@@ -10,8 +10,7 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter, DistSemaphore
 from ..utils import DeprecationHelper
 
-__all__ = ['HyperbandScheduler', 'DistributedHyperbandScheduler',
-           'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
+__all__ = ['HyperbandScheduler', 'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +114,9 @@ class HyperbandScheduler(FIFOScheduler):
     >>> scheduler.run()
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
-    >>> ag.done()
     """
     def __init__(self, train_fn, args=None, resource=None,
-                 searcher='random', search_options=None,
+                 searcher=None, search_options=None,
                  checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None,
                  time_out=None, max_reward=1.0,
@@ -156,7 +154,7 @@ class HyperbandScheduler(FIFOScheduler):
         """Adding a training task to the scheduler.
 
         Args:
-            task (:class:`autogluon.scheduler.Task`): a new trianing task
+            task (:class:`autogluon.scheduler.Task`): a new training task
 
         Relevant entries in kwargs:
         - bracket: HB bracket to be used. Has been sampled in _promote_config
@@ -314,6 +312,3 @@ class HyperbandScheduler(FIFOScheduler):
         reprstr = self.__class__.__name__ + '(' +  \
             'terminator: ' + str(self.terminator)
         return reprstr
-
-
-DistributedHyperbandScheduler = DeprecationHelper(HyperbandScheduler, 'DistributedHyperbandScheduler')

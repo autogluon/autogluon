@@ -50,13 +50,13 @@ def train_fn(args, reporter):
 
 def test_search_space():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
-                                           resource={'num_cpus': 2, 'num_gpus': 0},
+                                           resource={'num_cpus': 4, 'num_gpus': 0},
                                            num_trials=10,
                                            reward_attr='accuracy',
-                                           time_attr='epoch')
+                                           time_attr='epoch',
+                                           checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
-    ag.done()
 
 if __name__ == '__main__':
     test_search_space()

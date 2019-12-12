@@ -96,34 +96,26 @@ class BaseSearcher(object):
             else:
                 return {}
 
-    def is_best(self, config):
+    def get_best_config_reward(self):
         with self.LOCK:
-            best_config = max(self._results, key=self._results.get)
-            return pickle.dumps(config) == best_config
-
-    def get_best_state_path(self):
-        assert os.path.isfile(self._best_state_path), \
-            'Please use reporter.save_dict(model_params) during the training.'
-        return self._best_state_path
-
-    def get_best_state(self):
-        assert os.path.isfile(self._best_state_path), \
-            'Please use reporter.save_dict(model_params) during the training.'
-        return load(self._best_state_path)
-
-    def update_best_state(self, filepath):
-        self._best_state_path = filepath
+            if len(self._results) > 0:
+                config_pkl = max(self._results, key=self._results.get)
+                return pickle.loads(config_pkl), self._results[config_pkl]
+            else:
+                return dict(), 0.0
 
     def __repr__(self):
+        config, reward = self.get_best_config_reward()
         reprstr = self.__class__.__name__ + '(' +  \
             '\nConfigSpace: {}.'.format(str(self.configspace)) + \
             '\nNumber of Trials: {}.'.format(len(self._results)) + \
-            '\nBest Config: {}'.format(self.get_best_config()) + \
-            '\nBest Reward: {}'.format(self.get_best_reward()) + \
+            '\nBest Config: {}'.format(config) + \
+            '\nBest Reward: {}'.format(reward) + \
             ')'
         return reprstr
 
 
+# TODO: Does not use default hyperparams for first run
 class RandomSearcher(BaseSearcher):
     """Random sampling Searcher for ConfigSpace
 
@@ -145,22 +137,29 @@ class RandomSearcher(BaseSearcher):
     >>> searcher = RandomSearcher(cs)
     >>> searcher.get_config()
     """
+    MAX_RETRIES = 100
+
     def get_config(self, **kwargs):
-        """Function to sample a new configuration
-        This function is called inside Hyperband to query a new configuration
+        """Function to sample a new configuration at random
 
         Parameters
         ----------
-        returns: (config, info_dict)
-            must return a valid configuration and a (possibly empty) info dict
+        returns: config
+            must return a valid configuration
         """
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
             new_config = self.configspace.get_default_configuration().get_dictionary()
         else:
             new_config = self.configspace.sample_configuration().get_dictionary()
-        while pickle.dumps(new_config) in self._results.keys(): # TODO: may never terminate
-            new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[pickle.dumps(new_config)] = 0
+        with self.LOCK:
+            num_tries = 1
+            while pickle.dumps(new_config) in self._results.keys():
+                assert num_tries <= self.MAX_RETRIES, \
+                    "Cannot find new config in BaseSearcher, even after {} trials".format(
+                        self.MAX_RETRIES)
+                new_config = self.configspace.sample_configuration().get_dictionary()
+                num_tries += 1
+            self._results[pickle.dumps(new_config)] = 0
         return new_config
 
     def update(self, config, reward, **kwargs):

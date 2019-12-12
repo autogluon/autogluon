@@ -1,5 +1,10 @@
 Select your preferences and run the install command.
 
+.. note::
+
+  Now only Linux installation is supported. Installation instructions on Mac OSX and Windows will be available soon.
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ versions >= 3.6.
+
 .. role:: title
 .. role:: opt
    :class: option
@@ -7,6 +12,15 @@ Select your preferences and run the install command.
    :class: active option
 
 .. container:: install
+
+  .. container:: opt-group
+
+     :title:`OS:`
+     :act:`Linux`
+
+     .. raw:: html
+
+        <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
 
   .. container:: opt-group
 
@@ -24,48 +38,51 @@ Select your preferences and run the install command.
 
      :title:`Backend:`
      :act:`CPU`
-     :opt:`CUDA`
+     :opt:`GPU`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="cpu">Build-in backend for CPU.</div>
-        <div class="mdl-tooltip" data-mdl-for="cuda">Required to run on Nvidia GPUs.</div>
+        <div class="mdl-tooltip" data-mdl-for="gpu">Required to run on Nvidia GPUs.</div>
 
   .. admonition:: Command:
 
-     .. container:: pip
+     .. container:: linux
 
-        .. container:: cpu
+        .. container:: pip
 
-           .. code-block:: bash
+           .. container:: cpu
 
-              pip install --upgrade mxnet autogluon
+              .. code-block:: bash
 
-        .. container:: cuda
+                 pip install --upgrade mxnet
+                 pip install autogluon
 
-           .. code-block:: bash
+           .. container:: gpu
 
-              # Here we assume CUDA 10.0 is installed. You can change the number
-              # according to your own CUDA version.
-              pip install --upgrade mxnet-cu100 autogluon
+              .. code-block:: bash
 
-     .. container:: source
+                 # Here we assume CUDA 10.0 is installed.  You should change the number 
+                 # according to your own CUDA version (e.g. mxnet-cu101 for CUDA 10.1).
+                 pip install --upgrade mxnet-cu100
+                 pip install autogluon
 
-        .. container:: cpu
+        .. container:: source
 
-           .. code-block:: bash
+           .. container:: cpu
 
-              pip install --pre --upgrade mxnet
-              git clone https://github.com/awslabs/autogluon
-              cd autogluon && python setup.py install --user
+              .. code-block:: bash
 
-        .. container:: cuda
+                 pip install --pre --upgrade mxnet
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
 
-           .. code-block:: bash
+           .. container:: gpu
 
-              # Here we assume CUDA 10.0 is installed. You can change the number
-              # according to your own CUDA version.
-              pip install --pre --upgrade mxnet-cu100
-              git clone https://github.com/awslabs/autogluon
-              cd autogluon && python setup.py install --user
+              .. code-block:: bash
 
+                 # Here we assume CUDA 10.0 is installed.  You should change the number 
+                 # according to your own CUDA version (e.g. mxnet-cu101 for CUDA 10.1).
+                 pip install --pre --upgrade mxnet-cu100
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user

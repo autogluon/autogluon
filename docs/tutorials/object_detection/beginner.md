@@ -1,69 +1,57 @@
 # Object Detection - Quick Start
 :label:`sec_object_detection_quick`
 
-Besides Image classification, objecgt detection is another important task in computer vision. In this tutorial, we will share a brief example to go through the steps that how to use AutoGluon for object detection.
+Object detection is the process of identifying and localizing objects in an image and is an important task in computer vision. Follow this tutorial to learn how to use AutoGluon for object detection.
 
-Our goal is to detect motorbike in images by YOLO3 model. A tiny dataset is collected from VOC dataset, which only contains the motorbike category. The model pretained on COCO dataset is used to do finetuning our small dataset. With the help of AutoGluon, we are able to try many models with different hyper-parameters automatically, and return the best one as our final model. It is better to go over the tutorial about :ref:`sec_imgquick` first to learn how to use AutoGluon.
+**Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` first to learn the basics of the AutoGluon API.
 
-Let's start with importing autogluon and ObjectDetection module for our task 
+Our goal is to detect motorbike in images by [YOLO3 model](https://pjreddie.com/media/files/papers/YOLOv3.pdf). A tiny dataset is collected from VOC dataset, which only contains the motorbike category. The model pretrained on the COCO dataset is used to fine-tune our small dataset. With the help of AutoGluon, we are able to try many models with different hyperparameters automatically, and return the best one as our final model. 
+
+To start, import autogluon and ObjectDetection module as your task: 
+
 ```{.python .input}
 import autogluon as ag
 from autogluon import ObjectDetection as task
 ```
 
-## Tiny_motorbike dataset
-We collect a toy dataset only for detecting motorbikes in images. From VOC datset, 120 images are randomly selected as our training dataset, 50 images for validation and another 50 ones for testing. This tiny dataset follows the same format as VOC. 
+## Tiny_motorbike Dataset
+We collect a toy dataset for detecting motorbikes in images. From the VOC dataset, images are randomly selected for training, validation, and testing - 120 images for training, 50 images for validation, and 50 for testing. This tiny dataset follows the same format as VOC. 
 
-Using the commands below, we can download this dataset, which is only 23M. The variable `root` specifies the path to store this dataset. The name of unzipped folder is called `tiny_motorbike`.
+Using the commands below, we can download this dataset, which is only 23M. The variable `root` specifies the path to store the dataset in. The name of unzipped folder is called `tiny_motorbike`.
 
 ```{.python .input}
-import os
-root = './'
-filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip',
-                        path=root)
-ag.unzip(filename, root=root)
+filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/tiny_motorbike.zip')
+ag.unzip(filename)
 ```
 
-Once we retrieve the dataset, we can create dataset instacne with its name and path.
+When we retrieve the dataset, we can create a dataset instance with its name and path.
+
 ```{.python .input}
-dataset = task.Dataset("tiny_motorbike", root=os.path.join(root, "tiny_motorbike"))
+dataset = task.Dataset('tiny_motorbike', root='./tiny_motorbike')
 ```
 
-## Fit models using AutoGluon
-In this section, we will talk about how to apply AutoGluon to fit our detetion models. We use mobilenet as backbone for YOLO3 model. Two different learning rates will be used to finetune the network. The best model is the one that obtains the best performance on validation dataset. We can also try more networks and hyper-parameters to have a larger searching space. 
+## Fit Models by AutoGluon
+In this section, we demonstrate how to apply AutoGluon to fit our detection models. We use mobilenet as the backbone for the YOLO3 model. Two different learning rates are used to fine-tune the network. The best model is the one that obtains the best performance on the validation dataset. You can also try using more networks and hyperparameters to create a larger searching space. 
 
-In order to have results after you grab a cup of coffee, time_limits is set to 15mins for this task. In each experiment (one trial in our searching space), we train the model for 30 epoches. Let's start playing with AutoGluon.  
+We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 30 epoches. 
 
 ```{.python .input}
-time_limits = 15*60 # 15mins
 epochs = 30
 detector = task.fit(dataset,
-                    net=ag.Categorical('mobilenet1.0'),
-                    lr=ag.Categorical(5e-4, 1e-4),
-                    time_limits=time_limits,
                     epochs=epochs,
                     ngpus_per_trial=1)
 ```
 
-After fitting, AutoGluon will automatically return the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. Now, let's see how well the returned model performed on test dataset by simply calling detector.evaluate().
+After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 
 ```{.python .input}
-test_acc = detector.evaluate(dataset) # it only evaluates on test dataset.
-print("mAP on test dataset: {}".format(test_acc[1][1]))
+test_map = detector.evaluate(dataset) # it only evaluates on test dataset.
+print("mAP on test dataset: {}".format(test_map[1][1]))
 ```
 
-The mAP is not bad after just 30 epochs. Let's see one visualization result. We randomly select an image from test dataset, and show predicted bbox and probability over the origin image.  
+Below, we randomly select an image from test dataset and show the predicted box and probability over the origin image.  
 
 ```{.python .input}
-image = '000467.jpg'
-image_path = os.path.join(root, 'tiny_motorbike/VOC2007/JPEGImages', image)
-
+image_path = './tiny_motorbike/VOC2007/JPEGImages/000467.jpg'
 ind, prob, loc = detector.predict(image_path)
 ```
-
-We have tried models with various settings. Finally, showdown the whole processs via following command. 
-
-```{.python .input}
-ag.done()
-```
-

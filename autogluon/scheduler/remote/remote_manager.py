@@ -23,7 +23,6 @@ def get_ip():
         s.close()
     return IP
 
-
 class RemoteManager(object):
     NODES = {}
     LOCK = mp.Lock()

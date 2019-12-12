@@ -1,21 +1,23 @@
 Neural Architecture Search
 ==========================
 
-AutoGluon enables easy nerual architecture search, with API for fast prototyping and
+AutoGluon enables easy neural architecture search, with API for fast prototyping and
 state-of-the-art built-in methods.
 
+.. container:: cards
+
    .. card::
-      :title: Reinforcement Learing
+      :title: Reinforcement Learning
       :link: rl_searcher.html
 
-      Compare Reinforcement Learning with Random Searcher.
+      Compare reinforcement learning with random searcher.
 
    .. card::
       :title: Efficient NAS on Target Hardware
       :link: enas_mnist.html
 
-      Efficient Neural Architecture Search for low latency model
-      on Target Hardware.
+      Efficient neural architecture search for low latency model
+      on target hardware.
 
 .. toctree::
    :maxdepth: 1

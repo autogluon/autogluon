@@ -1,7 +1,7 @@
 Image classification
 ====================
 
-AutoGluon provides fit API which allows faster prototyping on image classification.
+AutoGluon provides the `fit` API, which enables faster prototyping on image classification.
 
 .. container:: cards
 
@@ -15,13 +15,14 @@ AutoGluon provides fit API which allows faster prototyping on image classificati
       :title: Customized Search and HPO
       :link: hpo.html
 
-      Image classification HPO tutorial.
+      Image classification HPO tutorial,  
+      changing default search algorithms.
 
    .. card::
       :title: Use Your Own Dataset
       :link: kaggle.html
 
-      Participate Kaggle competation.
+      Participate in the Kaggle competition.
 
 .. toctree::
    :maxdepth: 1

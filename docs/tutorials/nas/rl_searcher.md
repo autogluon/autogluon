@@ -6,7 +6,7 @@ In this tutorial, we are going to compare RL searcher with random search in a si
 ## A Toy Reward Space
 
 Input Space `x = [0: 99], y = [0: 99]`.
-The rewards is a combination of 2 gaussians as shown in the following figure:
+The rewards are a combination of 2 gaussians as shown in the following figure:
 
 ```{.python .input}
 import numpy as np
@@ -44,13 +44,13 @@ plt.show()
 
 ### Customize Train Function
 
-We can simply define any function with a decorator `autogluon_register_args` whichs converts the function to
+We can define any function with a decorator `@ag.args`, which converts the function to
 AutoGluon searchable. The `reporter` is used to communicate with AutoGluon search algorithms.
 
 ```{.python .input}
 import autogluon as ag
 
-@ag.autogluon_register_args(
+@ag.args(
     x=ag.space.Categorical(*list(range(100))),
     y=ag.space.Categorical(*list(range(100))),
 )
@@ -89,7 +89,7 @@ rl_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), rl_scheduler.get_best_reward()))
 ```
 
-### Compare the performance
+### Compare the Performance
 
 Get the result history:
 

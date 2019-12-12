@@ -24,8 +24,8 @@ class Remote(Client):
         if not local:
             remote_addr = (remote_ip + ':{}'.format(port))
             self.service = DaskRemoteService(remote_ip, port, ssh_username,
-                                      ssh_port, ssh_private_key, remote_python,
-                                      remote_dask_worker)
+                                             ssh_port, ssh_private_key, remote_python,
+                                             remote_dask_worker)
             super(Remote, self).__init__(remote_addr)
         else:
             super(Remote, self).__init__(processes=False)
@@ -38,7 +38,8 @@ class Remote(Client):
             self.upload_file(filename, **kwargs)
 
     def shutdown(self):
-        self.close()
+        self.close(timeout=2)
+        #super().shutdown()
         if self.service:
             self.service.shutdown()
 
@@ -46,7 +47,7 @@ class Remote(Client):
         return self
 
     def __exit__(self, *args):
-        self.service.shutdown()
+        self.shutdown()
 
     @classmethod
     def create_local_node(cls, ip, port):
@@ -84,15 +85,15 @@ class DaskRemoteService(object):
         )
         # Start worker nodes
         self.worker = start_worker(
-                self.scheduler_addr,
-                self.scheduler_port,
-                remote_addr,
-                self.ssh_username,
-                self.ssh_port,
-                self.ssh_private_key,
-                self.remote_python,
-                self.remote_dask_worker,
-            )
+            self.scheduler_addr,
+            self.scheduler_port,
+            remote_addr,
+            self.ssh_username,
+            self.ssh_port,
+            self.ssh_private_key,
+            self.remote_python,
+            self.remote_dask_worker,
+        )
         self.start_monitoring()
 
     def start_monitoring(self):
@@ -117,10 +118,9 @@ class DaskRemoteService(object):
                 time.sleep(0.1)
 
         except KeyboardInterrupt:
-            self.shutdown()
+            pass
 
     def shutdown(self):
-        import tornado
         all_processes = [self.worker, self.scheduler]
 
         for process in all_processes:

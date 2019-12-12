@@ -25,7 +25,7 @@ class ENAS_Scheduler(object):
     def __init__(self, supernet, train_set='imagenet', val_set=None,
                  train_fn=default_train_fn, eval_fn=default_val_fn,
                  train_args={}, val_args={}, reward_fn= default_reward_fn,
-                 num_gpus=1, num_cpus=4,
+                 num_gpus=0, num_cpus=4,
                  batch_size=256, epochs=120, warmup_epochs=5,
                  controller_lr=1e-3, controller_type='lstm',
                  controller_batch_size=10, ema_baseline_decay=0.95,
@@ -67,6 +67,7 @@ class ENAS_Scheduler(object):
         self._timeout = 20
         # logging history
         self.training_history = []
+        self._prefetch_controller()
 
     def initialize_miscs(self, train_set, val_set, batch_size, num_cpus, num_gpus,
                          train_args, val_args):
@@ -80,9 +81,9 @@ class ENAS_Scheduler(object):
 
         if isinstance(train_set, str):
             train_set = get_built_in_dataset(dataset_name, train=True, batch_size=batch_size,
-                                             num_workers=num_cpus, shuffle=True).init()
+                                             num_workers=num_cpus, shuffle=True)
             val_set = get_built_in_dataset(dataset_name, train=False, batch_size=batch_size,
-                                           num_workers=num_cpus, shuffle=True).init()
+                                           num_workers=num_cpus, shuffle=True)
         if isinstance(train_set, gluon.data.Dataset):
             self.train_data = DataLoader(
                     train_set, batch_size=batch_size, shuffle=True,
@@ -106,7 +107,6 @@ class ENAS_Scheduler(object):
         self.ctx = ctx
 
     def run(self):
-        self._prefetch_controller()
         tq = tqdm(range(self.epochs))
         for epoch in tq:
             # for recordio data

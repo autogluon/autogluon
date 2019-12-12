@@ -1,17 +1,16 @@
 """ TODOs needed to get predictor object working for any task:
-
     - Base Task should implement @classmethod load(output_directory) method which restores a Predictor object from file (previously saved using Predictor.save(output_directory)). task.load(output_directory) can simply: return Predictor.load(output_directory)
-    
+
     - Base Task.fit() needs to create Results object and assign it to predictor.results before returning predictor. The only thing task.fit should return is a single Predictor object.
-    
+
     - Right before task.fit() returns predictor, it should call: predictor.save(outputdir) so that training progress is not accidentally lost.
-    
+
     - task.fit() needs to have an output_directory argument where to store all outputs
-    
+
     - Delete line "Results = collections.namedtuple('Results', 'model reward config time metadata')" from task.fit(), and store all info in self.results dict object defined below instead.
-    
+
     - This code assumes trial_ids are sortable such that lower trial_id indicates trial was scheduled earlier than trial with higher trial_id
-    
+
     - task object should have get_labels(Dataset) method
 """
 
@@ -24,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['BasePredictor']
 
-PREDICTOR_FILENAME = "predictor.pkl" # Filename in which predictor object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
-RESULTS_FILENAME = "results.json" # Filename in which FitResults object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
+PREDICTOR_FILENAME = "predictor.pkl"  # Filename in which predictor object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
+RESULTS_FILENAME = "results.json"  # Filename in which FitResults object is stored. Should be hardcoded so that user only needs to specify directory where to store all training-related output files.
+
 
 class BasePredictor(ABC):
     """
     Base object returned by task.fit() for each task implemented in AutoGluon.
-
     Example user workflow for say image classification applications:
         # Training time:
         >>> from autogluon import image_classification as task
@@ -51,14 +50,15 @@ class BasePredictor(ABC):
         >>> single_prediction = predictor.predict(x_i)
         >>> print((x_i, single_prediction))
     """
+
     def __init__(self, loss_func, eval_func, model=None, results=None, **kwargs):
-        self.model = model # MXnet model or list of multiple models / ensemble. Each model should have its own loading/saving functionality.
-        self.loss_func = loss_func # Loss function (or string name) minimized during training
-        self.eval_func = eval_func # Evaluation function / metric applied on validation/test data to gauge predictive performance.
-        # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
+        self.model = model  # MXnet model or list of multiple models / ensemble. Each model should have its own loading/saving functionality.
+        self.loss_func = loss_func  # Loss function (or string name) minimized during training
+        self.eval_func = eval_func  # Evaluation function / metric applied on validation/test data to gauge predictive performance.
+        # Note: we may save a lot of headache if higher values of this eval_func metric = better, consistently across all tasks.
         # self.results = self._createResults() # dict object to store all information during task.fit().
         self.results = results
-    
+
     @classmethod
     @abstractmethod
     def load(cls, output_directory):
@@ -67,8 +67,8 @@ class BasePredictor(ABC):
         """
         filepath = output_directory + PREDICTOR_FILENAME
         results_file = output_directory + RESULTS_FILENAME
-        predictor = pickle.load(open(filepath,"rb"))
-        predictor.results = json.load(open(results_file,'r'))
+        predictor = pickle.load(open(filepath, "rb"))
+        predictor.results = json.load(open(results_file, 'r'))
         pass  # Need to load models and set them = predictor.model
 
     @abstractmethod
@@ -79,9 +79,9 @@ class BasePredictor(ABC):
         filepath = output_directory + PREDICTOR_FILENAME
         self._save_model(output_directory)
         self._save_results(output_directory)
-        self.model = None # Save model separately from Predictor object
-        self.results = None # Save results separately from Predictor object
-        pickle.dump(self, open(filepath,'wb'))
+        self.model = None  # Save model separately from Predictor object
+        self.results = None  # Save results separately from Predictor object
+        pickle.dump(self, open(filepath, 'wb'))
         logger.info("Predictor saved to file: " % filepath)
 
     def _save_results(self, output_directory):
@@ -89,12 +89,11 @@ class BasePredictor(ABC):
         results_file = output_directory + RESULTS_FILENAME
         json.dump(self.results, open(results_file, 'w'))
 
-    @abstractmethod
     def _save_model(self, output_directory):
         """ Internal helper function: Save self.model object to file located in output_directory.
             For example, if self.model is MXNet model, can simply call self.model.save(output_directory+filename)
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def predict(self, X):
@@ -123,7 +122,7 @@ class BasePredictor(ABC):
         """
         pass
 
-    def fit_summary(self, output_directory=None, verbosity = 2):
+    def fit_summary(self, output_directory=None, verbosity=2):
         """
             Returns a summary of the fit process.
             Args:
@@ -140,7 +139,7 @@ class BasePredictor(ABC):
             if len(self.results['metadata']) > 0:
                 print(self.results['metadata'])
 
-        if len(self.results['trial_info']) > 0 and  verbosity > 1:
+        if len(self.results['trial_info']) > 0 and verbosity > 1:
             ordered_trials = sorted(self.results['trial_info'].keys())
             if verbosity > 2:
                 for trial_id in ordered_trials:
@@ -152,33 +151,60 @@ class BasePredictor(ABC):
             plot_summary_of_models(self.results, output_directory)
             plot_performance_vs_trials(self.results, output_directory)
         return self.results
-    
+
     def _createResults(self):
         """ Internal helper function: Dict object to store all relevant information produced during task.fit(). 
             Empty for now, but should be updated during task.fit().
             All tasks should adhere to this same template for consistency.
         """
         results = {}
-        results['time'] = None # run-time of task.fit()
-        results['reward_attr'] = 'none' # (str), the reward attribute used to measure the performance
-        results[results['reward_attr']] = None # performance of the best trials
-        results['num_trials_completed'] = None # number of trials completed during task.fit() 
-        results['best_hyperparameters'] = None # hyperparameter values corresponding to the chosen model in self.model
-        results['search_space'] = None # hyperparameter search space considered in task.fit()
-        results['search_strategy'] = None # HPO algorithm used (ie. Hyperband, random, BayesOpt). If the HPO algorithm used kwargs, then this should be tuple (HPO_algorithm_string, HPO_kwargs)
-        
-        results['metadata'] = {} # dict containing other optional metadata with keys. For example:
+        results['time'] = None  # run-time of task.fit()
+        results['reward_attr'] = 'none'  # (str), the reward attribute used to measure the performance
+        results[results['reward_attr']] = None  # performance of the best trials
+        results['num_trials_completed'] = None  # number of trials completed during task.fit()
+        results['best_hyperparameters'] = None  # hyperparameter values corresponding to the chosen model in self.model
+        results['search_space'] = None  # hyperparameter search space considered in task.fit()
+        results['search_strategy'] = None  # HPO algorithm used (ie. Hyperband, random, BayesOpt). If the HPO algorithm used kwargs, then this should be tuple (HPO_algorithm_string, HPO_kwargs)
+
+        results['metadata'] = {}  # dict containing other optional metadata with keys. For example:
         # latency = inference-time of self.model (time for feedforward pass)
         # memory = amount of memory required by self.model
-        
-        results['trial_info'] = {} # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
+
+        results['trial_info'] = {}  # dict with keys = trial_IDs, values = dict of information about each individual trial (length = results['num_trials_completed'])
         """ Example of what one element of this dict must look like: 
-        
+
         results['trial_info'][trial_id] =  {
             'config' : hyperparameter configuration tried in this trial
-            'training_loss' : training loss value achieved by the model from this trial (on the training data)
+            'training_loss' : training loss value achieved by the model from this trial (on the training data)
             'metadata' : dict of various optional metadata with keys such as: latency, memory, time, early_stopped, etc.
         }
-        
+
         """
+        return results
+    
+    @staticmethod
+    def _format_results(results):
+        """ Formats miscellaneous records captured by scheduler into user-viewable Results object. """
+        def _merge_scheduler_history(training_history, config_history, reward_attr):
+            trial_info = {}
+            for tid, config in config_history.items():
+                trial_info[tid] = {}
+                trial_info[tid]['config'] = config
+                if tid in training_history:
+                    trial_info[tid]['history'] = training_history[tid]
+                    trial_info[tid]['metadata'] = {}
+
+                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
+                        last_history = training_history[tid][-1]
+                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
+                        trial_info[tid]['metadata'].update(last_history)
+            return trial_info
+
+        training_history = results.pop('training_history')
+        config_history = results.pop('config_history')
+        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
+                                                              results['reward_attr'])
+        results[results['reward_attr']] = results.pop('best_reward')
+        results['search_space'] = results['metadata'].pop('search_space')
+        results['search_strategy'] = results['metadata'].pop('search_strategy')
         return results

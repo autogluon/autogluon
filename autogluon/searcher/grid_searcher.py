@@ -2,6 +2,7 @@ __all__ = ['GridSearcher']
 
 from .searcher import BaseSearcher
 from ..core.space import Categorical
+from sklearn.model_selection import ParameterGrid
 
 class GridSearcher(BaseSearcher):
     """Grid Searcher, only search spaces :class:`autogluon.space.Categorical`
@@ -22,7 +23,6 @@ class GridSearcher(BaseSearcher):
     """
     def __init__(self, cs):
         super().__init__(cs)
-        from sklearn.model_selection import ParameterGrid
         param_grid = {}
         hp_ordering = cs.get_hyperparameter_names()
         for hp in hp_ordering:

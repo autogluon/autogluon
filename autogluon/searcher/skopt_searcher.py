@@ -24,7 +24,7 @@ class SKoptSearcher(BaseSearcher):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     kwargs: Optional arguments passed to skopt.optimizer.Optimizer class,
-            please see documentation at: http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer
+        please see documentation at: `skopt.optimizer.Optimizer <http://scikit-optimize.github.io/optimizer/index.html#skopt.optimizer.Optimizer>`_
         These kwargs be used to specify which surrogate model Bayesian optimization should rely on,
         which acquisition function to use, how to optimize the acquisition function, etc.
         The skopt library provides very comprehensive Bayesian optimization functionality,
@@ -37,21 +37,21 @@ class SKoptSearcher(BaseSearcher):
     
     Examples
     --------
-     >>> import autogluon as ag
-     >>> @ag.args(
-     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-     >>>     wd=ag.space.Real(1e-3, 1e-2))
-     >>> def train_fn(args, reporter):
-     >>>     pass
-     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
-     >>> searcher.get_config()
-     {'lr': 0.0031622777, 'wd': 0.0055}
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    >>>     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    >>>     pass
+    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+    >>> searcher.get_config()
+    {'lr': 0.0031622777, 'wd': 0.0055}
 
-     >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
-     >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
-     >>> next_config = searcher.get_config()
-     >>> next_reward = 10.0 # made-up value.
-     >>> searcher.update(next_config, next_reward)
+    >>> # create BayesOpt searcher which uses RF surrogate model and Expected Improvement acquisition: 
+    >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI')
+    >>> next_config = searcher.get_config()
+    >>> next_reward = 10.0 # made-up value.
+    >>> searcher.update(next_config, next_reward)
     
     .. note::
 
@@ -66,6 +66,7 @@ class SKoptSearcher(BaseSearcher):
         If all of these have configs have already been scheduled to try (might happen in asynchronous setting), 
         then get_config simply reverts to random search via random_config().
     """
+    errors_tohandle = (ValueError, TypeError, RuntimeError)
     
     def __init__(self, configspace, **kwargs):
         BaseSearcher.__init__(self, configspace)
@@ -117,7 +118,7 @@ class SKoptSearcher(BaseSearcher):
                 if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
                     self._results[pickle.dumps(new_config)] = 0
                     return new_config
-            except ValueError:
+            except self.errors_tohandle:
                 pass
             new_points = self.bayes_optimizer.ask(n_points=max_tries) # ask skopt for many configs since first one was not new
             i = 1 # which new point to return as new_config, we already tried the first point above
@@ -129,10 +130,10 @@ class SKoptSearcher(BaseSearcher):
                     if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
                         self._results[pickle.dumps(new_config)] = 0
                         return new_config
-                except ValueError:
+                except self.errors_tohandle:
                     pass
                 i += 1
-        except ValueError:
+        except self.errors_tohandle:
             pass
         logger.info("used random search instead of skopt to produce new hyperparameter configuration in this trial")
         return self.random_config()
@@ -170,7 +171,7 @@ class SKoptSearcher(BaseSearcher):
         try:
             self.bayes_optimizer.tell(self.config2skopt(config),
                                       -reward)  # provide negative reward since skopt performs minimization
-        except ValueError:
+        except self.errors_tohandle:
             logger.info("surrogate model not updated this trial")
         logger.info(
             'Finished Task with config: {} and reward: {}'.format(pickle.dumps(config), reward))
