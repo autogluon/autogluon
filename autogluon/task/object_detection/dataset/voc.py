@@ -18,12 +18,18 @@ import autogluon as ag
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 
+import glob
+from xml.etree import ElementTree as ET
 
-class TinyVOCDetection(gdata.VOCDetection):
-    """Tiny VOC detection Dataset.
-    It only contains one category, motorbike
+
+class CustomVOCDetectionBase(gdata.VOCDetection):
+    """custom Dataset which follows VOC protocol.
+    
     Parameters
     ----------
+    class: tuple of classes, default None
+        reuse the weights if the corresponding class appears in the pretrained model, 
+        otherwise, randomly initialize the weights for new categories.
     root : str, default '~/mxnet/datasets/voc'
         Path to folder storing the dataset.
     splits : list of tuples, default ((2007, 'trainval'), (2012, 'trainval'))
@@ -46,60 +52,73 @@ class TinyVOCDetection(gdata.VOCDetection):
         usage. Typical preloaded labels took tens of MB. You only need to disable it
         when your dataset is extremely large.
     """
-    CLASSES = ('motorbike',)
 
-    def __init__(self, root=os.path.join('~', '.mxnet', 'datasets', 'voc'),
+    def __init__(self, classes=None, root=os.path.join('~', '.mxnet', 'datasets', 'voc'),
                  splits=((2007, 'trainval'), (2012, 'trainval')),
                  transform=None, index_map=None, preload_label=True):
-        super(TinyVOCDetection, self).__init__(root=root,
+
+        # update classes 
+        if classes:
+            self._set_class(classes)  
+        super(CustomVOCDetectionBase, self).__init__(root=root,
                                                splits=splits,
                                                transform=transform,
                                                index_map=index_map,
                                                preload_label=preload_label),
-
-
-@obj()
-class VOC(DatasetBase):
-    def __init__(self):
-        super().__init__()
-        self.train_dataset = gdata.VOCDetection(
-            splits=[(2007, 'trainval'), (2012, 'trainval')])
-        self.val_dataset = gdata.VOCDetection(
-            splits=[(2007, 'test')])
-        self.val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=self.val_dataset.classes)
-
-    def get_train_val_metric(self):
-        return (self.train_dataset, self.val_dataset, self.val_metric)
-
-    def get_dataset_name(self):
-        return 'voc'
-
-@obj()
-class TinyVOC(DatasetBase):
-    def __init__(self, root, *args, **kwargs):
-        super().__init__()
-        self.train_dataset = TinyVOCDetection(
-            root = root,
-            splits=[(2007, 'tiny_motorbike_train')])
-        self.val_dataset = TinyVOCDetection(
-            root = root,
-            splits=[(2007, 'tiny_motorbike_val')])
-        self.val_metric = VOC07MApMetric(iou_thresh=0.5, class_names=self.val_dataset.classes)
     
-        self.test_dataset = TinyVOCDetection(
-            root = root,
-            splits=[(2007, 'tiny_motorbike_test')])
+    @classmethod
+    def _set_class(cls, classes):
+        cls.CLASSES = classes
+    
+    def _load_items(self, splits):
+        """Load individual image indices from splits."""
+        ids = []
+        for subfolder, name in splits:
+            root = os.path.join(self._root, subfolder) if subfolder else self._root
+            lf = os.path.join(root, 'ImageSets', 'Main', name + '.txt')
+            with open(lf, 'r') as f:
+                ids += [(root, line.strip()) for line in f.readlines()]
+        return ids
 
 
-    def get_train_val_metric(self):
-        return (self.train_dataset, self.val_dataset, self.val_metric)
+@obj()
+class CustomVOCDetection():
+    def __init__(self, root, splits, name, classes, **kwargs):
+        super().__init__()
+        self.root = root
+        
+        if not classes:
+            classes = self.generate_gt() if not name else None
+        
+        self.dataset = CustomVOCDetectionBase(classes=classes,
+                                              root=root,
+                                              splits=splits)
 
-    def get_test_metric(self):
-        return (self.test_dataset, self.val_metric)
+        self.metric = VOC07MApMetric(iou_thresh=0.5, class_names=self.dataset.classes)
 
-    def get_dataset_name(self):
-        return 'tiny_motorbike'
+    def get_dataset_and_metric(self):
+        return (self.dataset, self.metric)
 
     def get_classes(self):
-        return self.train_dataset.classes 
+        return self.dataset.classes 
+
+    def generate_gt(self):
+        classes = []
+
+        all_xml = glob.glob( os.path.join(self.root, 'Annotations', '*.xml') )
+        for each_xml_file in all_xml:
+            tree = ET.parse(each_xml_file)
+            root = tree.getroot()
+            for child in root:
+                if child.tag=='object':
+                    for item in child:
+                        if item.tag=='name':
+                            object_name = item.text
+                            if object_name not in classes:
+                                classes.append(object_name)
+
+        classes = sorted(classes)
+
+        return classes
+
 

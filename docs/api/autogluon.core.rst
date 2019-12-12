@@ -77,10 +77,3 @@ Core APIs
 
 .. autofunction::
    func
-
-:hidden:`done`
-~~~~~~~~~~~~~~
-
-.. autofunction::
-   done
-

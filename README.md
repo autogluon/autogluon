@@ -1,5 +1,8 @@
 ## AutoGluon: AutoML Toolkit for Deep Learning
 
+[![Build Status](http://ci.mxnet.io/view/all/job/autogluon/job/master/badge/icon)](http://ci.mxnet.io/view/all/job/autogluon/job/master/)
+[![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
+
 AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy deep learning models on image, text, and tabular data.  Get started with: 
 
 ```
