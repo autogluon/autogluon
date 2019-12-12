@@ -69,7 +69,7 @@ class Remote(Client):
         for filename in files:
             self.upload_file(filename, **kwargs)
 
-    def shutdown(self):
+    def _shutdown(self):
         if self.service:
             self.service.shutdown()
         self.close(timeout=2)
@@ -78,7 +78,7 @@ class Remote(Client):
         return self
 
     def __exit__(self, *args):
-        self.shutdown()
+        self._shutdown()
 
     @classmethod
     def create_local_node(cls, ip, port):
