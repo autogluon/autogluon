@@ -20,12 +20,21 @@ from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 from gluoncv.utils.metrics.coco_detection import COCODetectionMetric
 from gluoncv.utils import LRScheduler, LRSequential
 
+#TODO: move it to general util.py
+from ..image_classification.utils import _train_val_split 
+
+
+
 from ...core import *
 from ...utils.mxutils import collect_params
-from ...utils import tqdm, mkdir
+from ...utils import tqdm
 
 def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_workers, args):
     """Get dataloader."""
+    # when it is not in final_fit stage and val_dataset is not provided, we randomly sample (1 - args.split_ratio) data as our val_dataset
+    if (not args.final_fit) and (not val_dataset):
+        train_dataset, val_dataset = _train_val_split(train_dataset, args.split_ratio)
+
     width, height = data_shape, data_shape
     batchify_fn = Tuple(*([Stack() for _ in range(6)] + [Pad(axis=0, pad_val=-1) for _ in range(1)]))  # stack image, all targets generated
     if args.no_random_shape:
@@ -37,10 +46,13 @@ def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_
         train_loader = RandomTransformDataLoader(
             transform_fns, train_dataset, batch_size=batch_size, interval=10, last_batch='rollover',
             shuffle=True, batchify_fn=batchify_fn, num_workers=num_workers)
+
     val_batchify_fn = Tuple(Stack(), Pad(pad_val=-1))
-    val_loader = gluon.data.DataLoader(
-        val_dataset.transform(YOLO3DefaultValTransform(width, height)),
-        batch_size, False, batchify_fn=val_batchify_fn, last_batch='keep', num_workers=num_workers)
+    val_loader = None
+    if val_dataset:
+        val_loader = gluon.data.DataLoader(
+            val_dataset.transform(YOLO3DefaultValTransform(width, height)),
+            batch_size, False, batchify_fn=val_batchify_fn, last_batch='keep', num_workers=num_workers)
     return train_loader, val_loader
 
 def validate(net, val_data, ctx, eval_metric):
@@ -119,23 +131,21 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
 
     # set up logger
     logging.basicConfig()
-    logger = logging.getLogger(__name__)
-    if args.verbose:
-        logger.setLevel(logging.INFO)
-        log_file_path = args.save_prefix + '_train.log'
-        log_dir = os.path.dirname(log_file_path)
-        if log_dir:
-            mkdir(log_dir)
-        fh = logging.FileHandler(log_file_path)
-        logger.addHandler(fh)
-
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    log_file_path = args.save_prefix + '_train.log'
+    log_dir = os.path.dirname(log_file_path)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    fh = logging.FileHandler(log_file_path)
+    logger.addHandler(fh)
     logger.info(args)
     #logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
     best_map = [0]
 
     pre_current_map = 0
-    tbar = tqdm(range(args.start_epoch, args.epochs))
-    for epoch in tbar:
+    for epoch in range(args.start_epoch, args.epochs):
+        #tbar2.next()
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -190,13 +200,14 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
         name2, loss2 = center_metrics.get()
         name3, loss3 = scale_metrics.get()
         name4, loss4 = cls_metrics.get()
-        #logger.info('[Epoch {}] Training cost: {:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
-        #    epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
+        logger.info('[Epoch {}] Training cost: {:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}, {}={:.3f}'.format(
+            epoch, (time.time()-tic), name1, loss1, name2, loss2, name3, loss3, name4, loss4))
         if (not (epoch + 1) % args.val_interval) and not final_fit:
             # consider reduce the frequency of validation to save time
             map_name, mean_ap = validate(net, val_data, ctx, eval_metric)
-            val_msg = ' '.join(['{}={:.3f}'.format(k, v) for k, v in zip(map_name, mean_ap)])
-            tbar.set_description('[Epoch {}] {}'.format(epoch, val_msg))
+            val_msg = ' '.join(['{}={}'.format(k, v) for k, v in zip(map_name, mean_ap)])
+            #$tbar.set_description('[Epoch {}] Validation: {}'.format(epoch, val_msg))
+            logger.info('[Epoch {}] Validation: {}'.format(epoch, val_msg))
             current_map = float(mean_ap[-1])
             pre_current_map = current_map
         else:
@@ -214,19 +225,49 @@ def train_object_detection(args, reporter):
     net_name = '_'.join(('yolo3', args.net, 'custom'))
     args.save_prefix += net_name
 
+    # use sync bn if specified
+    if args.syncbn and len(ctx) > 1:
+        net = gcv.model_zoo.get_model(net_name, 
+                                    classes=args.dataset.get_classes(),
+                                    pretrained_base=False, 
+                                    transfer='coco',
+                                    norm_layer=gluon.contrib.nn.SyncBatchNorm,
+                                    norm_kwargs={'num_devices': len(ctx)})
+        #net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+        async_net = gcv.model_zoo.get_model(net_name, 
+                                            classes=args.dataset.get_classes(),
+                                            pretrained_base=False, 
+                                            transfer='coco')
+        #async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+    else:
+        net = gcv.model_zoo.get_model(net_name, 
+                                    classes=args.dataset.get_classes(),
+                                    pretrained_base=False, 
+                                    transfer='coco')
+        #net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+        async_net = net
+
+    if args.resume.strip():
+        net.load_parameters(args.resume.strip())
+        async_net.load_parameters(args.resume.strip())
+    else:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            net.initialize()
+            async_net.initialize()
+
+    '''
     net = gcv.model_zoo.get_model(net_name, 
                                   classes=args.dataset.get_classes(),
                                   pretrained_base=False, 
                                   transfer='coco')
+    '''
 
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        net.initialize()
 
     # training data
-    train_dataset, val_dataset, eval_metric = args.dataset.get_train_val_metric()
-    train_data, val_data = get_dataloader(net,
-        train_dataset, val_dataset, args.data_shape, args.batch_size, args.num_workers, args)
+    train_dataset, eval_metric = args.dataset.get_dataset_and_metric()
+    train_data, val_data = get_dataloader(
+        async_net, train_dataset, None, args.data_shape, args.batch_size, args.num_workers, args)
 
     # training
     train(net, train_data, val_data, eval_metric, ctx, args, reporter, args.final_fit)
