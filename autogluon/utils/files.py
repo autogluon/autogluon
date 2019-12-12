@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import requests
 import errno
 import shutil
@@ -14,8 +15,15 @@ __all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'unzip', 'raise_num_file'
 def unzip(zip_file_path, root=os.path.expanduser('./')):
     """Unzip the files.
     """
+    folders = []
     with zipfile.ZipFile(zip_file_path) as zf:
         zf.extractall(root)
+        for name in zf.namelist():
+            folder = Path(name).parts[0]
+            if folder not in folders:
+                folders.append(folder)
+    folders = folders[0] if len(folders) == 1 else tuple(folders)
+    return folders
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
     """Download an given URL
