@@ -364,7 +364,7 @@ class AbstractLearner:
 
     def leaderboard(self, X=None, y=None, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, silent=silent)
+            leaderboard = self.score_debug(X=X, y=y, silent=True)
         else:
             trainer = self.load_trainer()
             leaderboard = trainer.leaderboard()
