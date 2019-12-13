@@ -126,8 +126,8 @@ class DistStatusReporter(object):
         >>>     reporter(accuracy=0.1)
     """
 
-    def __init__(self):
-        self._queue = Queue()
+    def __init__(self, remote=None):
+        self._queue = Queue(client=remote)
         self._continue_semaphore = DistSemaphore(0)
         self._last_report_time = time.time()
 
@@ -180,8 +180,8 @@ class DistStatusReporter(object):
 
 
 class DistSemaphore(object):
-    def __init__(self, value):
-        self._queue = Queue()
+    def __init__(self, value, remote=None):
+        self._queue = Queue(client=remote)
         for i in range(value):
             self._queue.put(1)
 
