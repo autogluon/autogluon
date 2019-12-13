@@ -44,10 +44,10 @@ def _can_connect(host, port, s):
 class TimeoutError(Exception):
     pass
 
-def sync_training_processes(proccess_id_string, worker_id):
+def sync_training_processes(proccess_id_string, worker_id, sync_frequency=300):
     training_process_started = False
     while True:
-        time.sleep(300)
+        time.sleep(sync_frequency)
         training_process_ps = subprocess.check_output(f'ps -elf | grep "{proccess_id_string}"', encoding='utf-8', shell=True)
         print(training_process_ps)
         training_process_count = subprocess.check_output(f'ps -elf | grep "{proccess_id_string}" | wc -l', encoding='utf-8', shell=True)

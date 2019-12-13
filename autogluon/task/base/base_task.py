@@ -39,6 +39,7 @@ class BaseTask(object):
         plot_results = scheduler_options.pop('plot_results') \
                 if 'plot_results' in scheduler_options else False
         scheduler = scheduler(train_fn, **scheduler_options)
+        print('scheduler:', scheduler)
         scheduler.run()
         scheduler.join_jobs()
         # gather the best configuration

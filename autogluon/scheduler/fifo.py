@@ -215,7 +215,7 @@ class FIFOScheduler(TaskScheduler):
         cls = FIFOScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter
-        reporter = DistStatusReporter()
+        reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
