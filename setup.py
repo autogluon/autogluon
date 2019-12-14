@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.2'
+version = '0.0.3'
 try:
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
         cwd=cwd).decode('ascii').strip()
@@ -47,7 +47,6 @@ MIN_PYTHON_VERSION = '>=3.6.*'
 requirements = [
     'numpy>=1.16.0',
     'scipy>=1.3.3',
-    'pynvml>=8.0.0'
     'cython',
     'tornado',
     'requests',

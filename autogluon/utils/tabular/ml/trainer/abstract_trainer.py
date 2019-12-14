@@ -388,7 +388,14 @@ class AbstractTrainer:
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
         if weighted_ensemble_model.name in self.model_names:
-            self.model_best = weighted_ensemble_model.name  # TODO: Make it the max val score model!
+            if self.model_best is None:
+                self.model_best = weighted_ensemble_model.name
+            else:
+                best_score = self.model_performance[self.model_best]
+                cur_score = self.model_performance[weighted_ensemble_model.name]
+                if cur_score > best_score:
+                    # new best model
+                    self.model_best = weighted_ensemble_model.name
 
     def generate_stack_log_reg(self, X, y, level, k_fold=0, stack_loc=None):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])

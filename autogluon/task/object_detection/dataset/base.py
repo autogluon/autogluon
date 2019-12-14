@@ -7,7 +7,7 @@ class DatasetBase(ABC):
         pass
     
     @abstractmethod
-    def get_train_val_metric(self):
+    def get_dataset_and_metric(self):
         pass
 
     @abstractmethod
