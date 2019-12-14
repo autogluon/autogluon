@@ -59,13 +59,13 @@ def sync_training_processes(proccess_id_string, worker_id, sync_frequency=300):
             if not training_process_running:
                 print(f'Worker {worker_id} training completed.')
                 time.sleep(5)
-                sys.exit(0)
+                return
         if not training_process_started:
             if training_process_running:
                 training_process_started = True
             else:
                 print(f'Worker {worker_id} exiting: training not started in 300 seconds.')
-                sys.exit(1)
+                return
 
 @contextmanager
 def timeout(seconds=0, minutes=0, hours=0):
