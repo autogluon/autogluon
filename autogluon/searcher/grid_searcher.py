@@ -21,12 +21,12 @@ class GridSearcher(BaseSearcher):
     {'x.choice': 2, 'y.choice': 2}
    
     """
-    def __init__(self, cs):
-        super().__init__(cs)
+    def __init__(self, configspace):
+        super().__init__(configspace)
         param_grid = {}
-        hp_ordering = cs.get_hyperparameter_names()
+        hp_ordering = configspace.get_hyperparameter_names()
         for hp in hp_ordering:
-            hp_obj = cs.get_hyperparameter(hp)
+            hp_obj = configspace.get_hyperparameter(hp)
             hp_type = str(type(hp_obj)).lower()
             assert 'categorical' in hp_type, \
                 'Only Categorical is supported, but {} is {}'.format(hp, hp_type)
