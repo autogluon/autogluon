@@ -2,8 +2,8 @@ Select your preferences and run the install command.
 
 .. note::
 
-  Now only Linux installation is supported. Installation instructions on Mac OSX and Windows will be available soon.
-  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ versions >= 3.6.
+  Only Linux installation is supported for now (Mac OSX and Windows versions will be available soon).
+  AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6 or 3.7.
 
 .. role:: title
 .. role:: opt
