@@ -226,6 +226,8 @@ class TabularPrediction(BaseTask):
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         label_count_threshold = kwargs.get('label_count_threshold', 10)
+        if num_bagging_folds is not None: # Ensure there exist sufficient labels for stratified splits across all bags
+            label_count_threshold = max(label_count_threshold, num_bagging_folds)
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)

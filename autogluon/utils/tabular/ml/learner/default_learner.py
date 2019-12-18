@@ -1,12 +1,14 @@
 import copy, logging, time
 from pandas import DataFrame
 import pandas as pd
+import numpy as np
 
 from .abstract_learner import AbstractLearner
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 from ..trainer.auto_trainer import AutoTrainer
-from ..constants import BINARY
+from ..constants import BINARY, MULTICLASS
+from ...metrics import log_loss
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,9 @@ class DefaultLearner(AbstractLearner):
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
 
+        if self.objective_func == log_loss:
+            X = self.augment_rare_classes(X)
+
         # Gets labels prior to removal of infrequent classes
         y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
 
@@ -142,3 +147,37 @@ class DefaultLearner(AbstractLearner):
             X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
 
         return X, y, X_test, y_test
+
+    def augment_rare_classes(self, X):
+        """ Use this method for when using certain eval_metrics like log_loss, 
+            for which no classes may be filtered out. 
+            This method will augment dataset with additional examples of rare classes.
+        """
+        if self.problem_type != MULTICLASS:
+            raise ValueError("log_loss eval_metric cannot be specified for non-multiclass problem.")
+        class_counts = X[self.label].value_counts()
+        class_counts_invalid = class_counts[class_counts < self.threshold]
+        if len(class_counts_invalid) == 0:
+            logger.debug("augment_rare_classes did not need to duplicate any data from rare classes")
+            return X
+
+        invalid_classes = list(class_counts_invalid.index)
+        for clss in invalid_classes:
+            n_clss = class_counts_invalid[clss]
+            n_toadd = self.threshold - class_counts_invalid[clss]
+            clss_df = X.loc[X[self.label] == clss]
+            new_df = clss_df.copy()
+            duplicate_times = int(np.floor(n_toadd / n_clss))
+            remainder = n_toadd % n_clss
+            while duplicate_times > 0:
+                duplicate_times -= 1
+                new_df = new_df.append(clss_df.copy())
+            new_df = new_df.append(clss_df[:remainder])
+            X = X.append(new_df.copy())
+
+        class_counts = X[self.label].value_counts()
+        class_counts_invalid = class_counts[class_counts < self.threshold]
+        if len(class_counts_invalid) > 0:
+            raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
+        logger.log(15, "Duplicated data from rare classes in training set because eval_metric requires all classes")
+        return X
