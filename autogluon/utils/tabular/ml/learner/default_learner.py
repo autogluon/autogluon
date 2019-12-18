@@ -149,7 +149,7 @@ class DefaultLearner(AbstractLearner):
         return X, y, X_test, y_test
 
     def augment_rare_classes(self, X):
-        """ Use this method for when using certain eval_metrics like log_loss, 
+        """ Use this method when using certain eval_metrics like log_loss, 
             for which no classes may be filtered out. 
             This method will augment dataset with additional examples of rare classes.
         """
@@ -166,18 +166,19 @@ class DefaultLearner(AbstractLearner):
             n_clss = class_counts_invalid[clss]
             n_toadd = self.threshold - class_counts_invalid[clss]
             clss_df = X.loc[X[self.label] == clss]
-            new_df = clss_df.copy()
             duplicate_times = int(np.floor(n_toadd / n_clss))
             remainder = n_toadd % n_clss
+            new_df = clss_df.copy()
+            new_df = new_df[:remainder]
             while duplicate_times > 0:
+                logger.debug("Duplicating data from rare class: " + clss)
                 duplicate_times -= 1
                 new_df = new_df.append(clss_df.copy())
-            new_df = new_df.append(clss_df[:remainder])
             X = X.append(new_df.copy())
 
         class_counts = X[self.label].value_counts()
         class_counts_invalid = class_counts[class_counts < self.threshold]
         if len(class_counts_invalid) > 0:
             raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
-        logger.log(15, "Duplicated data from rare classes in training set because eval_metric requires all classes")
+        logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
         return X
