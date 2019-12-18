@@ -102,9 +102,9 @@ You can now play with different `fit()` arguments and feature-engineering techni
 
    - Be sure to specify the appropriate evaluation metric if one is specified on the competition website! If you are unsure which metric is best, then simply do not specify this argument when invoking `fit()`; AutoGluon should still produce high-quality models by automatically inferring which metric to use.
 
-   - If the training examples are time-based and the competition test examples come from future data, we recommend you reserve the most recently-collected training examples as a separate validation dataset passed to `fit()`. Otherwise, you do not need to specify a validation set yourself and AutoGluon will automatically partition the competition training data into its own training/validation sets.
+   - If the training examples are time-based and the competition test examples come from future data, we recommend you reserve the most recently-collected training examples as a separate validation dataset passed to `fit()`. Otherwise, you do not need to specify a validation set yourself and AutoGluon will automatically partition the competition training data into its own training/validation sets. 
 
-   - Specify the following `fit()` arguments: `num_bagging_folds`, `stack_ensemble_levels` (we recommend trying values 5-10 for the former, 1-2 for the latter). Note these choices will increase the runtime of `fit()`.
+   - Specify the following `fit()` arguments: `num_bagging_folds`, `stack_ensemble_levels` (we recommend trying values 5-10 for the former, 1-2 for the latter). Note these choices will increase the runtime of `fit()`, and use of bagging/stack-ensembling means models will be trained on your provided validation dataset as well as the training dataset.
 
 
 **Troubleshooting:**

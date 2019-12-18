@@ -78,7 +78,8 @@ class TabularPrediction(BaseTask):
             Name of column that contains the target variable to predict.
         tuning_data : (:class:`autogluon.task.tabular_prediction.TabularDataset` object, default = None)
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data). 
-            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your test data here! 
+            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
+            In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
         output_directory : (str) 
             Path to directory where models and intermediate outputs should be saved.

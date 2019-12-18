@@ -162,10 +162,13 @@ class DefaultLearner(AbstractLearner):
             return X
 
         invalid_classes = list(class_counts_invalid.index)
+        aug_df = None
         for clss in invalid_classes:
             n_clss = class_counts_invalid[clss]
             n_toadd = self.threshold - class_counts_invalid[clss]
             clss_df = X.loc[X[self.label] == clss]
+            if aug_df is None:
+                aug_df = clss_df[:0].copy()
             duplicate_times = int(np.floor(n_toadd / n_clss))
             remainder = n_toadd % n_clss
             new_df = clss_df.copy()
@@ -174,8 +177,9 @@ class DefaultLearner(AbstractLearner):
                 logger.debug("Duplicating data from rare class: " + clss)
                 duplicate_times -= 1
                 new_df = new_df.append(clss_df.copy())
-            X = X.append(new_df.copy())
-
+            aug_df = aug_df.append(new_df.copy())
+        
+        X = X.append(aug_df)
         class_counts = X[self.label].value_counts()
         class_counts_invalid = class_counts[class_counts < self.threshold]
         if len(class_counts_invalid) > 0:
