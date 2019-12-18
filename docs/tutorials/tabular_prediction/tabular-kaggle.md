@@ -6,7 +6,7 @@ We first outline the general steps to use AutoGluon in Kaggle contests. Here, we
 
 1) Run Bash command: pip install kaggle
 
-2) Navigate to: https://www.kaggle.com/account, and create an account (if necessary).
+2) Navigate to: https://www.kaggle.com/account and create an account (if necessary).
 Then , click on "Create New API Token" and move downloaded file to this location on your machine: `~/.kaggle/kaggle.json`. For troubleshooting, see [Kaggle API instructions](https://www.kaggle.com/docs/api). 
 
 3) To download data programmatically: Execute this Bash command in your terminal: 
