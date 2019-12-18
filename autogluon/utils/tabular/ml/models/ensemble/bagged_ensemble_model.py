@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaggedEnsembleModel(AbstractModel):
-    def __init__(self, path, name, model_base: AbstractModel, debug=0):
+    def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -23,7 +23,7 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = self.model_base.feature_types_metadata
         except:
             feature_types_metadata = None
-        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, debug=debug)
+        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
 
     def preprocess(self, X, model=None):
         if model is None:

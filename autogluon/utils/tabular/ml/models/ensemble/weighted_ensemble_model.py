@@ -6,16 +6,17 @@ from ...tuning.ensemble_selection import EnsembleSelection
 
 logger = logging.getLogger(__name__)
 
+
 # TODO: Do Kfold to determine if its overfit, observing the val score is way overly optimistic on AUC at l2, despite being worse on test than l1 (OpenML Amazon_employee_access)
 class WeightedEnsembleModel(StackerEnsembleModel):
-    def __init__(self, path, name, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_weights=None, num_classes=None, debug=0):
+    def __init__(self, path, name, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_weights=None, base_model_performances_dict=None, num_classes=None, hyperparameters=None, debug=0):
         self.base_model_weights = base_model_weights
 
         if self.base_model_weights is not None:
             base_model_names, self.base_model_weights = self.remove_zero_weight_models(self.base_model_names, self.base_model_weights)
 
         model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
-        super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, use_orig_features=False, num_classes=num_classes, debug=debug)
+        super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, base_model_performances_dict=base_model_performances_dict, use_orig_features=False, num_classes=num_classes, hyperparameters=hyperparameters, debug=debug)
         self.model_base = None
 
     # TODO: Add kfold support? Might be a useful debugging tool in optimizing weighted_ensemble to do better on average

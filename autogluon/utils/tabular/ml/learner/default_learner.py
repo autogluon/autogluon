@@ -27,7 +27,7 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0, 
+            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0,
             hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
