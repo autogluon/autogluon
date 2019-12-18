@@ -17,7 +17,7 @@ from test_tabular import run_tabular_benchmarks
 def test_tabularHPO():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 99 # random seed
     subsample_size = None
     hyperparameter_tune = True
     verbosity = 2 # how much output to print

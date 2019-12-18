@@ -18,10 +18,10 @@ def test_tabular_bag():
     num_bagging_folds = 3
     stack_ensemble_levels = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 123 # random seed
     subsample_size = None
     hyperparameter_tune = False
-    verbosity = 4 # how much output to print
+    verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
     fast_benchmark = True # False
@@ -31,8 +31,8 @@ def test_tabular_bag():
 
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
-        subsample_size = 100
-        nn_options = {'num_epochs': 3} 
+        subsample_size = 120
+        nn_options = {'num_epochs': 1} 
         gbm_options = {'num_boost_round': 30}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limits = 60
@@ -57,10 +57,10 @@ def test_tabular_stack1():
     stack_ensemble_levels = 1
     num_bagging_folds = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 32 # random seed
     subsample_size = None
     hyperparameter_tune = False
-    verbosity = 4 # how much output to print
+    verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
     fast_benchmark = True # False
@@ -96,7 +96,7 @@ def test_tabular_stack2():
     stack_ensemble_levels = 2
     num_bagging_folds = 0
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 66 # random seed
     subsample_size = None
     hyperparameter_tune = False
     verbosity = 2 # how much output to print
@@ -135,7 +135,7 @@ def test_tabular_bagstack():
     stack_ensemble_levels = 2
     num_bagging_folds = 3
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 53 # random seed
     subsample_size = None
     hyperparameter_tune = False
     verbosity = 2 # how much output to print
@@ -148,9 +148,9 @@ def test_tabular_bagstack():
 
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
-        subsample_size = 100
-        nn_options = {'num_epochs': 3} 
-        gbm_options = {'num_boost_round': 30}
+        subsample_size = 105
+        nn_options = {'num_epochs': 2} 
+        gbm_options = {'num_boost_round': 40}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options, 'custom': ['GBM']}
         time_limits = 60
 
@@ -171,6 +171,6 @@ def test_tabular_bagstack():
 
 if __name__ == '__main__':
     test_tabular_bag()
-    test_tabular_stack1()
-    test_tabular_stack2()
+    # test_tabular_stack1() # TODO: Ignored for now, since stacking is disabled without bagging.
+    # test_tabular_stack2()
     test_tabular_bagstack()

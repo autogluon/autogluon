@@ -46,9 +46,6 @@ def test_tabular():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 3} 
-        gbm_options = {'num_boost_round': 30}
-        hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limits = 60
 
     fit_args = {

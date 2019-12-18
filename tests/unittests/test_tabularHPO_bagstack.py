@@ -16,7 +16,7 @@ from test_tabular import run_tabular_benchmarks
 def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 0 # random seed
+    seed_val = 10000 # random seed
     subsample_size = None
     hyperparameter_tune = True
     stack_ensemble_levels = 2
@@ -33,8 +33,8 @@ def test_tabularHPObagstack():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 3, 'learning_rate': ag.Real(0.001,0.01)} 
-        gbm_options = {'num_boost_round': 30, 'learning_rate': ag.Real(0.01,0.1)}
+        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01)} 
+        gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limits = 60
         num_trials = 3
