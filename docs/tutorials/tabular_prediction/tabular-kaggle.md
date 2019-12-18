@@ -63,7 +63,7 @@ Note that a left-join on the `TransactionID` key happened to be most appropriate
 
 ```
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=output_directory, 
-                     objective_func=objective_func, hyperparameter_tune=False, 
+                     eval_metric=eval_metric, hyperparameter_tune=False, verbosity=3,
                      num_bagging_folds=10, stack_ensemble_levels=2) # delete last 2 arguments to reduce runtime
 
 results = predictor.fit_summary()
