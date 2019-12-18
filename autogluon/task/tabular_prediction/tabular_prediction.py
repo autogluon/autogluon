@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, math
 import numpy as np
 
 from .dataset import TabularDataset
@@ -54,7 +54,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
-            hyperparameter_tune=False, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
+            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
             hyperparameters = {
                                'NN': {'num_epochs': 500},
                                'GBM': {'num_boost_round': 10000},
@@ -102,7 +102,12 @@ class TabularPrediction(BaseTask):
         hyperparameter_tune : (bool, default = False)
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
         feature_prune : (bool, default = False)
-            Whether or not to perform feature selection. 
+            Whether or not to perform feature selection.
+        auto_stack : (bool, default = False)
+            Whether to have AutoGluon automatically attempt to select optimal num_bagging_folds and stack_ensemble_levels based on data properties.
+            Note: Overrides num_bagging_folds and stack_ensemble_levels values.
+            Note: This can increase training time by up to 20x, but can produce much better results.
+            Note: This can increase inference time by up to 20x.
         hyperparameters : (dict) 
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
@@ -232,6 +237,13 @@ class TabularPrediction(BaseTask):
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
+        num_train_rows = len(train_data)
+        if auto_stack:
+            # TODO: What about datasets that are 100k+? At a certain point should we not bag?
+            # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 200)))
+            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 2000)))
+
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
         if num_bagging_folds >= 2 and (time_limits_hpo is not None):
@@ -241,7 +253,6 @@ class TabularPrediction(BaseTask):
             hyperparameter_tune = False
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
-            num_train_rows = len(train_data)
             # Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples
             if num_train_rows < 5000:
                 holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
