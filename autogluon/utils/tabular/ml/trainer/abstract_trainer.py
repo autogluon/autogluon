@@ -85,7 +85,8 @@ class AbstractTrainer:
 
         self.model_performance = {}
         self.model_paths = {}
-        self.model_types = {}
+        self.model_types = {}  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
+        self.model_types_inner = {}  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
         self.model_fit_times = {}
         self.model_pred_times = {}
         self.models = {}
@@ -112,6 +113,9 @@ class AbstractTrainer:
         self.time_train_start = None
         self.time_train_level_start = None
         self.time_limit_per_level = self.time_limit / (self.stack_ensemble_levels + 1)
+
+        self.num_rows_train = None
+        self.num_cols_train = None
 
     @property
     def model_names(self):
@@ -247,6 +251,10 @@ class AbstractTrainer:
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
+            if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                self.model_types_inner[model.name] = model._child_type
+            else:
+                self.model_types_inner[model.name] = type(model)
             logger.log(20, '\t' + str(round(fit_end_time - fit_start_time, 2))+'s' + '\t = Training runtime')
             logger.log(20, '\t' + str(round(score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
             logger.log(15, '\tEvaluation runtime of '+str(model.name)+ ' = '+str(round(pred_end_time - fit_end_time, 2))+' s')
@@ -293,6 +301,10 @@ class AbstractTrainer:
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
                 self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
+                if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                    self.model_types_inner.update({name: model._child_type for name in sorted(hpo_models.keys())})
+                else:
+                    self.model_types_inner.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
             self.train_and_save(X_train, y_train, X_test, y_test, model, stack_loc=stack_loc, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
         self.save()
@@ -325,6 +337,8 @@ class AbstractTrainer:
         self.models_level[level] = unique_names  # make unique and preserve order
 
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
+        self.num_rows_train = len(X_train)
+        self.num_cols_train = len(list(X_train.columns))
         self.time_train_start = time.time()
         self.time_train_level_start = self.time_train_start
         self.train_multi(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
@@ -383,12 +397,12 @@ class AbstractTrainer:
         # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
         # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
 
-    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None, ignore_time_limit=False):
+    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None, hyperparameters=None, ignore_time_limit=False, name_suffix=''):
         if len(self.models_level[level-1]) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1],
-                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types,
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(k_fold) + '_l' + str(level), base_model_names=self.models_level[level-1],
+                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
                                                         num_classes=self.num_classes)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)

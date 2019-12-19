@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
     #  To solve this, this model must know full context of stacker, and only get preds once for each required model
     #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path, name, model_base: AbstractModel, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
+    def __init__(self, path, name, model_base: AbstractModel, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
         super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, debug=debug)
         self.base_model_names = base_model_names
         self.base_model_paths_dict = base_model_paths_dict
@@ -22,9 +22,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.use_orig_features = use_orig_features
         self.num_classes = num_classes
 
-        if base_model_performances_dict is not None:
+        if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
             if self.params['max_models_per_type'] > 0:
-                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=self.base_model_types_dict, model_scores=base_model_performances_dict, max_models_per_type=self.params['max_models_per_type'])
+                self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_models_per_type=self.params['max_models_per_type'])
             if self.params['max_models'] > 0:
                 self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_models=self.params['max_models'])
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
