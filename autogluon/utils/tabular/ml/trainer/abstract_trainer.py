@@ -338,6 +338,8 @@ class AbstractTrainer:
 
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
         self.num_rows_train = len(X_train)
+        if X_test is not None:
+            self.num_rows_train += len(X_test)
         self.num_cols_train = len(list(X_train.columns))
         self.time_train_start = time.time()
         self.time_train_level_start = self.time_train_start
@@ -591,34 +593,40 @@ class AbstractTrainer:
             best_model = self.model_best_core
         best_model_score_val = self.model_performance.get(best_model)
         # fit_time = None
-        stack_levels = self.max_level
+        num_bagging_folds = self.kfolds
+        max_stack_level = self.max_level
+        best_model_stack_level = self.get_model_level(best_model)
         problem_type = self.problem_type
         objective_func = self.objective_func.name
+        time_train_start = self.time_train_start
+        num_rows_train = self.num_rows_train
+        num_cols_train = self.num_cols_train
+        num_classes = self.num_classes
         # TODO:
         #  Disk size of models
         #  Raw feature count
-        #  Train row count
-        #  num_classes
-        #  Kfolds
         #  HPO time
         #  Bag time
         #  Feature prune time
         #  Exception count / models failed count
         #  True model count (models * kfold)
-        #  Best Model Error
         #  AutoGluon version fit on
         #  Max memory usage
         #  CPU count used / GPU count used
-        #  Date of fit
 
         info = {
             'model_count': model_count,
             'best_model': best_model,
             'best_model_score_val': best_model_score_val,
-            # 'fit_time': fit_time,
-            'stack_levels': stack_levels,
+            'num_bagging_folds': num_bagging_folds,
+            'max_stack_level': max_stack_level,
+            'best_model_stack_level': best_model_stack_level,
             'problem_type': problem_type,
             'objective_func': objective_func,
+            'time_train_start': time_train_start,
+            'num_rows_train': num_rows_train,
+            'num_cols_train': num_cols_train,
+            'num_classes': num_classes,
         }
 
         return info

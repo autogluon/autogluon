@@ -18,6 +18,7 @@ from ..tuning.ensemble_selection import EnsembleSelection
 logger = logging.getLogger(__name__)
 
 # TODO: - Semi-supervised learning
+# TODO: - Minimize memory usage of DataFrames (convert int64 -> uint8 when possible etc.)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class AbstractLearner:
     save_file_name = 'learner.pkl'
@@ -41,6 +42,11 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
+
+        self.time_fit_total = None
+        self.time_fit_preprocessing = None
+        self.time_fit_training = None
+        self.time_limit = None
 
     @property
     def class_labels(self):
@@ -377,7 +383,17 @@ class AbstractLearner:
 
     def info(self):
         trainer = self.load_trainer()
-        return trainer.info()
+        trainer_info = trainer.info()
+        learner_info = {
+            'path_context': self.path_context,
+            'time_fit_preprocessing': self.time_fit_preprocessing,
+            'time_fit_training': self.time_fit_training,
+            'time_fit_total': self.time_fit_total,
+            'time_limit': self.time_limit,
+        }
+
+        trainer_info.update(learner_info)
+        return trainer_info
 
     @staticmethod
     def get_problem_type(y: Series):

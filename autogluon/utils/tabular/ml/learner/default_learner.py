@@ -44,17 +44,19 @@ class DefaultLearner(AbstractLearner):
         """
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
         if time_limit:
+            self.time_limit = time_limit
             logger.log(20, 'Beginning AutoGluon training ... Time limit = ' + str(time_limit) + 's')
         else:
+            self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_test, y_test = self.general_data_processing(X, X_test)
         time_preprocessing_end = time.time()
-        time_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, '\tData preprocessing and feature engineering runtime = ' + str(round(time_preprocessing, 2)) + 's ...')
+        self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
+        logger.log(20, '\tData preprocessing and feature engineering runtime = ' + str(round(self.time_fit_preprocessing, 2)) + 's ...')
         if time_limit:
-            time_limit_trainer = time_limit - time_preprocessing
+            time_limit_trainer = time_limit - self.time_fit_preprocessing
         else:
             time_limit_trainer = None
 
@@ -81,8 +83,9 @@ class DefaultLearner(AbstractLearner):
                       hyperparameters=hyperparameters)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
-        time_total = time_end - time_preprocessing_start
-        logger.log(20, 'AutoGluon training complete, total runtime = ' + str(round(time_total, 2)) + 's ...')
+        self.time_fit_training = time_end - time_preprocessing_end
+        self.time_fit_total = time_end - time_preprocessing_start
+        logger.log(20, 'AutoGluon training complete, total runtime = ' + str(round(self.time_fit_total, 2)) + 's ...')
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame = None):
         """ General data processing steps used for all models. """
