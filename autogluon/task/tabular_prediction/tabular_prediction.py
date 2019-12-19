@@ -78,7 +78,8 @@ class TabularPrediction(BaseTask):
             Name of column that contains the target variable to predict.
         tuning_data : (:class:`autogluon.task.tabular_prediction.TabularDataset` object, default = None)
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data). 
-            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your test data here! 
+            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
+            In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
         output_directory : (str) 
             Path to directory where models and intermediate outputs should be saved.
@@ -226,6 +227,8 @@ class TabularPrediction(BaseTask):
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         label_count_threshold = kwargs.get('label_count_threshold', 10)
+        if num_bagging_folds is not None: # Ensure there exist sufficient labels for stratified splits across all bags
+            label_count_threshold = max(label_count_threshold, num_bagging_folds)
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)

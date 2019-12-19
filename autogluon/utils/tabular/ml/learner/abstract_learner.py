@@ -334,6 +334,8 @@ class AbstractLearner:
         return perf_dict
 
     def extract_label(self, X):
+        if self.label not in list(X.columns):
+            raise ValueError("Provided Dataframe does not contain label column: %s" % self.label)
         y = X[self.label].copy()
         X = X.drop(self.label, axis=1)
         return X, y

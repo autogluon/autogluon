@@ -99,6 +99,6 @@ performance = predictor.evaluate(val_data)
 
 Beyond hyperparameter-tuning with a correctly-specified metric, two other methods to boost predictive performance are bagging and stack-ensembling.  You'll often see performance improve if you specify `num_bagging_folds` = 5-10, `stack_ensemble_levels` = 1 or 2 in the call to `fit()`, but this will increase training times.
 
-```
+```{.python .input}
 predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric, num_bagging_folds=5, stack_ensemble_levels=1, hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}})
 ```

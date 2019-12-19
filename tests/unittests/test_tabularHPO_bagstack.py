@@ -1,5 +1,4 @@
 """ Runs autogluon.tabular on multiple benchmark datasets. 
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
 """
@@ -14,12 +13,14 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from test_tabular import run_tabular_benchmarks
 
 
-def test_tabularHPO():
+def test_tabularHPObagstack():
     ############ Benchmark options you can set: ########################
     perf_threshold = 1.1 # How much worse can performance on each dataset be vs previous performance without warning
-    seed_val = 99 # random seed
+    seed_val = 10000 # random seed
     subsample_size = None
     hyperparameter_tune = True
+    stack_ensemble_levels = 2
+    num_bagging_folds = 3
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
@@ -32,13 +33,15 @@ def test_tabularHPO():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 3} 
-        gbm_options = {'num_boost_round': 30}
+        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01)} 
+        gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limits = 60
         num_trials = 3
 
     fit_args = {
+        'num_bagging_folds': num_bagging_folds,
+        'stack_ensemble_levels': stack_ensemble_levels,
         'hyperparameter_tune': hyperparameter_tune,
         'verbosity': verbosity,
     }
@@ -54,4 +57,4 @@ def test_tabularHPO():
 
 
 if __name__ == '__main__':
-    test_tabularHPO()
+    test_tabularHPObagstack()

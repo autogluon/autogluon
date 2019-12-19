@@ -18,9 +18,16 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
       In-depth tutorial on controlling various aspects of model fitting.
 
+   .. card::
+      :title: Kaggle Tutorial
+      :link: tabular-kaggle.html
+
+      How to use AutoGluon for Kaggle competitions.
+
 .. toctree::
    :maxdepth: 1
    :hidden:
 
    tabular-quickstart
    tabular-indepth
+   tabular-kaggle
