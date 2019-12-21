@@ -299,7 +299,12 @@ class AbstractTrainer:
 
     def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_loc=None, kfolds=None, level=0, ignore_time_limit=False):
         for i, model in enumerate(models):
+            if self.low_memory:
+                model = copy.deepcopy(model)
             self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_loc=stack_loc, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+            if self.low_memory:
+                del model
+
         if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
             for i, hpo_model_name in enumerate(self.hpo_model_names[level]):
