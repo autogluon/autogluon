@@ -308,7 +308,7 @@ class TabularNeuralNetModel(AbstractModel):
                     # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
-                cumulative_loss += nd.sum(loss).asscalar()
+                cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
@@ -320,15 +320,15 @@ class TabularNeuralNetModel(AbstractModel):
             if test_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
-                      (e, train_loss, self.eval_metric_name, val_metric))
+                      (e, train_loss.asscalar(), self.eval_metric_name, val_metric))
                 if self.summary_writer is not None:
-                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
+                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name,
                                                    value=val_metric, global_step=e)
             else:
                 if verbose_eval > 0 and e % verbose_eval == 0:
-                    logger.log(15, "Epoch %s.  Train loss: %s" % (e, train_loss))
+                    logger.log(15, "Epoch %s.  Train loss: %s" % (e, train_loss.asscalar()))
             if self.summary_writer is not None:
-                self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
+                self.summary_writer.add_scalar(tag='train_loss', value=train_loss.asscalar(), global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
             if time_limit:
