@@ -76,10 +76,11 @@ class AbstractTrainer:
         self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
 
         # self.models_level_all['core'][0] # Includes base models
-        # self.models_level_all['core'][1] # Stacker level 1, includes weighted ensembles of level 0 (base)
-        # self.models_level_all['core'][2] # Stacker level 2, includes weighted ensembles of level 1
+        # self.models_level_all['core'][1] # Stacker level 1
+        # self.models_level_all['aux1'][1] # Stacker level 1 aux models, such as weighted_ensemble
+        # self.models_level_all['core'][2] # Stacker level 2
         self.models_level = defaultdict(dd_list)
-        self.models_level_hpo = defaultdict(dd_list)
+        self.models_level_hpo = defaultdict(dd_list)  # stores additional models produced during HPO
 
         self.model_best = None
         self.model_best_core = None
@@ -92,9 +93,8 @@ class AbstractTrainer:
         self.model_pred_times = {}
         self.models = {}
         self.reset_paths = False
-        # Things stored
+
         self.hpo_results = {}  # Stores summary of HPO process
-        self.hpo_model_names = defaultdict(list)  # stores additional models produced during HPO
         # Scheduler attributes:
         if scheduler_options is not None:
             self.scheduler_func = scheduler_options[0]  # unpack tuple
@@ -339,7 +339,7 @@ class AbstractTrainer:
                 logger.debug(err)
                 del model
             else:
-                self.hpo_model_names[level] += list(sorted(hpo_models.keys()))
+                self.models_level_hpo[stack_name][level] += list(sorted(hpo_models.keys()))
                 self.model_paths.update(hpo_models)
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
@@ -354,6 +354,7 @@ class AbstractTrainer:
 
     def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, level=0, ignore_time_limit=False):
         stack_loc = self.models_level[stack_name]
+        stack_loc_hpo = self.models_level_hpo[stack_name]
 
         for i, model in enumerate(models):
             if self.low_memory:
@@ -364,7 +365,7 @@ class AbstractTrainer:
 
         if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
-            for i, hpo_model_name in enumerate(self.hpo_model_names[level]):
+            for i, hpo_model_name in enumerate(stack_loc_hpo[level]):
                 model_hpo = self.load_model(hpo_model_name)
                 if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
                     model_hpo = model_hpo.create_unfit_copy()
@@ -375,7 +376,7 @@ class AbstractTrainer:
                 self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
-            stack_loc[level] += self.hpo_model_names[level]  # Update model list with (potentially empty) list of new models created during HPO
+            stack_loc[level] += stack_loc_hpo[level]  # Update model list with (potentially empty) list of new models created during HPO
         unique_names = []
         for item in stack_loc[level]:
             if item not in unique_names: unique_names.append(item)
