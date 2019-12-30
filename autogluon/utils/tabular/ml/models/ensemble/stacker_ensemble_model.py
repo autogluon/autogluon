@@ -10,8 +10,8 @@ from ...constants import MULTICLASS
 logger = logging.getLogger(__name__)
 
 # TODO: Currently, if this is a stacker above level 1, it will be very slow taking raw input due to each stacker needing to repeat computation on the base models.
-    #  To solve this, this model must know full context of stacker, and only get preds once for each required model
-    #  This is already done in trainer, but could be moved internally.
+#  To solve this, this model must know full context of stacker, and only get preds once for each required model
+#  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
     def __init__(self, path, name, model_base: AbstractModel, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
         super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, debug=debug)
