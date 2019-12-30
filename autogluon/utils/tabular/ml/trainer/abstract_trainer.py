@@ -118,40 +118,6 @@ class AbstractTrainer:
 
         self.is_data_saved = False
 
-    @property
-    def model_names(self):
-        return self.model_names_core + self.model_names_aux
-
-    @property
-    def model_names_core(self):
-        model_names = []
-        levels = np.sort(list(self.models_level['core'].keys()))
-        for level in levels:
-            model_names += self.models_level['core'][level]
-        return model_names
-
-    @property
-    def model_names_aux(self):
-        model_names = []
-        levels = np.sort(list(self.models_level['aux1'].keys()))
-        for level in levels:
-            model_names += self.models_level['aux1'][level]
-        return model_names
-
-    @property
-    def max_level(self):
-        try:
-            return np.sort(list(self.models_level['core'].keys()))[-1]
-        except IndexError:
-            return -1
-
-    @property
-    def max_level_auxiliary(self):
-        try:
-            return np.sort(list(self.models_level['aux1'].keys()))[-1]
-        except IndexError:
-            return -1
-
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self):
@@ -196,6 +162,31 @@ class AbstractTrainer:
     def save_y_val(self, y, verbose=True):
         path = self.path_data + 'y_val.pkl'
         save_pkl.save(path=path, object=y, verbose=verbose)
+
+    def get_model_names_all(self):
+        model_names = []
+        for stack_name in self.models_level.keys():
+            model_names += self.get_model_names(stack_name)
+        return model_names
+
+    def get_model_names(self, stack_name):
+        model_names = []
+        levels = np.sort(list(self.models_level[stack_name].keys()))
+        for level in levels:
+            model_names += self.models_level[stack_name][level]
+        return model_names
+
+    def get_max_level(self, stack_name: str):
+        try:
+            return np.sort(list(self.models_level[stack_name].keys()))[-1]
+        except IndexError:
+            return -1
+
+    def get_max_level_all(self):
+        max_level = 0
+        for stack_name in self.models_level.keys():
+            max_level = max(max_level, self.get_max_level(stack_name))
+        return max_level
 
     def get_models(self, hyperparameters, hyperparameter_tune=False):
         raise NotImplementedError
@@ -464,7 +455,7 @@ class AbstractTrainer:
                                                         num_classes=self.num_classes)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
-        if weighted_ensemble_model.name in self.model_names:
+        if weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
             else:
@@ -625,7 +616,7 @@ class AbstractTrainer:
         return model_names, model_paths, model_types
 
     def leaderboard(self):
-        model_names = self.model_names
+        model_names = self.get_model_names_all()
         score_val = []
         fit_time = []
         pred_time = []
@@ -646,7 +637,7 @@ class AbstractTrainer:
         return df_sorted
 
     def info(self):
-        model_count = len(self.model_names)
+        model_count = len(self.get_model_names_all())
         if self.model_best is not None:
             best_model = self.model_best
         else:
@@ -654,7 +645,7 @@ class AbstractTrainer:
         best_model_score_val = self.model_performance.get(best_model)
         # fit_time = None
         num_bagging_folds = self.kfolds
-        max_stack_level = self.max_level
+        max_stack_level = self.get_max_level('core')
         best_model_stack_level = self.get_model_level(best_model)
         problem_type = self.problem_type
         objective_func = self.objective_func.name

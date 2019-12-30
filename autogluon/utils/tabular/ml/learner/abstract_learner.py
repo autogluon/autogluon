@@ -183,10 +183,8 @@ class AbstractLearner:
                 # Log loss
                 raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
         # TODO: Move below into trainer, should not live in learner
-        max_level = trainer.max_level
-        max_level_auxiliary = trainer.max_level_auxiliary
 
-        max_level_to_check = max(max_level, max_level_auxiliary)
+        max_level_to_check = trainer.get_max_level_all()
         scores = {}
         pred_probas = None
         for level in range(max_level_to_check+1):
