@@ -39,10 +39,11 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
                  num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, 
-                 stack_ensemble_levels=0, time_limit=None, verbosity=2):
+                 stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
+        self.save_data = save_data
         self.verbosity = verbosity
         if objective_func is not None:
             self.objective_func = objective_func
@@ -117,6 +118,8 @@ class AbstractTrainer:
         self.num_rows_train = None
         self.num_cols_train = None
 
+        self.is_data_saved = False
+
     @property
     def model_names(self):
         return self.model_names_core + self.model_names_aux
@@ -150,6 +153,51 @@ class AbstractTrainer:
             return np.sort(list(self.models_level_auxiliary.keys()))[-1]
         except IndexError:
             return -1
+
+    # path_root is the directory containing learner.pkl
+    @property
+    def path_root(self):
+        return self.path.rsplit('/', maxsplit=2)[0] + '/'
+
+    @property
+    def path_utils(self):
+        return self.path_root + 'utils/'
+
+    @property
+    def path_data(self):
+        return self.path_utils + 'data/'
+
+    def load_X_train(self):
+        path = self.path_data + 'X_train.pkl'
+        return load_pkl.load(path=path)
+
+    def load_X_val(self):
+        path = self.path_data + 'X_val.pkl'
+        return load_pkl.load(path=path)
+
+    def load_y_train(self):
+        path = self.path_data + 'y_train.pkl'
+        return load_pkl.load(path=path)
+
+    def load_y_val(self):
+        path = self.path_data + 'y_val.pkl'
+        return load_pkl.load(path=path)
+
+    def save_X_train(self, X, verbose=True):
+        path = self.path_data + 'X_train.pkl'
+        save_pkl.save(path=path, object=X, verbose=verbose)
+
+    def save_X_val(self, X, verbose=True):
+        path = self.path_data + 'X_val.pkl'
+        save_pkl.save(path=path, object=X, verbose=verbose)
+
+    def save_y_train(self, y, verbose=True):
+        path = self.path_data + 'y_train.pkl'
+        save_pkl.save(path=path, object=y, verbose=verbose)
+
+    def save_y_val(self, y, verbose=True):
+        path = self.path_data + 'y_val.pkl'
+        save_pkl.save(path=path, object=y, verbose=verbose)
 
     def get_models(self, hyperparameters, hyperparameter_tune=False):
         raise NotImplementedError
@@ -337,6 +385,15 @@ class AbstractTrainer:
         self.models_level[level] = unique_names  # make unique and preserve order
 
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
+        if self.save_data and not self.is_data_saved:
+            self.save_X_train(X_train)
+            self.save_y_train(y_train)
+            if X_test is not None:
+                self.save_X_val(X_test)
+                if y_test is not None:
+                    self.save_y_val(y_test)
+            self.is_data_saved = True
+
         self.num_rows_train = len(X_train)
         if X_test is not None:
             self.num_rows_train += len(X_test)

@@ -64,6 +64,7 @@ class TabularPrediction(BaseTask):
                                'KNN': {},
                                'custom': ['GBM'],
                               },
+            enable_fit_continuation=False,
             time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
             verbosity=2, **kwargs):
@@ -142,7 +143,10 @@ class TabularPrediction(BaseTask):
         stack_ensemble_levels : (int)
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
-            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`. 
+            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
+        enable_fit_continuation : (bool, default = False)
+            Whether to enable predictor to be able to be fit beyond the initial fit call.
+            When enabled, the training and validation data are saved to disk.
         time_limits : (int)
             Approximately how long `fit()` should run for (wallclock time in seconds). 
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
@@ -301,5 +305,5 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                       holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
-                      hyperparameters=hyperparameters, time_limit=time_limits_orig, verbosity=verbosity)
+                      hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
         return TabularPredictor(learner=learner)

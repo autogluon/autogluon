@@ -28,7 +28,7 @@ class DefaultLearner(AbstractLearner):
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0,
-            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, verbosity=2):
+            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, save_data=False, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -71,6 +71,7 @@ class DefaultLearner(AbstractLearner):
             stack_ensemble_levels=stack_ensemble_levels,
             scheduler_options=scheduler_options,
             time_limit=time_limit_trainer,
+            save_data=save_data,
             verbosity=verbosity
         )
 
@@ -152,8 +153,8 @@ class DefaultLearner(AbstractLearner):
         return X, y, X_test, y_test
 
     def augment_rare_classes(self, X):
-        """ Use this method when using certain eval_metrics like log_loss, 
-            for which no classes may be filtered out. 
+        """ Use this method when using certain eval_metrics like log_loss,
+            for which no classes may be filtered out.
             This method will augment dataset with additional examples of rare classes.
         """
         if self.problem_type != MULTICLASS:
@@ -181,7 +182,7 @@ class DefaultLearner(AbstractLearner):
                 duplicate_times -= 1
                 new_df = new_df.append(clss_df.copy())
             aug_df = aug_df.append(new_df.copy())
-        
+
         X = X.append(aug_df)
         class_counts = X[self.label].value_counts()
         class_counts_invalid = class_counts[class_counts < self.threshold]
