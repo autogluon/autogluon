@@ -1,5 +1,6 @@
 import gc, os, multiprocessing, logging
 import numpy as np
+from collections import defaultdict
 from pandas import DataFrame, Series
 from datetime import datetime
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
@@ -209,3 +210,7 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters={'NN': None}):
         num_trials = 1
     time_limits *= 0.9  # reduce slightly to account for extra time overhead
     return time_limits, num_trials
+
+
+def dd_list():
+    return defaultdict(list)

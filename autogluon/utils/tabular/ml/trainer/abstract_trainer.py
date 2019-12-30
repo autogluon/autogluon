@@ -91,7 +91,6 @@ class AbstractTrainer:
         self.model_fit_times = {}
         self.model_pred_times = {}
         self.models = {}
-        self.model_weights = None
         self.reset_paths = False
         # Things stored
         self.hpo_results = {}  # Stores summary of HPO process
@@ -110,7 +109,6 @@ class AbstractTrainer:
             self.ignore_time_limit = True
         else:
             self.ignore_time_limit = False
-        self.time_clock = None
         self.time_train_start = None
         self.time_train_level_start = None
         self.time_limit_per_level = self.time_limit / (self.stack_ensemble_levels + 1)
@@ -514,13 +512,16 @@ class AbstractTrainer:
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
         return model.predict_proba(X=X, preprocess=False)
 
-    def get_inputs_to_model(self, model, X, level_start, fit=False):
+    def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
         if type(model) == str:
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
         if model_level >= 1:
             X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level-1, fit=fit)
-        X = model.preprocess(X)
+            X = model.preprocess(X, fit=fit, preprocess=preprocess)
+        else:
+            if preprocess:
+                X = model.preprocess(X)
         return X
 
     def score(self, X, y):
