@@ -388,40 +388,31 @@ class AbstractTrainer:
             self.num_rows_train += len(X_test)
         self.num_cols_train = len(list(X_train.columns))
         self.time_train_start = time.time()
-        self.time_train_level_start = self.time_train_start
         self.train_multi_levels(X_train, y_train, X_test, y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
+        if len(self.get_model_names_all()) == 0:
+            raise ValueError('AutoGluon did not successfully train any models')
 
     def train_multi_levels(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0):
-        if level_start == 0:
-            self.train_multi(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
-            for model_name in self.models_level['core'][0]:
-                if model_name not in self.model_performance:
-                    model = self.load_model(model_name)
-                    self.model_performance[model_name] = model.score(X_test, y_test)
-                logger.log(15, "Performance of %s model: %s" % (model_name, self.model_performance[model_name]))
-            if len(self.models_level['core'][0]) == 0:
-                raise ValueError('AutoGluon did not successfully train any models')
-
-            if self.bagged_mode:
-                self.stack_new_level_aux(X=X_train, y=y_train, level=1)
+        for level in range(max(0, level_start), self.stack_ensemble_levels + 1):
+            self.time_train_level_start = time.time()
+            self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (self.stack_ensemble_levels + 1 - level)
+            if level == 0:
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
             else:
-                self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=1)
-
-        if self.stack_mode:
-            for level in range(max(1, level_start), self.stack_ensemble_levels + 1):
-                self.time_train_level_start = time.time()
-                self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (self.stack_ensemble_levels + 1 - level)
-                self.stack_new_level(X=X_train, y=y_train, level=level, ignore_time_limit=self.ignore_time_limit)
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, ignore_time_limit=self.ignore_time_limit)
 
         self.save()
 
         # TODO: Select best weighted ensemble given L2 can be much worse than L1 when dealing with time limitation
 
-    def stack_new_level(self, X, y, level, ignore_time_limit=True):
-        self.stack_new_level_core(X=X, y=y, level=level, ignore_time_limit=ignore_time_limit)
-        self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
+    def stack_new_level(self, X, y, X_test=None, y_test=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
+        self.stack_new_level_core(X=X, y=y, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=ignore_time_limit)
+        if self.bagged_mode:
+            self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
+        else:
+            self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, ignore_time_limit=ignore_time_limit)
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, ignore_time_limit=True):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
         use_orig_features = True
         if models is None:
             models = self.get_models(self.hyperparameters)
@@ -440,7 +431,7 @@ class AbstractTrainer:
         if X_test is not None:
             X_test = self.get_inputs_to_stacker(X_test, level_start=0, level_end=level, fit=False)
 
-        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=False, feature_prune=False, level=level, ignore_time_limit=ignore_time_limit)
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, ignore_time_limit=ignore_time_limit)
 
     def stack_new_level_aux(self, X, y, level, fit=True, ignore_time_limit=True):
         stack_name = 'aux1'
