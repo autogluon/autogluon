@@ -190,7 +190,7 @@ class AbstractLearner:
         scores = {}
         pred_probas = None
         for level in range(max_level_to_check+1):
-            model_names_core = trainer.models_level[level]
+            model_names_core = trainer.models_level['core'][level]
             if level >= 1:
                 X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
             else:
@@ -221,7 +221,7 @@ class AbstractLearner:
                 else:
                     scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
-            model_names_aux = trainer.models_level_auxiliary[level]
+            model_names_aux = trainer.models_level['aux1'][level]
             if len(model_names_aux) > 0:
                 pred_probas_auxiliary = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_aux)
                 for i, model_name in enumerate(model_names_aux):
