@@ -405,9 +405,7 @@ class AbstractTrainer:
             if self.bagged_mode:
                 self.stack_new_level_aux(X=X_train, y=y_train, level=1)
             else:
-                stack_name = 'aux1'
-                X_test_preds = self.get_inputs_to_stacker(X=X_test, level_start=0, level_end=1, fit=False)
-                self.generate_weighted_ensemble(X=X_test_preds, y=y_test, level=1, stack_name=stack_name, ignore_time_limit=True)
+                self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=1)
 
         if self.stack_mode:
             for level in range(max(1, level_start), self.stack_ensemble_levels + 1):
@@ -423,27 +421,30 @@ class AbstractTrainer:
         self.stack_new_level_core(X=X, y=y, level=level, ignore_time_limit=ignore_time_limit)
         self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
 
-    def stack_new_level_core(self, X, y, level=1, ignore_time_limit=True):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level-1])
-        if len(base_model_names) == 0:
-            logger.log(20, 'No base models to train on, skipping stack level...')
-            return
-
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, ignore_time_limit=True):
         use_orig_features = True
-        stacker_models = self.get_models(self.hyperparameters)
+        if models is None:
+            models = self.get_models(self.hyperparameters)
 
-        stacker_models = [
-            StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names,
-                                 base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                                 num_classes=self.num_classes)
-            for stacker_model in stacker_models]
+        if level > 0:
+            base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level - 1])
+            if len(base_model_names) == 0:
+                logger.log(20, 'No base models to train on, skipping stack level...')
+                return
+            models = [
+                StackerEnsembleModel(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
+                                     base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
+                                     num_classes=self.num_classes)
+                for model in models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+        if X_test is not None:
+            X_test = self.get_inputs_to_stacker(X_test, level_start=0, level_end=level, fit=False)
 
-        self.train_multi(X_train=X_train_init, y_train=y, X_test=None, y_test=None, models=stacker_models, hyperparameter_tune=False, feature_prune=False, level=level, ignore_time_limit=ignore_time_limit)
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=False, feature_prune=False, level=level, ignore_time_limit=ignore_time_limit)
 
-    def stack_new_level_aux(self, X, y, level, ignore_time_limit=True):
+    def stack_new_level_aux(self, X, y, level, fit=True, ignore_time_limit=True):
         stack_name = 'aux1'
-        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
         self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_name=stack_name, ignore_time_limit=True)
 
     def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_name=None, hyperparameters=None, ignore_time_limit=False, name_suffix=''):
@@ -551,6 +552,10 @@ class AbstractTrainer:
         return preds
 
     def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
+        if level_start > level_end:
+            raise AssertionError('level_start cannot be greater than level end:' + str(level_start) + ', ' + str(level_end))
+        if (level_start == 0) and (level_end == 0):
+            return X
         if fit:
             if level_start >= 1:
                 dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
