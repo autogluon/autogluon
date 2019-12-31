@@ -388,16 +388,16 @@ class AbstractTrainer:
             self.num_rows_train += len(X_test)
         self.num_cols_train = len(list(X_train.columns))
         self.time_train_start = time.time()
-        self.train_multi_levels(X_train, y_train, X_test, y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
+        self.train_multi_levels(X_train, y_train, X_test, y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels)
         if len(self.get_model_names_all()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
-    def train_multi_levels(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0):
-        for level in range(max(0, level_start), self.stack_ensemble_levels + 1):
+    def train_multi_levels(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0, level_end=0):
+        for level in range(max(0, level_start), level_end + 1):
             self.time_train_level_start = time.time()
-            self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (self.stack_ensemble_levels + 1 - level)
+            self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (level_end + 1 - level)
             if level == 0:
-                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
             else:
                 self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, ignore_time_limit=self.ignore_time_limit)
 
