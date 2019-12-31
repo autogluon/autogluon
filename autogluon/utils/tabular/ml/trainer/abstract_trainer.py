@@ -615,18 +615,18 @@ class AbstractTrainer:
         model_names = self.get_model_names_all()
         score_val = []
         fit_time = []
-        pred_time = []
+        pred_time_val = []
         stack_level = []
         for model_name in model_names:
             score_val.append(self.model_performance.get(model_name))
             fit_time.append(self.model_fit_times.get(model_name))
-            pred_time.append(self.model_pred_times.get(model_name))
+            pred_time_val.append(self.model_pred_times.get(model_name))
             stack_level.append(self.get_model_level(model_name))
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
             'fit_time': fit_time,
-            'pred_time': pred_time,
+            'pred_time_val': pred_time_val,
             'stack_level': stack_level,
         })
         df_sorted = df.sort_values(by=['score_val', 'model'], ascending=False)
