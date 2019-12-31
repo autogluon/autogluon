@@ -19,6 +19,6 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         base_model_names = []
         for model in self.models:
             model = self.load_child(model, verbose=False)
-            base_model_names = [base_model_name for base_model_name in model.base_model_names if base_model_name not in base_model_names]
+            base_model_names = base_model_names + [base_model_name for base_model_name in model.base_model_names if base_model_name not in base_model_names]
         self.base_model_names = [base_model_name for base_model_name in self.base_model_names if base_model_name in base_model_names]
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
