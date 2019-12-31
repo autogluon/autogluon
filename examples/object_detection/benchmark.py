@@ -83,10 +83,3 @@ if __name__ == '__main__':
     print("mAP on test dataset: {}".format(test_map[1][1]))
 
 
-
-
-
-
-
-        
-
