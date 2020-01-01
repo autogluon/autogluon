@@ -73,7 +73,6 @@ class AbstractModel:
         self.debug = debug
         if type(model) == str:
             self.model = self.load_model(model)
-        self.child_models = []
 
         self.params = {}
         self._set_default_params()
@@ -242,6 +241,10 @@ class AbstractModel:
             _ = def_search_space.pop(key, None)
         if self.params is not None:
             self.params.update(def_search_space)
+
+    # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
+    def convert_to_template(self):
+        return self
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)

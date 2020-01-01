@@ -13,8 +13,6 @@ from ...utils.exceptions import TimeLimitExceeded
 from ..utils import get_pred_from_proba, dd_list
 from ..models.abstract.abstract_model import AbstractModel
 from ..tuning.feature_pruner import FeaturePruner
-from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from ..models.lgb.lgb_model import LGBModel
 from ...metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
@@ -358,10 +356,7 @@ class AbstractTrainer:
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
             for i, hpo_model_name in enumerate(stack_loc_hpo[level]):
                 model_hpo = self.load_model(hpo_model_name)
-                if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
-                    model_hpo = model_hpo.create_unfit_copy()
-                elif type(model_hpo) == LGBModel:  # TODO: Remove this after fixing LGBModel
-                    model_hpo.model = None
+                model_hpo = model_hpo.convert_to_template()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
                 # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
                 self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
