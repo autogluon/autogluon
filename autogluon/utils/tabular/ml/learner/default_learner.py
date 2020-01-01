@@ -27,7 +27,7 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, stack_ensemble_levels=0,
+            feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, save_data=False, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
@@ -68,6 +68,7 @@ class DefaultLearner(AbstractLearner):
             feature_types_metadata=self.feature_generator.feature_types_metadata,
             low_memory=True,
             kfolds=num_bagging_folds,
+            n_repeats=num_bagging_sets,
             stack_ensemble_levels=stack_ensemble_levels,
             scheduler_options=scheduler_options,
             time_limit=time_limit_trainer,

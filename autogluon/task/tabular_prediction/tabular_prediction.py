@@ -54,7 +54,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
-            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
+            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters = {
                                'NN': {'num_epochs': 500},
                                'GBM': {'num_boost_round': 10000},
@@ -139,7 +139,12 @@ class TabularPrediction(BaseTask):
             Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
         num_bagging_folds : (int)
             Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging). 
-            Disabled by default, but we recommend values between 5-10 to maximize predictive performance. 
+            Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
+        num_bagging_sets : (int)
+            Number of repeats of kfold bagging to perform. Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
+            Defaults to 1. Values greater than 1 will result in superior predictive performance, especially on smaller problems.
+            Disabled if num_bagging_folds is not specified.
+            Value must be >= 1 if specified
         stack_ensemble_levels : (int)
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
@@ -304,6 +309,6 @@ class TabularPrediction(BaseTask):
                           label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                       hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
         return TabularPredictor(learner=learner)
