@@ -36,7 +36,7 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, 
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=None,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         self.path = path
         self.problem_type = problem_type
@@ -66,10 +66,18 @@ class AbstractTrainer:
             self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
             self.stack_ensemble_levels = stack_ensemble_levels
             self.stack_mode = True if self.stack_ensemble_levels >= 1 else False
+            if n_repeats is None:
+                if time_limit is None:
+                    self.n_repeats = 1
+                else:
+                    self.n_repeats = 1  # TODO: Have this be larger than 1, do 1 repeat on each model, then 2, then 3, until no time left.
+            else:
+                self.n_repeats = n_repeats
         else:
             self.kfolds = 0
             self.stack_ensemble_levels = 0
             self.stack_mode = False
+            self.n_repeats = 1
 
         self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
 
@@ -231,10 +239,13 @@ class AbstractTrainer:
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None):
         raise NotImplementedError
 
-    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, level=0, time_limit=None):
+    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, n_repeats=None, level=0, time_limit=None):
         if kfolds is None:
             kfolds = self.kfolds
-        model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        if model.feature_types_metadata is None:
+            model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'verbosity': self.verbosity, 
@@ -243,12 +254,12 @@ class AbstractTrainer:
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=kfolds, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
+            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
         return model
 
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, level=0, ignore_time_limit=False):
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
         stack_loc = self.models_level[stack_name]
         fit_start_time = time.time()
         try:
@@ -262,7 +273,7 @@ class AbstractTrainer:
             else:
                 time_left = None
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...')
-            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, level=level, time_limit=time_left)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, n_repeats=n_repeats, level=level, time_limit=time_left)
             fit_end_time = time.time()
             if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
@@ -308,7 +319,7 @@ class AbstractTrainer:
                 del model
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
-                          hyperparameter_tune=True, stack_name='core', kfolds=None, level=0, ignore_time_limit=False):
+                          hyperparameter_tune=True, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
@@ -338,10 +349,10 @@ class AbstractTrainer:
                 else:
                     self.model_types_inner.update({name: type(model) for name in sorted(hpo_models.keys())})
         else:
-            self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+            self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, level=level, ignore_time_limit=ignore_time_limit)
         self.save()
 
-    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, level=0, ignore_time_limit=False):
+    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
         stack_loc = self.models_level[stack_name]
         stack_loc_hpo = self.models_level_hpo[stack_name]
 
@@ -359,7 +370,7 @@ class AbstractTrainer:
                 model_hpo = model_hpo.convert_to_template()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
                 # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
-                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
             stack_loc[level] += stack_loc_hpo[level]  # Update model list with (potentially empty) list of new models created during HPO
@@ -584,7 +595,7 @@ class AbstractTrainer:
     def save(self):
         save_pkl.save(path=self.path + self.trainer_file_name, object=self)
 
-    def load_model(self, model_name: str):
+    def load_model(self, model_name: str) -> AbstractModel:
         if self.low_memory:
             return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
         else:
