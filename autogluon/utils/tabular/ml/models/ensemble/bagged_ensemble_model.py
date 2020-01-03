@@ -43,13 +43,12 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
     def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, random_state=0, compute_base_preds=False, time_limit=None, **kwargs):
         if n_repeat_start != self._n_repeats:
-            raise ValueError('n_repeat_start must equal self._n_repeats')
+            raise ValueError('n_repeat_start must equal self._n_repeats, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats) + ')')
         if n_repeats <= n_repeat_start:
-            raise ValueError('n_repeats must be greater than n_repeat_start')
+            raise ValueError('n_repeats must be greater than n_repeat_start, values: (' + str(n_repeats) + ', ' + str(n_repeat_start) + ')')
         fold_start = n_repeat_start * k_fold
         fold_end = n_repeats * k_fold
         start_time = time.time()
-        self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         if self.problem_type == REGRESSION:
             stratified = False
         else:
@@ -67,6 +66,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base = self.load_model_base()
         else:
             model_base = self.model_base
+        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
 
         models = []
         num_folds = len(kfolds)
@@ -114,6 +114,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         self._n_repeats = n_repeats
 
+    # FIXME: Defective if model does not apply same preprocessing in all bags!
+    #  No model currently violates this rule, but in future it could happen
     def predict_proba(self, X, preprocess=True):
         model = self.load_child(self.models[0])
         if preprocess:

@@ -14,8 +14,8 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.base_model_names, problem_type=self.problem_type, objective_func=self.objective_func)
         self.low_memory = False
 
-    def fit(self, X, y, k_fold=5, random_state=1, compute_base_preds=True, time_limit=None, **kwargs):
-        super().fit(X, y, k_fold=k_fold, random_state=random_state, compute_base_preds=compute_base_preds, time_limit=time_limit, **kwargs)
+    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, random_state=1, compute_base_preds=True, time_limit=None, **kwargs):
+        super().fit(X, y, k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=random_state, compute_base_preds=compute_base_preds, time_limit=time_limit, **kwargs)
         base_model_names = []
         for model in self.models:
             model = self.load_child(model, verbose=False)
