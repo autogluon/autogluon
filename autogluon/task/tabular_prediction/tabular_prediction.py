@@ -142,7 +142,8 @@ class TabularPrediction(BaseTask):
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
         num_bagging_sets : (int)
             Number of repeats of kfold bagging to perform. Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
-            Defaults to 1. Values greater than 1 will result in superior predictive performance, especially on smaller problems.
+            Defaults to 1 if time_limits is not specified, otherwise 10.
+            Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
             Disabled if num_bagging_folds is not specified.
             Value must be >= 1 if specified
         stack_ensemble_levels : (int)
@@ -252,6 +253,15 @@ class TabularPrediction(BaseTask):
             # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 200)))
             stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 1000)))
+
+        if num_bagging_sets is None:
+            if num_bagging_folds >= 2:
+                if time_limits is not None:
+                    num_bagging_sets = 10
+                else:
+                    num_bagging_sets = 1
+            else:
+                num_bagging_sets = 1
 
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
