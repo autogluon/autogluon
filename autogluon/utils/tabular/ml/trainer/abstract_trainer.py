@@ -239,7 +239,7 @@ class AbstractTrainer:
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None):
         raise NotImplementedError
 
-    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, n_repeats=None, level=0, time_limit=None):
+    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if kfolds is None:
             kfolds = self.kfolds
         if n_repeats is None:
@@ -254,14 +254,15 @@ class AbstractTrainer:
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
+            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
         return model
 
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
         stack_loc = self.models_level[stack_name]
         fit_start_time = time.time()
+        model_names_trained = []
         try:
             if not ignore_time_limit:
                 time_left = self.time_limit_per_level - (fit_start_time - self.time_train_level_start)
@@ -273,7 +274,7 @@ class AbstractTrainer:
             else:
                 time_left = None
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...')
-            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, n_repeats=n_repeats, level=level, time_limit=time_left)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
             fit_end_time = time.time()
             if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
@@ -290,7 +291,8 @@ class AbstractTrainer:
             logger.debug(err)
             del model
         else:
-            stack_loc[level].append(model.name)
+            if model.name not in stack_loc[level]:
+                stack_loc[level].append(model.name)
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
@@ -303,8 +305,14 @@ class AbstractTrainer:
             logger.log(15, '\tEvaluation runtime of '+str(model.name)+ ' = '+str(round(pred_end_time - fit_end_time, 2))+' s')
             # TODO: Should model have fit-time/pred-time information?
             # TODO: Add to HPO
-            self.model_fit_times[model.name] = fit_end_time - fit_start_time
-            self.model_pred_times[model.name] = pred_end_time - fit_end_time
+            model_fit_time = fit_end_time - fit_start_time
+            model_pred_time = pred_end_time - fit_end_time
+            if n_repeat_start > 0:
+                self.model_fit_times[model.name] += model_fit_time
+                self.model_pred_times[model.name] += model_pred_time
+            else:
+                self.model_fit_times[model.name] = model_fit_time
+                self.model_pred_times[model.name] = model_pred_time
             self.save_model(model=model)
             if self.model_best_core is None:
                 self.model_best_core = model.name
@@ -315,17 +323,23 @@ class AbstractTrainer:
                     # new best core model
                     self.model_best_core = model.name
 
+            model_names_trained.append(model.name)
             if self.low_memory:
                 del model
+        return model_names_trained
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
-                          hyperparameter_tune=True, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
+                          hyperparameter_tune=True, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
         model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
+            if n_repeat_start != 0:
+                raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
             if self.scheduler_func is None or self.scheduler_options is None:
                 raise ValueError("scheduler_options cannot be None when hyperparameter_tune = True")
+            if n_repeat_start != 0:
+                raise ValueError('n_repeat_start must be 0 to hyperparameter_tune, value = ' + str(n_repeat_start))
             if (X_test is None) or (y_test is None):
                 X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
@@ -338,42 +352,67 @@ class AbstractTrainer:
                 logger.exception('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping this model.')
                 logger.debug(err)
                 del model
+                model_names_trained = []
             else:
-                self.models_level_hpo[stack_name][level] += list(sorted(hpo_models.keys()))
+                model_names_trained = list(sorted(hpo_models.keys()))
+                self.models_level_hpo[stack_name][level] += model_names_trained
                 self.model_paths.update(hpo_models)
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
-                self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
+                self.model_types.update({name: type(model) for name in model_names_trained})
                 if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
-                    self.model_types_inner.update({name: model._child_type for name in sorted(hpo_models.keys())})
+                    self.model_types_inner.update({name: model._child_type for name in model_names_trained})
                 else:
-                    self.model_types_inner.update({name: type(model) for name in sorted(hpo_models.keys())})
+                    self.model_types_inner.update({name: type(model) for name in model_names_trained})
         else:
-            self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, level=level, ignore_time_limit=ignore_time_limit)
+            model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
         self.save()
+        return model_names_trained
+
+    # TODO: How to deal with models that fail during this? They have trained valid models before, but should we use those models or remove the entire model?
+    def train_multi_repeats(self, X_train, y_train, X_test, y_test, models, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=1, level=0, ignore_time_limit=False):
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        models_valid = models
+        models_valid_next = []
+        for n in range(n_repeat_start, n_repeats):
+            for i, model in enumerate(models_valid):
+                if type(model) == str:
+                    model = self.load_model(model)
+                models_valid_next += self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, n_repeats=n+1, n_repeat_start=n, level=level, ignore_time_limit=ignore_time_limit)
+            models_valid = copy.deepcopy(models_valid_next)
+            models_valid_next = []
+        return models_valid
 
     def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
         stack_loc = self.models_level[stack_name]
-        stack_loc_hpo = self.models_level_hpo[stack_name]
 
+        model_names_trained = []
+        model_names_trained_hpo = []
         for i, model in enumerate(models):
-            if self.low_memory:
+            if type(model) == str:
+                model = self.load_model(model)
+            elif self.low_memory:
                 model = copy.deepcopy(model)
-            self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+            model_name_trained_lst = self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
+            if hyperparameter_tune:
+                model_names_trained_hpo += model_name_trained_lst
+            else:
+                model_names_trained += model_name_trained_lst
             if self.low_memory:
                 del model
 
         if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
-            for i, hpo_model_name in enumerate(stack_loc_hpo[level]):
+            for i, hpo_model_name in enumerate(model_names_trained_hpo):
                 model_hpo = self.load_model(hpo_model_name)
                 model_hpo = model_hpo.convert_to_template()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
-                # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
-                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, level=level, ignore_time_limit=ignore_time_limit)
+                model_names_trained += self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
-            stack_loc[level] += stack_loc_hpo[level]  # Update model list with (potentially empty) list of new models created during HPO
+            stack_loc[level] += model_names_trained_hpo  # Update model list with (potentially empty) list of new models created during HPO
+            model_names_trained += model_names_trained_hpo
         unique_names = []
         for item in stack_loc[level]:
             if item not in unique_names: unique_names.append(item)
