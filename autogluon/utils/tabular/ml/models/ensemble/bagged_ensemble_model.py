@@ -101,7 +101,7 @@ class BaggedEnsembleModel(AbstractModel):
                 models.append(fold_model)
             oof_pred_proba[test_index] += pred_proba
 
-        self.models = models
+        self.models += models
 
         if self.model_base is not None:
             self.save_model_base(self.model_base)
