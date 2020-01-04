@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=None, stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1, stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, num_classes=num_classes, low_memory=low_memory,
                          feature_types_metadata=feature_types_metadata, kfolds=kfolds, n_repeats=n_repeats,

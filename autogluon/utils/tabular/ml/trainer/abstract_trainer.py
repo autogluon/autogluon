@@ -324,7 +324,8 @@ class AbstractTrainer:
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
                           hyperparameter_tune=True, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
-        model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
+        if n_repeat_start == 0:
+            model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
