@@ -241,9 +241,6 @@ class TabularPrediction(BaseTask):
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
-        label_count_threshold = kwargs.get('label_count_threshold', 10)
-        if num_bagging_folds is not None: # Ensure there exist sufficient labels for stratified splits across all bags
-            label_count_threshold = max(label_count_threshold, num_bagging_folds)
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
@@ -251,7 +248,7 @@ class TabularPrediction(BaseTask):
         if auto_stack:
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
-            num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 200)))
+            num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
             stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 1000)))
 
         if num_bagging_sets is None:
@@ -262,6 +259,10 @@ class TabularPrediction(BaseTask):
                     num_bagging_sets = 1
             else:
                 num_bagging_sets = 1
+
+        label_count_threshold = kwargs.get('label_count_threshold', 10)
+        if num_bagging_folds is not None:  # Ensure there exist sufficient labels for stratified splits across all bags
+            label_count_threshold = max(label_count_threshold, num_bagging_folds)
 
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)

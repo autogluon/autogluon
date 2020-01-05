@@ -1,4 +1,4 @@
-import copy, logging, time
+import copy, logging, time, math
 from pandas import DataFrame
 import pandas as pd
 import numpy as np
@@ -7,7 +7,7 @@ from .abstract_learner import AbstractLearner
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 from ..trainer.auto_trainer import AutoTrainer
-from ..constants import BINARY, MULTICLASS
+from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...metrics import log_loss
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
                  problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer):
-        super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold, 
+        super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold,
             problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
@@ -51,7 +51,7 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, 'Beginning AutoGluon training ...')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
-        X, y, X_test, y_test = self.general_data_processing(X, X_test)
+        X, y, X_test, y_test, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_test, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
         logger.log(20, '\tData preprocessing and feature engineering runtime = ' + str(round(self.time_fit_preprocessing, 2)) + 's ...')
@@ -89,7 +89,7 @@ class DefaultLearner(AbstractLearner):
         self.time_fit_total = time_end - time_preprocessing_start
         logger.log(20, 'AutoGluon training complete, total runtime = ' + str(round(self.time_fit_total, 2)) + 's ...')
 
-    def general_data_processing(self, X: DataFrame, X_test: DataFrame = None):
+    def general_data_processing(self, X: DataFrame, X_test: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
@@ -108,6 +108,8 @@ class DefaultLearner(AbstractLearner):
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
 
+        self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
+
         if self.objective_func == log_loss:
             X = self.augment_rare_classes(X)
 
@@ -115,7 +117,6 @@ class DefaultLearner(AbstractLearner):
         y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
 
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
-        # TODO: Most models crash if it is a multiclass problem with only two labels after thresholding, switch to being binary if this happens. Convert output from trainer to multiclass output preds in learner
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
@@ -151,7 +152,70 @@ class DefaultLearner(AbstractLearner):
         else:
             X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
 
-        return X, y, X_test, y_test
+        return X, y, X_test, y_test, holdout_frac, num_bagging_folds
+
+    def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
+        new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
+        if new_threshold != threshold:
+            logger.warning('Warning: Updated threshold from %s to %s to avoid cutting too many classes.' % (threshold, new_threshold))
+        if new_holdout_frac != holdout_frac:
+            logger.warning('Warning: Updated holdout_frac from %s to %s to avoid cutting too many classes.' % (holdout_frac, new_holdout_frac))
+        if new_num_bagging_folds != num_bagging_folds:
+            logger.warning('Warning: Updated num_bagging_folds from %s to %s to avoid cutting too many classes.' % (num_bagging_folds, new_num_bagging_folds))
+        return new_threshold, new_holdout_frac, new_num_bagging_folds
+
+    def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
+        new_threshold = threshold
+        if self.problem_type == REGRESSION:
+            num_rows = len(y)
+            holdout_frac = max(holdout_frac, 1 / num_rows + 0.001)
+            num_bagging_folds = min(num_bagging_folds, num_rows)
+            return new_threshold, holdout_frac, num_bagging_folds
+
+        if num_bagging_folds < 2:
+            minimum_safe_threshold = math.ceil(1 / holdout_frac)
+        else:
+            minimum_safe_threshold = num_bagging_folds
+
+        if minimum_safe_threshold > new_threshold:
+            new_threshold = minimum_safe_threshold
+
+        class_counts = y.value_counts()
+        total_rows = class_counts.sum()
+        minimum_percent_to_keep = 0.975
+        minimum_rows_to_keep = math.ceil(total_rows * minimum_percent_to_keep)
+        minimum_class_to_keep = 2
+
+        num_classes = len(class_counts)
+        class_counts_valid = class_counts[class_counts >= new_threshold]
+        num_rows_valid = class_counts_valid.sum()
+        num_classes_valid = len(class_counts_valid)
+
+        if (num_rows_valid >= minimum_rows_to_keep) and (num_classes_valid >= minimum_class_to_keep):
+            return new_threshold, holdout_frac, num_bagging_folds
+
+        num_classes_valid = 0
+        num_rows_valid = 0
+        new_threshold = None
+        for i in range(num_classes):
+            num_classes_valid += 1
+            num_rows_valid += class_counts.iloc[i]
+            new_threshold = class_counts.iloc[i]
+            if (num_rows_valid >= minimum_rows_to_keep) and (num_classes_valid >= minimum_class_to_keep):
+                break
+
+        if new_threshold == 1:
+            new_threshold = 2  # threshold=1 is invalid, can't perform any train/val split in this case.
+        self.threshold = new_threshold
+
+        if new_threshold < minimum_safe_threshold:
+            if num_bagging_folds >= 2:
+                if num_bagging_folds > new_threshold:
+                    num_bagging_folds = new_threshold
+            elif math.ceil(1 / holdout_frac) > new_threshold:
+                holdout_frac = 1 / new_threshold + 0.001
+
+        return new_threshold, holdout_frac, num_bagging_folds
 
     def augment_rare_classes(self, X):
         """ Use this method when using certain eval_metrics like log_loss,
