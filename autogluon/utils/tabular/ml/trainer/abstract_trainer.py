@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ...utils.exceptions import TimeLimitExceeded
+from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from ..utils import get_pred_from_proba, dd_list
 from ..models.abstract.abstract_model import AbstractModel
 from ..tuning.feature_pruner import FeaturePruner
@@ -278,6 +278,9 @@ class AbstractTrainer:
         except TimeLimitExceeded as err:
             logger.log(20, '\tTime limit exceeded... Skipping ' + model.name + '.')
             # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
+            del model
+        except NotEnoughMemoryError as err:
+            logger.warning('\tNot enough memory to train model... Skipping ' + model.name + '.')
             del model
         except Exception as err:
             traceback.print_tb(err.__traceback__)

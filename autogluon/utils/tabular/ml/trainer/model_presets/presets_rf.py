@@ -1,22 +1,21 @@
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 from ...models.rf.rf_model import RFModel
 
 
 def rf_classifiers(hyperparameters, path, problem_type, objective_func):
     models = []
-    params = {'n_estimators': 300, 'n_jobs': -1}
-    params.update(hyperparameters.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+    params = {'model_type': 'rf'}
+    params.update(hyperparameters.copy())
     params_gini = params.copy()
     params_gini['criterion'] = 'gini'
     models.append(
-        RFModel(path=path, name='RandomForestClassifierGini', model=RandomForestClassifier(**params_gini), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='RandomForestClassifierGini', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_gini),
     )
     params_entro = params.copy()
     params_entro['criterion'] = 'entropy'
     models.append(
-        RFModel(path=path, name='RandomForestClassifierEntr', model=RandomForestClassifier(**params_entro), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='RandomForestClassifierEntr', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_entro),
     )
     # if objective_func.name == 'roc_auc':  # TODO: Update to any metric that is negatively impacted by class imbalance
     #     params_gini_balanced = params.copy()
@@ -40,19 +39,19 @@ def rf_classifiers(hyperparameters, path, problem_type, objective_func):
 
 def xt_classifiers(hyperparameters, path, problem_type, objective_func):
     models = []
-    params = {'n_estimators': 300, 'n_jobs': -1}
-    params.update(hyperparameters.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+    params = {'model_type': 'xt'}
+    params.update(hyperparameters.copy())
     params_gini = params.copy()
     params_gini['criterion'] = 'gini'
     models.append(
-        RFModel(path=path, name='ExtraTreesClassifierGini', model=ExtraTreesClassifier(**params_gini), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='ExtraTreesClassifierGini', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_gini),
     )
     params_entro = params.copy()
     params_entro['criterion'] = 'entropy'
     models.append(
-        RFModel(path=path, name='ExtraTreesClassifierEntr', model=ExtraTreesClassifier(**params_entro), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='ExtraTreesClassifierEntr', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_entro),
     )
     # if objective_func.name == 'roc_auc':  # TODO: Update to any metric that is negatively impacted by class imbalance
     #     params_gini_balanced = params.copy()
@@ -75,13 +74,13 @@ def xt_classifiers(hyperparameters, path, problem_type, objective_func):
 
 def rf_regressors(hyperparameters, path, problem_type, objective_func):
     models = []
-    params = {'n_estimators': 300, 'n_jobs': -1}
-    params.update(hyperparameters.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+    params = {'model_type': 'rf'}
+    params.update(hyperparameters.copy())
     params_mse = params.copy()
     params_mse['criterion'] = 'mse'
     models.append(
-        RFModel(path=path, name='RandomForestRegressorMSE', model=RandomForestRegressor(**params_mse), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='RandomForestRegressorMSE', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_mse),
     )
     # TODO: Slow, perhaps only do mae if objective func is mae
     # params_mae = params.copy()
@@ -95,13 +94,13 @@ def rf_regressors(hyperparameters, path, problem_type, objective_func):
 
 def xt_regressors(hyperparameters, path, problem_type, objective_func):
     models = []
-    params = {'n_estimators': 300, 'n_jobs': -1}
-    params.update(hyperparameters.copy())  # TODO: Move into RFModel, currently ignores hyperparameters
+    params = {'model_type': 'xt'}
+    params.update(hyperparameters.copy())
     params_mse = params.copy()
     params_mse['criterion'] = 'mse'
     models.append(
-        RFModel(path=path, name='ExtraTreesRegressorMSE', model=ExtraTreesRegressor(**params_mse), problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=hyperparameters.copy()),
+        RFModel(path=path, name='ExtraTreesRegressorMSE', problem_type=problem_type,
+                objective_func=objective_func, hyperparameters=params_mse),
     )
     # TODO: Slow, perhaps only do mae if objective func is mae
     # params_mae = params.copy()
