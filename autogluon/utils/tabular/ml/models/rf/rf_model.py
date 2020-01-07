@@ -82,9 +82,9 @@ class RFModel(SKLearnModel):
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
-                if model_memory_ratio > 0.35:
+                if model_memory_ratio > 0.20:
                     logger.warning('\tWarning: Model is expected to require %s percent of available memory...' % (model_memory_ratio*100))
-                if model_memory_ratio > 0.45:
+                if model_memory_ratio > 0.30:
                     raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
