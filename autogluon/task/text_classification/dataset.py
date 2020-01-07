@@ -14,6 +14,19 @@ __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask',
 
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
+    """ Load a text classification dataset to train AutoGluon models on.
+        
+        Parameters
+        ----------
+        path : str
+            Path to local directory containing text dataset. This dataset should be in GLUE format.
+        name : str
+            Name describing which built-in popular text dataset to use (mostly from the GLUE NLP benchmark).
+            Options include: 'mrpc', 'qqp', 'qnli', 'rte', 'sts-b', 'cola', 'mnli', 'wnli', 'sst', 'toysst',
+            Detailed descriptions can be found in the file: autogluon/task/text_classification/dataset.py
+        train : bool
+            Whether this data will be used for training models.
+    """
     if path is not None:
         raise NotImplementedError
     if name is not None and name.lower() in built_in_tasks:
@@ -22,7 +35,7 @@ def get_dataset(path=None, name=None, train=True, *args, **kwargs):
         raise NotImplementedError
 
 class AbstractGlueTask:
-    """Abstract GLUE task class.
+    """Abstract task class for datasets with GLUE format.
 
     Parameters
     ----------
@@ -69,7 +82,7 @@ class AbstractGlueTask:
         return 'train', self.get_dataset(segment='train')
 
     def dataset_dev(self):
-        """Get the dev segment of the dataset for the task.
+        """Get the development (i.e. validation) segment of the dataset for this task.
 
         Returns
         -------
@@ -87,7 +100,7 @@ class AbstractGlueTask:
         return 'test', self.get_dataset(segment='test')
 
 class ToySSTTask(AbstractGlueTask):
-    """The Stanford Sentiment Treebank task on GlueBenchmark."""
+    """The Stanford Sentiment Treebank task on GLUE benchmark."""
     def __init__(self):
         is_pair = False
         class_labels = ['0', '1']
@@ -130,7 +143,7 @@ class TSVClassificationTask(AbstractGlueTask):
         return 'dev', self.valset
 
 class MRPCTask(AbstractGlueTask):
-    """The MRPC task on GlueBenchmark."""
+    """The MRPC task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['0', '1']
@@ -150,7 +163,7 @@ class MRPCTask(AbstractGlueTask):
         return GlueMRPC(segment=segment)
 
 class QQPTask(AbstractGlueTask):
-    """The Quora Question Pairs task on GlueBenchmark."""
+    """The Quora Question Pairs task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['0', '1']
@@ -171,7 +184,7 @@ class QQPTask(AbstractGlueTask):
 
 
 class RTETask(AbstractGlueTask):
-    """The Recognizing Textual Entailment task on GlueBenchmark."""
+    """The Recognizing Textual Entailment task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['not_entailment', 'entailment']
@@ -189,7 +202,7 @@ class RTETask(AbstractGlueTask):
         return GlueRTE(segment=segment)
 
 class QNLITask(AbstractGlueTask):
-    """The SQuAD NLI task on GlueBenchmark."""
+    """The SQuAD NLI task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['not_entailment', 'entailment']
@@ -207,7 +220,7 @@ class QNLITask(AbstractGlueTask):
         return GlueQNLI(segment=segment)
 
 class STSBTask(AbstractGlueTask):
-    """The Sentence Textual Similarity Benchmark task on GlueBenchmark."""
+    """The Sentence Textual Similarity Benchmark task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = None
@@ -225,7 +238,7 @@ class STSBTask(AbstractGlueTask):
         return GlueSTSB(segment=segment)
 
 class CoLATask(AbstractGlueTask):
-    """The Warstdadt acceptability task on GlueBenchmark."""
+    """The Warstdadt acceptability task on GLUE benchmark."""
     def __init__(self):
         is_pair = False
         class_labels = ['0', '1']
@@ -243,7 +256,7 @@ class CoLATask(AbstractGlueTask):
         return GlueCoLA(segment=segment)
 
 class SSTTask(AbstractGlueTask):
-    """The Stanford Sentiment Treebank task on GlueBenchmark."""
+    """The Stanford Sentiment Treebank task on GLUE benchmark."""
     def __init__(self):
         is_pair = False
         class_labels = ['0', '1']
@@ -261,7 +274,7 @@ class SSTTask(AbstractGlueTask):
         return GlueSST2(segment=segment)
 
 class WNLITask(AbstractGlueTask):
-    """The Winograd NLI task on GlueBenchmark."""
+    """The Winograd NLI task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['0', '1']
@@ -279,7 +292,7 @@ class WNLITask(AbstractGlueTask):
         return GlueWNLI(segment=segment)
 
 class MNLITask(AbstractGlueTask):
-    """The Multi-Genre Natural Language Inference task on GlueBenchmark."""
+    """The Multi-Genre Natural Language Inference task on GLUE benchmark."""
     def __init__(self):
         is_pair = True
         class_labels = ['neutral', 'entailment', 'contradiction']

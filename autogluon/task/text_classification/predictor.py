@@ -19,9 +19,7 @@ __all__ = ['TextClassificationPredictor']
 
 class TextClassificationPredictor(Classifier):
     """
-    Classifier returned by task.fit()
-
-    Example user workflow:
+    Text Classifier returned by fit().
     """
     def __init__(self, model, transform, test_transform,
                  results, scheduler_checkpoint, args):
@@ -38,7 +36,7 @@ class TextClassificationPredictor(Classifier):
          Args:
             sentence: the input
          Example:
-            >>> ind = predictor.predict('this is cool')
+            >>> class_index = predictor.predict('this is cool')
         """
         proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
@@ -49,7 +47,7 @@ class TextClassificationPredictor(Classifier):
          Args:
             sentence: the input
          Example:
-            >>> prob = predictor.predict_proba('this is cool')
+            >>> class_probability = predictor.predict_proba('this is cool')
         """
         inputs = self.test_transform(X)
         X, valid_length, segment_id = [mx.nd.array(np.expand_dims(x, 0)) for x in inputs]

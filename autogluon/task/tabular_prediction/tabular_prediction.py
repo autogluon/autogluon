@@ -183,7 +183,7 @@ class TabularPrediction(BaseTask):
         
         Returns
         -------
-            :class:`autogluon.task.tabular_prediction.TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
+        :class:`autogluon.task.tabular_prediction.TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
         
         Examples
         --------

@@ -82,13 +82,13 @@ class ImageClassification(BaseTask):
 
         Parameters
         ----------
-        dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
+        dataset : str, :meth:`autogluon.task.ImageClassification.Dataset`
             Training dataset containing images and their associated class labels.
         input_size : int
             Size of images in the dataset (pixels).
-        net : str or :class:`autogluon.space.AutoGluonObject`
+        net : str, :class:`autogluon.space.Categorical`
             Which existing neural network models to consider as candidates.
-        optimizer : str or :class:`autogluon.space.AutoGluonObject`
+        optimizer : str, :class:`autogluon.space.AutoGluonObject`
             Which optimizers to consider as candidates for learning the neural network weights.
         lr_scheduler : str
             Describes how learning rate should be adjusted over the course of training. Options include: 'cosine', 'poly'.
@@ -96,9 +96,9 @@ class ImageClassification(BaseTask):
             How many images to group in each mini-batch during gradient computations in training.
         epochs: int
             How many epochs to train the neural networks for at most.
-        metric : str or object
+        metric : str, object
             Evaluation metric by which predictions will be ulitmately evaluated on test data.
-        loss : mxnet.gluon.loss
+        loss : `mxnet.gluon.loss`
             Loss function used during training of the neural network weights.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.

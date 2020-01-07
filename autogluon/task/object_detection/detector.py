@@ -46,12 +46,12 @@ class Detector(BasePredictor):
 
 
     def evaluate(self, dataset, ctx=[mx.cpu()]):
-        """Evaluate this object detector's predictions on test data.
+        """Evaluate performance of this object detector's predictions on test data.
          
          Parameters
          ----------
-            dataset: Test dataset.
-            ctx : MXNet context where to place data (CPU or GPU).
+        dataset: Test dataset.
+        ctx : MXNet context where to place data (CPU or GPU).
         """
         args = self.args
         net = self.model
@@ -135,18 +135,18 @@ class Detector(BasePredictor):
         
         Parameters
         ----------
-            X : Test data 
-            input_size : int
-                Size of images in test data (pixels)
-            thresh : float
-                Confidence Threshold above which detector outputs bounding box for object.
-            plot : bool
-                Whether or not to plot the detected objects on top of the original images.
+        X : Test data 
+        input_size : int
+            Size of images in test data (pixels)
+        thresh : float
+            Confidence Threshold above which detector outputs bounding box for object.
+        plot : bool
+            Whether or not to plot the detected objects on top of the original images.
         
         Returns
         -------
-            Tuple containing the class-IDs of detected objects, the confidence-scores associated with 
-            these detectiions, and the corresponding predicted bounding box locations.
+        Tuple containing the class-IDs of detected objects, the confidence-scores associated with 
+        these detectiions, and the corresponding predicted bounding box locations.
         """
         net = self.model
         net.set_nms(0.45, 200)

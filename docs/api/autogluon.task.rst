@@ -38,6 +38,7 @@ AutoGluon Tasks
    TabularPrediction
    ImageClassification
    ObjectDetection
+   TextClassification
 
 :hidden:`TabularPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,6 +77,19 @@ AutoGluon Tasks
     .. rubric:: Methods
 
     .. autoautosummary:: ObjectDetection
+        :methods:
+
+:hidden:`TextClassification`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextClassification
+   :members:
+   :inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TextClassification
         :methods:
 
 
@@ -232,3 +246,32 @@ Extra Methods/Classes for Object Detection
 
     .. autoautosummary:: COCO
         :attributes:
+
+
+Extra Methods/Classes for Text Classification
+----------------------------------------------
+
+.. automodule:: autogluon.task.text_classification
+
+:hidden:`TextClassificationPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextClassificationPredictor
+   :members: predict, evaluate, predict_proba
+   :no-inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TextClassificationPredictor
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: TextClassificationPredictor
+        :attributes:
+
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction::
+   get_dataset
