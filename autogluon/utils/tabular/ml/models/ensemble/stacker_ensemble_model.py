@@ -50,7 +50,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         return self.limit_models_per_type(models=models, model_types=model_types, model_scores=model_scores, max_models_per_type=max_models)
 
     def _set_default_params(self):
-        default_params = {'max_models': 0, 'max_models_per_type': 0}
+        default_params = {'max_models': 25, 'max_models_per_type': 5}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
