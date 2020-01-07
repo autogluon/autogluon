@@ -120,6 +120,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
 
     # Run benchmark:
     performance_vals = [0.0] * len(datasets) # performance obtained in this run
+    directory_prefix = './datasets/'
     with warnings.catch_warnings(record=True) as caught_warnings:
         for idx in range(len(datasets)):
             if seed_val is not None:
@@ -128,13 +129,14 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 mx.random.seed(seed_val)
             dataset = datasets[idx]
             print("Evaluating Benchmark Dataset %s (%d of %d)" % (dataset['name'], idx+1, len(datasets)))
-            directory = dataset['name'] + "/"
+            directory = directory_prefix + dataset['name'] + "/"
             train_file_path = directory + train_file
             test_file_path = directory + test_file
             if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
                 # fetch files from s3:
                 print("%s data not found locally, so fetching from %s" % (dataset['name'],  dataset['url']))
-                os.system("wget " + dataset['url'] + " -O temp.zip && unzip -o temp.zip && rm temp.zip")
+                os.makedirs(os.path.dirname(directory_prefix), exist_ok=True)
+                os.system("wget " + dataset['url'] + " -O temp.zip && unzip -o temp.zip -d " + directory_prefix + " && rm temp.zip")
             
             savedir = directory + 'AutogluonOutput/'
             shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
