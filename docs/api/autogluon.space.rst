@@ -4,11 +4,11 @@
 autogluon.space
 ===============
 
-Search Space in AutoGluon.
+Search space of possible hyperparameter values to consider.
 
 .. admonition:: Example
 
-   Define a dummy training function with searchable spaces:
+   Define a dummy training function with searchable spaces for hyperparameters `lr` and `wd`:
 
    >>> import numpy as np
    >>> import autogluon as ag
@@ -21,7 +21,7 @@ Search Space in AutoGluon.
    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-   Create a schedule and run the experiment:
+   Create a scheduler to manage training jobs and begin hyperparameter tuning with the provided search space:
 
    >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
    >>>                                             resource={'num_cpus': 2, 'num_gpus': 0},
@@ -32,7 +32,7 @@ Search Space in AutoGluon.
    >>> scheduler.run()
    >>> scheduler.join_jobs()
 
-   Visiualize the results and exit:
+   Visiualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 

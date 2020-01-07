@@ -79,8 +79,8 @@ AutoGluon Tasks
     .. autoautosummary:: TabularPrediction
         :methods:
 
-Image Classification Datasets
------------------------------
+Image Classification Objects
+----------------------------
 
 .. automodule:: autogluon.task.image_classification
 
@@ -123,6 +123,24 @@ Image Classification Datasets
 
     .. autoautosummary:: RecordDataset
         :attributes:
+
+:hidden:`Classifier`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Classifier
+   :members: predict, evaluate, load, save, predict_proba
+   :no-inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Classifier
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: Classifier
+        :attributes:
+
 
 Tabular Data Objects
 -----------------------------

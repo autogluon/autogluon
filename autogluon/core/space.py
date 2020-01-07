@@ -8,12 +8,12 @@ __all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'List', 'Dict',
            'Categorical', 'Choice', 'Real', 'Int', 'Bool']
 
 class Space(object):
-    """Basic Search Space
+    """Basic search space describing set of possible values for hyperparameter.
     """
     pass
 
 class SimpleSpace(Space):
-    """Non-nested Search Space
+    """Non-nested search space (i.e. corresponds to a single simple hyperparameter).
     """
     def __repr__(self):
         reprstr = self.__class__.__name__
@@ -46,7 +46,7 @@ class SimpleSpace(Space):
         return cs.sample_configuration().get_dictionary()['']
 
 class NestedSpace(Space):
-    """Nested Search Spaces
+    """Nested hyperparameter search space, which is a search space that itself contains multiple search spaces.
     """
     def sample(self, **config):
         pass
@@ -70,7 +70,7 @@ class NestedSpace(Space):
         return self.sample(**config)
 
 class AutoGluonObject(NestedSpace):
-    r"""Searchable Objects,
+    r"""Searchable objects,
     created by decorating customized class or function using
     :func:`autogluon.obj` or :func:`autogluon.func` decorators.
     """
@@ -112,7 +112,7 @@ class AutoGluonObject(NestedSpace):
         return 'AutoGluonObject'
 
 class List(NestedSpace):
-    r"""A Searchable List (Nested Space)
+    r"""Nested search space corresponding to an ordered list of hyperparameters.
 
     Parameters
     ----------
@@ -204,13 +204,13 @@ class List(NestedSpace):
         return reprstr
 
 class Dict(NestedSpace):
-    """A Searchable Dict (Nested Space)
+    """ Nested search space for dictionary containing multiple hyperparameters.
 
     Examples
     --------
     >>> g = ag.space.Dict(
-    >>>         key1=ag.space.Categorical('alpha', 'beta'),
-    >>>         key2=ag.space.Int(0, 3),
+    >>>         hyperparam1 = ag.space.Categorical('alpha', 'beta'),
+    >>>         hyperparam2 = ag.space.Int(0, 3)
     >>>     )
     >>> print(g)
     """
@@ -284,8 +284,7 @@ class Dict(NestedSpace):
         return reprstr
 
 class Categorical(NestedSpace):
-    """Categorical Search Space (Nested Space)
-    Add example for conditional space.
+    """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options.
 
     Parameters
     ----------
@@ -351,7 +350,7 @@ class Categorical(NestedSpace):
 Choice = DeprecationHelper(Categorical, 'Choice')
 
 class Real(SimpleSpace):
-    """linear search space.
+    """Search space for numeric hyperparameter that takes continuous values.
 
     Parameters
     ----------
@@ -379,7 +378,7 @@ class Real(SimpleSpace):
                                               default_value=self._default, log=self.log)
 
 class Int(SimpleSpace):
-    """integer search space.
+    """Search space for numeric hyperparameter that takes integer values.
 
     Parameters
     ----------
@@ -405,7 +404,8 @@ class Int(SimpleSpace):
                                                 default_value=self._default)
 
 class Bool(Int):
-    """Bool Search Space
+    """Search space for hyperparameter that is either True or False. 
+       ag.Bool() serves as shorthand for: ag.space.Categorical(True, False)
 
     Examples
     --------

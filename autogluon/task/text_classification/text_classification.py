@@ -22,7 +22,7 @@ __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
 
 class TextClassification(BaseTask):
-    """AutoGluon TextClassification Task
+    """AutoGluon Task for classifying text snippets based on their content
     """
     @staticmethod
     def Dataset(*args, **kwargs):

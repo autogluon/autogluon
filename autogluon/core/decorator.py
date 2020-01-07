@@ -119,10 +119,11 @@ class _autogluon_method(object):
 
 
 def args(default={}, **kwvars):
-    """Decorator for customized training script, registering arguments or searchable spaces
-    to the decorated function. The arguments should be python built-in objects,
-    autogluon objects (see :func:`autogluon.obj`_ .), or autogluon search spaces
-    (:class:`autogluon.space.Int`, :class:`autogluon.space.Real` ...).
+    """Decorator for customized training script, which registers arguments of 
+        the decorated function as hyperparameters which may take fixed values 
+        or be searchable spaces. The arguments should be python built-in objects,
+    autogluon objects (see :func:`autogluon.obj`.), or autogluon search spaces
+    (:class:`autogluon.space.Int`, :class:`autogluon.space.Real`, ...).
 
     Example:
         >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
@@ -145,11 +146,12 @@ def args(default={}, **kwvars):
 
 
 def func(**kwvars):
-    """Register args or searchable spaces to the functions.
+    """Decorator for a function which registers the function arguments as hyperparameters which 
+       may take fixed values or be searchable spaces.
 
     Returns
     -------
-    instance of :class:`autogluon.space.AutoGluonObject`:
+    Instance of :class:`autogluon.space.AutoGluonObject`:
         a lazy init object, which allows distributed training.
 
     Examples
@@ -190,11 +192,12 @@ def func(**kwvars):
     return registered_func
 
 def obj(**kwvars):
-    """Register args or searchable spaces to the class.
+    """Decorator for a python class which registers the class arguments as hyperparameters which 
+       may take fixed values or be searchable spaces.
 
     Returns
     -------
-    instance of :class:`autogluon.space.AutoGluonObject`:
+    Instance of :class:`autogluon.space.AutoGluonObject`:
         a lazy init object, which allows distributed training.
 
     Examples

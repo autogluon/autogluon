@@ -287,7 +287,7 @@ class ImageFolderDataset(object):
 
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
                          shuffle=True, **kwargs):
-    """Returns built-in popular image classification dataset baed on provided string name ('cifar10', 'cifar100','mnist','imagenet').
+    """Returns built-in popular image classification dataset based on provided string name ('cifar10', 'cifar100','mnist','imagenet').
     """
     logger.info('get_built_in_dataset {}'.format(name))
     name = name.lower()

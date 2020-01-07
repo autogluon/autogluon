@@ -23,7 +23,7 @@ __all__ = ['ObjectDetection']
 logger = logging.getLogger(__name__)
 
 class ObjectDetection(BaseTask):
-    """AutoGluon ObjectDetection Task
+    """AutoGluon Task for detecting and locating objects in images
     """
     @staticmethod
     def Dataset(*args, **kwargs):

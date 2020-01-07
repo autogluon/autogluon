@@ -19,7 +19,7 @@ logger = logging.getLogger() # return root logger
 
 class TabularPrediction(BaseTask):
     """ 
-    AutoGluon Task for predicting a column of tabular dataset (classification or regression)
+    AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
     """
     
     Dataset = TabularDataset
@@ -90,7 +90,7 @@ class TabularPrediction(BaseTask):
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression'). 
             If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset. 
         eval_metric : (func or str, default = None)
-            Metric by which performance will be ultimately evaluated on test data. 
+            Metric by which predictions will be ultimately evaluated on test data. 
             AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data. 
             
             If `eval_metric = None`, it is automatically chosen based on `problem_type`. 
