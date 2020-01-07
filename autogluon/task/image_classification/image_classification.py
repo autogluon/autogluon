@@ -108,16 +108,16 @@ class ImageClassification(BaseTask):
         time_limits : int
             Approximately how long should `fit()` should run for (wallclock time in seconds).
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
-        nthreads_per_trial : (int)
+        nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
-        ngpus_per_trial : (int)
+        ngpus_per_trial : int
             How many GPUs to use in each trial (ie. single training run of a model). 
-        checkpoint:
+        checkpoint: str
             The path to local directory where trained models will be saved.
         search_strategy : str
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
-        search_options : (dict)
+        search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
         resume : bool
             If a model checkpoint file exists, model training will resume from there when specified.

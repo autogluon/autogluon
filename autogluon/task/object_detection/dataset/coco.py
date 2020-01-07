@@ -5,6 +5,7 @@ from gluoncv import data as gdata
 
 @obj()
 class COCO(DatasetBase):
+    """ Built-in class to work with the well-known COCO dataset for object detection. """
     def __init__(self):
         super(COCO. self).__init__()
         self.train_dataset = gdata.COCODetection(splits='instances_train2017')

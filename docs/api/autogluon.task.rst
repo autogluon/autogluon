@@ -35,9 +35,22 @@ AutoGluon Tasks
 .. autosummary::
    :nosignatures:
 
+   TabularPrediction
    ImageClassification
    ObjectDetection
-   TabularPrediction
+
+:hidden:`TabularPrediction`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPrediction
+   :members: fit, load, Predictor, Dataset
+   :no-inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TabularPrediction
+        :methods:
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,25 +77,58 @@ AutoGluon Tasks
 
     .. autoautosummary:: ObjectDetection
         :methods:
-        
 
-:hidden:`TabularPrediction`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TabularPrediction
-   :members: fit, load, Predictor, Dataset
+Extra Methods/Classes for Tabular Prediction
+--------------------------------------------
+
+.. automodule:: autogluon.task.tabular_prediction
+
+:hidden:`TabularPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularPredictor
+   :members:
    :no-inherited-members:
-   :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TabularPrediction
+    .. autoautosummary:: TabularPredictor
         :methods:
 
-Image Classification Objects
-----------------------------
+    .. rubric:: Attributes
+
+    .. autoautosummary:: TabularPredictor
+        :attributes:
+
+:hidden:`TabularDataset`
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TabularDataset
+   :no-inherited-members:
+
+
+Extra Methods/Classes for Image Classification
+----------------------------------------------
 
 .. automodule:: autogluon.task.image_classification
+
+:hidden:`Classifier`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Classifier
+   :members: predict, evaluate, load, save, predict_proba
+   :no-inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Classifier
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: Classifier
+        :attributes:
 
 :hidden:`get_dataset`
 ~~~~~~~~~~~~~~~~~~~~~
@@ -124,50 +170,65 @@ Image Classification Objects
     .. autoautosummary:: RecordDataset
         :attributes:
 
-:hidden:`Classifier`
+
+Extra Methods/Classes for Object Detection
+------------------------------------------
+
+.. automodule:: autogluon.task.object_detection
+
+:hidden:`Detector`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: Classifier
-   :members: predict, evaluate, load, save, predict_proba
+.. autoclass:: Detector
+   :members: predict, evaluate
    :no-inherited-members:
 
     .. rubric:: Methods
 
-    .. autoautosummary:: Classifier
+    .. autoautosummary:: Detector
         :methods:
 
     .. rubric:: Attributes
 
-    .. autoautosummary:: Classifier
+    .. autoautosummary:: Detector
         :attributes:
 
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
 
-Tabular Data Objects
------------------------------
+.. autofunction::
+   get_dataset
 
-.. automodule:: autogluon.task.tabular_prediction
+:hidden:`CustomVOCDetectionBase`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:hidden:`TabularPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabularPredictor
+.. autoclass:: CustomVOCDetectionBase
    :members:
    :no-inherited-members:
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TabularPredictor
+    .. autoautosummary:: CustomVOCDetectionBase
         :methods:
 
     .. rubric:: Attributes
 
-    .. autoautosummary:: TabularPredictor
+    .. autoautosummary:: CustomVOCDetectionBase
         :attributes:
 
-:hidden:`TabularDataset`
-~~~~~~~~~~~~~~~~~~~~~~~~
+:hidden:`COCO`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TabularDataset
+.. autoclass:: COCO
+   :members:
    :no-inherited-members:
 
+    .. rubric:: Methods
 
+    .. autoautosummary:: COCO
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: COCO
+        :attributes:

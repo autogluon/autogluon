@@ -19,9 +19,7 @@ __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
     """
-    Classifier returned by task.fit()
-
-    Example user workflow:
+    Trained Image Classifier returned by fit()
     """
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, **kwargs):

@@ -35,8 +35,7 @@ import gluoncv as gcv
 
 class Detector(BasePredictor):
     """
-    Classifier returned by task.fit()
-    Example user workflow:
+    Trained Object Detector returned by fit()
     """
     def __init__(self, model, results, scheduler_checkpoint,
                  args, **kwargs):
@@ -47,13 +46,12 @@ class Detector(BasePredictor):
 
 
     def evaluate(self, dataset, ctx=[mx.cpu()]):
-        """The task evaluation function given the test dataset.
-         Args:
-            dataset: test dataset
-         Example:
-            >>> from autogluon import ImageClassification as task
-            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-            >>> test_reward = classifier.evaluate(dataset)
+        """Evaluate this object detector's predictions on test data.
+         
+         Parameters
+         ----------
+            dataset: Test dataset.
+            ctx : MXNet context where to place data (CPU or GPU).
         """
         args = self.args
         net = self.model
@@ -133,6 +131,23 @@ class Detector(BasePredictor):
         return results
     
     def predict(self, X, input_size=224, thresh=0.15, plot=True):
+        """ Use this object detector to make predictions on test data.
+        
+        Parameters
+        ----------
+            X : Test data 
+            input_size : int
+                Size of images in test data (pixels)
+            thresh : float
+                Confidence Threshold above which detector outputs bounding box for object.
+            plot : bool
+                Whether or not to plot the detected objects on top of the original images.
+        
+        Returns
+        -------
+            Tuple containing the class-IDs of detected objects, the confidence-scores associated with 
+            these detectiions, and the corresponding predicted bounding box locations.
+        """
         net = self.model
         net.set_nms(0.45, 200)
         net.collect_params().reset_ctx(ctx = mx.cpu())

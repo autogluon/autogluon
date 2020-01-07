@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 
 
 class CustomVOCDetectionBase(gdata.VOCDetection):
-    """custom Dataset which follows VOC protocol.
+    """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
     
     Parameters
     ----------
