@@ -76,16 +76,17 @@ def auto_suggest_network(dataset, net):
         logger.info('Auto suggesting network net for dataset {}'.format(net, dataset_name))
         return net
 
-def get_network(net, num_classes, ctx):
+def get_network(net, **kwargs):
     if type(net) == str:
-        net = get_built_in_network(net, num_classes, ctx=ctx)
+        net = get_built_in_network(net, **kwargs)
     else:
-        net.initialize(ctx=ctx)
+        net.initialize(ctx=kwargs['ctx'])
     return net
 
 def get_built_in_network(name, *args, **kwargs):
-    def _get_finetune_network(model_name, num_classes, ctx, *args, **kwargs):
-        finetune_net = get_model(model_name, *args, pretrained=True, **kwargs)
+    def _get_finetune_network(model_name, num_classes, ctx, **kwargs):
+        kwargs['pretrained'] = True
+        finetune_net = get_model(model_name, **kwargs)
         # change the last fully connected layer to match the number of classes
         with finetune_net.name_scope():
             if hasattr(finetune_net, 'output'):

@@ -83,13 +83,11 @@ class Classifier(BasePredictor):
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
         def predict_img(img):
-            # load and display the image
             proba = self.predict_proba(img)
             ind = mx.nd.argmax(proba, axis=1).astype('int')
-            idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context),
-                              ind.astype('float32'))
+            idx = mx.nd.stack(mx.nd.arange(proba.shape[0], ctx=proba.context), ind.astype('float32'))
             probai = mx.nd.gather_nd(proba, idx)
-            return ind, probai
+            return ind, probai, proba
         if isinstance(X, str) and os.path.isfile(X):
             img = self.loader(X)
             if plot:
@@ -99,12 +97,13 @@ class Classifier(BasePredictor):
             return predict_img(img)
         if isinstance(X, AutoGluonObject):
             X = X.init()
-        inds, probas = [], []
+        inds, probas, probals_all = [], [],[]
         for x in X:
-            ind, proba = predict_img(x[0])
-            inds.append(ind)
-            probas.append(proba)
-        return inds, probas
+            ind, proba, proba_all= predict_img(x[0])
+            inds.append(ind.asscalar())
+            probas.append(proba.asnumpy())
+            probals_all.append(proba_all.asnumpy().flatten())
+        return inds, probas, probals_all
 
     @staticmethod
     def loader(path):

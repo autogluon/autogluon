@@ -2,7 +2,7 @@
     If matplotlib or bokeh are not installed, simply will print warning message that plots cannot be shown.
 """
 
-import warnings
+import warnings, os
 import numpy as np
 from collections import OrderedDict
 
@@ -32,7 +32,7 @@ def plot_performance_vs_trials(results, output_directory, save_file="Performance
     ax.plot(x, y)
     ax.set(xlabel='Completed Trials', ylabel='Best Performance', title = plot_title)
     if output_directory is not None:
-        outputfile = output_directory + save_file
+        outputfile = os.path.join(output_directory, save_file)
         fig.savefig(outputfile)
         print("Plot of HPO performance saved to file: %s" % outputfile)
     plt.show()
@@ -64,8 +64,8 @@ def plot_summary_of_models(results, output_directory, save_file='SummaryOfModels
     if 'training_loss' in results:
         datadict['training_loss'] = [results['trial_info'][trial_id]['training_loss'] for trial_id in datadict['trial_id']]
         attr_color = 'training_loss'
-    
-    save_path = output_directory + save_file if output_directory else None
+
+    save_path = os.path.join(output_directory, save_file) if output_directory else None
     mousover_plot(datadict, attr_x=attr_x, attr_y='performance', attr_color=attr_color, 
         attr_size=attr_size, save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
     if save_path is not None:
