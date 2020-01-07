@@ -26,9 +26,8 @@ class ImageClassification(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
-        """Dataset for AutoGluon image classification tasks, can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a
-    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
+        """Dataset for AutoGluon image classification tasks, can either be a
+        :class:`ImageFolderDataset`, :class:`RecordDataset`, or a popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
         ----------
@@ -231,9 +230,8 @@ class ImageClassification(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        plot_training_curves = checkpoint.replace('exp1.ag', 'plot_training_curves.png')
         results = BaseTask.run_fit(train_image_classification, search_strategy,
-                                   scheduler_options, plot_training_curves)
+                                   scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}

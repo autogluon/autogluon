@@ -27,7 +27,7 @@ class BaseTask(object):
     """
     Dataset = BaseDataset
     @classmethod
-    def run_fit(cls, train_fn, search_strategy, scheduler_options, plot_training_curves):
+    def run_fit(cls, train_fn, search_strategy, scheduler_options):
         start_time = time.time()
         # create scheduler and schedule tasks
         if isinstance(search_strategy, str):
@@ -47,12 +47,10 @@ class BaseTask(object):
         best_config = scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
-        print('final_fit') if args.final_fit else print('No_final')
-        # final fit
         results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
-        # if plot_results and in_ipynb():
-        if plot_results:
+        if plot_results or in_ipynb():
+            plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
         results.update(best_reward=best_reward, best_config=best_config,
                        total_time=total_time, metadata=scheduler.metadata,
