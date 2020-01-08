@@ -135,9 +135,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
                 # fetch files from s3:
                 print("%s data not found locally, so fetching from %s" % (dataset['name'],  dataset['url']))
-                os.makedirs(os.path.dirname(directory_prefix), exist_ok=True)
-                os.system("wget " + dataset['url'] + " -O temp.zip && unzip -o temp.zip -d " + directory_prefix + " && rm temp.zip")
-            
+                zip_name = ag.download(dataset['url'], directory_prefix)
+                ag.unzip(zip_name, directory_prefix)
+                os.remove(zip_name)
+
             savedir = directory + 'AutogluonOutput/'
             shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
             label_column = dataset['label_column']
