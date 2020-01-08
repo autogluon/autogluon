@@ -6,7 +6,7 @@
 Traditional reinforcement learning-based neural architecture search learns an architecture controller
 by iteratively sampling the architecture and training the model to get final reward to update the controller. It is extremely expensive process due to training CNN.
 
-![ProxylessNAS](https://autogluon.s3.amazonaws.com/_images/proxyless.png)
+![ProxylessNAS](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/docs/tutorial/proxyless.png)
 
 Recent work of ENAS and ProxylessNAS construct an over-parameterized network (supernet) and share the weights across different architecture to speed up the search speed. The reward is calculated every few iterations instead of every training period.
 
