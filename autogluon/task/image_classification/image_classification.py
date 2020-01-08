@@ -29,8 +29,8 @@ class ImageClassification(BaseTask):
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. Can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
-    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
+           :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
+           popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
         ----------
@@ -77,8 +77,7 @@ class ImageClassification(BaseTask):
             dist_ip_addrs=[],
             grace_period=None,
             auto_search=True):
-        """
-        Fit image classification models to a given dataset.
+        """Fit image classification models to a given dataset.
 
         Parameters
         ----------

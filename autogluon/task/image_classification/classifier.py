@@ -18,8 +18,7 @@ from ...utils.pil_transforms import *
 __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
-    """
-    Trained Image Classifier returned by fit()
+    """Trained Image Classifier returned by fit()
     """
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, **kwargs):
@@ -59,7 +58,7 @@ class Classifier(BasePredictor):
         save(self.state_dict(), checkpoint)
 
     def predict(self, X, input_size=224, plot=True):
-        """ Predict class-index of a given image, as well as associated class probability.
+        """Predict class-index of a given image, as well as associated class probability.
         
         Parameters
         ----------
@@ -116,7 +115,7 @@ class Classifier(BasePredictor):
             return img.convert('RGB')
 
     def predict_proba(self, X):
-        """ Produces predicted class probabilities.
+        """Produces predicted class probabilities.
         """
         pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
