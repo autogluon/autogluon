@@ -141,3 +141,14 @@ The resulting architecture is:
 ```{.python .input}
 mynet.graph
 ```
+
+
+## Reference
+
+[1] Efficient Neural Architecture Search via Parameter Sharing
+    H Pham, MY Guan, B Zoph, QV Le, J Dean
+    *International Conference on Machine Learning (ICML)*
+
+[3] ProxylessNAS: Direct Neural Architecture Search on Target Task and Hardware
+    Han Cai, Ligeng Zhu, Song Han
+    *International Conference on Learning Representations (ICLR)*, 2019.
