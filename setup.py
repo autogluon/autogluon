@@ -65,6 +65,7 @@ requirements = [
     'pandas==0.24.2',
     'psutil',
     'scikit-learn==0.21.2',
+    'Pillow<=6.2.1',
 ]
 
 setup(
