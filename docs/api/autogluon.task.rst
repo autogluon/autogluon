@@ -40,6 +40,7 @@ AutoGluon Tasks
    ObjectDetection
    TextClassification
 
+
 :hidden:`TabularPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -52,6 +53,7 @@ AutoGluon Tasks
 
     .. autoautosummary:: TabularPrediction
         :methods:
+
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,6 +68,7 @@ AutoGluon Tasks
     .. autoautosummary:: ImageClassification
         :methods:
 
+
 :hidden:`ObjectDetection`
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -78,6 +81,7 @@ AutoGluon Tasks
 
     .. autoautosummary:: ObjectDetection
         :methods:
+
 
 :hidden:`TextClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
