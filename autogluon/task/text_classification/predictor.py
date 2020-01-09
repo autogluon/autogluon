@@ -18,8 +18,7 @@ from ...core import AutoGluonObject
 __all__ = ['TextClassificationPredictor']
 
 class TextClassificationPredictor(Classifier):
-    """
-    Text Classifier returned by fit().
+    """Trained Text Classifier returned by fit() that can be used to make predictions on new text data.
     """
     def __init__(self, model, transform, test_transform,
                  results, scheduler_checkpoint, args):
@@ -32,22 +31,40 @@ class TextClassificationPredictor(Classifier):
         self.args = args
 
     def predict(self, X):
-        """The task predict function given an input.
-         Args:
-            sentence: the input
-         Example:
-            >>> class_index = predictor.predict('this is cool')
+        """Predict class-index of a given sentence / text-snippet.
+        
+        Parameters
+        ----------
+        X : str
+            The input sentence we should classify.
+    
+        Examples
+        --------
+        >>> class_index = predictor.predict('this is cool')
+    
+        Returns
+        -------
+        Int corresponding to index of the predicted class.
         """
         proba = self.predict_proba(X)
         ind = mx.nd.argmax(proba, axis=1).astype('int')
         return ind
 
     def predict_proba(self, X):
-        """The task predict probability function given an input.
-         Args:
-            sentence: the input
-         Example:
-            >>> class_probability = predictor.predict_proba('this is cool')
+        """Predict class-probabilities of a given sentence / text-snippet.
+        
+        Parameters
+        ----------
+        X : str
+            The input sentence we should classify.
+        
+        Examples
+        --------
+        >>> class_probs = predictor.predict_proba('this is cool')
+        
+        Returns
+        -------
+        `mxnet.NDArray` containing predicted probabilities of each class.
         """
         inputs = self.test_transform(X)
         X, valid_length, segment_id = [mx.nd.array(np.expand_dims(x, 0)) for x in inputs]
@@ -58,13 +75,18 @@ class TextClassificationPredictor(Classifier):
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, ctx=[mx.cpu()]):
-        """The task evaluation function given the test dataset.
-         Args:
-            dataset: test dataset
-         Example:
-            >>> from autogluon import TextClassification as task
-            >>> dataset = task.Dataset(test_path='~/data/test')
-            >>> test_reward = predictor.evaluate(dataset)
+        """Evaluate predictive performance of trained text classifier using given test data.
+        
+        Parameters
+        ----------
+        dataset : :class:`autogluon.task.TextClassification.Dataset`
+            The dataset containing test sentences (must be in same format as the training dataset).
+        
+         Examples
+         --------
+        >>> from autogluon import TextClassification as task
+        >>> dataset = task.Dataset(test_path='~/data/test')
+        >>> test_performance = predictor.evaluate(dataset)
         """
         args = self.args
         net = self.model

@@ -119,17 +119,17 @@ class _autogluon_method(object):
 
 
 def args(default={}, **kwvars):
-    """Decorator for customized training script, which registers arguments of 
-        the decorated function as hyperparameters which may take fixed values 
-        or be searchable spaces. The arguments should be python built-in objects,
-    autogluon objects (see :func:`autogluon.obj`.), or autogluon search spaces
-    (:class:`autogluon.space.Int`, :class:`autogluon.space.Real`, ...).
+    """Decorator for a Python training script that registers its arguments as hyperparameters. 
+       Each hyperparameter takes fixed value or is a searchable space, and the arguments may either be:
+       built-in Python objects (e.g. floats, strings, lists, etc.), AutoGluon objects (see :func:`autogluon.obj`), 
+       or AutoGluon search spaces (see :class:`autogluon.space.Int`, :class:`autogluon.space.Real`, etc.).
 
-    Example:
-        >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
-        >>> def my_train(args):
-        ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
-
+    Examples
+    --------
+    >>> import autogluon as ag
+    >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
+    >>> def train_func(args):
+    ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
     """
     kwvars['_default_config'] = default
     def registered_func(func):
@@ -146,16 +146,17 @@ def args(default={}, **kwvars):
 
 
 def func(**kwvars):
-    """Decorator for a function which registers the function arguments as hyperparameters which 
-       may take fixed values or be searchable spaces.
+    """Decorator for a function that registers its arguments as hyperparameters. 
+       Each hyperparameter may take fixed value or be a searchable space (autogluon.space).
 
     Returns
     -------
     Instance of :class:`autogluon.space.AutoGluonObject`:
-        a lazy init object, which allows distributed training.
+        a lazy init object, which allows for distributed training.
 
     Examples
     --------
+    >>> import autogluon as ag
     >>> from gluoncv.model_zoo import get_model
     >>> 
     >>> @ag.func(pretrained=ag.space.Categorical(True, False))
@@ -192,8 +193,8 @@ def func(**kwvars):
     return registered_func
 
 def obj(**kwvars):
-    """Decorator for a python class which registers the class arguments as hyperparameters which 
-       may take fixed values or be searchable spaces.
+    """Decorator for a Python class that registers its arguments as hyperparameters. 
+       Each hyperparameter may take fixed value or be a searchable space (autogluon.space).
 
     Returns
     -------
@@ -210,7 +211,6 @@ def obj(**kwvars):
     >>> )
     >>> class Adam(optim.Adam):
     >>>     pass
-
     """
     def registered_class(Cls):
         class autogluonobject(AutoGluonObject):

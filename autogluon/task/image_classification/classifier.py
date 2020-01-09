@@ -18,7 +18,7 @@ from ...utils.pil_transforms import *
 __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
-    """Trained Image Classifier returned by fit()
+    """Trained Image Classifier returned by fit() that can be used to make predictions on new images.
     """
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, **kwargs):
@@ -30,6 +30,8 @@ class Classifier(BasePredictor):
 
     @classmethod
     def load(cls, checkpoint):
+        """Load trained Image Classifier from directory specified by `checkpoint`.
+        """
         state_dict = load(checkpoint)
         args = state_dict['args']
         results = state_dict['results']
@@ -55,15 +57,22 @@ class Classifier(BasePredictor):
         return destination
 
     def save(self, checkpoint):
+        """ Save image classifier to folder specified by `checkpoint`.
+        """
         save(self.state_dict(), checkpoint)
 
     def predict(self, X, input_size=224, plot=True):
-        """Predict class-index of a given image, as well as associated class probability.
+        """Predict class-index and associated class probability for each image in a given dataset (or just a single image). 
         
         Parameters
         ----------
-            X : str or :func:`autogluon.task.ImageClassification.Dataset`
-                Path to the input image or dataset of multiple images.
+        X : str or :class:`autogluon.task.ImageClassification.Dataset`
+            If str, should be path to the input image (when we just want to predict on single image).
+            Otherwise should be dataset of multiple images in same format as training dataset.
+        input_size : int
+            Size of the images (pixels).
+        ctx : mxnet.context
+            Whether to use CPU or GPU, options are: `mx.cpu()` or `mx.gpu()`.
         
         Examples
         --------
@@ -115,15 +124,22 @@ class Classifier(BasePredictor):
             return img.convert('RGB')
 
     def predict_proba(self, X):
-        """Produces predicted class probabilities.
+        """Produces predicted class probabilities for a given image.
         """
         pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
-        """Evaluate this classifier's predictions on test data.
-         Args:
-            dataset: test dataset
+        """Evaluate predictive performance of trained image classifier using given test data.
+        
+        Parameters
+        ----------
+        dataset : :class:`autogluon.task.ImageClassification.Dataset`
+            The dataset containing test images (must be in same format as the training dataset).
+        input_size : int
+            Size of the images (pixels).
+        ctx : mxnet.context
+            Whether to use CPU or GPU, options are: `mx.cpu()` or `mx.gpu()`.
         
         Examples
         --------

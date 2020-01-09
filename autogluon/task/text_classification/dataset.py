@@ -10,7 +10,7 @@ from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
-           'WNLITask', 'SSTTask', 'AbstractGlueTask']
+           'WNLITask', 'SSTTask', 'AbstractGlueTask', 'get_dataset']
 
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
@@ -23,7 +23,7 @@ def get_dataset(path=None, name=None, train=True, *args, **kwargs):
         name : str
             Name describing which built-in popular text dataset to use (mostly from the GLUE NLP benchmark).
             Options include: 'mrpc', 'qqp', 'qnli', 'rte', 'sts-b', 'cola', 'mnli', 'wnli', 'sst', 'toysst',
-            Detailed descriptions can be found in the file: autogluon/task/text_classification/dataset.py
+            Detailed descriptions can be found in the file: `autogluon/task/text_classification/dataset.py`
         train : bool
             Whether this data will be used for training models.
     """

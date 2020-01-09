@@ -83,7 +83,8 @@ class AutoGluonObject(NestedSpace):
         return self._instance.__call__(*args, **kwargs)
 
     def init(self):
-        """Initiate a real instance for interacting with AutoGluonObject.
+        """Instantiate an actual instance of this `AutoGluonObject`. 
+            In order to interact with such an `object`, you must always first call: `object.init()`.
         """
         config = self.cs.get_default_configuration().get_dictionary()
         return self.sample(**config)

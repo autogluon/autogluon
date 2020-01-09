@@ -11,3 +11,4 @@ dependencies:
   - mu-notedown
   - torch
   - torchvision
+  - bokeh

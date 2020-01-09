@@ -135,8 +135,7 @@ Extra Methods/Classes for Image Classification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: Classifier
-   :members: predict, evaluate, load, save, predict_proba
-   :no-inherited-members:
+   :members: predict, evaluate, load, save
 
     .. rubric:: Methods
 
@@ -159,7 +158,7 @@ Extra Methods/Classes for Image Classification
 
 .. autoclass:: ImageFolderDataset
    :members:
-   :inherited-members:
+   :inherited-members: init
 
     .. rubric:: Methods
 
@@ -176,7 +175,7 @@ Extra Methods/Classes for Image Classification
 
 .. autoclass:: RecordDataset
    :members:
-   :inherited-members:
+   :inherited-members: init
 
     .. rubric:: Methods
 
@@ -199,7 +198,6 @@ Extra Methods/Classes for Object Detection
 
 .. autoclass:: Detector
    :members: predict, evaluate
-   :no-inherited-members:
 
     .. rubric:: Methods
 
@@ -210,6 +208,8 @@ Extra Methods/Classes for Object Detection
 
     .. autoautosummary:: Detector
         :attributes:
+
+.. automodule:: autogluon.task.object_detection.dataset
 
 :hidden:`get_dataset`
 ~~~~~~~~~~~~~~~~~~~~~
@@ -222,7 +222,6 @@ Extra Methods/Classes for Object Detection
 
 .. autoclass:: CustomVOCDetectionBase
    :members:
-   :no-inherited-members:
 
     .. rubric:: Methods
 
@@ -239,7 +238,6 @@ Extra Methods/Classes for Object Detection
 
 .. autoclass:: COCO
    :members:
-   :no-inherited-members:
 
     .. rubric:: Methods
 
@@ -261,8 +259,7 @@ Extra Methods/Classes for Text Classification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: TextClassificationPredictor
-   :members: predict, evaluate, predict_proba
-   :no-inherited-members:
+   :members: predict, predict_proba, evaluate
 
     .. rubric:: Methods
 

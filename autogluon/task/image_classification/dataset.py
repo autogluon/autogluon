@@ -41,7 +41,7 @@ def get_dataset(path=None, train=True, name=None,
         name : str, optional
             Which built-in dataset to use, will override all other options if specified.
             The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-        train : bool, default True
+        train : bool, default = True
             Whether this dataset should be used for training or validation.
         path : str
             The training data location. If using :class:`ImageFolderDataset`,
@@ -93,17 +93,16 @@ def get_dataset(path=None, train=True, name=None,
 
 @obj()
 class RecordDataset(ImageRecordDataset):
-    """A dataset wrapping over a RecordIO file containing images.
-
-    Each sample is an image and its corresponding label.
+    """A dataset wrapping over a RecordIO file containing images. 
+       Each sample is an image and its corresponding label.
 
     Parameters
     ----------
     filename : str
-        Path to .rec file.
+        Local path to the .rec file.
     gray_scale : False
-        If True, always convert images to greyscale. \
-        If False, always convert images to colored (RGB).
+        If True, always convert images to greyscale. 
+        If False, always convert images to colored (RGB). 
     transform : function, default None
         A user defined callback that transforms each sample.
     """
@@ -135,20 +134,22 @@ class NativeImageFolderDataset(MXImageFolderDataset):
 
 @obj()
 class ImageFolderDataset(object):
-    """A generic data loader where the images are arranged in this way: ::
+    """A generic data loader where the images are arranged in this way on your local filesystem: ::
 
-        root/dog/xxx.png
-        root/dog/xxy.png
-        root/dog/xxz.png
+        root/dog/a.png
+        root/dog/b.png
+        root/dog/c.png
 
-        root/cat/123.png
-        root/cat/nsdf3.png
-        root/cat/asd932_.png
-
+        root/cat/x.png
+        root/cat/y.png
+        root/cat/z.png
+    
+    Here, folder-names `dog` and `cat` are the class labels and the images with file-names `a`,`b`,`c` belong to the `dog` class while the others are `cat` images.
+    
     Parameters
     ----------
     root : string
-        Root directory path.
+        Root directory path to the folder containing all of the data.
     transform : callable, optional
         A function/transform that  takes in an PIL image
         and returns a transformed version. E.g, ``transforms.RandomCrop``
@@ -229,8 +230,8 @@ class ImageFolderDataset(object):
             return img.convert('RGB')
 
     def _find_classes(self, dir):
-        """
-        Finds the class folders in a dataset.
+        """Finds the class folders in a dataset.
+        
         Parameters
         ----------
         dir : string
@@ -238,7 +239,7 @@ class ImageFolderDataset(object):
 
         Returns
         -------
-        tuple: classes, class_to_idx
+        tuple: (classes, class_to_idx)
             where classes are relative to (dir), and class_to_idx is a dictionary.
         """
         if sys.version_info >= (3, 5):
@@ -263,7 +264,7 @@ class ImageFolderDataset(object):
 
         Returns
         ----------
-        tuple : sample, target
+        tuple : (sample, target)
             where target is class_index of the target class.
         """
         path, target = self.samples[index]

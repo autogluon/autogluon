@@ -16,32 +16,32 @@ class TabularDataset(pd.DataFrame):
 
     Parameters
     ----------
-    file_path : (str, optional)
+    file_path : str (optional)
         Path to the data file (may be on local filesystem or URL to cloud s3 bucket). 
-        At least one of `file_path` and `df` arguments must be specified when constructing a new TabularDataset.
-    df : (pandas.DataFrame, optional)
+        At least one of `file_path` and `df` arguments must be specified when constructing a new `TabularDataset`.
+    df : `pandas.DataFrame` (optional)
         If you already have your data in a pandas Dataframe, you can directly provide it by specifying `df`. 
-        At least one of `file_path` and `df` arguments must be specified when constructing new TabularDataset.
-    feature_types : (dict, optional)
+        At least one of `file_path` and `df` arguments must be specified when constructing new `TabularDataset`.
+    feature_types : dict (optional)
         Mapping from column_names to string describing data type of each column. 
         If not specified, AutoGluon's fit() will automatically infer what type of data each feature contains.
-    subsample : (int, optional)
+    subsample : int (optional)
         If specified = k, we only keep first k rows of the provided dataset.
-    name : (str, optional)
-         Optional name to assign to dataset (has no effect beyond being accessible via TabularDataset.name).
+    name : str (optional)
+         Optional name to assign to dataset (has no effect beyond being accessible via `TabularDataset.name`).
 
     Attributes
     ----------
     name: (str)
-        An optional name assigned to this TabularDataset.
+        An optional name assigned to this `TabularDataset`.
     file_path: (str)
-        Path to data file from which this TabularDataset was created.
+        Path to data file from which this `TabularDataset` was created.
     feature_types: (dict) 
-        Maps column-names to string describing the data type of each column in this TabularDataset.
+        Maps column-names to string describing the data type of each column in this `TabularDataset`.
     subsample: (int) 
-        Describes size of subsample retained in this TabularDataset (None if this is original dataset).
+        Describes size of subsample retained in this `TabularDataset` (None if this is original dataset).
     
-    Note: In addition to these attributes, TabularDataset also shares all attributes and methods of a pandas Dataframe. 
+    Note: In addition to these attributes, `TabularDataset` also shares all attributes and methods of a pandas Dataframe. 
     For detailed list, see: https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
 
     Examples
@@ -49,6 +49,8 @@ class TabularDataset(pd.DataFrame):
     >>> from autogluon import TabularPrediction as task  # Note: TabularPrediction.Dataset == TabularDataset.
     >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
     >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+    >>> train_data.head(30)
+    >>> train_data.columns
     """
     
     _metadata = ['name', 'file_path', 'feature_types', 'subsample'] # preserved properties that will be copied to a new instance of TabularDataset
