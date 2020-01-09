@@ -17,6 +17,7 @@ __all__ = ['TabularPrediction']
 
 logger = logging.getLogger() # return root logger
 
+
 class TabularPrediction(BaseTask):
     """ 
     AutoGluon Task for predicting a column of tabular dataset (classification or regression)
@@ -138,12 +139,15 @@ class TabularPrediction(BaseTask):
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
             Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
         num_bagging_folds : (int)
-            Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging). 
+            Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
+            Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting.
+            If overfitting is a concern, consider increasing num_bagged_sets.
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
         num_bagging_sets : (int)
             Number of repeats of kfold bagging to perform. Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
             Defaults to 1 if time_limits is not specified, otherwise 10.
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
+            Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
             Disabled if num_bagging_folds is not specified.
             Value must be >= 1 if specified
         stack_ensemble_levels : (int)
@@ -154,7 +158,8 @@ class TabularPrediction(BaseTask):
             Whether to enable predictor to be able to be fit beyond the initial fit call.
             When enabled, the training and validation data are saved to disk.
         time_limits : (int)
-            Approximately how long `fit()` should run for (wallclock time in seconds). 
+            Approximately how long `fit()` should run for (wallclock time in seconds).
+            Defaults to None. If not specified AutoGluon will run until all models have completed, but will not repeatedly bag models unless num_bagging_sets is specified.
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         num_trials : (int) 
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
