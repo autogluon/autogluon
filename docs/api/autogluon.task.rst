@@ -32,6 +32,8 @@ autogluon.task
 AutoGluon Tasks
 -----------------
 
+Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
+
 .. autosummary::
    :nosignatures:
 
@@ -97,8 +99,8 @@ AutoGluon Tasks
         :methods:
 
 
-Extra Methods/Classes for Tabular Prediction
---------------------------------------------
+Additional Tabular Prediction APIs
+----------------------------------
 
 .. automodule:: autogluon.task.tabular_prediction
 
@@ -126,8 +128,8 @@ Extra Methods/Classes for Tabular Prediction
    :no-inherited-members:
 
 
-Extra Methods/Classes for Image Classification
-----------------------------------------------
+Additional Image Classification APIs
+------------------------------------
 
 .. automodule:: autogluon.task.image_classification
 
@@ -188,8 +190,8 @@ Extra Methods/Classes for Image Classification
         :attributes:
 
 
-Extra Methods/Classes for Object Detection
-------------------------------------------
+Additional Object Detection APIs
+--------------------------------
 
 .. automodule:: autogluon.task.object_detection
 
@@ -250,8 +252,8 @@ Extra Methods/Classes for Object Detection
         :attributes:
 
 
-Extra Methods/Classes for Text Classification
-----------------------------------------------
+Additional Text Classification APIs
+-----------------------------------
 
 .. automodule:: autogluon.task.text_classification
 

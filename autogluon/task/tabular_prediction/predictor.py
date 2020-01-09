@@ -12,7 +12,7 @@ logger = logging.getLogger()  # return root logger
 
 
 class TabularPredictor(BasePredictor):
-    """ Object returned by `fit()` in tabular_prediction tasks. 
+    """ Object returned by `fit()` in Tabular Prediction tasks. 
         Use for making predictions on new data and viewing information about models trained during `fit()`. 
 
         Attributes
@@ -30,7 +30,7 @@ class TabularPredictor(BasePredictor):
         model_performance : dict
             Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
         class_labels : list
-            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is None for problems that are not multiclass.
+            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is = None for problems that are not multiclass.
             For example if `pred = predict_proba(x)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
 
         Examples

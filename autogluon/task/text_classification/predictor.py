@@ -18,7 +18,7 @@ from ...core import AutoGluonObject
 __all__ = ['TextClassificationPredictor']
 
 class TextClassificationPredictor(Classifier):
-    """Trained Text Classifier returned by fit() that can be used to make predictions on new text data.
+    """Trained Text Classifier returned by `fit()` that can be used to make predictions on new text data.
     """
     def __init__(self, model, transform, test_transform,
                  results, scheduler_checkpoint, args):
@@ -80,7 +80,7 @@ class TextClassificationPredictor(Classifier):
         Parameters
         ----------
         dataset : :class:`autogluon.task.TextClassification.Dataset`
-            The dataset containing test sentences (must be in same format as the training dataset).
+            The dataset containing test sentences (must be in same format as the training dataset provided to fit).
         
          Examples
          --------
