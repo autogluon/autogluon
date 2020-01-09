@@ -1,3 +1,4 @@
+import os
 import copy
 import logging
 
@@ -47,6 +48,10 @@ class ImageClassification(BaseTask):
             The input image size.
         crop_ratio : float
             Center crop ratio (for evaluation only)
+
+        Returns
+        -------
+        :class:`autogluon.task.image_classification.Classifier` object that can be used to make predictions.
         """
         return get_dataset(*args, **kwargs)
 
@@ -71,7 +76,7 @@ class ImageClassification(BaseTask):
             search_options={},
             time_limits=None,
             resume=False,
-            checkpoint='checkpoint/exp1.ag',
+            output_directory='checkpoint/',
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=[],
@@ -100,8 +105,8 @@ class ImageClassification(BaseTask):
             training time limits in seconds.
         resources_per_trial : dict
             Machine resources to allocate per trial.
-        savedir : str
-            Local dir to save training results to.
+        output_directory : str
+            Dir to save search results.
         search_strategy : str
             Search Algorithms ('random', 'bayesopt' and 'hyperband')
         resume : bool
@@ -109,14 +114,15 @@ class ImageClassification(BaseTask):
 
         Examples
         --------
-        >>> dataset = task.Dataset(train_path='~/data/train',
+        >>> dataset = task.Dataset(train_path='data/train',
         >>>                        test_path='data/test')
-        >>> results = task.fit(dataset,
-        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                    time_limits=time_limits,
-        >>>                    ngpus_per_trial=1,
-        >>>                    num_trials = 4)
+        >>> classifier = task.fit(dataset,
+        >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                       time_limits=time_limits,
+        >>>                       ngpus_per_trial=1,
+        >>>                       num_trials = 4)
         """
+        checkpoint = os.path.join(output_directory, 'exp1.ag')
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics
