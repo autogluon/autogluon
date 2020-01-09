@@ -141,7 +141,7 @@ class TabularPrediction(BaseTask):
         num_bagging_folds : (int)
             Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
             Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting.
-            If overfitting is a concern, consider increasing num_bagged_sets.
+            Values > 10 produce diminishing returns, and may even harm overall results due to overfitting. To gain further benefits, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
         num_bagging_sets : (int)
             Number of repeats of kfold bagging to perform. Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
