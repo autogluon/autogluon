@@ -132,7 +132,8 @@ class RandomResizedCrop(object):
 class RandomCrop(object):
     """Crop the given PIL Image at a random location.
 
-    Args:
+    Parameters
+    ----------
         size (sequence or int): Desired output size of the crop. If size is an
             int instead of sequence like (h, w), a square crop (size, size) is
             made.
@@ -178,11 +179,13 @@ class RandomCrop(object):
     def get_params(img, output_size):
         """Get parameters for ``crop`` for a random crop.
 
-        Args:
+        Parameters
+        ----------
             img (PIL Image): Image to be cropped.
             output_size (tuple): Expected output size of the crop.
 
-        Returns:
+        Returns
+        -------
             tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
         """
         w, h = _get_image_size(img)
