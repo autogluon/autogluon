@@ -121,6 +121,8 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
     # Run benchmark:
     performance_vals = [0.0] * len(datasets) # performance obtained in this run
     directory_prefix = './datasets/'
+    if not os.path.exists(directory_prefix):
+        os.mkdir(directory_prefix)
     with warnings.catch_warnings(record=True) as caught_warnings:
         for idx in range(len(datasets)):
             if seed_val is not None:
