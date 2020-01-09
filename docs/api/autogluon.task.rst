@@ -165,7 +165,7 @@ Additional Image Classification APIs
     .. rubric:: Methods
 
     .. autoautosummary:: ImageFolderDataset
-        :methods:
+        :methods: init
 
     .. rubric:: Attributes
 
@@ -182,7 +182,7 @@ Additional Image Classification APIs
     .. rubric:: Methods
 
     .. autoautosummary:: RecordDataset
-        :methods:
+        :methods: init
 
     .. rubric:: Attributes
 

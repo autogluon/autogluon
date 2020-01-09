@@ -27,6 +27,8 @@ class ObjectDetection(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
+        """ Dataset of images in which to detect objects.
+        """
         return get_dataset(*args, **kwargs)
 
     @staticmethod
@@ -81,11 +83,11 @@ class ObjectDetection(BaseTask):
 
         Parameters
         ----------
-        dataset : str, :class:`autogluon.task.ObjectDectection.Dataset`
+        dataset : str or :class:`autogluon.task.ObjectDectection.Dataset`
             Training dataset containing images and corresponding object bounding boxes.
-        net : str, :class:`autogluon.AutoGluonObject`
+        net : str, :class:`autogluon.space.AutoGluonObject`
             Which existing neural network models to consider as candidates.
-        lr : float, :class:`autogluon.space`
+        lr : float or :class:`autogluon.space`
             The learning rate to use in each update of the neural network weights during training.
         loss : mxnet.gluon.loss
             Loss function used during training of the neural network weights.
@@ -146,9 +148,9 @@ class ObjectDetection(BaseTask):
             Learning rate to use during warm up period at the start of training.
         warmup_epochs : int
             How many initial epochs constitute the "warm up" period of model training.
-        momentum : float,  :class:`autogluon.space`
+        momentum : float or  :class:`autogluon.space`
             Momentum to use in optimization of neural network weights during training.
-        wd : float, :class:`autogluon.space`
+        wd : float or :class:`autogluon.space`
             Weight decay to use in optimization of neural network weights during training.
         log_interval : int
             Log results every so many epochs during training.

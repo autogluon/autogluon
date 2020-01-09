@@ -90,8 +90,8 @@ class NestedSpace(Space):
         return self.sample(**config)
 
 class AutoGluonObject(NestedSpace):
-    r"""Searchable objects,
-    created by decorating customized class or function using
+    r"""Searchable objects, 
+    created by decorating a custom Python class or function using the 
     :func:`autogluon.obj` or :func:`autogluon.func` decorators.
     """
     def __call__(self, *args, **kwargs):

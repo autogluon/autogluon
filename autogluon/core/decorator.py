@@ -152,7 +152,7 @@ def func(**kwvars):
     Returns
     -------
     Instance of :class:`autogluon.space.AutoGluonObject`:
-        a lazy init object, which allows for distributed training.
+        A lazily initialized object, which allows for distributed training.
 
     Examples
     --------
@@ -199,7 +199,7 @@ def obj(**kwvars):
     Returns
     -------
     Instance of :class:`autogluon.space.AutoGluonObject`:
-        a lazy init object, which allows distributed training.
+        A lazily initialized object object, which allows distributed training.
 
     Examples
     --------

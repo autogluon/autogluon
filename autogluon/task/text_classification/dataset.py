@@ -14,7 +14,7 @@ __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask',
 
 @func()
 def get_dataset(path=None, name=None, train=True, *args, **kwargs):
-    """ Load a text classification dataset to train AutoGluon models on.
+    """Load a text classification dataset to train AutoGluon models on.
         
         Parameters
         ----------

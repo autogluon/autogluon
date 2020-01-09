@@ -26,6 +26,8 @@ class TextClassification(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
+        """Dataset of text examples to make predictions for.
+        """
         return get_dataset(*args, **kwargs)
 
     @staticmethod
@@ -62,18 +64,17 @@ class TextClassification(BaseTask):
             verbose=False,
             **kwargs):
 
-        """
-        Fit neural networks on text dataset.
+        """Fit neural networks on text dataset.
 
         Parameters
         ----------
-        dataset : str, :class:`autogluon.task.TextClassification.Dataset`
+        dataset : str or :class:`autogluon.task.TextClassification.Dataset`
             The Training dataset. You can specify a string to use a popular built-in text dataset.
-        net : str, :class:`autogluon.space.Categorical`
+        net : str or :class:`autogluon.space.Categorical`
             Which existing neural network models to consider as candidates.
         pretrained_dataset : str, :class:`autogluon.space.Categorical`
             Which existing datasets to consider as candidates for transfer learning from.
-        lr : float, :class:`autogluon.space`
+        lr : float or :class:`autogluon.space`
             The learning rate to use in each update of the neural network weights during training.
         warmup_ratio : float
             Ratio of overall training period considered as "warm up".

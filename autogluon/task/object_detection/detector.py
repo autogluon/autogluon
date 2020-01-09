@@ -31,7 +31,7 @@ from gluoncv.utils import LRScheduler, LRSequential
 from gluoncv.data.transforms import presets
 import gluoncv as gcv
 
-
+__all__ = ['Detector']
 
 class Detector(BasePredictor):
     """
