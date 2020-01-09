@@ -12,18 +12,24 @@ logger = logging.getLogger(__name__)
 
 
 class BaggedEnsembleModel(AbstractModel):
-    def __init__(self, path, name, model_base: AbstractModel, debug=0):
+    def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
-        self.oof_pred_proba = None  # TODO: Remove this? Move it internally into trainer
-        self.n_repeats = 1  # TODO: Add as param or move to fit
+        self._oof_pred_proba = None
+        self._n_repeats = 0
         self.low_memory = True
         try:
             feature_types_metadata = self.model_base.feature_types_metadata
         except:
             feature_types_metadata = None
-        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, debug=debug)
+        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
+
+    # TODO: This assumes bagged ensemble has a complete k_fold and no partial k_fold models, this is likely fine but will act incorrectly if called when only a partial k_fold has been completed
+    #  Solving this is memory intensive, requires all oof_pred_probas from all n_repeats, so its probably not worth it.
+    @property
+    def oof_pred_proba(self):
+        return self._oof_pred_proba / self._n_repeats
 
     def preprocess(self, X, model=None):
         if model is None:
@@ -35,26 +41,38 @@ class BaggedEnsembleModel(AbstractModel):
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
-    def fit(self, X, y, k_fold=5, random_state=0, compute_base_preds=False, time_limit=None, **kwargs):
+    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, random_state=0, compute_base_preds=False, time_limit=None, **kwargs):
+        if n_repeat_start != self._n_repeats:
+            raise ValueError('n_repeat_start must equal self._n_repeats, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats) + ')')
+        if n_repeats <= n_repeat_start:
+            raise ValueError('n_repeats must be greater than n_repeat_start, values: (' + str(n_repeats) + ', ' + str(n_repeat_start) + ')')
+        fold_start = n_repeat_start * k_fold
+        fold_end = n_repeats * k_fold
         start_time = time.time()
-        self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         if self.problem_type == REGRESSION:
             stratified = False
         else:
             stratified = True
 
         # TODO: Preprocess data here instead of repeatedly
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state, n_repeats=self.n_repeats)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
         else:
             oof_pred_proba = np.zeros(shape=len(X))
 
+        if self.model_base is None:
+            model_base = self.load_model_base()
+        else:
+            model_base = self.model_base
+        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+
         models = []
         num_folds = len(kfolds)
         time_limit_fold = None
-        for i, fold in enumerate(kfolds):
+        for i in range(fold_start, fold_end):
+            fold = kfolds[i]
             if time_limit:
                 time_elapsed = time.time() - start_time
                 time_left = time_limit - time_elapsed
@@ -71,7 +89,7 @@ class BaggedEnsembleModel(AbstractModel):
             train_index, test_index = fold
             X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
             y_train, y_test = y.iloc[train_index], y.iloc[test_index]
-            fold_model = copy.deepcopy(self.model_base)
+            fold_model = copy.deepcopy(model_base)
             fold_model.name = fold_model.name + '_fold_' + str(i)
             fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
             fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
@@ -82,13 +100,22 @@ class BaggedEnsembleModel(AbstractModel):
             else:
                 models.append(fold_model)
             oof_pred_proba[test_index] += pred_proba
-        oof_pred_proba = oof_pred_proba / self.n_repeats
 
-        self.models = models
-        self.model_base = None
-        self.oof_pred_proba = oof_pred_proba
-        return self.models, oof_pred_proba
+        self.models += models
 
+        if self.model_base is not None:
+            self.save_model_base(self.model_base)
+            self.model_base = None
+
+        if self._oof_pred_proba is None:
+            self._oof_pred_proba = oof_pred_proba
+        else:
+            self._oof_pred_proba += oof_pred_proba
+
+        self._n_repeats = n_repeats
+
+    # FIXME: Defective if model does not apply same preprocessing in all bags!
+    #  No model currently violates this rule, but in future it could happen
     def predict_proba(self, X, preprocess=True):
         model = self.load_child(self.models[0])
         if preprocess:
@@ -129,6 +156,12 @@ class BaggedEnsembleModel(AbstractModel):
                     child_model = obj._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                     obj.models[i] = child_model
         return obj
+
+    def load_model_base(self):
+        return load_pkl.load(path=self.path + 'utils/model_template.pkl')
+
+    def save_model_base(self, model_base):
+        save_pkl.save(path=self.path + 'utils/model_template.pkl', object=model_base)
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, save_children=False):
         if directory is None:
