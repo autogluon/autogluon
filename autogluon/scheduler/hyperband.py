@@ -19,8 +19,8 @@ class HyperbandScheduler(FIFOScheduler):
     r"""Implements different variants of asynchronous Hyperband
 
     See 'type' for the different variants. One implementation detail is when
-    using multiple brackets, task allocation to bracket is done randomly with
-    over a softmax probability.
+    using multiple brackets, task allocation to bracket is done randomly 
+    based on a softmax probability.
 
     Parameters
     ----------

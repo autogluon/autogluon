@@ -6,7 +6,7 @@ autogluon.scheduler
 
 .. admonition:: Example
 
-   Define a dummy training function with searchable spaces:
+   Define a toy training function with searchable spaces:
 
    >>> import numpy as np
    >>> import autogluon as ag
@@ -19,7 +19,7 @@ autogluon.scheduler
    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-   Create a schedule and run the experiment:
+   Create a scheduler and use it to run training jobs:
 
    >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
    ...                                             resource={'num_cpus': 2, 'num_gpus': 0},
@@ -30,7 +30,7 @@ autogluon.scheduler
    >>> scheduler.run()
    >>> scheduler.join_jobs()
 
-   Visiualize the results and exit:
+   Visiualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 
