@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path, name, model_base: AbstractModel, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
+    def __init__(self, path, name, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
         super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, debug=debug)
+        if base_model_names is None:
+            base_model_names = []
+        if base_model_paths_dict is None:
+            base_model_paths_dict = {}
+        if base_model_types_dict is None:
+            base_model_types_dict = {}
         self.base_model_names = base_model_names
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict

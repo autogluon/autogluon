@@ -247,7 +247,7 @@ class AbstractTrainer:
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
-                model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
+                model = StackerEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
             model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
@@ -423,7 +423,7 @@ class AbstractTrainer:
             for i, hpo_model_name in enumerate(model_names_trained_hpo):
                 model_hpo = self.load_model(hpo_model_name)
                 model_hpo = model_hpo.convert_to_template()
-                model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
+                model_bagged = StackerEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
                 model_names_trained += self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
