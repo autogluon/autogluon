@@ -43,6 +43,8 @@ class BaggedEnsembleModel(AbstractModel):
     def oof_pred_proba(self):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
         oof_pred_model_repeats_without_0 = np.where(self._oof_pred_model_repeats == 0, 1, self._oof_pred_model_repeats)
+        if self._oof_pred_proba.ndim == 2:
+            oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
         return self._oof_pred_proba / oof_pred_model_repeats_without_0
 
     def preprocess(self, X, model=None):
