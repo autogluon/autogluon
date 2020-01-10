@@ -287,7 +287,7 @@ class TabularPredictor(BasePredictor):
     def load(cls, output_directory, verbosity=2):
         """ 
         Load a predictor object previously produced by `fit()` from file and returns this object. 
-        Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.load`.
+        Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.TabularPrediction.load`.
 
         Parameters
         ----------
