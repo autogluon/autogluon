@@ -73,7 +73,6 @@ class AbstractModel:
         self.debug = debug
         if type(model) == str:
             self.model = self.load_model(model)
-        self.child_models = []
 
         self.params = {}
         self._set_default_params()
@@ -95,6 +94,14 @@ class AbstractModel:
     def create_contexts(self, path_context):
         path = path_context
         return path
+
+    # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
+    # This means preprocess cannot be used for normalization
+    # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
+    def preprocess(self, X):
+        if self.features is not None:
+            return X[self.features]
+        return X
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
@@ -144,11 +151,6 @@ class AbstractModel:
     # TODO: Add simple generic CV logic
     def cv(self, X, y, k_fold=5):
         raise NotImplementedError
-
-    def preprocess(self, X):
-        if self.features is not None:
-            return X[self.features]
-        return X
 
     def save(self, file_prefix ="", directory = None, return_filename=False, verbose=True):
         if directory is None:
@@ -242,6 +244,10 @@ class AbstractModel:
             _ = def_search_space.pop(key, None)
         if self.params is not None:
             self.params.update(def_search_space)
+
+    # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
+    def convert_to_template(self):
+        return self
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
