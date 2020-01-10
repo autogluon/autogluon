@@ -21,7 +21,20 @@ class Classifier(BasePredictor):
     """
     Classifier returned by task.fit()
 
-    Example user workflow:
+    Attributes
+    ----------
+
+    Examples
+    --------
+    >>> dataset = task.Dataset(train_path='data/train',
+    >>>                        test_path='data/test')
+    >>> classifier = task.fit(dataset,
+    >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+    >>>                       time_limits=time_limits,
+    >>>                       ngpus_per_trial=1,
+    >>>                       num_trials = 4)
+    >>> image = 'data/test/BabyShirt/BabyShirt_323.jpg'
+    >>> ind, prob = classifier.predict(image)
     """
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, **kwargs):

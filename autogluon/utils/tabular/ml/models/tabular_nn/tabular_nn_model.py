@@ -90,8 +90,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.summary_writer = None
         self.ctx = mx.cpu()
 
-    # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
-    def create_unfit_copy(self):
+    # TODO: Fix model to not have tabNN in params
+    def convert_to_template(self):
         new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, features=self.features, hyperparameters=self.params)
         new_model.path = self.path
         new_model.params['tabNN'] = None

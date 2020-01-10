@@ -1,5 +1,6 @@
 import gc, os, multiprocessing, logging
 import numpy as np
+from collections import defaultdict
 from pandas import DataFrame, Series
 from datetime import datetime
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
@@ -187,7 +188,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
     if nthreads_per_trial is None:
         nthreads_per_trial = multiprocessing.cpu_count()  # Use all of processing power / trial by default. To use just half: # int(np.floor(multiprocessing.cpu_count()/2))
     if ngpus_per_trial is None:
-            ngpus_per_trial = 0 # do not use GPU by default
+        ngpus_per_trial = 0 # do not use GPU by default
     if ngpus_per_trial > 1:
         ngpus_per_trial = 1
         logger.debug("tabular_prediction currently doesn't use >1 GPU per training run. ngpus_per_trial set = 1")
@@ -209,3 +210,7 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters={'NN': None}):
         num_trials = 1
     time_limits *= 0.9  # reduce slightly to account for extra time overhead
     return time_limits, num_trials
+
+
+def dd_list():
+    return defaultdict(list)
