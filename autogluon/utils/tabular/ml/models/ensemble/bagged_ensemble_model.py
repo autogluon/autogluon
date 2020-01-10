@@ -11,13 +11,18 @@ from ....utils.exceptions import TimeLimitExceeded
 logger = logging.getLogger(__name__)
 
 
+# TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
     def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
         self._oof_pred_proba = None
-        self._n_repeats = 0
+        self._oof_pred_model_repeats = None
+        self._n_repeats = 0  # Number of n_repeats with at least 1 model fit, if kfold=5 and 8 models have been fit, _n_repeats is 2
+        self._n_repeats_finished = 0  # Number of n_repeats finished, if kfold=5 and 8 models have been fit, _n_repeats_finished is 1
+        self._k_fold_end = 0  # Number of models fit in current n_repeat (0 if completed), if kfold=5 and 8 models have been fit, _k_fold_end is 3
+        self._k = None  # k models per n_repeat, equivalent to kfold value
         self._random_state = random_state
         self.low_memory = True
         try:
@@ -26,6 +31,9 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = None
         super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
 
+    def is_valid(self):
+        return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
+
     def is_fit(self):
         return len(self.models) != 0
 
@@ -33,7 +41,9 @@ class BaggedEnsembleModel(AbstractModel):
     #  Solving this is memory intensive, requires all oof_pred_probas from all n_repeats, so its probably not worth it.
     @property
     def oof_pred_proba(self):
-        return self._oof_pred_proba / self._n_repeats
+        # TODO: Require is_valid == True (add option param to ignore is_valid)
+        oof_pred_model_repeats_without_0 = np.where(self._oof_pred_model_repeats == 0, 1, self._oof_pred_model_repeats)
+        return self._oof_pred_proba / oof_pred_model_repeats_without_0
 
     def preprocess(self, X, model=None):
         if model is None:
@@ -45,13 +55,27 @@ class BaggedEnsembleModel(AbstractModel):
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
-    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, compute_base_preds=False, time_limit=None, **kwargs):
-        if n_repeat_start != self._n_repeats:
-            raise ValueError('n_repeat_start must equal self._n_repeats, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats) + ')')
+    def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
+        if n_repeat_start != self._n_repeats_finished:
+            raise ValueError('n_repeat_start must equal self._n_repeats_finished, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats_finished) + ')')
         if n_repeats <= n_repeat_start:
             raise ValueError('n_repeats must be greater than n_repeat_start, values: (' + str(n_repeats) + ', ' + str(n_repeat_start) + ')')
-        fold_start = n_repeat_start * k_fold
-        fold_end = n_repeats * k_fold
+        if k_fold_end is None:
+            k_fold_end = k_fold
+        if k_fold_start != self._k_fold_end:
+            raise ValueError('k_fold_start must equal previous k_fold_end, values: (' + str(k_fold_start) + ', ' + str(self._k_fold_end) + ')')
+        if k_fold_start >= k_fold_end:
+            # TODO: Remove this limitation if n_repeats > 1
+            raise ValueError('k_fold_end must be greater than k_fold_start, values: (' + str(k_fold_end) + ', ' + str(k_fold_start) + ')')
+        if (n_repeats - n_repeat_start) > 1:
+            if k_fold_end != k_fold:
+                # TODO: Remove this limitation
+                raise ValueError('k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: (' + str(k_fold_end) + ', ' + str(k_fold) + ')')
+        if self._k is not None:
+            if self._k != k_fold:
+                raise ValueError('k_fold must equal previously fit k_fold value for the current n_repeat, values: (' + str(k_fold) + ', ' + str(self._k) + ')')
+        fold_start = n_repeat_start * k_fold + k_fold_start
+        fold_end = (n_repeats-1) * k_fold + k_fold_end
         start_time = time.time()
         if self.problem_type == REGRESSION:
             stratified = False
@@ -65,6 +89,7 @@ class BaggedEnsembleModel(AbstractModel):
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
         else:
             oof_pred_proba = np.zeros(shape=len(X))
+        oof_pred_model_repeats = np.zeros(shape=len(X))
 
         if self.model_base is None:
             model_base = self.load_model_base()
@@ -104,6 +129,7 @@ class BaggedEnsembleModel(AbstractModel):
             else:
                 models.append(fold_model)
             oof_pred_proba[test_index] += pred_proba
+            oof_pred_model_repeats[test_index] += 1
 
         self.models += models
 
@@ -113,10 +139,20 @@ class BaggedEnsembleModel(AbstractModel):
 
         if self._oof_pred_proba is None:
             self._oof_pred_proba = oof_pred_proba
+            self._oof_pred_model_repeats = oof_pred_model_repeats
         else:
             self._oof_pred_proba += oof_pred_proba
+            self._oof_pred_model_repeats += oof_pred_model_repeats
 
         self._n_repeats = n_repeats
+        if k_fold == k_fold_end:
+            self._k = None
+            self._k_fold_end = 0
+            self._n_repeats_finished = self._n_repeats
+        else:
+            self._k = k_fold
+            self._k_fold_end = k_fold_end
+            self._n_repeats_finished = self._n_repeats - 1
 
     # FIXME: Defective if model does not apply same preprocessing in all bags!
     #  No model currently violates this rule, but in future it could happen
@@ -131,6 +167,13 @@ class BaggedEnsembleModel(AbstractModel):
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
+
+    def score_with_oof(self, y):
+        valid_indices = self._oof_pred_model_repeats > 0
+        y = y[valid_indices]
+        y_pred_proba = self.oof_pred_proba[valid_indices]
+
+        return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
 
     def load_child(self, model, verbose=False):
         if type(model) == str:

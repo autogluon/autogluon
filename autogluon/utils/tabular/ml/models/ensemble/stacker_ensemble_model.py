@@ -96,7 +96,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba = pd.DataFrame(data=np.asarray(pred_proba).T, columns=self.stack_columns)
         return pred_proba
 
-    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
+    def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
@@ -111,7 +111,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 else:
                     self.feature_types_metadata['float'] = self.stack_columns
         if k_fold >= 2:
-            super().fit(X=X, y=y, k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit)
+            super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit)
             self.bagged_mode = True
         else:
             self.models = [copy.deepcopy(self.model_base)]
@@ -121,7 +121,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.models[0].feature_types_metadata = self.feature_types_metadata  # TODO: Move this
             self.models[0].fit(X_train=X, Y_train=y)
             self._oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+            self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1
+            self._n_repeats_finished = 1
 
     def set_stack_columns(self, base_model_names):
         if self.problem_type == MULTICLASS:

@@ -271,7 +271,7 @@ class AbstractTrainer:
             model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
             fit_end_time = time.time()
             if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
-                score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
+                score = model.score_with_oof(y=y_train)
             else:
                 score = model.score(X=X_test, y=y_test)
             pred_end_time = time.time()
