@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 
+from ...utils import generate_kfold
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
-from ...constants import MULTICLASS
+from ...constants import MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 
@@ -133,3 +134,67 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stack_columns = base_model_names
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
+
+    # TODO: Currently double disk usage, saving model in HPO and also saving model in stacker
+    def hyperparameter_tune(self, X, y, k_fold, scheduler_options=None, compute_base_preds=True, **kwargs):
+        if len(self.models) != 0:
+            raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
+        if self.problem_type == REGRESSION:
+            stratified = False
+        else:
+            stratified = True
+        # TODO: Preprocess data here instead of repeatedly
+        X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=1)
+
+        train_index, test_index = kfolds[0]
+        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        orig_time = scheduler_options[1]['time_out']
+        scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
+        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X_train=X_train, X_test=X_test, Y_train=y_train, Y_test=y_test, scheduler_options=scheduler_options, **kwargs)
+        scheduler_options[1]['time_out'] = orig_time
+
+        stackers = {}
+        stackers_performance = {}
+        for i, model_name in enumerate(hpo_models.keys()):
+
+            model_path = hpo_models[model_name]
+            model_performance = hpo_model_performances[model_name]
+            child = self._child_type.load(path=model_path)
+            pred_proba = child.predict_proba(X_test)
+
+            # TODO: Create new StackerEnsemble Here
+            stacker = copy.deepcopy(self)
+
+            if self.problem_type == MULTICLASS:
+                oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
+            else:
+                oof_pred_proba = np.zeros(shape=len(X))
+            oof_pred_model_repeats = np.zeros(shape=len(X))
+            oof_pred_proba[test_index] += pred_proba
+            oof_pred_model_repeats[test_index] += 1
+
+            stacker.set_contexts(self.path + str(i) + '/')
+            stacker.name = stacker.name + '/' + str(i)
+            stacker._k = k_fold
+            stacker._k_fold_end = 1
+            stacker._n_repeats = 1
+            stacker._oof_pred_proba = oof_pred_proba
+            stacker._oof_pred_model_repeats = oof_pred_model_repeats
+            child.name = child.name + '_fold_0'
+            child.path = child.create_contexts(stacker.path + child.name + '/')
+            if stacker.low_memory:
+                stacker.save_child(child, verbose=False)
+                stacker.models.append(child.name)
+            else:
+                stacker.models.append(child)
+
+            stacker.model_base = None
+            stacker.save_model_base(child.convert_to_template())
+            stacker.save()
+            stackers[stacker.name] = stacker.path
+            stackers_performance[stacker.name] = model_performance
+
+        # TODO: hpo_results likely not correct because no renames
+        return stackers, stackers_performance, hpo_results
