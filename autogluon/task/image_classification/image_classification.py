@@ -1,3 +1,4 @@
+import os
 import copy
 import logging
 
@@ -47,6 +48,10 @@ class ImageClassification(BaseTask):
             The input image size.
         crop_ratio : float
             Center crop ratio (for evaluation only)
+
+        Returns
+        -------
+        :class:`autogluon.task.image_classification.Classifier` object that can be used to make predictions.
         """
         return get_dataset(*args, **kwargs)
 
@@ -71,7 +76,7 @@ class ImageClassification(BaseTask):
             search_options={},
             time_limits=None,
             resume=False,
-            checkpoint='checkpoint/exp1.ag',
+            output_directory='checkpoint/',
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=[],
@@ -111,8 +116,10 @@ class ImageClassification(BaseTask):
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : int
             How many GPUs to use in each trial (ie. single training run of a model). 
-        checkpoint: str
-            The path to local directory where trained models will be saved.
+        resources_per_trial : dict
+            Machine resources to allocate per trial.
+        output_directory : str
+            Dir to save search results.
         search_strategy : str
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -139,14 +146,17 @@ class ImageClassification(BaseTask):
         
         Examples
         --------
-        >>> from autogluon import ImageClassification as task
-        >>> train_data = task.Dataset(train_path='~/data/train')
-        >>> classifier = task.fit(train_data,
+        >>> dataset = task.Dataset(train_path='data/train',
+        >>>                        test_path='data/test')
+        >>> classifier = task.fit(dataset,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                       time_limits=600, ngpus_per_trial=1, num_trials=4)
+        >>>                       time_limits=time_limits,
+        >>>                       ngpus_per_trial=1,
+        >>>                       num_trials = 4)
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
         """
+        checkpoint = os.path.join(output_directory, 'exp1.ag')
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics

@@ -45,6 +45,7 @@ except(IOError, ImportError):
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
+    'Pillow<=6.2.1',
     'numpy>=1.16.0',
     'scipy>=1.3.3',
     'cython',

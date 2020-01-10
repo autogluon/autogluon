@@ -128,8 +128,8 @@ Additional Tabular Prediction APIs
    :no-inherited-members:
 
 
-Additional Image Classification APIs
-------------------------------------
+Image Classification Objects
+----------------------------
 
 .. automodule:: autogluon.task.image_classification
 
