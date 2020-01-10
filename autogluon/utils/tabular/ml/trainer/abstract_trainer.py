@@ -288,8 +288,6 @@ class AbstractTrainer:
             logger.debug(err)
             del model
         else:
-            if model.name not in stack_loc[level]:
-                stack_loc[level].append(model.name)
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
@@ -311,14 +309,17 @@ class AbstractTrainer:
                 self.model_fit_times[model.name] = model_fit_time
                 self.model_pred_times[model.name] = model_pred_time
             self.save_model(model=model)
-            if self.model_best_core is None:
-                self.model_best_core = model.name
-            else:
-                best_score = self.model_performance[self.model_best_core]
-                cur_score = self.model_performance[model.name]
-                if cur_score > best_score:
-                    # new best core model
+            if model.is_valid():
+                if model.name not in stack_loc[level]:
+                    stack_loc[level].append(model.name)
+                if self.model_best_core is None:
                     self.model_best_core = model.name
+                else:
+                    best_score = self.model_performance[self.model_best_core]
+                    cur_score = self.model_performance[model.name]
+                    if cur_score > best_score:
+                        # new best core model
+                        self.model_best_core = model.name
 
             model_names_trained.append(model.name)
             if self.low_memory:

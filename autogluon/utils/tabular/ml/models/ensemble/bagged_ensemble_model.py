@@ -26,6 +26,9 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = None
         super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
 
+    def is_fit(self):
+        return len(self.models) != 0
+
     # TODO: This assumes bagged ensemble has a complete k_fold and no partial k_fold models, this is likely fine but will act incorrectly if called when only a partial k_fold has been completed
     #  Solving this is memory intensive, requires all oof_pred_probas from all n_repeats, so its probably not worth it.
     @property

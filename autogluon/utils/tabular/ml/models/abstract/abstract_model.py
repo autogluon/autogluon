@@ -81,6 +81,14 @@ class AbstractModel:
             self.params.update(hyperparameters.copy())
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
 
+    # Checks if model is ready to make predictions for final result
+    def is_valid(self):
+        return self.is_fit()
+
+    # Checks if a model has been fit
+    def is_fit(self):
+        return self.model is not None
+
     def _set_default_params(self):
         pass
 

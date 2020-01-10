@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 
 # TODO: Normalize data!
 class KNNModel(SKLearnModel):
+    _is_fit = False
+
+    def is_fit(self):
+        return self._is_fit
+
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns
         X = X.drop(cat_columns, axis=1).fillna(0)  # TODO: Test if crash when all columns are categorical
@@ -35,6 +40,7 @@ class KNNModel(SKLearnModel):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
         self.model = self.model.fit(X_train, Y_train)
+        self._is_fit = True  # TODO: remove after fixing model input to not be present
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
