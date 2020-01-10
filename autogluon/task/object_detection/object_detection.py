@@ -38,8 +38,8 @@ class ObjectDetection(BaseTask):
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             split_ratio=0.2,
             batch_size=16,
-            epochs=200,
-            num_trials=1,
+            epochs=50,
+            num_trials=2,
             nthreads_per_trial=12,
             num_workers=32,
             ngpus_per_trial=1,
@@ -76,6 +76,7 @@ class ObjectDetection(BaseTask):
             no_mixup_epochs=20,
             label_smooth=False,
             syncbn=False,
+            reuse_pred_weights=True,
             ):
 
         """
@@ -228,7 +229,8 @@ class ObjectDetection(BaseTask):
             no_mixup_epochs=no_mixup_epochs,
             label_smooth=label_smooth,
             resume=resume,
-            syncbn=syncbn)
+            syncbn=syncbn,
+            reuse_pred_weights=reuse_pred_weights)
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},

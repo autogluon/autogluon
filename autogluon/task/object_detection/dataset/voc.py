@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import warnings
 import numpy as np
+import glob
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
@@ -17,10 +18,6 @@ import autogluon as ag
 
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
-
-import glob
-from xml.etree import ElementTree as ET
-
 
 class CustomVOCDetectionBase(gdata.VOCDetection):
     """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
@@ -64,7 +61,10 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
                                                splits=splits,
                                                transform=transform,
                                                index_map=index_map,
-                                               preload_label=preload_label),
+                                               preload_label=False),
+        self._items_new = [self._items[each_id] for each_id in range(len(self._items)) if self._check_valid(each_id) ]
+        self._items = self._items_new
+        self._label_cache = self._preload_labels() if preload_label else None
     
     @classmethod
     def _set_class(cls, classes):
@@ -80,6 +80,39 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
                 ids += [(root, line.strip()) for line in f.readlines()]
         return ids
 
+    def _check_valid(self, idx):
+        """Parse xml file and return labels."""
+        img_id = self._items[idx]
+        anno_path = self._anno_path.format(*img_id)
+        root = ET.parse(anno_path).getroot()
+        size = root.find('size')
+        width = float(size.find('width').text)
+        height = float(size.find('height').text)
+        if idx not in self._im_shapes:
+            # store the shapes for later usage
+            self._im_shapes[idx] = (width, height)
+        label = []
+        for obj in root.iter('object'):
+            try:
+                difficult = int(obj.find('difficult').text)
+            except ValueError:
+                difficult = 0
+            cls_name = obj.find('name').text.strip().lower()
+            if cls_name not in self.classes:
+                continue
+            cls_id = self.index_map[cls_name]
+            xml_box = obj.find('bndbox')
+            xmin = (float(xml_box.find('xmin').text) - 1)
+            ymin = (float(xml_box.find('ymin').text) - 1)
+            xmax = (float(xml_box.find('xmax').text) - 1)
+            ymax = (float(xml_box.find('ymax').text) - 1)
+
+            if not ((0 <= xmin < width) and (0 <= ymin < height) \
+                    and (xmin < xmax <= width) and (ymin < ymax <= height)):
+                return False
+
+        return True
+
 
 @obj()
 class CustomVOCDetection():
@@ -87,8 +120,9 @@ class CustomVOCDetection():
         super().__init__()
         self.root = root
         
-        if not classes:
-            classes = self.generate_gt() if not name else None
+        # search classes from gt files for custom dataset
+        if not (classes or name):
+            classes = self.generate_gt() 
         
         self.dataset = CustomVOCDetectionBase(classes=classes,
                                               root=root,
@@ -104,7 +138,6 @@ class CustomVOCDetection():
 
     def generate_gt(self):
         classes = []
-
         all_xml = glob.glob( os.path.join(self.root, 'Annotations', '*.xml') )
         for each_xml_file in all_xml:
             tree = ET.parse(each_xml_file)
@@ -118,7 +151,6 @@ class CustomVOCDetection():
                                 classes.append(object_name)
 
         classes = sorted(classes)
-
         return classes
 
 
