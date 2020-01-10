@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path, name, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, debug=0):
-        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, debug=debug)
+    def __init__(self, path, name, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, random_state=0, debug=0):
+        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, random_state=random_state, debug=debug)
         if base_model_names is None:
             base_model_names = []
         if base_model_paths_dict is None:
@@ -95,7 +95,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             pred_proba = pd.DataFrame(data=np.asarray(pred_proba).T, columns=self.stack_columns)
         return pred_proba
 
-    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, random_state=1, compute_base_preds=True, time_limit=None, **kwargs):
+    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         start_time = time.time()
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         if time_limit is not None:
@@ -110,7 +110,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 else:
                     self.feature_types_metadata['float'] = self.stack_columns
         if k_fold >= 2:
-            super().fit(X=X, y=y, k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=random_state, time_limit=time_limit)
+            super().fit(X=X, y=y, k_fold=k_fold, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit)
             self.bagged_mode = True
         else:
             self.models = [copy.deepcopy(self.model_base)]

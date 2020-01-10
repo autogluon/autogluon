@@ -247,8 +247,8 @@ class AbstractTrainer:
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
-                model = StackerEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
+                model = StackerEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model, random_state=level)
+            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
         return model
@@ -423,7 +423,7 @@ class AbstractTrainer:
             for i, hpo_model_name in enumerate(model_names_trained_hpo):
                 model_hpo = self.load_model(hpo_model_name)
                 model_hpo = model_hpo.convert_to_template()
-                model_bagged = StackerEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
+                model_bagged = StackerEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo, random_state=level)
                 model_names_trained += self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
@@ -505,7 +505,7 @@ class AbstractTrainer:
             models = [
                 StackerEnsembleModel(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
                                      base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                                     num_classes=self.num_classes)
+                                     num_classes=self.num_classes, random_state=level)
                 for model in models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         if X_test is not None:
@@ -524,7 +524,7 @@ class AbstractTrainer:
             return
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(k_fold) + '_l' + str(level), base_model_names=self.models_level['core'][level-1],
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        num_classes=self.num_classes)
+                                                        num_classes=self.num_classes, random_state=level)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
         if weighted_ensemble_model.name in self.get_model_names_all():
@@ -545,7 +545,7 @@ class AbstractTrainer:
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
-                                                num_classes=self.num_classes)
+                                                num_classes=self.num_classes, random_state=level)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level)
 
@@ -681,7 +681,7 @@ class AbstractTrainer:
             path='', name='',
             model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func),
             base_model_names=model_names, base_model_paths_dict=self.model_paths,
-            base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes
+            base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level
         )
         return dummy_stacker
 

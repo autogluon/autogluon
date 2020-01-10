@@ -12,12 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 class BaggedEnsembleModel(AbstractModel):
-    def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, debug=0):
+    def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
         self._oof_pred_proba = None
         self._n_repeats = 0
+        self._random_state = random_state
         self.low_memory = True
         try:
             feature_types_metadata = self.model_base.feature_types_metadata
@@ -41,7 +42,7 @@ class BaggedEnsembleModel(AbstractModel):
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
-    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, random_state=0, compute_base_preds=False, time_limit=None, **kwargs):
+    def fit(self, X, y, k_fold=5, n_repeats=1, n_repeat_start=0, compute_base_preds=False, time_limit=None, **kwargs):
         if n_repeat_start != self._n_repeats:
             raise ValueError('n_repeat_start must equal self._n_repeats, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats) + ')')
         if n_repeats <= n_repeat_start:
@@ -55,7 +56,7 @@ class BaggedEnsembleModel(AbstractModel):
             stratified = True
 
         # TODO: Preprocess data here instead of repeatedly
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=random_state, n_repeats=n_repeats)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
