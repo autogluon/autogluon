@@ -26,7 +26,8 @@ class TextClassification(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
-        """Dataset of text examples to make predictions for.
+        """Dataset of text examples to make predictions for. 
+           See :meth:`autogluon.task.TextClassification.get_dataset`
         """
         return get_dataset(*args, **kwargs)
 

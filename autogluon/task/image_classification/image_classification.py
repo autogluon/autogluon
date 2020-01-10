@@ -30,7 +30,7 @@ class ImageClassification(BaseTask):
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. 
-           May either be a :class:`ImageFolderDataset`, :class:`RecordDataset`, 
+           May either be a :class:`autogluon.task.image_classification.ImageFolderDataset`, :class:`autogluon.task.image_classification.RecordDataset`, 
            or a popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
@@ -47,11 +47,12 @@ class ImageClassification(BaseTask):
         input_size : int
             The input image size.
         crop_ratio : float
-            Center crop ratio (for evaluation only)
-
+            Center crop ratio (for evaluation only).
+        
         Returns
         -------
-        :class:`autogluon.task.image_classification.Classifier` object that can be used to make predictions.
+        Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+        To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
         """
         return get_dataset(*args, **kwargs)
 
@@ -87,7 +88,8 @@ class ImageClassification(BaseTask):
         Parameters
         ----------
         dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
-            Training dataset containing images and their associated class labels.
+            Training dataset containing images and their associated class labels. 
+            Popular image datasets built into AutoGluon can be used by specifying their name as a string (options: ‘mnist’, ‘cifar’, ‘cifar10’, ‘cifar100’, ‘imagenet’).
         input_size : int
             Size of images in the dataset (pixels).
         net : str or :class:`autogluon.space.Categorical`
@@ -146,6 +148,7 @@ class ImageClassification(BaseTask):
         
         Examples
         --------
+        >>> from autogluon import ImageClassification as task
         >>> dataset = task.Dataset(train_path='data/train',
         >>>                        test_path='data/test')
         >>> classifier = task.fit(dataset,

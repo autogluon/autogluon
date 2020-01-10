@@ -25,6 +25,7 @@ class Classifier(BasePredictor):
 
     Examples
     --------
+    >>> from autogluon import ImageClassification as task
     >>> dataset = task.Dataset(train_path='data/train',
     >>>                        test_path='data/test')
     >>> classifier = task.fit(dataset,

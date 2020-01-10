@@ -50,8 +50,10 @@ class Detector(BasePredictor):
          
          Parameters
          ----------
-        dataset: Test dataset.
-        ctx : MXNet context where to place data (CPU or GPU).
+        dataset: :meth:`Dataset`
+            Test dataset (must be in the same format as training data previously provided to fit).
+        ctx : `mxnet.context`
+            Which MXNet context to use for evaluation (CPU or GPU).
         """
         args = self.args
         net = self.model
@@ -135,9 +137,9 @@ class Detector(BasePredictor):
         
         Parameters
         ----------
-        X : Test data 
+        X : Test data with image(s) to make predictions for.
         input_size : int
-            Size of images in test data (pixels)
+            Size of images in test data (pixels).
         thresh : float
             Confidence Threshold above which detector outputs bounding box for object.
         plot : bool

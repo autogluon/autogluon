@@ -38,19 +38,25 @@ def get_dataset(path=None, train=True, name=None,
 
     Parameters
     ----------
-        name : str, optional
-            Which built-in dataset to use, will override all other options if specified.
-            The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-        train : bool, default = True
-            Whether this dataset should be used for training or validation.
-        path : str
-            The training data location. If using :class:`ImageFolderDataset`,
-            image folder`path/to/the/folder` should be provided.
-            If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
-        input_size : int
-            The input image size.
-        crop_ratio : float
-            Center crop ratio (for evaluation only)
+    name : str, optional
+        Which built-in dataset to use, will override all other options if specified.
+        The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+    train : bool, default = True
+        Whether this dataset should be used for training or validation.
+    path : str
+        The training data location. If using :class:`ImageFolderDataset`,
+        image folder`path/to/the/folder` should be provided.
+        If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
+    input_size : int
+        The input image size.
+    crop_ratio : float
+        Center crop ratio (for evaluation only)
+        
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
+        
     """
     resize = int(math.ceil(input_size / crop_ratio))
     if isinstance(name, str) and name.lower() in built_in_datasets:
@@ -144,16 +150,16 @@ class ImageFolderDataset(object):
         root/cat/y.png
         root/cat/z.png
     
-    Here, folder-names `dog` and `cat` are the class labels and the images with file-names `a`,`b`,`c` belong to the `dog` class while the others are `cat` images.
+    Here, folder-names `dog` and `cat` are the class labels and the images with file-names 'a', `b`, `c` belong to the `dog` class while the others are `cat` images.
     
     Parameters
     ----------
     root : string
         Root directory path to the folder containing all of the data.
-    transform : callable, optional
+    transform : callable (optional)
         A function/transform that  takes in an PIL image
         and returns a transformed version. E.g, ``transforms.RandomCrop``
-    is_valid_file : callable, optional
+    is_valid_file : callable (optional)
         A function that takes path of an Image file
         and check if the file is a valid file (used to check of corrupt files)
 

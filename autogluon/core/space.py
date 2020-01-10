@@ -406,7 +406,8 @@ class Real(SimpleSpace):
     default : float (optional)
         default value
     log : (True/False)
-        search space in log scale
+        Whether to search the values on a logarithmic rather than linear scale. 
+        This is useful for numeric hyperparameters (such as learning rates) whose search space spans many orders of magnitude.
 
     Examples
     --------
