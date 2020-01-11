@@ -35,7 +35,7 @@ class EnsembleSelection:
         else:
             self.objective_func_expects_y_pred = True
 
-    def fit(self, predictions, labels, identifiers):
+    def fit(self, predictions, labels, identifiers=None):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError('Ensemble size cannot be less than one!')
@@ -48,6 +48,7 @@ class EnsembleSelection:
         self._calculate_weights()
         logger.log(15, 'Ensemble weights: ')
         logger.log(15, self.weights_)
+        return self
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
     def _fit(self, predictions, labels):
@@ -141,3 +142,16 @@ class EnsembleSelection:
             weights = weights / np.sum(weights)
 
         self.weights_ = weights
+
+    def predict(self, X):
+        y_pred_proba = self.predict_proba(X)
+        return get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
+
+    def predict_proba(self, X):
+        return self.weight_pred_probas(X, weights=self.weights_)
+
+    @staticmethod
+    def weight_pred_probas(pred_probas, weights):
+        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights)]
+        preds_ensemble = np.sum(preds_norm, axis=0)
+        return preds_ensemble

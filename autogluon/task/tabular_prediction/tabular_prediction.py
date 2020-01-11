@@ -1,4 +1,4 @@
-import copy, logging
+import copy, logging, math
 import numpy as np
 
 from .dataset import TabularDataset
@@ -16,6 +16,7 @@ from ...utils import verbosity2loglevel
 __all__ = ['TabularPrediction']
 
 logger = logging.getLogger() # return root logger
+
 
 class TabularPrediction(BaseTask):
     """ 
@@ -54,7 +55,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
-            hyperparameter_tune=False, feature_prune=False, holdout_frac=None, num_bagging_folds=0, stack_ensemble_levels=0,
+            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters = {
                                'NN': {'num_epochs': 500},
                                'GBM': {'num_boost_round': 10000},
@@ -64,6 +65,7 @@ class TabularPrediction(BaseTask):
                                'KNN': {},
                                'custom': ['GBM'],
                               },
+            enable_fit_continuation=False,
             time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
             verbosity=2, **kwargs):
@@ -102,7 +104,12 @@ class TabularPrediction(BaseTask):
         hyperparameter_tune : (bool, default = False)
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
         feature_prune : (bool, default = False)
-            Whether or not to perform feature selection. 
+            Whether or not to perform feature selection.
+        auto_stack : (bool, default = False)
+            Whether to have AutoGluon automatically attempt to select optimal num_bagging_folds and stack_ensemble_levels based on data properties.
+            Note: Overrides num_bagging_folds and stack_ensemble_levels values.
+            Note: This can increase training time by up to 20x, but can produce much better results.
+            Note: This can increase inference time by up to 20x.
         hyperparameters : (dict) 
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
@@ -132,14 +139,27 @@ class TabularPrediction(BaseTask):
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
             Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
         num_bagging_folds : (int)
-            Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging). 
-            Disabled by default, but we recommend values between 5-10 to maximize predictive performance. 
+            Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
+            Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting.
+            Values > 10 produce diminishing returns, and may even harm overall results due to overfitting. To gain further benefits, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
+            Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
+        num_bagging_sets : (int)
+            Number of repeats of kfold bagging to perform. Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
+            Defaults to 1 if time_limits is not specified, otherwise 10.
+            Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
+            Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
+            Disabled if num_bagging_folds is not specified.
+            Value must be >= 1 if specified
         stack_ensemble_levels : (int)
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
-            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`. 
+            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
+        enable_fit_continuation : (bool, default = False)
+            Whether to enable predictor to be able to be fit beyond the initial fit call.
+            When enabled, the training and validation data are saved to disk.
         time_limits : (int)
-            Approximately how long `fit()` should run for (wallclock time in seconds). 
+            Approximately how long `fit()` should run for (wallclock time in seconds).
+            Defaults to None. If not specified AutoGluon will run until all models have completed, but will not repeatedly bag models unless num_bagging_sets is specified.
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         num_trials : (int) 
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
@@ -226,12 +246,29 @@ class TabularPrediction(BaseTask):
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
-        label_count_threshold = kwargs.get('label_count_threshold', 10)
-        if num_bagging_folds is not None: # Ensure there exist sufficient labels for stratified splits across all bags
-            label_count_threshold = max(label_count_threshold, num_bagging_folds)
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
+        num_train_rows = len(train_data)
+        if auto_stack:
+            # TODO: What about datasets that are 100k+? At a certain point should we not bag?
+            # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
+            num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
+            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 1000)))
+
+        if num_bagging_sets is None:
+            if num_bagging_folds >= 2:
+                if time_limits is not None:
+                    num_bagging_sets = 10
+                else:
+                    num_bagging_sets = 1
+            else:
+                num_bagging_sets = 1
+
+        label_count_threshold = kwargs.get('label_count_threshold', 10)
+        if num_bagging_folds is not None:  # Ensure there exist sufficient labels for stratified splits across all bags
+            label_count_threshold = max(label_count_threshold, num_bagging_folds)
+
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
         if num_bagging_folds >= 2 and (time_limits_hpo is not None):
@@ -241,7 +278,6 @@ class TabularPrediction(BaseTask):
             hyperparameter_tune = False
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
         if holdout_frac is None:
-            num_train_rows = len(train_data)
             # Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples
             if num_train_rows < 5000:
                 holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
@@ -289,6 +325,6 @@ class TabularPrediction(BaseTask):
                           label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, stack_ensemble_levels=stack_ensemble_levels, 
-                      hyperparameters=hyperparameters, time_limit=time_limits_orig, verbosity=verbosity)
+                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                      hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
         return TabularPredictor(learner=learner)
