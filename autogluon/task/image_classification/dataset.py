@@ -55,8 +55,7 @@ def get_dataset(path=None, train=True, name=None,
     Returns
     -------
     Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
-    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
-        
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.    
     """
     resize = int(math.ceil(input_size / crop_ratio))
     if isinstance(name, str) and name.lower() in built_in_datasets:

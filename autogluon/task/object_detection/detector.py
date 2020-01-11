@@ -35,7 +35,7 @@ __all__ = ['Detector']
 
 class Detector(BasePredictor):
     """
-    Trained Object Detector returned by fit()
+    Trained Object Detector returned by `task.fit()`
     """
     def __init__(self, model, results, scheduler_checkpoint,
                  args, **kwargs):
@@ -50,7 +50,7 @@ class Detector(BasePredictor):
          
          Parameters
          ----------
-        dataset: :meth:`Dataset`
+        dataset: `Dataset`
             Test dataset (must be in the same format as training data previously provided to fit).
         ctx : `mxnet.context`
             Which MXNet context to use for evaluation (CPU or GPU).

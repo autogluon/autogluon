@@ -20,7 +20,7 @@ from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 
 class CustomVOCDetectionBase(gdata.VOCDetection):
-    """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
+    """Base class for custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
     
     Parameters
     ----------
@@ -116,6 +116,26 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
 
 @obj()
 class CustomVOCDetection():
+    """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
+    
+    Parameters
+    ----------
+    root : str, default '~/mxnet/datasets/voc'
+        Path to folder storing the dataset.
+    splits : list of tuples        
+        List of combinations of (year, name) to indicate how to split data into training, validation, and test sets.
+        For the original VOC dataset, the year candidates can be: 2007, 2012.
+        For the original VOC dataset, the name candidates can be: 'train', 'val', 'trainval', 'test'.
+        For the original VOC dataset, one might use for example: ((2007, 'trainval'), (2012, 'trainval'))
+    classes: tuple of classes
+        We reuse the neural network weights if the corresponding class appears in the pretrained model. 
+        Otherwise, we randomly initialize the neural network weights for new classes.
+    
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
+    """
     def __init__(self, root, splits, name, classes, **kwargs):
         super().__init__()
         self.root = root

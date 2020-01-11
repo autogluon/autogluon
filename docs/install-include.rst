@@ -1,9 +1,10 @@
-Select your preferences and run the install command.
-
 .. note::
 
-  Only Linux installation is supported for now (Mac OSX and Windows versions will be available soon).
   AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6 or 3.7.
+  Linux is the only operating system fully supported for now (complete Mac OSX and Windows versions will be available soon).
+
+
+Select your preferences below and run the corresponding install commands:
 
 .. role:: title
 .. role:: opt
@@ -17,10 +18,12 @@ Select your preferences and run the install command.
 
      :title:`OS:`
      :act:`Linux`
+     :opt:`Mac`
 
      .. raw:: html
 
         <div class="mdl-tooltip" data-mdl-for="linux">Linux.</div>
+        <div class="mdl-tooltip" data-mdl-for="mac">Mac OSX.</div>
 
   .. container:: opt-group
 
@@ -73,7 +76,7 @@ Select your preferences and run the install command.
 
               .. code-block:: bash
 
-                 pip install --pre --upgrade mxnet
+                 pip install --upgrade mxnet
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
 
@@ -86,3 +89,64 @@ Select your preferences and run the install command.
                  pip install --pre --upgrade mxnet-cu100
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py install --user
+
+     .. container:: mac
+
+        .. container:: pip
+
+           .. container:: cpu
+           
+              .. note::
+              
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
+                 Once you have Homebrew, LibOMP can be installed via:
+
+                 .. code-block:: bash
+
+                     brew install libomp
+
+              .. code-block:: bash
+
+                 pip install --upgrade mxnet
+                 pip install autogluon
+
+              .. note::
+              
+                 AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.  However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
+
+           .. container:: gpu
+              
+              .. note::
+
+                 GPU usage is not yet supported on Mac OSX, please use Linux to utilize GPUs in AutoGluon.
+
+        .. container:: source
+
+           .. container:: cpu
+
+              .. note::
+              
+                 If you don't have them, please first install: 
+                 `XCode <https://developer.apple.com/xcode/>`_, `Homebrew <https://brew.sh>`_, `LibOMP <https://formulae.brew.sh/formula/libomp>`_.
+                 Once you have Homebrew, LibOMP can be installed via:
+
+                 .. code-block:: bash
+
+                     brew install libomp
+
+              .. code-block:: bash
+
+                 pip install --upgrade mxnet
+                 git clone https://github.com/awslabs/autogluon
+                 cd autogluon && python setup.py install --user
+
+              .. note::
+              
+                 AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.  However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
+
+           .. container:: gpu
+
+              .. note::
+
+                 GPU usage is not yet supported on Mac OSX , please use Linux to utilize GPUs in AutoGluon.

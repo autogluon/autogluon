@@ -31,6 +31,11 @@ def get_dataset(root='~/.mxnet/datasets/voc', index_file_name='trainval', name=N
         pecify Train/Test mode. It is only valid when name is not None.
     kwargs : keyword arguments
         Passed to either: :meth:`autogluon.task.object_detection.dataset.CustomVOCDetection` or :meth:`autogluon.task.object_detection.dataset.COCO`.
+    
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
     """
     if format=='voc':
         logger.info(">>> create dataset(VOC format) ")

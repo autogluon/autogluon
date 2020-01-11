@@ -5,7 +5,13 @@ from gluoncv import data as gdata
 
 @obj()
 class COCO(DatasetBase):
-    """ Built-in class to work with the well-known COCO dataset for object detection. """
+    """Built-in class to work with the well-known COCO dataset for object detection. 
+    
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
+    """
     def __init__(self):
         super(COCO. self).__init__()
         self.train_dataset = gdata.COCODetection(splits='instances_train2017')

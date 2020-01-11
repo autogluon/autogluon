@@ -219,6 +219,22 @@ Additional Object Detection APIs
 .. autofunction::
    get_dataset
 
+:hidden:`CustomVOCDetection`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CustomVOCDetection
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: CustomVOCDetection
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: CustomVOCDetection
+        :attributes:
+
 :hidden:`CustomVOCDetectionBase`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
