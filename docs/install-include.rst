@@ -78,7 +78,7 @@ Select your preferences below and run the corresponding install commands:
 
                  pip install --upgrade mxnet
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py install --user
+                 cd autogluon && python setup.py develop
 
            .. container:: gpu
 
@@ -88,7 +88,7 @@ Select your preferences below and run the corresponding install commands:
                  # according to your own CUDA version (e.g. mxnet-cu101 for CUDA 10.1).
                  pip install --pre --upgrade mxnet-cu100
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py install --user
+                 cd autogluon && python setup.py develop
 
      .. container:: mac
 
@@ -139,7 +139,7 @@ Select your preferences below and run the corresponding install commands:
 
                  pip install --upgrade mxnet
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py install --user
+                 cd autogluon && python setup.py develop
 
               .. note::
               
