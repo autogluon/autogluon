@@ -38,6 +38,7 @@ class Getmodel_kwargs():
         self._model_name = model_name
         self._model_teacher = model_teacher
         self._hybridize = hybridize
+        self._hard_weight = hard_weight
 
         if multi_precision:
             self._dtype = 'float16'
@@ -53,7 +54,7 @@ class Getmodel_kwargs():
         if last_gamma:
             self._kwargs['last_gamma'] = True
 
-        if self._model_teacher is not None and all() < 1.0:
+        if self._model_teacher is not None and self._hard_weight < 1.0:
             self._distillation = True
         else:
             self._distillation = False

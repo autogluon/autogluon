@@ -271,7 +271,7 @@ def config_choice(dataset, data_path):
             learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
             momentum=ag.space.Real(0.85, 0.95),
             wd=ag.space.Real(1e-6, 1e-2, log=True),
-            multi_precision=False
+            multi_precision=True
         )
         class NAG(optim.NAG):
             pass

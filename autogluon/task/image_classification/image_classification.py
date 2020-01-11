@@ -51,7 +51,7 @@ class ImageClassification(BaseTask):
     def fit(dataset,
             net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
             optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
-                           wd=Real(1e-4, 1e-3, log=True)),
+                           wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
             lr_scheduler='cosine',
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
@@ -233,8 +233,8 @@ class ImageClassification(BaseTask):
         results = BaseTask.run_fit(train_image_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
-
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
         model = get_network(args.net, **kwargs)
-        update_params(model, results.pop('model_params'), optimizer.kwvars['multi_precision'])
+        multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
+        update_params(model, results.pop('model_params'), multi_precision)
         return Classifier(model, results, default_val_fn, checkpoint, args)
