@@ -93,7 +93,7 @@ For more information, see :class:`autogluon.searcher.SKoptSearcher`.
 
 ```{.python .input}
 time_limits = 2*60
-epochs = 10
+epochs = 1
 
 classifier = task.fit(dataset,
                       net=net,
@@ -131,7 +131,7 @@ classifier = task.fit(dataset,
                       lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                       search_strategy=search_strategy,
                       epochs=epochs,
-                      num_trials=4,
+                      num_trials=1,
                       verbose=False,
                       plot_results=True,
                       ngpus_per_trial=1,
