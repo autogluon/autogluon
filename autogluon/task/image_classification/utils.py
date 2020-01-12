@@ -53,7 +53,7 @@ def default_batch_fn(batch, ctx):
     label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0 ,even_split=False)
     return data, label
 
-def default_val_fn(net, batch, batch_fn, metric, ctx, dtype = 'float32'):
+def default_val_fn(net, batch, batch_fn, metric, ctx, dtype='float32'):
     with mx.autograd.pause(train_mode=False):
         data, label = batch_fn(batch, ctx)
         outputs = [net(X.astype(dtype, copy=False)) for X in data]
@@ -79,9 +79,9 @@ def smooth(label, classes, eta=0.1):
     return smoothed
 
 def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, trainer, batch_fn, ctx,
-                     mixup, label_smoothing, distillation,
-                     mixup_alpha, mixup_off_epoch, classes,
-                     dtype, metric, teacher_prob):
+                     mixup=False, label_smoothing=False, distillation=False,
+                     mixup_alpha=0.2, mixup_off_epoch=0, classes=1000,
+                     dtype='float32', metric=None, teacher_prob=None):
     data, label = batch_fn(batch, ctx)
     if mixup:
         lam = np.random.beta(mixup_alpha, mixup_alpha)
@@ -108,16 +108,19 @@ def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, train
         l.backward()
     trainer.step(batch_size, ignore_stale_grad=True)
 
-    if mixup:
-        output_softmax = [nd.SoftmaxActivation(out.astype('float32', copy=False)) \
-                          for out in outputs]
-        metric.update(label, output_softmax)
-    else:
-        if label_smoothing:
-            metric.update(hard_label, outputs)
+    if metric:
+        if mixup:
+            output_softmax = [nd.SoftmaxActivation(out.astype('float32', copy=False)) \
+                              for out in outputs]
+            metric.update(label, output_softmax)
         else:
-            metric.update(label, outputs)
-    return metric
+            if label_smoothing:
+                metric.update(hard_label, outputs)
+            else:
+                metric.update(label, outputs)
+        return metric
+    else:
+        return
 
 def _train_val_split(train_dataset, split_ratio=0.2):
     train_sampler, val_sampler = get_split_samplers(train_dataset, split_ratio)
