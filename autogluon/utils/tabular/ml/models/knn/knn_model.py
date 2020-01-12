@@ -2,7 +2,9 @@ import logging
 import pickle
 import psutil
 import sys
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
+from ...constants import REGRESSION
 from ..sklearn.sklearn_model import SKLearnModel
 from ....utils.exceptions import NotEnoughMemoryError
 
@@ -11,15 +13,25 @@ logger = logging.getLogger(__name__)
 
 # TODO: Normalize data!
 class KNNModel(SKLearnModel):
-    _is_fit = False
-
-    def is_fit(self):
-        return self._is_fit
+    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
+        if self.problem_type == REGRESSION:
+            self._model_type = KNeighborsRegressor
+        else:
+            self._model_type = KNeighborsClassifier
 
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns
         X = X.drop(cat_columns, axis=1).fillna(0)  # TODO: Test if crash when all columns are categorical
         return X
+
+    def _set_default_params(self):
+        default_params = {
+            'weights': 'uniform',
+            'n_jobs': -1,
+        }
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
 
     # TODO: Enable HPO for KNN
     def _get_default_searchspace(self, problem_type):
@@ -39,8 +51,8 @@ class KNNModel(SKLearnModel):
             if model_memory_ratio > 0.45:
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
-        self.model = self.model.fit(X_train, Y_train)
-        self._is_fit = True  # TODO: remove after fixing model input to not be present
+        model = self._model_type(**self.params)
+        self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
