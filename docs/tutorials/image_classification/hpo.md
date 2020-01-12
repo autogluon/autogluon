@@ -92,7 +92,7 @@ You can specify what kind of surrogate model to use (e.g., Gaussian Process, Ran
 For more information, see :class:`autogluon.searcher.SKoptSearcher`.
 
 ```{.python .input}
-time_limits = 2*60
+time_limits = 60
 epochs = 1
 
 classifier = task.fit(dataset,
