@@ -47,10 +47,13 @@ class Getmodel_kwargs():
         if use_gn:
             from gluoncv.nn import GroupNorm
             self._kwargs['norm_layer'] = GroupNorm
-        if model_name.startswith('vgg'):
-            self._kwargs['batch_norm'] = batch_norm
-        elif model_name.startswith('resnext'):
-            self._kwargs['use_se'] = use_se
+
+        if isinstance(model_name, str):
+            if model_name.startswith('vgg'):
+                self._kwargs['batch_norm'] = batch_norm
+            elif model_name.startswith('resnext'):
+                self._kwargs['use_se'] = use_se
+
         if last_gamma:
             self._kwargs['last_gamma'] = True
 
