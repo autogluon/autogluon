@@ -43,7 +43,7 @@ This is an example of a :class:`autogluon.space.Categorical` search space, in wh
 import gluoncv as gcv
 
 @ag.func(
-    multiplier=ag.Categorical(0.25, 1.0),
+    multiplier=ag.Categorical(0.25, 0.5),
 )
 def get_mobilenet(multiplier):
     return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
@@ -92,8 +92,8 @@ You can specify what kind of surrogate model to use (e.g., Gaussian Process, Ran
 For more information, see :class:`autogluon.searcher.SKoptSearcher`.
 
 ```{.python .input}
-time_limits = 60
-epochs = 1
+time_limits = 2*60
+epochs = 2
 
 classifier = task.fit(dataset,
                       net=net,
