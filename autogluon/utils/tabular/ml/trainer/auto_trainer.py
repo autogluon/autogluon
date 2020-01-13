@@ -15,7 +15,7 @@ class AutoTrainer(AbstractTrainer):
                          feature_types_metadata=feature_types_metadata, kfolds=kfolds, n_repeats=n_repeats,
                          stack_ensemble_levels=stack_ensemble_levels, time_limit=time_limit, save_data=save_data, verbosity=verbosity)
 
-    def get_models(self, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+    def get_models(self, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, **kwargs):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func,
                                  num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
 

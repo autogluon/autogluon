@@ -188,7 +188,7 @@ class AbstractTrainer:
             max_level = max(max_level, self.get_max_level(stack_name))
         return max_level
 
-    def get_models(self, hyperparameters, hyperparameter_tune=False):
+    def get_models(self, hyperparameters, hyperparameter_tune=False, **kwargs):
         raise NotImplementedError
 
     def get_model_level(self, model_name):
@@ -518,7 +518,7 @@ class AbstractTrainer:
     def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
         use_orig_features = True
         if models is None:
-            models = self.get_models(self.hyperparameters)
+            models = self.get_models(self.hyperparameters, level=level)
 
         if self.bagged_mode:
             if level == 0:
