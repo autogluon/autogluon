@@ -1,13 +1,12 @@
 # Customize Training Script
 :label:`sec_customscript`
 
-In this tutorial, we are showing the example of doing HPO using AutoGluon on any customized
-python scripts. AutoGluon is a framework agnostic HPO toolkit, which is compatible with
-any training code written in python. See also :ref:`sec_customstorch`.
+This tutorial demonstrates how to do hyperparameter optimization of any customized
+Python scripts using AutoGluon. AutoGluon is a framework agnostic HPO toolkit, which is compatible with any training code written in Python. See also :ref:`sec_customstorch`.
 
-## Start with a Fine-tuning Example
+## Neural Network Fine-tuning Example
 
-Import the basic packages, such as numpy, mxnet and gluoncv:
+Import required packages, such as numpy, mxnet and gluoncv:
 
 ```{.python .input}
 import os

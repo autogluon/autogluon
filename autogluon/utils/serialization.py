@@ -36,18 +36,18 @@ STORAGE_KEY_SEPARATOR = ','
 _package_registry = []
 
 def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL):
-    """Saves an object to a disk file.
+    """Saves an object to local file.
 
     Parameters
     ----------
     obj : object
-        saved object
+        Python object to save.
     f : string or file object
-        a file-like object (has to implement write and flush) or a string containing a file name
+        A file-like object (has to implement write and flush), or a string containing a file name
     pickle_module : pickle
-        module used for pickling metadata and objects
-    pickle_protocol : protocol
-        an be specified to override the default protocol
+        Module used for pickling metadata and objects
+    pickle_protocol : protocol (optional)
+        Protocol can be specified to override the default pickle protocol.
 
     Examples
     --------
@@ -56,7 +56,7 @@ def save(obj, f, pickle_module=pickle, pickle_protocol=DEFAULT_PROTOCOL):
     return _with_file_like(f, "wb", lambda f: _save(obj, f, pickle_module, pickle_protocol))
 
 def load(f, map_location=None, pickle_module=pickle, **pickle_load_args):
-    """Loads an object saved with :func:`save` from a file.
+    """Loads an object saved with :func:`save` from file.
 
     Parameters
     ----------

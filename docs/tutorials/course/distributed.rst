@@ -1,10 +1,7 @@
 Distributed Search
 ==================
 
-AutoGluon provide seamless experience on distributed search.  It automatically schedule tasks
-onto remote machines, just like the local one. The communications are automatically handled and
-it looks like a big machine with many GPUs to the user.
-This is a quick tutorial for setting up AutoGluon with Distributed Training.
+AutoGluon provide a seamless experience for distributing the hyperparameter search across multiple machines.  It will automatically schedule tasks onto remote machines, just like the local one. All communications are automatically handled such that it looks like a big machine with many GPUs to the user.  This is a quick tutorial for setting up AutoGluon to leverage discributed compute resources.
 
 
 A Toy Example
@@ -40,8 +37,8 @@ A Toy Example
 
     >>> extra_node_ips = ['172.31.3.95']
 
-    Create a distributed scheduler. If no ipaddresses are provided, 
-    scheduler will only use the local resources
+    Create a distributed scheduler. If no ip addresses are provided, the 
+    scheduler will only use local resources.
 
     >>> scheduler = ag.scheduler.FIFOScheduler(
     >>>     train_fn,
@@ -56,7 +53,7 @@ A Toy Example
     	<Remote: 'tcp://172.31.3.95:8702' processes=1 threads=8, memory=64.39 GB>, Resource: NodeResourceManager(8 CPUs, 0 GPUs))
     })
 
-    Launch 16 Tasks
+    Launch 16 Tasks.
 
     >>> scheduler.run(num_trials=20)
     >>> scheduler.join_jobs()
@@ -87,29 +84,29 @@ A Toy Example
 
     .. image:: https://github.com/zhanghang1989/AutoGluonWebdata/blob/master/docs/tutorial/course.distributed.png?raw=true
 
-System Implementation Logics
-----------------------------
+System Implementation Logic
+---------------------------
 
 .. image:: https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_distributed.png
 
 
-The main training script (main python file) is serialized and scheduled remotely.
-AutoGluon distributed schedulers monitors the training process and gather the results.
+The main training script (main Python file) is serialized and scheduled remotely.
+AutoGluon's distributed scheduler monitors the training process and gathers results.
 
-Any files (such as python scripts and dataset) beyond the main training script need to
+Any files (such as Python scripts and datasets) beyond the main training script need to
 be made accessible. We recommand the following practice:
 
-- Use ``scheduler.upload_files(files_list)`` to upload individual python scripts or small datasets to the execution folder, so that the main script can import or load.
+- Use ``scheduler.upload_files(files_list)`` to upload individual Python scripts or small datasets to the execution folder on remote machines, so that the main script can import or load these.
 
-- Make a python library for many files in the same folder and install it manually on different machine.
+- Make a Python library for many files in the same folder and install it manually on all remote machines.
 
-- Upload large files (such as dataset) manually to different machines and share the same absolute filepath, because the tasks can be scheduled to different machines.
+- Upload large files (such as datasets) manually to remote machines and share the same absolute filepath, because the tasks can be scheduled to different machines.
 
 
 Distributed Training Setup on AWS EC2
 -------------------------------------
 
-Here are the steps for preparing the environment to run imagenet example ``examples/imagenet_autogluon.py``.
+Here are the steps for preparing the environment to run an image classification example using the ImageNet dataset: ``examples/imagenet_autogluon.py``.
 We will first set up two machines, one master machine and one worker machine.
 Then we may use EC2 AMI to clone as many worker machines as you want.
 
