@@ -48,7 +48,7 @@ import gluoncv as gcv
 def get_mobilenet(multiplier):
     return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
 
-net = ag.space.Categorical('resnet50_v1b', get_mobilenet())
+net = ag.space.Categorical('mobilenet0.25', get_mobilenet())
 print(net)
 ```
 
