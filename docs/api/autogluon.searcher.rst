@@ -5,6 +5,7 @@ autogluon.searcher
 ------------------
 
 .. admonition:: Example
+
    Define a dummy training function with searchable spaces:
 
    >>> import numpy as np
@@ -24,7 +25,7 @@ autogluon.searcher
    >>> searcher.get_config()
    {'lr': 0.0031622777, 'wd': 0.0055}
 
-   Create a scheduler and run the dummy experiment:
+   Create a scheduler and run this toy experiment:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
    ...                                        searcher = searcher,
@@ -34,7 +35,7 @@ autogluon.searcher
    ...                                        time_attr='epoch')
    >>> scheduler.run()
 
-   Visiualize the results and exit:
+   Visualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 
@@ -49,22 +50,11 @@ Searchers
 .. autosummary::
    :nosignatures:
 
-   GridSearcher
    RandomSearcher
    SKoptSearcher
+   GridSearcher
    RLSearcher
 
-:hidden:`GridSearcher`
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: GridSearcher
-   :members:
-   :inherited-members:
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: GridSearcher
-        :methods:
 
 :hidden:`RandomSearcher`
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,6 +80,20 @@ Searchers
 
     .. autoautosummary:: SKoptSearcher
         :methods:
+
+
+:hidden:`GridSearcher`
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: GridSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: GridSearcher
+        :methods:
+
 
 :hidden:`RLSearcher`
 ~~~~~~~~~~~~~~~~~~~~

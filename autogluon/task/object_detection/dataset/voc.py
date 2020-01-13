@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import warnings
 import numpy as np
+import glob
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
@@ -18,35 +19,31 @@ import autogluon as ag
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 
-import glob
-from xml.etree import ElementTree as ET
-
-
 class CustomVOCDetectionBase(gdata.VOCDetection):
-    """custom Dataset which follows VOC protocol.
+    """Base class for custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
     
     Parameters
     ----------
-    class: tuple of classes, default None
-        reuse the weights if the corresponding class appears in the pretrained model, 
-        otherwise, randomly initialize the weights for new categories.
+    class: tuple of classes, default = None
+        We reuse the neural network weights if the corresponding class appears in the pretrained model. 
+        Otherwise, we randomly initialize the neural network weights for new classes.
     root : str, default '~/mxnet/datasets/voc'
         Path to folder storing the dataset.
     splits : list of tuples, default ((2007, 'trainval'), (2012, 'trainval'))
         List of combinations of (year, name)
         For years, candidates can be: 2007, 2012.
         For names, candidates can be: 'train', 'val', 'trainval', 'test'.
-    transform : callable, default None
+    transform : callable, default = None
         A function that takes data and label and transforms them. Refer to
         :doc:`./transforms` for examples.
         A transform function for object detection should take label into consideration,
         because any geometric modification will require label to be modified.
-    index_map : dict, default None
-        In default, the 20 classes are mapped into indices from 0 to 19. We can
+    index_map : dict, default = None
+        By default, the 20 classes are mapped into indices from 0 to 19. We can
         customize it by providing a str to int dict specifying how to map class
-        names to indices. Use by advanced users only, when you want to swap the orders
+        names to indices. This is only for advanced users, when you want to swap the orders
         of class labels.
-    preload_label : bool, default True
+    preload_label : bool, default = True
         If True, then parse and load all labels into memory during
         initialization. It often accelerate speed but require more memory
         usage. Typical preloaded labels took tens of MB. You only need to disable it
@@ -64,7 +61,10 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
                                                splits=splits,
                                                transform=transform,
                                                index_map=index_map,
-                                               preload_label=preload_label),
+                                               preload_label=False),
+        self._items_new = [self._items[each_id] for each_id in range(len(self._items)) if self._check_valid(each_id) ]
+        self._items = self._items_new
+        self._label_cache = self._preload_labels() if preload_label else None
     
     @classmethod
     def _set_class(cls, classes):
@@ -80,15 +80,69 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
                 ids += [(root, line.strip()) for line in f.readlines()]
         return ids
 
+    def _check_valid(self, idx):
+        """Parse xml file and return labels."""
+        img_id = self._items[idx]
+        anno_path = self._anno_path.format(*img_id)
+        root = ET.parse(anno_path).getroot()
+        size = root.find('size')
+        width = float(size.find('width').text)
+        height = float(size.find('height').text)
+        if idx not in self._im_shapes:
+            # store the shapes for later usage
+            self._im_shapes[idx] = (width, height)
+        label = []
+        for obj in root.iter('object'):
+            try:
+                difficult = int(obj.find('difficult').text)
+            except ValueError:
+                difficult = 0
+            cls_name = obj.find('name').text.strip().lower()
+            if cls_name not in self.classes:
+                continue
+            cls_id = self.index_map[cls_name]
+            xml_box = obj.find('bndbox')
+            xmin = (float(xml_box.find('xmin').text) - 1)
+            ymin = (float(xml_box.find('ymin').text) - 1)
+            xmax = (float(xml_box.find('xmax').text) - 1)
+            ymax = (float(xml_box.find('ymax').text) - 1)
+
+            if not ((0 <= xmin < width) and (0 <= ymin < height) \
+                    and (xmin < xmax <= width) and (ymin < ymax <= height)):
+                return False
+
+        return True
+
 
 @obj()
 class CustomVOCDetection():
+    """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
+    
+    Parameters
+    ----------
+    root : str, default '~/mxnet/datasets/voc'
+        Path to folder storing the dataset.
+    splits : list of tuples        
+        List of combinations of (year, name) to indicate how to split data into training, validation, and test sets.
+        For the original VOC dataset, the year candidates can be: 2007, 2012.
+        For the original VOC dataset, the name candidates can be: 'train', 'val', 'trainval', 'test'.
+        For the original VOC dataset, one might use for example: ((2007, 'trainval'), (2012, 'trainval'))
+    classes: tuple of classes
+        We reuse the neural network weights if the corresponding class appears in the pretrained model. 
+        Otherwise, we randomly initialize the neural network weights for new classes.
+    
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
+    """
     def __init__(self, root, splits, name, classes, **kwargs):
         super().__init__()
         self.root = root
         
-        if not classes:
-            classes = self.generate_gt() if not name else None
+        # search classes from gt files for custom dataset
+        if not (classes or name):
+            classes = self.generate_gt() 
         
         self.dataset = CustomVOCDetectionBase(classes=classes,
                                               root=root,
@@ -104,7 +158,6 @@ class CustomVOCDetection():
 
     def generate_gt(self):
         classes = []
-
         all_xml = glob.glob( os.path.join(self.root, 'Annotations', '*.xml') )
         for each_xml_file in all_xml:
             tree = ET.parse(each_xml_file)
@@ -118,7 +171,6 @@ class CustomVOCDetection():
                                 classes.append(object_name)
 
         classes = sorted(classes)
-
         return classes
 
 

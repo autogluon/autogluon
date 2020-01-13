@@ -9,12 +9,10 @@ from sklearn.model_selection import train_test_split
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
-from ...utils.exceptions import TimeLimitExceeded
-from ..utils import get_pred_from_proba
+from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
+from ..utils import get_pred_from_proba, dd_list
 from ..models.abstract.abstract_model import AbstractModel
 from ..tuning.feature_pruner import FeaturePruner
-from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from ..models.lgb.lgb_model import LGBModel
 from ...metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
@@ -38,11 +36,12 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, 
-                 stack_ensemble_levels=0, time_limit=None, verbosity=2):
+                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1,
+                 stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
+        self.save_data = save_data
         self.verbosity = verbosity
         if objective_func is not None:
             self.objective_func = objective_func
@@ -67,33 +66,35 @@ class AbstractTrainer:
             self.kfolds = kfolds  # int number of folds to do model bagging, < 2 means disabled
             self.stack_ensemble_levels = stack_ensemble_levels
             self.stack_mode = True if self.stack_ensemble_levels >= 1 else False
+            self.n_repeats = n_repeats
         else:
             self.kfolds = 0
             self.stack_ensemble_levels = 0
             self.stack_mode = False
+            self.n_repeats = 1
 
         self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
 
-        # self.models_level[0] # Includes base models
-        # self.models_level[1] # Stacker level 1, includes weighted ensembles of level 0 (base)
-        # self.models_level[2] # Stacker level 2, includes weighted ensembles of level 1
-        self.models_level = defaultdict(list)
-        self.models_level_auxiliary = defaultdict(list)
+        # self.models_level_all['core'][0] # Includes base models
+        # self.models_level_all['core'][1] # Stacker level 1
+        # self.models_level_all['aux1'][1] # Stacker level 1 aux models, such as weighted_ensemble
+        # self.models_level_all['core'][2] # Stacker level 2
+        self.models_level = defaultdict(dd_list)
+        self.models_level_hpo = defaultdict(dd_list)  # stores additional models produced during HPO
 
         self.model_best = None
         self.model_best_core = None
 
         self.model_performance = {}
         self.model_paths = {}
-        self.model_types = {}
+        self.model_types = {}  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
+        self.model_types_inner = {}  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
         self.model_fit_times = {}
         self.model_pred_times = {}
         self.models = {}
-        self.model_weights = None
         self.reset_paths = False
-        # Things stored
+
         self.hpo_results = {}  # Stores summary of HPO process
-        self.hpo_model_names = defaultdict(list)  # stores additional models produced during HPO
         # Scheduler attributes:
         if scheduler_options is not None:
             self.scheduler_func = scheduler_options[0]  # unpack tuple
@@ -108,55 +109,93 @@ class AbstractTrainer:
             self.ignore_time_limit = True
         else:
             self.ignore_time_limit = False
-        self.time_clock = None
         self.time_train_start = None
         self.time_train_level_start = None
         self.time_limit_per_level = self.time_limit / (self.stack_ensemble_levels + 1)
 
+        self.num_rows_train = None
+        self.num_cols_train = None
+
+        self.is_data_saved = False
+
+    # path_root is the directory containing learner.pkl
     @property
-    def model_names(self):
-        return self.model_names_core + self.model_names_aux
+    def path_root(self):
+        return self.path.rsplit('/', maxsplit=2)[0] + '/'
 
     @property
-    def model_names_core(self):
+    def path_utils(self):
+        return self.path_root + 'utils/'
+
+    @property
+    def path_data(self):
+        return self.path_utils + 'data/'
+
+    def load_X_train(self):
+        path = self.path_data + 'X_train.pkl'
+        return load_pkl.load(path=path)
+
+    def load_X_val(self):
+        path = self.path_data + 'X_val.pkl'
+        return load_pkl.load(path=path)
+
+    def load_y_train(self):
+        path = self.path_data + 'y_train.pkl'
+        return load_pkl.load(path=path)
+
+    def load_y_val(self):
+        path = self.path_data + 'y_val.pkl'
+        return load_pkl.load(path=path)
+
+    def save_X_train(self, X, verbose=True):
+        path = self.path_data + 'X_train.pkl'
+        save_pkl.save(path=path, object=X, verbose=verbose)
+
+    def save_X_val(self, X, verbose=True):
+        path = self.path_data + 'X_val.pkl'
+        save_pkl.save(path=path, object=X, verbose=verbose)
+
+    def save_y_train(self, y, verbose=True):
+        path = self.path_data + 'y_train.pkl'
+        save_pkl.save(path=path, object=y, verbose=verbose)
+
+    def save_y_val(self, y, verbose=True):
+        path = self.path_data + 'y_val.pkl'
+        save_pkl.save(path=path, object=y, verbose=verbose)
+
+    def get_model_names_all(self):
         model_names = []
-        levels = np.sort(list(self.models_level.keys()))
-        for level in levels:
-            model_names += self.models_level[level]
+        for stack_name in self.models_level.keys():
+            model_names += self.get_model_names(stack_name)
         return model_names
 
-    @property
-    def model_names_aux(self):
+    def get_model_names(self, stack_name):
         model_names = []
-        levels = np.sort(list(self.models_level_auxiliary.keys()))
+        levels = np.sort(list(self.models_level[stack_name].keys()))
         for level in levels:
-            model_names += self.models_level_auxiliary[level]
+            model_names += self.models_level[stack_name][level]
         return model_names
 
-    @property
-    def max_level(self):
+    def get_max_level(self, stack_name: str):
         try:
-            return np.sort(list(self.models_level.keys()))[-1]
+            return np.sort(list(self.models_level[stack_name].keys()))[-1]
         except IndexError:
             return -1
 
-    @property
-    def max_level_auxiliary(self):
-        try:
-            return np.sort(list(self.models_level_auxiliary.keys()))[-1]
-        except IndexError:
-            return -1
+    def get_max_level_all(self):
+        max_level = 0
+        for stack_name in self.models_level.keys():
+            max_level = max(max_level, self.get_max_level(stack_name))
+        return max_level
 
     def get_models(self, hyperparameters, hyperparameter_tune=False):
         raise NotImplementedError
 
     def get_model_level(self, model_name):
-        for level in self.models_level.keys():
-            if model_name in self.models_level[level]:
-                return level
-        for level in self.models_level_auxiliary.keys():
-            if model_name in self.models_level_auxiliary[level]:
-                return level
+        for stack_name in self.models_level.keys():
+            for level in self.models_level[stack_name].keys():
+                if model_name in self.models_level[stack_name][level]:
+                    return level
         raise ValueError('Model' + str(model_name) + 'does not exist in trainer.')
 
     def set_contexts(self, path_context):
@@ -194,10 +233,13 @@ class AbstractTrainer:
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None):
         raise NotImplementedError
 
-    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, level=0, time_limit=None):
+    def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if kfolds is None:
             kfolds = self.kfolds
-        model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        if model.feature_types_metadata is None:
+            model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'verbosity': self.verbosity, 
@@ -206,27 +248,27 @@ class AbstractTrainer:
         if self.bagged_mode or (type(model) == WeightedEnsembleModel):
             if type(model) not in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 model = BaggedEnsembleModel(path=model.path[:-(len(model.name) + 1)], name=model.name + '_BAGGED' + '_l' + str(level), model_base=model)
-            model.fit(X=X_train, y=y_train, k_fold=kfolds, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
+            model.fit(X=X_train, y=y_train, k_fold=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, random_state=level, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
         return model
 
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_loc=None, kfolds=None, level=0, ignore_time_limit=False):
-        if stack_loc is None:
-            stack_loc = self.models_level
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+        stack_loc = self.models_level[stack_name]
         fit_start_time = time.time()
+        model_names_trained = []
         try:
             if not ignore_time_limit:
                 time_left = self.time_limit_per_level - (fit_start_time - self.time_train_level_start)
                 if time_left < 0:
                     logging.log(15, 'Skipping ' + str(model.name) + ' due to lack of time remaining.')
-                    return
+                    return model_names_trained
                 time_left_total = self.time_limit - (fit_start_time - self.time_train_start)
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...' + ' Training model for up to ' + str(round(time_left, 2)) + 's of the ' + str(round(time_left_total, 2)) + 's of remaining time.')
             else:
                 time_left = None
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...')
-            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, level=level, time_limit=time_left)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
             fit_end_time = time.time()
             if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 score = model.score_with_y_pred_proba(y=y_train, y_pred_proba=model.oof_pred_proba)
@@ -237,23 +279,37 @@ class AbstractTrainer:
             logger.log(20, '\tTime limit exceeded... Skipping ' + model.name + '.')
             # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
             del model
+        except NotEnoughMemoryError as err:
+            logger.warning('\tNot enough memory to train model... Skipping ' + model.name + '.')
+            del model
         except Exception as err:
             traceback.print_tb(err.__traceback__)
             logger.exception('Warning: Exception caused ' +str(model.name)+' to fail during training... Skipping this model.')
             logger.debug(err)
             del model
         else:
-            stack_loc[level].append(model.name)
+            if model.name not in stack_loc[level]:
+                stack_loc[level].append(model.name)
             self.model_performance[model.name] = score
             self.model_paths[model.name] = model.path
             self.model_types[model.name] = type(model)
+            if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                self.model_types_inner[model.name] = model._child_type
+            else:
+                self.model_types_inner[model.name] = type(model)
             logger.log(20, '\t' + str(round(fit_end_time - fit_start_time, 2))+'s' + '\t = Training runtime')
             logger.log(20, '\t' + str(round(score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
             logger.log(15, '\tEvaluation runtime of '+str(model.name)+ ' = '+str(round(pred_end_time - fit_end_time, 2))+' s')
             # TODO: Should model have fit-time/pred-time information?
             # TODO: Add to HPO
-            self.model_fit_times[model.name] = fit_end_time - fit_start_time
-            self.model_pred_times[model.name] = pred_end_time - fit_end_time
+            model_fit_time = fit_end_time - fit_start_time
+            model_pred_time = pred_end_time - fit_end_time
+            if n_repeat_start > 0:
+                self.model_fit_times[model.name] += model_fit_time
+                self.model_pred_times[model.name] += model_pred_time
+            else:
+                self.model_fit_times[model.name] = model_fit_time
+                self.model_pred_times[model.name] = model_pred_time
             self.save_model(model=model)
             if self.model_best_core is None:
                 self.model_best_core = model.name
@@ -264,17 +320,24 @@ class AbstractTrainer:
                     # new best core model
                     self.model_best_core = model.name
 
+            model_names_trained.append(model.name)
             if self.low_memory:
                 del model
+        return model_names_trained
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
-                          hyperparameter_tune=True, stack_loc=None, kfolds=None, level=0, ignore_time_limit=False):
-        model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
+                          hyperparameter_tune=True, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+        if n_repeat_start == 0:
+            model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
+            if n_repeat_start != 0:
+                raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
             if self.scheduler_func is None or self.scheduler_options is None:
                 raise ValueError("scheduler_options cannot be None when hyperparameter_tune = True")
+            if n_repeat_start != 0:
+                raise ValueError('n_repeat_start must be 0 to hyperparameter_tune, value = ' + str(n_repeat_start))
             if (X_test is None) or (y_test is None):
                 X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
             # Moved split into lightGBM. TODO: need to do same for other models that use their own splits as well. Old code was:  model.hyperparameter_tune(pd.concat([X_train, X_test], ignore_index=True), pd.concat([y_train, y_test], ignore_index=True))
@@ -287,112 +350,184 @@ class AbstractTrainer:
                 logger.exception('Warning: Exception caused ' + model.name + ' to fail during hyperparameter tuning... Skipping this model.')
                 logger.debug(err)
                 del model
+                model_names_trained = []
             else:
-                self.hpo_model_names[level] += list(sorted(hpo_models.keys()))
+                model_names_trained = list(sorted(hpo_models.keys()))
+                self.models_level_hpo[stack_name][level] += model_names_trained
                 self.model_paths.update(hpo_models)
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
-                self.model_types.update({name: type(model) for name in sorted(hpo_models.keys())})
+                self.model_types.update({name: type(model) for name in model_names_trained})
+                if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                    self.model_types_inner.update({name: model._child_type for name in model_names_trained})
+                else:
+                    self.model_types_inner.update({name: type(model) for name in model_names_trained})
         else:
-            self.train_and_save(X_train, y_train, X_test, y_test, model, stack_loc=stack_loc, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+            model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
         self.save()
+        return model_names_trained
 
-    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_loc=None, kfolds=None, level=0, ignore_time_limit=False):
+    # TODO: How to deal with models that fail during this? They have trained valid models before, but should we still use those models or remove the entire model? Currently we still use models.
+    # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
+    # TODO: Time allowance not accurate if running from fit_continue
+    # Takes trained bagged ensemble models and fits additional k-fold bags.
+    def train_multi_repeats(self, X_train, y_train, X_test, y_test, models, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=1, level=0, ignore_time_limit=False):
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        models_valid = models
+        models_valid_next = []
+        start_time = time.time()
+        repeats_completed = 0
+        for n in range(n_repeat_start, n_repeats):
+            if not ignore_time_limit:
+                repeat_start_time = time.time()
+                time_left = self.time_limit_per_level - (repeat_start_time - self.time_train_level_start)
+                if n == n_repeat_start:
+                    time_required = self.time_limit_per_level * 0.575  # Require slightly over 50% to be safe
+                else:
+                    time_required = (repeat_start_time - start_time) / repeats_completed * (0.575/0.425)
+                if time_left < time_required:
+                    logger.log(15, 'Not enough time left to finish repeated k-fold bagging, stopping early ...')
+                    break
+            logger.log(20, 'Repeating k-fold bagging: ' + str(n+1) + '/' + str(n_repeats))
+            for i, model in enumerate(models_valid):
+                if type(model) == str:
+                    model = self.load_model(model)
+                models_valid_next += self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, n_repeats=n+1, n_repeat_start=n, level=level, ignore_time_limit=ignore_time_limit)
+            models_valid = copy.deepcopy(models_valid_next)
+            models_valid_next = []
+            repeats_completed += 1
+        logger.log(20, 'Completed ' + str(n_repeat_start + repeats_completed) + '/' + str(n_repeats) + ' k-fold bagging repeats ...')
+        return models_valid
+
+    def train_multi_initial(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
+        stack_loc = self.models_level[stack_name]
+
+        model_names_trained = []
+        model_names_trained_hpo = []
         for i, model in enumerate(models):
-            if self.low_memory:
+            if type(model) == str:
+                model = self.load_model(model)
+            elif self.low_memory:
                 model = copy.deepcopy(model)
-            self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_loc=stack_loc, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+            model_name_trained_lst = self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
+            if hyperparameter_tune:
+                model_names_trained_hpo += model_name_trained_lst
+            else:
+                model_names_trained += model_name_trained_lst
             if self.low_memory:
                 del model
 
         if self.bagged_mode:  # TODO: Maybe toggle this based on if we have sufficient time left in our time budget after HPO
             # TODO: Maybe generate weighted_ensemble prior to bagging, and only bag models which were given weight in the initial weighted_ensemble
-            for i, hpo_model_name in enumerate(self.hpo_model_names[level]):
+            for i, hpo_model_name in enumerate(model_names_trained_hpo):
                 model_hpo = self.load_model(hpo_model_name)
-                if type(model_hpo) == TabularNeuralNetModel:  # TODO: Remove this after fixing TabularNeuralNetModel
-                    model_hpo = model_hpo.create_unfit_copy()
-                elif type(model_hpo) == LGBModel:  # TODO: Remove this after fixing LGBModel
-                    model_hpo.model = None
+                model_hpo = model_hpo.convert_to_template()
                 model_bagged = BaggedEnsembleModel(path=model_hpo.path[:-(len(model_hpo.name) + 1)], name=model_hpo.name + '_' + str(i) + '_BAGGED' + '_l' + str(level), model_base=model_hpo)
-                # TODO: Throws exception on Neural Network since trained object is not pickle-able. Fix this to enable bagging for NN by creating new base model in BaggedEnsembleModel with trained model's hyperparams
-                self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_loc=stack_loc, kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+                model_names_trained += self.train_and_save(X_train, y_train, X_test, y_test, model_bagged, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
                 self.save()
         else:
-            self.models_level[level] += self.hpo_model_names[level]  # Update model list with (potentially empty) list of new models created during HPO
+            stack_loc[level] += model_names_trained_hpo  # Update model list with (potentially empty) list of new models created during HPO
+            model_names_trained += model_names_trained_hpo
         unique_names = []
-        for item in self.models_level[level]:
+        for item in stack_loc[level]:
             if item not in unique_names: unique_names.append(item)
-        self.models_level[level] = unique_names  # make unique and preserve order
+        stack_loc[level] = unique_names  # make unique and preserve order
+        return model_names_trained
+
+    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+        if n_repeats is None:
+            n_repeats = self.n_repeats
+        if ignore_time_limit:
+            n_repeats_initial = n_repeats
+        else:
+            n_repeats_initial = 1
+        if n_repeat_start == 0:
+            model_names_trained = self.train_multi_initial(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                                                           stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats_initial, level=level, ignore_time_limit=ignore_time_limit)
+            n_repeat_start = n_repeats_initial
+        else:
+            model_names_trained = models
+        if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
+            model_names_trained = self.train_multi_repeats(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, models=model_names_trained,
+                                                           stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
+        return model_names_trained
 
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
+        if self.save_data and not self.is_data_saved:
+            self.save_X_train(X_train)
+            self.save_y_train(y_train)
+            if X_test is not None:
+                self.save_X_val(X_test)
+                if y_test is not None:
+                    self.save_y_val(y_test)
+            self.is_data_saved = True
+
+        self.num_rows_train = len(X_train)
+        if X_test is not None:
+            self.num_rows_train += len(X_test)
+        self.num_cols_train = len(list(X_train.columns))
         self.time_train_start = time.time()
-        self.time_train_level_start = self.time_train_start
-        self.train_multi(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
-        for model_name in self.models_level[0]:
-            if model_name not in self.model_performance:
-                model = self.load_model(model_name)
-                self.model_performance[model_name] = model.score(X_test, y_test)
-            logger.log(15, "Performance of %s model: %s" % (model_name, self.model_performance[model_name]))
-        if len(self.models_level[0]) == 0:
+        self.train_multi_levels(X_train, y_train, X_test, y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels)
+        if len(self.get_model_names_all()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
-        if self.bagged_mode:
-            self.stack_new_level_aux(X=X_train, y=y_train, level=1)
-        else:
-            stack_loc = self.models_level_auxiliary
-            X_test_preds = self.get_inputs_to_stacker(X=X_test, level_start=0, level_end=1, fit=False)
-            self.generate_weighted_ensemble(X=X_test_preds, y=y_test, level=1, stack_loc=stack_loc, ignore_time_limit=True)
-
-        if self.stack_mode:
-            for level in range(1, self.stack_ensemble_levels + 1):
-                self.time_train_level_start = time.time()
-                self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (self.stack_ensemble_levels + 1 - level)
-                self.stack_new_level(X=X_train, y=y_train, level=level, ignore_time_limit=self.ignore_time_limit)
+    def train_multi_levels(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0, level_end=0):
+        for level in range(max(0, level_start), level_end + 1):
+            self.time_train_level_start = time.time()
+            self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (level_end + 1 - level)
+            if level == 0:
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
+            else:
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, ignore_time_limit=self.ignore_time_limit)
 
         self.save()
 
         # TODO: Select best weighted ensemble given L2 can be much worse than L1 when dealing with time limitation
 
-    def stack_new_level(self, X, y, level, ignore_time_limit=True):
-        self.stack_new_level_core(X=X, y=y, level=level, ignore_time_limit=ignore_time_limit)
-        self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
+    def stack_new_level(self, X, y, X_test=None, y_test=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
+        self.stack_new_level_core(X=X, y=y, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=ignore_time_limit)
+        if self.bagged_mode:
+            self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
+        else:
+            self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, ignore_time_limit=ignore_time_limit)
 
-    def stack_new_level_core(self, X, y, level=1, ignore_time_limit=True):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
-        if len(base_model_names) == 0:
-            logger.log(20, 'No base models to train on, skipping stack level...')
-            return
-
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
         use_orig_features = True
-        stacker_models = self.get_models(self.hyperparameters)
+        if models is None:
+            models = self.get_models(self.hyperparameters)
 
-        stacker_models = [
-            StackerEnsembleModel(path=self.path, name=stacker_model.name + '_STACKER_l' + str(level), model_base=stacker_model, base_model_names=base_model_names,
-                                 base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                                 num_classes=self.num_classes)
-            for stacker_model in stacker_models]
+        if level > 0:
+            base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level - 1])
+            if len(base_model_names) == 0:
+                logger.log(20, 'No base models to train on, skipping stack level...')
+                return
+            models = [
+                StackerEnsembleModel(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
+                                     base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
+                                     num_classes=self.num_classes)
+                for model in models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+        if X_test is not None:
+            X_test = self.get_inputs_to_stacker(X_test, level_start=0, level_end=level, fit=False)
 
-        self.train_multi(X_train=X_train_init, y_train=y, X_test=None, y_test=None, models=stacker_models, hyperparameter_tune=False, feature_prune=False, level=level, ignore_time_limit=ignore_time_limit)
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, ignore_time_limit=ignore_time_limit)
 
-    def stack_new_level_aux(self, X, y, level, ignore_time_limit=True):
-        stack_loc = self.models_level_auxiliary
-        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
-        self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc, ignore_time_limit=True)
+    def stack_new_level_aux(self, X, y, level, fit=True, ignore_time_limit=True):
+        stack_name = 'aux1'
+        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
+        self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_name=stack_name, ignore_time_limit=True)
 
-        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_loc=stack_loc)
-        # self.generate_stack_log_reg(X=X_train_stack_preds, y=y, level=level, k_fold=self.kfolds, stack_loc=stack_loc)
-
-    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_loc=None, ignore_time_limit=False):
-        if len(self.models_level[level-1]) == 0:
+    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_name=None, hyperparameters=None, ignore_time_limit=False, name_suffix=''):
+        if len(self.models_level['core'][level-1]) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_l' + str(level), base_model_names=self.models_level[level-1],
-                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types,
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(k_fold) + '_l' + str(level), base_model_names=self.models_level['core'][level-1],
+                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
                                                         num_classes=self.num_classes)
 
-        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
-        if weighted_ensemble_model.name in self.model_names:
+        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
+        if weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
             else:
@@ -401,9 +536,10 @@ class AbstractTrainer:
                 if cur_score > best_score:
                     # new best model
                     self.model_best = weighted_ensemble_model.name
+        return weighted_ensemble_model.name
 
-    def generate_stack_log_reg(self, X, y, level, k_fold=0, stack_loc=None):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level[level-1])
+    def generate_stack_log_reg(self, X, y, level, k_fold=0, stack_name=None):
+        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level-1])
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
         name_new = stacker_model_lr.name + '_STACKER_k' + str(k_fold) + '_l' + str(level)
 
@@ -411,7 +547,7 @@ class AbstractTrainer:
                                                 use_orig_features=False,
                                                 num_classes=self.num_classes)
 
-        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_loc=stack_loc, kfolds=k_fold, level=level)
+        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level)
 
     def predict(self, X):
         if self.model_best is not None:
@@ -441,13 +577,16 @@ class AbstractTrainer:
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
         return model.predict_proba(X=X, preprocess=False)
 
-    def get_inputs_to_model(self, model, X, level_start, fit=False):
+    def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
         if type(model) == str:
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
         if model_level >= 1:
             X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level-1, fit=fit)
-        X = model.preprocess(X)
+            X = model.preprocess(X, fit=fit, preprocess=preprocess)
+        else:
+            if preprocess:
+                X = model.preprocess(X)
         return X
 
     def score(self, X, y):
@@ -484,6 +623,10 @@ class AbstractTrainer:
         return preds
 
     def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
+        if level_start > level_end:
+            raise AssertionError('level_start cannot be greater than level end:' + str(level_start) + ', ' + str(level_end))
+        if (level_start == 0) and (level_end == 0):
+            return X
         if fit:
             if level_start >= 1:
                 dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
@@ -526,14 +669,14 @@ class AbstractTrainer:
     def save(self):
         save_pkl.save(path=self.path + self.trainer_file_name, object=self)
 
-    def load_model(self, model_name: str):
+    def load_model(self, model_name: str) -> AbstractModel:
         if self.low_memory:
             return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
         else:
             return self.models[model_name]
 
     def _get_dummy_stacker(self, level, use_orig_features=True):
-        model_names = self.models_level[level - 1]
+        model_names = self.models_level['core'][level-1]
         dummy_stacker = StackerEnsembleModel(
             path='', name='',
             model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func),
@@ -549,62 +692,68 @@ class AbstractTrainer:
         return model_names, model_paths, model_types
 
     def leaderboard(self):
-        model_names = self.model_names
+        model_names = self.get_model_names_all()
         score_val = []
         fit_time = []
-        pred_time = []
+        pred_time_val = []
         stack_level = []
         for model_name in model_names:
             score_val.append(self.model_performance.get(model_name))
             fit_time.append(self.model_fit_times.get(model_name))
-            pred_time.append(self.model_pred_times.get(model_name))
+            pred_time_val.append(self.model_pred_times.get(model_name))
             stack_level.append(self.get_model_level(model_name))
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
             'fit_time': fit_time,
-            'pred_time': pred_time,
+            'pred_time_val': pred_time_val,
             'stack_level': stack_level,
         })
         df_sorted = df.sort_values(by=['score_val', 'model'], ascending=False)
         return df_sorted
 
     def info(self):
-        model_count = len(self.model_names)
+        model_count = len(self.get_model_names_all())
         if self.model_best is not None:
             best_model = self.model_best
         else:
             best_model = self.model_best_core
         best_model_score_val = self.model_performance.get(best_model)
         # fit_time = None
-        stack_levels = self.max_level
+        num_bagging_folds = self.kfolds
+        max_stack_level = self.get_max_level('core')
+        best_model_stack_level = self.get_model_level(best_model)
         problem_type = self.problem_type
         objective_func = self.objective_func.name
+        time_train_start = self.time_train_start
+        num_rows_train = self.num_rows_train
+        num_cols_train = self.num_cols_train
+        num_classes = self.num_classes
         # TODO:
         #  Disk size of models
         #  Raw feature count
-        #  Train row count
-        #  num_classes
-        #  Kfolds
         #  HPO time
         #  Bag time
         #  Feature prune time
         #  Exception count / models failed count
         #  True model count (models * kfold)
-        #  Best Model Error
         #  AutoGluon version fit on
         #  Max memory usage
         #  CPU count used / GPU count used
-        #  Date of fit
 
         info = {
             'model_count': model_count,
             'best_model': best_model,
             'best_model_score_val': best_model_score_val,
-            # 'fit_time': fit_time,
-            'stack_levels': stack_levels,
+            'num_bagging_folds': num_bagging_folds,
+            'max_stack_level': max_stack_level,
+            'best_model_stack_level': best_model_stack_level,
             'problem_type': problem_type,
             'objective_func': objective_func,
+            'time_train_start': time_train_start,
+            'num_rows_train': num_rows_train,
+            'num_cols_train': num_cols_train,
+            'num_classes': num_classes,
         }
 
         return info

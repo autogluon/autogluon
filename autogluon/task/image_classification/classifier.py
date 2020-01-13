@@ -18,14 +18,14 @@ from ...utils.pil_transforms import *
 __all__ = ['Classifier']
 
 class Classifier(BasePredictor):
-    """
-    Classifier returned by task.fit()
+    """Trained Image Classifier returned by fit() that can be used to make predictions on new images.
 
     Attributes
     ----------
 
     Examples
     --------
+    >>> from autogluon import ImageClassification as task
     >>> dataset = task.Dataset(train_path='data/train',
     >>>                        test_path='data/test')
     >>> classifier = task.fit(dataset,
@@ -46,6 +46,8 @@ class Classifier(BasePredictor):
 
     @classmethod
     def load(cls, checkpoint):
+        """Load trained Image Classifier from directory specified by `checkpoint`.
+        """
         state_dict = load(checkpoint)
         args = state_dict['args']
         results = state_dict['results']
@@ -71,20 +73,32 @@ class Classifier(BasePredictor):
         return destination
 
     def save(self, checkpoint):
+        """ Save image classifier to folder specified by `checkpoint`.
+        """
         save(self.state_dict(), checkpoint)
 
     def predict(self, X, input_size=224, plot=True):
-        """ This method should be able to produce predictions regardless if:
-            X = single data example (e.g. single image),
-            X = task.Dataset object
-        """
-        """The task predict function given an input.
+        """Predict class-index and associated class probability for each image in a given dataset (or just a single image). 
+        
         Parameters
         ----------
-            X : str or :func:`autogluon.task.ImageClassification.Dataset`
-                path to the input image or dataset
-        Example:
-        >>> ind, prob = classifier.predict('example.jpg')
+        X : str or :class:`autogluon.task.ImageClassification.Dataset`
+            If str, should be path to the input image (when we just want to predict on single image).
+            Otherwise should be dataset of multiple images in same format as training dataset.
+        input_size : int
+            Size of the images (pixels).
+        plot : bool
+            Whether to plot the image being classified.
+        
+        Examples
+        --------
+        >>> from autogluon import ImageClassification as task
+        >>> train_data = task.Dataset(train_path='~/data/train')
+        >>> classifier = task.fit(train_data,
+        >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                       time_limits=600, ngpus_per_trial=1, num_trials=4)
+        >>> test_data = task.Dataset('~/data/test', train=False)
+        >>> class_index, class_probability = classifier.predict('example.jpg')
         """
         # model inference
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
@@ -126,20 +140,32 @@ class Classifier(BasePredictor):
             return img.convert('RGB')
 
     def predict_proba(self, X):
-        """ Produces predicted class probabilities if we are dealing with a classification task.
-            In this case, predict() should just be a wrapper around this method to convert predicted probabilties to predicted class labels.
+        """Produces predicted class probabilities for a given image.
         """
         pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):
-        """The task evaluation function given the test dataset.
-         Args:
-            dataset: test dataset
-         Example:
-            >>> from autogluon import ImageClassification as task
-            >>> dataset = task.Dataset(name='shopeeiet', test_path='~/data/test')
-            >>> test_reward = classifier.evaluate(dataset)
+        """Evaluate predictive performance of trained image classifier using given test data.
+        
+        Parameters
+        ----------
+        dataset : :class:`autogluon.task.ImageClassification.Dataset`
+            The dataset containing test images (must be in same format as the training dataset).
+        input_size : int
+            Size of the images (pixels).
+        ctx : List of mxnet.context elements.
+            Determines whether to use CPU or GPU(s), options include: `[mx.cpu()]` or `[mx.gpu()]`.
+        
+        Examples
+        --------
+        >>> from autogluon import ImageClassification as task
+        >>> train_data = task.Dataset(train_path='~/data/train')
+        >>> classifier = task.fit(train_data,
+        >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
+        >>>                       time_limits=600, ngpus_per_trial=1, num_trials = 4)
+        >>> test_data = task.Dataset('~/data/test', train=False)
+        >>> test_acc = classifier.evaluate(test_data)
         """
         args = self.args
         net = self.model
