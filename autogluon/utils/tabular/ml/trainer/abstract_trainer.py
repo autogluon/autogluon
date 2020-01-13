@@ -327,17 +327,21 @@ class AbstractTrainer:
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
-        if n_repeat_start == 0:
+        if (n_repeat_start == 0) and (k_fold_start == 0):
             model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
+            elif k_fold_start != 0:
+                raise ValueError('k_fold_start must be 0 to feature_prune, value = ' + str(k_fold_start))
             self.autotune(X_train=X_train, X_holdout=X_test, y_train=y_train, y_holdout=y_test, model_base=model)  # TODO: Update to use CV instead of holdout
         if hyperparameter_tune:
             if self.scheduler_func is None or self.scheduler_options is None:
                 raise ValueError("scheduler_options cannot be None when hyperparameter_tune = True")
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to hyperparameter_tune, value = ' + str(n_repeat_start))
+            elif k_fold_start != 0:
+                raise ValueError('k_fold_start must be 0 to hyperparameter_tune, value = ' + str(k_fold_start))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
                 if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
