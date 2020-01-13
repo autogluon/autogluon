@@ -111,6 +111,8 @@ class ImageClassification(BaseTask):
             Search Algorithms ('random', 'bayesopt' and 'hyperband')
         resume : bool
             If checkpoint exists, the experiment will resume from there.
+        ensemble : 1
+            Number of ensembles used for the output model. This is designed for participating challenge purposes.
 
         Examples
         --------
@@ -174,4 +176,13 @@ class ImageClassification(BaseTask):
 
         model = get_network(args.net, results['num_classes'], mx.cpu(0))
         update_params(model, results.pop('model_params'))
+        models = [model]
+        scheduler = scheduler(train_image_classification, **scheduler_options)
+        if ensemble > 1:
+            for i in range(1, ensemble):
+                resultsi = scheduler.run_with_config(best_config)
+                model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
+                update_params(model, resultsi.pop('model_params'))
+                models.append(model)
+        model = Ensemble(models)
         return Classifier(model, results, default_val_fn, checkpoint, args)
