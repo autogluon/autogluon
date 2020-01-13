@@ -2,8 +2,7 @@
 
 This tutorial explains the supported search spaces and how to use them, including
 simple search spaces (Int, Real, and Categorical) and nested search spaces
-(Categorical, List, Dict).
-AutoGluon also enables search spaces in user-defined objects using the decorator
+(Categorical, List, Dict). Each search space describes the set of possible values for a hyperparameter, from which the searcher will try particular values during hyperparameter optimization. AutoGluon also enables search spaces in user-defined objects using the decorator
 `ag.obj` and user-defined functions using the decorator `ag.func`.
 
 ## Search Space
@@ -189,7 +188,7 @@ for _ in range(5):
 
 #### Searchable Space in Customized Function :func:`autogluon.obj`
 
-We can also insert searchable space in a customized function:
+We can also insert a searchable space in a customized function:
 
 ```{.python .input}
 @ag.func(
@@ -201,7 +200,7 @@ i = myfunc()
 print(i)
 ```
 
-We can also make them inside a nested space:
+We can also put a searchable space inside a nested space:
 
 ```{.python .input}
 j = ag.space.Dict(

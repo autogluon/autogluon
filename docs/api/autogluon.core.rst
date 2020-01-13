@@ -36,7 +36,7 @@ Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary
    ...     assert i in ['mxnet', 'pytorch']
    ...     reporter(epoch=e, accuracy=0)
 
-   Create a scheduler and run trials to find best values of the hyperparameters:
+   Create a scheduler and run training trials to search for the best values of the hyperparameters:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
@@ -58,7 +58,6 @@ Core APIs
    args
    obj
    func
-   done
 
 :hidden:`args`
 ~~~~~~~~~~~~~~

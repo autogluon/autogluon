@@ -20,30 +20,30 @@ from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric
 
 class CustomVOCDetectionBase(gdata.VOCDetection):
-    """custom Dataset which follows VOC protocol.
+    """Base class for custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
     
     Parameters
     ----------
-    class: tuple of classes, default None
-        reuse the weights if the corresponding class appears in the pretrained model, 
-        otherwise, randomly initialize the weights for new categories.
+    class: tuple of classes, default = None
+        We reuse the neural network weights if the corresponding class appears in the pretrained model. 
+        Otherwise, we randomly initialize the neural network weights for new classes.
     root : str, default '~/mxnet/datasets/voc'
         Path to folder storing the dataset.
     splits : list of tuples, default ((2007, 'trainval'), (2012, 'trainval'))
         List of combinations of (year, name)
         For years, candidates can be: 2007, 2012.
         For names, candidates can be: 'train', 'val', 'trainval', 'test'.
-    transform : callable, default None
+    transform : callable, default = None
         A function that takes data and label and transforms them. Refer to
         :doc:`./transforms` for examples.
         A transform function for object detection should take label into consideration,
         because any geometric modification will require label to be modified.
-    index_map : dict, default None
-        In default, the 20 classes are mapped into indices from 0 to 19. We can
+    index_map : dict, default = None
+        By default, the 20 classes are mapped into indices from 0 to 19. We can
         customize it by providing a str to int dict specifying how to map class
-        names to indices. Use by advanced users only, when you want to swap the orders
+        names to indices. This is only for advanced users, when you want to swap the orders
         of class labels.
-    preload_label : bool, default True
+    preload_label : bool, default = True
         If True, then parse and load all labels into memory during
         initialization. It often accelerate speed but require more memory
         usage. Typical preloaded labels took tens of MB. You only need to disable it
@@ -116,6 +116,26 @@ class CustomVOCDetectionBase(gdata.VOCDetection):
 
 @obj()
 class CustomVOCDetection():
+    """Custom Dataset which follows protocol/formatting of the well-known VOC object detection dataset.
+    
+    Parameters
+    ----------
+    root : str, default '~/mxnet/datasets/voc'
+        Path to folder storing the dataset.
+    splits : list of tuples        
+        List of combinations of (year, name) to indicate how to split data into training, validation, and test sets.
+        For the original VOC dataset, the year candidates can be: 2007, 2012.
+        For the original VOC dataset, the name candidates can be: 'train', 'val', 'trainval', 'test'.
+        For the original VOC dataset, one might use for example: ((2007, 'trainval'), (2012, 'trainval'))
+    classes: tuple of classes
+        We reuse the neural network weights if the corresponding class appears in the pretrained model. 
+        Otherwise, we randomly initialize the neural network weights for new classes.
+    
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
+    """
     def __init__(self, root, splits, name, classes, **kwargs):
         super().__init__()
         self.root = root

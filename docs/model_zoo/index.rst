@@ -1,13 +1,13 @@
 autogluon.model_zoo
 ===================
 
-Pretrained Models discovered via Neural Architecture Search
+Here we provide pretrained Models discovered via Neural Architecture Search
 
 How To Use Pretrained Models
 ----------------------------
 
 
-How to load pretrained 'efficientnet_b0'.
+Example showing how to load pretrained network 'efficientnet_b0', which was produced via NAS.
 
 .. code-block:: python
 
@@ -18,7 +18,8 @@ How to load pretrained 'efficientnet_b0'.
 EfficientNet
 ------------
 
-The pretrained EfficientNet [1]_ models are provided.
+The following pretrained EfficientNet [1]_ models are provided for image classification. 
+The accuracy achieved by each model on a popular image classification benchmark is indicated, along with the image crop-size used by each model.  
 
 .. [1] Tan, Mingxing, and Quoc V. Le. \
        "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks.
@@ -44,8 +45,8 @@ The pretrained EfficientNet [1]_ models are provided.
 +---------------------------+--------+-----------+
 
 
-How to reproduce search on EfficientNet?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How to reproduce EfficientNet's neural architecture search
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 

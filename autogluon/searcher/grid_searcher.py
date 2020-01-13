@@ -5,7 +5,8 @@ from ..core.space import Categorical
 from sklearn.model_selection import ParameterGrid
 
 class GridSearcher(BaseSearcher):
-    """Grid Searcher, only search spaces :class:`autogluon.space.Categorical`
+    """Grid Searcher that exhaustively tries all possible configurations. 
+       This Searcher can only be used for discrete search spaces of type :class:`autogluon.space.Categorical`
 
     Examples
     --------
@@ -19,7 +20,6 @@ class GridSearcher(BaseSearcher):
     >>> searcher.get_config()
     Number of configurations for grid search is 9
     {'x.choice': 2, 'y.choice': 2}
-   
     """
     def __init__(self, configspace):
         super().__init__(configspace)
@@ -39,4 +39,6 @@ class GridSearcher(BaseSearcher):
         return len(self._configs)
 
     def get_config(self):
+        """ Return new hyperparameter configuration to try next.
+        """
         return self._configs.pop()
