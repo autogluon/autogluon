@@ -16,12 +16,12 @@ class Ensemble(object):
 
     def __call__(self, *inputs):
         outputs = [model(*inputs) for model in self.model_list]
-        output = outputs[0]
+        output = outputs[0].exp()
         for i in range(1, len(outputs)):
-            output += outputs[i]
+            output += outputs[i].exp()
 
         output /= len(outputs)
-        return output
+        return output.log()
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
