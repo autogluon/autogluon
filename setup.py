@@ -63,7 +63,7 @@ requirements = [
     'catboost',
     'boto3==1.9.187',
     'lightgbm==2.3.0',
-    'pandas==0.24.2',
+    'pandas==0.25.1',
     'psutil',
     'scikit-learn==0.21.2',
     'Pillow<=6.2.1',
