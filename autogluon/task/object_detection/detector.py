@@ -52,8 +52,8 @@ class Detector(BasePredictor):
          ----------
         dataset: `Dataset`
             Test dataset (must be in the same format as training data previously provided to fit).
-        ctx : `mxnet.context`
-            Which MXNet context to use for evaluation (CPU or GPU).
+        ctx : List of `mxnet.context` elements.
+            Determines whether to use CPU or GPU(s), options include: `[mx.cpu()]` or `[mx.gpu()]`.
         """
         args = self.args
         net = self.model
@@ -143,7 +143,7 @@ class Detector(BasePredictor):
         thresh : float
             Confidence Threshold above which detector outputs bounding box for object.
         plot : bool
-            Whether or not to plot the detected objects on top of the original images.
+            Whether or not to plot the bounding box of detected objects on top of the original images.
         
         Returns
         -------

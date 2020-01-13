@@ -108,11 +108,11 @@ class ImageClassification(BaseTask):
             Loss function used during training of the neural network weights.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.
-        split_ratio : float, defaut = 0.8
+        split_ratio : float, default = 0.8
             Fraction of dataset to use for training (rest of data is held-out for tuning hyperparameters).
             The final returned model may be fit to all of the data (after hyperparameters have been selected).
         time_limits : int
-            Approximately how long should `fit()` should run for (wallclock time in seconds).
+            Approximately how long `fit()` should run for (wallclock time in seconds).
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).

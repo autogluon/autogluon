@@ -32,7 +32,7 @@ Search space of possible hyperparameter values to consider.
    >>> scheduler.run()
    >>> scheduler.join_jobs()
 
-   Visiualize the results:
+   Visualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 

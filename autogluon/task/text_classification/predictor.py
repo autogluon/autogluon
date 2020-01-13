@@ -81,8 +81,8 @@ class TextClassificationPredictor(Classifier):
         ----------
         dataset : :class:`autogluon.task.TextClassification.Dataset`
             The dataset containing test sentences (must be in same format as the training dataset provided to fit).
-        ctx : mxnet.context
-            Whether to use CPU or GPU, options are: `mx.cpu()` or `mx.gpu()`.
+        ctx : List of `mxnet.context` elements.
+            Determines whether to use CPU or GPU(s), options include: `[mx.cpu()]` or `[mx.gpu()]`.
         
          Examples
          --------

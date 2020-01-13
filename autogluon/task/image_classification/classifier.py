@@ -87,8 +87,8 @@ class Classifier(BasePredictor):
             Otherwise should be dataset of multiple images in same format as training dataset.
         input_size : int
             Size of the images (pixels).
-        ctx : mxnet.context
-            Whether to use CPU or GPU, options are: `mx.cpu()` or `mx.gpu()`.
+        plot : bool
+            Whether to plot the image being classified.
         
         Examples
         --------
@@ -154,8 +154,8 @@ class Classifier(BasePredictor):
             The dataset containing test images (must be in same format as the training dataset).
         input_size : int
             Size of the images (pixels).
-        ctx : mxnet.context
-            Whether to use CPU or GPU, options are: `mx.cpu()` or `mx.gpu()`.
+        ctx : List of mxnet.context elements.
+            Determines whether to use CPU or GPU(s), options include: `[mx.cpu()]` or `[mx.gpu()]`.
         
         Examples
         --------

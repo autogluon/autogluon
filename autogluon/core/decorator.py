@@ -147,7 +147,7 @@ def args(default={}, **kwvars):
 
 def func(**kwvars):
     """Decorator for a function that registers its arguments as hyperparameters. 
-       Each hyperparameter may take fixed value or be a searchable space (autogluon.space).
+       Each hyperparameter may take a fixed value or be a searchable space (autogluon.space).
 
     Returns
     -------
@@ -194,12 +194,12 @@ def func(**kwvars):
 
 def obj(**kwvars):
     """Decorator for a Python class that registers its arguments as hyperparameters. 
-       Each hyperparameter may take fixed value or be a searchable space (autogluon.space).
+       Each hyperparameter may take a fixed value or be a searchable space (autogluon.space).
 
     Returns
     -------
     Instance of :class:`autogluon.space.AutoGluonObject`:
-        A lazily initialized object object, which allows distributed training.
+        A lazily initialized object, which allows distributed training.
 
     Examples
     --------

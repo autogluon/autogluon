@@ -55,7 +55,8 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
-            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
+            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None,
+            num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters = {
                                'NN': {'num_epochs': 500},
                                'GBM': {'num_boost_round': 10000},
@@ -104,7 +105,12 @@ class TabularPrediction(BaseTask):
         hyperparameter_tune : bool, default = False
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
         feature_prune : bool, default = False
-            Whether or not to perform feature selection. 
+            Whether or not to perform feature selection.
+        auto_stack : bool, default = False
+            Whether to have AutoGluon automatically attempt to select optimal num_bagging_folds and stack_ensemble_levels based on data properties. 
+            Note: Overrides num_bagging_folds and stack_ensemble_levels values. 
+            Note: This can increase training time by up to 20x, but can produce much better results. 
+            Note: This can increase inference time by up to 20x. 
         hyperparameters : dict
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
@@ -134,16 +140,28 @@ class TabularPrediction(BaseTask):
         holdout_frac : float 
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
             Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
-        num_bagging_folds : int
+        num_bagging_folds : int, default = 0
             Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging). 
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance. 
-        stack_ensemble_levels : int
+            Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting. 
+            Values > 10 may produce diminishing returns, and can even harm overall results due to overfitting. 
+            To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets. 
+        num_bagging_sets : int
+            Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets. 
+            Defaults to 1 if time_limits is not specified, otherwise 10 (always disabled if num_bagging_folds is not specified). 
+            Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled. 
+            Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit. 
+        stack_ensemble_levels : int, default = 0
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
-            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`. 
+            To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
+        enable_fit_continuation : bool, default = False
+            Whether the predictor returned by this `fit()` call should be able to be further trained via another future `fit()` call. 
+            When enabled, the training and validation data are saved to disk for future reuse.
         time_limits : int
             Approximately how long `fit()` should run for (wallclock time in seconds). 
-            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+            If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
+            The given time_limits may be exceeded if even just a single model takes much longer to train on your dataset.
         num_trials : int 
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent. 

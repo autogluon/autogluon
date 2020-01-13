@@ -35,7 +35,7 @@ autogluon.searcher
    ...                                        time_attr='epoch')
    >>> scheduler.run()
 
-   Visiualize the results:
+   Visualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 
