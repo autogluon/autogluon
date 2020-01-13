@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class GreedyWeightedEnsembleModel(AbstractModel):
     def __init__(self, path, name, num_classes, base_model_names, model_base=EnsembleSelection, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
-        super().__init__(path, name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
+        super().__init__(path, name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
         self.model_base = model_base
         self.num_classes = num_classes
         self.base_model_names = base_model_names

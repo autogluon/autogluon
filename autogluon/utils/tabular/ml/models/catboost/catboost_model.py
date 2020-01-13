@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor

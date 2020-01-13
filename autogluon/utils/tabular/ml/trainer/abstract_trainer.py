@@ -701,7 +701,7 @@ class AbstractTrainer:
         model_names = self.models_level['core'][level-1]
         dummy_stacker = StackerEnsembleModel(
             path='', name='',
-            model_base=AbstractModel(path='', name='', model=None, problem_type=self.problem_type, objective_func=self.objective_func),
+            model_base=AbstractModel(path='', name='', problem_type=self.problem_type, objective_func=self.objective_func),
             base_model_names=model_names, base_model_paths_dict=self.model_paths,
             base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level
         )

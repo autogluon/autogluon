@@ -24,7 +24,7 @@ class LGBModel(AbstractModel):
     def __init__(self, path, name, problem_type, objective_func,
                  num_classes=None, hyperparameters=None, features=None, debug=0):
         self.num_classes = num_classes
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
 
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True

@@ -48,7 +48,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path, name, model=None, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs

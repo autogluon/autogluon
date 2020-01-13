@@ -29,7 +29,7 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = self.model_base.feature_types_metadata
         except:
             feature_types_metadata = None
-        super().__init__(path=path, name=name, model=None, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
+        super().__init__(path=path, name=name, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
