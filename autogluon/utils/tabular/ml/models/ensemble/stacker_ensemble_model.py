@@ -143,6 +143,18 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stratified = False
         else:
             stratified = True
+
+        if len(self.models) == 0:
+            if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
+                self.feature_types_metadata = {'float': self.stack_columns}
+            else:
+                self.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)
+                if 'float' in self.feature_types_metadata.keys():
+                    self.feature_types_metadata['float'] += self.stack_columns
+                else:
+                    self.feature_types_metadata['float'] = self.stack_columns
+        self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Move this
+
         # TODO: Preprocess data here instead of repeatedly
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=1)
