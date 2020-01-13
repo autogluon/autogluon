@@ -12,6 +12,7 @@ from ...searcher import *
 from ...scheduler import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
+from ..base.base_task import schedulers
 from ...utils import update_params
 
 from .dataset import get_dataset
@@ -66,6 +67,7 @@ class ImageClassification(BaseTask):
             batch_size=64,
             input_size=224,
             epochs=20,
+            ensemble=1,
             metric='accuracy',
             nthreads_per_trial=4,
             ngpus_per_trial=1,
@@ -176,13 +178,19 @@ class ImageClassification(BaseTask):
 
         model = get_network(args.net, results['num_classes'], mx.cpu(0))
         update_params(model, results.pop('model_params'))
-        models = [model]
-        scheduler = scheduler(train_image_classification, **scheduler_options)
         if ensemble > 1:
+            models = [model]
+            if isinstance(search_strategy, str):
+                scheduler = schedulers[search_strategy.lower()]
+            else:
+                assert callable(search_strategy)
+                scheduler = search_strategy
+                scheduler_options['searcher'] = 'random'
+            scheduler = scheduler(train_image_classification, **scheduler_options)
             for i in range(1, ensemble):
-                resultsi = scheduler.run_with_config(best_config)
+                resultsi = scheduler.run_with_config(results['best_config'])
                 model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
                 update_params(model, resultsi.pop('model_params'))
                 models.append(model)
-        model = Ensemble(models)
+            model = Ensemble(models)
         return Classifier(model, results, default_val_fn, checkpoint, args)
