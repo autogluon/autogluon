@@ -11,7 +11,7 @@ __all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 logger = logging.getLogger(__name__)
 
 class BaseSearcher(object):
-    """Base Searcher (A virtual class to inherit from)
+    """Base Searcher (virtual class to inherit from if you are creating a custom Searcher).
 
     Parameters
     ----------
@@ -41,11 +41,11 @@ class BaseSearcher(object):
     def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
 
-        Note that for multi-fidelity schedulers (e.g., Hyperband), also
-        intermediate results are reported. In this case, the time attribute is
-        among **kwargs. We can also assume that if
-        register_pending(config, ...) is received, then later on,
-        the searcher receives update(config, ...) with milestone as time attribute.
+        Note that for multi-fidelity schedulers (e.g., Hyperband), 
+        intermediate results are also reported. In this case, the time attribute is
+        among `**kwargs`. We can also assume that if
+        `register_pending(config, ...)` is received, then later on,
+        the searcher receives `update(config, ...)` with milestone as time attribute.
         """
         is_done = kwargs.get('done', False)
         is_terminated = kwargs.get('terminated', False)
@@ -76,6 +76,9 @@ class BaseSearcher(object):
         pass
 
     def get_best_reward(self):
+        """Calculates the reward (i.e. validation performance) produced by training under the best configuration identified so far.
+           Assumes higher reward values indicate better performance.
+        """
         with self.LOCK:
             if len(self._results) > 0:
                 config = max(self._results, key=self._results.get)
@@ -83,12 +86,16 @@ class BaseSearcher(object):
         return 0.0
 
     def get_reward(self, config):
+        """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
+        """
         k = pickle.dumps(config)
         with self.LOCK:
             assert k in self._results
             return self._results[k]
 
     def get_best_config(self):
+        """Returns the best configuration found so far.
+        """
         with self.LOCK:
             if len(self._results) > 0:
                 config = max(self._results, key=self._results.get)
@@ -97,6 +104,8 @@ class BaseSearcher(object):
                 return {}
 
     def get_best_config_reward(self):
+        """Returns the best configuration found so far, as well as the reward associated with this best config.
+        """
         with self.LOCK:
             if len(self._results) > 0:
                 config_pkl = max(self._results, key=self._results.get)
@@ -117,13 +126,13 @@ class BaseSearcher(object):
 
 # TODO: Does not use default hyperparams for first run
 class RandomSearcher(BaseSearcher):
-    """Random sampling Searcher for ConfigSpace
+    """Searcher which randomly samples configurations to try next.
 
     Parameters
     ----------
     configspace: ConfigSpace.ConfigurationSpace
         The configuration space to sample from. It contains the full
-        specification of the Hyperparameters with their priors
+        specification of the set of hyperparameter values (with optional prior distributions over these values).
 
     Examples
     --------
@@ -140,12 +149,11 @@ class RandomSearcher(BaseSearcher):
     MAX_RETRIES = 100
 
     def get_config(self, **kwargs):
-        """Function to sample a new configuration at random
+        """Sample a new configuration at random
 
-        Parameters
-        ----------
-        returns: config
-            must return a valid configuration
+        Returns
+        -------
+        A new configuration that is valid.
         """
         if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
             new_config = self.configspace.get_default_configuration().get_dictionary()

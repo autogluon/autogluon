@@ -5,20 +5,18 @@
 
 ![](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_system.png)
 
-AutoGluon system includes Searcher, Scheduler and Resource Manager:
+Important components of the AutoGluon system include the Searcher, Scheduler and Resource Manager:
 
-- The Searcher suggests configurations for the next training jobs.
-- Scheduler schedules the training job when the computation resources are available.
+- The Searcher suggests hyperparameter configurations for the next training job.
+- The Scheduler runs the training job when computation resources become available.
 
-In this tutorial, we illustrate how the search algorithm works and
-compare the performance on a toy experiments.
+In this tutorial, we illustrate how various search algorithms work and
+compare their performance via toy experiments.
 
 ## FIFO Scheduling vs. Early Stopping
 
-In this section, we compare the different behaviors of a sequential First In, First Out (FIFO) scheduling
-using :class:`autogluon.scheduler.FIFOScheduler` vs. a preemptive scheduling algorithm
-:class:`autogluon.scheduler.HyperbandScheduler` that terminates the trial with bad
-configurations at the early/middle stages.
+In this section, we compare the different behaviors of a sequential First In, First Out (FIFO) scheduler using :class:`autogluon.scheduler.FIFOScheduler` vs. a preemptive scheduling algorithm
+:class:`autogluon.scheduler.HyperbandScheduler` that early-terminates certain training jobs that do not appear promising during their early stages.
 
 ### Create a Dummy Training Function
 
@@ -37,7 +35,7 @@ def train_fn(args, reporter):
 
 ### FIFO Scheduler
 
-This scheduler runs training trials in order.
+This scheduler runs training trials in order. When there are more resources available than required for a single training job, multiple training jobs may be run in parallel.
 
 ```{.python .input}
 scheduler = ag.scheduler.FIFOScheduler(train_fn,
