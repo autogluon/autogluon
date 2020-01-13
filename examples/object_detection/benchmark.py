@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     dataset_train, dataset_test = get_dataset(args) 
 
-    time_limits = 5*60*60 # 5 days
+    time_limits = 5*24*60*60 # 5 days
     epochs = 1
     detector = task.fit(dataset_train,
                         num_trials=30,
