@@ -244,7 +244,7 @@ class DefaultLearner(AbstractLearner):
             new_df = clss_df.copy()
             new_df = new_df[:remainder]
             while duplicate_times > 0:
-                logger.debug("Duplicating data from rare class: " + clss)
+                logger.debug("Duplicating data from rare class: " + str(clss))
                 duplicate_times -= 1
                 new_df = new_df.append(clss_df.copy())
             aug_df = aug_df.append(new_df.copy())
