@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Pass in num_classes?
 class RFModel(SKLearnModel):
-    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
         if self.params['model_type'] == 'rf':
             if self.problem_type == REGRESSION:

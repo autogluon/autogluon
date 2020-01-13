@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
-    def __init__(self, path, name, model_base: AbstractModel, hyperparameters=None, random_state=0, debug=0):
+    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []

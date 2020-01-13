@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)  # TODO: Currently
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
-    def __init__(self, path, name, problem_type, objective_func,
+    def __init__(self, path: str, name: str, problem_type: str, objective_func,
                  num_classes=None, hyperparameters=None, features=None, debug=0):
         self.num_classes = num_classes
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)

@@ -2,9 +2,8 @@ import logging, time, pickle, os
 import numpy as np
 import pandas as pd
 
-from ....metrics import accuracy
 from ...utils import get_pred_from_proba
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, REGRESSION
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
 from .... import metrics
@@ -48,7 +47,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model=None, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs

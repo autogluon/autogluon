@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None, debug=0):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor
