@@ -254,6 +254,7 @@ class AbstractModel:
 
     # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
+        self.model = None
         return self
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):

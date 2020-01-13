@@ -38,10 +38,6 @@ class LGBModel(AbstractModel):
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
 
-    def convert_to_template(self):
-        self.model = None
-        return self
-
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
         start_time = time.time()

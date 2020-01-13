@@ -53,10 +53,6 @@ class RFModel(SKLearnModel):
 
         return spaces
 
-    def convert_to_template(self):
-        self.model = None
-        return self
-
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         hyperparams = self.params.copy()
         hyperparams.pop('model_type')

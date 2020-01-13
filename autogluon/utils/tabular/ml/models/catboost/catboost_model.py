@@ -41,10 +41,6 @@ class CatboostModel(AbstractModel):
 
         return spaces
 
-    def convert_to_template(self):
-        self.model = None
-        return self
-
     def preprocess(self, X):
         X = super().preprocess(X)
         categoricals = list(X.select_dtypes(include='category').columns)
