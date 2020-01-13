@@ -52,7 +52,7 @@ net = ag.space.Categorical('mobilenet0.25', get_mobilenet())
 print(net)
 ```
 
-## Specify the Optimizer and Its Search Spaece
+## Specify the Optimizer and Its Search Space
 
 Similarly, we can manually specify the optimizer candidates.
 We can construct another search space to identify which optimizer works best for our task, and also identify the best hyperparameter configurations for this optimizer.
@@ -131,7 +131,7 @@ classifier = task.fit(dataset,
                       lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                       search_strategy=search_strategy,
                       epochs=epochs,
-                      num_trials=1,
+                      num_trials=2,
                       verbose=False,
                       plot_results=True,
                       ngpus_per_trial=1,
