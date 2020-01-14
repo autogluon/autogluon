@@ -63,7 +63,7 @@ if __name__ == '__main__':
     dataset_train, dataset_test = get_dataset(args) 
 
     time_limits = 5*60*60 # 5 days
-    epochs = 10
+    epochs = 1
     # use coco pre-trained model for custom datasets
     transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else 'coco' 
     detector = task.fit(dataset_train,

@@ -40,7 +40,7 @@ In this section, we demonstrate how to apply AutoGluon to fit our detection mode
 We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 30 epoches. 
 
 ```{.python .input}
-time_limits = 5*60*60 # 5 days
+time_limits = 5*60*60  # 5 hours
 epochs = 30
 detector = task.fit(dataset_train,
                     num_trials=2,
