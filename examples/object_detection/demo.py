@@ -11,7 +11,7 @@ filename = ag.unzip(filename_zip, root=root)
 data_root = os.path.join(root, filename)
 dataset_train = task.Dataset(data_root, classes=('motorbike',))
 
-time_limits = 5*60*60 # 5 days
+time_limits = 5*60*60 # 5 hours
 epochs = 30
 detector = task.fit(dataset_train,
                     num_trials=2,

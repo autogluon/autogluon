@@ -93,7 +93,11 @@ class LabelCleanerBinary(LabelCleaner):
         if len(self.unique_values) != 2:
             raise AssertionError('y does not contain exactly 2 unique values:', self.unique_values)
         # TODO: Clean this code, for loop
-        if (False in self.unique_values) and (True in self.unique_values):
+        if (1 in self.unique_values) and (2 in self.unique_values):
+            self.inv_map: dict = {1: 0, 2: 1}
+        elif ('1' in self.unique_values) and ('2' in self.unique_values):
+            self.inv_map: dict = {'1': 0, '2': 1}
+        elif (False in self.unique_values) and (True in self.unique_values):
             self.inv_map: dict = {False: 0, True: 1}
         elif (0 in self.unique_values) and (1 in self.unique_values):
             self.inv_map: dict = {0: 0, 1: 1}
