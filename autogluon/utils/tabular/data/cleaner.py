@@ -5,6 +5,7 @@ from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 
+
 # Cleaner cleans data prior to entering feature generation
 class Cleaner:
     @staticmethod
@@ -61,10 +62,10 @@ class CleanerMulticlass(Cleaner):
         sum_after = sum(class_counts_valid)
         percent = sum_after / sum_prior
         if len(valid_classes) < len(class_counts):
-            logger.log(25, 'Warning: Some classes in data were not valid. AutoGluon will only keep '+str(len(valid_classes))+
-                   ' out of '+str(len(class_counts))+ ' classes')
+            logger.log(25, 'Warning: Some classes in the training set have fewer than %s examples. AutoGluon will only keep %s out of %s classes for training. '
+                           'To keep more classes, increase data size or reduce label_count_threshold.' % (threshold, len(valid_classes), len(class_counts)))
         if percent < 1.0:
-            logger.log(25, 'Fraction of data that will be kept for training models: '+str(percent))
+            logger.log(25, 'Fraction of data that contain classes with at least %s examples and will be kept for training models: %s' % (threshold, percent))
         return valid_classes
 
     @staticmethod
