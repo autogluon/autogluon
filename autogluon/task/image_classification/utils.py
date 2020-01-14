@@ -1,6 +1,6 @@
 import numpy as np
 import mxnet as mx
-from mxnet import gluon
+from mxnet import gluon, nd
 import gluoncv as gcv
 from .nets import *
 from .dataset import *
@@ -49,25 +49,79 @@ def imagenet_batch_fn(batch, ctx):
     return data, label
 
 def default_batch_fn(batch, ctx):
-    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0)
-    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0)
+    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0 ,even_split=False)
+    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0 ,even_split=False)
     return data, label
 
-def default_val_fn(net, batch, batch_fn, metric, ctx):
+
+def default_val_fn(net, batch, batch_fn, metric, ctx, dtype='float32'):
     with mx.autograd.pause(train_mode=False):
         data, label = batch_fn(batch, ctx)
-        outputs = [net(X) for X in data]
+        outputs = [net(X.astype(dtype, copy=False)) for X in data]
     metric.update(label, outputs)
 
-def default_train_fn(net, batch, batch_size, criterion, trainer, batch_fn, ctx):
+def mixup_transform(label, classes, lam=1, eta=0.0):
+    if isinstance(label, nd.NDArray):
+        label = [label]
+    res = []
+    for l in label:
+        y1 = l.one_hot(classes, on_value = 1 - eta + eta/classes, off_value = eta/classes)
+        y2 = l[::-1].one_hot(classes, on_value = 1 - eta + eta/classes, off_value = eta/classes)
+        res.append(lam*y1 + (1-lam)*y2)
+    return res
+
+def smooth(label, classes, eta=0.1):
+    if isinstance(label, nd.NDArray):
+        label = [label]
+    smoothed = []
+    for l in label:
+        res = l.one_hot(classes, on_value = 1 - eta + eta/classes, off_value = eta/classes)
+        smoothed.append(res)
+    return smoothed
+
+def default_train_fn(epoch, num_epochs, net, batch, batch_size, criterion, trainer, batch_fn, ctx,
+                     mixup=False, label_smoothing=False, distillation=False,
+                     mixup_alpha=0.2, mixup_off_epoch=0, classes=1000,
+                     dtype='float32', metric=None, teacher_prob=None):
     data, label = batch_fn(batch, ctx)
-    outputs = [net(X) for X in data]
+    if mixup:
+        lam = np.random.beta(mixup_alpha, mixup_alpha)
+        if epoch >= num_epochs - mixup_off_epoch:
+            lam = 1
+        data = [lam * X + (1 - lam) * X[::-1] for X in data]
+        if label_smoothing:
+            eta = 0.1
+        else:
+            eta = 0.0
+        label = mixup_transform(label, classes, lam, eta)
+    elif label_smoothing:
+        hard_label = label
+        label = smooth(label, classes)
     with mx.autograd.record():
-        outputs = [net(X) for X in data]
-        loss = [criterion(yhat, y) for yhat, y in zip(outputs, label)]
+        outputs = [net(X.astype(dtype, copy=False)) for X in data]
+        if distillation:
+            loss = [criterion(yhat.astype('float', copy=False),
+                      y.astype('float', copy=False),
+                      p.astype('float', copy=False)) for yhat, y, p in zip(outputs, label, teacher_prob(data))]
+        else:
+            loss = [criterion(yhat, y.astype(dtype, copy=False)) for yhat, y in zip(outputs, label)]
     for l in loss:
         l.backward()
     trainer.step(batch_size, ignore_stale_grad=True)
+
+    if metric:
+        if mixup:
+            output_softmax = [nd.SoftmaxActivation(out.astype('float32', copy=False)) \
+                              for out in outputs]
+            metric.update(label, output_softmax)
+        else:
+            if label_smoothing:
+                metric.update(hard_label, outputs)
+            else:
+                metric.update(label, outputs)
+        return metric
+    else:
+        return
 
 def _train_val_split(train_dataset, split_ratio=0.2):
     train_sampler, val_sampler = get_split_samplers(train_dataset, split_ratio)

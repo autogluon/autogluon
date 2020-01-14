@@ -64,9 +64,8 @@ requirements = [
     'boto3==1.9.187',
     'lightgbm==2.3.0',
     'pandas>=0.24.2,<=0.25.3',
-    'psutil',
+    'psutil>=5.0.0',
     'scikit-learn==0.21.2',
-    'Pillow<=6.2.1',
 ]
 
 setup(

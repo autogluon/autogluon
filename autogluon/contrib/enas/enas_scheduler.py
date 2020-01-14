@@ -117,7 +117,8 @@ class ENAS_Scheduler(object):
                 # sample network configuration
                 config = self.controller.pre_sample()[0]
                 self.supernet.sample(**config)
-                self.train_fn(self.supernet, batch, **self.train_args)
+                # self.train_fn(self.supernet, batch, **self.train_args)
+                self.train_fn(epoch, self.epochs, self.supernet, batch, **self.train_args)
                 mx.nd.waitall()
                 if epoch >= self.warmup_epochs and (idx % self.update_arch_frequency) == 0:
                     self.train_controller()

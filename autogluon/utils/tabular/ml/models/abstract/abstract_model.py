@@ -2,9 +2,8 @@ import logging, time, pickle, os
 import numpy as np
 import pandas as pd
 
-from ....metrics import accuracy
 from ...utils import get_pred_from_proba
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, REGRESSION
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
 from .... import metrics
@@ -48,7 +47,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path, name, model, problem_type=BINARY, objective_func=accuracy, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
@@ -80,6 +79,14 @@ class AbstractModel:
         if hyperparameters is not None:
             self.params.update(hyperparameters.copy())
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+
+    # Checks if model is ready to make predictions for final result
+    def is_valid(self):
+        return self.is_fit()
+
+    # Checks if a model has been fit
+    def is_fit(self):
+        return self.model is not None
 
     def _set_default_params(self):
         pass
@@ -247,6 +254,7 @@ class AbstractModel:
 
     # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
+        self.model = None
         return self
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):

@@ -452,7 +452,7 @@ class AbstractLearner:
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
-        elif unique_vals.dtype == 'float':
+        elif np.issubdtype(unique_vals.dtype, np.floating):
             unique_ratio = len(unique_vals) / float(len(y))
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 try:
@@ -472,7 +472,7 @@ class AbstractLearner:
         elif unique_vals.dtype == 'object':
             problem_type = MULTICLASS
             reason = "dtype of label-column == object"
-        elif unique_vals.dtype == 'int':
+        elif np.issubdtype(unique_vals.dtype, np.integer):
             unique_ratio = len(unique_vals)/float(len(y))
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression

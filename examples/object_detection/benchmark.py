@@ -64,11 +64,14 @@ if __name__ == '__main__':
 
     time_limits = 5*60*60 # 5 days
     epochs = 1
+    # use coco pre-trained model for custom datasets
+    transfer = None if ('voc' in args.dataset_name) or ('coco' in args.dataset_name) else 'coco' 
     detector = task.fit(dataset_train,
                         num_trials=30,
                         epochs=epochs,
                         net=ag.Categorical('darknet53', 'mobilenet1.0'),
                         lr=ag.Categorical(1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5),
+                        transfer=transfer,
                         data_shape=ag.Categorical(320, 416),
                         ngpus_per_trial=1,
                         batch_size=8,

@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import logging
+import platform
 import numpy as np
 from PIL import Image
 
@@ -15,7 +16,10 @@ from ..base import BaseDataset
 from ...utils import get_data_rec
 from ...utils.pil_transforms import *
 
-__all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset']
+_is_osx = platform.system() == "Darwin"
+
+__all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset',
+           'NativeImageFolderDataset']
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,16 @@ built_in_datasets = [
     'imagenet',
     'fashionmnist',
 ]
+
+class _TransformFirstClosure(object):
+    """Use callable object instead of nested function, it can be pickled."""
+    def __init__(self, fn):
+        self._fn = fn
+
+    def __call__(self, x, *args):
+        if args:
+            return (self._fn(x),) + args
+        return self._fn(x)
 
 @func()
 def get_dataset(path=None, train=True, name=None,
@@ -61,7 +75,21 @@ def get_dataset(path=None, train=True, name=None,
     if isinstance(name, str) and name.lower() in built_in_datasets:
         return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
 
-    if '.rec' in path:
+    if _is_osx:
+        # using PIL to load image (slow)
+        transform = Compose([
+                RandomResizedCrop(input_size),
+                RandomHorizontalFlip(),
+                ColorJitter(0.4, 0.4, 0.4),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]) if train else Compose([
+                Resize(resize),
+                CenterCrop(input_size),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+    else:
         transform = transforms.Compose([
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomFlipLeftRight(),
@@ -77,24 +105,16 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
-        dataset = RecordDataset(path, *args, **kwargs)
-        dataset.transform_first(transform)
-    else:
-        # PIL Data Augmentation for users from Mac OSX
-        transform = Compose([
-                RandomResizedCrop(input_size),
-                RandomHorizontalFlip(),
-                ColorJitter(0.4, 0.4, 0.4),
-                ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]) if train else Compose([
-                Resize(resize),
-                CenterCrop(input_size),
-                ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+    if '.rec' in path:
+        dataset = RecordDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    elif _is_osx:
         dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
-    return dataset.init()
+    else:
+        dataset = NativeImageFolderDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    dataset = dataset.init()
+    return dataset
 
 @obj()
 class RecordDataset(ImageRecordDataset):

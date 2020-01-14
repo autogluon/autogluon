@@ -8,11 +8,25 @@ from ...core import *
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['get_network', 'auto_suggest_network']
+__all__ = ['Ensemble', 'get_network', 'auto_suggest_network']
+
+class Ensemble(object):
+    def __init__(self, model_list):
+        self.model_list = model_list
+
+    def __call__(self, *inputs):
+        outputs = [model(*inputs) for model in self.model_list]
+        output = outputs[0].exp()
+        for i in range(1, len(outputs)):
+            output += outputs[i].exp()
+
+        output /= len(outputs)
+        return output.log()
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
         return x
+
 class ConvBNReLU(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, kernel, stride):
         super().__init__()
@@ -76,16 +90,17 @@ def auto_suggest_network(dataset, net):
         logger.info('Auto suggesting network net for dataset {}'.format(net, dataset_name))
         return net
 
-def get_network(net, num_classes, ctx):
+def get_network(net, **kwargs):
     if type(net) == str:
-        net = get_built_in_network(net, num_classes, ctx=ctx)
+        net = get_built_in_network(net, **kwargs)
     else:
-        net.initialize(ctx=ctx)
+        net.initialize(ctx=kwargs['ctx'])
     return net
 
 def get_built_in_network(name, *args, **kwargs):
-    def _get_finetune_network(model_name, num_classes, ctx, *args, **kwargs):
-        finetune_net = get_model(model_name, *args, pretrained=True, **kwargs)
+    def _get_finetune_network(model_name, num_classes, ctx, **kwargs):
+        kwargs['pretrained'] = True
+        finetune_net = get_model(model_name, **kwargs)
         # change the last fully connected layer to match the number of classes
         with finetune_net.name_scope():
             if hasattr(finetune_net, 'output'):

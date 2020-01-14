@@ -146,10 +146,10 @@ class BasePredictor(ABC):
                     print("Information about each trial:  ")
                     print("Trial ID: %s" % trial_id)
                     print(self.results['trial_info'][trial_id])
-
-            # Create plot summaries:
-            plot_summary_of_models(self.results, output_directory)
-            plot_performance_vs_trials(self.results, output_directory)
+            if verbosity > 3:
+                # Create plot summaries:
+                plot_summary_of_models(self.results, output_directory)
+                plot_performance_vs_trials(self.results, output_directory)
         return self.results
 
     def _createResults(self):
