@@ -82,7 +82,6 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -183,6 +182,7 @@ class ImageClassification(BaseTask):
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
 
+
         Bag of tricks are used on image classification dataset
 
         lr_config
@@ -281,7 +281,9 @@ class ImageClassification(BaseTask):
         results = BaseTask.run_fit(train_image_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+
+        kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
+        model = get_network(args.net, **kwargs)
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
         if ensemble > 1:
@@ -295,8 +297,10 @@ class ImageClassification(BaseTask):
             scheduler = scheduler(train_image_classification, **scheduler_options)
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
-                model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
+                kwargs = {'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
+                model = get_network(args.net,  **kwargs)
                 update_params(model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
+
         return Classifier(model, results, default_val_fn, checkpoint, args)
