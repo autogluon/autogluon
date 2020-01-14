@@ -246,6 +246,10 @@ class TabularPrediction(BaseTask):
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
+        if enable_fit_continuation:
+            enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
+            logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
+
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
