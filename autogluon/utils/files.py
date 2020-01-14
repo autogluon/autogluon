@@ -10,10 +10,10 @@ from .tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'unzip', 'raise_num_file']
+__all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'raise_num_file']
 
 def unzip(zip_file_path, root=os.path.expanduser('./')):
-    """Unzip the files.
+    """Unzips files located at `zip_file_path` into parent directory specified by `root`.
     """
     folders = []
     with zipfile.ZipFile(zip_file_path) as zf:
@@ -26,20 +26,20 @@ def unzip(zip_file_path, root=os.path.expanduser('./')):
     return folders
 
 def download(url, path=None, overwrite=False, sha1_hash=None):
-    """Download an given URL
+    """Download files from a given URL.
 
     Parameters
     ----------
     url : str
-        URL to download
+        URL where file is located
     path : str, optional
         Destination path to store downloaded file. By default stores to the
         current directory with same name as in url.
     overwrite : bool, optional
-        Whether to overwrite destination file if already exists.
+        Whether to overwrite destination file if one already exists at this location.
     sha1_hash : str, optional
-        Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
-        but doesn't match.
+        Expected sha1 hash in hexadecimal digits (will ignore existing file when hash is specified
+        but doesn't match).
 
     Returns
     -------
@@ -113,7 +113,8 @@ def check_sha1(filename, sha1_hash):
 
 
 def mkdir(path):
-    """make dir exists okay"""
+    """Make directory at the specified local path with special error handling.
+    """
     try:
         os.makedirs(path)
     except OSError as exc:  # Python >2.5

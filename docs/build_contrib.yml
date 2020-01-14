@@ -4,10 +4,11 @@ dependencies:
 - graphviz
 - pip:
   - jupyter-sphinx>=0.2.2
-  - mxnet-cu100==1.5.0b20190331
+  - mxnet-cu100==1.6.0b20191013
   - portalocker
   - nose
   - docutils
   - mu-notedown
   - torch
   - torchvision
+  - bokeh

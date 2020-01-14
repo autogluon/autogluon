@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import logging
+import platform
 import numpy as np
 from PIL import Image
 
@@ -15,7 +16,10 @@ from ..base import BaseDataset
 from ...utils import get_data_rec
 from ...utils.pil_transforms import *
 
-__all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset']
+_is_osx = platform.system() == "Darwin"
+
+__all__ = ['get_dataset', 'get_built_in_dataset', 'ImageFolderDataset', 'RecordDataset',
+           'NativeImageFolderDataset']
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,16 @@ built_in_datasets = [
     'fashionmnist',
 ]
 
+class _TransformFirstClosure(object):
+    """Use callable object instead of nested function, it can be pickled."""
+    def __init__(self, fn):
+        self._fn = fn
+
+    def __call__(self, x, *args):
+        if args:
+            return (self._fn(x),) + args
+        return self._fn(x)
+
 @func()
 def get_dataset(path=None, train=True, name=None,
                 input_size=224, crop_ratio=0.875, jitter_param=0.4,
@@ -38,25 +52,44 @@ def get_dataset(path=None, train=True, name=None,
 
     Parameters
     ----------
-        name : str, optional
-            Which built-in dataset to use, will override all other options if specified.
-            The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-        train : bool, default True
-            Whether this dataset should be used for training or validation.
-        path : str
-            The training data location. If using :class:`ImageFolderDataset`,
-            image folder`path/to/the/folder` should be provided.
-            If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
-        input_size : int
-            The input image size.
-        crop_ratio : float
-            Center crop ratio (for evaluation only)
+    name : str, optional
+        Which built-in dataset to use, will override all other options if specified.
+        The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+    train : bool, default = True
+        Whether this dataset should be used for training or validation.
+    path : str
+        The training data location. If using :class:`ImageFolderDataset`,
+        image folder`path/to/the/folder` should be provided.
+        If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
+    input_size : int
+        The input image size.
+    crop_ratio : float
+        Center crop ratio (for evaluation only)
+        
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.    
     """
     resize = int(math.ceil(input_size / crop_ratio))
     if isinstance(name, str) and name.lower() in built_in_datasets:
         return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
 
-    if '.rec' in path:
+    if _is_osx:
+        # using PIL to load image (slow)
+        transform = Compose([
+                RandomResizedCrop(input_size),
+                RandomHorizontalFlip(),
+                ColorJitter(0.4, 0.4, 0.4),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]) if train else Compose([
+                Resize(resize),
+                CenterCrop(input_size),
+                ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+    else:
         transform = transforms.Compose([
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomFlipLeftRight(),
@@ -72,38 +105,29 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
-        dataset = RecordDataset(path, *args, **kwargs)
-        dataset.transform_first(transform)
-    else:
-        # PIL Data Augmentation for users from Mac OSX
-        transform = Compose([
-                RandomResizedCrop(input_size),
-                RandomHorizontalFlip(),
-                ColorJitter(0.4, 0.4, 0.4),
-                ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]) if train else Compose([
-                Resize(resize),
-                CenterCrop(input_size),
-                ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+    if '.rec' in path:
+        dataset = RecordDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    elif _is_osx:
         dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
-    return dataset.init()
+    else:
+        dataset = NativeImageFolderDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    dataset = dataset.init()
+    return dataset
 
 @obj()
 class RecordDataset(ImageRecordDataset):
-    """A dataset wrapping over a RecordIO file containing images.
-
-    Each sample is an image and its corresponding label.
+    """A dataset wrapping over a RecordIO file containing images. 
+       Each sample is an image and its corresponding label.
 
     Parameters
     ----------
     filename : str
-        Path to .rec file.
+        Local path to the .rec file.
     gray_scale : False
-        If True, always convert images to greyscale. \
-        If False, always convert images to colored (RGB).
+        If True, always convert images to greyscale. 
+        If False, always convert images to colored (RGB). 
     transform : function, default None
         A user defined callback that transforms each sample.
     """
@@ -135,24 +159,26 @@ class NativeImageFolderDataset(MXImageFolderDataset):
 
 @obj()
 class ImageFolderDataset(object):
-    """A generic data loader where the images are arranged in this way: ::
+    """A generic data loader where the images are arranged in this way on your local filesystem: ::
 
-        root/dog/xxx.png
-        root/dog/xxy.png
-        root/dog/xxz.png
+        root/dog/a.png
+        root/dog/b.png
+        root/dog/c.png
 
-        root/cat/123.png
-        root/cat/nsdf3.png
-        root/cat/asd932_.png
-
+        root/cat/x.png
+        root/cat/y.png
+        root/cat/z.png
+    
+    Here, folder-names `dog` and `cat` are the class labels and the images with file-names 'a', `b`, `c` belong to the `dog` class while the others are `cat` images.
+    
     Parameters
     ----------
     root : string
-        Root directory path.
-    transform : callable, optional
+        Root directory path to the folder containing all of the data.
+    transform : callable (optional)
         A function/transform that  takes in an PIL image
         and returns a transformed version. E.g, ``transforms.RandomCrop``
-    is_valid_file : callable, optional
+    is_valid_file : callable (optional)
         A function that takes path of an Image file
         and check if the file is a valid file (used to check of corrupt files)
 
@@ -229,8 +255,8 @@ class ImageFolderDataset(object):
             return img.convert('RGB')
 
     def _find_classes(self, dir):
-        """
-        Finds the class folders in a dataset.
+        """Finds the class folders in a dataset.
+        
         Parameters
         ----------
         dir : string
@@ -238,7 +264,7 @@ class ImageFolderDataset(object):
 
         Returns
         -------
-        tuple: classes, class_to_idx
+        tuple: (classes, class_to_idx)
             where classes are relative to (dir), and class_to_idx is a dictionary.
         """
         if sys.version_info >= (3, 5):
@@ -263,7 +289,7 @@ class ImageFolderDataset(object):
 
         Returns
         ----------
-        tuple : sample, target
+        tuple : (sample, target)
             where target is class_index of the target class.
         """
         path, target = self.samples[index]
@@ -287,7 +313,7 @@ class ImageFolderDataset(object):
 
 def get_built_in_dataset(name, train=True, input_size=224, batch_size=256, num_workers=32,
                          shuffle=True, **kwargs):
-    """Returns built-in popular image classification dataset baed on provided string name ('cifar10', 'cifar100','mnist','imagenet').
+    """Returns built-in popular image classification dataset based on provided string name ('cifar10', 'cifar100','mnist','imagenet').
     """
     logger.info('get_built_in_dataset {}'.format(name))
     name = name.lower()

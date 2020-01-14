@@ -4,7 +4,7 @@
 autogluon.utils
 ===============
 
-AutoGluon built-in utility functions and objects.
+Various built-in utility functions and objects that are used throughout AutoGluon.
 
 .. automodule:: autogluon.utils
 .. currentmodule:: autogluon.utils

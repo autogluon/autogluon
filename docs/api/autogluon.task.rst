@@ -32,39 +32,16 @@ autogluon.task
 AutoGluon Tasks
 -----------------
 
+Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
+
 .. autosummary::
    :nosignatures:
 
+   TabularPrediction
    ImageClassification
    ObjectDetection
-   TabularPrediction
+   TextClassification
 
-:hidden:`ImageClassification`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: ImageClassification
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ImageClassification
-        :methods:
-
-:hidden:`ObjectDetection`
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: ObjectDetection
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: ObjectDetection
-        :methods:
-        
 
 :hidden:`TabularPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,53 +56,51 @@ AutoGluon Tasks
     .. autoautosummary:: TabularPrediction
         :methods:
 
-Image Classification Datasets
------------------------------
 
-.. automodule:: autogluon.task.image_classification
+:hidden:`ImageClassification`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:hidden:`get_dataset`
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction::
-   get_dataset
-
-:hidden:`ImageFolderDataset`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: ImageFolderDataset
+.. autoclass:: ImageClassification
    :members:
    :inherited-members:
+   :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: ImageFolderDataset
+    .. autoautosummary:: ImageClassification
         :methods:
 
-    .. rubric:: Attributes
 
-    .. autoautosummary:: ImageFolderDataset
-        :attributes:
+:hidden:`ObjectDetection`
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:hidden:`RecordDataset`
-~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: RecordDataset
+.. autoclass:: ObjectDetection
    :members:
    :inherited-members:
+   :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: RecordDataset
+    .. autoautosummary:: ObjectDetection
         :methods:
 
-    .. rubric:: Attributes
 
-    .. autoautosummary:: RecordDataset
-        :attributes:
+:hidden:`TextClassification`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Tabular Data Objects
------------------------------
+.. autoclass:: TextClassification
+   :members:
+   :inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TextClassification
+        :methods:
+
+
+Additional Tabular Prediction APIs
+----------------------------------
 
 .. automodule:: autogluon.task.tabular_prediction
 
@@ -153,3 +128,169 @@ Tabular Data Objects
    :no-inherited-members:
 
 
+Additional Image Classification APIs
+------------------------------------
+
+.. automodule:: autogluon.task.image_classification
+
+:hidden:`Classifier`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Classifier
+   :members: predict, evaluate, load, save
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Classifier
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: Classifier
+        :attributes:
+
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction::
+   get_dataset
+
+:hidden:`ImageFolderDataset`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: ImageFolderDataset
+   :members:
+   :inherited-members: init
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: ImageFolderDataset
+        :methods: init
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: ImageFolderDataset
+        :attributes:
+
+:hidden:`RecordDataset`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: RecordDataset
+   :members:
+   :inherited-members: init
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: RecordDataset
+        :methods: init
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: RecordDataset
+        :attributes:
+
+
+Additional Object Detection APIs
+--------------------------------
+
+.. automodule:: autogluon.task.object_detection
+
+:hidden:`Detector`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Detector
+   :members: predict, evaluate
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: Detector
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: Detector
+        :attributes:
+
+.. automodule:: autogluon.task.object_detection.dataset
+
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction::
+   get_dataset
+
+:hidden:`CustomVOCDetection`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CustomVOCDetection
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: CustomVOCDetection
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: CustomVOCDetection
+        :attributes:
+
+:hidden:`CustomVOCDetectionBase`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: CustomVOCDetectionBase
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: CustomVOCDetectionBase
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: CustomVOCDetectionBase
+        :attributes:
+
+:hidden:`COCO`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: COCO
+   :members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: COCO
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: COCO
+        :attributes:
+
+
+Additional Text Classification APIs
+-----------------------------------
+
+.. automodule:: autogluon.task.text_classification
+
+:hidden:`TextClassificationPredictor`
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextClassificationPredictor
+   :members: predict, predict_proba, evaluate
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TextClassificationPredictor
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: TextClassificationPredictor
+        :attributes:
+
+:hidden:`get_dataset`
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction::
+   get_dataset

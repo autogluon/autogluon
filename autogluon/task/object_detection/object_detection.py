@@ -23,10 +23,12 @@ __all__ = ['ObjectDetection']
 logger = logging.getLogger(__name__)
 
 class ObjectDetection(BaseTask):
-    """AutoGluon ObjectDetection Task
+    """AutoGluon Task for detecting and locating objects in images
     """
     @staticmethod
     def Dataset(*args, **kwargs):
+        """ Dataset of images in which to detect objects.
+        """
         return get_dataset(*args, **kwargs)
 
     @staticmethod
@@ -34,10 +36,10 @@ class ObjectDetection(BaseTask):
             net=Categorical('mobilenet1.0'),
             lr=Categorical(5e-4, 1e-4),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
-            split_ratio=0.2,
+            split_ratio=0.8,
             batch_size=16,
-            epochs=200,
-            num_trials=1,
+            epochs=50,
+            num_trials=2,
             nthreads_per_trial=12,
             num_workers=32,
             ngpus_per_trial=1,
@@ -46,6 +48,7 @@ class ObjectDetection(BaseTask):
             search_options={},
             time_limits=None,
             verbose=False,
+            transfer='coco',
             resume='',
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
@@ -74,6 +77,7 @@ class ObjectDetection(BaseTask):
             no_mixup_epochs=20,
             label_smooth=False,
             syncbn=False,
+            reuse_pred_weights=True,
             ):
 
         """
@@ -81,38 +85,105 @@ class ObjectDetection(BaseTask):
 
         Parameters
         ----------
-        dataset : str or :meth:`autogluon.task.ObjectDectection.Dataset`
-            Training dataset.
-        net : str, :class:`autogluon.AutoGluonObject`
-            Network candidates.
-        optimizer : str, :class:`autogluon.AutoGluonObject`
-            optimizer candidates.
-         metric : str or object
-            observation metric.
+        dataset : str or :class:`autogluon.task.ObjectDectection.Dataset`
+            Training dataset containing images and corresponding object bounding boxes.
+        net : str, :class:`autogluon.space.AutoGluonObject`
+            Which existing neural network models to consider as candidates.
+        lr : float or :class:`autogluon.space`
+            The learning rate to use in each update of the neural network weights during training.
         loss : mxnet.gluon.loss
-            training loss function.
+            Loss function used during training of the neural network weights.
+        split_ratio : float
+            Fraction of dataset to hold-out during training in order to tune hyperparameters (i.e. validation data).
+            The final returned model may be fit to all of the data (after hyperparameters have been selected).
+        batch_size : int
+            How many images to group in each mini-batch during gradient computations in training.
+        epochs: int
+            How many epochs to train the neural networks for at most.
         num_trials : int
-            number of trials in the experiment.
+            Maximal number of hyperparameter configurations to try out.
+        nthreads_per_trial : int
+            How many CPUs to use in each trial (ie. single training run of a model).
+        num_workers : int
+            How many CPUs to use for data loading during training of a model.
+        ngpus_per_trial : int
+            How many GPUs to use in each trial (ie. single training run of a model). 
+        hybridize : bool
+            Whether or not the MXNet neural network should be hybridized (for increased efficiency).
+        search_strategy : str
+            Which hyperparameter search algorithm to use. 
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+        search_options : dict
+            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
         time_limits : int
-            training time limits in seconds.
-        resources_per_trial : dict
-            Machine resources to allocate per trial.
-        savedir : str
-            Local dir to save training results to.
-        search_strategy : str or callable
-            Search Algorithms ('random', 'bayesopt' and 'hyperband')
-        resume : bool, default False
-            If checkpoint exists, the experiment will resume from there.
-
+            Approximately how long should `fit()` should run for (wallclock time in seconds).
+            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+        verbose : bool
+            Whether or not to print out intermediate information during training.
+        checkpoint: str
+            The path to local directory where trained models will be saved.
+        resume : str
+            Path to checkpoint file of existing model, from which model training should resume.
+        visualizer : str
+            Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
+        dist_ip_addrs : list
+            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+        grace_period : int
+            The grace period in early stopping when using Hyperband to tune hyperparameters. If None, this is set automatically.
+        auto_search : bool
+            If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
+        seed : int
+            Random seed to set for reproducibility.
+        data_shape : int
+            Shape of the image data.
+        start_epoch : int
+            Which epoch we begin training from 
+            (eg. if we resume training of an existing model, then this
+            argument may be set to the number of epochs the model has already been trained for previously).
+        lr_mode : str
+            What sort of learning rate schedule should be followed during training.
+        lr_decay : float
+            How much learning rate should be decayed during training.
+        lr_decay_period : int
+            How often learning rate should be decayed during training.
+        warmup_lr : float
+            Learning rate to use during warm up period at the start of training.
+        warmup_epochs : int
+            How many initial epochs constitute the "warm up" period of model training.
+        momentum : float or  :class:`autogluon.space`
+            Momentum to use in optimization of neural network weights during training.
+        wd : float or :class:`autogluon.space`
+            Weight decay to use in optimization of neural network weights during training.
+        log_interval : int
+            Log results every so many epochs during training.
+        save_prefix : str
+            Prefix to append to file name for saved model.
+        save_interval : int
+            Save a copy of model every so many epochs during training.
+        val_interval : int
+            Evaluate performance on held-out validation data every so many epochs during training.
+        no_random_shape : bool
+            Whether random shapes should not be used.
+        no_wd : bool
+            Whether weight decay should be turned off.
+        mixup : bool
+            Whether or not to utilize mixup data augmentation strategy.
+        no_mixup_epochs : int
+            If using mixup, we first train model for this many epochs without mixup data augmentation.
+        label_smooth : bool
+            Whether or not to utilize label smoothing.
+        syncbn : bool
+            Whether or not to utilize synchronized batch normalization.
+        
+        Returns
+        -------
+            :class:`autogluon.task.object_detection.Detector` object which can make predictions on new data and summarize what happened during `fit()`.
+        
         Examples
         --------
-        >>> dataset = task.Dataset(train_path='~/data/train',
-        >>>                        test_path='data/test')
-        >>> results = task.fit(dataset,
-        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                    time_limits=time_limits,
-        >>>                    ngpus_per_trial=1,
-        >>>                    num_trials = 4)
+        >>> from autogluon import ObjectDetection as task
+        >>> detector = task.fit(dataset = 'voc', net = 'mobilenet1.0',
+        >>>                     time_limits = 600, ngpus_per_trial = 1, num_trials = 1)
         """
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
@@ -140,6 +211,7 @@ class ObjectDetection(BaseTask):
             seed=seed,
             data_shape=data_shape,
             start_epoch=0,
+            transfer=transfer,
             lr_mode=lr_mode,
             lr_decay=lr_decay,
             lr_decay_period=lr_decay_period,
@@ -159,7 +231,8 @@ class ObjectDetection(BaseTask):
             no_mixup_epochs=no_mixup_epochs,
             label_smooth=label_smooth,
             resume=resume,
-            syncbn=syncbn)
+            syncbn=syncbn,
+            reuse_pred_weights=reuse_pred_weights)
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},

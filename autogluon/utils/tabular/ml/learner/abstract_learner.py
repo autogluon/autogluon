@@ -1,4 +1,4 @@
-import datetime, json, warnings, logging
+import datetime, json, warnings, logging, time
 from collections import OrderedDict
 import pandas as pd
 from pandas import DataFrame, Series
@@ -18,6 +18,7 @@ from ..tuning.ensemble_selection import EnsembleSelection
 logger = logging.getLogger(__name__)
 
 # TODO: - Semi-supervised learning
+# TODO: - Minimize memory usage of DataFrames (convert int64 -> uint8 when possible etc.)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class AbstractLearner:
     save_file_name = 'learner.pkl'
@@ -41,6 +42,11 @@ class AbstractLearner:
         self.trainer_type = None
         self.trainer_path = None
         self.reset_paths = False
+
+        self.time_fit_total = None
+        self.time_fit_preprocessing = None
+        self.time_fit_training = None
+        self.time_limit = None
 
     @property
     def class_labels(self):
@@ -177,23 +183,23 @@ class AbstractLearner:
                 # Log loss
                 raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
         # TODO: Move below into trainer, should not live in learner
-        max_level = trainer.max_level
-        max_level_auxiliary = trainer.max_level_auxiliary
 
-        max_level_to_check = max(max_level, max_level_auxiliary)
+        max_level_to_check = trainer.get_max_level_all()
         scores = {}
+        pred_times = {}
+        pred_times_full = {}
+        pred_time_offset = 0
         pred_probas = None
         for level in range(max_level_to_check+1):
-            model_names_core = trainer.models_level[level]
-            if level >= 1:
-                X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
-            else:
-                X_stack = X
+            X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
 
-            if len(model_names_core) > 0:
-                pred_probas = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_core)
-                for i, model_name in enumerate(model_names_core):
-                    pred_proba = pred_probas[i]
+            model_names_aux = trainer.models_level['aux1'][level]
+            if len(model_names_aux) > 0:
+                pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
+                for i, model_name in enumerate(model_names_aux):
+                    pred_proba = pred_probas_auxiliary[i]
+                    pred_times[model_name] = pred_probas_time_auxiliary[i]
+                    pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
                     if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                         pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
                     if trainer.objective_func_expects_y_pred:
@@ -202,42 +208,55 @@ class AbstractLearner:
                     else:
                         scores[model_name] = self.objective_func(y, pred_proba)
 
+            model_names_core = trainer.models_level['core'][level]
+            if len(model_names_core) > 0:
+                pred_probas, pred_probas_time = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_core)
+                for i, model_name in enumerate(model_names_core):
+                    pred_proba = pred_probas[i]
+                    pred_times[model_name] = pred_probas_time[i]
+                    pred_times_full[model_name] = pred_probas_time[i] + pred_time_offset
+                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+                    if trainer.objective_func_expects_y_pred:
+                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
+                        scores[model_name] = self.objective_func(y, pred)
+                    else:
+                        scores[model_name] = self.objective_func(y, pred_proba)
+                pred_time_offset += sum(pred_probas_time)
+
                 ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.objective_func)
                 ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
                 oracle_weights = ensemble_selection.weights_
+                oracle_pred_time_start = time.time()
                 oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
                 oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
                 if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                     oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
+                oracle_pred_time = time.time() - oracle_pred_time_start
+                pred_times['oracle_ensemble_l' + str(level+1)] = oracle_pred_time
+                pred_times_full['oracle_ensemble_l' + str(level+1)] = oracle_pred_time + pred_time_offset
                 if trainer.objective_func_expects_y_pred:
                     oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
                     scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_ensemble)
                 else:
                     scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
-            model_names_aux = trainer.models_level_auxiliary[level]
-            if len(model_names_aux) > 0:
-                pred_probas_auxiliary = self.get_pred_probas_models(X=X_stack, trainer=trainer, model_names=model_names_aux)
-                for i, model_name in enumerate(model_names_aux):
-                    pred_proba = pred_probas_auxiliary[i]
-                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
-                    if trainer.objective_func_expects_y_pred:
-                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                        scores[model_name] = self.objective_func(y, pred)
-                    else:
-                        scores[model_name] = self.objective_func(y, pred_proba)
-
         logger.debug('Model scores:')
         logger.debug(str(scores))
         model_names = []
         scores_test = []
+        pred_times_lst = []
+        pred_times_full_lst = []
         for model in scores.keys():
             model_names.append(model)
             scores_test.append(scores[model])
+            pred_times_lst.append(pred_times[model])
+            pred_times_full_lst.append(pred_times_full[model])
         df = pd.DataFrame(data={
             'model': model_names,
             'score_test': scores_test,
+            'pred_time_test': pred_times_lst,
+            'pred_time_test_full': pred_times_full_lst,
         })
 
         df = df.sort_values(by='score_test', ascending=False).reset_index(drop=True)
@@ -245,17 +264,40 @@ class AbstractLearner:
         leaderboard_df = self.leaderboard(silent=silent)
 
         df_merged = pd.merge(df, leaderboard_df, on='model')
+        df_columns_lst = df_merged.columns.tolist()
+        explicit_order = [
+            'model',
+            'score_test',
+            'score_val',
+            'fit_time',
+            'pred_time_test_full',
+            'pred_time_test',
+            'pred_time_val',
+            'stack_level',
+        ]
+        df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
+        df_columns_new = explicit_order + df_columns_other
+        df_merged = df_merged[df_columns_new]
 
+        # TODO: Fix pred_time_test_full value for weighted_ensembles / models who only have X base_models instead of the full level.
+        #  Currently it is over-estimating prediction time
+        #  Fix by implementing DAG representation
         return df_merged
 
-    def get_pred_probas_models(self, X, trainer, model_names):
-        if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
-            # Handles case where we need to add empty columns to represent classes that were not used for training
-            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
-            pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
-        else:
-            pred_probas = trainer.pred_proba_predictions(models=model_names, X_test=X)
-        return pred_probas
+    def get_pred_probas_models_and_time(self, X, trainer, model_names):
+        pred_probas_lst = []
+        pred_probas_time_lst = []
+        for model_name in model_names:
+            model = trainer.load_model(model_name)
+            time_start = time.time()
+            pred_probas = trainer.pred_proba_predictions(models=[model], X_test=X)
+            if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
+                # Handles case where we need to add empty columns to represent classes that were not used for training
+                pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
+            time_diff = time.time() - time_start
+            pred_probas_lst += pred_probas
+            pred_probas_time_lst.append(time_diff)
+        return pred_probas_lst, pred_probas_time_lst
 
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions. 
@@ -377,7 +419,17 @@ class AbstractLearner:
 
     def info(self):
         trainer = self.load_trainer()
-        return trainer.info()
+        trainer_info = trainer.info()
+        learner_info = {
+            'path_context': self.path_context,
+            'time_fit_preprocessing': self.time_fit_preprocessing,
+            'time_fit_training': self.time_fit_training,
+            'time_fit_total': self.time_fit_total,
+            'time_limit': self.time_limit,
+        }
+
+        trainer_info.update(learner_info)
+        return trainer_info
 
     @staticmethod
     def get_problem_type(y: Series):
@@ -400,7 +452,7 @@ class AbstractLearner:
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
-        elif unique_vals.dtype == 'float':
+        elif np.issubdtype(unique_vals.dtype, np.floating):
             unique_ratio = len(unique_vals) / float(len(y))
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 try:
@@ -420,7 +472,7 @@ class AbstractLearner:
         elif unique_vals.dtype == 'object':
             problem_type = MULTICLASS
             reason = "dtype of label-column == object"
-        elif unique_vals.dtype == 'int':
+        elif np.issubdtype(unique_vals.dtype, np.integer):
             unique_ratio = len(unique_vals)/float(len(y))
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression

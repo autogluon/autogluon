@@ -89,6 +89,10 @@ def test_tricks(test_trials):
                               num_trials = target['num_trials'],
                               batch_size = target['batch_size'],
                               verbose = True,
+<<<<<<< HEAD
+=======
+                              search_strategy='skopt',
+>>>>>>> upstream/master
                               tricks = target['tricks'],
                               lr_config = target['lr_config'],
                               plot_results = True)
