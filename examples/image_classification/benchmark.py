@@ -43,11 +43,7 @@ def main():
         os.mkdir(opt.dataset)
     local_path = os.path.dirname(__file__)
     data_path = os.path.join(local_path, opt.data_dir, opt.dataset)
-<<<<<<< HEAD
-    checkpoint = os.path.join(opt.dataset ,'checkpoint/exp1.ag')
-=======
     output_directory = os.path.join(opt.dataset ,'checkpoint/')
->>>>>>> upstream/master
     filehandler = logging.FileHandler(os.path.join(opt.dataset ,'summary.log'))
     streamhandler = logging.StreamHandler()
     logger = logging.getLogger('')
@@ -59,11 +55,7 @@ def main():
     target = config_choice(opt.dataset, opt.data_dir)
     load_dataset = task.Dataset(target['dataset'])
     classifier = task.fit(dataset = load_dataset,
-<<<<<<< HEAD
-                          checkpoint = checkpoint,
-=======
                           output_directory = output_directory,
->>>>>>> upstream/master
                           net = target['net'],
                           optimizer = target['optimizer'],
                           tricks = target['tricks'],
