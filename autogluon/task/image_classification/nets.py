@@ -8,11 +8,25 @@ from ...core import *
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['get_network', 'auto_suggest_network']
+__all__ = ['Ensemble', 'get_network', 'auto_suggest_network']
+
+class Ensemble(object):
+    def __init__(self, model_list):
+        self.model_list = model_list
+
+    def __call__(self, *inputs):
+        outputs = [model(*inputs) for model in self.model_list]
+        output = outputs[0].exp()
+        for i in range(1, len(outputs)):
+            output += outputs[i].exp()
+
+        output /= len(outputs)
+        return output.log()
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
         return x
+
 class ConvBNReLU(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, kernel, stride):
         super().__init__()
