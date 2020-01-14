@@ -144,7 +144,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         if X_test is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
-            logger.log(15, 'Performing general data preprocessing with merged train & valiation data, so validation performance may not accurately reflect performance on new test data')
+            logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
             X_super = pd.concat([X, X_test], ignore_index=True)
             X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
             X = X_super.head(len(X)).set_index(X.index)
@@ -158,7 +158,7 @@ class DefaultLearner(AbstractLearner):
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
         if new_threshold != threshold:
-            logger.warning('Warning: Updated threshold from %s to %s to avoid cutting too many classes.' % (threshold, new_threshold))
+            logger.warning('Warning: Updated label_count_threshold from %s to %s to avoid cutting too many classes.' % (threshold, new_threshold))
         if new_holdout_frac != holdout_frac:
             logger.warning('Warning: Updated holdout_frac from %s to %s to avoid cutting too many classes.' % (holdout_frac, new_holdout_frac))
         if new_num_bagging_folds != num_bagging_folds:
