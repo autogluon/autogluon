@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)  # TODO: Currently
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
-    def __init__(self, path, name, problem_type, objective_func,
+    def __init__(self, path: str, name: str, problem_type: str, objective_func,
                  num_classes=None, hyperparameters=None, features=None, debug=0):
         self.num_classes = num_classes
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
 
         self.eval_metric_name = self.objective_func.name
         self.is_higher_better = True
@@ -37,10 +37,6 @@ class LGBModel(AbstractModel):
 
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.objective_func, is_higher_better=True, needs_pred_proba=not self.metric_needs_y_pred, problem_type=self.problem_type)
-
-    def convert_to_template(self):
-        self.model = None
-        return self
 
     # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):

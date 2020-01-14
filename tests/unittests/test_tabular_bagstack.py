@@ -47,6 +47,7 @@ def test_tabular_bag():
         fit_args['hyperparameters'] = hyperparameters
     if time_limits is not None:
         fit_args['time_limits'] = time_limits
+        fit_args['num_bagging_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)
@@ -164,6 +165,7 @@ def test_tabular_bagstack():
         fit_args['hyperparameters'] = hyperparameters
     if time_limits is not None:
         fit_args['time_limits'] = time_limits
+        fit_args['num_bagging_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args)

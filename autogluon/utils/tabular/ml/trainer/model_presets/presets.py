@@ -1,5 +1,4 @@
 import logging
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
@@ -58,17 +57,17 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
         models += xt_classifiers(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
-        knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        knn_unif_params = knn_options.copy()
+        knn_unif_params['weights'] = 'uniform'
         models.append(
-            KNNModel(path=path, name='KNeighborsClassifierUnif', model=KNeighborsClassifier(**knn_unif_params),
-                     problem_type=problem_type, objective_func=objective_func, hyperparameters=knn_options.copy()),
+            KNNModel(path=path, name='KNeighborsClassifierUnif', problem_type=problem_type,
+                     objective_func=objective_func, hyperparameters=knn_unif_params),
         )
-        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
-        knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        knn_dist_params = knn_options.copy()
+        knn_dist_params['weights'] = 'distance'
         models.append(
-            KNNModel(path=path, name='KNeighborsClassifierDist', model=KNeighborsClassifier(**knn_dist_params), problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_options.copy()),
+            KNNModel(path=path, name='KNeighborsClassifierDist', problem_type=problem_type,
+                     objective_func=objective_func, hyperparameters=knn_dist_params),
         )
     if gbm_options is not None:
         models.append(
@@ -114,17 +113,17 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
         models += xt_regressors(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = {'weights': 'uniform', 'n_jobs': -1}
-        knn_unif_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        knn_unif_params = knn_options.copy()
+        knn_unif_params['weights'] = 'uniform'
         models.append(
-            KNNModel(path=path, name='KNeighborsRegressorUnif', model=KNeighborsRegressor(**knn_unif_params), problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=knn_options.copy()),
+            KNNModel(path=path, name='KNeighborsRegressorUnif', problem_type=problem_type,
+                    objective_func=objective_func, hyperparameters=knn_unif_params),
         )
-        knn_dist_params = {'weights': 'distance', 'n_jobs': -1}
-        knn_dist_params.update(knn_options.copy())  # TODO: Move into KNNModel, currently ignores hyperparameters
+        knn_dist_params = knn_options.copy()
+        knn_dist_params['weights'] = 'distance'
         models.append(
-            KNNModel(path=path, name='KNeighborsRegressorDist', model=KNeighborsRegressor(**knn_dist_params), problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_options.copy()),
+            KNNModel(path=path, name='KNeighborsRegressorDist', problem_type=problem_type,
+                     objective_func=objective_func, hyperparameters=knn_dist_params),
         )
     if gbm_options is not None:
         models.append(
