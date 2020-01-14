@@ -230,21 +230,25 @@ def train_object_detection(args, reporter):
         net = gcv.model_zoo.get_model(net_name, 
                                     classes=args.dataset.get_classes(),
                                     pretrained_base=False, 
-                                    transfer='coco',
+                                    transfer=args.transfer,
                                     norm_layer=gluon.contrib.nn.SyncBatchNorm,
                                     norm_kwargs={'num_devices': len(ctx)})
-        #net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+        if not args.reuse_pred_weights:
+            net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+
         async_net = gcv.model_zoo.get_model(net_name, 
                                             classes=args.dataset.get_classes(),
                                             pretrained_base=False, 
-                                            transfer='coco')
-        #async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+                                            transfer=args.transfer)
+        if not args.reuse_pred_weights:
+            async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
     else:
         net = gcv.model_zoo.get_model(net_name, 
                                     classes=args.dataset.get_classes(),
                                     pretrained_base=False, 
-                                    transfer='coco')
-        #net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+                                    transfer=args.transfer)
+        if not args.reuse_pred_weights:
+            net.reset_class(args.dataset.get_classes(), reuse_weights=None)
         async_net = net
 
     if args.resume.strip():
@@ -255,13 +259,6 @@ def train_object_detection(args, reporter):
             warnings.simplefilter("always")
             net.initialize()
             async_net.initialize()
-
-    '''
-    net = gcv.model_zoo.get_model(net_name, 
-                                  classes=args.dataset.get_classes(),
-                                  pretrained_base=False, 
-                                  transfer='coco')
-    '''
 
 
     # training data

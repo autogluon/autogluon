@@ -1,7 +1,7 @@
 Text classification
 ===================
 
-AutoGluon automatically trains many models under thousands of different hyperparameter configurations and then return the best model.
+For classifying snippets of text (sentences or short paragraphs) based on their content, AutoGluon provides a simple `fit()` function that  automatically produces high quality text classification models.  A single call to `fit()` will train highly accurate neural networks on your provided text dataset, automatically leveraging accuracy-boosting techniques such as transfer learning and hyperparameter optimization on your behalf.
 
 .. container:: cards
 

@@ -45,6 +45,7 @@ except(IOError, ImportError):
 MIN_PYTHON_VERSION = '>=3.6.*'
 
 requirements = [
+    'Pillow<=6.2.1',
     'numpy>=1.16.0',
     'scipy>=1.3.3',
     'cython',
@@ -63,7 +64,7 @@ requirements = [
     'boto3==1.9.187',
     'lightgbm==2.3.0',
     'pandas==0.24.2',
-    'psutil',
+    'psutil>=5.0.0',
     'scikit-learn==0.21.2',
 ]
 

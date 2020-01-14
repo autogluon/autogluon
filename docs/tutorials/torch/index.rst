@@ -1,8 +1,8 @@
 For PyTorch Users
 =================
 
-AutoGluon is a framework agnostic HPO toolkit for deep learning, which enables
-fast prototyping on any customized python code. Prior to this tutorial, we recommend that you first read the `Customize AutoGluon <../course/index.html>` tutorial to familiarize yourself with the core API.
+AutoGluon can serve as a framework agnostic HPO toolkit for deep learning, which enables
+fast prototyping on any customized python code. Prior to this tutorial, we recommend that you first read the :doc:`Customize AutoGluon <../course/index>` tutorial to familiarize yourself with AutoGluon's core API.
 
 .. container:: cards
 

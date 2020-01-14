@@ -43,16 +43,16 @@ This is an example of a :class:`autogluon.space.Categorical` search space, in wh
 import gluoncv as gcv
 
 @ag.func(
-    multiplier=ag.Categorical(0.25, 1.0),
+    multiplier=ag.Categorical(0.25, 0.5),
 )
 def get_mobilenet(multiplier):
     return gcv.model_zoo.MobileNetV2(multiplier=multiplier, classes=4)
 
-net = ag.space.Categorical('resnet50_v1b', get_mobilenet())
+net = ag.space.Categorical('mobilenet0.25', get_mobilenet())
 print(net)
 ```
 
-## Specify the Optimizer and Its Search Spaece
+## Specify the Optimizer and Its Search Space
 
 Similarly, we can manually specify the optimizer candidates.
 We can construct another search space to identify which optimizer works best for our task, and also identify the best hyperparameter configurations for this optimizer.
@@ -93,7 +93,7 @@ For more information, see :class:`autogluon.searcher.SKoptSearcher`.
 
 ```{.python .input}
 time_limits = 2*60
-epochs = 10
+epochs = 2
 
 classifier = task.fit(dataset,
                       net=net,
@@ -131,7 +131,7 @@ classifier = task.fit(dataset,
                       lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                       search_strategy=search_strategy,
                       epochs=epochs,
-                      num_trials=4,
+                      num_trials=2,
                       verbose=False,
                       plot_results=True,
                       ngpus_per_trial=1,

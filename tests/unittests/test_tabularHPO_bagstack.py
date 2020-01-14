@@ -49,6 +49,7 @@ def test_tabularHPObagstack():
         fit_args['hyperparameters'] = hyperparameters
     if time_limits is not None:
         fit_args['time_limits'] = time_limits
+        fit_args['num_bagging_sets'] = 2
     if num_trials is not None:
         fit_args['num_trials'] = num_trials
     ###################################################################

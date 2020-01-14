@@ -3,9 +3,9 @@
 
 In this quick start, we'll use the task of image classification to illustrate how to use AutoGluon’s APIs. 
 
-In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to `AutoGluon`'s [`fit`](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
+In this tutorial, we load images and the corresponding labels into AutoGluon and use this data to obtain a neural network that can classify new images. This is different from traditional machine learning where we need to manually define the neural network and then specify the hyperparameters in the training process. Instead, with just a single call to AutoGluon's [fit](/api/autogluon.task.html#autogluon.task.ImageClassification.fit) function, AutoGluon automatically trains many models with different hyperparameter configurations and returns the model that achieved the highest level of accuracy.
 
-We begin by specifying [`ImageClassification`](/api/autogluon.task.html#autogluon.task.ImageClassification) as our task of interest as follows:
+We begin by specifying [ImageClassification](/api/autogluon.task.html#autogluon.task.ImageClassification) as our task of interest as follows:
 
 ```{.python .input}
 import autogluon as ag
@@ -14,7 +14,7 @@ from autogluon import ImageClassification as task
 
 ## Create AutoGluon Dataset
 
-For demonstration purpose, we use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
+For demonstration purposes, we use a subset of the [Shopee-IET dataset](https://www.kaggle.com/c/shopee-iet-machine-learning-competition/data) from Kaggle.
 Each image in this data depicts a clothing item and the corresponding label specifies its clothing category.
 Our subset of the data contains the following possible labels: `BabyPants`, `BabyShirt`, `womencasualshoes`, `womenchiffontop`.
 
@@ -74,7 +74,7 @@ Given an example image, we can easily use the final model to `predict` the label
 # skip this if training FashionMNIST on CPU.
 if ag.get_gpu_count() > 0:
     image = 'data/test/BabyShirt/BabyShirt_323.jpg'
-    ind, prob = classifier.predict(image)
+    ind, prob, _ = classifier.predict(image)
 
     print('The input picture is classified as [%s], with probability %.2f.' %
           (dataset.init().classes[ind.asscalar()], prob.asscalar()))

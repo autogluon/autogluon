@@ -130,10 +130,10 @@ We first load the test data as a `Dataset` object and then call `predict`:
 
 ```
 test_dataset = task.Dataset('./data/shopeeiet/test')
-inds, probs = classifier.predict(test_dataset)
+inds, probs, probs_all = classifier.predict(test_dataset)
 ```
 
-`inds` above contains the indices of the predicted class for each test image. `probs` contains the confidence in these class predictions.
+`inds` above contains the indices of the predicted class for each test image. `probs` contains the confidence in these class predictions. `probs_all` contains the confidence in the whole of classes predictions.
 
 
 Here are the results of AutoGluon's default `fit` and `predict` under different `time_limits` when executed on a p3.16xlarge EC2 instance:

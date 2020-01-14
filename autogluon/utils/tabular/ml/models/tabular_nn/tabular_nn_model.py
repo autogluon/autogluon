@@ -65,8 +65,8 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    def __init__(self, path, name, problem_type, objective_func, hyperparameters=None, features=None):
-        super().__init__(path=path, name=name, model=None, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
         """
         TabularNeuralNetModel object.
         
@@ -90,8 +90,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.summary_writer = None
         self.ctx = mx.cpu()
 
-    # TODO: Remove this, add generic unfit_copy func or fix model to not have tabNN in params
-    def create_unfit_copy(self):
+    # TODO: Fix model to not have tabNN in params
+    def convert_to_template(self):
         new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, features=self.features, hyperparameters=self.params)
         new_model.path = self.path
         new_model.params['tabNN'] = None
