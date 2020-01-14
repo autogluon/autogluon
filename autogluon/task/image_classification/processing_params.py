@@ -38,10 +38,7 @@ class Getmodel_kwargs():
         self._model_name = model_name
         self._model_teacher = model_teacher
         self._hybridize = hybridize
-<<<<<<< HEAD
-=======
         self._hard_weight = hard_weight
->>>>>>> upstream/master
 
         if multi_precision:
             self._dtype = 'float16'
@@ -50,17 +47,6 @@ class Getmodel_kwargs():
         if use_gn:
             from gluoncv.nn import GroupNorm
             self._kwargs['norm_layer'] = GroupNorm
-<<<<<<< HEAD
-        if model_name.startswith('vgg'):
-            self._kwargs['batch_norm'] = batch_norm
-        elif model_name.startswith('resnext'):
-            self._kwargs['use_se'] = use_se
-        if last_gamma:
-            self._kwargs['last_gamma'] = True
-
-        if self._model_teacher is not None and all() < 1.0:
-=======
-
         if isinstance(model_name, str):
             if model_name.startswith('vgg'):
                 self._kwargs['batch_norm'] = batch_norm
@@ -71,7 +57,6 @@ class Getmodel_kwargs():
             self._kwargs['last_gamma'] = True
 
         if self._model_teacher is not None and self._hard_weight < 1.0:
->>>>>>> upstream/master
             self._distillation = True
         else:
             self._distillation = False
@@ -105,8 +90,5 @@ class Getmodel_kwargs():
         net.cast(self._dtype)
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
-<<<<<<< HEAD
         return net
-=======
-        return net
->>>>>>> upstream/master
+

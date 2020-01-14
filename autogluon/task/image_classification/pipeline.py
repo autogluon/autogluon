@@ -5,11 +5,7 @@ from mxnet.gluon import nn
 from mxnet import gluon, init, autograd, nd
 from mxnet.gluon.data.vision import transforms
 from gluoncv.model_zoo import get_model
-<<<<<<< HEAD
-import gluoncv as gcv
-=======
 from gluoncv.loss import DistillationSoftmaxCrossEntropyLoss
->>>>>>> upstream/master
 from .metrics import get_metric_instance
 from ...core.optimizer import SGD, NAG
 from ...core import *
@@ -64,11 +60,7 @@ def train_image_classification(args, reporter):
             teacher_prob = [nd.softmax(teacher(X.astype(target_kwargs.dtype, copy=False)) / args.tricks.temperature) \
                                 for X in data]
             return teacher_prob
-<<<<<<< HEAD
-        L = gcv.loss.DistillationSoftmaxCrossEntropyLoss(temperature=args.tricks.temperature,
-=======
         L = DistillationSoftmaxCrossEntropyLoss(temperature=args.tricks.temperature,
->>>>>>> upstream/master
                                                          hard_weight=args.tricks.hard_weight,
                                                          sparse_label=sparse_label_loss)
     else:

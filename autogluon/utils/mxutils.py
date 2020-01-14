@@ -6,11 +6,8 @@ import mxnet as mx
 
 __all__ = ['update_params', 'collect_params', 'get_data_rec', 'read_remote_ips']
 
-<<<<<<< HEAD
-def update_params(net, params, multi_precision, ctx=mx.cpu(0)):
-=======
+
 def update_params(net, params, multi_precision=False, ctx=mx.cpu(0)):
->>>>>>> upstream/master
     param_dict = net._collect_params_with_prefix()
     for k, v in param_dict.items():
         param_dict[k]._load_init(params[k], cast_dtype=multi_precision, ctx=None)

@@ -28,14 +28,9 @@ class ImageClassification(BaseTask):
     """
     @staticmethod
     def Dataset(*args, **kwargs):
-<<<<<<< HEAD
-        """Dataset for AutoGluon image classification tasks, can either be a
-        :class:`ImageFolderDataset`, :class:`RecordDataset`, or a popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
-=======
         """Dataset for AutoGluon image classification tasks. 
            May either be a :class:`autogluon.task.image_classification.ImageFolderDataset`, :class:`autogluon.task.image_classification.RecordDataset`, 
            or a popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
->>>>>>> upstream/master
 
         Parameters
         ----------
@@ -87,10 +82,6 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-<<<<<<< HEAD
-=======
-
->>>>>>> upstream/master
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -100,24 +91,14 @@ class ImageClassification(BaseTask):
                 warmup_lr=0.0,
                 warmup_epochs=0),
             tricks=Dict(
-<<<<<<< HEAD
-                last_gamma=True,
-                use_pretrained=True,
-=======
                 last_gamma=False,#True
                 use_pretrained=False,#True
->>>>>>> upstream/master
                 use_se=False,
                 mixup=False,
                 mixup_alpha=0.2,
                 mixup_off_epoch= 0,
-<<<<<<< HEAD
-                label_smoothing=True,
-                no_wd=True,
-=======
                 label_smoothing=False,#True
                 no_wd=False,#True
->>>>>>> upstream/master
                 teacher_name=None,
                 temperature=20.0,
                 hard_weight=0.5,
@@ -193,13 +174,6 @@ class ImageClassification(BaseTask):
         >>> from autogluon import ImageClassification as task
         >>> dataset = task.Dataset(train_path='data/train',
         >>>                        test_path='data/test')
-<<<<<<< HEAD
-        >>> results = task.fit(dataset,
-        >>>                    nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
-        >>>                    time_limits=time_limits,
-        >>>                    ngpus_per_trial=1,
-        >>>                    num_trials = 4)
-=======
         >>> classifier = task.fit(dataset,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
         >>>                       time_limits=time_limits,
@@ -207,7 +181,7 @@ class ImageClassification(BaseTask):
         >>>                       num_trials = 4)
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
->>>>>>> upstream/master
+
 
         Bag of tricks are used on image classification dataset
 
@@ -307,13 +281,9 @@ class ImageClassification(BaseTask):
         results = BaseTask.run_fit(train_image_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
-<<<<<<< HEAD
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
         model = get_network(args.net, **kwargs)
-        update_params(model, results.pop('model_params'), optimizer.kwvars['multi_precision'])
-=======
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
         if ensemble > 1:
@@ -327,9 +297,10 @@ class ImageClassification(BaseTask):
             scheduler = scheduler(train_image_classification, **scheduler_options)
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
-                model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
+                kwargs = {'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
+                model = get_network(args.net,  **kwargs)
                 update_params(model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
->>>>>>> upstream/master
+
         return Classifier(model, results, default_val_fn, checkpoint, args)
