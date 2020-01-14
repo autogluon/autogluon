@@ -1,10 +1,8 @@
 import os
 import copy
 import logging
-
 import mxnet as mx
 from mxnet import gluon, nd
-
 from ...core.optimizer import *
 from ...core.loss import *
 from ...core import *
@@ -61,7 +59,7 @@ class ImageClassification(BaseTask):
     def fit(dataset,
             net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
             optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
-                           wd=Real(1e-4, 1e-3, log=True)),
+                           wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
             lr_scheduler='cosine',
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
@@ -84,8 +82,32 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-            auto_search=True):
-        """Fit image classification models to a given dataset.
+
+            auto_search=True,
+            lr_config=Dict(
+                lr_mode='cosine',
+                lr_decay=0.1,
+                lr_decay_period=0,
+                lr_decay_epoch='40,80',
+                warmup_lr=0.0,
+                warmup_epochs=0),
+            tricks=Dict(
+                last_gamma=False,#True
+                use_pretrained=False,#True
+                use_se=False,
+                mixup=False,
+                mixup_alpha=0.2,
+                mixup_off_epoch= 0,
+                label_smoothing=False,#True
+                no_wd=False,#True
+                teacher_name=None,
+                temperature=20.0,
+                hard_weight=0.5,
+                batch_norm=False,
+                use_gn=False)
+            ):
+        """
+        Fit image classification models to a given dataset.
 
         Parameters
         ----------
@@ -160,6 +182,52 @@ class ImageClassification(BaseTask):
         >>>                       num_trials = 4)
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
+
+        Bag of tricks are used on image classification dataset
+
+        lr_config
+        ----------
+        lr-mode : type=str, default='step'.
+            learning rate scheduler mode. options are step, poly and cosine.
+        lr-decay : type=float, default=0.1.
+            decay rate of learning rate. default is 0.1.
+        lr-decay-period : type=int, default=0.
+            interval for periodic learning rate decays. default is 0 to disable.
+        lr-decay-epoch : type=str, default='10,20,30'.
+            epochs at which learning rate decays. epochs=40, default is 10, 20, 30.
+        warmup-lr : type=float, default=0.0.
+            starting warmup learning rate. default is 0.0.
+        warmup-epochs : type=int, default=0.
+            number of warmup epochs.
+
+        tricks
+        ----------
+        last-gamma', default= True.
+            whether to init gamma of the last BN layer in each bottleneck to 0.
+        use-pretrained', default= True.
+            enable using pretrained model from gluon.
+        use_se', default= False.
+            use SE layers or not in resnext. default is false.
+        mixup', default= False.
+            whether train the model with mix-up. default is false.
+        mixup-alpha', type=float, default=0.2.
+            beta distribution parameter for mixup sampling, default is 0.2.
+        mixup-off-epoch', type=int, default=0.
+            how many last epochs to train without mixup, default is 0.
+        label-smoothing', default= True.
+            use label smoothing or not in training. default is false.
+        no-wd', default= True.
+            whether to remove weight decay on bias, and beta/gamma for batchnorm layers.
+        teacher', type=str, default=None.
+            teacher model for distillation training
+        temperature', type=float, default=20.
+            temperature parameter for distillation teacher model
+        hard-weight', type=float, default=0.5.
+            weight for the loss of one-hot label for distillation training
+        batch-norm', default= True.
+            enable batch normalization or not in vgg. default is false.
+        use-gn', default= False.
+            whether to use group norm.
         """
         checkpoint = os.path.join(output_directory, 'exp1.ag')
         if auto_search:
@@ -185,7 +253,10 @@ class ImageClassification(BaseTask):
             verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
-            final_fit=False)
+            final_fit=False,
+            tricks=tricks,
+            lr_config=lr_config
+            )
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
@@ -210,9 +281,9 @@ class ImageClassification(BaseTask):
         results = BaseTask.run_fit(train_image_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
-
         model = get_network(args.net, results['num_classes'], mx.cpu(0))
-        update_params(model, results.pop('model_params'))
+        multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
+        update_params(model, results.pop('model_params'), multi_precision)
         if ensemble > 1:
             models = [model]
             if isinstance(search_strategy, str):
@@ -225,7 +296,7 @@ class ImageClassification(BaseTask):
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
                 model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
-                update_params(model, resultsi.pop('model_params'))
+                update_params(model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
         return Classifier(model, results, default_val_fn, checkpoint, args)
