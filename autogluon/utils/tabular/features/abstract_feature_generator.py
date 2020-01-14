@@ -386,16 +386,21 @@ class AbstractFeatureGenerator:
     # TODO: add option for user to specify dtypes on load
     @staticmethod
     def get_type_family(type):
-        if type.name in ['int', 'int64', 'int32', 'int16', 'int8', 'int_', 'uint', 'uint8', 'uint16', 'uint32', 'uint64']:
-            return 'int'
-        elif type.name in ['float', 'float_', 'float16', 'float32', 'float64']:
-            return 'float'
-        elif type.name in ['bool', 'bool_']:
+        try:
+            if 'datetime' in type.name:
+                return 'datetime'
+            elif np.issubdtype(type, np.integer):
+                return 'int'
+            elif np.issubdtype(type, np.floating):
+                return 'float'
+        except Exception as err:
+            logger.exception('Warning: dtype %s is not recognized as a valid dtype by numpy! AutoGluon may incorrectly handle this feature...')
+            logger.exception(err)
+
+        if type.name in ['bool', 'bool_']:
             return 'bool'
         elif type.name in ['str', 'string', 'object']:
             return 'object'
-        elif 'datetime' in type.name:
-            return 'datetime'
         else:
             return type.name
 
