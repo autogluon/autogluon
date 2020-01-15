@@ -86,5 +86,13 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'Accuracy'
     if (metric.name == 'log_loss') and (problem_type == BINARY) and needs_pred_proba:
         return 'Logloss'
+    if (metric.name == 'f1') and (problem_type == BINARY) and not needs_pred_proba:
+        return 'F1'
+    if (metric.name == 'balanced_accuracy') and (problem_type == BINARY) and not needs_pred_proba:
+        return 'BalancedAccuracy'
+    if (metric.name == 'recall') and (problem_type == BINARY) and not needs_pred_proba:
+        return 'Recall'
+    if (metric.name == 'precision') and (problem_type == BINARY) and not needs_pred_proba:
+        return 'Precision'
     metric_class = metric_classes_dict[problem_type]
     return metric_class(metric=metric, is_higher_better=is_higher_better, needs_pred_proba=needs_pred_proba)
