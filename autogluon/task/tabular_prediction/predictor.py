@@ -66,7 +66,7 @@ class TabularPredictor(BasePredictor):
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
 
-    def predict(self, dataset, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, dataset, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
             Parameters
@@ -74,6 +74,8 @@ class TabularPredictor(BasePredictor):
             dataset : :class:`TabularDataset` or `pandas.DataFrame`
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            model : str (optional)
+                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -91,9 +93,9 @@ class TabularPredictor(BasePredictor):
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
-        return self._learner.predict(X_test=dataset, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
     
-    def predict_proba(self, dataset, as_pandas=False):
+    def predict_proba(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
 
             Parameters
@@ -101,6 +103,8 @@ class TabularPredictor(BasePredictor):
             dataset : :class:`TabularDataset` or `pandas.DataFrame`
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            model : str (optional)
+                The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False). 
                 Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
@@ -113,7 +117,7 @@ class TabularPredictor(BasePredictor):
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
-        return self._learner.predict_proba(X_test=dataset, as_pandas=as_pandas)
+        return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas)
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.

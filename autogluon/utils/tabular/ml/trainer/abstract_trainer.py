@@ -575,7 +575,9 @@ class AbstractTrainer:
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level)
 
-    def predict(self, X):
+    def predict(self, X, model=None):
+        if model is not None:
+            return self.predict_model(X, model)
         if self.model_best is not None:
             return self.predict_model(X, self.model_best)
         elif self.model_best_core is not None:
@@ -583,8 +585,10 @@ class AbstractTrainer:
         else:
             raise Exception('Trainer has no fit models to predict with.')
 
-    def predict_proba(self, X):
-        if self.model_best is not None:
+    def predict_proba(self, X, model=None):
+        if model is not None:
+            return self.predict_proba_model(X, model)
+        elif self.model_best is not None:
             return self.predict_proba_model(X, self.model_best)
         elif self.model_best_core is not None:
             return self.predict_proba_model(X, self.model_best_core)
