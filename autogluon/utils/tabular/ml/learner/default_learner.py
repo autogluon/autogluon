@@ -8,7 +8,6 @@ from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 from ..trainer.auto_trainer import AutoTrainer
 from ..constants import BINARY, MULTICLASS, REGRESSION
-from ...metrics import log_loss
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +110,7 @@ class DefaultLearner(AbstractLearner):
 
         self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
-        if self.objective_func == log_loss:
+        if (self.objective_func.name == 'log_loss') and (self.problem_type == MULTICLASS):
             X = self.augment_rare_classes(X)
 
         # Gets labels prior to removal of infrequent classes
@@ -223,8 +222,6 @@ class DefaultLearner(AbstractLearner):
             for which no classes may be filtered out.
             This method will augment dataset with additional examples of rare classes.
         """
-        if self.problem_type != MULTICLASS:
-            raise ValueError("log_loss eval_metric cannot be specified for non-multiclass problem.")
         class_counts = X[self.label].value_counts()
         class_counts_invalid = class_counts[class_counts < self.threshold]
         if len(class_counts_invalid) == 0:
