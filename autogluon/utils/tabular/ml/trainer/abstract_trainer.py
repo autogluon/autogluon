@@ -578,7 +578,7 @@ class AbstractTrainer:
     def predict(self, X, model=None):
         if model is not None:
             return self.predict_model(X, model)
-        if self.model_best is not None:
+        elif self.model_best is not None:
             return self.predict_model(X, self.model_best)
         elif self.model_best_core is not None:
             return self.predict_model(X, self.model_best_core)
