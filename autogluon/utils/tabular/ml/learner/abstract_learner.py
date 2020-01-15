@@ -71,7 +71,7 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, as_pandas=False, inverse_transform=True, sample=None):
+    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, inverse_transform=True, sample=None):
         ##########
         # Enable below for local testing # TODO: do we want to keep sample option?
         if sample is not None:
@@ -80,7 +80,7 @@ class AbstractLearner:
         trainer = self.load_trainer()
 
         X_test = self.transform_features(X_test)
-        y_pred_proba = trainer.predict_proba(X_test)
+        y_pred_proba = trainer.predict_proba(X_test, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_pandas:
@@ -93,7 +93,7 @@ class AbstractLearner:
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X_test: DataFrame, model=None, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
@@ -110,7 +110,7 @@ class AbstractLearner:
             X_test_cache_miss = X_test
 
         if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, inverse_transform=False, sample=sample)
+            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False, sample=sample)
             if self.trainer_problem_type is not None:
                 problem_type = self.trainer_problem_type
             else:
