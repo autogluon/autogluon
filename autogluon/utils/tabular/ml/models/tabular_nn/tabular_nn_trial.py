@@ -68,7 +68,7 @@ def tabular_nn_trial(args, reporter):
                 loss = tabNN.loss_func(output, labels) / loss_scaling_factor
             loss.backward()
             tabNN.optimizer.step(labels.shape[0])
-            cumulative_loss += nd.sum(loss).asscalar()
+            cumulative_loss += loss.sum()
         train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
         if test_dataset is not None:
             # val_metric = tabNN.evaluate_metric(test_dataset) # Evaluate after each epoch
@@ -78,7 +78,7 @@ def tabular_nn_trial(args, reporter):
             best_val_epoch = e
             tabNN.model.save_parameters(trial_temp_file_name)
         # print("Epoch %s.  Train loss: %s, Val %s: %s" % (e, train_loss, tabNN.eval_metric_name, val_metric))
-        reporter(epoch=e, validation_performance=val_metric, train_loss=train_loss) # Higher val_metric = better
+        reporter(epoch=e, validation_performance=val_metric, train_loss=float(train_loss.asscalar())) # Higher val_metric = better
         if e - best_val_epoch > args.epochs_wo_improve:
             break
     tabNN.model.load_parameters(trial_temp_file_name) # Revert back to best model

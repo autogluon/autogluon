@@ -8,6 +8,7 @@ from ..utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
 
+
 class EnsembleSelection:
     def __init__(
             self,
