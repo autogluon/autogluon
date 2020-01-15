@@ -27,6 +27,8 @@ class TabularPredictor(BasePredictor):
             Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
         feature_types : dict
             Inferred data type of each predictive variable (i.e. column of training data table used to predict `label_column`).
+        model_names : list
+            List of model names trained during `fit()`.
         model_performance : dict
             Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
         class_labels : list
@@ -63,6 +65,7 @@ class TabularPredictor(BasePredictor):
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
+        self.model_names = self._trainer.get_model_names_all()
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
 
