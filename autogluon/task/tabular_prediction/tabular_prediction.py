@@ -97,7 +97,10 @@ class TabularPrediction(BaseTask):
             AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data. 
             
             If `eval_metric = None`, it is automatically chosen based on `problem_type`. 
-            Otherwise, options for classification: ['accuracy', 'balanced_accuracy', 'f1', 'roc_auc', 'average_precision', 'precision', 'recall', 'log_loss', 'pac_score']. 
+            Otherwise, options for classification: [
+                'accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
+                'roc_auc', 'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted',
+                'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score'].
             Options for regression: ['r2', 'mean_squared_error', 'root_mean_squared_error' 'mean_absolute_error', 'median_absolute_error']. 
             For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics   
             
