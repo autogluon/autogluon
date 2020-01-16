@@ -91,8 +91,8 @@ def train_image_classification(args, reporter):
         for i, batch in enumerate(train_data):
             metric = default_train_fn(epoch, num_epochs, net, batch, batch_size, L, trainer,
                                       batch_fn, ctx, args.tricks.mixup, args.tricks.label_smoothing,
-                                      distillation, args.tricks.mixup_alpha,  args.tricks.mixup_off_epoch,
-                                      classes,target_kwargs.dtype, metric, teacher_prob)
+                                      distillation, args.tricks.mixup_alpha, args.tricks.mixup_off_epoch,
+                                      classes, target_kwargs.dtype, metric, teacher_prob)
             mx.nd.waitall()
         return metric
 

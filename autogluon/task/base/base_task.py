@@ -1,4 +1,5 @@
 import time
+import copy
 import collections
 import mxnet as mx
 from abc import abstractmethod
@@ -52,12 +53,15 @@ class BaseTask(object):
         if plot_results or in_ipynb():
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
-        results.update(best_reward=best_reward, best_config=best_config,
-                       total_time=total_time, metadata=scheduler.metadata,
+        record_args = copy.deepcopy(args)
+        results.update(best_reward=best_reward,
+                       best_config=best_config,
+                       total_time=total_time,
+                       metadata=scheduler.metadata,
                        training_history=scheduler.training_history,
                        config_history=scheduler.config_history,
                        reward_attr=scheduler._reward_attr,
-                       args=args)
+                       args=record_args)
         return results
 
     @abstractmethod

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class ImageClassification(BaseTask):
     """AutoGluon Task for classifying images based on their content
     """
+    Classifier=Classifier
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. 
@@ -303,4 +304,8 @@ class ImageClassification(BaseTask):
                 models.append(model)
             model = Ensemble(models)
 
+        results.pop('args')
+        args.pop('optimizer')
+        args.pop('dataset')
+        args.pop('loss')
         return Classifier(model, results, default_val_fn, checkpoint, args)

@@ -1,6 +1,7 @@
 import os
 import math
-import pickle
+import copy
+import cloudpickle as pkl
 import numpy as np
 from PIL import Image
 from collections import OrderedDict
@@ -11,9 +12,10 @@ from mxnet.gluon.data.vision import transforms
 
 from ...core import AutoGluonObject
 from .utils import *
+from .nets import get_network
 from .metrics import get_metric_instance
 from ..base.base_predictor import BasePredictor
-from ...utils import save, load, tqdm
+from ...utils import save, load, tqdm, collect_params, update_params
 from ...utils.pil_transforms import *
 
 __all__ = ['Classifier']
@@ -38,12 +40,13 @@ class Classifier(BasePredictor):
     >>> ind, prob = classifier.predict(image)
     """
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
-                 args, **kwargs):
+                 args, ensemble=0, format_results=True, **kwargs):
         self.model = model
         self.eval_func = eval_func
-        self.results = self._format_results(results)
+        self.results = self._format_results(results) if format_results else results
         self.scheduler_checkpoint = scheduler_checkpoint
         self.args = args
+        self.ensemble = ensemble
 
     @classmethod
     def load(cls, checkpoint):
@@ -51,32 +54,40 @@ class Classifier(BasePredictor):
         """
         state_dict = load(checkpoint)
         args = state_dict['args']
-        results = state_dict['results']
-        eval_func = pickle.loads(state_dict['eval_func'])
+        results = pkl.loads(state_dict['results'])
+        eval_func = state_dict['eval_func']
         scheduler_checkpoint = state_dict['scheduler_checkpoint']
         model_params = state_dict['model_params']
+        ensemble = state_dict['ensemble']
 
-        model_args = copy.deepcopy(args)
-        model_args.update(results['best_config'])
-        model = get_network(args.net, args.dataset.num_classes)
-        update_params(model, model_params)
-        return cls(eval_func, model, eval_func, scheduler_checkpoint, args)
+        if ensemble <= 1:
+            model_args = copy.deepcopy(args)
+            model_args.update(results['best_config'])
+            model = get_network(args.net, num_classes=results['num_classes'], ctx=mx.cpu(0))
+            update_params(model, model_params)
+        else:
+            raise NotImplemented
+        return cls(model, results, eval_func, scheduler_checkpoint, args,
+                   ensemble, format_results=False)
 
     def state_dict(self, destination=None):
         if destination is None:
             destination = OrderedDict()
             destination._metadata = OrderedDict()
-        destination['model_params'] = collect_params(self.model)
-        destination['eval_func'] = pickle.dumps(self.eval_func)
-        destination['results'] = self.results
+        model_params = collect_params(self.model)
+        destination['model_params'] = model_params
+        destination['eval_func'] = self.eval_func
+        destination['results'] = pkl.dumps(self.results)
         destination['scheduler_checkpoint'] = self.scheduler_checkpoint
         destination['args'] = self.args
+        destination['ensemble'] = self.ensemble
         return destination
 
     def save(self, checkpoint):
         """ Save image classifier to folder specified by `checkpoint`.
         """
-        save(self.state_dict(), checkpoint)
+        state_dict = self.state_dict()
+        save(state_dict, checkpoint)
 
     def predict(self, X, input_size=224, plot=True):
         """Predict class-index and associated class probability for each image in a given dataset (or just a single image). 
