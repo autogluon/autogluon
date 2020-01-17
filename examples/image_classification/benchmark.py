@@ -4,7 +4,42 @@ import logging
 import autogluon as ag
 from autogluon import ImageClassification as task
 from kaggle_configuration import config_choice
+"""
+--data-dir
+data
+--dataset
+shopee-iet
+--num-trials
+2
+--num-epochs
+1
+--batch-size
+8
+--ngpus-per-trial
+1
 
+python benchmark.py --data-dir data --dataset shopee-iet --num-trials 2 --num-epochs 1 --batch-size 8 --ngpus-per-trial 1
+
+
+# ensemble=1
+# test
+python benchmark.py --data-dir data --dataset dog-breed-identification --num-trials 3 --num-epochs 1 --batch-size 48 --ngpus-per-trial 1 
+
+# 10_5 # succeed
+python benchmark.py --data-dir data --dataset dog-breed-identification --num-trials 5 --num-epochs 10 --batch-size 48 --ngpus-per-trial 1
+
+# test ensemble / submission
+python benchmark.py --data-dir data --dataset dog-breed-identification --num-trials 1 --num-epochs 1 --batch-size 48 --ngpus-per-trial 1 --submission
+
+# ensemble=2 的两次相同？ 必须要num-trials >1 ? 
+# test_ensemble=2 # failure
+python benchmark.py --data-dir data --dataset dog-breed-identification --num-trials 1 --num-epochs 2 --batch-size 48 --ngpus-per-trial 1 --resume --submission
+
+
+# 
+python benchmark.py --data-dir data --dataset dog-breed-identification --num-trials 1 --num-epochs 180 --batch-size 48 --ngpus-per-trial 1 --resume --submission
+
+"""
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a model for different kaggle competitions.')
     parser.add_argument('--data-dir', type=str, default='data/',
@@ -29,7 +64,7 @@ def parse_args():
     return opt
 
 def predict_details(data_path, classifier, load_dataset):
-    test_dataset = os.path.join(data_path, 'test')
+    test_dataset = os.path.join(data_path ,'test')
     inds, probs, probs_all= classifier.predict(task.Dataset(test_dataset))
     value = []
     target_dataset = load_dataset.init()
@@ -65,6 +100,7 @@ def main():
                           ngpus_per_trial=opt.ngpus_per_trial,
                           num_trials=opt.num_trials,
                           batch_size=opt.batch_size,
+                          ensemble=2,
                           verbose=True,
                           plot_results = True)
 
@@ -74,6 +110,10 @@ def main():
 
     if opt.submission:
         inds, probs, probs_all, value = predict_details(data_path, classifier, load_dataset)
+        # logging.info(inds)
+        # logging.info(probs)
+        # logging.info(probs_all)
+        # logging.info(value)
         ag.utils.generate_csv_submission(opt.dataset, data_path, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':

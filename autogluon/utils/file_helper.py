@@ -75,7 +75,7 @@ def generate_csv_submission(dataset, data_path, local_path, inds, preds, class_n
                       'value': 'probability_1',
                       'special': 0}
 
-    test_path = os.path.join(data_path, 'test')
+    test_path = os.path.join(data_path, 'test','test')
     csv_path = os.path.join(data_path, 'sample_submission.csv')
     ids = sorted(os.listdir(test_path))
     save_csv_name = custom + '.csv'
@@ -86,6 +86,7 @@ def generate_csv_submission(dataset, data_path, local_path, inds, preds, class_n
             imagename_list = [name_id[:-4] for name_id in ids]
         else:
             imagename_list = ids
+        # print(imagename_list)
         row_index_group = []
         for i in imagename_list:
             if csv_config['content'] == 'str':
@@ -96,6 +97,7 @@ def generate_csv_submission(dataset, data_path, local_path, inds, preds, class_n
                 row_index = df[df[csv_config['image_column_name']] == int(i)].index.tolist()
             elif csv_config['content'] == 'special':
                 row_index = df[df[csv_config['image_column_name']] == int(i[5:])].index.tolist()
+            #print('row_index:',row_index)
             row_index_group.append(row_index[0])
         if csv_config['value'] == 'category':
             df.loc[row_index_group, csv_config['class_column_name']] = class_name

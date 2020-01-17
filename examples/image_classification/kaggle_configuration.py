@@ -179,14 +179,22 @@ def config_choice(dataset, data_path):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
-        net_dog = ag.space.Categorical('resnet101_v1', 'resnet101_v2', 'resnext101_64x4d', 'resnet101_v1b_gn',
-                                       'resnet101_v1b', 'resnet101_v1c', 'resnet101_v1d', 'resnet101_v1e',
-                                       'resnet101_v1s', 'resnext101b_64x4d')
-
+        # net_dog = ag.space.Categorical('resnet101_v1', 'resnet101_v2', 'resnext101_64x4d', 'resnet101_v1b_gn',
+        #                                'resnet101_v1b', 'resnet101_v1c', 'resnet101_v1d',
+        #                                'resnet101_v1s', 'resnext101b_64x4d') # 'resnet101_v1e',
+        net_dog = ag.space.Categorical('resnet101_v1', 'resnext101b_64x4d') # 'resnet101_v1e',
+        # net_dog = ag.space.Categorical('resnext101b_64x4d', 'resnet152_v1')  #
+        #net_dog = ag.space.Categorical('resnext101_64x4d')
         @ag.obj(
-            learning_rate=ag.space.Real(1e-4, 1e-3, log=True),
-            momentum=ag.space.Real(0.90, 0.95),
-            wd=ag.space.Real(1e-6, 1e-4, log=True),
+            # learning_rate=ag.space.Real(0.3, 0.5),
+            # momentum=ag.space.Real(0.85, 0.95),
+            # wd=ag.space.Real(1e-6, 1e-2, log=True),
+            learning_rate=0.37773572192939275,
+            momentum=0.8781469686956929,
+            wd=3.9731885220200256e-06,
+            # learning_rate=ag.space.Real(1e-4, 1e-3, log=True),
+            # momentum=ag.space.Real(0.90, 0.95),
+            # wd=ag.space.Real(1e-6, 1e-4, log=True),
             multi_precision=True  # True fix
         )
         class NAG(optim.NAG):
@@ -200,7 +208,7 @@ def config_choice(dataset, data_path):
                     warmup_lr=0.0,
                     warmup_epochs=5)
         tricks = ag.space.Dict(
-                    last_gamma=True,
+                    last_gamma=True,# final fit inference difference
                     use_pretrained=True,
                     use_se=False,
                     mixup=False,

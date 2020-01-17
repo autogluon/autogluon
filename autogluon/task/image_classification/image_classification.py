@@ -278,15 +278,21 @@ class ImageClassification(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        results = BaseTask.run_fit(train_image_classification, search_strategy,
-                                   scheduler_options)
+        results = BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
+
+        logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_image_classification.args, results['best_config'])
+        logger.info('The best config: {}'.format(results['best_config']))
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
         model = get_network(args.net, **kwargs)
+
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
+
+
         if ensemble > 1:
+            logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ensemble model")
             models = [model]
             if isinstance(search_strategy, str):
                 scheduler = schedulers[search_strategy.lower()]

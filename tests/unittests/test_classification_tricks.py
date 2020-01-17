@@ -88,7 +88,6 @@ def test_tricks(test_trials):
                               ngpus_per_trial = target['ngpus_per_trial'],
                               num_trials = target['num_trials'],
                               batch_size = target['batch_size'],
-                              verbose = True,
                               search_strategy='skopt',
                               tricks = target['tricks'],
                               lr_config = target['lr_config'],
