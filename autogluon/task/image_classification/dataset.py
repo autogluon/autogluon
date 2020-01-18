@@ -117,6 +117,55 @@ def get_dataset(path=None, train=True, name=None,
     return dataset
 
 @obj()
+class IndexImageDataset(MXImageFolderDataset):
+    """A image classification dataset with a CVS label file
+       Each sample is an image and its corresponding label.
+
+    Parameters
+    ----------
+    root : str
+        Path to the image folder.
+    indexfile : str
+        Local path to the csv index file. The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+    gray_scale : False
+        If True, always convert images to greyscale. 
+        If False, always convert images to colored (RGB). 
+    transform : function, default None
+        A user defined callback that transforms each sample.
+    """
+    def __init__(self, root, indexfile, gray_scale=False, transform=None,
+                 extension='.jpg'):
+        self._root = os.path.expanduser(root)
+        self.items = self.read_csv(indexfile, root, extension)
+        self.flag = 0 if gray_scale else 1
+        self._transform = transform
+
+    @staticmethod
+    def read_csv(filename, root, extension):
+        """The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+        """
+        def label_to_index(label_list, name):
+            return label_list.index(name)
+        import csv
+        label_dict = {}
+        with open(os.path.expanduser(filename)) as f:
+            for row in reader:
+                assert len(row) == 2
+                label_dict[row[0]] = row[1]
+        if 'id' in label_dict:
+            label_dict.pop('id')
+        labels = list(set(label_dict.values()))
+        samples = []
+        for k, v in label_dict.items():
+            samples.append((os.path.join(root, f"{k}{extension}"),
+                            label_to_index(labels, v)))
+        return samples
+
+@obj()
 class RecordDataset(ImageRecordDataset):
     """A dataset wrapping over a RecordIO file containing images. 
        Each sample is an image and its corresponding label.
