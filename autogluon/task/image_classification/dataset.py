@@ -105,7 +105,11 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
-    if '.rec' in path:
+
+    if 'label_file' in kwargs:
+        dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
+                                    *args, **kwargs)
+    elif '.rec' in path:
         dataset = RecordDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     elif _is_osx:
@@ -135,10 +139,10 @@ class IndexImageDataset(MXImageFolderDataset):
     transform : function, default None
         A user defined callback that transforms each sample.
     """
-    def __init__(self, root, indexfile, gray_scale=False, transform=None,
+    def __init__(self, root, label_file, gray_scale=False, transform=None,
                  extension='.jpg'):
         self._root = os.path.expanduser(root)
-        self.items = self.read_csv(indexfile, root, extension)
+        self.items = self.read_csv(label_file, root, extension)
         self._flag = 0 if gray_scale else 1
         self._transform = transform
 
