@@ -48,6 +48,8 @@ class BaseTask(object):
         best_config = scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
+        if hasattr(args, 'epochs') and hasattr(args, 'final_fit_epochs'):
+            args.epochs = args.final_fit_epochs
         results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
         if plot_results or in_ipynb():
