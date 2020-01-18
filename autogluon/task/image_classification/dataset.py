@@ -139,7 +139,7 @@ class IndexImageDataset(MXImageFolderDataset):
                  extension='.jpg'):
         self._root = os.path.expanduser(root)
         self.items = self.read_csv(indexfile, root, extension)
-        self.flag = 0 if gray_scale else 1
+        self._flag = 0 if gray_scale else 1
         self._transform = transform
 
     @staticmethod
@@ -152,7 +152,8 @@ class IndexImageDataset(MXImageFolderDataset):
             return label_list.index(name)
         import csv
         label_dict = {}
-        with open(os.path.expanduser(filename)) as f:
+        with open(filename) as f:
+            reader = csv.reader(f)
             for row in reader:
                 assert len(row) == 2
                 label_dict[row[0]] = row[1]
