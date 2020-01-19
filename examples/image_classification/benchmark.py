@@ -29,9 +29,6 @@ def parse_args():
     return opt
 
 def predict_details(test_path, classifier, load_dataset):
-    # test_dataset = os.path.join(test_path, 'test')
-    # inds, probs, probs_all= classifier.predict(test_path)
-    # test_data = task.Dataset('~/data/test', train=False)
     inds, probs, probs_all= classifier.predict(task.Dataset(test_path, train=False))
     value = []
     target_dataset = load_dataset.init()

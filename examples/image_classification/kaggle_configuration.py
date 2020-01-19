@@ -89,21 +89,18 @@ def config_choice(data_path, dataset):
                     use_gn=False)
         kaggle_choice = {'classes': 2, 'net': net_aeri, 'optimizer': optimizer,
                          'dataset': dataset_path,
-                         'batch_size': 256,#384
+                         'batch_size': 256,
                          'epochs': 180,
                          'ngpus_per_trial': 8,
                          'lr_config': lr_config,
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'plant-seedlings-classification':
-        net_plant = ag.space.Categorical('resnet50_v1', 'resnet50_v1b', 'resnet50_v1c',
-                                        'resnet50_v1d', 'resnet50_v1s')
-
+        net_plant = ag.space.Categorical('resnet50_v1', 'resnet50_v1b', 'resnet50_v1c')
         @ag.obj(
             learning_rate=ag.space.Real(1e-4, 1e-3, log=True),
             momentum=ag.space.Real(0.93, 0.95),
-            wd=ag.space.Real(1e-6, 1e-4, log=True),
-            multi_precision=False
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
@@ -142,8 +139,7 @@ def config_choice(data_path, dataset):
         @ag.obj(
             learning_rate=ag.space.Real(1e-3, 1e-2, log=True),
             momentum=ag.space.Real(0.85, 0.90),
-            wd=ag.space.Real(1e-6, 1e-4, log=True),
-            multi_precision=False
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
@@ -179,16 +175,11 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
-        # net_dog = ag.space.Categorical('resnet101_v1', 'resnet101_v2', 'resnext101_64x4d', 'resnet101_v1b_gn',
-        #                               'resnet101_v1b', 'resnet101_v1c', 'resnet101_v1d', 'resnet101_v1e',
-        #                               'resnet101_v1s', 'resnext101b_64x4d')
-
         net_dog = ag.space.Categorical('resnet152_v1', 'resnext101_64x4d')
         @ag.obj(
-            learning_rate=ag.space.Real(1e-4, 1e-3, log=True),
+            learning_rate=ag.space.Real(0.3, 0.5),
             momentum=ag.space.Real(0.90, 0.95),
-            wd=ag.space.Real(1e-6, 1e-4, log=True),
-            multi_precision=True  # True fix
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
@@ -223,12 +214,11 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'shopee-iet-machine-learning-competition':
-        net_shopee = ag.space.Categorical('resnet152_v1','resnet152_v2', 'resnet152_v1b', 'resnet152_v1d','resnet152_v1s')
+        net_shopee = ag.space.Categorical('resnet152_v1','resnet152_v2')
         @ag.obj(
             learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
             momentum=ag.space.Real(0.90, 1.0),
             wd=ag.space.Real(1e-4, 1e-2, log=True),
-            multi_precision=False
         )
         class NAG(optim.NAG):
             pass

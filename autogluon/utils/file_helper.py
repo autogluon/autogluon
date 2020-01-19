@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from glob import glob
 
-__all__ = ['generate_csv', 'generate_csv_submission','generate_prob_csv']
+__all__ = ['generate_csv', 'generate_csv_submission', 'generate_prob_csv']
 
 def generate_csv_submission(dataset_path, dataset, local_path, inds, preds, class_name, custom):
     """
