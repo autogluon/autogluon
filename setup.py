@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.3'
+version = '0.0.4'
 try:
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
         cwd=cwd).decode('ascii').strip()
@@ -54,7 +54,8 @@ requirements = [
     'matplotlib',
     'tqdm>=4.38.0',
     'paramiko>=2.5.0',
-    'distributed>=2.6.0',
+    'dask==2.6.0',
+    'distributed==2.6.0',
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0',
     'gluonnlp==0.8.1',

@@ -47,7 +47,6 @@ class Getmodel_kwargs():
         if use_gn:
             from gluoncv.nn import GroupNorm
             self._kwargs['norm_layer'] = GroupNorm
-
         if isinstance(model_name, str):
             if model_name.startswith('vgg'):
                 self._kwargs['batch_norm'] = batch_norm
@@ -92,3 +91,4 @@ class Getmodel_kwargs():
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
         return net
+

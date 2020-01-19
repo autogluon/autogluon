@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class ImageClassification(BaseTask):
     """AutoGluon Task for classifying images based on their content
     """
+    Classifier=Classifier
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. 
@@ -66,6 +67,7 @@ class ImageClassification(BaseTask):
             batch_size=64,
             input_size=224,
             epochs=20,
+            final_fit_epochs=None,
             ensemble=1,
             metric='accuracy',
             nthreads_per_trial=4,
@@ -82,7 +84,6 @@ class ImageClassification(BaseTask):
             num_trials=2,
             dist_ip_addrs=[],
             grace_period=None,
-
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -126,6 +127,8 @@ class ImageClassification(BaseTask):
             How many images to group in each mini-batch during gradient computations in training.
         epochs: int
             How many epochs to train the neural networks for at most.
+        final_fit_epochs: int, default None
+            Final fit epochs, the same number of epochs will be used as during the HPO if not specified.
         metric : str or callable object
             Evaluation metric by which predictions will be ulitmately evaluated on test data.
         loss : `mxnet.gluon.loss`
@@ -183,6 +186,7 @@ class ImageClassification(BaseTask):
         >>> test_data = task.Dataset('~/data/test', train=False)
         >>> test_acc = classifier.evaluate(test_data)
 
+
         Bag of tricks are used on image classification dataset
 
         lr_config
@@ -238,6 +242,7 @@ class ImageClassification(BaseTask):
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
 
+        final_fit_epochs = final_fit_epochs if final_fit_epochs else epochs
         train_image_classification.register_args(
             dataset=dataset,
             net=net,
@@ -250,6 +255,7 @@ class ImageClassification(BaseTask):
             batch_size=batch_size,
             input_size=input_size,
             epochs=epochs,
+            final_fit_epochs=final_fit_epochs,
             verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
@@ -281,7 +287,9 @@ class ImageClassification(BaseTask):
         results = BaseTask.run_fit(train_image_classification, search_strategy,
                                    scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
-        model = get_network(args.net, results['num_classes'], mx.cpu(0))
+
+        kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
+        model = get_network(args.net, **kwargs)
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
         if ensemble > 1:
@@ -295,8 +303,14 @@ class ImageClassification(BaseTask):
             scheduler = scheduler(train_image_classification, **scheduler_options)
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
-                model = get_network(args.net, resultsi['num_classes'], mx.cpu(0))
+                kwargs = {'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
+                model = get_network(args.net,  **kwargs)
                 update_params(model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
+
+        results.pop('args')
+        args.pop('optimizer')
+        args.pop('dataset')
+        args.pop('loss')
         return Classifier(model, results, default_val_fn, checkpoint, args)

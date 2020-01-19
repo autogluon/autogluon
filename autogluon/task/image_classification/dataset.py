@@ -105,7 +105,11 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
-    if '.rec' in path:
+
+    if 'label_file' in kwargs:
+        dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
+                                    *args, **kwargs)
+    elif '.rec' in path:
         dataset = RecordDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     elif _is_osx:
@@ -115,6 +119,56 @@ def get_dataset(path=None, train=True, name=None,
                 transform=_TransformFirstClosure(transform), **kwargs)
     dataset = dataset.init()
     return dataset
+
+@obj()
+class IndexImageDataset(MXImageFolderDataset):
+    """A image classification dataset with a CVS label file
+       Each sample is an image and its corresponding label.
+
+    Parameters
+    ----------
+    root : str
+        Path to the image folder.
+    indexfile : str
+        Local path to the csv index file. The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+    gray_scale : False
+        If True, always convert images to greyscale. 
+        If False, always convert images to colored (RGB). 
+    transform : function, default None
+        A user defined callback that transforms each sample.
+    """
+    def __init__(self, root, label_file, gray_scale=False, transform=None,
+                 extension='.jpg'):
+        self._root = os.path.expanduser(root)
+        self.items = self.read_csv(label_file, root, extension)
+        self._flag = 0 if gray_scale else 1
+        self._transform = transform
+
+    @staticmethod
+    def read_csv(filename, root, extension):
+        """The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+        """
+        def label_to_index(label_list, name):
+            return label_list.index(name)
+        import csv
+        label_dict = {}
+        with open(filename) as f:
+            reader = csv.reader(f)
+            for row in reader:
+                assert len(row) == 2
+                label_dict[row[0]] = row[1]
+        if 'id' in label_dict:
+            label_dict.pop('id')
+        labels = list(set(label_dict.values()))
+        samples = []
+        for k, v in label_dict.items():
+            samples.append((os.path.join(root, f"{k}{extension}"),
+                            label_to_index(labels, v)))
+        return samples
 
 @obj()
 class RecordDataset(ImageRecordDataset):
