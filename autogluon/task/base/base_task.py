@@ -1,4 +1,5 @@
 import time
+import copy
 import collections
 import mxnet as mx
 from abc import abstractmethod
@@ -47,17 +48,22 @@ class BaseTask(object):
         best_config = scheduler.get_best_config()
         args = train_fn.args
         args.final_fit = True
+        if hasattr(args, 'epochs') and hasattr(args, 'final_fit_epochs'):
+            args.epochs = args.final_fit_epochs
         results = scheduler.run_with_config(best_config)
         total_time = time.time() - start_time
         if plot_results or in_ipynb():
             plot_training_curves = scheduler_options['checkpoint'].replace('exp1.ag', 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True, use_legend=False)
-        results.update(best_reward=best_reward, best_config=best_config,
-                       total_time=total_time, metadata=scheduler.metadata,
+        record_args = copy.deepcopy(args)
+        results.update(best_reward=best_reward,
+                       best_config=best_config,
+                       total_time=total_time,
+                       metadata=scheduler.metadata,
                        training_history=scheduler.training_history,
                        config_history=scheduler.config_history,
                        reward_attr=scheduler._reward_attr,
-                       args=args)
+                       args=record_args)
         return results
 
     @abstractmethod

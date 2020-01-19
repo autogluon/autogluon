@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class ImageClassification(BaseTask):
     """AutoGluon Task for classifying images based on their content
     """
+    Classifier=Classifier
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. 
@@ -66,6 +67,7 @@ class ImageClassification(BaseTask):
             batch_size=64,
             input_size=224,
             epochs=20,
+            final_fit_epochs=None,
             ensemble=1,
             metric='accuracy',
             nthreads_per_trial=4,
@@ -125,6 +127,8 @@ class ImageClassification(BaseTask):
             How many images to group in each mini-batch during gradient computations in training.
         epochs: int
             How many epochs to train the neural networks for at most.
+        final_fit_epochs: int, default None
+            Final fit epochs, the same number of epochs will be used as during the HPO if not specified.
         metric : str or callable object
             Evaluation metric by which predictions will be ulitmately evaluated on test data.
         loss : `mxnet.gluon.loss`
@@ -238,6 +242,7 @@ class ImageClassification(BaseTask):
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
 
+        final_fit_epochs = final_fit_epochs if final_fit_epochs else epochs
         train_image_classification.register_args(
             dataset=dataset,
             net=net,
@@ -250,6 +255,7 @@ class ImageClassification(BaseTask):
             batch_size=batch_size,
             input_size=input_size,
             epochs=epochs,
+            final_fit_epochs=final_fit_epochs,
             verbose=verbose,
             num_workers=nthreads_per_trial,
             hybridize=hybridize,
@@ -303,4 +309,8 @@ class ImageClassification(BaseTask):
                 models.append(model)
             model = Ensemble(models)
 
+        results.pop('args')
+        args.pop('optimizer')
+        args.pop('dataset')
+        args.pop('loss')
         return Classifier(model, results, default_val_fn, checkpoint, args)
