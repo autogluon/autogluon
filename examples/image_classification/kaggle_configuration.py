@@ -11,7 +11,7 @@ def download_shopee(dataset, data_path):
     else:
         print(dataset + '.zip already exists.\n')
 
-def config_choice(dataset, data_path):
+def config_choice(data_path, dataset):
     global kaggle_choice
     dataset_path = os.path.join(data_path, dataset, 'images')
     if dataset == 'dogs-vs-cats-redux-kernels-edition':
@@ -179,10 +179,11 @@ def config_choice(dataset, data_path):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
-        net_dog = ag.space.Categorical('resnet101_v1', 'resnet101_v2', 'resnext101_64x4d', 'resnet101_v1b_gn',
-                                       'resnet101_v1b', 'resnet101_v1c', 'resnet101_v1d', 'resnet101_v1e',
-                                       'resnet101_v1s', 'resnext101b_64x4d')
+        # net_dog = ag.space.Categorical('resnet101_v1', 'resnet101_v2', 'resnext101_64x4d', 'resnet101_v1b_gn',
+        #                               'resnet101_v1b', 'resnet101_v1c', 'resnet101_v1d', 'resnet101_v1e',
+        #                               'resnet101_v1s', 'resnext101b_64x4d')
 
+        net_dog = ag.space.Categorical('resnet152_v1', 'resnext101_64x4d')
         @ag.obj(
             learning_rate=ag.space.Real(1e-4, 1e-3, log=True),
             momentum=ag.space.Real(0.90, 0.95),

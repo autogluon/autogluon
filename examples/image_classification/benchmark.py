@@ -28,9 +28,11 @@ def parse_args():
     opt = parser.parse_args()
     return opt
 
-def predict_details(data_path, classifier, load_dataset):
-    test_dataset = os.path.join(data_path, 'test')
-    inds, probs, probs_all= classifier.predict(task.Dataset(test_dataset))
+def predict_details(test_path, classifier, load_dataset):
+    # test_dataset = os.path.join(test_path, 'test')
+    # inds, probs, probs_all= classifier.predict(test_path)
+    # test_data = task.Dataset('~/data/test', train=False)
+    inds, probs, probs_all= classifier.predict(task.Dataset(test_path, train=False))
     value = []
     target_dataset = load_dataset.init()
     for i in inds:
@@ -41,8 +43,9 @@ def main():
     opt = parse_args()
     if not os.path.exists(opt.dataset):
         os.mkdir(opt.dataset)
+    dataset_path = os.path.join(opt.data_dir, opt.dataset)
+
     local_path = os.path.dirname(__file__)
-    data_path = os.path.join(local_path, opt.data_dir, opt.dataset)
     output_directory = os.path.join(opt.dataset ,'checkpoint/')
     filehandler = logging.FileHandler(os.path.join(opt.dataset ,'summary.log'))
     streamhandler = logging.StreamHandler()
@@ -52,7 +55,7 @@ def main():
     logger.addHandler(streamhandler)
     logging.info(opt)
 
-    target = config_choice(opt.dataset, opt.data_dir)
+    target = config_choice(opt.data_dir, opt.dataset)
     load_dataset = task.Dataset(target['dataset'])
     classifier = task.fit(dataset = load_dataset,
                           output_directory = output_directory,
@@ -73,8 +76,9 @@ def main():
     logger.info(summary)
 
     if opt.submission:
-        inds, probs, probs_all, value = predict_details(data_path, classifier, load_dataset)
-        ag.utils.generate_csv_submission(opt.dataset, data_path, local_path, inds, probs_all, value, opt.custom)
+        test_path = os.path.join(opt.data_dir, opt.dataset, 'test')
+        inds, probs, probs_all, value = predict_details(test_path, classifier, load_dataset)
+        ag.utils.generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()

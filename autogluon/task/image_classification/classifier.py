@@ -89,7 +89,7 @@ class Classifier(BasePredictor):
         state_dict = self.state_dict()
         save(state_dict, checkpoint)
 
-    def predict(self, X, input_size=224, plot=True):
+    def predict(self, X, input_size=224, crop_ratio=0.875, random_crop_ratio=0.2, plot=True):
         """Predict class-index and associated class probability for each image in a given dataset (or just a single image). 
         
         Parameters
@@ -114,10 +114,11 @@ class Classifier(BasePredictor):
         """
         # model inference
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
-        resize = int(math.ceil(input_size / 0.875))
+        resize = int(math.ceil(input_size / crop_ratio))
         transform_fn = Compose([
                 Resize(resize),
                 CenterCrop(input_size),
+                # RandomCrop(input_size),
                 ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
@@ -142,6 +143,7 @@ class Classifier(BasePredictor):
             inds.append(ind.asscalar())
             probas.append(proba.asnumpy())
             probals_all.append(proba_all.asnumpy().flatten())
+
         return inds, probas, probals_all
 
     @staticmethod
