@@ -128,7 +128,6 @@ search_strategy = 'hyperband'
 classifier = task.fit(dataset,
                       net=net,
                       optimizer=optimizer,
-                      lr_scheduler=ag.space.Categorical('poly', 'cosine'),
                       search_strategy=search_strategy,
                       epochs=epochs,
                       num_trials=2,

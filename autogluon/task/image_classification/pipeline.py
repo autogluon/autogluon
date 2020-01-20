@@ -76,11 +76,11 @@ def train_image_classification(args, reporter):
 
     if isinstance(args.lr_config.lr_mode, str): # fix
         target_lr = LR_params(args.optimizer.lr, args.lr_config.lr_mode, args.epochs, num_batches,
-                             args.lr_config.lr_decay_epoch,
-                             args.lr_config.lr_decay ,
-                             args.lr_config.lr_decay_period,
-                             args.lr_config.warmup_epochs,
-                             args.lr_config.warmup_lr)
+                              args.lr_config.lr_decay_epoch,
+                              args.lr_config.lr_decay ,
+                              args.lr_config.lr_decay_period,
+                              args.lr_config.warmup_epochs,
+                              args.lr_config.warmup_lr)
         lr_scheduler = target_lr.get_lr_scheduler
     else:
         lr_scheduler = args.lr_config.lr_mode
