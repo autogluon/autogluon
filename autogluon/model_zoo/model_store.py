@@ -18,6 +18,8 @@ _model_sha1 = {name: checksum for checksum, name in [
     ('e0da163506c2aa3ad48b92829af75162e09e0b7b', 'efficientnet_b5'),
     ('eb97a9dab456c9931673e469e0a09a0d3fda2a11', 'efficientnet_b6'),
     ('3cb5cc71e074ddb8eb1b334d1099fc1ecaa78562', 'efficientnet_b7'),
+    ('96443327d8113ae5b4346db1cd29b96b361eed72', 'standford_dog_resnet152_v1'),
+    ('5dbc5d6789b0f6fd8c27974e7bb68db540c2e2e5', 'standford_dog_resnext101_64x4d'),
     ]}
 
 autogluon_repo_url = 'https://autogluon.s3.amazonaws.com/'
