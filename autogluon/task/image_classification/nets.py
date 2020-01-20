@@ -2,8 +2,8 @@ import logging
 import mxnet as mx
 from mxnet import gluon, init
 from mxnet.gluon import nn
-from gluoncv.model_zoo import get_model
 
+from ...model_zoo.model_zoo import get_model
 from ...core import *
 
 logger = logging.getLogger(__name__)
@@ -106,6 +106,9 @@ def get_built_in_network(name, *args, **kwargs):
             if hasattr(finetune_net, 'output'):
                 finetune_net.output = gluon.nn.Dense(num_classes)
                 finetune_net.output.initialize(init.Xavier(), ctx=ctx)
+            elif hasattr(finetune_net, '_fc'):
+                finetune_net._fc = gluon.nn.Dense(num_classes)
+                finetune_net._fc.initialize(init.Xavier(), ctx=ctx)
             else:
                 assert hasattr(finetune_net, 'fc')
                 finetune_net.fc = gluon.nn.Dense(num_classes)
