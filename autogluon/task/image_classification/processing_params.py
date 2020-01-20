@@ -78,10 +78,7 @@ class Getmodel_kwargs():
 
     @property
     def get_net(self):
-        if isinstance(self._model_name, str):
-            net = get_network(self._model_name, **self._kwargs)
-        else:
-            net = self._model_name
+        net = get_network(self._model_name, **self._kwargs)
         net.cast(self._dtype)
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)

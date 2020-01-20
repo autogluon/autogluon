@@ -24,3 +24,4 @@ def test_classifier_save_load():
 
 if __name__ == '__main__':
     test_ensemble()
+    test_classifier_save_load()
