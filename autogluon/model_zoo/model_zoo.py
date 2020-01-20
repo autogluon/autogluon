@@ -1,4 +1,5 @@
 from .models.efficientnet import *
+from .models.standford_dog_models import *
 
 _all__ = ['get_model']
 
@@ -26,6 +27,8 @@ def get_model(name, **kwargs):
         'efficientnet_b5': get_efficientnet_b5,
         'efficientnet_b6': get_efficientnet_b6,
         'efficientnet_b7': get_efficientnet_b7,
+        'standford_dog_resnet152_v1': standford_dog_resnet152_v1,
+        'standford_dog_resnext101_64x4d': standford_dog_resnext101_64x4d,
         }
     name = name.lower()
     if name not in models:

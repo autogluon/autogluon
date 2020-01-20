@@ -16,6 +16,7 @@ class Ensemble(object):
 
     def __call__(self, *inputs):
         outputs = [model(*inputs) for model in self.model_list]
+        print('outputs', outputs)
         output = outputs[0].exp()
         for i in range(1, len(outputs)):
             output += outputs[i].exp()
