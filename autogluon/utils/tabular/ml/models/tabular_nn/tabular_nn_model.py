@@ -479,6 +479,13 @@ class TabularNeuralNetModel(AbstractModel):
         self.processor = self._create_preprocessor()
         processed_array = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in processed_array corresponding to this feature
+        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map]) # should match number of columns in processed array
+        # print("self.feature_arraycol_map", self.feature_arraycol_map)
+        # print("num_array_cols", num_array_cols)
+        # print("processed_array.shape",processed_array.shape)
+        if num_array_cols != processed_array.shape[1]:
+            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in processed_array does not match feature_arraycol_map.")
+        
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
@@ -587,7 +594,8 @@ class TabularNeuralNetModel(AbstractModel):
                     feature = transformed_features[i]
                     if feature in feature_arraycol_map:
                         raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    oh_dimensionality = len(oh_encoder.categories_[i])
+                    oh_dimensionality = min(len(oh_encoder.categories_[i]), self.params['proc.max_category_levels']+1)
+                    # print("feature: %s, oh_dimensionality: %s" % (feature, oh_dimensionality)) # TODO! debug
                     feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
                     current_colindex += oh_dimensionality
             else:
