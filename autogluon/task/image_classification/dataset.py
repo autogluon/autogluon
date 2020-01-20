@@ -142,7 +142,7 @@ class IndexImageDataset(MXImageFolderDataset):
     def __init__(self, root, label_file, gray_scale=False, transform=None,
                  extension='.jpg'):
         self._root = os.path.expanduser(root)
-        self.items = self.read_csv(label_file, root, extension)
+        self.items, self.synsets = self.read_csv(label_file, root, extension)
         self._flag = 0 if gray_scale else 1
         self._transform = transform
 
@@ -168,7 +168,15 @@ class IndexImageDataset(MXImageFolderDataset):
         for k, v in label_dict.items():
             samples.append((os.path.join(root, f"{k}{extension}"),
                             label_to_index(labels, v)))
-        return samples
+        return samples, labels
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        raise self.synsets
 
 @obj()
 class RecordDataset(ImageRecordDataset):
