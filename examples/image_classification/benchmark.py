@@ -53,6 +53,7 @@ def main():
     logging.info(opt)
 
     target = config_choice(opt.data_dir, opt.dataset)
+    print(target['lr_config'])
     load_dataset = task.Dataset(target['dataset'])
     classifier = task.fit(dataset = load_dataset,
                           output_directory = output_directory,

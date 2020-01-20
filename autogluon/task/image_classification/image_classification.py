@@ -61,7 +61,6 @@ class ImageClassification(BaseTask):
             net=Categorical('ResNet50_v1', 'ResNet18_v1'),
             optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
                            wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
-            lr_scheduler='cosine',
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
             batch_size=64,
@@ -70,7 +69,7 @@ class ImageClassification(BaseTask):
             final_fit_epochs=None,
             ensemble=1,
             metric='accuracy',
-            nthreads_per_trial=4,
+            nthreads_per_trial=60,
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
@@ -121,8 +120,6 @@ class ImageClassification(BaseTask):
             Which existing neural network models to consider as candidates.
         optimizer : str or :class:`autogluon.space.AutoGluonObject`
             Which optimizers to consider as candidates for learning the neural network weights.
-        lr_scheduler : str
-            Describes how learning rate should be adjusted over the course of training. Options include: 'cosine', 'poly'.
         batch_size : int
             How many images to group in each mini-batch during gradient computations in training.
         epochs: int
@@ -192,7 +189,7 @@ class ImageClassification(BaseTask):
         lr_config
         ----------
         lr-mode : type=str, default='step'.
-            learning rate scheduler mode. options are step, poly and cosine.
+            describes how learning rate should be adjusted over the course of training. Options include: 'cosine', 'poly'.
         lr-decay : type=float, default=0.1.
             decay rate of learning rate. default is 0.1.
         lr-decay-period : type=int, default=0.
@@ -247,7 +244,6 @@ class ImageClassification(BaseTask):
             dataset=dataset,
             net=net,
             optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
             loss=loss,
             metric=metric,
             num_gpus=ngpus_per_trial,

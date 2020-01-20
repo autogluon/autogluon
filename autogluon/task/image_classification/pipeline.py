@@ -74,7 +74,7 @@ def train_image_classification(args, reporter):
     train_data, val_data, batch_fn, num_batches = \
         get_data_loader(args.dataset, input_size, batch_size, args.num_workers, args.final_fit, args.split_ratio)
 
-    if isinstance(args.lr_config.lr_mode, str):
+    if isinstance(args.lr_config.lr_mode, str): # fix
         target_lr = LR_params(args.optimizer.lr, args.lr_config.lr_mode, args.epochs, num_batches,
                              args.lr_config.lr_decay_epoch,
                              args.lr_config.lr_decay ,
