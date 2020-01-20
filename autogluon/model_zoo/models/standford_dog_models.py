@@ -16,7 +16,7 @@ def standford_dog_resnet152_v1(pretrained=False, root=os.path.join('~', '.autogl
 
 def standford_dog_resnext101_64x4d(pretrained=False, root=os.path.join('~', '.autogluon', 'models'),
                                    ctx=mx.cpu(0), **kwargs):
-    net = gcv.model_zoo.resnext101_64x4d(classes=120, **kwargs)
+    net = gcv.model_zoo.resnext.resnext101_64x4d(classes=120, **kwargs)
     if pretrained:
         net.load_parameters(get_model_file('standford_dog_resnext101_64x4d',
                                            root=root), ctx=ctx)
