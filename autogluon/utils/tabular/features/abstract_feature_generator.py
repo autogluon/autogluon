@@ -156,7 +156,7 @@ class AbstractFeatureGenerator:
                     X[col] = [None] * len(X)
                 else:  # was a dtype==numerical column in training dataset
                     X[col] = [np.nan] * len(X)
-        # TODO (Nick): I don't think we should allow missing columns. This is very dangerous, we should throw an exception instead.
+        # TODO: I don't think we hould allow missing columns. This is dangerous, we should throw an exception instead.
         if len(missing_cols) > 0:
             warnings.warn("The columns listed below from the training data are no longer in the given dataset. "
                           "(AutoGluon will proceed assuming their values are missing, but you should remove these columns "

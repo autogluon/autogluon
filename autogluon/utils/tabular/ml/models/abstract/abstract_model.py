@@ -322,7 +322,7 @@ class AbstractModel:
         hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). Ask Hang how to ID these?
+            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
             file_id = "trial_"+str(trial) # unique identifier to files from this trial
             file_prefix = file_id + "_"
             trial_model_name = self.name+"_"+file_id
