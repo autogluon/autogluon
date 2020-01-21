@@ -139,7 +139,7 @@ class Classifier(BasePredictor):
             X = X.init()
         inds, probas, probals_all = [], [],[]
         for x in X:
-            ind, proba, proba_all= predict_img(x[0])
+            ind, proba, proba_all = predict_img(x[0])
             inds.append(ind.asscalar())
             probas.append(proba.asnumpy())
             probals_all.append(proba_all.asnumpy().flatten())
