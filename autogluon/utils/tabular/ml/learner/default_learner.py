@@ -107,7 +107,12 @@ class DefaultLearner(AbstractLearner):
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
 
-        self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
+        if X_test is not None and self.label in list(X_test.columns):
+            # TODO: This is not an ideal solution, instead check if bagging and X_test exists with label, then merge them prior to entering general data processing.
+            #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
+            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
+        else:
+            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
         if (self.objective_func is not None) and (self.objective_func.name == 'log_loss') and (self.problem_type == MULTICLASS):
             X = self.augment_rare_classes(X)
