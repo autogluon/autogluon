@@ -529,8 +529,6 @@ class AbstractTrainer:
 
         self.save()
 
-        # TODO: Select best weighted ensemble given L2 can be much worse than L1 when dealing with time limitation
-
     def stack_new_level(self, X, y, X_test=None, y_test=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, time_limit_core=None, time_limit_aux=None):
         self.stack_new_level_core(X=X, y=y, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core)
         if self.bagged_mode:
