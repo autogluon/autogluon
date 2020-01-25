@@ -5,7 +5,7 @@ import sys
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 
 from ..sklearn.sklearn_model import SKLearnModel
-from ...constants import REGRESSION
+from ...constants import MULTICLASS, REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError
 
 logger = logging.getLogger(__name__)
@@ -56,18 +56,25 @@ class RFModel(SKLearnModel):
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
         hyperparams = self.params.copy()
         hyperparams.pop('model_type')
-        hyperparams['warm_start'] = True
         n_estimators_final = hyperparams['n_estimators']
 
+        X_train = self.preprocess(X_train)
+        n_estimator_increments = [n_estimators_final]
         if n_estimators_final > 50:
-            n_estimator_increments = [10, n_estimators_final]
-        else:
-            n_estimator_increments = [n_estimators_final]
+            if self.problem_type == MULTICLASS:
+                n_estimator_increments = [10, n_estimators_final]
+                hyperparams['warm_start'] = True
+            else:
+                X_train_size_bytes = sys.getsizeof(pickle.dumps(X_train))
+                available_mem = psutil.virtual_memory().available
+                X_train_memory_ratio = X_train_size_bytes/available_mem
+                if X_train_memory_ratio > 0.02*(100/n_estimators_final):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
+                    # Causes ~10% training slowdown, so try to avoid if memory is not an issue
+                    n_estimator_increments = [10, n_estimators_final]
+                    hyperparams['warm_start'] = True
 
         hyperparams['n_estimators'] = n_estimator_increments[0]
         self.model = self._model_type(**hyperparams)
-
-        X_train = self.preprocess(X_train)
 
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
