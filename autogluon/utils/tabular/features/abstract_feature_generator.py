@@ -125,16 +125,16 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
-        logger.log(15, 'Feature Generator processed '+str(X_len)+' data points with '+str(len(self.features))+' features')
-        logger.log(15, 'Original Features:')
+        logger.log(20, 'Feature Generator processed '+str(X_len)+' data points with '+str(len(self.features))+' features')
+        logger.log(20, 'Original Features:')
         for key, val in self.feature_type_family.items():
-            logger.log(15, '\t ' +str(key) +' features: '+str(len(val)))
-        logger.log(15, 'Generated Features:')
+            logger.log(20, '\t ' +str(key) +' features: '+str(len(val)))
+        logger.log(20, 'Generated Features:')
         for key, val in self.feature_types_metadata_generated.items():
-            logger.log(15, '\t ' + str(key) +' features: '+str(len(val)))
-        logger.log(15, 'All Features:')
+            logger.log(20, '\t ' + str(key) +' features: '+str(len(val)))
+        logger.log(20, 'All Features:')
         for key, val in self.feature_types_metadata_full.items():
-            logger.log(15, '\t ' +str(key)+' features: '+str(len(val)))
+            logger.log(20, '\t ' +str(key)+' features: '+str(len(val)))
 
         return X_features
 
