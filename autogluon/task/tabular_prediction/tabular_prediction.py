@@ -267,7 +267,7 @@ class TabularPrediction(BaseTask):
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
-            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 1000)))
+            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 750)))
 
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
