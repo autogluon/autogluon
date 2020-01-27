@@ -93,7 +93,7 @@ class ImageClassification(BaseTask):
                 warmup_epochs=0),
             tricks=Dict(
                 last_gamma=False,#True
-                use_pretrained=False,#True
+                use_pretrained=True,#True
                 use_se=False,
                 mixup=False,
                 mixup_alpha=0.2,
@@ -272,7 +272,7 @@ class ImageClassification(BaseTask):
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
-            'plot_results': plot_results,
+            'plot_results': plot_results
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
@@ -280,8 +280,7 @@ class ImageClassification(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        results = BaseTask.run_fit(train_image_classification, search_strategy,
-                                   scheduler_options)
+        results = BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}

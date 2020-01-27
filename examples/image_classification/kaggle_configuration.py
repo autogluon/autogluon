@@ -173,6 +173,14 @@ def config_choice(data_path, dataset):
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
         net_dog = ag.space.Categorical('resnext101_64x4d')
+        # Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+        # 'grid': FIFOScheduler,
+        # 'random': FIFOScheduler,
+        # 'skopt': FIFOScheduler,
+        # 'hyperband': HyperbandScheduler,
+        # 'rl': RLScheduler,
+        # search_strategy = ag.space.Categorical('rl', 'hyperband', 'skopt', 'random')
+        search_strategy = 'hyperband'
         @ag.obj(
             learning_rate=ag.space.Real(0.3, 0.5),
             momentum=ag.space.Real(0.85, 0.95),
@@ -209,6 +217,7 @@ def config_choice(data_path, dataset):
                          'ngpus_per_trial': 4,
                          'lr_config': lr_config,
                          'tricks': tricks,
+                         'search_strategy' : search_strategy,
                          'num_trials': 30}
     elif dataset == 'shopee-iet-machine-learning-competition':
         net_shopee = ag.space.Categorical('resnet152_v1d')

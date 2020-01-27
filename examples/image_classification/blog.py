@@ -7,6 +7,7 @@ def task_dog_breed_identification():
     # data_loader
     data_path = '/home/ubuntu/workspace/dataset'
     dataset = 'dog-breed-identification_mini'
+    # dataset = 'dog-breed-identification'
     dataset_path = os.path.join(data_path, dataset, 'train')
     test_path = os.path.join(data_path, dataset, 'test')
     csv_path = os.path.join(data_path, dataset, 'sample_submission.csv')
@@ -26,18 +27,20 @@ def task_dog_breed_identification():
     class NAG(optim.NAG):
         pass
 
+    # model = ag.model_zoo.get_model('standford_dog_resnext101_64x4d', pretrained=True)
+    # use_pretrained = True,  # True
+
     classifier = task.fit(dataset=load_dataset,
-                          # pretrain model
-                          # nets=ag.Categorical('resnext_101_standforddog', 'resnet151_v1d_standford'),
+                          net=ag.Categorical('standford_dog_resnext101_64x4d', 'standford_dog_resnet152_v1'),
                           optimizer=NAG(),
-                          epochs=1,
+                          epochs=10,
                           num_trials=2,
                           ngpus_per_trial=1,
                           batch_size=48,
                           verbose=False,
                           ensemble=2)
 
-    multi_scale_crop = True
+    multi_scale_crop = False
     if multi_scale_crop:
         scale_ratio_choice=[0.875, 0.8, 0.7] #256,280,320
         for i in scale_ratio_choice:

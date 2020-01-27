@@ -61,6 +61,7 @@ def main():
                           optimizer = target['optimizer'],
                           tricks = target['tricks'],
                           lr_config = target['lr_config'],
+                          # search_strategy = target['search_strategy'],#'hyperband',
                           resume=opt.resume,
                           epochs=opt.num_epochs,
                           ngpus_per_trial=opt.ngpus_per_trial,

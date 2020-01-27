@@ -162,11 +162,15 @@ def generate_prob_csv(test_path, csv_path, preds, set_prob_thresh=0, custom='./s
         file_list = []
         for i, glob_file in enumerate(glob(glob_files)):
             file_list.append(pd.read_csv(glob_file, index_col=0))
+
         w = sum([*file_list])/len(file_list)
+
         if scale_min_max:
             w = w.apply(lambda x: np.round((x - min(x)) / (1.0 * (max(x) - min(x))), 2), axis=1)
+
         for i in w.columns.values:
             w[i] = w[i].apply(filter_value, Threshold=set_prob_thresh)
+
         w.to_csv(custom)
     if not ensemble_list.strip() == '':
         ensemble_csv(ensemble_list)
