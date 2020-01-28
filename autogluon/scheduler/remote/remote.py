@@ -49,14 +49,12 @@ class Remote(Client):
     LOCK = mp.Lock()
     REMOTE_ID = mp.Value('i', 0)
     def __init__(self, remote_ip=None, port=None, local=False, ssh_username=None,
-            ssh_port=22, ssh_private_key=None, remote_python=None,
-            remote_dask_worker="distributed.cli.dask_worker"):
+            ssh_port=22, ssh_private_key=None, remote_python=None):
         self.service = None
         if not local:
             remote_addr = (remote_ip + ':{}'.format(port))
             self.service = DaskRemoteService(remote_ip, port, ssh_username,
-                                             ssh_port, ssh_private_key, remote_python,
-                                             remote_dask_worker)
+                                             ssh_port, ssh_private_key, remote_python)
             _set_global_remote_service(self.service)
             super(Remote, self).__init__(remote_addr)
         else:
@@ -92,8 +90,7 @@ class Remote(Client):
 
 class DaskRemoteService(object):
     def __init__(self, remote_addr, scheduler_port, ssh_username=None,
-        ssh_port=22, ssh_private_key=None, remote_python=None,
-        remote_dask_worker="distributed.cli.dask_worker"):
+        ssh_port=22, ssh_private_key=None, remote_python=None):
 
         self.scheduler_addr = remote_addr
         self.scheduler_port = scheduler_port
@@ -102,7 +99,6 @@ class DaskRemoteService(object):
         self.ssh_port = ssh_port
         self.ssh_private_key = ssh_private_key
         self.remote_python = remote_python
-        self.remote_dask_worker = remote_dask_worker
         self.monitor_thread = Thread()
 
         # Start the scheduler node
@@ -123,7 +119,6 @@ class DaskRemoteService(object):
             self.ssh_port,
             self.ssh_private_key,
             self.remote_python,
-            self.remote_dask_worker,
         )
         self.start_monitoring()
         self.status = "live"

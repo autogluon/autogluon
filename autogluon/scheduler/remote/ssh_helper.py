@@ -208,7 +208,10 @@ def async_ssh(cmd_dict):
 
 def start_scheduler(addr, port, ssh_username, ssh_port,
                     ssh_private_key, remote_python=None):
-    cmd = "{python} -m distributed.cli.dask_scheduler --port {port}".format(
+    #cmd = "{python} -m distributed.cli.dask_scheduler --port {port}".format(
+    #    python=remote_python or sys.executable, port=port
+    #)
+    cmd = "{python} -m autogluon.scheduler.remote.dask_scheduler --port {port}".format(
         python=remote_python or sys.executable, port=port
     )
 
@@ -245,20 +248,28 @@ def start_scheduler(addr, port, ssh_username, ssh_port,
 
 def start_worker(scheduler_addr, scheduler_port, worker_addr,
     ssh_username, ssh_port, ssh_private_key,
-    remote_python=None, remote_dask_worker="distributed.cli.dask_worker"):
+    remote_python=None):
 
     cmd = (
-        "{python} -m {remote_dask_worker} "
+        "{python} -m dask.distributed.dask_worker "
         "{scheduler_addr}:{scheduler_port} "
-        #"--no-nanny"
+        "--no-nanny "
+        "--nthreads 0 "
+        #"--nprocs 8"
     )
+    #cmd = (
+    #    "{python} -m autogluon.scheduler.remote.dask_worker "
+    #    "{scheduler_addr}:{scheduler_port} "
+    #    #"--no-nanny "
+    #    "--nthreads 0 "
+    #    "--nprocs 8"
+    #)
 
     #if not nohost:
     cmd += " --host {worker_addr}"
 
     cmd = cmd.format(
         python=remote_python or sys.executable,
-        remote_dask_worker=remote_dask_worker,
         scheduler_addr=scheduler_addr,
         scheduler_port=scheduler_port,
         worker_addr=worker_addr,

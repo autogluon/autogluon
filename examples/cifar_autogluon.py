@@ -34,7 +34,7 @@ def parse_args():
     return args
 
 
-@ag.autogluon_register_args(
+@ag.args(
     batch_size=64,
     num_workers=2,
     num_gpus=1,
@@ -85,11 +85,11 @@ def train_cifar(args, reporter):
 
         train_data = gluon.data.DataLoader(
             gluon.data.vision.CIFAR10(train=True).transform_first(transform_train),
-            batch_size=batch_size, shuffle=True, last_batch='discard', num_workers=num_workers)
+            batch_size=batch_size, shuffle=True, last_batch='discard', num_workers=0)
 
         val_data = gluon.data.DataLoader(
             gluon.data.vision.CIFAR10(train=False).transform_first(transform_test),
-            batch_size=batch_size, shuffle=False, num_workers=num_workers)
+            batch_size=batch_size, shuffle=False, num_workers=0)
 
         lr_scheduler = LRScheduler(mode='cosine', base_lr=args.lr,
                                    nepochs=args.epochs,
@@ -167,22 +167,26 @@ if __name__ == '__main__':
 
     train_cifar.update(epochs=args.epochs)
     # create searcher and scheduler
+    extra_node_ips = []#'172.31.27.142']
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.HyperbandScheduler(train_cifar,
                                                       resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
                                                       num_trials=args.num_trials,
                                                       checkpoint=args.checkpoint,
                                                       time_attr='epoch', reward_attr="accuracy",
-                                                      max_t=args.epochs, grace_period=args.epochs//4)
+                                                      max_t=args.epochs, grace_period=args.epochs//4,
+                                                      dist_ip_addrs=extra_node_ips)
     elif args.scheduler == 'fifo':
         myscheduler = ag.scheduler.FIFOScheduler(train_cifar,
                                                  resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
                                                  num_trials=args.num_trials,
                                                  checkpoint=args.checkpoint,
-                                                 reward_attr="accuracy")
+                                                 reward_attr="accuracy",
+                                                 dist_ip_addrs=extra_node_ips)
     else:
         raise RuntimeError('Unsuported Scheduler!')
 
+    print(myscheduler)
     myscheduler.run()
     myscheduler.join_tasks()
     myscheduler.get_training_curves('{}.png'.format(os.path.splitext(args.checkpoint)[0]))

@@ -116,29 +116,37 @@ class TaskScheduler(object):
         if 'terminator_semaphore' in args:
             terminator_semaphore = args.pop('terminator_semaphore')
 
-        def _worker(gpu_ids, args):
-            """Worker function in thec client
-            """
-            if len(gpu_ids) > 0:
-                # handle GPU devices
-                os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
-                os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
-
-            # running
-            try:
-                ret = fn(**args)
-            except AutoGluonEarlyStop:
-                ret = None
-            return ret
+        if len(gpu_ids) > 0:
+            # handle GPU devices
+            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+            os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
 
         try:
-            with worker_client() as client:
-                ret_future = client.submit(_worker, gpu_ids, args)
-                ret = ret_future.result()
+            ret = fn(**args)
+        except AutoGluonEarlyStop:
+            ret = None
 
-        except Exception as e:
-            logger.error('Exception in worker process: {}'.format(e))
+        #def _worker(gpu_ids, args):
+        #    """Worker function in thec client
+        #    """
+        #    if len(gpu_ids) > 0:
+        #        # handle GPU devices
+        #        os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+        #        os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+        #    # running
+        #    try:
+        #        ret = fn(**args)
+        #    except AutoGluonEarlyStop:
+        #        ret = None
+        #    return ret
 
+        #try:
+        #    with worker_client() as client:
+        #        ret_future = client.submit(_worker, gpu_ids, args)
+        #        ret = ret_future.result()
+        #except Exception as e:
+        #    ret = None
+        #    logger.error('Exception in worker process: {}'.format(e))
         return ret
 
 
