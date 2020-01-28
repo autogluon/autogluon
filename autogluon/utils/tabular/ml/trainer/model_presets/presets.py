@@ -52,9 +52,9 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     knn_options = hyperparameters.get('KNN', None)
     custom_options = hyperparameters.get('custom', None)
     if rf_options is not None:
-        models += rf_classifiers(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
+        models += rf_classifiers(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes)
     if xt_options is not None:
-        models += xt_classifiers(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
+        models += xt_classifiers(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes)
     if knn_options is not None:
         # TODO: Combine uniform and distance into one model when doing HPO
         knn_unif_params = knn_options.copy()
