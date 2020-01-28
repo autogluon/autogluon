@@ -220,7 +220,7 @@ class FIFOScheduler(TaskScheduler):
         # Register pending evaluation
         self.searcher.register_pending(task.args['config'])
         # main process
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         # reporter thread
         rp = threading.Thread(target=self._run_reporter, args=(task, job, reporter,
                               self.searcher), daemon=False)
@@ -240,15 +240,12 @@ class FIFOScheduler(TaskScheduler):
     def _clean_task_internal(self, task_dict):
         task_dict['ReporterThread'].join()
 
-    def _run_reporter(self, task, task_job, reporter, searcher,
-                      checkpoint_semaphore=None):
+    def _run_reporter(self, task, task_job, reporter, searcher):
         last_result = None
         while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
-                if checkpoint_semaphore is not None:
-                    checkpoint_semaphore.release()
                 break
             self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])

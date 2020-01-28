@@ -90,7 +90,6 @@ class Remote(Client):
         return reprstr
 
 
-
 class DaskRemoteService(object):
     def __init__(self, remote_addr, scheduler_port, ssh_username=None,
         ssh_port=22, ssh_private_key=None, remote_python=None,
@@ -140,18 +139,15 @@ class DaskRemoteService(object):
         all_processes = [self.scheduler, self.worker]
         try:
             while True:
-                stopped = False
                 for process in all_processes:
-                    if not process['thread'].isAlive():
-                        stopped = True
                     while not process["output_queue"].empty():
                         try:
                             msg = process["output_queue"].get()
                             if 'distributed.' not in msg:
                                 print(msg)
-                        except Exception:
+                        except Exception as e:
+                            print(f'Exception happend {e}, terminating the remote.')
                             break
-                if stopped: break
                 # Kill some time and free up CPU
                 time.sleep(0.1)
 

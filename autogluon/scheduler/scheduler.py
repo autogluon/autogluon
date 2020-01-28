@@ -8,11 +8,13 @@ from threading import Thread
 import multiprocessing as mp
 from collections import OrderedDict
 
+from distributed import worker_client
+
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
-from .reporter import StatusReporter, Communicator, DistSemaphore
-from ..utils import DeprecationHelper, AutoGluonWarning
+from .reporter import DistSemaphore
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,6 @@ class TaskScheduler(object):
         cls.RESOURCE_MANAGER.add_remote(cls.REMOTE_MANAGER.get_remotes())
         self.scheduled_tasks = []
         self.finished_tasks = []
-        self.env_sem = DistSemaphore(1)
 
     def add_remote(self, ip_addrs):
         """Add remote nodes to the scheduler computation resource.
@@ -80,7 +81,7 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         with self.LOCK:
             new_dict = self._dict_from_task(task)
             new_dict['Job'] = job
@@ -91,70 +92,53 @@ class TaskScheduler(object):
         """
         cls = TaskScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         return job.result()
 
     @staticmethod
-    def _start_distributed_job(task, resource_manager, env_sem):
+    def _start_distributed_job(task, resource_manager):
+        """Async Execute the job in remote and release the resources
+        """
         logger.debug('\nScheduling {}'.format(task))
         job = task.resources.node.submit(TaskScheduler._run_dist_job,
-                                         task.fn, task.args, task.resources.gpu_ids,
-                                         env_sem)
+                                         task.fn, task.args, task.resources.gpu_ids)
         def _release_resource_callback(fut):
+            logger.debug('Start Releasing Resource')
             resource_manager._release(task.resources)
         job.add_done_callback(_release_resource_callback)
         return job
 
     @staticmethod
-    def _run_dist_job(fn, args, gpu_ids, env_semaphore):
-        """Executing the task
+    def _run_dist_job(fn, args, gpu_ids):
+        """Remote function Executing the task
         """
-        # create local communicator
-        if 'reporter' in args:
-            local_reporter = StatusReporter()
-            dist_reporter = args['reporter']
-            args['reporter'] = local_reporter
-        # handle terminator
         terminator_semaphore = None
         if 'terminator_semaphore' in args:
             terminator_semaphore = args.pop('terminator_semaphore')
 
-        manager = mp.Manager()
-        return_list = manager.list()
-        def _worker(return_list, **kwargs):
-            ret = fn(**kwargs)
-            return_list.append(ret)
-
-        try:
-            env_semaphore.acquire()
+        def _worker(gpu_ids, args):
+            """Worker function in thec client
+            """
             if len(gpu_ids) > 0:
                 # handle GPU devices
                 os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
                 os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
-            # start local progress
-            p = mp.Process(target=_worker, args=(return_list,), kwargs=args)
-            p.start()
-            env_semaphore.release()
-            if 'reporter' in args:
-                cp = Communicator.Create(p, local_reporter, dist_reporter)
-            if terminator_semaphore is not None:
-                terminator_semaphore.acquire()
-                if p.is_alive():
-                    if 'kill' in dir(p):
-                        p.kill()
-                        p.join()
-                    else:
-                        try:
-                            subprocess.run(['kill', '-9', str(p.pid)])
-                            subprocess.run(['kill', '-9', str(p.pid)])
-                        except Exception:
-                            pass
-                        p.join()
-            else:
-                p.join()
+
+            # running
+            try:
+                ret = fn(**args)
+            except AutoGluonEarlyStop:
+                ret = None
+            return ret
+
+        try:
+            with worker_client() as client:
+                ret_future = client.submit(_worker, gpu_ids, args)
+                ret = ret_future.result()
+
         except Exception as e:
             logger.error('Exception in worker process: {}'.format(e))
-        ret = return_list[0] if len(return_list) > 0 else None
+
         return ret
 
 
