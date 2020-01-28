@@ -13,7 +13,7 @@ def get_fixed_params():
         # Options: [3,4,10, 100, 1000]
         'proc.impute_strategy': 'median',  # # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
         # Options: ['median', 'mean', 'most_frequent']
-        'proc.max_category_levels': 500,  # maximum number of allowed levels per categorical feature
+        'proc.max_category_levels': 100,  # maximum number of allowed levels per categorical feature
         # Options: [10, 100, 200, 300, 400, 500, 1000, 10000]
         'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         # Options: [0.2, 0.3, 0.5, 0.8, 1.0, 10.0, 100.0]
