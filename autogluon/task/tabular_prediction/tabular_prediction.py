@@ -312,7 +312,7 @@ class TabularPrediction(BaseTask):
                         raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
                     eval_metric = REGRESSION_METRICS[eval_metric]
                 else:
-                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function")
+                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function" % eval_metric)
         
         # All models use the same scheduler:
         scheduler_options = {
