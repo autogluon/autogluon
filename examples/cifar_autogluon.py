@@ -85,11 +85,11 @@ def train_cifar(args, reporter):
 
         train_data = gluon.data.DataLoader(
             gluon.data.vision.CIFAR10(train=True).transform_first(transform_train),
-            batch_size=batch_size, shuffle=True, last_batch='discard', num_workers=0)
+            batch_size=batch_size, shuffle=True, last_batch='discard', num_workers=num_workers)
 
         val_data = gluon.data.DataLoader(
             gluon.data.vision.CIFAR10(train=False).transform_first(transform_test),
-            batch_size=batch_size, shuffle=False, num_workers=0)
+            batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
         lr_scheduler = LRScheduler(mode='cosine', base_lr=args.lr,
                                    nepochs=args.epochs,
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
     train_cifar.update(epochs=args.epochs)
     # create searcher and scheduler
-    extra_node_ips = []#'172.31.27.142']
+    extra_node_ips = []
     if args.scheduler == 'hyperband':
         myscheduler = ag.scheduler.HyperbandScheduler(train_cifar,
                                                       resource={'num_cpus': 2, 'num_gpus': args.num_gpus},
