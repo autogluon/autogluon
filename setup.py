@@ -55,6 +55,7 @@ requirements = [
     'tqdm>=4.38.0',
     'paramiko>=2.5.0',
     'dask==2.6.0',
+    'cryptography>=2.8',
     'distributed==2.6.0',
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0',
@@ -91,5 +92,10 @@ setup(
     cmdclass={
         'install': install,
         'develop': develop,
+    },
+    entry_points={
+        'console_scripts': [
+            'agremote = autogluon.scheduler.remote.cli:main',
+        ]
     },
 )

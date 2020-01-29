@@ -13,12 +13,15 @@ from distributed import worker_client
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
-from .reporter import DistSemaphore
+from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
+
+
+
 
 class TaskScheduler(object):
     """Base Distributed Task Scheduler
@@ -112,43 +115,43 @@ class TaskScheduler(object):
     def _run_dist_job(fn, args, gpu_ids):
         """Remote function Executing the task
         """
-        terminator_semaphore = None
-        if 'terminator_semaphore' in args:
-            terminator_semaphore = args.pop('terminator_semaphore')
+        if '_default_config' in args['args']:
+            args['args'].pop('_default_config')
 
-        if len(gpu_ids) > 0:
-            # handle GPU devices
-            os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
-            os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+        if 'reporter' in args:	
+            local_reporter = LocalStatusReporter()	
+            dist_reporter = args['reporter']	
+            args['reporter'] = local_reporter
+
+        manager = mp.Manager()
+        return_list = manager.list()
+        def _worker(return_list, gpu_ids, args):
+            """Worker function in thec client
+            """
+            if len(gpu_ids) > 0:
+                # handle GPU devices
+                os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
+                os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
+
+            # running
+            try:
+                ret = fn(**args)
+            except AutoGluonEarlyStop:
+                ret = None
+            #return ret
+            return_list.append(ret)
 
         try:
-            ret = fn(**args)
-        except AutoGluonEarlyStop:
-            ret = None
-
-        #def _worker(gpu_ids, args):
-        #    """Worker function in thec client
-        #    """
-        #    if len(gpu_ids) > 0:
-        #        # handle GPU devices
-        #        os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, gpu_ids))
-        #        os.environ['MXNET_CUDNN_AUTOTUNE_DEFAULT'] = "0"
-        #    # running
-        #    try:
-        #        ret = fn(**args)
-        #    except AutoGluonEarlyStop:
-        #        ret = None
-        #    return ret
-
-        #try:
-        #    with worker_client() as client:
-        #        ret_future = client.submit(_worker, gpu_ids, args)
-        #        ret = ret_future.result()
-        #except Exception as e:
-        #    ret = None
-        #    logger.error('Exception in worker process: {}'.format(e))
+            # start local progress
+            p = mp.Process(target=_worker, args=(return_list,gpu_ids, args))
+            p.start()
+            if 'reporter' in args:
+                cp = Communicator.Create(p, local_reporter, dist_reporter)
+            p.join()
+        except Exception as e:
+            logger.error('Exception in worker process: {}'.format(e))
+        ret = return_list[0] if len(return_list) > 0 else None
         return ret
-
 
     def _clean_task_internal(self, task_dict):
         pass
