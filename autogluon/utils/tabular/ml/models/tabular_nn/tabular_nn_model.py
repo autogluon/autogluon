@@ -293,6 +293,23 @@ class TabularNeuralNetModel(AbstractModel):
         else:
             verbose_eval = 1
         
+        if num_epochs == 0: # use dummy training loop that stops immediately (useful for using NN just for data preprocessing / debugging)
+            logger.log(20, "Not training Neural Net since num_epochs == 0.  Neural network architecture is:")
+            for batch_idx, data_batch in enumerate(train_dataset.dataloader):
+                data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
+                with autograd.record():
+                    output = self.model(data_batch)
+                    labels = data_batch['label']
+                    loss = self.loss_func(output, labels) / loss_scaling_factor
+                    # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
+                loss.backward()
+                self.optimizer.step(labels.shape[0])
+                if batch_idx > 0:
+                    break
+            self.model.save_parameters(self.net_filename)
+            logger.log(15, "untrained Neural Net saved to file")
+            return
+        
         # Training Loop:
         for e in range(num_epochs):
             if e == 0: # special actions during first epoch:
