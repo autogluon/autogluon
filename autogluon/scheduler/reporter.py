@@ -103,6 +103,7 @@ class LocalStatusReporter(object):
 
     def __init__(self, dict_path=None):#, result_queue, continue_semaphore):
         self._queue = mp.Queue(1)
+        self._stop = mp.Value('i', 0)
         self._last_report_time = None
         self._continue_semaphore = mp.Semaphore(0)
         self._last_report_time = time.time()
@@ -123,15 +124,21 @@ class LocalStatusReporter(object):
         self._last_report_time = report_time
 
         self._queue.put(kwargs.copy(), block=True)
-        self._continue_semaphore.acquire()
-
         logger.debug('StatusReporter reporting: {}'.format(json.dumps(kwargs)))
+
+        self._continue_semaphore.acquire()
+        if self._stop.value:
+            raise AutoGluonEarlyStop
 
     def fetch(self, block=True):
         kwargs = self._queue.get(block=block)
         return kwargs
 
     def move_on(self):
+        self._continue_semaphore.release()
+
+    def terminate(self):
+        self._stop.value = 1
         self._continue_semaphore.release()
 
     def _start(self):
@@ -171,8 +178,11 @@ class Communicator(threading.Thread):
                 reported_result = self.local_reporter.fetch()
             except BrokenPipeError:
                 break
-            self.dist_reporter(**reported_result)
-            self.local_reporter.move_on()
+            try:
+                self.dist_reporter(**reported_result)
+                self.local_reporter.move_on()
+            except AutoGluonEarlyStop:
+                self.local_reporter.terminate()
             if 'done' in reported_result and reported_result['done'] is True:
                 self.process.join()
                 break

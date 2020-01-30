@@ -138,7 +138,6 @@ class TaskScheduler(object):
                 ret = fn(**args)
             except AutoGluonEarlyStop:
                 ret = None
-            #return ret
             return_list.append(ret)
 
         try:
