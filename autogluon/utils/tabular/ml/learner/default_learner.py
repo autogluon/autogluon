@@ -49,6 +49,11 @@ class DefaultLearner(AbstractLearner):
             self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
         logger.log(20, 'AutoGluon will save models to %s' % self.path_context)
+        logger.log(20, 'Train Data Rows:    %s' % len(X))
+        logger.log(20, 'Train Data Columns: %s' % len(X.columns))
+        if X_test is not None:
+            logger.log(20, 'Tuning Data Rows:    %s' % len(X_test))
+            logger.log(20, 'Tuning Data Columns: %s' % len(X_test.columns))
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_test, y_test, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_test, holdout_frac, num_bagging_folds)

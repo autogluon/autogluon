@@ -29,11 +29,12 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         X = self.convert_pred_probas_df_to_list(X)
         return X
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    # TODO: Check memory after loading best model predictions, only load top X model predictions that fit in memory
+    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         X_train = self.preprocess(X_train)
 
         self.model = self.model_base(ensemble_size=100, problem_type=self.problem_type, metric=self.objective_func)
-        self.model = self.model.fit(X_train, Y_train)
+        self.model = self.model.fit(X_train, Y_train, time_limit=time_limit)
         self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
         self.features, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
 

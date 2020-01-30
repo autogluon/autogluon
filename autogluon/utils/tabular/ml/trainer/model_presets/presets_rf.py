@@ -1,7 +1,7 @@
 from ...models.rf.rf_model import RFModel
 
 
-def rf_classifiers(hyperparameters, path, problem_type, objective_func):
+def rf_classifiers(hyperparameters, path, problem_type, objective_func, num_classes):
     models = []
     params = {'model_type': 'rf'}
     params.update(hyperparameters.copy())
@@ -9,13 +9,13 @@ def rf_classifiers(hyperparameters, path, problem_type, objective_func):
     params_gini['criterion'] = 'gini'
     models.append(
         RFModel(path=path, name='RandomForestClassifierGini', problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=params_gini),
+                objective_func=objective_func, num_classes=num_classes, hyperparameters=params_gini),
     )
     params_entro = params.copy()
     params_entro['criterion'] = 'entropy'
     models.append(
         RFModel(path=path, name='RandomForestClassifierEntr', problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=params_entro),
+                objective_func=objective_func, num_classes=num_classes, hyperparameters=params_entro),
     )
     # if objective_func.name == 'roc_auc':  # TODO: Update to any metric that is negatively impacted by class imbalance
     #     params_gini_balanced = params.copy()
@@ -37,7 +37,7 @@ def rf_classifiers(hyperparameters, path, problem_type, objective_func):
     return models
 
 
-def xt_classifiers(hyperparameters, path, problem_type, objective_func):
+def xt_classifiers(hyperparameters, path, problem_type, objective_func, num_classes):
     models = []
     params = {'model_type': 'xt'}
     params.update(hyperparameters.copy())
@@ -45,13 +45,13 @@ def xt_classifiers(hyperparameters, path, problem_type, objective_func):
     params_gini['criterion'] = 'gini'
     models.append(
         RFModel(path=path, name='ExtraTreesClassifierGini', problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=params_gini),
+                objective_func=objective_func, num_classes=num_classes, hyperparameters=params_gini),
     )
     params_entro = params.copy()
     params_entro['criterion'] = 'entropy'
     models.append(
         RFModel(path=path, name='ExtraTreesClassifierEntr', problem_type=problem_type,
-                objective_func=objective_func, hyperparameters=params_entro),
+                objective_func=objective_func, num_classes=num_classes, hyperparameters=params_entro),
     )
     # if objective_func.name == 'roc_auc':  # TODO: Update to any metric that is negatively impacted by class imbalance
     #     params_gini_balanced = params.copy()

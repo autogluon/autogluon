@@ -120,7 +120,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.bagged_mode = False
             self.models[0].set_contexts(path_context=self.path + self.models[0].name + '/')
             self.models[0].feature_types_metadata = self.feature_types_metadata  # TODO: Move this
-            self.models[0].fit(X_train=X, Y_train=y)
+            self.models[0].fit(X_train=X, Y_train=y, time_limit=time_limit)
             self._oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1

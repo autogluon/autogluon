@@ -251,22 +251,20 @@ class AbstractTrainer:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
         return model
 
-    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+    def train_and_save(self, X_train, y_train, X_test, y_test, model: AbstractModel, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have train_multi handle this
         fit_start_time = time.time()
         model_names_trained = []
         try:
-            if not ignore_time_limit:
-                time_left = self.time_limit_per_level - (fit_start_time - self.time_train_level_start)
-                if time_left < 0:
+            if time_limit is not None:
+                if time_limit <= 0:
                     logging.log(15, 'Skipping ' + str(model.name) + ' due to lack of time remaining.')
                     return model_names_trained
                 time_left_total = self.time_limit - (fit_start_time - self.time_train_start)
-                logging.log(20, 'Fitting model: ' + str(model.name) + ' ...' + ' Training model for up to ' + str(round(time_left, 2)) + 's of the ' + str(round(time_left_total, 2)) + 's of remaining time.')
+                logging.log(20, 'Fitting model: ' + str(model.name) + ' ...' + ' Training model for up to ' + str(round(time_limit, 2)) + 's of the ' + str(round(time_left_total, 2)) + 's of remaining time.')
             else:
-                time_left = None
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...')
-            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
+            model = self.train_single(X_train, y_train, X_test, y_test, model, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_limit)
             fit_end_time = time.time()
             if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
                 score = model.score_with_oof(y=y_train)
@@ -284,7 +282,7 @@ class AbstractTrainer:
             if self.verbosity >= 1:
                 traceback.print_tb(err.__traceback__)
             logger.exception('Warning: Exception caused ' +str(model.name)+' to fail during training... Skipping this model.')
-            logger.debug(err)
+            logger.log(20, err)
             del model
         else:
             self.model_performance[model.name] = score
@@ -294,9 +292,9 @@ class AbstractTrainer:
                 self.model_types_inner[model.name] = model._child_type
             else:
                 self.model_types_inner[model.name] = type(model)
-            logger.log(20, '\t' + str(round(fit_end_time - fit_start_time, 2))+'s' + '\t = Training runtime')
             logger.log(20, '\t' + str(round(score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
-            logger.log(15, '\tEvaluation runtime of '+str(model.name)+ ' = '+str(round(pred_end_time - fit_end_time, 2))+' s')
+            logger.log(20, '\t' + str(round(fit_end_time - fit_start_time, 2)) + 's' + '\t = Training runtime')
+            logger.log(20, '\t' + str(round(pred_end_time - fit_end_time, 2))+'s' + '\t = Validation runtime')
             # TODO: Should model have fit-time/pred-time information?
             # TODO: Add to HPO
             model_fit_time = fit_end_time - fit_start_time
@@ -326,7 +324,7 @@ class AbstractTrainer:
         return model_names_trained
 
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
-                          hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+                          hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
             model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
         if feature_prune:
@@ -370,7 +368,7 @@ class AbstractTrainer:
                 else:
                     self.model_types_inner.update({name: type(model) for name in model_names_trained})
         else:
-            model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
+            model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_limit)
         self.save()
         return model_names_trained
 
@@ -378,21 +376,19 @@ class AbstractTrainer:
     # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
     # TODO: Time allowance not accurate if running from fit_continue
     # Takes trained bagged ensemble models and fits additional k-fold bags.
-    def train_multi_repeats(self, X_train, y_train, X_test, y_test, models, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=1, level=0, ignore_time_limit=False):
-        if n_repeats is None:
-            n_repeats = self.n_repeats
+    def train_multi_repeats(self, X_train, y_train, X_test, y_test, models, kfolds, n_repeats, n_repeat_start=1, stack_name='core', level=0, time_limit=None):
         models_valid = models
         models_valid_next = []
-        start_time = time.time()
         repeats_completed = 0
+        time_start = time.time()
         for n in range(n_repeat_start, n_repeats):
-            if not ignore_time_limit:
-                repeat_start_time = time.time()
-                time_left = self.time_limit_per_level - (repeat_start_time - self.time_train_level_start)
+            if time_limit is not None:
+                time_start_repeat = time.time()
+                time_left = time_limit - (time_start_repeat - time_start)
                 if n == n_repeat_start:
                     time_required = self.time_limit_per_level * 0.575  # Require slightly over 50% to be safe
                 else:
-                    time_required = (repeat_start_time - start_time) / repeats_completed * (0.575/0.425)
+                    time_required = (time_start_repeat - time_start) / repeats_completed * (0.575/0.425)
                 if time_left < time_required:
                     logger.log(15, 'Not enough time left to finish repeated k-fold bagging, stopping early ...')
                     break
@@ -400,16 +396,19 @@ class AbstractTrainer:
             for i, model in enumerate(models_valid):
                 if type(model) == str:
                     model = self.load_model(model)
-                models_valid_next += self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, k_fold_start=0, k_fold_end=None, n_repeats=n+1, n_repeat_start=n, level=level, ignore_time_limit=ignore_time_limit)
+                if time_limit is None:
+                    time_left = None
+                else:
+                    time_start_model = time.time()
+                    time_left = time_limit - (time_start_model - time_start)
+                models_valid_next += self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, k_fold_start=0, k_fold_end=None, n_repeats=n+1, n_repeat_start=n, level=level, time_limit=time_left)
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
             repeats_completed += 1
         logger.log(20, 'Completed ' + str(n_repeat_start + repeats_completed) + '/' + str(n_repeats) + ' k-fold bagging repeats ...')
         return models_valid
 
-    def train_multi_initial(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, level=0, ignore_time_limit=False):
-        if kfolds is None:
-            kfolds = self.kfolds
+    def train_multi_initial(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], kfolds, n_repeats, hyperparameter_tune=True, feature_prune=False, stack_name='core', level=0, time_limit=None):
         stack_loc = self.models_level[stack_name]
 
         model_names_trained = []
@@ -417,15 +416,19 @@ class AbstractTrainer:
         models_valid = models
         if kfolds == 0:
             models_valid = self.train_multi_fold(X_train, y_train, X_test, y_test, models_valid, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name,
-                                                          kfolds=kfolds, level=level, ignore_time_limit=ignore_time_limit)
+                                                          kfolds=kfolds, level=level, time_limit=time_limit)
         else:
             k_fold_start = 0
             if hyperparameter_tune or feature_prune:
+                time_start = time.time()
                 models_valid = self.train_multi_fold(X_train, y_train, X_test, y_test, models_valid, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name,
-                                                     kfolds=kfolds, k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
+                                                     kfolds=kfolds, k_fold_start=0, k_fold_end=1, n_repeats=n_repeats, n_repeat_start=0, level=level, time_limit=time_limit)
                 k_fold_start = 1
+                if time_limit is not None:
+                    time_limit = time_limit - (time.time() - time_start)
+
             models_valid = self.train_multi_fold(X_train, y_train, X_test, y_test, models_valid, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name,
-                                                 kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, ignore_time_limit=ignore_time_limit)
+                                                 kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, time_limit=time_limit)
 
         if hyperparameter_tune:
             model_names_trained_hpo += models_valid
@@ -440,17 +443,24 @@ class AbstractTrainer:
         stack_loc[level] = unique_names  # make unique and preserve order
         return model_names_trained
 
-    def train_multi_fold(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+    # TODO: Add time_limit_per_model
+    def train_multi_fold(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         models_valid = []
+        time_start = time.time()
         for i, model in enumerate(models):
             if type(model) == str:
                 model = self.load_model(model)
             elif self.low_memory:
                 model = copy.deepcopy(model)
             # TODO: Only update scores when finished, only update model as part of final models if finished!
+            if time_limit is None:
+                time_left = None
+            else:
+                time_start_model = time.time()
+                time_left = time_limit - (time_start_model - time_start)
             model_name_trained_lst = self.train_single_full(X_train, y_train, X_test, y_test, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name,
                                                             kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
-                                                            n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
+                                                            n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
 
             if self.low_memory:
                 del model
@@ -458,22 +468,29 @@ class AbstractTrainer:
 
         return models_valid
 
-    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, ignore_time_limit=False):
+    def train_multi(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
+        if kfolds is None:
+            kfolds = self.kfolds
         if n_repeats is None:
             n_repeats = self.n_repeats
-        if ignore_time_limit:
+        if (kfolds == 0) and (n_repeats != 1):
+            raise ValueError('n_repeats must be 1 when kfolds is 0, values: (%s, %s)' % (n_repeats, kfolds))
+        if time_limit is None:
             n_repeats_initial = n_repeats
         else:
             n_repeats_initial = 1
         if n_repeat_start == 0:
-            model_names_trained = self.train_multi_initial(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                                                           stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats_initial, level=level, ignore_time_limit=ignore_time_limit)
+            time_start = time.time()
+            model_names_trained = self.train_multi_initial(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, models=models, kfolds=kfolds, n_repeats=n_repeats_initial, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                                                           stack_name=stack_name, level=level, time_limit=time_limit)
             n_repeat_start = n_repeats_initial
+            if time_limit is not None:
+                time_limit = time_limit - (time.time() - time_start)
         else:
             model_names_trained = models
         if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
             model_names_trained = self.train_multi_repeats(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, models=model_names_trained,
-                                                           stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, ignore_time_limit=ignore_time_limit)
+                                                           kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, stack_name=stack_name, level=level, time_limit=time_limit)
         return model_names_trained
 
     def train_multi_and_ensemble(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
@@ -499,23 +516,27 @@ class AbstractTrainer:
         for level in range(max(0, level_start), level_end + 1):
             self.time_train_level_start = time.time()
             self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (level_end + 1 - level)
-            if level == 0:
-                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=self.ignore_time_limit)
+            if self.ignore_time_limit:
+                time_limit_core = None
+                time_limit_aux = None
             else:
-                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, ignore_time_limit=self.ignore_time_limit)
+                time_limit_core = self.time_limit_per_level
+                time_limit_aux = max(self.time_limit_per_level * 0.1, min(self.time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+            if level == 0:
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit_core=time_limit_core, time_limit_aux=time_limit_aux)
+            else:
+                self.stack_new_level(X=X_train, y=y_train, X_test=X_test, y_test=y_test, level=level, time_limit_core=time_limit_core, time_limit_aux=time_limit_aux)
 
         self.save()
 
-        # TODO: Select best weighted ensemble given L2 can be much worse than L1 when dealing with time limitation
-
-    def stack_new_level(self, X, y, X_test=None, y_test=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
-        self.stack_new_level_core(X=X, y=y, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, ignore_time_limit=ignore_time_limit)
+    def stack_new_level(self, X, y, X_test=None, y_test=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, time_limit_core=None, time_limit_aux=None):
+        self.stack_new_level_core(X=X, y=y, X_test=X_test, y_test=y_test, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core)
         if self.bagged_mode:
-            self.stack_new_level_aux(X=X, y=y, level=level+1, ignore_time_limit=ignore_time_limit)
+            self.stack_new_level_aux(X=X, y=y, level=level+1, time_limit=time_limit_aux)
         else:
-            self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, ignore_time_limit=ignore_time_limit)
+            self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, time_limit=time_limit_aux)
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, ignore_time_limit=True):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, time_limit=None):
         use_orig_features = True
         if models is None:
             models = self.get_models(self.hyperparameters, level=level)
@@ -528,6 +549,8 @@ class AbstractTrainer:
                 if len(base_model_names) == 0:
                     logger.log(20, 'No base models to train on, skipping stack level...')
                     return
+            else:
+                raise AssertionError('Stack level cannot be negative! level = %s' % level)
             models = [
                 StackerEnsembleModel(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
                                      base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
@@ -537,22 +560,22 @@ class AbstractTrainer:
         if X_test is not None:
             X_test = self.get_inputs_to_stacker(X_test, level_start=0, level_end=level, fit=False)
 
-        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, ignore_time_limit=ignore_time_limit)
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, time_limit=time_limit)
 
-    def stack_new_level_aux(self, X, y, level, fit=True, ignore_time_limit=True):
+    def stack_new_level_aux(self, X, y, level, fit=True, time_limit=None):
         stack_name = 'aux1'
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
-        self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, k_fold=0, stack_name=stack_name, ignore_time_limit=True)
+        self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
 
-    def generate_weighted_ensemble(self, X, y, level, k_fold=0, stack_name=None, hyperparameters=None, ignore_time_limit=False, name_suffix=''):
+    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, name_suffix=''):
         if len(self.models_level['core'][level-1]) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(k_fold) + '_l' + str(level), base_model_names=self.models_level['core'][level-1],
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(kfolds) + '_l' + str(level), base_model_names=self.models_level['core'][level-1],
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
                                                         num_classes=self.num_classes, random_state=level)
 
-        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level, ignore_time_limit=ignore_time_limit)
+        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
@@ -564,16 +587,16 @@ class AbstractTrainer:
                     self.model_best = weighted_ensemble_model.name
         return weighted_ensemble_model.name
 
-    def generate_stack_log_reg(self, X, y, level, k_fold=0, stack_name=None):
+    def generate_stack_log_reg(self, X, y, level, kfolds=0, stack_name=None):
         base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level-1])
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
-        name_new = stacker_model_lr.name + '_STACKER_k' + str(k_fold) + '_l' + str(level)
+        name_new = stacker_model_lr.name + '_STACKER_k' + str(kfolds) + '_l' + str(level)
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
                                                 num_classes=self.num_classes, random_state=level)
 
-        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=k_fold, level=level)
+        self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, level=level)
 
     def predict(self, X, model=None):
         if model is not None:
