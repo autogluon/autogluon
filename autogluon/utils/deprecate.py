@@ -1,7 +1,11 @@
 import warnings
 from warnings import warn
 
-__all__ = ['AutoGluonWarning', 'make_deprecate', 'DeprecationHelper']
+__all__ = ['AutoGluonEarlyStop', 'AutoGluonWarning', 'make_deprecate',
+           'DeprecationHelper']
+
+class AutoGluonEarlyStop(ValueError):
+    pass
 
 class AutoGluonWarning(DeprecationWarning):
     pass

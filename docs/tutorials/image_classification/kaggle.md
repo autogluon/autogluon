@@ -129,7 +129,7 @@ We can ask our final model to generate predictions on the provided test images.
 We first load the test data as a `Dataset` object and then call `predict`:
 
 ```
-test_dataset = task.Dataset('./data/shopeeiet/test')
+test_dataset = task.Dataset('./data/shopeeiet/test', train=False)
 inds, probs, probs_all = classifier.predict(test_dataset)
 ```
 

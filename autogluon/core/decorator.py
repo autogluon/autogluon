@@ -46,7 +46,7 @@ class _autogluon_method(object):
         self.args = ezdict()
         functools.update_wrapper(self, f)
 
-    def __call__(self, args, config, **kwargs):
+    def __call__(self, args, config={}, **kwargs):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)
@@ -163,9 +163,31 @@ def func(**kwvars):
     >>> def cifar_resnet(pretrained):
     ...     return get_model('cifar_resnet20_v1', pretrained=pretrained)
     """
+    def _autogluon_kwargs_func(**kwvars):
+        def registered_func(func):
+            kwspaces = OrderedDict()
+            @functools.wraps(func)
+            def wrapper_call(*args, **kwargs):
+                _kwvars = copy.deepcopy(kwvars)
+                _kwvars.update(kwargs)
+                for k, v in _kwvars.items():
+                    if isinstance(v, NestedSpace):
+                        kwspaces[k] = v
+                        kwargs[k] = v
+                    elif isinstance(v, Space):
+                        kwspaces[k] = v
+                        hp = v.get_hp(name=k)
+                        kwargs[k] = hp.default_value
+                    else:
+                        kwargs[k] = v
+                return func(*args, **kwargs)
+            wrapper_call.kwspaces = kwspaces
+            return wrapper_call
+        return registered_func
+
     def registered_func(func):
         class autogluonobject(AutoGluonObject):
-            @_autogluon_kwargs(**kwvars)
+            @_autogluon_kwargs_func(**kwvars)
             def __init__(self, *args, **kwargs):
                 self.func = func
                 self.args = args
@@ -186,8 +208,10 @@ def func(**kwvars):
 
         @functools.wraps(func)
         def wrapper_call(*args, **kwargs):
+            _kwvars = copy.deepcopy(kwvars)
+            _kwvars.update(kwargs)
             agobj = autogluonobject(*args, **kwargs)
-            agobj.kwvars = agobj.__init__.kwvars
+            agobj.kwvars = _kwvars
             return agobj
         return wrapper_call
     return registered_func
@@ -212,9 +236,31 @@ def obj(**kwvars):
     >>> class Adam(optim.Adam):
     >>>     pass
     """
+    def _autogluon_kwargs_obj(**kwvars):
+        def registered_func(func):
+            kwspaces = OrderedDict()
+            @functools.wraps(func)
+            def wrapper_call(*args, **kwargs):
+                kwvars.update(kwargs)
+                for k, v in kwvars.items():
+                    if isinstance(v, NestedSpace):
+                        kwspaces[k] = v
+                        kwargs[k] = v
+                    elif isinstance(v, Space):
+                        kwspaces[k] = v
+                        hp = v.get_hp(name=k)
+                        kwargs[k] = hp.default_value
+                    else:
+                        kwargs[k] = v
+                return func(*args, **kwargs)
+            wrapper_call.kwspaces = kwspaces
+            wrapper_call.kwvars = kwvars
+            return wrapper_call
+        return registered_func
+
     def registered_class(Cls):
         class autogluonobject(AutoGluonObject):
-            @_autogluon_kwargs(**kwvars)
+            @_autogluon_kwargs_obj(**kwvars)
             def __init__(self, *args, **kwargs):
                 self.args = args
                 self.kwargs = kwargs
@@ -239,32 +285,11 @@ def obj(**kwvars):
         autogluonobject.kwvars = autogluonobject.__init__.kwvars
         autogluonobject.__doc__ = Cls.__doc__
         autogluonobject.__name__ = Cls.__name__
-        #autogluonobject.__bases__ = Cls.__bases__
         return autogluonobject
 
     return registered_class
 
-def _autogluon_kwargs(**kwvars):
-    def registered_func(func):
-        kwspaces = OrderedDict()
-        @functools.wraps(func)
-        def wrapper_call(*args, **kwargs):
-            kwvars.update(kwargs)
-            for k, v in kwvars.items():
-                if isinstance(v, NestedSpace):
-                    kwspaces[k] = v
-                    kwargs[k] = v
-                elif isinstance(v, Space):
-                    kwspaces[k] = v
-                    hp = v.get_hp(name=k)
-                    kwargs[k] = hp.default_value
-                else:
-                    kwargs[k] = v
-            return func(*args, **kwargs)
-        wrapper_call.kwspaces = kwspaces
-        wrapper_call.kwvars = kwvars
-        return wrapper_call
-    return registered_func
+
 
 autogluon_register_args = make_deprecate(args, 'autogluon_register_args')
 autogluon_register_dict = make_deprecate(args, 'autogluon_register_dict')
