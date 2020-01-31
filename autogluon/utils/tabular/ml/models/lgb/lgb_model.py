@@ -42,6 +42,19 @@ class LGBModel(AbstractModel):
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
         start_time = time.time()
         params = self.params.copy()
+
+        # TODO: Do this for dataset_train and dataset_val instead
+        # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
+        if (X_test is not None) and (X_train is not None):
+            num_rows_train = len(X_train)
+            if num_rows_train <= 10000:
+                modifier = 1
+            else:
+                modifier = 10000 / num_rows_train
+            early_stopping_rounds = max(round(modifier * 150), 10)
+        else:
+            early_stopping_rounds = 150
+
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
@@ -74,7 +87,7 @@ class LGBModel(AbstractModel):
         valid_sets = [dataset_train]
         if dataset_val is not None:
             callbacks += [
-                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
+                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=verbose_eval, manual_stop_file=False),
                 ]
             valid_names = ['valid_set'] + valid_names
@@ -105,22 +118,7 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
         # Train lgbm model:
         self.model = lgb.train(**train_params)
-        # del dataset_train
-        # del dataset_val
-        # print('running gc...')
-        # gc.collect()
-        # print('ran garbage collection...')
         self.best_iteration = self.model.best_iteration
-        params['num_boost_round'] = num_boost_round
-        if seed_val is not None:
-            params['seed_value'] = seed_val
-        # self.model.save_model(self.path + 'model.txt')
-        # model_json = self.model.dump_model()
-        #
-        # with open(self.path + 'model.json', 'w+') as f:
-        #     json.dump(model_json, f, indent=4)
-        # save_pkl.save(path=self.path + self.model_name_trained, object=self)  # TODO: saving self instead of model, not consistent with save callbacks
-        # save_pointer.save(path=self.path + self.latest_model_checkpoint, content_path=self.path + self.model_name_trained)
 
     def predict_proba(self, X, preprocess=True):
         if preprocess:
