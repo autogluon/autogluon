@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
-    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, random_state=0, debug=0):
+    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -29,7 +29,12 @@ class BaggedEnsembleModel(AbstractModel):
             feature_types_metadata = self.model_base.feature_types_metadata
         except:
             feature_types_metadata = None
-        super().__init__(path=path, name=name, problem_type=self.model_base.problem_type, objective_func=self.model_base.objective_func, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
+        if objective_func is None:
+            objective_func = self.model_base.objective_func
+        if stopping_metric is None:
+            stopping_metric = self.model_base.stopping_metric
+
+        super().__init__(path=path, name=name, problem_type=self.model_base.problem_type, objective_func=objective_func, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)

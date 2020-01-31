@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, is_trainer_present=False, trainer_type=AutoTrainer):
+                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False, trainer_type=AutoTrainer):
         super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold,
-            problem_type=problem_type, objective_func=objective_func, is_trainer_present=is_trainer_present)
+            problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, is_trainer_present=is_trainer_present)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
@@ -69,6 +69,7 @@ class DefaultLearner(AbstractLearner):
             path=self.model_context,
             problem_type=self.trainer_problem_type,
             objective_func=self.objective_func,
+            stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
             low_memory=True,
@@ -84,6 +85,8 @@ class DefaultLearner(AbstractLearner):
         self.trainer_path = trainer.path
         if self.objective_func is None:
             self.objective_func = trainer.objective_func
+        if self.stopping_metric is None:
+            self.stopping_metric = trainer.stopping_metric
 
         self.save()
         trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
