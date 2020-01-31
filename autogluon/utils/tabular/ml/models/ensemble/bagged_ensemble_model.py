@@ -100,18 +100,20 @@ class BaggedEnsembleModel(AbstractModel):
         model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
 
         models = []
-        num_folds = len(kfolds)
         time_limit_fold = None
+        folds_to_fit = fold_end - fold_start
         for i in range(fold_start, fold_end):
+            folds_finished = i - fold_start
+            folds_left = fold_end - i
             fold = kfolds[i]
-            if time_limit:
-                time_elapsed = time.time() - start_time
+            time_elapsed = time.time() - start_time
+            if time_limit is not None:
                 time_left = time_limit - time_elapsed
-                required_time_per_fold = time_left / (num_folds - i)
+                required_time_per_fold = time_left / folds_left
                 time_limit_fold = required_time_per_fold * 0.8
-                if i > 0:
-                    expected_time_required = time_elapsed * (num_folds / i)
-                    expected_remaining_time_required = expected_time_required / (num_folds / (num_folds - i))
+                if folds_finished > 0:
+                    expected_time_required = time_elapsed * folds_to_fit / folds_finished
+                    expected_remaining_time_required = expected_time_required * folds_left / folds_to_fit
                     if expected_remaining_time_required > time_left:
                         raise TimeLimitExceeded
                 if time_left <= 0:
@@ -124,6 +126,14 @@ class BaggedEnsembleModel(AbstractModel):
             fold_model.name = fold_model.name + '_fold_' + str(i)
             fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
             fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
+            if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
+                if i != (fold_end-1):
+                    time_elapsed = time.time() - start_time
+                    time_left = time_limit - time_elapsed
+                    expected_time_required = time_elapsed * folds_to_fit / (folds_finished+1)
+                    expected_remaining_time_required = expected_time_required * (folds_left-1) / folds_to_fit
+                    if expected_remaining_time_required > time_left:
+                        raise TimeLimitExceeded
             pred_proba = fold_model.predict_proba(X_test)
             if self.low_memory:
                 self.save_child(fold_model, verbose=False)

@@ -1,11 +1,14 @@
 import logging, time
-from .....try_import import try_import_catboost
+import pickle, psutil, sys
+import math
 
+from .....try_import import try_import_catboost
 from ..abstract.abstract_model import AbstractModel
 from .hyperparameters.parameters import get_param_baseline
 from .catboost_utils import construct_custom_catboost_metric
-from ...constants import PROBLEM_TYPES_CLASSIFICATION
+from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS
 from ......core import Int, Real
+from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +17,8 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None, debug=0):
+        self.num_classes = num_classes
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor
@@ -55,17 +59,47 @@ class CatboostModel(AbstractModel):
         return X
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+        from catboost import Pool
+        num_rows_train = len(X_train)
+        num_cols_train = len(X_train.columns)
+        if self.problem_type == MULTICLASS:
+            if self.num_classes is not None:
+                num_classes = self.num_classes
+            else:
+                num_classes = 10  # Guess if not given, can do better by looking at y_train
+        else:
+            num_classes = 1
+
+        # TODO: Add ignore_memory_limits param to disable NotEnoughMemoryError Exceptions
+        approx_mem_size_req = num_rows_train * num_cols_train * num_classes / 2  # TODO: Extremely crude approximation, can be vastly improved
+        if approx_mem_size_req > 1e9:  # > 1 GB
+            available_mem = psutil.virtual_memory().available
+            ratio = approx_mem_size_req / available_mem
+            if ratio > 1:
+                logger.warning('Warning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                raise NotEnoughMemoryError
+            elif ratio > 0.2:
+                logger.warning('Warning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+
         start_time = time.time()
         X_train = self.preprocess(X_train)
+        cat_features = list(X_train.select_dtypes(include='category').columns)
+        X_train = Pool(data=X_train, label=Y_train, cat_features=cat_features)
+
         if X_test is not None:
             X_test = self.preprocess(X_test)
-            eval_set = (X_test, Y_test)
-            early_stopping_rounds = 150
+            X_test = Pool(data=X_test, label=Y_test, cat_features=cat_features)
+            eval_set = X_test
+            if num_rows_train <= 10000:
+                modifier = 1
+            else:
+                modifier = 10000/num_rows_train
+            early_stopping_rounds = max(round(modifier*150), 10)
+            num_sample_iter_max = max(round(modifier*100), 2)
         else:
             eval_set = None
             early_stopping_rounds = None
-
-        cat_features = list(X_train.select_dtypes(include='category').columns)
+            num_sample_iter_max = 100
 
         invalid_params = ['num_threads', 'num_gpus']
         for invalid in invalid_params:
@@ -92,15 +126,16 @@ class CatboostModel(AbstractModel):
 
         if time_limit:
             time_left_start = time_limit - (time.time() - start_time)
+            if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
+                raise TimeLimitExceeded
             params_init = self.params.copy()
-            num_sample_iter = min(100, params_init['iterations'])
+            num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
             params_init['iterations'] = num_sample_iter
             self.model = self.model_type(
                 **params_init,
             )
             self.model.fit(
-                X_train, Y_train,
-                cat_features=cat_features,
+                X_train,
                 eval_set=eval_set,
                 use_best_model=True,
                 verbose=verbose,
@@ -117,8 +152,20 @@ class CatboostModel(AbstractModel):
             init_model = self.model
 
             params_final = self.params.copy()
-            params_final['iterations'] = min(self.params['iterations'] - num_sample_iter, estimated_iters_in_time)
 
+            # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
+            available_mem = psutil.virtual_memory().available
+            model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+
+            max_memory_proportion = 0.3
+            mem_usage_per_iter = model_size_bytes / num_sample_iter
+            max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
+
+            params_final['iterations'] = min(self.params['iterations'] - num_sample_iter, estimated_iters_in_time)
+            if params_final['iterations'] > max_memory_iters - num_sample_iter:
+                if max_memory_iters - num_sample_iter <= 500:
+                    logger.warning('Warning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
+                params_final['iterations'] = max_memory_iters - num_sample_iter
         else:
             params_final = self.params.copy()
 
@@ -129,8 +176,7 @@ class CatboostModel(AbstractModel):
 
             # TODO: Strangely, this performs different if clone init_model is sent in than if trained for same total number of iterations. May be able to optimize catboost models further with this
             self.model.fit(
-                X_train, Y_train,
-                cat_features=cat_features,
+                X_train,
                 eval_set=eval_set,
                 verbose=verbose,
                 early_stopping_rounds=early_stopping_rounds,

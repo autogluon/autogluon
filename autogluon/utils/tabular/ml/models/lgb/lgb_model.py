@@ -15,8 +15,8 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 
-warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version") # lightGBM brew libomp warning
-logger = logging.getLogger(__name__)  # TODO: Currently
+warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
+logger = logging.getLogger(__name__)
 
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
@@ -42,12 +42,34 @@ class LGBModel(AbstractModel):
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
         start_time = time.time()
         params = self.params.copy()
+
+        # TODO: Do this for dataset_train and dataset_val instead
+        # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
+        if (X_test is not None) and (X_train is not None):
+            num_rows_train = len(X_train)
+            if num_rows_train <= 10000:
+                modifier = 1
+            else:
+                modifier = 10000 / num_rows_train
+            early_stopping_rounds = max(round(modifier * 150), 10)
+        else:
+            early_stopping_rounds = 150
+
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
         if 'min_data_in_leaf' in params:
             if params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
                 params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
+
+        if verbosity <= 1:
+            verbose_eval = False
+        elif verbosity == 2:
+            verbose_eval = 1000
+        elif verbosity == 3:
+            verbose_eval = 50
+        else:
+            verbose_eval = 1
 
         num_boost_round = params.pop('num_boost_round', 1000)
         logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
@@ -56,26 +78,16 @@ class LGBModel(AbstractModel):
         seed_val = params.pop('seed_value', None)
 
         eval_metric = self.get_eval_metric()
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
-        
-        if verbosity <= 1:
-            verbose_eval = False
-        elif verbosity == 2:
-            verbose_eval = 1000
-        elif verbosity == 3:
-            verbose_eval = 50
-        else:
-            verbose_eval = True
-        
-        self.eval_results = {}
+
         callbacks = []
         valid_names = ['train_set']
         valid_sets = [dataset_train]
         if dataset_val is not None:
             callbacks += [
-                early_stopping_custom(150, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
-                                      ignore_dart_warning=True, verbose=verbose_eval, manual_stop_file=False),
+                early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
+                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False),
                 ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
@@ -105,22 +117,7 @@ class LGBModel(AbstractModel):
             np.random.seed(seed_val)
         # Train lgbm model:
         self.model = lgb.train(**train_params)
-        # del dataset_train
-        # del dataset_val
-        # print('running gc...')
-        # gc.collect()
-        # print('ran garbage collection...')
         self.best_iteration = self.model.best_iteration
-        params['num_boost_round'] = num_boost_round
-        if seed_val is not None:
-            params['seed_value'] = seed_val
-        # self.model.save_model(self.path + 'model.txt')
-        # model_json = self.model.dump_model()
-        #
-        # with open(self.path + 'model.json', 'w+') as f:
-        #     json.dump(model_json, f, indent=4)
-        # save_pkl.save(path=self.path + self.model_name_trained, object=self)  # TODO: saving self instead of model, not consistent with save callbacks
-        # save_pointer.save(path=self.path + self.latest_model_checkpoint, content_path=self.path + self.model_name_trained)
 
     def predict_proba(self, X, preprocess=True):
         if preprocess:
@@ -129,7 +126,7 @@ class LGBModel(AbstractModel):
             return self.model.predict(X)
 
         y_pred_proba = self.model.predict(X)
-        if (self.problem_type == BINARY):
+        if self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 1:
@@ -187,12 +184,12 @@ class LGBModel(AbstractModel):
         X = X.drop(['count'], axis=1)
         return X, w
 
-    def generate_datasets(self, X_train: DataFrame, Y_train: Series, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
+    def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round','num_threads', 'num_classes', 'verbose'] # Keys that are specific to lightGBM Dataset object construction.
         data_params = {}
         for key in lgb_dataset_params_keys:
-            if key in self.params:
-                data_params[key] = self.params[key]
+            if key in params:
+                data_params[key] = params[key]
         data_params = data_params.copy()
 
         W_train = None  # TODO: Add weight support
@@ -258,7 +255,7 @@ class LGBModel(AbstractModel):
         self.params['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
 
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, X_test=X_test, Y_test=Y_test)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=self.params, X_test=X_test, Y_test=Y_test)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
         if os.path.exists(train_file): # clean up old files first
@@ -342,100 +339,3 @@ class LGBModel(AbstractModel):
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = def_search_space.pop(key, None)
         self.params.update(def_search_space)
-
-
-""" OLD code: TODO: remove once confirming no longer needed.
-
-# my (minorly) revised HPO function 
-
-    def hyperparameter_tune(self, X_train, X_test, y_train, y_test, spaces=None, scheduler_options=None): # scheduler_options unused for now
-        print("Beginning hyperparameter tuning for Gradient Boosting Model...")
-        X = pd.concat([X_train, X_test], ignore_index=True)
-        y = pd.concat([y_train, y_test], ignore_index=True)
-        if spaces is None:
-            spaces = LGBMSpaces(problem_type=self.problem_type, objective_func=self.objective_func, num_classes=None).get_hyperparam_spaces_baseline()
-
-        X = self.preprocess(X)
-        dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
-        space = spaces[0]
-        param_baseline = self.params
-
-        @use_named_args(space)
-        def objective(**params):
-            print(params)
-            new_params = copy.deepcopy(param_baseline)
-            new_params['verbose'] = -1
-            for param in params:
-                new_params[param] = params[param]
-
-            new_model = copy.deepcopy(self)
-            new_model.params = new_params
-            score = new_model.cv(dataset_train=dataset_train)
-
-            print(score)
-            if self.is_higher_better:
-                score = -score
-
-            return score
-
-        reg_gp = gp_minimize(objective, space, verbose=True, n_jobs=1, n_calls=15)
-
-        print('best score: {}'.format(reg_gp.fun))
-
-        optimal_params = copy.deepcopy(param_baseline)
-        for i, param in enumerate(space):
-            optimal_params[param.name] = reg_gp.x[i]
-
-        self.params = optimal_params
-        print(self.params)
-
-        # TODO: final fit should not be here eventually
-        self.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test)
-        self.save()
-        return ({self.name: self.path}, {}) # dummy hpo_info
-
-# Original HPO function: 
-
-    def hyperparameter_tune(self, X, y, spaces=None):
-        if spaces is None:
-            spaces = LGBMSpaces(problem_type=self.problem_type, objective_func=self.objective_func, num_classes=None).get_hyperparam_spaces_baseline()
-
-        X = self.preprocess(X)
-        dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
-
-        print('starting skopt')
-        space = spaces[0]
-
-        param_baseline = self.params
-
-        @use_named_args(space)
-        def objective(**params):
-            print(params)
-            new_params = copy.deepcopy(param_baseline)
-            new_params['verbose'] = -1
-            for param in params:
-                new_params[param] = params[param]
-
-            new_model = copy.deepcopy(self)
-            new_model.params = new_params
-            score = new_model.cv(dataset_train=dataset_train)
-
-            print(score)
-            if self.is_higher_better:
-                score = -score
-
-            return score
-
-        reg_gp = gp_minimize(objective, space, verbose=True, n_jobs=1, n_calls=15)
-
-        print('best score: {}'.format(reg_gp.fun))
-
-        optimal_params = copy.deepcopy(param_baseline)
-        for i, param in enumerate(space):
-            optimal_params[param.name] = reg_gp.x[i]
-
-        self.params = optimal_params
-        print(self.params)
-        return optimal_params
-
-"""

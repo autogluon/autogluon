@@ -147,7 +147,9 @@ class TabularPrediction(BaseTask):
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
-            Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
+            Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
+            Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
             Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
@@ -156,7 +158,7 @@ class TabularPrediction(BaseTask):
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
         num_bagging_sets : int
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
-            Defaults to 1 if time_limits is not specified, otherwise 10 (always disabled if num_bagging_folds is not specified).
+            Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
             Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
         stack_ensemble_levels : int, default = 0
@@ -254,6 +256,9 @@ class TabularPrediction(BaseTask):
             enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
             logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
 
+        if hyperparameter_tune:
+            logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
@@ -272,7 +277,7 @@ class TabularPrediction(BaseTask):
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
                 if time_limits is not None:
-                    num_bagging_sets = 10
+                    num_bagging_sets = 20
                 else:
                     num_bagging_sets = 1
             else:
