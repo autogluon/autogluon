@@ -77,7 +77,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     if cat_options is not None:
         models.append(
             CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+                          objective_func=objective_func, num_classes=num_classes, hyperparameters=cat_options.copy()),
         )
     if nn_options is not None:
         models.append(
