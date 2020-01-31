@@ -57,18 +57,9 @@ class TabularPrediction(BaseTask):
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
             hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None,
             num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters = {
-                               'NN': {'num_epochs': 500},
-                               'GBM': {'num_boost_round': 10000},
-                               'CAT': {'iterations': 10000},
-                               'RF': {'n_estimators': 300},
-                               'XT': {'n_estimators': 300},
-                               'KNN': {},
-                               'custom': ['GBM'],
-                              },
-            enable_fit_continuation=False,
-            time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
-            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
+            hyperparameters=None, enable_fit_continuation=False,
+            time_limits=None, num_trials=None, search_strategy='random', search_options=None,
+            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
             verbosity=2, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -263,6 +254,23 @@ class TabularPrediction(BaseTask):
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+
+        if dist_ip_addrs is None:
+            dist_ip_addrs = []
+
+        if search_options is None:
+            search_options = {}
+
+        if hyperparameters is None:
+            hyperparameters = {
+               'NN': {'num_epochs': 500},
+               'GBM': {'num_boost_round': 10000},
+               'CAT': {'iterations': 10000},
+               'RF': {'n_estimators': 300},
+               'XT': {'n_estimators': 300},
+               'KNN': {},
+               'custom': ['GBM'],
+             }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
