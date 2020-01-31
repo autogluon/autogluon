@@ -66,12 +66,14 @@ class TabularPrediction(BaseTask):
         
         Parameters
         ----------
-        train_data : :class:`autogluon.task.tabular_prediction.TabularDataset`
+        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`
             Table of the training data, which is similar to pandas DataFrame.
+            If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
-            Name of column that contains the target variable to predict.
-        tuning_data : :class:`autogluon.task.tabular_prediction.TabularDataset`, default = None
-            Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data). 
+            Name of the column that contains the target variable to predict.
+        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`, default = None
+            Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
+            If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
@@ -237,7 +239,12 @@ class TabularPrediction(BaseTask):
         for kwarg_name in kwarg_names:
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
-        
+
+        if type(train_data) == str:
+            train_data = TabularDataset(file_path=train_data)
+        if tuning_data is not None and type(tuning_data) == str:
+            tuning_data = TabularDataset(file_path=tuning_data)
+
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
