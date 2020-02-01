@@ -8,12 +8,13 @@ To start, import autogluon and TabularPrediction module as your task:
 ```{.python .input}
 import autogluon as ag
 from autogluon import TabularPrediction as task
+import pandas as pd
 ```
 
-Load training data from a CSV file into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both. 
+Load training data from a CSV file into a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html).
 
 ```{.python .input}
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 ```
@@ -38,7 +39,7 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
 
 ```{.python .input}
-test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 y_test = test_data[label_column]  # values to predict
 test_data_nolab = test_data.drop(labels=[label_column],axis=1) # delete label column to prove we're not cheating
 print(test_data_nolab.head())
@@ -59,7 +60,7 @@ As long as they're stored in a popular format like CSV, you should be able to ac
 
 ```
 from autogluon import TabularPrediction as task
-predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
+predictor = task.fit(train_data=pd.read_csv(<file-name>), label_column=<variable-name>)
 ```
 
 
