@@ -24,16 +24,20 @@ class TabularPredictor(BasePredictor):
         eval_metric : function or str
             What metric is used to evaluate predictive performance.
         label_column : str
-            Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
+            Name of table column that contains data from the variable to predict (often referred to as: labels, response
+            variable, target variable, dependent variable, Y, etc).
         feature_types : dict
-            Inferred data type of each predictive variable (i.e. column of training data table used to predict `label_column`).
+            Inferred data type of each predictive variable (i.e. column of training data table used
+            to predict `label_column`).
         model_names : list
             List of model names trained during `fit()`.
         model_performance : dict
-            Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
+            Maps names of trained models to their predictive performance values attained on
+            the validation dataset during `fit()`.
         class_labels : list
-            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is = None for problems that are not multiclass.
-            For example if `pred = predict_proba(x)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
+            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
+            Is = None for problems that are not multiclass. For example if `pred = predict_proba(x)`, then
+            ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
 
         Examples
         --------
@@ -90,16 +94,19 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-            Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series depending on `as_pandas` argument.
+            Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series
+            depending on `as_pandas` argument.
 
         """
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
-        return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache,
+                                     add_to_pred_cache=add_to_pred_cache)
     
     def predict_proba(self, dataset, model=None, as_pandas=False):
-        """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+        """ Use trained models to produce predicted class probabilities rather than class-labels
+            (if task is classification).
 
             Parameters
             ----------
@@ -107,7 +114,8 @@ class TabularPredictor(BasePredictor):
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
             model : str (optional)
-                The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
+                The name of the model to get prediction probabilities from. Defaults to None, which uses
+                the highest scoring model on the validation set.
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False). 
                 Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
@@ -115,7 +123,8 @@ class TabularPredictor(BasePredictor):
             Returns
             -------
             Array of predicted class-probabilities, corresponding to each row in the given dataset. 
-            May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
+            May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of
+            prediction problem.
         """
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
@@ -124,7 +133,8 @@ class TabularPredictor(BasePredictor):
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.
-            This is basically a shortcut for: `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)` 
+            This is basically a shortcut for:
+            `pred = predict(dataset); evaluate_predictions(dataset[label_column], preds, auxiliary_metrics=False)`
             that automatically uses `predict_proba()` instead of `predict()` when appropriate.
 
             Parameters
@@ -205,7 +215,8 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-            Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
+            Dict containing various detailed information. We do not recommend directly printing this dict as it may be
+            very large.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
@@ -299,12 +310,14 @@ class TabularPredictor(BasePredictor):
         Parameters
         ----------
         output_directory : str
-            Path to directory where trained models are stored (i.e. the `output_directory` specified in previous call to `fit()`).
+            Path to directory where trained models are stored (i.e. the `output_directory` specified in
+            the previous call to `fit()`).
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is generally printed by this Predictor.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`, 
-            where `L` ranges from 0 to 50 (Note: higher values `L` correspond to fewer print statements, opposite of verbosity levels)
+            where `L` ranges from 0 to 50 (Note: higher values `L` correspond to fewer print statements, opposite of
+            verbosity levels)
 
         Returns
         -------
