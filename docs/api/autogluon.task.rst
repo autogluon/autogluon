@@ -121,12 +121,6 @@ Additional Tabular Prediction APIs
     .. autoautosummary:: TabularPredictor
         :attributes:
 
-:hidden:`TabularDataset`
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TabularDataset
-   :no-inherited-members:
-
 
 Additional Image Classification APIs
 ------------------------------------

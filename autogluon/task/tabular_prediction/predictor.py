@@ -41,11 +41,11 @@ class TabularPredictor(BasePredictor):
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+        >>> import pandas as pd
+        >>> train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+        >>> test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
         >>> predictor = task.fit(train_data=train_data, label='class')
-        >>> results = predictor.fit_summary()
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
-        >>> perf = predictor.evaluate(test_data)
+        >>> performance = predictor.evaluate(test_data)
         
     """
 
@@ -77,12 +77,14 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
-                (may contain extra columns that won't be used by Predictor, including the label-column itself).
+            dataset : str or :class:`pandas.DataFrame`
+                The dataset to make predictions for. Should contain same column names as training Dataset and follow
+                the same format. (may contain extra columns that won't be used by Predictor, including the label-column
+                itself).
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
-                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on
+                the validation set.
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -98,6 +100,11 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset)
+        if type(dataset) == str:
+            dataset = pd.read_csv(dataset)
+        if isinstance(dataset, pd.Series):
+            raise TypeError("dataset must be pandas.DataFrame, not pandas.Series. \
+                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
         return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
 
     def predict_proba(self, dataset, model=None, as_pandas=False):
@@ -105,8 +112,9 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
+            dataset : str or :class:`pandas.DataFrame`
+                The dataset to make predictions for. Should contain same column names as training Dataset and follow
+                 the same format.
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
@@ -121,6 +129,11 @@ class TabularPredictor(BasePredictor):
             May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
         """
         dataset = self.__get_dataset(dataset)
+        if type(dataset) == str:
+            dataset = pd.read_csv(dataset)
+        if isinstance(dataset, pd.Series):
+            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
         return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas)
 
     def evaluate(self, dataset, silent=False):
@@ -130,7 +143,7 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
+            dataset : str or :class: `pandas.DataFrame`
                 This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
 
@@ -181,7 +194,7 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+            dataset : str or :class: `pandas.DataFrame` (optional)
                 This Dataset must also contain the label-column with the same column-name as specified during fit().
                 If specified, then the leaderboard returned will contain an additional column 'score_test'
                 'score_test' is the score of the model on the validation_metric for the dataset provided
@@ -191,7 +204,7 @@ class TabularPredictor(BasePredictor):
 
             Returns
             -------
-            Pandas `pandas.DataFrame` of model performance summary information.
+            `pandas.DataFrame` of model performance summary information.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         return self._learner.leaderboard(X=dataset, silent=silent)

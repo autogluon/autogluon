@@ -1,7 +1,7 @@
 import copy, logging, math
 import numpy as np
 
-from .dataset import TabularDataset
+import pandas
 from .predictor import TabularPredictor
 from ..base import BaseTask
 from ..base.base_task import schedulers
@@ -23,7 +23,6 @@ class TabularPrediction(BaseTask):
     AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
     """
     
-    Dataset = TabularDataset
     Predictor = TabularPredictor
     
     @staticmethod
@@ -66,12 +65,12 @@ class TabularPrediction(BaseTask):
         
         Parameters
         ----------
-        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
-            Table of the training data, which is similar to pandas DataFrame.
+        train_data : str or :class:`pandas.DataFrame`
+            Dataframe with training data
             If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
             Name of the column that contains the target variable to predict.
-        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+        tuning_data : str or :class:`pandas.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
@@ -217,10 +216,11 @@ class TabularPrediction(BaseTask):
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+        >>> import pandas as pd
+        >>> train_data = pd.read_csv('https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
         >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column)
-        >>> test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+        >>> test_data = pd.read_csv('https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
