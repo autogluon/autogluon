@@ -79,10 +79,12 @@ class TabularPredictor(BasePredictor):
             Parameters
             ----------
             dataset : :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
-                (may contain extra columns that won't be used by Predictor, including the label-column itself).
+                The dataset to make predictions for. Should contain same column names as training Dataset and follow the
+                same format (may contain extra columns that won't be used by Predictor, including
+                the label-column itself).
             model : str (optional)
-                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+                The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on
+                 the validation set.
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -99,8 +101,9 @@ class TabularPredictor(BasePredictor):
 
         """
         if isinstance(dataset, pd.Series):
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. "
+                            "To predict on just single example (ith row of table), use dataset.iloc[[i]] rather "
+                            "than dataset.iloc[i]")
         return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache,
                                      add_to_pred_cache=add_to_pred_cache)
     
@@ -111,7 +114,8 @@ class TabularPredictor(BasePredictor):
             Parameters
             ----------
             dataset : :class:`TabularDataset` or `pandas.DataFrame`
-                The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
+                The dataset to make predictions for. Should contain same column names as training Dataset and follow the
+                same format.
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
             model : str (optional)
                 The name of the model to get prediction probabilities from. Defaults to None, which uses
@@ -127,8 +131,9 @@ class TabularPredictor(BasePredictor):
             prediction problem.
         """
         if isinstance(dataset, pd.Series):
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series."
+                            " To predict on just single example (ith row of table), use dataset.iloc[[i]]"
+                            " rather than dataset.iloc[i]")
         return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas)
 
     def evaluate(self, dataset, silent=False):
@@ -165,13 +170,15 @@ class TabularPredictor(BasePredictor):
                 The ordered collection of ground-truth labels. 
             y_pred : list or `numpy.array`
                 The ordered collection of predictions. 
-                For certain types of `eval_metric` (such as AUC), `y_pred` must be predicted-probabilities rather than predicted labels.
+                For certain types of `eval_metric` (such as AUC), `y_pred` must be predicted-probabilities rather than
+                the predicted labels.
             silent : bool (optional)
                 Should performance results be printed?
             auxiliary_metrics: bool (optional)
                 Should we compute other (`problem_type` specific) metrics in addition to the default metric?
             detailed_report : bool (optional) 
-                Should we computed more detailed versions of the `auxiliary_metrics`? (requires `auxiliary_metrics = True`)
+                Should we compute more detailed versions of the `auxiliary_metrics`?
+                (requires `auxiliary_metrics = True`)
 
             Returns
             -------
@@ -264,7 +271,8 @@ class TabularPredictor(BasePredictor):
             if stacking_used:
                 num_stack_str = " (with "+str(results['stack_ensemble_levels'])+" levels)"
             print("Stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
-            # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
+            # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune',
+            #  'feature-selection used', results)
             print("User-specified hyperparameters:")
             print(results['hyperparameters_userspecified'])
         if verbosity > 1: # create plots
@@ -285,7 +293,8 @@ class TabularPredictor(BasePredictor):
                 for model_type in hpo_results:
                     hpo_model = hpo_results[model_type]
                     print("HPO for %s model:  Num. configurations tried = %s, Time spent = %s, Search strategy = %s" 
-                          % (model_type, len(hpo_model['trial_info']), hpo_model['total_time'], hpo_model['search_strategy']))
+                          % (model_type, len(hpo_model['trial_info']), hpo_model['total_time'],
+                             hpo_model['search_strategy']))
                     print("Best hyperparameter-configuration (validation-performance: %s = %s):" 
                           % (self.eval_metric, hpo_model['validation_performance']))
                     print(hpo_model['best_config'])
