@@ -330,7 +330,7 @@ class TabularNeuralNetModel(AbstractModel):
             if test_dataset is not None:
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
                 val_metric = self.score(X=test_dataset, y=y_test)
-            if test_dataset is None or val_metric >= best_val_metric:  # keep training if score has improved
+            if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
