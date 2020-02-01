@@ -23,6 +23,7 @@ import warnings, shutil, os
 import numpy as np
 import mxnet as mx
 from random import seed
+import pandas as pd
 
 import autogluon as ag
 from autogluon import TabularPrediction as task
@@ -144,8 +145,8 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             savedir = directory + 'AutogluonOutput/'
             shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
             label_column = dataset['label_column']
-            train_data = task.Dataset(file_path=train_file_path)
-            test_data = task.Dataset(file_path=test_file_path)
+            train_data = pd.read_csv(train_file_path)
+            test_data = pd.read_csv(test_file_path)
             y_test = test_data[label_column]
             test_data = test_data.drop(labels=[label_column], axis=1)
             if fast_benchmark:
