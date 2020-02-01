@@ -100,7 +100,7 @@ class TabularPrediction(BaseTask):
             
             You can also pass your own evaluation function here as long as it follows formatting of the functions defined in `autogluon/utils/tabular/metrics/`.
         stopping_metric : function or str, default = None
-            Metric by which models use to early stop to avoid overfitting.
+            Metric which models use to early stop to avoid overfitting.
             `stopping_metric` is not used by weighted ensembles, instead weighted ensembles maximize `eval_metric`.
             Defaults to `eval_metric` value except when `eval_metric='roc_auc'`, where it defaults to `log_loss`.
             Options are identical to options for `eval_metric`.
