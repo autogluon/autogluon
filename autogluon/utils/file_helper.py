@@ -77,7 +77,7 @@ def generate_csv_submission(dataset_path, dataset, local_path, inds, preds, clas
                       'value': 'probability_1',
                       'special': 0}
 
-    test_path = os.path.join(dataset_path, 'test', 'test')
+    test_path = os.path.join(dataset_path, 'test')
     csv_path = os.path.join(dataset_path, 'sample_submission.csv')
     ids = sorted(os.listdir(test_path))
     save_csv_name = custom + '.csv'
@@ -148,7 +148,6 @@ def filter_value(prob, Threshold):
     return prob
 
 def generate_prob_csv(test_path, csv_path, preds, set_prob_thresh=0, custom='./submission.csv', scale_min_max=True, ensemble_list=''):
-    test_path = os.path.join(test_path, 'test')
     ids = sorted(os.listdir(test_path))
     df = pd.read_csv(csv_path)
     imagename_list = [name_id[:-4] for name_id in ids]

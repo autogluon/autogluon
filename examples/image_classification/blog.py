@@ -9,7 +9,7 @@ def task_dog_breed_identification():
     dataset = 'dog-breed-identification_mini'
     # dataset = 'dog-breed-identification'
     dataset_path = os.path.join(data_path, dataset, 'train')
-    test_path = os.path.join(data_path, dataset, 'test')
+
     csv_path = os.path.join(data_path, dataset, 'sample_submission.csv')
     load_dataset = task.Dataset(dataset_path)
 
@@ -33,22 +33,29 @@ def task_dog_breed_identification():
     classifier = task.fit(dataset=load_dataset,
                           net=ag.Categorical('standford_dog_resnext101_64x4d', 'standford_dog_resnet152_v1'),
                           optimizer=NAG(),
-                          epochs=10,
-                          num_trials=2,
-                          ngpus_per_trial=1,
-                          batch_size=48,
+                          epochs=1,#10
+                          num_trials=1,
+                          ngpus_per_trial=4,
+                          batch_size=4,
                           verbose=False,
                           ensemble=2)
+
+    test_path = os.path.join(data_path, dataset, 'test', 'test')
+    test_dataset = task.Dataset(test_path, train=False)
+
+    # inds, probs, probs_all = classifier.predict(test_dataset)
+    # ag.utils.generate_prob_csv(test_dataset, probs_all, './submission.csv', set_prob_thresh=0.9
 
     multi_scale_crop = False
     if multi_scale_crop:
         scale_ratio_choice=[0.875, 0.8, 0.7] #256,280,320
         for i in scale_ratio_choice:
-            inds, probs, probs_all = classifier.predict(task.Dataset(test_path), crop_ratio=i)
+            # inds, probs, probs_all = classifier.predict(task.Dataset(test_path), crop_ratio=i)
+            inds, probs, probs_all = classifier.predict(test_dataset, crop_ratio=i)
             ag.utils.generate_prob_csv(test_path, csv_path, probs_all, custom='./submission_%.3f.csv' % (i))
         ag.utils.generate_prob_csv(test_path, csv_path, probs_all, custom='./ensemble.csv', ensemble_list='./submission_*.csv')
     else:
-        inds, probs, probs_all = classifier.predict(task.Dataset(test_path), crop_ratio=0.875)
+        inds, probs, probs_all = classifier.predict(test_dataset)
         ag.utils.generate_prob_csv(test_path, csv_path, probs_all, custom='./submission.csv')
 
 if __name__ == '__main__':

@@ -28,8 +28,8 @@ def parse_args():
     opt = parser.parse_args()
     return opt
 
-def predict_details(test_path, classifier, load_dataset):
-    inds, probs, probs_all= classifier.predict(task.Dataset(test_path, train=False))
+def predict_details(test_dataset, classifier, load_dataset):
+    inds, probs, probs_all= classifier.predict(test_dataset)
     value = []
     target_dataset = load_dataset.init()
     for i in inds:
@@ -53,7 +53,6 @@ def main():
     logging.info(opt)
 
     target = config_choice(opt.data_dir, opt.dataset)
-    print(target['lr_config'])
     load_dataset = task.Dataset(target['dataset'])
     classifier = task.fit(dataset = load_dataset,
                           output_directory = output_directory,
@@ -75,9 +74,10 @@ def main():
     logger.info(summary)
 
     if opt.submission:
-        test_path = os.path.join(opt.data_dir, opt.dataset, 'test')
-        inds, probs, probs_all, value = predict_details(test_path, classifier, load_dataset)
+        test_dataset = task.Dataset(os.path.join(opt.data_dir, opt.dataset, 'test'), train=False)
+        inds, probs, probs_all, value = predict_details(test_dataset, classifier, load_dataset)
         ag.utils.generate_csv_submission(dataset_path, opt.dataset, local_path, inds, probs_all, value, opt.custom)
 
 if __name__ == '__main__':
     main()
+

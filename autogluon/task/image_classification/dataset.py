@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import logging
+import warnings
 import platform
 import numpy as np
 from PIL import Image
@@ -106,14 +107,17 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
 
-    if 'label_file' in kwargs:
-        dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
-                                    *args, **kwargs)
-    elif '.rec' in path:
+    if '.rec' in path:
         dataset = RecordDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     elif _is_osx:
         dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
+    elif not train:
+        dataset = TestImageFolderDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    elif 'label_file' in kwargs:
+        dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
+                                    *args, **kwargs)
     else:
         dataset = NativeImageFolderDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
@@ -142,7 +146,7 @@ class IndexImageDataset(MXImageFolderDataset):
     def __init__(self, root, label_file, gray_scale=False, transform=None,
                  extension='.jpg'):
         self._root = os.path.expanduser(root)
-        self.items = self.read_csv(label_file, root, extension)
+        self.items, self.synsets = self.read_csv(label_file, root, extension)
         self._flag = 0 if gray_scale else 1
         self._transform = transform
 
@@ -168,7 +172,15 @@ class IndexImageDataset(MXImageFolderDataset):
         for k, v in label_dict.items():
             samples.append((os.path.join(root, f"{k}{extension}"),
                             label_to_index(labels, v)))
-        return samples
+        return samples, labels
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
 
 @obj()
 class RecordDataset(ImageRecordDataset):
@@ -210,6 +222,39 @@ class NativeImageFolderDataset(MXImageFolderDataset):
     @property
     def classes(self):
         return self.synsets
+
+@obj()
+class TestImageFolderDataset(MXImageFolderDataset):
+    def __init__(self, root, gray_scale=False, transform=None):
+        flag = 0 if gray_scale else 1
+        super().__init__(root, flag=flag, transform=transform)
+
+    def _list_images(self, root):
+        self.synsets = []
+        self.items = []
+
+        #for folder in sorted(os.listdir(root)):
+        path = os.path.expanduser(root)
+        if not os.path.isdir(path):
+            raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+        label = len(self.synsets)
+        for filename in sorted(os.listdir(path)):
+            filename = os.path.join(path, filename)
+            ext = os.path.splitext(filename)[1]
+            if ext.lower() not in self._exts:
+                warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                    filename, ext, ', '.join(self._exts)))
+                continue
+            self.items.append((filename, label))
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
+
 
 @obj()
 class ImageFolderDataset(object):
