@@ -65,8 +65,8 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None):
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, hyperparameters=None, features=None):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features)
         """
         TabularNeuralNetModel object.
         
@@ -79,9 +79,7 @@ class TabularNeuralNetModel(AbstractModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.problem_type = problem_type
-        self.objective_func = objective_func
-        self.eval_metric_name = self.objective_func.name
+        self.eval_metric_name = self.stopping_metric.name
         self.feature_types_metadata = None
         self.types_of_features = None
         self.feature_arraycol_map = None
@@ -92,7 +90,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     # TODO: Fix model to not have tabNN in params
     def convert_to_template(self):
-        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, features=self.features, hyperparameters=self.params)
+        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, features=self.features, hyperparameters=self.params)
         new_model.path = self.path
         new_model.params['tabNN'] = None
         return new_model
@@ -329,7 +327,7 @@ class TabularNeuralNetModel(AbstractModel):
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
-                val_metric = self.score(X=test_dataset, y=y_test)
+                val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if not np.isnan(val_metric):
                     best_val_metric = val_metric
@@ -360,7 +358,7 @@ class TabularNeuralNetModel(AbstractModel):
         if test_dataset is None: # evaluate one final time:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:
-            final_val_metric = self.score(X=test_dataset, y=y_test)
+            final_val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %

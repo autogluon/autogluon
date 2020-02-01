@@ -47,7 +47,7 @@ def hp_default_value(hp_value):
 class AbstractModel:
     model_file_name = 'model.pkl'
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model. 
             Args:
                 path (str): directory where to store all outputs
@@ -58,15 +58,25 @@ class AbstractModel:
         self.path = self.create_contexts(path + name + '/')
         self.model = model
         self.problem_type = problem_type
-        self.objective_func = objective_func # Note: we require higher values = better performance
+        self.objective_func = objective_func  # Note: we require higher values = better performance
+        if stopping_metric is None:
+            self.stopping_metric = self.objective_func
+        else:
+            self.stopping_metric = stopping_metric
         self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
-        if type(objective_func) == metrics._ProbaScorer:
+        if type(self.objective_func) == metrics._ProbaScorer:
             self.metric_needs_y_pred = False
-        elif type(objective_func) == metrics._ThresholdScorer:
+        elif type(self.objective_func) == metrics._ThresholdScorer:
             self.metric_needs_y_pred = False
         else:
             self.metric_needs_y_pred = True
+        if type(self.stopping_metric) == metrics._ProbaScorer:
+            self.stopping_metric_needs_y_pred = False
+        elif type(self.stopping_metric) == metrics._ThresholdScorer:
+            self.stopping_metric_needs_y_pred = False
+        else:
+            self.stopping_metric_needs_y_pred = True
 
         self.features = features
         self.debug = debug
@@ -140,20 +150,28 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y):
-        if self.metric_needs_y_pred:
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None):
+        if eval_metric is None:
+            eval_metric = self.objective_func
+        if metric_needs_y_pred is None:
+            metric_needs_y_pred = self.metric_needs_y_pred
+        if metric_needs_y_pred:
             y_pred = self.predict(X=X)
-            return self.objective_func(y, y_pred)
+            return eval_metric(y, y_pred)
         else:
             y_pred_proba = self.predict_proba(X=X)
-            return self.objective_func(y, y_pred_proba)
+            return eval_metric(y, y_pred_proba)
 
-    def score_with_y_pred_proba(self, y, y_pred_proba):
-        if self.metric_needs_y_pred:
+    def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
+        if eval_metric is None:
+            eval_metric = self.objective_func
+        if metric_needs_y_pred is None:
+            metric_needs_y_pred = self.metric_needs_y_pred
+        if metric_needs_y_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-            return self.objective_func(y, y_pred)
+            return eval_metric(y, y_pred)
         else:
-            return self.objective_func(y, y_pred_proba)
+            return eval_metric(y, y_pred_proba)
 
     # TODO: Add simple generic CV logic
     def cv(self, X, y, k_fold=5):
@@ -236,7 +254,6 @@ class AbstractModel:
         results = results.sort_values(ascending=False)
 
         return results
-        # self.save_debug()
 
     def _get_default_searchspace(self, problem_type):
         return NotImplementedError

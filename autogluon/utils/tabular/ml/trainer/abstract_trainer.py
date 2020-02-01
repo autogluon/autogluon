@@ -13,7 +13,7 @@ from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from ..utils import get_pred_from_proba, dd_list
 from ..models.abstract.abstract_model import AbstractModel
 from ..tuning.feature_pruner import FeaturePruner
-from ...metrics import accuracy, root_mean_squared_error, scorer_expects_y_pred
+from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
-    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None,
+    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         self.path = path
@@ -52,12 +52,21 @@ class AbstractTrainer:
         else:
             self.objective_func = root_mean_squared_error
 
+        # stopping_metric is used to early stop all models except for aux models.
+        if stopping_metric is not None:
+            self.stopping_metric = stopping_metric
+        elif self.objective_func.name == 'roc_auc':
+            self.stopping_metric = log_loss
+        else:
+            self.stopping_metric = self.objective_func
+
         self.objective_func_expects_y_pred = scorer_expects_y_pred(scorer=self.objective_func)
         logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.objective_func.name)
         if not self.objective_func_expects_y_pred:
             logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "To change this, specify the eval_metric argument of fit()")
+        logger.log(25, "AutoGluon will early stop models using evaluation metric: %s" % self.stopping_metric.name)  # TODO: stopping_metric is likely not used during HPO, fix this
         self.num_classes = num_classes
         self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
@@ -573,7 +582,7 @@ class AbstractTrainer:
             return
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(kfolds) + '_l' + str(level), base_model_names=self.models_level['core'][level-1],
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        num_classes=self.num_classes, random_state=level)
+                                                        objective_func=self.objective_func, num_classes=self.num_classes, random_state=level)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if weighted_ensemble_model.name in self.get_model_names_all():

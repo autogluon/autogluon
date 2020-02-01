@@ -13,15 +13,15 @@ from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regres
 logger = logging.getLogger(__name__)
 
 
-def get_preset_models(path, problem_type, objective_func, num_classes=None,
+def get_preset_models(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
                       hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
     if problem_type in [BINARY, MULTICLASS]:
         return get_preset_models_classification(path=path, problem_type=problem_type,
-                    objective_func=objective_func, num_classes=num_classes,
+                    objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
                     hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+                    objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
     else:
         raise NotImplementedError
 
@@ -39,7 +39,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
     return model
 
 
-def get_preset_models_classification(path, problem_type, objective_func, num_classes=None,
+def get_preset_models_classification(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
                                      hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
     # TODO: define models based on additional keys in hyperparameters
 
@@ -72,22 +72,22 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
-                     objective_func=objective_func, num_classes=num_classes, hyperparameters=gbm_options.copy())
+                     objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=gbm_options.copy())
         )
     if cat_options is not None:
         models.append(
             CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-                          objective_func=objective_func, num_classes=num_classes, hyperparameters=cat_options.copy()),
+                          objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=cat_options.copy()),
         )
     if nn_options is not None:
         models.append(
             TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy()),
+                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
         if 'GBM' in custom_options:
-            models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, 
+            models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric,
                                 num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes))
                       ]
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
@@ -98,7 +98,7 @@ def get_preset_models_classification(path, problem_type, objective_func, num_cla
     return models
 
 
-def get_preset_models_regression(path, problem_type, objective_func, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
+def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
     models = []
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
@@ -128,21 +128,21 @@ def get_preset_models_regression(path, problem_type, objective_func, hyperparame
     if gbm_options is not None:
         models.append(
             LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=gbm_options.copy())
+                     objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=gbm_options.copy())
         )
     if cat_options is not None:
         models.append(
             CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
-                          objective_func=objective_func, hyperparameters=cat_options.copy()),
+                          objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=cat_options.copy()),
         )
     if nn_options is not None:
         models.append(
             TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
-                                  objective_func=objective_func, hyperparameters=nn_options.copy())
+                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         if 'GBM' in custom_options:
-            models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, hyperparameters=get_param_baseline_custom(problem_type))]
+            models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
 
     return models

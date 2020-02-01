@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, num_classes=None, hyperparameters=None, features=None, debug=0):
         self.num_classes = num_classes
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, debug=debug)
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features, debug=debug)
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
@@ -34,7 +34,7 @@ class CatboostModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
-        self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.objective_func, True, not self.metric_needs_y_pred, self.problem_type))
+        self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
 
     def _get_default_searchspace(self, problem_type):
         spaces = {
@@ -186,7 +186,7 @@ class CatboostModel(AbstractModel):
 
             if init_model is not None:
                 final_model_best_score = self.model.get_best_score()['validation'][self.metric_name]
-                if self.objective_func._optimum > final_model_best_score:
+                if self.stopping_metric._optimum > final_model_best_score:
                     if final_model_best_score > init_model_best_score:
                         best_iteration = init_model_tree_count + self.model.get_best_iteration()
                     else:
