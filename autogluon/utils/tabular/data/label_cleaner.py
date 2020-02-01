@@ -97,14 +97,15 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {1: 0, 2: 1}
         elif ('1' in self.unique_values) and ('2' in self.unique_values):
             self.inv_map: dict = {'1': 0, '2': 1}
-        elif (False in self.unique_values) and (True in self.unique_values):
-            self.inv_map: dict = {False: 0, True: 1}
+        elif ((str(False) in [str(val) for val in self.unique_values]) and 
+              (str(True) in [str(val) for val in self.unique_values])):
+            false_val = [val for val in self.unique_values if str(val)==str(False)][0]  # may be str or bool 
+            true_val = [val for val in self.unique_values if str(val)==str(True)][0] # may be str or bool
+            self.inv_map: dict = {false_val: 0, true_val: 1}
         elif (0 in self.unique_values) and (1 in self.unique_values):
             self.inv_map: dict = {0: 0, 1: 1}
         elif ('0' in self.unique_values) and ('1' in self.unique_values):
             self.inv_map: dict = {'0': 0, '1': 1}
-        elif ('False' in self.unique_values) and ('True' in self.unique_values):
-            self.inv_map = {'False': 0, 'True': 1}
         elif ('No' in self.unique_values) and ('Yes' in self.unique_values):
             self.inv_map: dict = {'No': 0, 'Yes': 1}
         elif ('N' in self.unique_values) and ('Y' in self.unique_values):

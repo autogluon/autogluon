@@ -328,8 +328,9 @@ class TabularNeuralNetModel(AbstractModel):
             if test_dataset is not None:
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
                 val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
-            if test_dataset is None or val_metric >= best_val_metric:  # keep training if score has improved
-                best_val_metric = val_metric
+            if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
+                if not np.isnan(val_metric):
+                    best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
@@ -358,6 +359,8 @@ class TabularNeuralNetModel(AbstractModel):
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:
             final_val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+            if np.isnan(final_val_metric):
+                final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
