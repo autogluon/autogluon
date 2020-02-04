@@ -182,6 +182,14 @@ class IndexImageDataset(MXImageFolderDataset):
     def classes(self):
         return self.synsets
 
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
+
 @obj()
 class RecordDataset(ImageRecordDataset):
     """A dataset wrapping over a RecordIO file containing images. 

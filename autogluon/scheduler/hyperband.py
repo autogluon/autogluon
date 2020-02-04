@@ -168,10 +168,8 @@ class HyperbandScheduler(FIFOScheduler):
         cls = HyperbandScheduler
         cls.RESOURCE_MANAGER._request(task.resources)
         # reporter and terminator
-        reporter = DistStatusReporter()
-        terminator_semaphore = DistSemaphore(0)
+        reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
-        task.args['terminator_semaphore'] = terminator_semaphore
 
         milestones = self.terminator.on_task_add(task, **kwargs)
         if kwargs.get('new_config', True):
@@ -198,11 +196,11 @@ class HyperbandScheduler(FIFOScheduler):
                 task.args['config'], next_milestone)
 
         # main process
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER, self.env_sem)
+        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         # reporter thread
         rp = threading.Thread(target=self._run_reporter,
-                              args=(task, job, reporter, self.searcher, self.terminator,
-                                    None, terminator_semaphore), daemon=False)
+                              args=(task, job, reporter, self.searcher, self.terminator),
+                              daemon=False)
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
@@ -216,18 +214,14 @@ class HyperbandScheduler(FIFOScheduler):
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
-    def _run_reporter(self, task, task_job, reporter, searcher, terminator,
-                      checkpoint_semaphore, terminator_semaphore):
+    def _run_reporter(self, task, task_job, reporter, searcher, terminator):
         last_result = None
         last_updated = None
         while not task_job.done():
             reported_result = reporter.fetch()
             if reported_result.get('done', False):
                 reporter.move_on()
-                terminator_semaphore.release()
                 terminator.on_task_complete(task, last_result)
-                if checkpoint_semaphore is not None:
-                    checkpoint_semaphore.release()
                 break
             # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
@@ -268,11 +262,9 @@ class HyperbandScheduler(FIFOScheduler):
                 logger.debug(
                     'Stopping task ({} evaluation, resource = {}):\n{}'.format(
                         act_str, reported_result[self._time_attr], task))
-                terminator_semaphore.release()
                 terminator.on_task_remove(task)
+                reporter.terminate()
                 #task_process.join()
-                if checkpoint_semaphore is not None:
-                    checkpoint_semaphore.release()
                 break
         # Pass all of last_result to searcher (unless this has already been
         # done)

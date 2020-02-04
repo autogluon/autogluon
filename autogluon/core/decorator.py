@@ -46,7 +46,7 @@ class _autogluon_method(object):
         self.args = ezdict()
         functools.update_wrapper(self, f)
 
-    def __call__(self, args, config, **kwargs):
+    def __call__(self, args, config={}, **kwargs):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)

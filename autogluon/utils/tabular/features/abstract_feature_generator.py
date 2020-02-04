@@ -125,16 +125,16 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
-        logger.log(15, 'Feature Generator processed '+str(X_len)+' data points with '+str(len(self.features))+' features')
-        logger.log(15, 'Original Features:')
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
+        logger.log(20, 'Original Features:')
         for key, val in self.feature_type_family.items():
-            logger.log(15, '\t ' +str(key) +' features: '+str(len(val)))
-        logger.log(15, 'Generated Features:')
+            logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Generated Features:')
         for key, val in self.feature_types_metadata_generated.items():
-            logger.log(15, '\t ' + str(key) +' features: '+str(len(val)))
-        logger.log(15, 'All Features:')
+            logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'All Features:')
         for key, val in self.feature_types_metadata_full.items():
-            logger.log(15, '\t ' +str(key)+' features: '+str(len(val)))
+            logger.log(20, '\t%s features: %s' % (key, len(val)))
 
         return X_features
 
@@ -156,7 +156,7 @@ class AbstractFeatureGenerator:
                     X[col] = [None] * len(X)
                 else:  # was a dtype==numerical column in training dataset
                     X[col] = [np.nan] * len(X)
-        # TODO (Nick): I don't think we should allow missing columns. This is very dangerous, we should throw an exception instead.
+        # TODO: I don't think we hould allow missing columns. This is dangerous, we should throw an exception instead.
         if len(missing_cols) > 0:
             warnings.warn("The columns listed below from the training data are no longer in the given dataset. "
                           "(AutoGluon will proceed assuming their values are missing, but you should remove these columns "
