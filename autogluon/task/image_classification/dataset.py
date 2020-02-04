@@ -238,6 +238,7 @@ class TestImageFolderDataset(MXImageFolderDataset):
         if not os.path.isdir(path):
             raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
         label = len(self.synsets)
+
         for filename in sorted(os.listdir(path)):
             filename = os.path.join(path, filename)
             ext = os.path.splitext(filename)[1]

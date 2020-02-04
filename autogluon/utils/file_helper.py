@@ -147,29 +147,27 @@ def filter_value(prob, Threshold):
         prob = 0
     return prob
 
-def generate_prob_csv(test_path, csv_path, preds, set_prob_thresh=0, custom='./submission.csv', scale_min_max=True, ensemble_list=''):
-    ids = sorted(os.listdir(test_path))
+def generate_prob_csv(test_dataset, preds, set_prob_thresh=0, custom='./submission.csv', scale_min_max=True, ensemble_list=''):
+    ids = sorted([x for x, _ in test_dataset.rand.items])
+    csv_path = test_dataset.rand._root.replace('test/test', 'sample_submission.csv')
     df = pd.read_csv(csv_path)
     imagename_list = [name_id[:-4] for name_id in ids]
     row_index_group = []
     for i in imagename_list:
         row_index = df[df['id'] == str(i)].index.tolist()
-        row_index_group.append(row_index[0])
+        if not len(row_index) == 0:
+            row_index_group.append(row_index[0])
     df.loc[row_index_group, 1:] = preds
     df.to_csv(custom, index=False)
     def ensemble_csv(glob_files):
         file_list = []
         for i, glob_file in enumerate(glob(glob_files)):
             file_list.append(pd.read_csv(glob_file, index_col=0))
-
         w = sum([*file_list])/len(file_list)
-
         if scale_min_max:
             w = w.apply(lambda x: np.round((x - min(x)) / (1.0 * (max(x) - min(x))), 2), axis=1)
-
         for i in w.columns.values:
             w[i] = w[i].apply(filter_value, Threshold=set_prob_thresh)
-
         w.to_csv(custom)
     if not ensemble_list.strip() == '':
         ensemble_csv(ensemble_list)
