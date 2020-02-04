@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, random_state=0, debug=0):
-        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, random_state=random_state, debug=debug)
+    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
+        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, random_state=random_state, debug=debug)
         if base_model_names is None:
             base_model_names = []
         if base_model_paths_dict is None:
@@ -112,7 +112,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 else:
                     self.feature_types_metadata['float'] = self.stack_columns
         if k_fold >= 2:
-            super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit)
+            super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
             self.bagged_mode = True
         else:
             self.models = [copy.deepcopy(self.model_base)]
@@ -120,7 +120,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self.bagged_mode = False
             self.models[0].set_contexts(path_context=self.path + self.models[0].name + '/')
             self.models[0].feature_types_metadata = self.feature_types_metadata  # TODO: Move this
-            self.models[0].fit(X_train=X, Y_train=y)
+            self.models[0].fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
             self._oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1

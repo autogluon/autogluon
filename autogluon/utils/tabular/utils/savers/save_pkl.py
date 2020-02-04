@@ -1,4 +1,4 @@
-# TODO (Nick): Standardize / unify this code with ag.save()
+# TODO: Standardize / unify this code with ag.save()
 import os, pickle, tempfile, logging, boto3
 
 from .. import s3_utils
