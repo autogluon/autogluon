@@ -142,6 +142,11 @@ class TextClassification(BaseTask):
         >>> dataset = task.Dataset(name='ToySST')
         >>> predictor = task.fit(dataset)
         """
+
+        logger.warning('Warning: `TextClassification` is in preview mode and is not feature complete. '
+                       'Using `TextClassification` on datasets other than `Stanford Sentiment Treebank` is not yet supported. '
+                       'For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.')
+
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics
