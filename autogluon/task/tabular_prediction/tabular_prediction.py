@@ -66,12 +66,12 @@ class TabularPrediction(BaseTask):
         
         Parameters
         ----------
-        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`
+        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
             Table of the training data, which is similar to pandas DataFrame.
             If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
             Name of the column that contains the target variable to predict.
-        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`, default = None
+        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
