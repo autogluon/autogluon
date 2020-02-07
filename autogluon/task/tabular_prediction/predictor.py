@@ -1,5 +1,7 @@
 import logging
 import pandas as pd
+
+from .dataset import TabularDataset
 from ..base.base_predictor import BasePredictor
 from ...utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
@@ -74,9 +76,10 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : :class:`TabularDataset` or `pandas.DataFrame`
+            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
+                If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
             as_pandas : bool (optional)
@@ -93,6 +96,8 @@ class TabularPredictor(BasePredictor):
             Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series depending on `as_pandas` argument.
 
         """
+        if type(dataset) == str:
+            dataset = TabularDataset(file_path=dataset)
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
@@ -103,9 +108,10 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : :class:`TabularDataset` or `pandas.DataFrame`
+            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
                 The dataset to make predictions for. Should contain same column names as training Dataset and follow same format 
                 (may contain extra columns that won't be used by Predictor, including the label-column itself).
+                If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
             as_pandas : bool (optional)
@@ -117,6 +123,8 @@ class TabularPredictor(BasePredictor):
             Array of predicted class-probabilities, corresponding to each row in the given dataset. 
             May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
         """
+        if type(dataset) == str:
+            dataset = TabularDataset(file_path=dataset)
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
@@ -129,8 +137,9 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : :class:`TabularDataset` or `pandas.DataFrame`
+            dataset : str or :class:`TabularDataset` or `pandas.DataFrame`
                 This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+                If str is passed, `dataset` will be loaded using the str value as the file path.
 
             silent : bool (optional)
                 Should performance results be printed?
@@ -139,6 +148,8 @@ class TabularPredictor(BasePredictor):
             -------
             Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
+        if type(dataset) == str:
+            dataset = TabularDataset(file_path=dataset)
         perf = self._learner.score(dataset)
         sign = self._learner.objective_func._sign
         perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
@@ -178,10 +189,11 @@ class TabularPredictor(BasePredictor):
 
             Parameters
             ----------
-            dataset : :class:`TabularDataset` or `pandas.DataFrame` (optional)
+            dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
                 This Dataset must also contain the label-column with the same column-name as specified during fit().
                 If specified, then the leaderboard returned will contain an additional column 'score_test'
                 'score_test' is the score of the model on the validation_metric for the dataset provided
+                If str is passed, `dataset` will be loaded using the str value as the file path.
             silent: bool (optional)
                 Should leaderboard DataFrame be printed?
 
@@ -189,6 +201,8 @@ class TabularPredictor(BasePredictor):
             -------
             Pandas `pandas.DataFrame` of model performance summary information.
         """
+        if type(dataset) == str:
+            dataset = TabularDataset(file_path=dataset)
         return self._learner.leaderboard(X=dataset, silent=silent)
 
     def fit_summary(self, verbosity=3):
