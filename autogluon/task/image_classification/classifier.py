@@ -115,10 +115,10 @@ class Classifier(BasePredictor):
         # model inference
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
         resize = int(math.ceil(input_size / 0.875))
-        transform_fn = Compose([
-                Resize(resize),
-                CenterCrop(input_size),
-                ToTensor(),
+        transform_size = transforms.Compose([
+                transforms.Resize(resize),
+                transforms.CenterCrop(input_size),
+                transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
         def predict_img(img):
@@ -128,11 +128,11 @@ class Classifier(BasePredictor):
             probai = mx.nd.gather_nd(proba, idx)
             return ind, probai, proba
         if isinstance(X, str) and os.path.isfile(X):
-            img = self.loader(X)
+            img = mx.image.imread(filename=X)
             if plot:
                 plt.imshow(np.array(img))
                 plt.show()
-            img = transform_fn(img)
+            img = transform_size(img)
             return predict_img(img)
         if isinstance(X, AutoGluonObject):
             X = X.init()
