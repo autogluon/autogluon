@@ -7,6 +7,7 @@ from .. import s3_utils, multiprocessing_utils
 logger = logging.getLogger(__name__)
 
 
+# TODO: Update so verbose prints at level 20, and adjust calls to save accordingly
 # gzip compression produces random deflate issues on linux machines - use with caution
 def save(path, df, index=False, verbose=True, type=None, sep=',', compression='gzip', header=True, json_dump_columns=None):
     if json_dump_columns is not None:
