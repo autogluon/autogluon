@@ -118,11 +118,10 @@ class Classifier(BasePredictor):
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
         resize = int(math.ceil(input_size / resize_ratio))
 
-        transform_fn = Compose([
-            Resize(resize),
-            CenterCrop(input_size),
-            # RandomCrop(input_size),
-            ToTensor(),
+        transform_size = transforms.Compose([
+            transforms.Resize(resize),
+            transforms.CenterCrop(input_size),
+            transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
@@ -174,11 +173,12 @@ class Classifier(BasePredictor):
             return inds, probas, probals_all
 
         if isinstance(X, str) and os.path.isfile(X):
-            img = self.loader(X)
+            img = mx.image.imread(filename=X)
             if plot:
-                plt.imshow(np.array(img))
+                plt.imshow(img.asnumpy())
                 plt.show()
-            img = transform_fn(img)
+
+            img = transform_size(img)
             return predict_img(img)
 
         if isinstance(X, AutoGluonObject):
@@ -201,8 +201,7 @@ class Classifier(BasePredictor):
     def predict_proba(self, X):
         """Produces predicted class probabilities for a given image.
         """
-        input = X.expand_dims(0)
-        pred = self.model(input)
+        pred = self.model(X.expand_dims(0))
         return mx.nd.softmax(pred)
 
     def evaluate(self, dataset, input_size=224, ctx=[mx.cpu()]):

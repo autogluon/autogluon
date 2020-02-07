@@ -21,11 +21,11 @@ def task_dog_breed_identification(data_path, dataset):
     classifier = task.fit(dataset=load_dataset,
                           net=ag.Categorical('standford_dog_resnext101_64x4d', 'standford_dog_resnet152_v1'),
                           optimizer=NAG(),
-                          epochs=2,
-                          final_fit_epochs=10,
+                          epochs=5,
+                          # final_fit_epochs=10,
                           num_trials=1,
                           ngpus_per_trial=8,
-                          batch_size=48,
+                          batch_size=16,
                           verbose=False,
                           ensemble=1)
 

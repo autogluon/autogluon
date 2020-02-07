@@ -58,8 +58,8 @@ class ImageClassification(BaseTask):
 
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet50_v1', 'ResNet18_v1'),
-            optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
+            net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
+            optimizer= NAG(learning_rate=Real(1e-3, 1e-2, log=True),
                            wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
@@ -287,6 +287,7 @@ class ImageClassification(BaseTask):
         model = get_network(args.net, **kwargs)
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
+
         if ensemble > 1:
             models = [model]
             if isinstance(search_strategy, str):
