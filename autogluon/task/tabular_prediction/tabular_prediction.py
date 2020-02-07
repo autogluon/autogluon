@@ -54,33 +54,26 @@ class TabularPrediction(BaseTask):
         return TabularPredictor(learner=learner)
     
     @staticmethod
-    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None,
+    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
             hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None,
             num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters = {
-                               'NN': {'num_epochs': 500},
-                               'GBM': {'num_boost_round': 10000},
-                               'CAT': {'iterations': 10000},
-                               'RF': {'n_estimators': 300},
-                               'XT': {'n_estimators': 300},
-                               'KNN': {},
-                               'custom': ['GBM'],
-                              },
-            enable_fit_continuation=False,
-            time_limits=None, num_trials=None, search_strategy='random', search_options={}, 
-            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=[], visualizer='none',
+            hyperparameters=None, enable_fit_continuation=False,
+            time_limits=None, num_trials=None, search_strategy='random', search_options=None,
+            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
             verbosity=2, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
         
         Parameters
         ----------
-        train_data : :class:`autogluon.task.tabular_prediction.TabularDataset`
+        train_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`
             Table of the training data, which is similar to pandas DataFrame.
+            If str is passed, `train_data` will be loaded using the str value as the file path.
         label : str
-            Name of column that contains the target variable to predict.
-        tuning_data : :class:`autogluon.task.tabular_prediction.TabularDataset`, default = None
-            Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data). 
+            Name of the column that contains the target variable to predict.
+        tuning_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset`, default = None
+            Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
+            If str is passed, `tuning_data` will be loaded using the str value as the file path.
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
@@ -96,12 +89,21 @@ class TabularPrediction(BaseTask):
             Metric by which predictions will be ultimately evaluated on test data.
             AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data. 
             
-            If `eval_metric = None`, it is automatically chosen based on `problem_type`. 
-            Otherwise, options for classification: ['accuracy', 'balanced_accuracy', 'f1', 'roc_auc', 'average_precision', 'precision', 'recall', 'log_loss', 'pac_score']. 
-            Options for regression: ['r2', 'mean_squared_error', 'root_mean_squared_error' 'mean_absolute_error', 'median_absolute_error']. 
+            If `eval_metric = None`, it is automatically chosen based on `problem_type`.
+            Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
+            Otherwise, options for classification: [
+                'accuracy', 'balanced_accuracy', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
+                'roc_auc', 'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted',
+                'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score'].
+            Options for regression: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'].
             For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics   
             
             You can also pass your own evaluation function here as long as it follows formatting of the functions defined in `autogluon/utils/tabular/metrics/`.
+        stopping_metric : function or str, default = None
+            Metric which models use to early stop to avoid overfitting.
+            `stopping_metric` is not used by weighted ensembles, instead weighted ensembles maximize `eval_metric`.
+            Defaults to `eval_metric` value except when `eval_metric='roc_auc'`, where it defaults to `log_loss`.
+            Options are identical to options for `eval_metric`.
         hyperparameter_tune : bool, default = False
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
         feature_prune : bool, default = False
@@ -143,7 +145,9 @@ class TabularPrediction(BaseTask):
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
-            Default value is 0.2 if `hyperparameter_tune = True`, otherwise 0.1 is used by default. 
+            Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
+            Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
             Number of folds used for bagging of models. When `num_bagging_folds = k`, training time is roughly increased by a factor of `k` (set = 0 to disable bagging).
             Disabled by default, but we recommend values between 5-10 to maximize predictive performance.
@@ -152,7 +156,7 @@ class TabularPrediction(BaseTask):
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
         num_bagging_sets : int
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
-            Defaults to 1 if time_limits is not specified, otherwise 10 (always disabled if num_bagging_folds is not specified).
+            Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
             Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
         stack_ensemble_levels : int, default = 0
@@ -235,7 +239,12 @@ class TabularPrediction(BaseTask):
         for kwarg_name in kwarg_names:
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
-        
+
+        if type(train_data) == str:
+            train_data = TabularDataset(file_path=train_data)
+        if tuning_data is not None and type(tuning_data) == str:
+            tuning_data = TabularDataset(file_path=tuning_data)
+
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
         if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
@@ -245,6 +254,30 @@ class TabularPrediction(BaseTask):
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
+
+        if enable_fit_continuation:
+            enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
+            logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
+
+        if hyperparameter_tune:
+            logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
+
+        if dist_ip_addrs is None:
+            dist_ip_addrs = []
+
+        if search_options is None:
+            search_options = {}
+
+        if hyperparameters is None:
+            hyperparameters = {
+               'NN': {'num_epochs': 500},
+               'GBM': {'num_boost_round': 10000},
+               'CAT': {'iterations': 10000},
+               'RF': {'n_estimators': 300},
+               'XT': {'n_estimators': 300},
+               'KNN': {},
+               'custom': ['GBM'],
+             }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory) # Format directory name
@@ -259,12 +292,12 @@ class TabularPrediction(BaseTask):
             # TODO: What about datasets that are 100k+? At a certain point should we not bag?
             # TODO: What about time_limits? Metalearning can tell us expected runtime of each model, then we can select optimal folds + stack levels to fit time constraint
             num_bagging_folds = min(10, max(5, math.floor(num_train_rows / 100)))
-            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 1000)))
+            stack_ensemble_levels = min(1, max(0, math.floor(num_train_rows / 750)))
 
         if num_bagging_sets is None:
             if num_bagging_folds >= 2:
                 if time_limits is not None:
-                    num_bagging_sets = 10
+                    num_bagging_sets = 20
                 else:
                     num_bagging_sets = 1
             else:
@@ -304,7 +337,19 @@ class TabularPrediction(BaseTask):
                         raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
                     eval_metric = REGRESSION_METRICS[eval_metric]
                 else:
-                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function")
+                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function" % eval_metric)
+        # TODO: Move below code to a function to avoid inconsistencies between eval_metric and stopping_metric conversion
+        if stopping_metric is not None and isinstance(stopping_metric, str): # convert to function
+                if stopping_metric in CLASSIFICATION_METRICS:
+                    if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
+                        raise ValueError("stopping_metric=%s can only be used for classification problems" % stopping_metric)
+                    stopping_metric = CLASSIFICATION_METRICS[stopping_metric]
+                elif stopping_metric in REGRESSION_METRICS:
+                    if problem_type is not None and problem_type != REGRESSION:
+                        raise ValueError("stopping_metric=%s can only be used for regression problems" % stopping_metric)
+                    stopping_metric = REGRESSION_METRICS[stopping_metric]
+                else:
+                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own stopping_metric function" % stopping_metric)
         
         # All models use the same scheduler:
         scheduler_options = {
@@ -325,7 +370,7 @@ class TabularPrediction(BaseTask):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
-        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, 
+        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, 
                           label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,

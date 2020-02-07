@@ -53,6 +53,7 @@ def default_batch_fn(batch, ctx):
     label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0 ,even_split=False)
     return data, label
 
+
 def default_val_fn(net, batch, batch_fn, metric, ctx, dtype='float32'):
     with mx.autograd.pause(train_mode=False):
         data, label = batch_fn(batch, ctx)

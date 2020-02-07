@@ -45,7 +45,7 @@ class RemoteManager(object):
     def start_local_node(cls):
         port = cls.get_port_id()
         with warning_filter():
-            remote = Remote.create_local_node(cls.MASTER_IP, port)
+            remote = Remote(cls.MASTER_IP, port, local=True)
         with cls.LOCK:
             cls.NODES[cls.MASTER_IP] = remote
 

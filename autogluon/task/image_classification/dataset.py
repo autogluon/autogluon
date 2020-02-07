@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import logging
+import warnings
 import platform
 import numpy as np
 from PIL import Image
@@ -105,16 +106,81 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
+
     if '.rec' in path:
         dataset = RecordDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     elif _is_osx:
         dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
+    elif not train:
+        dataset = TestImageFolderDataset(path, *args,
+                transform=_TransformFirstClosure(transform), **kwargs)
+    elif 'label_file' in kwargs:
+        dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
+                                    *args, **kwargs)
     else:
         dataset = NativeImageFolderDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     dataset = dataset.init()
     return dataset
+
+@obj()
+class IndexImageDataset(MXImageFolderDataset):
+    """A image classification dataset with a CVS label file
+       Each sample is an image and its corresponding label.
+
+    Parameters
+    ----------
+    root : str
+        Path to the image folder.
+    indexfile : str
+        Local path to the csv index file. The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+    gray_scale : False
+        If True, always convert images to greyscale. 
+        If False, always convert images to colored (RGB). 
+    transform : function, default None
+        A user defined callback that transforms each sample.
+    """
+    def __init__(self, root, label_file, gray_scale=False, transform=None,
+                 extension='.jpg'):
+        self._root = os.path.expanduser(root)
+        self.items = self.read_csv(label_file, root, extension)
+        self._flag = 0 if gray_scale else 1
+        self._transform = transform
+
+    @staticmethod
+    def read_csv(filename, root, extension):
+        """The CSV should have two collums
+        1. image name (e.g. xxxx or xxxx.jpg)
+        2. label name or index (e.g. aaa or 1)
+        """
+        def label_to_index(label_list, name):
+            return label_list.index(name)
+        import csv
+        label_dict = {}
+        with open(filename) as f:
+            reader = csv.reader(f)
+            for row in reader:
+                assert len(row) == 2
+                label_dict[row[0]] = row[1]
+        if 'id' in label_dict:
+            label_dict.pop('id')
+        labels = list(set(label_dict.values()))
+        samples = []
+        for k, v in label_dict.items():
+            samples.append((os.path.join(root, f"{k}{extension}"),
+                            label_to_index(labels, v)))
+        return samples
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
 
 @obj()
 class RecordDataset(ImageRecordDataset):
@@ -156,6 +222,39 @@ class NativeImageFolderDataset(MXImageFolderDataset):
     @property
     def classes(self):
         return self.synsets
+
+@obj()
+class TestImageFolderDataset(MXImageFolderDataset):
+    def __init__(self, root, gray_scale=False, transform=None):
+        flag = 0 if gray_scale else 1
+        super().__init__(root, flag=flag, transform=transform)
+
+    def _list_images(self, root):
+        self.synsets = []
+        self.items = []
+
+        #for folder in sorted(os.listdir(root)):
+        path = os.path.expanduser(root)
+        if not os.path.isdir(path):
+            raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+        label = len(self.synsets)
+        for filename in sorted(os.listdir(path)):
+            filename = os.path.join(path, filename)
+            ext = os.path.splitext(filename)[1]
+            if ext.lower() not in self._exts:
+                warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                    filename, ext, ', '.join(self._exts)))
+                continue
+            self.items.append((filename, label))
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
+
 
 @obj()
 class ImageFolderDataset(object):

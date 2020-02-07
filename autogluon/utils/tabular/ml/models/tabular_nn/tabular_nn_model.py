@@ -65,8 +65,8 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None):
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features)
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, hyperparameters=None, features=None):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features)
         """
         TabularNeuralNetModel object.
         
@@ -79,9 +79,7 @@ class TabularNeuralNetModel(AbstractModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.problem_type = problem_type
-        self.objective_func = objective_func
-        self.eval_metric_name = self.objective_func.name
+        self.eval_metric_name = self.stopping_metric.name
         self.feature_types_metadata = None
         self.types_of_features = None
         self.feature_arraycol_map = None
@@ -92,7 +90,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     # TODO: Fix model to not have tabNN in params
     def convert_to_template(self):
-        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, features=self.features, hyperparameters=self.params)
+        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, features=self.features, hyperparameters=self.params)
         new_model.path = self.path
         new_model.params['tabNN'] = None
         return new_model
@@ -293,6 +291,23 @@ class TabularNeuralNetModel(AbstractModel):
         else:
             verbose_eval = 1
         
+        if num_epochs == 0: # use dummy training loop that stops immediately (useful for using NN just for data preprocessing / debugging)
+            logger.log(20, "Not training Neural Net since num_epochs == 0.  Neural network architecture is:")
+            for batch_idx, data_batch in enumerate(train_dataset.dataloader):
+                data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
+                with autograd.record():
+                    output = self.model(data_batch)
+                    labels = data_batch['label']
+                    loss = self.loss_func(output, labels) / loss_scaling_factor
+                    # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
+                loss.backward()
+                self.optimizer.step(labels.shape[0])
+                if batch_idx > 0:
+                    break
+            self.model.save_parameters(self.net_filename)
+            logger.log(15, "untrained Neural Net saved to file")
+            return
+        
         # Training Loop:
         for e in range(num_epochs):
             if e == 0: # special actions during first epoch:
@@ -308,27 +323,28 @@ class TabularNeuralNetModel(AbstractModel):
                     # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
-                cumulative_loss += nd.sum(loss).asscalar()
+                cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
             if test_dataset is not None:
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
-                val_metric = self.score(X=test_dataset, y=y_test)
-            if test_dataset is None or val_metric >= best_val_metric:  # keep training if score has improved
-                best_val_metric = val_metric
+                val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+            if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
+                if not np.isnan(val_metric):
+                    best_val_metric = val_metric
                 best_val_epoch = e
                 self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
-                      (e, train_loss, self.eval_metric_name, val_metric))
+                      (e, train_loss.asscalar(), self.eval_metric_name, val_metric))
                 if self.summary_writer is not None:
-                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name, 
+                    self.summary_writer.add_scalar(tag='val_'+self.eval_metric_name,
                                                    value=val_metric, global_step=e)
             else:
                 if verbose_eval > 0 and e % verbose_eval == 0:
-                    logger.log(15, "Epoch %s.  Train loss: %s" % (e, train_loss))
+                    logger.log(15, "Epoch %s.  Train loss: %s" % (e, train_loss.asscalar()))
             if self.summary_writer is not None:
-                self.summary_writer.add_scalar(tag='train_loss', value=train_loss, global_step=e)  # TODO: do we want to keep mxboard support?
+                self.summary_writer.add_scalar(tag='train_loss', value=train_loss.asscalar(), global_step=e)  # TODO: do we want to keep mxboard support?
             if e - best_val_epoch > self.params['epochs_wo_improve']:
                 break
             if time_limit:
@@ -342,7 +358,9 @@ class TabularNeuralNetModel(AbstractModel):
         if test_dataset is None: # evaluate one final time:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:
-            final_val_metric = self.score(X=test_dataset, y=y_test)
+            final_val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
+            if np.isnan(final_val_metric):
+                final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
         return
@@ -479,6 +497,13 @@ class TabularNeuralNetModel(AbstractModel):
         self.processor = self._create_preprocessor()
         processed_array = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in processed_array corresponding to this feature
+        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map]) # should match number of columns in processed array
+        # print("self.feature_arraycol_map", self.feature_arraycol_map)
+        # print("num_array_cols", num_array_cols)
+        # print("processed_array.shape",processed_array.shape)
+        if num_array_cols != processed_array.shape[1]:
+            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in processed_array does not match feature_arraycol_map.")
+        
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
@@ -587,7 +612,8 @@ class TabularNeuralNetModel(AbstractModel):
                     feature = transformed_features[i]
                     if feature in feature_arraycol_map:
                         raise ValueError("same feature is processed by two different column transformers: %s" % feature)
-                    oh_dimensionality = len(oh_encoder.categories_[i])
+                    oh_dimensionality = min(len(oh_encoder.categories_[i]), self.params['proc.max_category_levels']+1)
+                    # print("feature: %s, oh_dimensionality: %s" % (feature, oh_dimensionality)) # TODO! debug
                     feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
                     current_colindex += oh_dimensionality
             else:

@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.3'
+version = '0.0.5'
 try:
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
         cwd=cwd).decode('ascii').strip()
@@ -49,12 +49,14 @@ requirements = [
     'numpy>=1.16.0',
     'scipy>=1.3.3',
     'cython',
-    'tornado',
+    'tornado>=5.0.1',
     'requests',
     'matplotlib',
     'tqdm>=4.38.0',
     'paramiko>=2.5.0',
-    'distributed>=2.6.0',
+    'dask==2.6.0',
+    'cryptography>=2.8',
+    'distributed==2.6.0',
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0',
     'gluonnlp==0.8.1',
@@ -63,7 +65,7 @@ requirements = [
     'catboost',
     'boto3==1.9.187',
     'lightgbm==2.3.0',
-    'pandas==0.24.2',
+    'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0',
     'scikit-learn==0.21.2',
 ]
@@ -90,5 +92,10 @@ setup(
     cmdclass={
         'install': install,
         'develop': develop,
+    },
+    entry_points={
+        'console_scripts': [
+            'agremote = autogluon.scheduler.remote.cli:main',
+        ]
     },
 )

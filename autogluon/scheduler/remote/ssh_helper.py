@@ -208,12 +208,10 @@ def async_ssh(cmd_dict):
 
 def start_scheduler(addr, port, ssh_username, ssh_port,
                     ssh_private_key, remote_python=None):
-    cmd = "{python} -m distributed.cli.dask_scheduler --port {port}".format(
-        python=remote_python or sys.executable, port=port
+    cmd = "dask-scheduler --port {port}".format(
+        #python=remote_python or sys.executable,
+        port=port
     )
-    #cmd = "{python} -m autogluon.scheduler.remote.dask_scheduler --port {port}".format(
-    #    python=remote_python or sys.executable, port=port
-    #)
 
     # Format output labels we can prepend to each line of output, and create
     # a 'status' key to keep track of jobs that terminate prematurely.
@@ -248,20 +246,19 @@ def start_scheduler(addr, port, ssh_username, ssh_port,
 
 def start_worker(scheduler_addr, scheduler_port, worker_addr,
     ssh_username, ssh_port, ssh_private_key,
-    remote_python=None, remote_dask_worker="distributed.cli.dask_worker"):
+    remote_python=None):
 
     cmd = (
-        "{python} -m {remote_dask_worker} "
+        "dask-worker "
         "{scheduler_addr}:{scheduler_port} "
-        "--no-nanny"
+        "--no-nanny "
     )
 
     #if not nohost:
     cmd += " --host {worker_addr}"
 
     cmd = cmd.format(
-        python=remote_python or sys.executable,
-        remote_dask_worker=remote_dask_worker,
+        #python=remote_python or sys.executable,
         scheduler_addr=scheduler_addr,
         scheduler_port=scheduler_port,
         worker_addr=worker_addr,

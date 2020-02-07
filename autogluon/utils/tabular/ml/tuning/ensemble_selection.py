@@ -1,4 +1,4 @@
-import logging
+import logging, time
 import numpy as np
 from collections import Counter
 
@@ -7,6 +7,7 @@ from ...metrics import calculate_score, _ProbaScorer, _ThresholdScorer
 from ..utils import get_pred_from_proba
 
 logger = logging.getLogger(__name__)
+
 
 class EnsembleSelection:
     def __init__(
@@ -35,7 +36,7 @@ class EnsembleSelection:
         else:
             self.objective_func_expects_y_pred = True
 
-    def fit(self, predictions, labels, identifiers=None):
+    def fit(self, predictions, labels, time_limit=None, identifiers=None):
         self.ensemble_size = int(self.ensemble_size)
         if self.ensemble_size < 1:
             raise ValueError('Ensemble size cannot be less than one!')
@@ -44,14 +45,14 @@ class EnsembleSelection:
         # if not isinstance(self.metric, Scorer):
         #     raise ValueError('Metric must be of type scorer')
 
-        self._fit(predictions=predictions, labels=labels)
+        self._fit(predictions=predictions, labels=labels, time_limit=time_limit)
         self._calculate_weights()
         logger.log(15, 'Ensemble weights: ')
         logger.log(15, self.weights_)
         return self
 
     # TODO: Consider having a removal stage, remove each model and see if score is affected, if improves or not effected, remove it.
-    def _fit(self, predictions, labels):
+    def _fit(self, predictions, labels, time_limit=None):
         ensemble_size = self.ensemble_size
         self.num_input_models_ = len(predictions)
         ensemble = []
@@ -71,6 +72,7 @@ class EnsembleSelection:
         #         trajectory.append(ensemble_performance)
         #     ensemble_size -= n_best
 
+        time_start = time.time()
         for i in range(ensemble_size):
             scores = np.zeros((len(predictions)))
             s = len(ensemble)
@@ -114,6 +116,13 @@ class EnsembleSelection:
             # Handle special case
             if len(predictions) == 1:
                 break
+
+            if time_limit is not None:
+                time_elapsed = time.time() - time_start
+                time_left = time_limit - time_elapsed
+                if time_left <= 0:
+                    logger.warning('Warning: Ensemble Selection ran out of time, early stopping at iteration %s. This may mean that the time_limit specified is very small for this problem.' % (i+1))
+                    break
 
         min_score = np.min(trajectory)
         first_index_of_best = trajectory.index(min_score)

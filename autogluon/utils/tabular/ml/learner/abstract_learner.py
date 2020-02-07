@@ -24,7 +24,7 @@ class AbstractLearner:
     save_file_name = 'learner.pkl'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10, 
-                 problem_type=None, objective_func=None, is_trainer_present=False):
+                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
@@ -32,6 +32,7 @@ class AbstractLearner:
         self.problem_type = problem_type
         self.trainer_problem_type = None
         self.objective_func = objective_func
+        self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
@@ -71,7 +72,7 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, as_pandas=False, inverse_transform=True, sample=None):
+    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, inverse_transform=True, sample=None):
         ##########
         # Enable below for local testing # TODO: do we want to keep sample option?
         if sample is not None:
@@ -80,7 +81,7 @@ class AbstractLearner:
         trainer = self.load_trainer()
 
         X_test = self.transform_features(X_test)
-        y_pred_proba = trainer.predict_proba(X_test)
+        y_pred_proba = trainer.predict_proba(X_test, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_pandas:
@@ -93,7 +94,7 @@ class AbstractLearner:
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X_test: DataFrame, model=None, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
@@ -110,7 +111,7 @@ class AbstractLearner:
             X_test_cache_miss = X_test
 
         if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, inverse_transform=False, sample=sample)
+            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False, sample=sample)
             if self.trainer_problem_type is not None:
                 problem_type = self.trainer_problem_type
             else:

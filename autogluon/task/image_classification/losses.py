@@ -3,7 +3,7 @@ import gluoncv
 
 __all__ = ['get_loss_instance']
 
-#TODO(cgraywang): abstract general loss shared across tasks
+#TODO: abstract general loss shared across tasks
 losses = {'SoftmaxCrossEntropyLoss': gluon.loss.SoftmaxCrossEntropyLoss,
           'L2Loss': gluon.loss.L2Loss,
           'L1Loss': gluon.loss.L1Loss,
