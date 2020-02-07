@@ -1,7 +1,7 @@
 # Text Classification - Quick Start
 :label:`sec_textquick`
 
-Note: `TextClassification` is in preview mode and is not feature complete. While the tutorial described below is functional, using `TextClassification` on new datasets is not yet supported. For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.
+Note: `TextClassification` is in preview mode and is not feature complete. While the tutorial described below is functional, using `TextClassification` on custom datasets is not yet supported. For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.
 
 We adopt the task of Text Classification as a running example to illustrate basic usage of AutoGluon’s NLP capability.
 

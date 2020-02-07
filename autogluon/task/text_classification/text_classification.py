@@ -144,7 +144,7 @@ class TextClassification(BaseTask):
         """
 
         logger.warning('Warning: `TextClassification` is in preview mode and is not feature complete. '
-                       'Using `TextClassification` on datasets other than `Stanford Sentiment Treebank` is not yet supported. '
+                       'Using `TextClassification` on custom datasets is not yet supported. '
                        'For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.')
 
         if auto_search:
