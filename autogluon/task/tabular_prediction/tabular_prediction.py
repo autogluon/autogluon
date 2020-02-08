@@ -15,7 +15,7 @@ from ...utils import verbosity2loglevel
 
 __all__ = ['TabularPrediction']
 
-logger = logging.getLogger() # return root logger
+logger = logging.getLogger()  # return root logger
 
 
 class TabularPrediction(BaseTask):
@@ -233,8 +233,13 @@ class TabularPrediction(BaseTask):
             verbosity = 4
         
         logger.setLevel(verbosity2loglevel(verbosity))
-        allowed_kwarg_names = set(['feature_generator_type', 'feature_generator_kwargs', 'trainer_type', 
-                                   'label_count_threshold', 'id_columns'])
+        allowed_kwarg_names = {
+            'feature_generator_type',
+            'feature_generator_kwargs',
+            'trainer_type',
+            'label_count_threshold',
+            'id_columns'
+        }
         kwarg_names = list(kwargs.keys())
         for kwarg_name in kwarg_names:
             if kwarg_name not in allowed_kwarg_names:
@@ -280,7 +285,7 @@ class TabularPrediction(BaseTask):
              }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
-        output_directory = setup_outputdir(output_directory) # Format directory name
+        output_directory = setup_outputdir(output_directory)  # Format directory name
         feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
         feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
@@ -326,29 +331,29 @@ class TabularPrediction(BaseTask):
         # Add visualizer to NN hyperparameters:
         if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
             hyperparameters['NN']['visualizer'] = visualizer
-        if eval_metric is not None and isinstance(eval_metric, str): # convert to function
-                if eval_metric in CLASSIFICATION_METRICS:
-                    if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
-                        raise ValueError("eval_metric=%s can only be used for classification problems" % eval_metric)
-                    eval_metric = CLASSIFICATION_METRICS[eval_metric]
-                elif eval_metric in REGRESSION_METRICS:
-                    if problem_type is not None and problem_type != REGRESSION:
-                        raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
-                    eval_metric = REGRESSION_METRICS[eval_metric]
-                else:
-                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function" % eval_metric)
+        if eval_metric is not None and isinstance(eval_metric, str):  # convert to function
+            if eval_metric in CLASSIFICATION_METRICS:
+                if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
+                    raise ValueError("eval_metric=%s can only be used for classification problems" % eval_metric)
+                eval_metric = CLASSIFICATION_METRICS[eval_metric]
+            elif eval_metric in REGRESSION_METRICS:
+                if problem_type is not None and problem_type != REGRESSION:
+                    raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
+                eval_metric = REGRESSION_METRICS[eval_metric]
+            else:
+                raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function" % eval_metric)
         # TODO: Move below code to a function to avoid inconsistencies between eval_metric and stopping_metric conversion
         if stopping_metric is not None and isinstance(stopping_metric, str): # convert to function
-                if stopping_metric in CLASSIFICATION_METRICS:
-                    if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
-                        raise ValueError("stopping_metric=%s can only be used for classification problems" % stopping_metric)
-                    stopping_metric = CLASSIFICATION_METRICS[stopping_metric]
-                elif stopping_metric in REGRESSION_METRICS:
-                    if problem_type is not None and problem_type != REGRESSION:
-                        raise ValueError("stopping_metric=%s can only be used for regression problems" % stopping_metric)
-                    stopping_metric = REGRESSION_METRICS[stopping_metric]
-                else:
-                    raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own stopping_metric function" % stopping_metric)
+            if stopping_metric in CLASSIFICATION_METRICS:
+                if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
+                    raise ValueError("stopping_metric=%s can only be used for classification problems" % stopping_metric)
+                stopping_metric = CLASSIFICATION_METRICS[stopping_metric]
+            elif stopping_metric in REGRESSION_METRICS:
+                if problem_type is not None and problem_type != REGRESSION:
+                    raise ValueError("stopping_metric=%s can only be used for regression problems" % stopping_metric)
+                stopping_metric = REGRESSION_METRICS[stopping_metric]
+            else:
+                raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own stopping_metric function" % stopping_metric)
 
         # All models use the same scheduler:
         scheduler_options = {
@@ -373,7 +378,7 @@ class TabularPrediction(BaseTask):
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
-                      hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
-                      holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                      hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
+                    hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+                    holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
         return TabularPredictor(learner=learner)
