@@ -240,9 +240,9 @@ class TabularPrediction(BaseTask):
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
-        if type(train_data) == str:
+        if isinstance(train_data,  str):
             train_data = TabularDataset(file_path=train_data)
-        if tuning_data is not None and type(tuning_data) == str:
+        if tuning_data is not None and isinstance(tuning_data, str):
             tuning_data = TabularDataset(file_path=tuning_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
@@ -324,8 +324,7 @@ class TabularPrediction(BaseTask):
             if hyperparameter_tune:
                 holdout_frac = min(0.2, holdout_frac*2)  # We want to allocate more validation data for HPO to avoid overfitting
         # Add visualizer to NN hyperparameters:
-        if ((visualizer is not None) and (visualizer != 'none') and 
-            ('NN' in hyperparameters)):
+        if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
             hyperparameters['NN']['visualizer'] = visualizer
         if eval_metric is not None and isinstance(eval_metric, str): # convert to function
                 if eval_metric in CLASSIFICATION_METRICS:
@@ -350,7 +349,7 @@ class TabularPrediction(BaseTask):
                     stopping_metric = REGRESSION_METRICS[stopping_metric]
                 else:
                     raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own stopping_metric function" % stopping_metric)
-        
+
         # All models use the same scheduler:
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
@@ -371,7 +370,7 @@ class TabularPrediction(BaseTask):
             scheduler_options['searcher'] = 'random'
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
-                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type, 
+                          id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                       hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
