@@ -51,7 +51,7 @@ Now, we fit a classifier using AutoGluon as follows:
 
 ```{.python .input}
 classifier = task.fit(dataset,
-                      epochs=10,
+                      epochs=5,
                       ngpus_per_trial=1,
                       verbose=False)
 ```
@@ -74,6 +74,12 @@ Given an example image, we can easily use the final model to `predict` the label
 # skip this if training FashionMNIST on CPU.
 if ag.get_gpu_count() > 0:
     image = 'data/test/BabyShirt/BabyShirt_323.jpg'
+    ind, prob, _ = classifier.predict(image)
+
+    print('The input picture is classified as [%s], with probability %.2f.' %
+          (dataset.init().classes[ind.asscalar()], prob.asscalar()))
+
+    image = 'data/test/womenchiffontop/womenchiffontop_184.jpg'
     ind, prob, _ = classifier.predict(image)
 
     print('The input picture is classified as [%s], with probability %.2f.' %
