@@ -130,7 +130,7 @@ class Classifier(BasePredictor):
         if isinstance(X, str) and os.path.isfile(X):
             img = mx.image.imread(filename=X)
             if plot:
-                plt.imshow(np.array(img))
+                plt.imshow(img.asnumpy())
                 plt.show()
             img = transform_size(img)
             return predict_img(img)
