@@ -653,12 +653,12 @@ class AbstractTrainer:
                 X = model.preprocess(X)
         return X
 
-    def score(self, X, y):
+    def score(self, X, y, model=None):
         if self.objective_func_expects_y_pred:
-            y_pred_ensemble = self.predict(X=X)
+            y_pred_ensemble = self.predict(X=X, model=model)
             return self.objective_func(y, y_pred_ensemble)
         else:
-            y_pred_proba_ensemble = self.predict_proba(X=X)
+            y_pred_proba_ensemble = self.predict_proba(X=X, model=model)
             return self.objective_func(y, y_pred_proba_ensemble)
 
     def score_with_y_pred_proba(self, y, y_pred_proba):
