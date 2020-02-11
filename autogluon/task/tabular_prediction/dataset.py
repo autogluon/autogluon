@@ -1,7 +1,9 @@
 import warnings
+
 import pandas as pd
 
 from ...utils import warning_filter
+
 with warning_filter():
     from ...utils.tabular.utils.loaders import load_pd
 
@@ -52,39 +54,39 @@ class TabularDataset(pd.DataFrame):
     >>> train_data.head(30)
     >>> train_data.columns
     """
-    
-    _metadata = ['name', 'file_path', 'feature_types', 'subsample'] # preserved properties that will be copied to a new instance of TabularDataset
-    
+
+    _metadata = ['name', 'file_path', 'feature_types', 'subsample']  # preserved properties that will be copied to a new instance of TabularDataset
+
     @property
     def _constructor(self):
         return TabularDataset
-    
+
     @property
     def _constructor_sliced(self):
         return pd.Series
-    
+
     def __init__(self, *args, **kwargs):
         file_path = kwargs.get('file_path', None)
         name = kwargs.get('name', None)
         feature_types = kwargs.get('feature_types', None)
         df = kwargs.get('df', None)
         subsample = kwargs.get('subsample', None)
-        construct_from_df = False # whether or not we are constructing new dataset object from scratch based on provided DataFrame.
+        construct_from_df = False  # whether or not we are constructing new dataset object from scratch based on provided DataFrame.
         # if df is None and file_path is None: # Cannot be used currently!
         #     raise ValueError("Must specify either named argument 'file_path' or 'df' in order to construct tabular Dataset")
-        if df is not None: # Create Dataset from existing Python DataFrame:
+        if df is not None:  # Create Dataset from existing Python DataFrame:
             construct_from_df = True
-            if type(df) != pd.DataFrame:
+            if not isinstance(df, pd.DataFrame):
                 raise ValueError("'df' must be existing pandas DataFrame. To read dataset from file instead, use 'file_path' string argument.")
             if file_path is not None:
                 warnings.warn("Both 'df' and 'file_path' supplied. Creating dataset based on DataFrame 'df' rather than reading from file_path.")
             df = df.copy(deep=True)
-        elif file_path is not None: # Read from file to create dataset
+        elif file_path is not None:  # Read from file to create dataset
             construct_from_df = True
             df = load_pd.load(file_path)
-        if construct_from_df: # Construct new Dataset object based off of DataFrame
+        if construct_from_df:  # Construct new Dataset object based off of DataFrame
             if subsample is not None:
-                if type(subsample) != int or subsample <= 1:
+                if not isinstance(subsample, int) or subsample <= 1:
                     raise ValueError("'subsample' must be of type int and > 1")
                 df = df.head(subsample)
             super().__init__(df)
