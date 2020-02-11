@@ -191,23 +191,27 @@ class AbstractLearner:
         pred_times_full = {}
         pred_time_offset = 0
         pred_probas = None
+        stack_names = list(trainer.models_level.keys())
+        stack_names_not_core = [name for name in stack_names if name != 'core']
+
         for level in range(max_level_to_check+1):
             X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
 
-            model_names_aux = trainer.models_level['aux1'][level]
-            if len(model_names_aux) > 0:
-                pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
-                for i, model_name in enumerate(model_names_aux):
-                    pred_proba = pred_probas_auxiliary[i]
-                    pred_times[model_name] = pred_probas_time_auxiliary[i]
-                    pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
-                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
-                    if trainer.objective_func_expects_y_pred:
-                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                        scores[model_name] = self.objective_func(y, pred)
-                    else:
-                        scores[model_name] = self.objective_func(y, pred_proba)
+            for stack_name in stack_names_not_core:
+                model_names_aux = trainer.models_level[stack_name][level]
+                if len(model_names_aux) > 0:
+                    pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
+                    for i, model_name in enumerate(model_names_aux):
+                        pred_proba = pred_probas_auxiliary[i]
+                        pred_times[model_name] = pred_probas_time_auxiliary[i]
+                        pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
+                        if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                            pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+                        if trainer.objective_func_expects_y_pred:
+                            pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
+                            scores[model_name] = self.objective_func(y, pred)
+                        else:
+                            scores[model_name] = self.objective_func(y, pred_proba)
 
             model_names_core = trainer.models_level['core'][level]
             if len(model_names_core) > 0:
