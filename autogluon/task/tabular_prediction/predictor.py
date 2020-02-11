@@ -97,11 +97,7 @@ class TabularPredictor(BasePredictor):
             Array of predictions, one corresponding to each row in given dataset. Either numpy Ndarray or pandas Series depending on `as_pandas` argument.
 
         """
-        if isinstance(dataset, str):
-            dataset = TabularDataset(file_path=dataset)
-        if isinstance(dataset, pd.Series):
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+        dataset = self.__get_dataset(dataset)
         return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
 
     def predict_proba(self, dataset, model=None, as_pandas=False):
@@ -124,11 +120,7 @@ class TabularPredictor(BasePredictor):
             Array of predicted class-probabilities, corresponding to each row in the given dataset. 
             May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
         """
-        if isinstance(dataset, str):
-            dataset = TabularDataset(file_path=dataset)
-        if isinstance(dataset, pd.Series):
-            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
-                To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+        dataset = self.__get_dataset(dataset)
         return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas)
 
     def evaluate(self, dataset, silent=False):
@@ -149,8 +141,7 @@ class TabularPredictor(BasePredictor):
             -------
             Predictive performance value on the given dataset, based on the `eval_metric` used by this Predictor.
         """
-        if isinstance(dataset, str):
-            dataset = TabularDataset(file_path=dataset)
+        dataset = self.__get_dataset(dataset)
         perf = self._learner.score(dataset)
         sign = self._learner.objective_func._sign
         perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
@@ -202,8 +193,7 @@ class TabularPredictor(BasePredictor):
             -------
             Pandas `pandas.DataFrame` of model performance summary information.
         """
-        if isinstance(dataset, str):
-            dataset = TabularDataset(file_path=dataset)
+        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         return self._learner.leaderboard(X=dataset, silent=silent)
 
     def fit_summary(self, verbosity=3):
@@ -224,13 +214,13 @@ class TabularPredictor(BasePredictor):
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
-        unique_model_types = set(model_typenames.values()) # no more class info
+        unique_model_types = set(model_typenames.values())  # no more class info
         # all fit() information that is returned:
         results = {
-            'model_types': model_typenames, # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self.model_performance, # dict with key = model-name, value = validation performance
-            'model_best': self._trainer.model_best, # the name of the best model (on validation data)
-            'model_paths': self._trainer.model_paths, # dict with key = model-name, value = path to model file
+            'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
+            'model_performance': self.model_performance,  # dict with key = model-name, value = validation performance
+            'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
+            'model_paths': self._trainer.model_paths,  # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.model_fit_times,
             'model_pred_times': self._trainer.model_pred_times,
             'num_bagging_folds': self._trainer.kfolds,
@@ -279,13 +269,13 @@ class TabularPredictor(BasePredictor):
                 for model_type in results['hpo_results']:
                     plot_summary_of_models(
                         results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type+"_HPOmodelsummary.html",
+                        output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
                         plot_title=f"Models produced during {model_type} HPO")
                     plot_performance_vs_trials(
                         results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type+"_HPOperformanceVStrials.png",
+                        output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
                         plot_title=f"HPO trials for {model_type} models")
-        if verbosity > 2: # print detailed information
+        if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
                 print("*** Details of Hyperparameter optimization ***")
@@ -328,11 +318,11 @@ class TabularPredictor(BasePredictor):
         -------
         :class:`TabularPredictor` object
         """
-        logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (may be in new Python session)
+        logger.setLevel(verbosity2loglevel(verbosity))  # Reset logging after load (may be in new Python session)
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
 
-        output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
+        output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
         return cls(learner=learner)
 
@@ -348,3 +338,17 @@ class TabularPredictor(BasePredictor):
     def _summarize(key, msg, results):
         if key in results:
             print(msg + ": " + str(results[key]))
+
+    @staticmethod
+    def __get_dataset(dataset):
+        if isinstance(dataset, TabularDataset):
+            return dataset
+        if isinstance(dataset, str):
+            return TabularDataset(file_path=dataset)
+        if isinstance(dataset, pd.DataFrame):
+            return TabularDataset(df=dataset)
+        if isinstance(dataset, pd.Series):
+            raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
+                   To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
+        else:
+            raise TypeError("dataset must be TabularDataset or pandas.DataFrame or str file path to dataset")
