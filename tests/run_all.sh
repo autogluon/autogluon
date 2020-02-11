@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+#set -e
 FILES=./tests/unittests/*.py
 for f in $FILES
 do
