@@ -11,7 +11,6 @@ from ...utils.savers import save_pkl
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from ..utils import get_pred_from_proba, dd_list, generate_train_test_split
 from ..models.abstract.abstract_model import AbstractModel
-from ..tuning.feature_pruner import FeaturePruner
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
@@ -650,13 +649,7 @@ class AbstractTrainer:
             return self.objective_func(y, y_pred_proba)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
-        feature_pruner = FeaturePruner(model_base=model_base)
-        X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
-        feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=y_holdout)
-        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
-        logger.debug(str(features_to_keep))
-        model_base.features = features_to_keep
-        # autotune.evaluate()
+        model_base.feature_prune(X_train, X_holdout, y_train, y_holdout)
 
     def pred_proba_predictions(self, models, X_test):
         preds = []
