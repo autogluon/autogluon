@@ -363,6 +363,7 @@ class TabularNeuralNetModel(AbstractModel):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
+        self.params_trained['num_epochs'] = best_val_epoch
         return
 
     def evaluate_metric(self, dataset, mx_metric=None):

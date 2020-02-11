@@ -89,6 +89,7 @@ class AbstractModel:
         if hyperparameters is not None:
             self.params.update(hyperparameters.copy())
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+        self.params_trained = dict()
 
     # Checks if model is ready to make predictions for final result
     def is_valid(self):

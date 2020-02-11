@@ -118,6 +118,7 @@ class LGBModel(AbstractModel):
         # Train lgbm model:
         self.model = lgb.train(**train_params)
         self.best_iteration = self.model.best_iteration
+        self.params_trained['num_boost_round'] = self.model.best_iteration
 
     def predict_proba(self, X, preprocess=True):
         if preprocess:
