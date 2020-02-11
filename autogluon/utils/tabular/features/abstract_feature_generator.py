@@ -375,7 +375,7 @@ class AbstractFeatureGenerator:
             rank = rank[rank >= 3]
             rank = rank.reset_index()
             val_list = list(rank['index'].values)
-            if len(val_list) == 1:
+            if len(val_list) <= 1:
                 self.features_to_remove_post.append(column)
                 self.features_categorical_final = [feature for feature in self.features_categorical_final if feature != column]
                 logger.debug('Dropping '+str(column))
