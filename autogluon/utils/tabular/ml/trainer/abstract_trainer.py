@@ -527,7 +527,7 @@ class AbstractTrainer:
         else:
             self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, time_limit=time_limit_aux)
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, hyperparameter_tune=False, feature_prune=False, time_limit=None):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', hyperparameter_tune=False, feature_prune=False, time_limit=None):
         use_orig_features = True
         if models is None:
             models = self.get_models(self.hyperparameters, level=level)
@@ -551,7 +551,7 @@ class AbstractTrainer:
         if X_test is not None:
             X_test = self.get_inputs_to_stacker(X_test, level_start=0, level_end=level, fit=False)
 
-        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, time_limit=time_limit)
+        self.train_multi(X_train=X_train_init, y_train=y, X_test=X_test, y_test=y_test, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, stack_name=stack_name, time_limit=time_limit)
 
     def stack_new_level_aux(self, X, y, level, fit=True, time_limit=None):
         stack_name = 'aux1'
