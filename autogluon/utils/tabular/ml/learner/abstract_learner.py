@@ -153,7 +153,7 @@ class AbstractLearner:
             X = feature_generator.transform(X)
         return X
 
-    def score(self, X: DataFrame, y=None):
+    def score(self, X: DataFrame, y=None, model=None):
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -162,14 +162,14 @@ class AbstractLearner:
         if self.problem_type == MULTICLASS:
             y = y.fillna(-1)
             if trainer.objective_func_expects_y_pred:
-                return trainer.score(X=X, y=y)
+                return trainer.score(X=X, y=y, model=model)
             else:
                 # Log loss
                 if -1 in y.unique():
                     raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
-                return trainer.score(X=X, y=y)
+                return trainer.score(X=X, y=y, model=model)
         else:
-            return trainer.score(X=X, y=y)
+            return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, silent=False):
