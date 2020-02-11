@@ -143,6 +143,19 @@ class AbstractLearner:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
 
+    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
+    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
+    def distill(self, X=None, y=None):
+        if X is not None:
+            if y is None:
+                X, y = self.extract_label(X)
+            X = self.transform_features(X)
+            y = self.label_cleaner.transform(y)
+        else:
+            y = None
+        trainer = self.load_trainer()
+        trainer.distill(X=X, y=y)
+
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)

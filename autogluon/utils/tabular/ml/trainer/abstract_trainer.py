@@ -16,6 +16,7 @@ from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
+from ..trainer.model_presets.presets_distill import get_preset_models_distillation
 
 logger = logging.getLogger(__name__)
 
@@ -697,6 +698,30 @@ class AbstractTrainer:
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
+
+    def distill(self, X=None, y=None):
+        if X is None:
+            X = self.load_X_train()
+        if y is None:
+            y = self.load_y_train()
+
+        model_best = self.load_model(self.model_best)
+        if self.problem_type == MULTICLASS:
+            raise NotImplementedError
+        if not self.bagged_mode:
+            raise NotImplementedError
+        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, num_classes=self.num_classes, hyperparameters=self.hyperparameters)
+        y_distill = pd.Series(model_best.oof_pred_proba)
+        # X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=REGRESSION, test_size=0.1)  # TODO: Do stratified for binary/multiclass!
+        # self.bagged_mode = False
+        # self.stack_new_level_core(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models_distill, level=0, stack_name='distill', hyperparameter_tune=False, feature_prune=False)
+        # self.bagged_mode = True
+
+        self.stack_new_level_core(X=X, y=y_distill, models=models_distill, level=0, stack_name='distilled', hyperparameter_tune=False, feature_prune=False)
+
+        # TODO: Compress distilled models bagged -> _FULL
+
+        self.save()
 
     def save_model(self, model):
         if self.low_memory:
