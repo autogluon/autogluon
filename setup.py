@@ -67,6 +67,7 @@ requirements = [
     'lightgbm==2.3.0',
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0',
+    'pynvml>=8.0.4',
     'scikit-learn==0.21.2',
 ]
 
