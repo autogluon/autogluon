@@ -1,5 +1,8 @@
 import copy, logging, time
 import numpy as np
+import pandas as pd
+from statistics import mean
+from collections import Counter
 
 from ..abstract.abstract_model import AbstractModel
 from ...utils import generate_kfold
@@ -65,6 +68,8 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
     def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
+        if k_fold < 1:
+            k_fold = 1
         if n_repeat_start != self._n_repeats_finished:
             raise ValueError('n_repeat_start must equal self._n_repeats_finished, values: (' + str(n_repeat_start) + ', ' + str(self._n_repeats_finished) + ')')
         if n_repeats <= n_repeat_start:
@@ -91,6 +96,27 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             stratified = True
 
+        model_base = self._get_model_base()
+        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+
+        if k_fold == 1:
+            if self._n_repeats != 0:
+                raise ValueError('n_repeats must equal 0 when fitting a single model with k_fold < 2, values: (%s, %s)' % (self._n_repeats, k_fold))
+            self.model_base = None
+            model_base.set_contexts(path_context=self.path + model_base.name + '/')
+            model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
+            self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
+            self._oof_pred_model_repeats = np.ones(shape=len(X))
+            self._n_repeats = 1
+            self._n_repeats_finished = 1
+            self.bagged_mode = False
+            if self.low_memory:
+                self.save_child(model_base, verbose=False)
+                self.models = [model_base.name]
+            else:
+                self.models = [model_base]
+            return
+
         # TODO: Preprocess data here instead of repeatedly
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=n_repeats)
 
@@ -99,12 +125,6 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             oof_pred_proba = np.zeros(shape=len(X))
         oof_pred_model_repeats = np.zeros(shape=len(X))
-
-        if self.model_base is None:
-            model_base = self.load_model_base()
-        else:
-            model_base = self.model_base
-        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
 
         models = []
         time_limit_fold = None
@@ -158,6 +178,7 @@ class BaggedEnsembleModel(AbstractModel):
                 oof_pred_model_repeats[test_index] += 1
         self.models += models
 
+        self.bagged_mode = True
         if self.model_base is not None:
             self.save_model_base(self.model_base)
             self.model_base = None
@@ -211,6 +232,54 @@ class BaggedEnsembleModel(AbstractModel):
         child = self.load_child(model)
         child.path = self.create_contexts(self.path + child.name + '/')
         child.save(verbose=verbose)
+
+    # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
+    # Trains a single model on all of the data, averaging the hyperparameters of all the bagged models (such as epochs trained)
+    # Generally expected to have lower accuracy but faster inference time
+    def compress(self, X, y):
+        model_compressed = self.convert_to_compressed_template()
+        model_compressed.fit(X_train=X, Y_train=y)  # TODO: This only works for stacker, not for bagged
+        return model_compressed
+
+    def convert_to_compressed_template(self):
+        compressed_params = self._get_compressed_params()
+        model_compressed = copy.deepcopy(self._get_model_base())
+        model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+        model_compressed.params = compressed_params
+        model_compressed.name = model_compressed.name + '_C'
+        model_compressed.path = model_compressed.create_contexts(self.path + model_compressed.name + '/')
+        return model_compressed
+
+    def _get_compressed_params(self):
+        model_params_compressed = dict()
+        model_params_list = []
+        for child in self.models:
+            model_params = self.load_child(child).get_trained_params()
+            model_params_list.append(model_params)
+        for param in model_params_list[0].keys():
+            model_param_vals = [model_params[param] for model_params in model_params_list]
+            if all(isinstance(val, bool) for val in model_param_vals):
+                counter = Counter(model_param_vals)
+                compressed_val = counter.most_common(1)[0][0]
+            elif all(isinstance(val, int) for val in model_param_vals):
+                compressed_val = round(mean(model_param_vals))
+            elif all(isinstance(val, float) for val in model_param_vals):
+                compressed_val = mean(model_param_vals)
+            else:
+                try:
+                    counter = Counter(model_param_vals)
+                    compressed_val = counter.most_common(1)[0][0]
+                except TypeError:
+                    compressed_val = model_param_vals[0]
+            model_params_compressed[param] = compressed_val
+        return model_params_compressed
+
+    def _get_model_base(self):
+        if self.model_base is None:
+            model_base = self.load_model_base()
+        else:
+            model_base = self.model_base
+        return model_base
 
     @classmethod
     def load(cls, path, file_prefix="", reset_paths=False, low_memory=True, verbose=True):
