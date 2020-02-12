@@ -19,17 +19,17 @@ logger = logging.getLogger()  # return root logger
 
 
 class TabularPrediction(BaseTask):
-    """ 
+    """
     AutoGluon Task for predicting values in column of tabular dataset (classification or regression)
     """
-    
+
     Predictor = TabularPredictor
-    
+
     @staticmethod
     def load(output_directory, verbosity=2):
-        """ 
+        """
         Load a predictor object previously produced by `fit()` from file and returns this object.
-        
+
         Parameters
         ----------
         output_directory : str
@@ -37,9 +37,9 @@ class TabularPrediction(BaseTask):
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information will be printed by the loaded `Predictor`.
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`, 
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where L ranges from 0 to 50 (Note: higher values L correspond to fewer print statements, opposite of verbosity levels)
-        
+
         Returns
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object that can be used to make predictions.
@@ -47,11 +47,11 @@ class TabularPrediction(BaseTask):
         logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
         if output_directory is None:
             raise ValueError("output_directory cannot be None in load()")
-        
+
         output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
         return TabularPredictor(learner=learner)
-    
+
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
             hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None,
@@ -62,7 +62,7 @@ class TabularPrediction(BaseTask):
             verbosity=2, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
-        
+
         Parameters
         ----------
         train_data : str or :class:`pandas.DataFrame`
@@ -73,21 +73,21 @@ class TabularPrediction(BaseTask):
         tuning_data : str or :class:`pandas.DataFrame`, default = None
             Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
             If str is passed, `tuning_data` will be loaded using the str value as the file path.
-            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here! 
+            Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
-            If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`. 
+            If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
         output_directory : str
             Path to directory where models and intermediate outputs should be saved.
-            If unspecified, a time-stamped folder called "autogluon-fit-[TIMESTAMP]" will be created in the working directory to store all models. 
-            Note: To call `fit()` twice and save all results of each fit, you must specify different `output_directory` locations. 
-            Otherwise files from first `fit()` will be overwritten by second `fit()`. 
+            If unspecified, a time-stamped folder called "autogluon-fit-[TIMESTAMP]" will be created in the working directory to store all models.
+            Note: To call `fit()` twice and save all results of each fit, you must specify different `output_directory` locations.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
         problem_type : str, default = None
-            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression'). 
-            If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset. 
+            Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
+            If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
         eval_metric : function or str, default = None
             Metric by which predictions will be ultimately evaluated on test data.
-            AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data. 
-            
+            AutoGluon tunes factors such as hyperparameters, early-stopping, ensemble-weights, etc. in order to improve this metric on validation data.
+
             If `eval_metric = None`, it is automatically chosen based on `problem_type`.
             Defaults to 'accuracy' for binary and multiclass classification and 'root_mean_squared_error' for regression.
             Otherwise, options for classification: [
@@ -95,8 +95,8 @@ class TabularPrediction(BaseTask):
                 'roc_auc', 'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted',
                 'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'log_loss', 'pac_score'].
             Options for regression: ['root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'median_absolute_error', 'r2'].
-            For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics   
-            
+            For more information on these options, see `sklearn.metrics`: https://scikit-learn.org/stable/modules/classes.html#sklearn-metrics-metrics
+
             You can also pass your own evaluation function here as long as it follows formatting of the functions defined in `autogluon/utils/tabular/metrics/`.
         stopping_metric : function or str, default = None
             Metric which models use to early stop to avoid overfitting.
@@ -115,16 +115,16 @@ class TabularPrediction(BaseTask):
         hyperparameters : dict
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
-                If certain key is missing from hyperparameters, then `fit()` will not train any models of that type. 
+                If certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
                 For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
-            Values = dict of hyperparameter settings for each model type. 
-                Each hyperparameter can either be single fixed value or a search space containing many possible values. 
-                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`). 
-                Caution: Any provided search spaces will be overriden by fixed defauls if `hyperparameter_tune = False`. 
-            
+            Values = dict of hyperparameter settings for each model type.
+                Each hyperparameter can either be single fixed value or a search space containing many possible values.
+                Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
+                Caution: Any provided search spaces will be overriden by fixed defauls if `hyperparameter_tune = False`.
+
             Note: `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
             If `hyperparameter_tune = False`, then these additional models will also be trained using custom pre-specified hyperparameter settings that are known to work well.
-            
+
             Details regarding the hyperparameters you can specify for each model are provided in the following files:
                 NN: `autogluon/utils/tabular/ml/models/tabular_nn/hyperparameters/parameters.py`
                     Note: certain hyperparameter settings may cause these neural networks to train much slower.
@@ -143,7 +143,7 @@ class TabularPrediction(BaseTask):
                     Note: 'weights' parameter will be overriden. Both 'distance' and 'uniform' are used automatically, training two models.
 
         holdout_frac : float
-            Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
+            Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
             Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
             Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
             Disabled if `num_bagging_folds >= 2`.
@@ -159,8 +159,8 @@ class TabularPrediction(BaseTask):
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
             Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
         stack_ensemble_levels : int, default = 0
-            Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
-            Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
+            Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
+            Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
         enable_fit_continuation : bool, default = False
             Whether the predictor returned by this `fit()` call should be able to be further trained via another future `fit()` call.
@@ -169,19 +169,19 @@ class TabularPrediction(BaseTask):
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
         num_trials : int
-            Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
-            If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent. 
+            Maximal number of different hyperparameter settings of each model type to evaluate during HPO.
+            If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
         search_strategy : str
-            Which hyperparameter search algorithm to use. 
+            Which hyperparameter search algorithm to use.
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
+            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
             This is automatically determined by AutoGluon when left as None.
         ngpus_per_trial : int
-            How many GPUs to use in each trial (ie. single training run of a model). 
-            This is automatically determined by AutoGluon when left as None. 
+            How many GPUs to use in each trial (ie. single training run of a model).
+            This is automatically determined by AutoGluon when left as None.
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         visualizer : str
@@ -189,30 +189,30 @@ class TabularPrediction(BaseTask):
         verbosity: int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
-            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`, 
+            If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-        
+
         Kwargs can include addtional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
                 A `FeatureGenerator` class specifying which feature engineering protocol to follow
                 (see autogluon.utils.tabular.features.abstract_feature_generator.AbstractFeatureGenerator).
-                Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class. 
+                Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
             feature_generator_kwargs : dict, default={}
                 Keyword arguments to pass into the `FeatureGenerator` constructor.
             trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheritng from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models. 
-                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session. 
+                A class inheritng from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
             label_count_threshold : int, default = 10
-                For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class. 
-                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them). 
+                For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
+                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
             id_columns : list, default = []
-                Banned subset of column names that model may not use as predictive features (e.g. contains label, user-ID, etc). 
+                Banned subset of column names that model may not use as predictive features (e.g. contains label, user-ID, etc).
                 These columns are ignored during `fit()`, but DataFrame of just these columns with appended predictions may be produced, for example to submit in a ML competition.
-        
+
         Returns
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
-        
+
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
@@ -231,7 +231,7 @@ class TabularPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
-        
+
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
             'feature_generator_type',
@@ -246,9 +246,9 @@ class TabularPrediction(BaseTask):
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
         if isinstance(train_data,  str):
-            train_data = TabularDataset(file_path=train_data)
+            train_data = pd.read_csv(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = TabularDataset(file_path=tuning_data)
+            tuning_data = pd.read_csv(tuning_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
