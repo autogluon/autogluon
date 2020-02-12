@@ -1,17 +1,19 @@
-import copy, logging, math
+import copy
+import logging
+import math
+
 import numpy as np
 
 from .dataset import TabularDataset
 from .predictor import TabularPredictor
 from ..base import BaseTask
 from ..base.base_task import schedulers
+from ...utils import verbosity2loglevel
+from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
+from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
-from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
-from ...utils.tabular.metrics import CLASSIFICATION_METRICS, REGRESSION_METRICS
-from ...utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from ...utils import verbosity2loglevel
 
 __all__ = ['TabularPrediction']
 
@@ -240,8 +242,7 @@ class TabularPrediction(BaseTask):
             'label_count_threshold',
             'id_columns'
         }
-        kwarg_names = list(kwargs.keys())
-        for kwarg_name in kwarg_names:
+        for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
@@ -314,46 +315,31 @@ class TabularPrediction(BaseTask):
 
         time_limits_orig = copy.deepcopy(time_limits)
         time_limits_hpo = copy.deepcopy(time_limits)
+
         if num_bagging_folds >= 2 and (time_limits_hpo is not None):
             time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
+
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):
             hyperparameter_tune = False
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
+
         if holdout_frac is None:
             # Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples
             if num_train_rows < 5000:
                 holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
             else:
                 holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
+
             if hyperparameter_tune:
-                holdout_frac = min(0.2, holdout_frac*2)  # We want to allocate more validation data for HPO to avoid overfitting
+                holdout_frac = min(0.2, holdout_frac * 2)  # We want to allocate more validation data for HPO to avoid overfitting
+
         # Add visualizer to NN hyperparameters:
         if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
             hyperparameters['NN']['visualizer'] = visualizer
-        if eval_metric is not None and isinstance(eval_metric, str):  # convert to function
-            if eval_metric in CLASSIFICATION_METRICS:
-                if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
-                    raise ValueError("eval_metric=%s can only be used for classification problems" % eval_metric)
-                eval_metric = CLASSIFICATION_METRICS[eval_metric]
-            elif eval_metric in REGRESSION_METRICS:
-                if problem_type is not None and problem_type != REGRESSION:
-                    raise ValueError("eval_metric=%s can only be used for regression problems" % eval_metric)
-                eval_metric = REGRESSION_METRICS[eval_metric]
-            else:
-                raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own eval_metric function" % eval_metric)
-        # TODO: Move below code to a function to avoid inconsistencies between eval_metric and stopping_metric conversion
-        if stopping_metric is not None and isinstance(stopping_metric, str): # convert to function
-            if stopping_metric in CLASSIFICATION_METRICS:
-                if problem_type is not None and problem_type not in [BINARY, MULTICLASS]:
-                    raise ValueError("stopping_metric=%s can only be used for classification problems" % stopping_metric)
-                stopping_metric = CLASSIFICATION_METRICS[stopping_metric]
-            elif stopping_metric in REGRESSION_METRICS:
-                if problem_type is not None and problem_type != REGRESSION:
-                    raise ValueError("stopping_metric=%s can only be used for regression problems" % stopping_metric)
-                stopping_metric = REGRESSION_METRICS[stopping_metric]
-            else:
-                raise ValueError("%s is unknown metric, see utils/tabular/metrics/ for available options or how to define your own stopping_metric function" % stopping_metric)
+
+        eval_metric = get_metric(eval_metric, problem_type, 'eval_metric')
+        stopping_metric = get_metric(stopping_metric, problem_type, 'stopping_metric')
 
         # All models use the same scheduler:
         scheduler_options = {
