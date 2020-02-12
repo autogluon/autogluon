@@ -1,4 +1,4 @@
-import logging, time, pickle, os
+import logging, time, pickle, os, copy
 import numpy as np
 import pandas as pd
 
@@ -55,7 +55,7 @@ class AbstractModel:
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values)
         """
         self.name = name
-        self.path = self.create_contexts(path + name + '/')
+        self.path = self.create_contexts(path + name + '/')  # TODO: Keep original path, make this path a function for consistency.
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func  # Note: we require higher values = better performance
@@ -269,10 +269,31 @@ class AbstractModel:
         if self.params is not None:
             self.params.update(def_search_space)
 
+    # Hyperparameters of trained model
+    def get_trained_params(self):
+        trained_params = self.params.copy()
+        trained_params.update(self.params_trained)
+        return trained_params
+
+    # TODO: currently inplace and destructive. This won't work well for in-memory models.
+    #  Problem with not inplace -> 2x memory usage, try to avoid somehow
     # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
+        model = self.model
         self.model = None
-        return self
+        template = copy.deepcopy(self)
+        template.params_trained = dict()
+        self.model = model
+        return template
+
+    # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
+    def convert_to_compressed_template(self):
+        params_trained = self.params_trained.copy()
+        template = self.convert_to_template()
+        template.params.update(params_trained)
+        template.name = template.name + '_compressed'
+        template.path = template.create_contexts(self.path + template.name + '/')
+        return template
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
