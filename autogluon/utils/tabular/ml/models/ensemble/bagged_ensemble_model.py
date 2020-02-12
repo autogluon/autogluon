@@ -23,8 +23,10 @@ class BaggedEnsembleModel(AbstractModel):
         self._n_repeats_finished = 0  # Number of n_repeats finished, if kfold=5 and 8 models have been fit, _n_repeats_finished is 1
         self._k_fold_end = 0  # Number of models fit in current n_repeat (0 if completed), if kfold=5 and 8 models have been fit, _k_fold_end is 3
         self._k = None  # k models per n_repeat, equivalent to kfold value
+        self._k_per_n_repeat = []  # k-fold used for each n_repeat. == [5, 10, 3] if first kfold was 5, second was 10, and third was 3
         self._random_state = random_state
         self.low_memory = True
+        self.bagged_mode = None
         try:
             feature_types_metadata = self.model_base.feature_types_metadata
         except:
@@ -107,47 +109,53 @@ class BaggedEnsembleModel(AbstractModel):
         models = []
         time_limit_fold = None
         folds_to_fit = fold_end - fold_start
-        for i in range(fold_start, fold_end):
-            folds_finished = i - fold_start
-            folds_left = fold_end - i
-            fold = kfolds[i]
-            time_elapsed = time.time() - start_time
-            if time_limit is not None:
-                time_left = time_limit - time_elapsed
-                required_time_per_fold = time_left / folds_left
-                time_limit_fold = required_time_per_fold * 0.8
-                if folds_finished > 0:
-                    expected_time_required = time_elapsed * folds_to_fit / folds_finished
-                    expected_remaining_time_required = expected_time_required * folds_left / folds_to_fit
-                    if expected_remaining_time_required > time_left:
-                        raise TimeLimitExceeded
-                if time_left <= 0:
-                    raise TimeLimitExceeded
-
-            train_index, test_index = fold
-            X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
-            y_train, y_test = y.iloc[train_index], y.iloc[test_index]
-            fold_model = copy.deepcopy(model_base)
-            fold_model.name = fold_model.name + '_fold_' + str(i)
-            fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
-            fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
-            if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
-                if i != (fold_end-1):
-                    time_elapsed = time.time() - start_time
+        for j in range(n_repeat_start, n_repeats):  # For each n_repeat
+            cur_repeat_count = j - n_repeat_start
+            fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
+            fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
+            is_training_from_start = fold_end_n_repeat - fold_start_n_repeat == k_fold
+            if is_training_from_start:
+                self._k_per_n_repeat.append(k_fold)
+            for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
+                folds_finished = i - fold_start
+                folds_left = fold_end - i
+                fold = kfolds[i]
+                time_elapsed = time.time() - start_time
+                if time_limit is not None:
                     time_left = time_limit - time_elapsed
-                    expected_time_required = time_elapsed * folds_to_fit / (folds_finished+1)
-                    expected_remaining_time_required = expected_time_required * (folds_left-1) / folds_to_fit
-                    if expected_remaining_time_required > time_left:
+                    required_time_per_fold = time_left / folds_left
+                    time_limit_fold = required_time_per_fold * 0.8
+                    if folds_finished > 0:
+                        expected_time_required = time_elapsed * folds_to_fit / folds_finished
+                        expected_remaining_time_required = expected_time_required * folds_left / folds_to_fit
+                        if expected_remaining_time_required > time_left:
+                            raise TimeLimitExceeded
+                    if time_left <= 0:
                         raise TimeLimitExceeded
-            pred_proba = fold_model.predict_proba(X_test)
-            if self.low_memory:
-                self.save_child(fold_model, verbose=False)
-                models.append(fold_model.name)
-            else:
-                models.append(fold_model)
-            oof_pred_proba[test_index] += pred_proba
-            oof_pred_model_repeats[test_index] += 1
 
+                train_index, test_index = fold
+                X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
+                y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                fold_model = copy.deepcopy(model_base)
+                fold_model.name = fold_model.name + '_fold_' + str(i)
+                fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
+                fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
+                if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
+                    if i != (fold_end-1):
+                        time_elapsed = time.time() - start_time
+                        time_left = time_limit - time_elapsed
+                        expected_time_required = time_elapsed * folds_to_fit / (folds_finished+1)
+                        expected_remaining_time_required = expected_time_required * (folds_left-1) / folds_to_fit
+                        if expected_remaining_time_required > time_left:
+                            raise TimeLimitExceeded
+                pred_proba = fold_model.predict_proba(X_test)
+                if self.low_memory:
+                    self.save_child(fold_model, verbose=False)
+                    models.append(fold_model.name)
+                else:
+                    models.append(fold_model)
+                oof_pred_proba[test_index] += pred_proba
+                oof_pred_model_repeats[test_index] += 1
         self.models += models
 
         if self.model_base is not None:
