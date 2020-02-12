@@ -1,5 +1,5 @@
+import logging
 import re
-import time
 
 import numpy as np
 from pandas import DataFrame
@@ -12,6 +12,8 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer
 from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, get_one_hot_features, NumericDataPreprocessor
+
+logger = logging.getLogger(__name__)
 
 
 class LRModel(AbstractModel):
@@ -72,6 +74,8 @@ class LRModel(AbstractModel):
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000):
         X = X.copy()
         feature_types = self._get_types_of_features(X)
+        logger.log(15, "Applying model-specific pre-processing")
+        logger.log(15, " - input shape %s" % str(X.shape))
         if is_train:
             transformer_list = []
 
@@ -87,7 +91,7 @@ class LRModel(AbstractModel):
                 pipeline = Pipeline(steps=[
                     ('generator', OheFeaturesGenerator(cats_cols=feature_types['onehot'])),
                 ])
-                # transformer_list.append(('cats', pipeline))
+                transformer_list.append(('cats', pipeline))
 
             if len(feature_types['continuous']) > 0:
                 pipeline = Pipeline(steps=[
@@ -106,17 +110,21 @@ class LRModel(AbstractModel):
                 transformer_list.append(('skew', pipeline))
 
             self.pipeline = FeatureUnion(transformer_list=transformer_list)
+            logger.log(15, " - fitting pre-processing pipeline")
             self.pipeline.fit(X)
 
+        logger.log(15, " - transforming inputs using pre-processing pipeline")
         X = self.pipeline.transform(X)
+        logger.log(15, " - output shape %s" % str(X.shape))
+
         return X
 
     def _set_default_params(self):
         default_params = {
             'model_type': 'LR',
             'C': 1,
-            'vectorizer_dict_size': 3000,
-            'proc.ngram_range': (1, 3),
+            'vectorizer_dict_size': 75000,
+            'proc.ngram_range': (1, 5),
             'proc.skew_threshold': 0.99,
             'proc.impute_strategy': 'median',  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
         }
@@ -131,7 +139,6 @@ class LRModel(AbstractModel):
         return spaces
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
-        time_start = time.time()
         hyperparams = self.params.copy()
 
         self.cat_one_hot = get_one_hot_features(X_train)
@@ -139,16 +146,16 @@ class LRModel(AbstractModel):
         # See solver options here: https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
         if self.problem_type == BINARY:
             Y_train = Y_train.astype(int).values
-            solver = 'liblinear'
+            solver = 'lbfgs'  # TODO use liblinear for smaller datasets
         elif self.problem_type == MULTICLASS:
             solver = 'saga'  # another option is lbfgs
         else:
-            solver = 'liblinear'
+            solver = 'lbfgs'
 
         X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
 
         # TODO: get seed from seeds provider
-        self.model = LogisticRegression(C=hyperparams['C'], random_state=17, solver=solver)
+        self.model = LogisticRegression(C=hyperparams['C'], random_state=17, solver=solver, n_jobs=-1)
         self.model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
