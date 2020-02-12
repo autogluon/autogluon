@@ -337,6 +337,7 @@ class TabularPrediction(BaseTask):
                'CAT': {'iterations': 10000},
                'RF': {'n_estimators': 300},
                'XT': {'n_estimators': 300},
+               'LR': {'C': 1},
                'KNN': {},
                'custom': ['GBM'],
              }
