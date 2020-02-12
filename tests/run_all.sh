@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 FILES=./tests/unittests/*.py
 for f in $FILES
 do
