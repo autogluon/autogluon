@@ -92,7 +92,7 @@ if __name__ == '__main__':
                         nthreads_per_trial=16,
                         ngpus_per_trial=1,
                         batch_size=8,
-                        lr_decay_epoch=ag.Categorical('80,90','85,95'),
+                        lr_decay_epoch=ag.Categorical('80,90', '85,95'),
                         warmup_epochs=ag.Int(1, 10),
                         warmup_iters=ag.Int(250, 1000),
                         wd=ag.Categorical(1e-4, 5e-4, 2.5e-4),

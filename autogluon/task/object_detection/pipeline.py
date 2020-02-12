@@ -319,7 +319,7 @@ def train_object_detection(args, reporter):
     if args.syncbn and len(ctx) > 1:
         net = gcv.model_zoo.get_model(net_name,
                                       classes=args.dataset.get_classes(),
-                                      pretrained_base=False,
+                                      pretrained_base=True,
                                       transfer=args.transfer,
                                       norm_layer=gluon.contrib.nn.SyncBatchNorm,
                                       norm_kwargs={'num_devices': len(ctx)}, **kwargs)
@@ -328,7 +328,7 @@ def train_object_detection(args, reporter):
 
         async_net = gcv.model_zoo.get_model(net_name,
                                             classes=args.dataset.get_classes(),
-                                            pretrained_base=False,
+                                            pretrained_base=True,
                                             transfer=args.transfer, **kwargs)
         if not args.reuse_pred_weights:
             async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
