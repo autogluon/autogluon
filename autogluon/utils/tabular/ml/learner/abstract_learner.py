@@ -145,7 +145,9 @@ class AbstractLearner:
 
     # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
-    def distill(self, X=None, y=None):
+    def distill(self):
+        X = None
+        y = None
         if X is not None:
             if y is None:
                 X, y = self.extract_label(X)
