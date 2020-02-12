@@ -122,3 +122,6 @@ tutorials/checkpoint/*
 tutorials/train/*
 autogluon/version.py
 examples/image_classification/*/
+
+
+AutogluonModels
