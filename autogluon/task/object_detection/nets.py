@@ -26,7 +26,7 @@ def get_built_in_network(meta_arch, name, *args, **kwargs):
                       'pos_iou_thresh': 0.5, 'pos_ratio': 0.25, 'max_num_gt': 100}
             net = gcv.model_zoo.get_model(net_name, classes=transfer_classes,
                                           pretrained_base=False,
-                                          transfer=args.transfer, **kwargs)
+                                          transfer=None, **kwargs)
         else:
             raise NotImplementedError('%s not implemented.' % meta_arch)
         return net
