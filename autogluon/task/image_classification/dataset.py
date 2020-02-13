@@ -257,21 +257,33 @@ class TestImageFolderDataset(MXImageFolderDataset):
     def _list_images(self, root):
         self.synsets = []
         self.items = []
-
-        #for folder in sorted(os.listdir(root)):
         path = os.path.expanduser(root)
         if not os.path.isdir(path):
             raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
-        label = len(self.synsets)
-
         for filename in sorted(os.listdir(path)):
             filename = os.path.join(path, filename)
-            ext = os.path.splitext(filename)[1]
-            if ext.lower() not in self._exts:
-                warnings.warn('Ignoring %s of type %s. Only support %s'%(
-                    filename, ext, ', '.join(self._exts)))
-                continue
-            self.items.append((filename, label))
+            if os.path.isfile(filename): # add
+                label = len(self.synsets)
+                ext = os.path.splitext(filename)[1]
+                if ext.lower() not in self._exts:
+                    warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                        filename, ext, ', '.join(self._exts)))
+                    continue
+                self.items.append((filename, label))
+            else:
+                folder = filename
+                if not os.path.isdir(folder):
+                    raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+                label = len(self.synsets)
+                for sub_filename in sorted(os.listdir(folder)):
+                    sub_filename = os.path.join(folder, sub_filename)
+                    ext = os.path.splitext(sub_filename)[1]
+                    if ext.lower() not in self._exts:
+                        warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                            sub_filename, ext, ', '.join(self._exts)))
+                        continue
+                    self.items.append((sub_filename, label))
+                self.synsets.append(label)
 
     @property
     def num_classes(self):

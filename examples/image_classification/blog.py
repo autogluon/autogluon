@@ -21,15 +21,15 @@ def task_dog_breed_identification(data_path, dataset):
     classifier = task.fit(dataset=load_dataset,
                           net=ag.Categorical('standford_dog_resnext101_64x4d', 'standford_dog_resnet152_v1'),
                           optimizer=NAG(),
-                          epochs=5,
-                          # final_fit_epochs=10,
-                          num_trials=1,
+                          epochs=20,
+                          final_fit_epochs=180,
+                          num_trials=40,
                           ngpus_per_trial=8,
-                          batch_size=16,
+                          batch_size=48,
                           verbose=False,
                           ensemble=1)
 
-    test_dataset = task.Dataset(test_path, train=False, scale_ratio_choice=[0.7, 0.8, 0.875])
+    test_dataset = task.Dataset(test_path, train=False, crop_ratio=0.65)
     inds, probs, probs_all = classifier.predict(test_dataset, set_prob_thresh=0.001)
     ag.utils.generate_prob_csv(test_dataset, probs_all, custom='./submission.csv')
 
