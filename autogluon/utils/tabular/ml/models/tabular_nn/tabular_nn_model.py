@@ -47,7 +47,7 @@ class TabularNeuralNetModel(AbstractModel):
     
         Attributes:
             types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
-            feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in processed_array corresponding to this feature
+            feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in df corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
         
@@ -460,8 +460,8 @@ class TabularNeuralNetModel(AbstractModel):
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
         df = self.ensure_onehot_object(df)
-        processed_array = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, 
+        df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
+        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map, 
                                 self.params, self.problem_type, labels=labels, is_test=True)
 
     def process_train_data(self, df, labels):
@@ -495,19 +495,19 @@ class TabularNeuralNetModel(AbstractModel):
         logger.log(15, "\n")
         df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor()
-        processed_array = self.processor.fit_transform(df) # 2D numpy array
-        self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in processed_array corresponding to this feature
+        df = self.processor.fit_transform(df) # 2D numpy array
+        self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map]) # should match number of columns in processed array
         # print("self.feature_arraycol_map", self.feature_arraycol_map)
         # print("num_array_cols", num_array_cols)
-        # print("processed_array.shape",processed_array.shape)
-        if num_array_cols != processed_array.shape[1]:
-            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in processed_array does not match feature_arraycol_map.")
+        # print("df.shape",df.shape)
+        if num_array_cols != df.shape[1]:
+            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
         
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map,
+        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 self.params, self.problem_type, labels=labels, is_test=False)
 
     def setup_trainer(self):
