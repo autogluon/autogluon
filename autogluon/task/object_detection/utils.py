@@ -6,9 +6,9 @@ from gluoncv.utils.metrics.rcnn import RPNAccMetric, RPNL1LossMetric, RCNNAccMet
 from .nets import get_built_in_network
 
 
-def get_network(net, transfer_classes, ctx):
+def get_network(meta_arch, net, transfer_classes, ctx):
     if type(net) == str:
-        net = get_built_in_network(net, transfer_classes, ctx=ctx)
+        net = get_built_in_network(meta_arch, net, transfer_classes, ctx=ctx)
     else:
         net.initialize(ctx=ctx)
     return net
