@@ -113,6 +113,10 @@ class AbstractModel:
         path = path_context
         return path
 
+    def rename(self, name):
+        self.path = self.path[:-len(self.name)-1] + name + '/'
+        self.name = name
+
     # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
     # This means preprocess cannot be used for normalization
     # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
