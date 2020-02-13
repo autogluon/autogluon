@@ -4,15 +4,13 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 from collections import defaultdict
-from sklearn.model_selection import train_test_split
 
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
-from ..utils import get_pred_from_proba, dd_list
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split
 from ..models.abstract.abstract_model import AbstractModel
-from ..tuning.feature_pruner import FeaturePruner
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
@@ -221,24 +219,6 @@ class AbstractTrainer:
 
         return path, model_paths
 
-    def generate_train_test_split(self, X: DataFrame, y: Series, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
-        if (test_size <= 0.0) or (test_size >= 1.0):
-            raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
-        if self.problem_type == REGRESSION:
-            stratify = None
-        else:
-            stratify = y
-
-        # TODO: Enable stratified split when y class would result in 0 samples in test.
-        #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
-        #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
-        #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
-        X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
-        y_train = pd.Series(y_train, index=X_train.index)
-        y_test = pd.Series(y_test, index=X_test.index)
-
-        return X_train, X_test, y_train, y_test
-
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None):
         raise NotImplementedError
 
@@ -355,7 +335,7 @@ class AbstractTrainer:
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=kfolds, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
                 else:
                     if (X_test is None) or (y_test is None):
-                        X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
+                        X_train, X_test, y_train, y_test = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
                         Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
             except Exception as err:
@@ -452,6 +432,8 @@ class AbstractTrainer:
         stack_loc[level] = unique_names  # make unique and preserve order
         return model_names_trained
 
+    # TODO: Ban KNN from being a Stacker model outside of aux. Will need to ensemble select on all stack layers ensemble selector to make it work
+    # TODO: Robert dataset, LightGBM is super good but RF and KNN take all the time away from it on 1h despite being much worse
     # TODO: Add time_limit_per_model
     def train_multi_fold(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         models_valid = []
@@ -651,12 +633,12 @@ class AbstractTrainer:
                 X = model.preprocess(X)
         return X
 
-    def score(self, X, y):
+    def score(self, X, y, model=None):
         if self.objective_func_expects_y_pred:
-            y_pred_ensemble = self.predict(X=X)
+            y_pred_ensemble = self.predict(X=X, model=model)
             return self.objective_func(y, y_pred_ensemble)
         else:
-            y_pred_proba_ensemble = self.predict_proba(X=X)
+            y_pred_proba_ensemble = self.predict_proba(X=X, model=model)
             return self.objective_func(y, y_pred_proba_ensemble)
 
     def score_with_y_pred_proba(self, y, y_pred_proba):
@@ -667,13 +649,7 @@ class AbstractTrainer:
             return self.objective_func(y, y_pred_proba)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
-        feature_pruner = FeaturePruner(model_base=model_base)
-        X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train)
-        feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=y_holdout)
-        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
-        logger.debug(str(features_to_keep))
-        model_base.features = features_to_keep
-        # autotune.evaluate()
+        model_base.feature_prune(X_train, X_holdout, y_train, y_holdout)
 
     def pred_proba_predictions(self, models, X_test):
         preds = []

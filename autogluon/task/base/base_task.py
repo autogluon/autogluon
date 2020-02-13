@@ -1,10 +1,11 @@
-import time
-import copy
 import collections
-import mxnet as mx
+import copy
+import time
 from abc import abstractmethod
+
+import mxnet as mx
+
 from ...scheduler import *
-from .base_predictor import *
 from ...utils import in_ipynb
 
 __all__ = ['BaseDataset', 'BaseTask']
@@ -19,14 +20,17 @@ schedulers = {
     'rl': RLScheduler,
 }
 
+
 class BaseDataset(mx.gluon.data.Dataset):
     # put any sharable dataset methods here
     pass
+
 
 class BaseTask(object):
     """BaseTask for AutoGluon applications
     """
     Dataset = BaseDataset
+
     @classmethod
     def run_fit(cls, train_fn, search_strategy, scheduler_options):
         start_time = time.time()
@@ -38,7 +42,7 @@ class BaseTask(object):
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
         plot_results = scheduler_options.pop('plot_results') \
-                if 'plot_results' in scheduler_options else False
+            if 'plot_results' in scheduler_options else False
         scheduler = scheduler(train_fn, **scheduler_options)
         print('scheduler:', scheduler)
         scheduler.run()
@@ -66,6 +70,7 @@ class BaseTask(object):
                        args=record_args)
         return results
 
+    @classmethod
     @abstractmethod
     def fit(cls, *args, **kwargs):
         pass

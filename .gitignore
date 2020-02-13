@@ -124,3 +124,5 @@ autogluon/version.py
 examples/image_classification/*/
 examples/image_classification/*.csv
 tests/unittests/*.zip
+
+AutogluonModels

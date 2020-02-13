@@ -5,11 +5,13 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
 # TODO: currently is buggy
 class FeaturePruner:
-    def __init__(self, model_base, threshold_baseline=0.004):
-        self.model_base = copy.deepcopy(model_base)
+    def __init__(self, model_base, threshold_baseline=0.004, is_fit=False):
+        self.model_base = model_base
         self.threshold_baseline = threshold_baseline
+        self.is_fit = is_fit
 
         self.best_score = 0
         self.best_iteration = 0
@@ -22,6 +24,7 @@ class FeaturePruner:
         self.threshold = self.threshold_baseline
         self.cur_iteration = 0
         self.tuned = False
+        self.early_stopping_rounds = 2
 
     def evaluate(self):
         untuned_score = self.score_in_iter[0]
@@ -51,6 +54,8 @@ class FeaturePruner:
         else:
             valid_features = self.features_in_iter[-1]
 
+        iter_since_best = 0
+        iter_start = self.cur_iteration
         for iteration in range(self.cur_iteration, total_runs):
             self.cur_iteration = iteration
             logger.debug('iteration: %s ' % iteration)
@@ -60,8 +65,11 @@ class FeaturePruner:
             self.valid_feature_counts.append(len(valid_features))
             self.features_in_iter.append(valid_features)
 
-            model_iter = copy.deepcopy(self.model_base)
-            model_iter.fit(X_train=X_train_subset, Y_train=y_train, X_test=X_test_subset, Y_test=y_test)
+            if self.is_fit and (iteration == iter_start):
+                model_iter = self.model_base
+            else:
+                model_iter = copy.deepcopy(self.model_base)
+                model_iter.fit(X_train=X_train_subset, Y_train=y_train, X_test=X_test_subset, Y_test=y_test)
 
             banned_features = []
 
@@ -84,20 +92,29 @@ class FeaturePruner:
             cur_score_val = model_iter.score(X=X_test_subset, y=y_test)
             cur_score = model_iter.score(X=X_holdout[valid_features], y=y_holdout)
 
-            logger.debug('Iter '+str(iteration)+'  Score: '+str(cur_score))
-            logger.debug('Iter '+str(iteration)+ '  Score Val: '+str(cur_score_val))
+            logger.log(15, 'Iter '+str(iteration)+'  Score: '+str(cur_score))
+            logger.log(15, 'Iter '+str(iteration)+ '  Score Val: '+str(cur_score_val))
             if objective_goal_is_negative:
                 cur_score = -cur_score
 
             if self.best_score == 0 or cur_score > self.best_score:
-                logger.debug("New best score found!")
-                logger.debug(str(cur_score)+ ' > '+str(self.best_score))
+                logger.log(15, "New best score found!")
+                logger.log(15, str(cur_score)+ ' > '+str(self.best_score))
                 self.best_score = cur_score
                 self.best_iteration = iteration
+                iter_since_best = 0
+            else:
+                iter_since_best += 1
 
             self.score_in_iter.append(cur_score)
 
-            gain_df = model_iter.debug_feature_gain(X_test=X_test_subset, Y_test=y_test, model=model_iter, features_to_use=features_to_use)
+            if iter_since_best >= self.early_stopping_rounds:
+                logger.log(15, "Early stopping on iter %s" % iteration)
+                logger.log(15, "Best Iteration: %s" % self.best_iteration)
+                self.tuned = True
+                break
+
+            gain_df = model_iter.compute_feature_importance(X=X_test_subset, y=y_test, features_to_use=features_to_use)
             if not objective_goal_is_negative:
                 gain_df = -gain_df
 
@@ -115,8 +132,8 @@ class FeaturePruner:
             valid_features = [feature for feature in valid_features if feature not in banned_features]
 
             if len(valid_features) == 0:
-                logger.debug('No more features to remove, Feature pruning complete')
-                logger.debug("score_in_iter: "+str(self.score_in_iter))
+                logger.log(15, 'No more features to remove, Feature pruning complete')
+                logger.log(15, "score_in_iter: "+str(self.score_in_iter))
                 self.tuned = True
                 break
         self.tuned = True
@@ -142,7 +159,7 @@ class FeaturePruner:
             else:
                 threshold_new = gain_df.max()
 
-            logger.debug('Adjusting threshold to %s' % threshold_new)
+            logger.log(10, 'Adjusting threshold to %s' % threshold_new)
             return FeaturePruner.adjust_threshold(gain_df=gain_df, threshold=threshold_new)
         else:
             return threshold

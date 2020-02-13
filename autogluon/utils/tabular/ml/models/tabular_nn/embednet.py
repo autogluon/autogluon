@@ -1,3 +1,4 @@
+import threading
 import numpy as np
 import mxnet as mx
 from mxnet import nd, gluon
@@ -150,10 +151,42 @@ class EmbedNet(gluon.Block): # TODO: hybridize?
             input_activations = numerical_activations
         if self.has_embed_features:
             embed_data = data_batch['embed'] # List
-            embed_activations = self.embed_blocks[0](embed_data[0])
-            for i in range(1,len(self.embed_blocks)):
-                embed_activations = nd.concat(embed_activations, 
-                                      self.embed_blocks[i](embed_data[i]), dim=2)
+            lock = threading.Lock()
+            results = {}
+
+            def _worker(i, results, embed_block, embed_data, is_recording, is_training, lock):
+                if is_recording:
+                    with mx.autograd.record(is_training):
+                        output = embed_block(embed_data)
+                else:
+                    output = embed_block(embed_data)
+                output.wait_to_read()
+                with lock:
+                    results[i] = output
+
+            is_training = mx.autograd.is_training()
+            is_recording = mx.autograd.is_recording()
+            threads = [threading.Thread(target=_worker,
+                                args=(i, results, embed_block, embed_data, 
+                                      is_recording, is_training, lock),
+                                )
+               for i, (embed_block, embed_data) in
+               enumerate(zip(self.embed_blocks, embed_data))]
+
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            embed_activations = []
+            for i in range(len(results)):
+                output = results[i]
+                embed_activations.append(output)
+
+            #embed_activations = []
+            #for i in range(len(self.embed_blocks)):
+            #    embed_activations.append(self.embed_blocks[i](embed_data[i]))
+            embed_activations = nd.concat(*embed_activations, dim=2)
             embed_activations = embed_activations.flatten()
             if not self.has_vector_features:
                 input_activations = embed_activations
