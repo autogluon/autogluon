@@ -24,7 +24,7 @@ from ......task.base import BasePredictor
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ....utils.savers import save_pkl
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .tabular_nn_dataset import TabularNNDataset
 from .embednet import EmbedNet
@@ -102,7 +102,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     def set_net_defaults(self, train_dataset):
         """ Sets dataset-adaptive default values to use for our neural network """
-        if self.problem_type == MULTICLASS:
+        if (self.problem_type == MULTICLASS) or (self.problem_type == SOFTCLASS):
             self.num_classes = train_dataset.num_classes
             self.num_net_outputs = self.num_classes
         elif self.problem_type == REGRESSION:
@@ -125,11 +125,13 @@ class TabularNeuralNetModel(AbstractModel):
         elif self.problem_type == BINARY:
             self.num_classes = 2
             self.num_net_outputs = 2
-        
+        else:
+            raise ValueError("unknown problem_type specified: %s" % self.problem_type)
+            
         if self.params['layers'] is None: # Use default choices for MLP architecture
             if self.problem_type == REGRESSION:
                 default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
-            elif self.problem_type == BINARY or self.problem_type == MULTICLASS:
+            else:
                 default_sizes = [256, 128] # will be scaled adaptively
                 # base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
                 base_size = max(1, min(self.num_net_outputs, 100) / 50)  # TODO: Updated because it improved model quality and made training far faster
@@ -352,9 +354,9 @@ class TabularNeuralNetModel(AbstractModel):
 
         if test_dataset is not None:
             self.model.load_parameters(self.net_filename)  # Revert back to best model
-        if test_dataset is None:  # evaluate one final time:
+        if test_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
-        else:
+        else: # evaluate one final time:
             final_val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
@@ -368,7 +370,7 @@ class TabularNeuralNetModel(AbstractModel):
             If provided, mx_metric must be a function that follows the mxnet.metric API. Higher values = better!
             By default, returns accuracy in the case of classification, R^2 for regression.
 
-            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics...
+            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics. This method is not currently employed by the neural network.
         """
         if mx_metric is None:
             if self.problem_type == REGRESSION:
@@ -515,6 +517,8 @@ class TabularNeuralNetModel(AbstractModel):
         if self.params['loss_function'] is None:
             if self.problem_type == REGRESSION:
                 self.params['loss_function'] = gluon.loss.L1Loss()
+            elif self.problem_type == SOFTCLASS:
+                self.params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=self.model.from_logits)
             else:
                 self.params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
         self.loss_func = self.params['loss_function']

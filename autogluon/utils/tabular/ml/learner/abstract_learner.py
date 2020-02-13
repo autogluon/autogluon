@@ -185,7 +185,8 @@ class AbstractLearner:
             if y is None:
                 X, y = self.extract_label(X)
             X = self.transform_features(X)
-            y = self.label_cleaner.transform(y)
+            if self.problem_type != MULTICLASS and self.problem_type != SOFTCLASS:
+                y = self.label_cleaner.transform(y)
         else:
             y = None
         trainer = self.load_trainer()

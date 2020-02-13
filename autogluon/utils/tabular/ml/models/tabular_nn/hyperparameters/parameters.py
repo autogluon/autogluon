@@ -35,7 +35,7 @@ def get_hyper_params():
         'numeric_embed_dim': None,  # Size of joint embedding for all numeric+one-hot features.
         # Options: integer values between 10-10000
         'activation': 'relu',  # Activation function
-        # Options: ['relu', 'softrelu' 'elu'??, 'tanh']
+        # Options: ['relu', 'softrelu', 'tanh', 'softsign']
         'max_layer_width': 2056,  # maximum number of hidden units in network layer (integer > 0)
         # Does not need to be searched by default
         'embedding_size_factor': 1.0,  # scaling factor to adjust size of embedding layers (float > 0)

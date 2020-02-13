@@ -6,7 +6,7 @@ import numpy as np
 import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
 
-from . import classification_metrics
+from . import classification_metrics, softclass_metrics
 from .util import sanitize_array
 from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
 from ...miscs import warning_filter
@@ -273,6 +273,11 @@ pac_score = make_scorer('pac_score',
                         classification_metrics.pac_score,
                         greater_is_better=True,
                         needs_proba=True)
+
+# Score for soft-classisification (with soft, probalistic labels):
+soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
+                            greater_is_better=False, needs_proba=True)
+
 # TODO what about mathews correlation coefficient etc?
 
 
@@ -361,6 +366,8 @@ def get_metric(metric, problem_type, metric_type):
             if problem_type is not None and problem_type not in PROBLEM_TYPES_REGRESSION:
                 raise ValueError(f"{metric_type}={metric} can only be used for regression problems")
             return REGRESSION_METRICS[metric]
+        elif metric == 'soft_log_loss':
+            return soft_log_loss
         else:
             raise ValueError(
                 f"{metric} is unknown metric, see utils/tabular/metrics/ for available options "

@@ -6,7 +6,7 @@ import mxnet as mx
 
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 logger = logging.getLogger(__name__) # TODO: Currently unused
 
@@ -45,8 +45,9 @@ class TabularNNDataset:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
                 feature_arraycol_map (OrderedDict): Mapsfeature-name -> list of column-indices in processed_array corresponding to this feature
                 feature_type_map (OrderedDict): Maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
-                params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
                 labels (pd.Series): list of labels (y) if available
+                batch_size (int): number of examples to put in each mini-batch
+                num_dataloading_workers (int): number of threads to devote to loading mini-batches of data rather than model-training 
         """
         self.dataset = None
         self.dataloader = None
@@ -129,13 +130,18 @@ class TabularNNDataset:
         self.num_classes = None
         if labels is not None:
             labels = np.array(labels)
-            if problem_type == REGRESSION and labels.dtype != np.float32:
-                    labels = labels.astype('float32') # Convert to proper float-type if not already
-            data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
             self.data_desc.append("label")
-            self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
-            if problem_type in [BINARY, MULTICLASS]:
-                self.num_classes = len(set(labels))
+            self.label_index = len(data_list) # To access data labels, use: self.dataset._data[self.label_index]
+            self.num_classes = None
+            if self.problem_type == REGRESSION and labels.dtype != np.float32:
+                    labels = labels.astype('float32') # Convert to proper float-type if not already
+            if self.problem_type == SOFTCLASS:
+                data_list.append(mx.nd.array(labels))
+                self.num_classes = labels.shape[1]
+            else:
+                data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
+                if self.problem_type in [BINARY, MULTICLASS]:
+                    self.num_classes = len(set(labels))
         
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
@@ -169,7 +175,10 @@ class TabularNNDataset:
     def get_labels(self):
         """ Returns numpy array of labels for this dataset """
         if self.label_index is not None:
-            return self.dataset._data[self.label_index].asnumpy().flatten()
+            if self.problem_type == SOFTCLASS:
+                return self.dataset._data[self.label_index].asnumpy()
+            else:
+                return self.dataset._data[self.label_index].asnumpy().flatten()
         else:
             return None
 
@@ -265,7 +274,6 @@ class TabularNNDataset:
                 formatted_batch['language'].append(data_batch[i].as_in_context(ctx))
         if self.label_index is not None: # is None if there are no labels
             formatted_batch['label'] = data_batch[self.label_index].as_in_context(ctx)
-
 
         return formatted_batch
 
