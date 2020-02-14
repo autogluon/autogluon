@@ -207,7 +207,7 @@ class BasePredictor(ABC):
         config_history = results.pop('config_history')
         results['trial_info'] = _merge_scheduler_history(training_history, config_history,
                                                          results['reward_attr'])
-        results[results['reward_attr']] = results.pop('best_reward')
+        results[results['reward_attr']] = results['best_reward']
         results['search_space'] = results['metadata'].pop('search_space')
         results['search_strategy'] = results['metadata'].pop('search_strategy')
         return results
