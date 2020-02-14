@@ -143,6 +143,44 @@ class AbstractLearner:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
 
+    # TODO: Experimental, not integrated with core code, highly subject to change
+    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
+    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
+    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
+    # Compresses bagged ensembles to a single model fit on 100% of the data.
+    # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
+    def compress(self):
+        X = None
+        y = None
+        if X is not None:
+            if y is None:
+                X, y = self.extract_label(X)
+            X = self.transform_features(X)
+            y = self.label_cleaner.transform(y)
+        else:
+            y = None
+        trainer = self.load_trainer()
+        trainer.compress(X=X, y=y)
+
+    # TODO: Experimental, not integrated with core code, highly subject to change
+    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
+    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
+    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
+    # Distills the full ensemble into a single model trained on 100% of the data.
+    # Results in significantly worse model quality (--), but extremely faster inference times (++++), minimal memory usage (++++), and minimal space usage (++++).
+    def distill(self):
+        X = None
+        y = None
+        if X is not None:
+            if y is None:
+                X, y = self.extract_label(X)
+            X = self.transform_features(X)
+            y = self.label_cleaner.transform(y)
+        else:
+            y = None
+        trainer = self.load_trainer()
+        trainer.distill(X=X, y=y)
+
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
@@ -191,23 +229,27 @@ class AbstractLearner:
         pred_times_full = {}
         pred_time_offset = 0
         pred_probas = None
+        stack_names = list(trainer.models_level.keys())
+        stack_names_not_core = [name for name in stack_names if name != 'core']
+
         for level in range(max_level_to_check+1):
             X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
 
-            model_names_aux = trainer.models_level['aux1'][level]
-            if len(model_names_aux) > 0:
-                pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
-                for i, model_name in enumerate(model_names_aux):
-                    pred_proba = pred_probas_auxiliary[i]
-                    pred_times[model_name] = pred_probas_time_auxiliary[i]
-                    pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
-                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                        pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
-                    if trainer.objective_func_expects_y_pred:
-                        pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                        scores[model_name] = self.objective_func(y, pred)
-                    else:
-                        scores[model_name] = self.objective_func(y, pred_proba)
+            for stack_name in stack_names_not_core:
+                model_names_aux = trainer.models_level[stack_name][level]
+                if len(model_names_aux) > 0:
+                    pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
+                    for i, model_name in enumerate(model_names_aux):
+                        pred_proba = pred_probas_auxiliary[i]
+                        pred_times[model_name] = pred_probas_time_auxiliary[i]
+                        pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
+                        if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                            pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+                        if trainer.objective_func_expects_y_pred:
+                            pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
+                            scores[model_name] = self.objective_func(y, pred)
+                        else:
+                            scores[model_name] = self.objective_func(y, pred_proba)
 
             model_names_core = trainer.models_level['core'][level]
             if len(model_names_core) > 0:
