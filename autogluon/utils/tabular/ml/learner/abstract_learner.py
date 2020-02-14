@@ -143,8 +143,12 @@ class AbstractLearner:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
 
+    # TODO: Experimental, not integrated with core code, highly subject to change
+    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
     # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
+    # Compresses bagged ensembles to a single model fit on 100% of the data.
+    # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
     def compress(self):
         X = None
         y = None
@@ -158,8 +162,12 @@ class AbstractLearner:
         trainer = self.load_trainer()
         trainer.compress(X=X, y=y)
 
+    # TODO: Experimental, not integrated with core code, highly subject to change
+    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
     # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
+    # Distills the full ensemble into a single model trained on 100% of the data.
+    # Results in significantly worse model quality (--), but extremely faster inference times (++++), minimal memory usage (++++), and minimal space usage (++++).
     def distill(self):
         X = None
         y = None
