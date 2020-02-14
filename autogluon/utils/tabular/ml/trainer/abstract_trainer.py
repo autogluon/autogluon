@@ -757,11 +757,8 @@ class AbstractTrainer:
             raise NotImplementedError
         models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, num_classes=self.num_classes, hyperparameters=self.hyperparameters)
         y_distill = pd.Series(model_best.oof_pred_proba)
-        # X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=REGRESSION, test_size=0.1)  # TODO: Do stratified for binary/multiclass!
-        # self.bagged_mode = False
-        # self.stack_new_level_core(X=X_train, y=y_train, X_test=X_test, y_test=y_test, models=models_distill, level=0, stack_name='distill', hyperparameter_tune=False, feature_prune=False)
-        # self.bagged_mode = True
 
+        # TODO: Do stratified for binary/multiclass, folds are not aligned!
         models_trained = self.stack_new_level_core(X=X, y=y_distill, models=models_distill, level=0, stack_name='distilled', hyperparameter_tune=False, feature_prune=False)
         self.compress(X=X, y=y_distill, models=models_trained)
 
