@@ -261,9 +261,9 @@ class TabularPrediction(BaseTask):
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
-        # if enable_fit_continuation:
-        #     enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
-        #     logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
+        if enable_fit_continuation:
+            enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
+            logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
