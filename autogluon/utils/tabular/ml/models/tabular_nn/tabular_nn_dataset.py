@@ -39,7 +39,7 @@ class TabularNNDataset:
     DATAOBJ_SUFFIX = '_tabNNdataset.pkl' # hard-coded names for files. This file contains pickled TabularNNDataset object
     DATAVALUES_SUFFIX = '_tabNNdata.npz' # This file contains raw data values as data_list of NDArrays
 
-    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, problem_type,
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, batch_size, num_dataloading_workers, problem_type,
                  labels=None, is_test=True):
         """ Args:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
@@ -48,27 +48,24 @@ class TabularNNDataset:
                 params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
                 labels (pd.Series): list of labels (y) if available
         """
-        self.params = params
-        self.is_test = is_test
-        self.problem_type = problem_type
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map) # number of features (!=dim(processed_array) because some features may be vector-valued, eg one-hot)
-        self.batch_size = min(self.num_examples, params['batch_size'])
-        last_batch_size = self.num_examples % self.batch_size
+        batch_size = min(self.num_examples, batch_size)
+        last_batch_size = self.num_examples % batch_size
         if last_batch_size == 0:
-            last_batch_size = self.batch_size
+            last_batch_size = batch_size
         # TODO: The code fixes the crash on mxnet gluon interpreting a single value in a batch incorrectly.
         #  Comment out to see crash if data would have single row as final batch on test prediction (such as 1025 rows for batch size 512)
-        if (self.num_examples != 1) and self.is_test and (last_batch_size == 1):
-            init_batch_size = self.batch_size
+        if (self.num_examples != 1) and is_test and (last_batch_size == 1):
+            init_batch_size = batch_size
             while last_batch_size == 1:
-                self.batch_size = self.batch_size + 1
-                last_batch_size = self.num_examples % self.batch_size
+                batch_size = batch_size + 1
+                last_batch_size = self.num_examples % batch_size
                 if last_batch_size == 0:
-                    last_batch_size = self.batch_size
-                if self.batch_size > init_batch_size+10:
+                    last_batch_size = batch_size
+                if batch_size > init_batch_size+10:
                     # Hard set to avoid potential infinite loop, don't think its mathematically possible to reach this code however.
-                    self.batch_size = self.num_examples
+                    batch_size = self.num_examples
                     last_batch_size = 0
 
         if feature_arraycol_map.keys() != feature_type_map.keys():
@@ -85,7 +82,7 @@ class TabularNNDataset:
             else:
                 raise ValueError("unknown feature type: %s" % feature)
 
-        if not self.is_test and labels is None:
+        if not is_test and labels is None:
             raise ValueError("labels must be provided when is_test = False")
         if labels is not None and len(labels) != self.num_examples:
             raise ValueError("number of labels and training examples do not match")
@@ -127,22 +124,22 @@ class TabularNNDataset:
 
         if labels is not None:
             labels = np.array(labels)
-            if self.problem_type == REGRESSION and labels.dtype != np.float32:
+            if problem_type == REGRESSION and labels.dtype != np.float32:
                     labels = labels.astype('float32') # Convert to proper float-type if not already
             data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
-            if self.problem_type in [BINARY, MULTICLASS]:
+            if problem_type in [BINARY, MULTICLASS]:
                 self.num_classes = len(set(labels))
         
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
         self.num_categories_per_embed_feature = None
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list) # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
-        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not is_test,
+        self.dataloader = mx.gluon.data.DataLoader(self.dataset, batch_size, shuffle= not is_test,
                                 last_batch = 'keep' if is_test else 'rollover',
-                                num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
+                                num_workers=num_dataloading_workers) # no need to shuffle test data
         if not is_test: 
             self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
 
