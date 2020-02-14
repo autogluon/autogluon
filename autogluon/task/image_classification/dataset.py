@@ -43,39 +43,7 @@ class _TransformFirstClosure(object):
             return (self._fn(x),) + args
         return self._fn(x)
 
-@func()
-def get_dataset(path=None, train=True, name=None,
-                input_size=224, crop_ratio=0.875, jitter_param=0.4,
-                *args, **kwargs):
-    """ Method to produce image classification dataset for AutoGluon, can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
-    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
-
-    Parameters
-    ----------
-    name : str, optional
-        Which built-in dataset to use, will override all other options if specified.
-        The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
-    train : bool, default = True
-        Whether this dataset should be used for training or validation.
-    path : str
-        The training data location. If using :class:`ImageFolderDataset`,
-        image folder`path/to/the/folder` should be provided.
-        If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
-    input_size : int
-        The input image size.
-    crop_ratio : float
-        Center crop ratio (for evaluation only)
-        
-    Returns
-    -------
-    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
-    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.    
-    """
-    resize = int(math.ceil(input_size / crop_ratio))
-    if isinstance(name, str) and name.lower() in built_in_datasets:
-        return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
-
+def generate_transform(train, resize, _is_osx, input_size, jitter_param):
     if _is_osx:
         # using PIL to load image (slow)
         transform = Compose([
@@ -106,22 +74,71 @@ def get_dataset(path=None, train=True, name=None,
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
+    return transform
 
+
+@func()
+def get_dataset(path=None, train=True, name=None,
+                input_size=224, crop_ratio=0.875, jitter_param=0.4, scale_ratio_choice=[],
+                *args, **kwargs):
+    """ Method to produce image classification dataset for AutoGluon, can either be a 
+    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
+    popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
+
+    Parameters
+    ----------
+    name : str, optional
+        Which built-in dataset to use, will override all other options if specified.
+        The options are ('mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet')
+    train : bool, default = True
+        Whether this dataset should be used for training or validation.
+    path : str
+        The training data location. If using :class:`ImageFolderDataset`,
+        image folder`path/to/the/folder` should be provided.
+        If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
+    input_size : int
+        The input image size.
+    crop_ratio : float
+        Center crop ratio (for evaluation only)
+    scale_ratio_choice: list
+        List of crop_ratio, only in the test dataset, the set of scaling ratios obtained is scaled to the original image, and then cut a fixed size (input_size) and get a set of predictions for averaging.
+
+    Returns
+    -------
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.    
+    """
+
+    resize = int(math.ceil(input_size / crop_ratio))
+    transform = generate_transform(train, resize, _is_osx, input_size, jitter_param)
+    if isinstance(name, str) and name.lower() in built_in_datasets:
+        return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
     if '.rec' in path:
         dataset = RecordDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
     elif _is_osx:
         dataset = ImageFolderDataset(path, transform=transform, *args, **kwargs)
     elif not train:
-        dataset = TestImageFolderDataset(path, *args,
-                transform=_TransformFirstClosure(transform), **kwargs)
+        if scale_ratio_choice == []:
+            dataset = TestImageFolderDataset(path, *args,
+                                             transform=_TransformFirstClosure(transform), **kwargs)
+        else:
+            dataset = []
+            for i in scale_ratio_choice:
+                resize = int(math.ceil(input_size / i))
+                dataset_item = TestImageFolderDataset(path, *args,
+                                                 transform=_TransformFirstClosure(generate_transform(train, resize, _is_osx, input_size, jitter_param)), **kwargs)
+                dataset.append(dataset_item.init())
+
     elif 'label_file' in kwargs:
         dataset = IndexImageDataset(path, transform=_TransformFirstClosure(transform),
                                     *args, **kwargs)
     else:
         dataset = NativeImageFolderDataset(path, *args,
                 transform=_TransformFirstClosure(transform), **kwargs)
-    dataset = dataset.init()
+
+    if scale_ratio_choice == []:
+        dataset = dataset.init()
     return dataset
 
 @obj()
@@ -146,7 +163,7 @@ class IndexImageDataset(MXImageFolderDataset):
     def __init__(self, root, label_file, gray_scale=False, transform=None,
                  extension='.jpg'):
         self._root = os.path.expanduser(root)
-        self.items = self.read_csv(label_file, root, extension)
+        self.items, self.synsets = self.read_csv(label_file, root, extension)
         self._flag = 0 if gray_scale else 1
         self._transform = transform
 
@@ -172,7 +189,15 @@ class IndexImageDataset(MXImageFolderDataset):
         for k, v in label_dict.items():
             samples.append((os.path.join(root, f"{k}{extension}"),
                             label_to_index(labels, v)))
-        return samples
+        return samples, labels
+
+    @property
+    def num_classes(self):
+        return len(self.synsets)
+
+    @property
+    def classes(self):
+        return self.synsets
 
     @property
     def num_classes(self):
@@ -232,20 +257,33 @@ class TestImageFolderDataset(MXImageFolderDataset):
     def _list_images(self, root):
         self.synsets = []
         self.items = []
-
-        #for folder in sorted(os.listdir(root)):
         path = os.path.expanduser(root)
         if not os.path.isdir(path):
             raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
-        label = len(self.synsets)
         for filename in sorted(os.listdir(path)):
             filename = os.path.join(path, filename)
-            ext = os.path.splitext(filename)[1]
-            if ext.lower() not in self._exts:
-                warnings.warn('Ignoring %s of type %s. Only support %s'%(
-                    filename, ext, ', '.join(self._exts)))
-                continue
-            self.items.append((filename, label))
+            if os.path.isfile(filename): # add
+                label = len(self.synsets)
+                ext = os.path.splitext(filename)[1]
+                if ext.lower() not in self._exts:
+                    warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                        filename, ext, ', '.join(self._exts)))
+                    continue
+                self.items.append((filename, label))
+            else:
+                folder = filename
+                if not os.path.isdir(folder):
+                    raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+                label = len(self.synsets)
+                for sub_filename in sorted(os.listdir(folder)):
+                    sub_filename = os.path.join(folder, sub_filename)
+                    ext = os.path.splitext(sub_filename)[1]
+                    if ext.lower() not in self._exts:
+                        warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                            sub_filename, ext, ', '.join(self._exts)))
+                        continue
+                    self.items.append((sub_filename, label))
+                self.synsets.append(label)
 
     @property
     def num_classes(self):

@@ -89,14 +89,15 @@ def test_tricks(test_trials):
                               num_trials = target['num_trials'],
                               batch_size = target['batch_size'],
                               verbose = True,
-                              search_strategy='skopt',
+                              search_strategy='random',
                               tricks = target['tricks'],
                               lr_config = target['lr_config'],
                               plot_results = True)
 
-        # test_dataset = task.Dataset(target['dataset'].replace('images', 'test'))
-        # inds, probs, probals_all= classifier.predict(test_dataset)
-        # print(inds[0], probs[0], probals_all[0])
+        test_dataset = task.Dataset(target['dataset'].replace('train', 'test/BabyPants'), train=False,
+                                    scale_ratio_choice=[0.7, 0.8, 0.875])
+        inds, probs, probs_all = classifier.predict(test_dataset, set_prob_thresh=0.001)
+        print(inds[0],probs[0],probs_all[0])
 
         print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
         # summary = classifier.fit_summary(output_directory=dataset, verbosity=3)
@@ -104,4 +105,7 @@ def test_tricks(test_trials):
 
 if __name__ == '__main__':
     test_tricks(2)
+
+
+
 

@@ -30,7 +30,7 @@ def get_data_loader(dataset, input_size, batch_size, num_workers, final_fit, spl
         imagenet_samples = 1281167
         num_batches = imagenet_samples // batch_size
     else:
-        num_workers = 0
+        num_workers = 0 #?
         train_data = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True,
             last_batch="discard", num_workers=num_workers)
