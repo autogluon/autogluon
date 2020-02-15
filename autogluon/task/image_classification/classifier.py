@@ -89,7 +89,7 @@ class Classifier(BasePredictor):
         state_dict = self.state_dict()
         save(state_dict, checkpoint)
 
-    def predict(self, X, input_size=224, resize_ratio=0.875, set_prob_thresh=0.001, plot=False):
+    def predict(self, X, input_size=224, crop_ratio=0.875, set_prob_thresh=0.001, plot=False):
         """Predict class-index and associated class probability for each image in a given dataset (or just a single image). 
         
         Parameters
@@ -116,7 +116,7 @@ class Classifier(BasePredictor):
         """
 
         input_size = self.model.input_size if hasattr(self.model, 'input_size') else input_size
-        resize = int(math.ceil(input_size / resize_ratio))
+        resize = int(math.ceil(input_size / crop_ratio))
 
         transform_size = transforms.Compose([
             transforms.Resize(resize),
@@ -140,14 +140,19 @@ class Classifier(BasePredictor):
             inds, probas, probals_all = [], [], []
             for i in range(len(different_dataset)):
                 items = len(different_dataset[0])
-                for j in range(items):
+                tbar = tqdm(range(items))
+                for j in tbar:
+                    tbar.set_description(f"Test dataset {i}, Now get {j/items}")
                     result.setdefault(j, []).append(different_dataset[i][j])
-            for c in result.keys():
+            w = len(result.keys())
+            bar = tqdm(range(w))
+            for c in bar:
                 proba_all = sum([*result[c]]) / len(different_dataset)
-                proba_all = mx.nd.array(np.where(proba_all.asnumpy() >= threshold, proba_all.asnumpy(), 0))
+                proba_all = (proba_all > threshold) * proba_all
                 ind = mx.nd.argmax(proba_all, axis=1).astype('int')
                 idx = mx.nd.stack(mx.nd.arange(proba_all.shape[0], ctx=proba_all.context), ind.astype('float32'))
                 proba = mx.nd.gather_nd(proba_all, idx)
+                bar.set_description(f"Ensemble {c / w}, probability: {proba.asnumpy()}")
                 inds.append(ind.asscalar())
                 probas.append(proba.asnumpy())
                 probals_all.append(proba_all.asnumpy().flatten())
@@ -156,20 +161,27 @@ class Classifier(BasePredictor):
         def predict_imgs(X):
             if isinstance(X, list):
                 different_dataset = []
-                for x in X:
+                for i, x in enumerate(X):
                     proba_all_one_dataset = []
-                    for x_item in x:
+                    tbar = tqdm(range(len(x.items)))
+                    for j, x_item in enumerate(x):
+                        tbar.update(1)
                         proba_all = predict_img(x_item[0], ensemble=True)
+                        tbar.set_description('ratio:[%d],The input picture [%d]' % (i, j))
                         proba_all_one_dataset.append(proba_all)
                     different_dataset.append(proba_all_one_dataset)
                 inds, probas, probals_all = avg_prediction(different_dataset, threshold=set_prob_thresh)
             else:
                 inds, probas, probals_all = [], [], []
-                for x in X:
+                tbar = tqdm(range(len(X.items)))
+                for i, x in enumerate(X):
+                    tbar.update(1)
                     ind, proba, proba_all = predict_img(x[0])
-                inds.append(ind.asscalar())
-                probas.append(proba.asnumpy())
-                probals_all.append(proba_all.asnumpy().flatten())
+                    tbar.set_description('The input picture [%d] is classified as [%d], with probability %.2f ' %
+                      (i, ind.asscalar(), proba.asscalar()))
+                    inds.append(ind.asscalar())
+                    probas.append(proba.asnumpy())
+                    probals_all.append(proba_all.asnumpy().flatten())
             return inds, probas, probals_all
 
         if isinstance(X, str) and os.path.isfile(X):
