@@ -102,7 +102,7 @@ def get_dataset(path=None, train=True, name=None,
         Center crop ratio (for evaluation only)
     scale_ratio_choice: list
         List of crop_ratio, only in the test dataset, the set of scaling ratios obtained is scaled to the original image, and then cut a fixed size (input_size) and get a set of predictions for averaging.
-    
+        
     Returns
     -------
     Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
@@ -253,7 +253,7 @@ class TestImageFolderDataset(MXImageFolderDataset):
     def __init__(self, root, gray_scale=False, transform=None):
         flag = 0 if gray_scale else 1
         super().__init__(root, flag=flag, transform=transform)
-        
+           
     def _list_images(self, root):
         self.synsets = []
         self.items = []
