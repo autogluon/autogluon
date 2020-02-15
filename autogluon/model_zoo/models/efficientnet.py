@@ -163,7 +163,7 @@ def get_efficientnet_b3(pretrained=False, dropout_rate=0.2, classes=1000, width_
                              depth_divisor, min_depth, drop_connect_rate,
                              input_size=input_size)
     if pretrained:
-        from .model_store import get_model_file
+        from ..model_store import get_model_file
         model.load_parameters(get_model_file('efficientnet_b3', root=root), ctx=ctx)
     else:
         model.collect_params().initialize(ctx=ctx)
@@ -189,7 +189,7 @@ def get_efficientnet_b5(pretrained=False, dropout_rate=0.2, classes=1000, width_
                              depth_divisor, min_depth, drop_connect_rate,
                              input_size=input_size)
     if pretrained:
-        from .model_store import get_model_file
+        from ..model_store import get_model_file
         model.load_parameters(get_model_file('efficientnet_b5', root=root), ctx=ctx)
     else:
         model.collect_params().initialize(ctx=ctx)
@@ -202,7 +202,7 @@ def get_efficientnet_b6(pretrained=False, dropout_rate=0.2, classes=1000, width_
                              depth_divisor, min_depth, drop_connect_rate,
                              input_size=input_size)
     if pretrained:
-        from .model_store import get_model_file
+        from ..model_store import get_model_file
         model.load_parameters(get_model_file('efficientnet_b6', root=root), ctx=ctx)
     else:
         model.collect_params().initialize(ctx=ctx)

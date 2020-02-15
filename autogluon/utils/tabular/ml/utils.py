@@ -1,15 +1,14 @@
 import gc, os, multiprocessing, logging
 import numpy as np
+import pandas as pd
 from collections import defaultdict
 from pandas import DataFrame, Series
 from datetime import datetime
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold
-import mxnet as mx
+from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
 
 from .constants import BINARY, REGRESSION
 from ..utils.savers import save_pd
 from ..utils.decorators import calculate_time
-from ....scheduler.resource import get_gpu_count
 from ...try_import import try_import_lightgbm
 
 logger = logging.getLogger(__name__)
@@ -45,6 +44,25 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
         for train_index, test_index in kf.split(X):
             kfolds.append([train_index, test_index])
     return kfolds
+
+
+def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
+    if (test_size <= 0.0) or (test_size >= 1.0):
+        raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
+    if problem_type == REGRESSION:
+        stratify = None
+    else:
+        stratify = y
+
+    # TODO: Enable stratified split when y class would result in 0 samples in test.
+    #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
+    #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
+    #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
+    X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
+    y_train = pd.Series(y_train, index=X_train.index)
+    y_test = pd.Series(y_test, index=X_test.index)
+
+    return X_train, X_test, y_train, y_test
 
 
 # TODO: Move to lgb

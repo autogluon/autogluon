@@ -47,7 +47,7 @@ class TabularNeuralNetModel(AbstractModel):
     
         Attributes:
             types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
-            feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in processed_array corresponding to this feature
+            feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in df corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
         
@@ -329,10 +329,11 @@ class TabularNeuralNetModel(AbstractModel):
                 # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
                 val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
-                if not np.isnan(val_metric):
-                    best_val_metric = val_metric
+                if test_dataset is not None:
+                    if not np.isnan(val_metric):
+                        best_val_metric = val_metric
                 best_val_epoch = e
-                self.model.save_parameters(self.net_filename)
+                self.model.save_parameters(self.net_filename)  # TODO: Should we be saving every epoch when test_dataset is None? Probably not.
             if test_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
@@ -363,6 +364,7 @@ class TabularNeuralNetModel(AbstractModel):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
+        self.params_trained['num_epochs'] = best_val_epoch
         return
 
     def evaluate_metric(self, dataset, mx_metric=None):
@@ -460,8 +462,8 @@ class TabularNeuralNetModel(AbstractModel):
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
         df = self.ensure_onehot_object(df)
-        processed_array = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map, 
+        df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
+        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map, 
                                 self.params, self.problem_type, labels=labels, is_test=True)
 
     def process_train_data(self, df, labels):
@@ -495,19 +497,19 @@ class TabularNeuralNetModel(AbstractModel):
         logger.log(15, "\n")
         df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor()
-        processed_array = self.processor.fit_transform(df) # 2D numpy array
-        self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in processed_array corresponding to this feature
+        df = self.processor.fit_transform(df) # 2D numpy array
+        self.feature_arraycol_map = self._get_feature_arraycol_map() # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
         num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map]) # should match number of columns in processed array
         # print("self.feature_arraycol_map", self.feature_arraycol_map)
         # print("num_array_cols", num_array_cols)
-        # print("processed_array.shape",processed_array.shape)
-        if num_array_cols != processed_array.shape[1]:
-            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in processed_array does not match feature_arraycol_map.")
+        # print("df.shape",df.shape)
+        if num_array_cols != df.shape[1]:
+            raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
         
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
-        return TabularNNDataset(processed_array, self.feature_arraycol_map, self.feature_type_map,
+        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 self.params, self.problem_type, labels=labels, is_test=False)
 
     def setup_trainer(self):

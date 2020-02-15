@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_preset_models(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, name_suffix=''):
     if problem_type in [BINARY, MULTICLASS]:
         return get_preset_models_classification(path=path, problem_type=problem_type,
-                    objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
-                    hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+                                                objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
+                                                hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type,
-                    objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+                                            objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters,
+                                            hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
     else:
         raise NotImplementedError
 
@@ -40,7 +41,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
 
 
 def get_preset_models_classification(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
+                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
     # TODO: define models based on additional keys in hyperparameters
 
     models = []
@@ -95,10 +96,14 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
         # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func)
 
+    for model in models:
+        model.rename(model.name + name_suffix)
+
+    # TODO: Update name_suffix to only apply here so its not repeated code! Add .rename function to model
     return models
 
 
-def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
+def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
     models = []
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
@@ -144,5 +149,8 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
         if 'GBM' in custom_options:
             models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
+
+    for model in models:
+        model.rename(model.name + name_suffix)
 
     return models

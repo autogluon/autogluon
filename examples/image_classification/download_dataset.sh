@@ -63,7 +63,7 @@ do
         cd ./data/plant-seedlings-classification/
         kaggle competitions download -c plant-seedlings-classification
         unzip plant-seedlings-classification.zip
-        rm *.zip && mv train images
+        rm *.zip
         echo plant-seedlings-classification dataset finish.
 
     elif [ "$arg" = "fish" ] ;then

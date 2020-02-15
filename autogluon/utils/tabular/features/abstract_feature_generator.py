@@ -1,14 +1,19 @@
-import copy, sys, re, warnings, logging
+import copy
+import logging
+import re
+import warnings
+from collections import defaultdict
+
+import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
-import numpy as np
-from collections import defaultdict
 
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
 
 logger = logging.getLogger(__name__)
+
 
 # TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
 # TODO: Add feature of # of observation counts to high cardinality categorical features
@@ -40,11 +45,13 @@ class AbstractFeatureGenerator:
 
     @property
     def feature_types_metadata(self):
-        feature_types_metadata = copy.deepcopy({
-            'nlp': self.features_nlp,
-            'vectorizers': self.features_vectorizers,
-            **self.feature_type_family
-        })
+        feature_types_metadata = copy.deepcopy(
+            {
+                'nlp': self.features_nlp,
+                'vectorizers': self.features_vectorizers,
+                **self.feature_type_family
+            }
+        )
         for key, val in self.feature_type_family_generated.items():
             if key in feature_types_metadata:
                 feature_types_metadata[key] += val
@@ -54,9 +61,9 @@ class AbstractFeatureGenerator:
 
     @property
     def feature_types_metadata_generated(self):
-        feature_types_metadata_generated = copy.deepcopy({
-            **self.feature_type_family_generated
-        })
+        feature_types_metadata_generated = copy.deepcopy(
+            {**self.feature_type_family_generated}
+        )
         if 'int' in feature_types_metadata_generated:  # TODO: Clean this, feature_vectorizers should already be handled
             feature_types_metadata_generated['int'] += self.features_vectorizers
         elif len(self.features_vectorizers) > 0:
@@ -65,9 +72,9 @@ class AbstractFeatureGenerator:
 
     @property
     def feature_types_metadata_full(self):
-        feature_types_metadata_full = copy.deepcopy({
-            **self.feature_type_family
-        })
+        feature_types_metadata_full = copy.deepcopy(
+            {**self.feature_type_family}
+        )
         for key, val in self.feature_type_family_generated.items():
             if key in feature_types_metadata_full:
                 feature_types_metadata_full[key] += val
@@ -84,7 +91,7 @@ class AbstractFeatureGenerator:
         logger.log(15, 'Fitting vectorizer...')
         transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
         vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
-        logger.log(15, 'Vectorizer fit with vocabulary size = '+str(len(vectorizer.vocabulary_)))
+        logger.log(15, f'Vectorizer fit with vocabulary size = {len(vectorizer.vocabulary_)}')
         return vectorizer, transform_matrix
 
     def preprocess(self, X: DataFrame):
@@ -125,6 +132,7 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
+
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
         logger.log(20, 'Original Features:')
         for key, val in self.feature_type_family.items():
@@ -247,7 +255,7 @@ class AbstractFeatureGenerator:
         bins_3 = list(bins_2.values)
         bins_unique = sorted(list(set(bins_3)))
         bins_with_epsilon_max = set([i for i in bins_unique] + [i - bin_epsilon for i in bins_unique if i == max_val])
-        removal_bins = set([bins_unique[index-1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
+        removal_bins = set([bins_unique[index - 1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
         bins_4 = sorted(list(bins_with_epsilon_max - removal_bins))
         bins_5 = [np.inf if (x == max_val) else x for x in bins_4]
         bins_6 = sorted(list(set([-np.inf] + bins_5 + [np.inf])))
@@ -264,14 +272,16 @@ class AbstractFeatureGenerator:
             dtype = col_val.dtype
             num_unique = len(col_val.unique())
             unique_counts = col_val.value_counts()
-            num_unique_duplicates = len(unique_counts[unique_counts > 100])
-            num_rows = len(col_val)
-            unique_ratio = num_unique / float(num_rows)
+
+            # num_unique_duplicates = len(unique_counts[unique_counts > 100])
+            # num_rows = len(col_val)
+            # unique_ratio = num_unique / float(num_rows)
             # print(column)
             # print(num_unique)
             # # print(num_rows)
             # # print(unique_ratio)
             # print(dtype)
+
             type_family = self.get_type_family(dtype)
             # print(num_unique, '\t', num_unique_duplicates, '\t', unique_ratio, '\t', type_family, '\t', column,)
 
@@ -284,17 +294,16 @@ class AbstractFeatureGenerator:
             #     print('fairly unique!')
             # print(col_val.value_counts())
 
-            # print()
             if self.check_if_datetime_feature(col_val):
                 type_family = 'datetime'  # TODO: Verify
                 dtype = 'datetime'
                 self.features_datetime.append(column)
-                logger.debug('date: '+str(column))
+                logger.debug(f'date: {column}')
                 logger.debug(unique_counts.head(5))
             elif self.check_if_nlp_feature(col_val):
                 self.features_nlp.append(column)
                 self.features_nlp_ratio.append(column)
-                logger.debug('nlp: ' +str(column))
+                logger.debug(f'nlp: {column}')
                 logger.debug(unique_counts.head(5))
             # print(is_nlp, '\t', column)
 
@@ -350,18 +359,16 @@ class AbstractFeatureGenerator:
 
     def generate_text_features(self, X: Series, feature: str) -> DataFrame:
         X: DataFrame = X.to_frame(name=feature)
-        X[feature + '.char_count'] = [self.char_count(value) for value in X[feature].values]
-        X[feature + '.word_count'] = [self.word_count(value) for value in X[feature].values]
-        X[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X[feature].values]
-        X[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X[feature].values]
-        X[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X[feature].values]
-        X[feature + '.special_ratio'] = [self.special_ratio(value) for value in X[feature].values]
+        X[feature + '.char_count'] = [self.char_count(value) for value in X[feature]]
+        X[feature + '.word_count'] = [self.word_count(value) for value in X[feature]]
+        X[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X[feature]]
+        X[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X[feature]]
+        X[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X[feature]]
+        X[feature + '.special_ratio'] = [self.special_ratio(value) for value in X[feature]]
 
         symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
-        # symbols = []
-
         for symbol in symbols:
-            X[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X[feature].values]
+            X[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X[feature]]
             X[feature + '.symbol_ratio.' + symbol] = X[feature + '.symbol_count.' + symbol] / X[feature + '.char_count']
             X[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
 
@@ -375,10 +382,10 @@ class AbstractFeatureGenerator:
             rank = rank[rank >= 3]
             rank = rank.reset_index()
             val_list = list(rank['index'].values)
-            if len(val_list) == 1:
+            if len(val_list) <= 1:
                 self.features_to_remove_post.append(column)
                 self.features_categorical_final = [feature for feature in self.features_categorical_final if feature != column]
-                logger.debug('Dropping '+str(column))
+                logger.debug(f'Dropping {column}')
             else:
                 X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
         return X_features
@@ -415,41 +422,35 @@ class AbstractFeatureGenerator:
     @staticmethod
     def special_ratio(string):
         string = string.replace(' ', '')
-        if len(string) == 0:
+        if not string:
             return 0
-        prev_len = len(string)
-        # print(string)
         new_str = re.sub(r'[\w]+', '', string)
-        new_len = len(new_str)
-
-        # print(new_str)
-
-        return new_len / prev_len
+        return len(new_str) / len(string)
 
     @staticmethod
     def digit_ratio(string):
         string = string.replace(' ', '')
-        if len(string) == 0:
+        if not string:
             return 0
-        return sum(c.isdigit() for c in string)/len(string)
+        return sum(c.isdigit() for c in string) / len(string)
 
     @staticmethod
     def lower_ratio(string):
         string = string.replace(' ', '')
-        if len(string) == 0:
+        if not string:
             return 0
         return sum(c.islower() for c in string) / len(string)
 
     @staticmethod
     def capital_ratio(string):
         string = string.replace(' ', '')
-        if len(string) == 0:
+        if not string:
             return 0
-        return sum(1 for c in string if c.isupper())/len(string)
+        return sum(1 for c in string if c.isupper()) / len(string)
 
     @staticmethod
     def symbol_in_string_count(string, character):
-        if len(string) == 0:
+        if not string:
             return 0
         return sum(1 for c in string if c == character)
 
@@ -458,7 +459,7 @@ class AbstractFeatureGenerator:
     @staticmethod
     def drop_duplicate_features(X):
         X_without_dups = X.T.drop_duplicates().T
-        logger.debug("X_without_dups.shape: "+str(X_without_dups.shape))
+        logger.debug(f"X_without_dups.shape: {X_without_dups.shape}")
 
         columns_orig = X.columns.values
         columns_new = X_without_dups.columns.values
@@ -468,7 +469,7 @@ class AbstractFeatureGenerator:
 
         logger.log(15, 'Warning: duplicate columns removed ')
         logger.log(15, columns_removed)
-        logger.log(15, 'Removed '+str(len(columns_removed))+' duplicate columns before training models')
+        logger.log(15, f'Removed {len(columns_removed)} duplicate columns before training models')
 
         return X[columns_new]
 

@@ -59,9 +59,8 @@ class ImageClassification(BaseTask):
     @staticmethod
     def fit(dataset,
             net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
-            optimizer= SGD(learning_rate=Real(1e-3, 1e-2, log=True),
+            optimizer= NAG(learning_rate=Real(1e-3, 1e-2, log=True),
                            wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
-            lr_scheduler='cosine',
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
             batch_size=64,
@@ -70,7 +69,7 @@ class ImageClassification(BaseTask):
             final_fit_epochs=None,
             ensemble=1,
             metric='accuracy',
-            nthreads_per_trial=4,
+            nthreads_per_trial=60,
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
@@ -93,14 +92,14 @@ class ImageClassification(BaseTask):
                 warmup_lr=0.0,
                 warmup_epochs=0),
             tricks=Dict(
-                last_gamma=False,#True
-                use_pretrained=False,#True
+                last_gamma=False,
+                use_pretrained=True,
                 use_se=False,
                 mixup=False,
                 mixup_alpha=0.2,
                 mixup_off_epoch= 0,
-                label_smoothing=False,#True
-                no_wd=False,#True
+                label_smoothing=False,
+                no_wd=False,
                 teacher_name=None,
                 temperature=20.0,
                 hard_weight=0.5,
@@ -121,8 +120,6 @@ class ImageClassification(BaseTask):
             Which existing neural network models to consider as candidates.
         optimizer : str or :class:`autogluon.space.AutoGluonObject`
             Which optimizers to consider as candidates for learning the neural network weights.
-        lr_scheduler : str
-            Describes how learning rate should be adjusted over the course of training. Options include: 'cosine', 'poly'.
         batch_size : int
             How many images to group in each mini-batch during gradient computations in training.
         epochs: int
@@ -192,7 +189,7 @@ class ImageClassification(BaseTask):
         lr_config
         ----------
         lr-mode : type=str, default='step'.
-            learning rate scheduler mode. options are step, poly and cosine.
+            describes how learning rate should be adjusted over the course of training. Options include: 'cosine', 'poly'.
         lr-decay : type=float, default=0.1.
             decay rate of learning rate. default is 0.1.
         lr-decay-period : type=int, default=0.
@@ -247,7 +244,6 @@ class ImageClassification(BaseTask):
             dataset=dataset,
             net=net,
             optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
             loss=loss,
             metric=metric,
             num_gpus=ngpus_per_trial,
@@ -276,7 +272,7 @@ class ImageClassification(BaseTask):
             'dist_ip_addrs': dist_ip_addrs,
             'searcher': search_strategy,
             'search_options': search_options,
-            'plot_results': plot_results,
+            'plot_results': plot_results
         }
         if search_strategy == 'hyperband':
             scheduler_options.update({
@@ -284,14 +280,14 @@ class ImageClassification(BaseTask):
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
 
-        results = BaseTask.run_fit(train_image_classification, search_strategy,
-                                   scheduler_options)
+        results = BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
         model = get_network(args.net, **kwargs)
         multi_precision = optimizer.kwvars['multi_precision'] if 'multi_precision' in optimizer.kwvars else False
         update_params(model, results.pop('model_params'), multi_precision)
+
         if ensemble > 1:
             models = [model]
             if isinstance(search_strategy, str):

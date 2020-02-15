@@ -14,9 +14,11 @@
     - task object should have get_labels(Dataset) method
 """
 
+import json
 import logging
+import pickle
 from abc import ABC, abstractmethod
-import pickle, json
+
 from ...utils import plot_performance_vs_trials, plot_summary_of_models
 
 logger = logging.getLogger(__name__)
@@ -82,7 +84,7 @@ class BasePredictor(ABC):
         self.model = None  # Save model separately from Predictor object
         self.results = None  # Save results separately from Predictor object
         pickle.dump(self, open(filepath, 'wb'))
-        logger.info("Predictor saved to file: " % filepath)
+        logger.info("Predictor saved to file: %s " % filepath)
 
     def _save_results(self, output_directory):
         """ Internal helper function: Save results in human-readable file JSON format """
@@ -181,10 +183,11 @@ class BasePredictor(ABC):
 
         """
         return results
-    
+
     @staticmethod
     def _format_results(results):
         """ Formats miscellaneous records captured by scheduler into user-viewable Results object. """
+
         def _merge_scheduler_history(training_history, config_history, reward_attr):
             trial_info = {}
             for tid, config in config_history.items():
@@ -203,7 +206,7 @@ class BasePredictor(ABC):
         training_history = results.pop('training_history')
         config_history = results.pop('config_history')
         results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                              results['reward_attr'])
+                                                         results['reward_attr'])
         results[results['reward_attr']] = results.pop('best_reward')
         results['search_space'] = results['metadata'].pop('search_space')
         results['search_strategy'] = results['metadata'].pop('search_strategy')

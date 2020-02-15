@@ -1,14 +1,15 @@
-from abc import ABCMeta, abstractmethod
 import copy
+from abc import ABCMeta, abstractmethod
 from functools import partial
+
+import numpy as np
 import sklearn.metrics
 from sklearn.utils.multiclass import type_of_target
-import numpy as np
 
-from ...miscs import warning_filter
 from . import classification_metrics
 from .util import sanitize_array
-from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION
+from ..ml.constants import PROBLEM_TYPES, PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION
+from ...miscs import warning_filter
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -64,9 +65,9 @@ class _PredictScorer(Scorer):
             Score function applied to prediction of estimator on X.
         """
 
-        if type(y_true) == list:
+        if isinstance(y_true, list):
             y_true = np.array(y_true)
-        if type(y_pred) == list:
+        if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
         type_true = type_of_target(y_true)
 
@@ -137,9 +138,9 @@ class _ThresholdScorer(Scorer):
         score : float
             Score function applied to prediction of estimator on X.
         """
-        if type(y_true) == list:
+        if isinstance(y_true, list):
             y_true = np.array(y_true)
-        if type(y_pred) == list:
+        if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
         y_type = type_of_target(y_true)
         if y_type not in ("binary", "multilabel-indicator"):
@@ -232,13 +233,15 @@ median_absolute_error = make_scorer('median_absolute_error',
                                     optimum=0,
                                     greater_is_better=False)
 
+
 def rmse_func(predictions, targets):
     return np.sqrt(((predictions - targets) ** 2).mean())
 
+
 root_mean_squared_error = make_scorer('root_mean_squared_error',
-                                 rmse_func,
-                                 optimum=0,
-                                 greater_is_better=False)
+                                      rmse_func,
+                                      optimum=0,
+                                      greater_is_better=False)
 
 # Standard Classification Scores
 accuracy = make_scorer('accuracy',
@@ -274,16 +277,15 @@ pac_score = make_scorer('pac_score',
 # TODO what about mathews correlation coefficient etc?
 
 
-REGRESSION_METRICS = dict()
-for scorer in [r2, mean_squared_error, mean_absolute_error,
-               median_absolute_error]:
-    REGRESSION_METRICS[scorer.name] = scorer
+REGRESSION_METRICS = {
+    scorer.name: scorer
+    for scorer in [r2, mean_squared_error, mean_absolute_error, median_absolute_error]
+}
 
-CLASSIFICATION_METRICS = dict()
-
-for scorer in [accuracy, balanced_accuracy, roc_auc, average_precision,
-               log_loss, pac_score]:
-    CLASSIFICATION_METRICS[scorer.name] = scorer
+CLASSIFICATION_METRICS = {
+    scorer.name: scorer
+    for scorer in [accuracy, balanced_accuracy, roc_auc, average_precision, log_loss, pac_score]
+}
 
 for name, metric in [('precision', sklearn.metrics.precision_score),
                      ('recall', sklearn.metrics.recall_score),
@@ -293,9 +295,7 @@ for name, metric in [('precision', sklearn.metrics.precision_score),
     for average in ['macro', 'micro', 'samples', 'weighted']:
         qualified_name = '{0}_{1}'.format(name, average)
         globals()[qualified_name] = make_scorer(qualified_name,
-                                                partial(metric,
-                                                        pos_label=None,
-                                                        average=average))
+                                                partial(metric, pos_label=None, average=average))
         CLASSIFICATION_METRICS[qualified_name] = globals()[qualified_name]
 
 
@@ -348,3 +348,24 @@ def calculate_score(solution, prediction, task_type, metric,
             score = metric(solution, prediction)
 
     return score
+
+
+def get_metric(metric, problem_type, metric_type):
+    """Returns metric function by using its name if the metric is str.
+    Performs basic check for metric compatibility with given problem type."""
+    if metric is not None and isinstance(metric, str):
+        if metric in CLASSIFICATION_METRICS:
+            if problem_type is not None and problem_type not in PROBLEM_TYPES_CLASSIFICATION:
+                raise ValueError(f"{metric_type}={metric} can only be used for classification problems")
+            return CLASSIFICATION_METRICS[metric]
+        elif metric in REGRESSION_METRICS:
+            if problem_type is not None and problem_type not in PROBLEM_TYPES_REGRESSION:
+                raise ValueError(f"{metric_type}={metric} can only be used for regression problems")
+            return REGRESSION_METRICS[metric]
+        else:
+            raise ValueError(
+                f"{metric} is unknown metric, see utils/tabular/metrics/ for available options "
+                f"or how to define your own {metric_type} function"
+            )
+    else:
+        return metric

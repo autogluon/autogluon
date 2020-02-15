@@ -84,7 +84,7 @@ def get_dataset(path=None, train=True, name=None,
     """ Method to produce image classification dataset for AutoGluon, can either be a 
     :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
-
+    
     Parameters
     ----------
     name : str, optional
@@ -102,7 +102,7 @@ def get_dataset(path=None, train=True, name=None,
         Center crop ratio (for evaluation only)
     scale_ratio_choice: list
         List of crop_ratio, only in the test dataset, the set of scaling ratios obtained is scaled to the original image, and then cut a fixed size (input_size) and get a set of predictions for averaging.
-
+    
     Returns
     -------
     Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
@@ -253,25 +253,37 @@ class TestImageFolderDataset(MXImageFolderDataset):
     def __init__(self, root, gray_scale=False, transform=None):
         flag = 0 if gray_scale else 1
         super().__init__(root, flag=flag, transform=transform)
-
+        
     def _list_images(self, root):
         self.synsets = []
         self.items = []
-
         path = os.path.expanduser(root)
-        for folder in sorted(os.listdir(root)):
-            folder = os.path.join(path, folder)
-            if not os.path.isdir(folder):
-                raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
-            label = len(self.synsets)
-            for filename in sorted(os.listdir(folder)):
-                filename = os.path.join(folder, filename)
+        if not os.path.isdir(path):
+            raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+        for filename in sorted(os.listdir(path)):
+            filename = os.path.join(path, filename)
+            if os.path.isfile(filename):
+                label = len(self.synsets)
                 ext = os.path.splitext(filename)[1]
                 if ext.lower() not in self._exts:
                     warnings.warn('Ignoring %s of type %s. Only support %s'%(
                         filename, ext, ', '.join(self._exts)))
                     continue
                 self.items.append((filename, label))
+            else:
+                folder = filename
+                if not os.path.isdir(folder):
+                    raise ValueError('Ignoring %s, which is not a directory.'%path, stacklevel=3)
+                label = len(self.synsets)
+                for sub_filename in sorted(os.listdir(folder)):
+                    sub_filename = os.path.join(folder, sub_filename)
+                    ext = os.path.splitext(sub_filename)[1]
+                    if ext.lower() not in self._exts:
+                        warnings.warn('Ignoring %s of type %s. Only support %s'%(
+                            sub_filename, ext, ', '.join(self._exts)))
+                        continue
+                    self.items.append((sub_filename, label))
+                self.synsets.append(label)
 
     @property
     def num_classes(self):

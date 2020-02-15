@@ -58,6 +58,8 @@ class CatboostModel(AbstractModel):
                     X[category] = X[category].cat.add_categories('__NaN__').fillna('__NaN__')
         return X
 
+    # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
+    #  Pool is much more memory efficient, avoids copying data twice in memory
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         from catboost import Pool
         num_rows_train = len(X_train)
@@ -200,3 +202,4 @@ class CatboostModel(AbstractModel):
                 self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
 
         self.best_iteration = self.model.tree_count_ - 1
+        self.params_trained['iterations'] = self.model.tree_count_ - 1

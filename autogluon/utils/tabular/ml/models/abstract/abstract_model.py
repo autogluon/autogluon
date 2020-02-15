@@ -1,16 +1,16 @@
-import logging, time, pickle, os
+import logging, time, pickle, os, copy
 import numpy as np
 import pandas as pd
 
-from ...utils import get_pred_from_proba
+from ...utils import get_pred_from_proba, generate_train_test_split
 from ...constants import BINARY, REGRESSION
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
 from .... import metrics
-from ....utils.decorators import calculate_time
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
 from .model_trial import model_trial
+from ...tuning.feature_pruner import FeaturePruner
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class AbstractModel:
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values)
         """
         self.name = name
-        self.path = self.create_contexts(path + name + '/')
+        self.path = self.create_contexts(path + name + '/')  # TODO: Keep original path, make this path a function for consistency.
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func  # Note: we require higher values = better performance
@@ -89,6 +89,7 @@ class AbstractModel:
         if hyperparameters is not None:
             self.params.update(hyperparameters.copy())
             self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+        self.params_trained = dict()
 
     # Checks if model is ready to make predictions for final result
     def is_valid(self):
@@ -111,6 +112,10 @@ class AbstractModel:
     def create_contexts(self, path_context):
         path = path_context
         return path
+
+    def rename(self, name):
+        self.path = self.path[:-len(self.name)-1] + name + '/'
+        self.name = name
 
     # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
     # This means preprocess cannot be used for normalization
@@ -195,35 +200,34 @@ class AbstractModel:
             obj.set_contexts(path)
             return obj
 
-    @calculate_time
-    def debug_feature_gain(self, X_test, Y_test, model, features_to_use=None):
+    def compute_feature_importance(self, X, y, features_to_use=None):
         sample_size = 10000
-        if len(X_test) > sample_size:
-            X_test = X_test.sample(sample_size, random_state=0)
-            Y_test = Y_test.loc[X_test.index]
+        if len(X) > sample_size:
+            X = X.sample(sample_size, random_state=0)
+            y = y.loc[X.index]
         else:
-            X_test = X_test.copy()
-            Y_test = Y_test.copy()
+            X = X.copy()
+            y = y.copy()
 
-        X_test.reset_index(drop=True, inplace=True)
-        Y_test.reset_index(drop=True, inplace=True)
+        X.reset_index(drop=True, inplace=True)
+        y.reset_index(drop=True, inplace=True)
 
-        X_test = model.preprocess(X_test)
+        X = self.preprocess(X)
 
         if not features_to_use:
-            features = X_test.columns.values
+            features = X.columns.values
         else:
             features = features_to_use
         feature_count = len(features)
 
-        model_score_base = model.score(X=X_test, y=Y_test)
+        model_score_base = self.score(X=X, y=y)
 
         model_score_diff = []
 
-        row_count = X_test.shape[0]
+        row_count = X.shape[0]
         rand_shuffle = np.random.randint(0, row_count, size=row_count)
 
-        X_test_shuffled = X_test.iloc[rand_shuffle].reset_index(drop=True)
+        X_test_shuffled = X.iloc[rand_shuffle].reset_index(drop=True)
         compute_count = 200
         indices = [x for x in range(0, feature_count, compute_count)]
 
@@ -233,21 +237,21 @@ class AbstractModel:
                 compute_count = feature_count - indice
 
             logger.debug(indice)
-            x = [X_test.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
+            x = [X.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
             for j, val in enumerate(x):
                 feature = features[indice+j]
                 val[feature] = X_test_shuffled[feature]
             X_test_raw = pd.concat(x, ignore_index=True)
-            if model.metric_needs_y_pred:
-                Y_pred = model.predict(X_test_raw, preprocess=False)
+            if self.metric_needs_y_pred:
+                Y_pred = self.predict(X_test_raw, preprocess=False)
             else:
-                Y_pred = model.predict_proba(X_test_raw, preprocess=False)
+                Y_pred = self.predict_proba(X_test_raw, preprocess=False)
             row_index = 0
             for j in range(compute_count):
                 row_index_end = row_index + row_count
                 Y_pred_cur = Y_pred[row_index:row_index_end]
                 row_index = row_index_end
-                score = model.objective_func(Y_test, Y_pred_cur)
+                score = self.objective_func(y, Y_pred_cur)
                 model_score_diff.append(model_score_base - score)
 
         results = pd.Series(data=model_score_diff, index=features)
@@ -269,10 +273,31 @@ class AbstractModel:
         if self.params is not None:
             self.params.update(def_search_space)
 
+    # Hyperparameters of trained model
+    def get_trained_params(self):
+        trained_params = self.params.copy()
+        trained_params.update(self.params_trained)
+        return trained_params
+
+    # TODO: currently inplace and destructive. This won't work well for in-memory models.
+    #  Problem with not inplace -> 2x memory usage, try to avoid somehow
     # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
+        model = self.model
         self.model = None
-        return self
+        template = copy.deepcopy(self)
+        template.params_trained = dict()
+        self.model = model
+        return template
+
+    # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
+    def convert_to_compressed_template(self):
+        params_trained = self.params_trained.copy()
+        template = self.convert_to_template()
+        template.params.update(params_trained)
+        template.name = template.name + '_compressed'
+        template.path = template.create_contexts(self.path + template.name + '/')
+        return template
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
@@ -357,3 +382,11 @@ class AbstractModel:
         # args.final_fit = True
         # final_model = scheduler.run_with_config(best_config)
         # save(final_model)
+
+    def feature_prune(self, X_train, X_holdout, Y_train, Y_holdout):
+        feature_pruner = FeaturePruner(model_base=self)
+        X_train, X_test, y_train, y_test = generate_train_test_split(X_train, Y_train, problem_type=self.problem_type, test_size=0.2)
+        feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=Y_holdout)
+        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
+        logger.debug(str(features_to_keep))
+        self.features = features_to_keep
