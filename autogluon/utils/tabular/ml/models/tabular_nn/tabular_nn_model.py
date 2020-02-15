@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import mxnet as mx
 from mxnet import nd, autograd, gluon
+from gluoncv.utils import LRSequential, LRScheduler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -25,6 +26,7 @@ from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ....metrics import log_loss
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .tabular_nn_dataset import TabularNNDataset
 from .embednet import EmbedNet
@@ -256,8 +258,8 @@ class TabularNeuralNetModel(AbstractModel):
                 try_import_mxboard()
                 from mxboard import SummaryWriter
                 self.summary_writer = SummaryWriter(logdir=self.path, flush_secs=5, verbose=False)
-            self.setup_trainer()
-        best_val_metric = -np.inf  # higher = better
+            self.setup_trainer(train_dataset)
+        best_val_metric = -np.inf # higher = better
         val_metric = None
         best_val_epoch = 0
         num_epochs = self.params['num_epochs']
@@ -435,7 +437,22 @@ class TabularNeuralNetModel(AbstractModel):
         if self.problem_type == REGRESSION or not predict_proba:
             return preds.asnumpy().flatten() # return 1D numpy array
         elif self.problem_type == BINARY and predict_proba:
-            return preds[:,1].asnumpy() # for binary problems, only return P(Y==1)
+            preds = preds[:,1].asnumpy() # for binary problems, only return P(Y==+1)
+            if self.stopping_metric == log_loss or self.objective_func == log_loss: # Ensure nonzero predicted probabilities under log-loss:
+                min_pred = np.min(preds)
+                max_pred = np.max(preds)
+                if min_pred < EPS or max_pred > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
+                    preds =  EPS + ((1-2*EPS)/(max_pred-min_pred)) * (preds - min_pred)
+            return preds
+        elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and 
+              (self.stopping_metric == log_loss or self.objective_func == log_loss)):
+            # Ensure nonzero predicted probabilities under log-loss:
+            preds = preds.asnumpy()
+            most_negative_rowvals = np.clip(np.min(preds, axis=1), a_min=None, a_max=0)
+            preds = preds - most_negative_rowvals[:,None] # ensure nonnegative rows
+            preds = np.clip(preds, a_min = EPS, a_max = None) # ensure no zeros
+            return preds / preds.sum(axis=1, keepdims=1) # renormalize
+        
         return preds.asnumpy() # return 2D numpy array
 
     def process_data(self, df, labels=None, is_test=True):
@@ -500,15 +517,35 @@ class TabularNeuralNetModel(AbstractModel):
                                 batch_size=self.params['batch_size'], num_dataloading_workers=self.params['num_dataloading_workers'],
                                 problem_type=self.problem_type, labels=labels, is_test=False)
 
-    def setup_trainer(self):
+    def setup_trainer(self, train_dataset):
         """ Set up stuff needed for training: 
             optimizer, loss, and summary writer (for mxboard).
             Network must first be initialized before this. 
         """
         optimizer_opts = {'learning_rate': self.params['learning_rate'],  
             'wd': self.params['weight_decay'], 'clip_gradient': self.params['clip_gradient']}
+        if 'lr_scheduler' in self.params and self.params['lr_scheduler'] is not None:
+            base_lr = self.params.get('base_lr', 1e-6)
+            target_lr = self.params.get('target_lr', 1.0)
+            warmup_epochs = self.params.get('warmup_epochs', 10)
+            lr_decay = self.params.get('lr_decay', 0.1)
+            lr_mode = self.params['lr_scheduler']
+            num_batches = train_dataset.num_examples // self.params['batch_size']
+            lr_decay_epoch = [max(warmup_epochs, int(self.params['num_epochs']/3)), max(warmup_epochs+1, int(self.params['num_epochs']/2)),
+                              max(warmup_epochs+2, int(2*self.params['num_epochs']/3))]
+            lr_scheduler = LRSequential([
+                LRScheduler('linear', base_lr=base_lr, target_lr=target_lr,
+                    nepochs=warmup_epochs, iters_per_epoch=num_batches),
+                LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr,
+                    nepochs=self.params['num_epochs'] - warmup_epochs,
+                    iters_per_epoch=num_batches,
+                    step_epoch=lr_decay_epoch,
+                    step_factor=lr_decay, power=2)
+            ])
+            optimizer_opts['lr_scheduler'] = lr_scheduler
         if self.params['optimizer'] == 'sgd':
-            optimizer_opts['momentum'] = self.params['momentum']
+            if 'momentum' in self.params:
+                optimizer_opts['momentum'] = self.params['momentum']
             self.optimizer = gluon.Trainer(self.model.collect_params(), 'sgd', optimizer_opts)
         elif self.params['optimizer'] == 'adam':  # TODO: Can we try AdamW?
             self.optimizer = gluon.Trainer(self.model.collect_params(), 'adam', optimizer_opts)

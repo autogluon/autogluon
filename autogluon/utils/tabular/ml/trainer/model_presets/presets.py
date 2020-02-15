@@ -162,9 +162,8 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
 def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False):
     print("Neural Net is currently the only model supported for multi-class distillation.")
     models = []
-    # TODO: only NN supported for now. add other models.
-    # nn_options = hyperparameters.get('NN', {'num_epochs': 1000, 'dropout_prob': 0, 'weight_decay':1e-9})
-    nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-8, 'epochs_wo_improve': 50, 'layers': [2056, 2056, 2056],'numeric_embed_dim': 2056, 'activation': 'softrelu'}
+    # TODO: only NN supported for now. add other models. We use a big NN for distillation to ensure it has high capacity to approximate ensemble:
+    nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*4, 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
     models.append(
         TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
                               objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())

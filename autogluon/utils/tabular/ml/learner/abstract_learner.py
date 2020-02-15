@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba
@@ -191,6 +191,18 @@ class AbstractLearner:
             y = None
         trainer = self.load_trainer()
         trainer.distill(X=X, y=y)
+
+    def augment_distill(self, X=None, y=None, num_augmented_samples=50000):
+        if X is not None:
+            if y is None:
+                X, y = self.extract_label(X)
+            X = self.transform_features(X)
+            if self.problem_type != MULTICLASS and self.problem_type != SOFTCLASS:
+                y = self.label_cleaner.transform(y)
+        else:
+            y = None
+        trainer = self.load_trainer()
+        trainer.augment_distill(X=X, y=y, num_augmented_samples=num_augmented_samples)
 
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
