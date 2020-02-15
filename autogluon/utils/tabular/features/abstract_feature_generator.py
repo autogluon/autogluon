@@ -359,16 +359,16 @@ class AbstractFeatureGenerator:
 
     def generate_text_features(self, X: Series, feature: str) -> DataFrame:
         X: DataFrame = X.to_frame(name=feature)
-        X[feature + '.char_count'] = X[feature].apply(self.char_count)
-        X[feature + '.word_count'] = X[feature].apply(self.word_count)
-        X[feature + '.capital_ratio'] = X[feature].apply(self.capital_ratio)
-        X[feature + '.lower_ratio'] = X[feature].apply(self.lower_ratio)
-        X[feature + '.digit_ratio'] = X[feature].apply(self.digit_ratio)
-        X[feature + '.special_ratio'] = X[feature].apply(self.special_ratio)
+        X[feature + '.char_count'] = [self.char_count(value) for value in X[feature]]
+        X[feature + '.word_count'] = [self.word_count(value) for value in X[feature]]
+        X[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X[feature]]
+        X[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X[feature]]
+        X[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X[feature]]
+        X[feature + '.special_ratio'] = [self.special_ratio(value) for value in X[feature]]
 
         symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         for symbol in symbols:
-            X[feature + '.symbol_count.' + symbol] = X[feature].apply(lambda x: self.symbol_in_string_count(x, symbol))
+            X[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X[feature]]
             X[feature + '.symbol_ratio.' + symbol] = X[feature + '.symbol_count.' + symbol] / X[feature + '.char_count']
             X[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
 
