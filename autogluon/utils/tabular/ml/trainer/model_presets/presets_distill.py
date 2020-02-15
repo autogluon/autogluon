@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 def get_preset_models_distillation(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
                       hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, distill_level=1):
     if problem_type == MULTICLASS:
-        # raise ValueError("Cannot distill multiclass prediction problem, you must specify problem_type=softclass instead.")
-        models = get_preset_models_softclass(path=path, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+        name_suffix = '_d' + str(distill_level)
+        models = get_preset_models_softclass(path=path, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
         return models
     elif problem_type != REGRESSION:
         objective_func = mean_squared_error

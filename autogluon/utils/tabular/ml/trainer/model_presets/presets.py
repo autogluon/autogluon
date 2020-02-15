@@ -159,7 +159,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
 
 
 
-def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False):
+def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
     print("Neural Net is currently the only model supported for multi-class distillation.")
     models = []
     # TODO: only NN supported for now. add other models. We use a big NN for distillation to ensure it has high capacity to approximate ensemble:
