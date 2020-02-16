@@ -838,6 +838,7 @@ class AbstractTrainer:
         if self.problem_type == MULTICLASS:
             y_distill = pd.DataFrame(y_distill)
             X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=SOFTCLASS, test_size=0.1)
+            self.normalize_predprobs = True
         else:
             if self.problem_type == BINARY:
                 EPS_bin2regress = 0.03

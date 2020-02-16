@@ -10,7 +10,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
-from ....metrics import soft_log_loss
+from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
 
 
 def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
-    print("Neural Net is currently the only model supported for multi-class distillation.")
+    # print("Neural Net is currently the only model supported for multi-class distillation.")
     models = []
     # TODO: only NN supported for now. add other models. We use a big NN for distillation to ensure it has high capacity to approximate ensemble:
     nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*4, 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
@@ -168,6 +168,8 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
         TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
                               objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
     )
+    rf_options = {}
+    models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=REGRESSION, objective_func=soft_log_loss)
     for model in models:
         model.rename(model.name + name_suffix)
     

@@ -14,6 +14,7 @@ def get_preset_models_distillation(path, problem_type, objective_func, stopping_
     if problem_type == MULTICLASS:
         name_suffix = '_d' + str(distill_level)
         models = get_preset_models_softclass(path=path, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
+        print("Trying to distill with each of these model types: \n", models)
         return models
     elif problem_type != REGRESSION:
         objective_func = mean_squared_error
@@ -25,4 +26,7 @@ def get_preset_models_distillation(path, problem_type, objective_func, stopping_
     nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*4, 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
     nn_model = TabularNeuralNetModel(path=path, name='NeuralNetRegressor'+name_suffix, problem_type=problem_type,
                               objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
-    return [nn_model] + models
+    
+    models = [nn_model] + models
+    print("Trying to distill with each of these model types: \n", models)
+    return models
