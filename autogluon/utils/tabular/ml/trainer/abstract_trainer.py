@@ -828,14 +828,13 @@ class AbstractTrainer:
         if y is None:
             y = self.load_y_train() # TODO: doesn't appear anywhere?
 
-        # model_best = self.load_model(self.model_best)
         models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, 
                                                         objective_func=self.objective_func, 
                                                         stopping_metric=self.stopping_metric, 
                                                         num_classes=self.num_classes, 
                                                         hyperparameters=self.hyperparameters)
         X = self.augment_data_preserve_joint(X, num_augmented_samples)
-        y_distill = self.predict_proba(X, model_best)
+        y_distill = self.predict_proba(X)
         if self.problem_type == MULTICLASS:
             y_distill = pd.DataFrame(y_distill)
             X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=SOFTCLASS, test_size=0.1)
