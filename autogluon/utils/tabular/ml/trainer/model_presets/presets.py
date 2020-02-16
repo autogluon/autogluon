@@ -168,6 +168,9 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
         TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
                               objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
     )
+    for model in models:
+        model.rename(model.name + name_suffix)
+    
     return models
 
 

@@ -542,7 +542,7 @@ class AbstractTrainer:
         else:
             self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, time_limit=time_limit_aux)
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', hyperparameter_tune=False, feature_prune=False, time_limit=None):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', kfolds=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None):
         use_orig_features = True
         if models is None:
             models = self.get_models(self.hyperparameters, level=level)
@@ -852,7 +852,8 @@ class AbstractTrainer:
         self.bagged_mode = og_bagged_mode
         self.verbosity = og_verbosity
         self.save()
-
+    
+    # TODO: experimental code.
     def augment_data_hotdeck(self, X, num_augmented_samples = 50000, continuous_feature_noise = 0.1):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
             num_augmented_samples: number of total augmented data points to return (we add extra points to training set until this number is reached).
@@ -886,6 +887,7 @@ class AbstractTrainer:
         print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
         return X_aug
     
+    # TODO: experimental code.
     def augment_data_preserve_joint(self, X, num_augmented_samples = 50000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
             num_augmented_samples: number of total augmented data points to return (we add extra points to training set until this number is reached)
@@ -899,7 +901,7 @@ class AbstractTrainer:
         if frac_feature_perturb > 1.0:
             raise ValueError("frac_feature_perturb must be <= 1")
         print("Augmenting training data with synthetic samples for distillation...")
-        num_feature_perturb = max(1,int(frac_feature_perturb * len(X.columns)))
+        num_feature_perturb = max(1, int(frac_feature_perturb*len(X.columns)))
         num_augmented_samples = num_augmented_samples - len(X)
         X_aug = pd.concat([X.iloc[[0]]]*num_augmented_samples)
         X_aug.reset_index(drop=True, inplace=True)
@@ -933,6 +935,7 @@ class AbstractTrainer:
         print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
         return X_aug
     
+    # TODO: experimental code.
     def augment_trade(self, X = None):
         if X is None:
             X = self.load_X_train()
@@ -959,7 +962,7 @@ class AbstractTrainer:
         import pickle
         pickle.dump(continuous_featnames, open("continuous_features.p", "wb") )
         """
-        # Script to reload:
+        # Script to reload from this file for training TRADE generative model:
         import pandas as pd
         import pickle
         X = pd.read_csv("data4trade.csv")
@@ -971,9 +974,20 @@ class AbstractTrainer:
                 num_categories[feat] = len(X[feat].unique())
         X = X.to_numpy()
         """
-        
-        
-        
+    
+    def best_single_model(self, stack_name, stack_level): 
+        """ Returns name of best single (compressed) model in this trainer object. 
+            
+            Examples: 
+                To get get best single (compressed) model:
+                    trainer.best_single_model('compressed', 0)  # TODO: does not work because compressed models have no validation score.
+                To get best single (distilled) model:
+                    trainer.best_single_model('distill', 0)
+        """
+        single_models = self.models_level[stack_name][stack_level]
+        perfs = [self.model_performance[m] for m in single_models]
+        return single_models[perfs.index(max(perfs))]
+    
     def save_model(self, model):
         if self.low_memory:
             model.save()
