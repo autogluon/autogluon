@@ -1,24 +1,22 @@
-import os
-import time
-import copy
-import pickle
 import json
 import logging
-import threading
 import multiprocessing as mp
+import os
+import pickle
+import threading
+import time
 from collections import OrderedDict
 
+from tqdm.auto import tqdm
+
+from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
-from ..utils import save, load, mkdir, try_import_mxboard
+from .scheduler import TaskScheduler
 from ..core import Task
 from ..core.decorator import _autogluon_method
-from .scheduler import TaskScheduler
-from ..searcher.searcher_factory import searcher_factory
 from ..searcher import BaseSearcher
-from .reporter import DistStatusReporter, FakeReporter
-from ..utils import DeprecationHelper, in_ipynb
-
-from tqdm.auto import tqdm
+from ..searcher.searcher_factory import searcher_factory
+from ..utils import save, load, mkdir, try_import_mxboard
 
 __all__ = ['FIFOScheduler']
 
@@ -70,6 +68,7 @@ class FIFOScheduler(TaskScheduler):
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
     """
+
     def __init__(self, train_fn, args=None, resource=None,
                  searcher=None, search_options=None,
                  checkpoint='./exp/checkpoint.ag',
@@ -77,31 +76,34 @@ class FIFOScheduler(TaskScheduler):
                  time_out=None, max_reward=1.0, time_attr='epoch',
                  reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=None):
-        super(FIFOScheduler,self).__init__(dist_ip_addrs)
+        super(FIFOScheduler, self).__init__(dist_ip_addrs)
+
         if resource is None:
             resource = {'num_cpus': 1, 'num_gpus': 0}
+        self.resource = resource
+
         if searcher is None:
             searcher = 'random'  # Default: Random searcher
-        if search_options is None:
-            search_options = dict()
-        assert isinstance(train_fn, _autogluon_method)
-        self.train_fn = train_fn
-        self.args = args if args else train_fn.args
-        self.resource = resource
+
         if isinstance(searcher, str):
-            kwargs = search_options.copy()
+            kwargs = search_options.copy() if search_options else dict()
             kwargs['configspace'] = train_fn.cs
             self.searcher = searcher_factory(searcher, **kwargs)
         else:
             assert isinstance(searcher, BaseSearcher)
             self.searcher = searcher
+
+        assert isinstance(train_fn, _autogluon_method)
+        self.train_fn = train_fn
+        self.args = args if args else train_fn.args
+
         # meta data
-        self.metadata = {}
-        self.metadata['search_space'] = train_fn.kwspaces
-        keys = copy.deepcopy(list(self.metadata['search_space'].keys()))
-        self.metadata['search_strategy'] = searcher
-        self.metadata['stop_criterion'] = {'time_limits': time_out, 'max_reward': max_reward}
-        self.metadata['resources_per_trial'] = resource
+        self.metadata = {
+            'search_space': train_fn.kwspaces,
+            'search_strategy': searcher,
+            'stop_criterion': {'time_limits': time_out, 'max_reward': max_reward},
+            'resources_per_trial': resource
+        }
 
         self.num_trials = num_trials
         self.time_out = time_out
@@ -116,7 +118,8 @@ class FIFOScheduler(TaskScheduler):
             self.mxboard = SummaryWriter(
                 logdir=os.path.join(os.path.splitext(checkpoint)[0], 'logs'),
                 flush_secs=3,
-                verbose=False)
+                verbose=False
+            )
         self.log_lock = mp.Lock()
         self.training_history = OrderedDict()
         self.config_history = OrderedDict()
@@ -125,7 +128,7 @@ class FIFOScheduler(TaskScheduler):
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
             else:
-                msg = 'checkpoint path {} is not available for resume.'.format(checkpoint)
+                msg = f'checkpoint path {checkpoint} is not available for resume.'
                 logger.exception(msg)
                 raise FileExistsError(msg)
 
@@ -136,8 +139,8 @@ class FIFOScheduler(TaskScheduler):
         num_trials = kwargs.get('num_trials', self.num_trials)
         time_out = kwargs.get('time_out', self.time_out)
         logger.info('Starting Experiments')
-        logger.info('Num of Finished Tasks is {}'.format(self.num_finished_tasks))
-        logger.info('Num of Pending Tasks is {}'.format(num_trials - self.num_finished_tasks))
+        logger.info(f'Num of Finished Tasks is {self.num_finished_tasks}')
+        logger.info(f'Num of Pending Tasks is {num_trials - self.num_finished_tasks}')
         tbar = tqdm(range(self.num_finished_tasks, num_trials))
         for _ in tbar:
             if time_out and time.time() - start_time >= time_out \
@@ -172,8 +175,11 @@ class FIFOScheduler(TaskScheduler):
         else:
             # This is not a new config, but a paused one which is now promoted
             extra_kwargs['new_config'] = False
-        task = Task(self.train_fn, {'args': self.args, 'config': config},
-                    DistributedResource(**self.resource))
+        task = Task(
+            self.train_fn,
+            {'args': self.args, 'config': config},
+            DistributedResource(**self.resource)
+        )
         self.add_job(task, **extra_kwargs)
 
     def run_with_config(self, config):
@@ -183,8 +189,11 @@ class FIFOScheduler(TaskScheduler):
         one can use this function to retrain a model with the same hyperparameters on all the available labeled data
         (including the hold out set). It can also returns other objects or states.
         """
-        task = Task(self.train_fn, {'args': self.args, 'config': config},
-                    DistributedResource(**self.resource))
+        task = Task(
+            self.train_fn,
+            {'args': self.args, 'config': config},
+            DistributedResource(**self.resource)
+        )
         reporter = FakeReporter()
         task.args['reporter'] = reporter
         return self.run_job(task)
@@ -222,8 +231,11 @@ class FIFOScheduler(TaskScheduler):
         # main process
         job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         # reporter thread
-        rp = threading.Thread(target=self._run_reporter, args=(task, job, reporter,
-                              self.searcher), daemon=False)
+        rp = threading.Thread(
+            target=self._run_reporter,
+            args=(task, job, reporter, self.searcher),
+            daemon=False
+        )
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
@@ -232,6 +244,7 @@ class FIFOScheduler(TaskScheduler):
             def _save_checkpoint_callback(fut):
                 self._cleaning_tasks()
                 self.save()
+
             job.add_done_callback(_save_checkpoint_callback)
 
         with self.LOCK:
@@ -255,7 +268,9 @@ class FIFOScheduler(TaskScheduler):
             last_result['done'] = True
             searcher.update(
                 config=task.args['config'],
-                reward=last_result[self._reward_attr], **last_result)
+                reward=last_result[self._reward_attr],
+                **last_result
+            )
 
     def _promote_config(self):
         """
@@ -281,15 +296,22 @@ class FIFOScheduler(TaskScheduler):
     def _add_training_result(self, task_id, reported_result, config=None):
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             if 'loss' in reported_result:
-                self.mxboard.add_scalar(tag='loss',
-                                        value=('task {task_id} valid_loss'.format(task_id=task_id),
-                                               reported_result['loss']),
-                                        global_step=reported_result[self._reward_attr])
-            self.mxboard.add_scalar(tag=self._reward_attr,
-                                    value=('task {task_id} {reward_attr}'.format(
-                                           task_id=task_id, reward_attr=self._reward_attr),
-                                           reported_result[self._reward_attr]),
-                                    global_step=reported_result[self._reward_attr])
+                self.mxboard.add_scalar(
+                    tag='loss',
+                    value=(
+                        f'task {task_id} valid_loss',
+                        reported_result['loss']
+                    ),
+                    global_step=reported_result[self._reward_attr]
+                )
+            self.mxboard.add_scalar(
+                tag=self._reward_attr,
+                value=(
+                    f'task {task_id} {self._reward_attr}',
+                    reported_result[self._reward_attr]
+                ),
+                global_step=reported_result[self._reward_attr]
+            )
         with self.log_lock:
             # Note: We store all of reported_result in training_history[task_id],
             # not just the reward value.
@@ -327,13 +349,14 @@ class FIFOScheduler(TaskScheduler):
             for task_id, task_res in self.training_history.items():
                 rewards = [x[self._reward_attr] for x in task_res]
                 x = list(range(len(task_res)))
-                plt.plot(x, rewards, label='task {}'.format(task_id))
+                plt.plot(x, rewards, label=f'task {task_id}')
         if use_legend:
             plt.legend(loc='best')
-        if filename is not None:
-            logger.info('Saving Training Curve in {}'.format(filename))
+        if filename:
+            logger.info(f'Saving Training Curve in {filename}')
             plt.savefig(filename)
-        if plot: plt.show()
+        if plot:
+            plt.show()
 
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
@@ -363,4 +386,4 @@ class FIFOScheduler(TaskScheduler):
             self.training_history = json.loads(state_dict['training_history'])
         if self.visualizer == 'mxboard' or self.visualizer == 'tensorboard':
             self.mxboard._scalar_dict = json.loads(state_dict['visualizer'])
-        logger.debug('Loading Searcher State {}'.format(self.searcher))
+        logger.debug(f'Loading Searcher State {self.searcher}')
