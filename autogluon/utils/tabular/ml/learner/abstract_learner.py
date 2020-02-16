@@ -192,7 +192,7 @@ class AbstractLearner:
         trainer = self.load_trainer()
         trainer.distill(X=X, y=y)
 
-    def augment_distill(self, X=None, y=None, num_augmented_samples=50000):
+    def augment_distill(self, X=None, y=None, num_augmented_samples=50000, time_limits=None):
         if X is not None:
             if y is None:
                 X, y = self.extract_label(X)
@@ -202,7 +202,7 @@ class AbstractLearner:
         else:
             y = None
         trainer = self.load_trainer()
-        trainer.augment_distill(X=X, y=y, num_augmented_samples=num_augmented_samples)
+        trainer.augment_distill(X=X,y=y,num_augmented_samples=num_augmented_samples,time_limits=time_limits)
 
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:

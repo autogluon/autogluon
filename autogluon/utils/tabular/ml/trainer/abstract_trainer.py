@@ -814,7 +814,7 @@ class AbstractTrainer:
         self.save()
 
 
-    def augment_distill(self, X=None, y=None, num_augmented_samples=50000):
+    def augment_distill(self, X=None, y=None, num_augmented_samples=50000, time_limits=None):
         og_bagged_mode = self.bagged_mode
         og_verbosity = self.verbosity
         self.bagged_mode = False # turn off bagging
@@ -847,7 +847,7 @@ class AbstractTrainer:
             X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=REGRESSION, test_size=0.1)
         for model in models_distill:
             model_distill = self.train_single_full(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, model=model,
-                                                   hyperparameter_tune=False, stack_name='distill')
+                                                   hyperparameter_tune=False, stack_name='distill', time_limit=time_limits)
         # reset trainer to old state:
         self.bagged_mode = og_bagged_mode
         self.verbosity = og_verbosity
