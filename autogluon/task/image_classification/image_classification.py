@@ -1,43 +1,42 @@
-import os
-import copy
 import logging
-import mxnet as mx
-from mxnet import gluon, nd
-from ...core.optimizer import *
-from ...core.loss import *
-from ...core import *
-from ...searcher import *
-from ...scheduler import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ..base import BaseTask
-from ..base.base_task import schedulers
-from ...utils import update_params
+import os
 
+import mxnet as mx
+
+from .classifier import Classifier
 from .dataset import get_dataset
+from .nets import *
 from .pipeline import train_image_classification
 from .utils import *
-from .nets import *
-from .classifier import Classifier
+from ..base import BaseTask
+from ..base.base_task import schedulers
+from ...core import *
+from ...core.loss import *
+from ...core.optimizer import *
+from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ...utils import update_params
 
 __all__ = ['ImageClassification']
 
 logger = logging.getLogger(__name__)
 
+
 class ImageClassification(BaseTask):
     """AutoGluon Task for classifying images based on their content
     """
-    Classifier=Classifier
+    Classifier = Classifier
+
     @staticmethod
     def Dataset(*args, **kwargs):
         """Dataset for AutoGluon image classification tasks. 
            May either be a :class:`autogluon.task.image_classification.ImageFolderDataset`, :class:`autogluon.task.image_classification.RecordDataset`, 
-           or a popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
+           or a popular dataset already built into AutoGluon ('mnist', 'fashionmnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
         ----------
         name : str, optional
             Which built-in dataset to use, will override all other options if specified.
-            The options are: 'mnist', 'cifar', 'cifar10', 'cifar100', 'imagenet'
+            The options are: 'mnist', 'fashionmnist', 'cifar', 'cifar10', 'cifar100', 'imagenet'
         train : bool, default = True
             Whether this dataset should be used for training or validation.
         train_path : str
@@ -59,8 +58,11 @@ class ImageClassification(BaseTask):
     @staticmethod
     def fit(dataset,
             net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
-            optimizer= NAG(learning_rate=Real(1e-3, 1e-2, log=True),
-                           wd=Real(1e-4, 1e-3, log=True), multi_precision=False),
+            optimizer=NAG(
+                learning_rate=Real(1e-3, 1e-2, log=True),
+                wd=Real(1e-4, 1e-3, log=True),
+                multi_precision=False
+            ),
             loss=SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
             batch_size=64,
@@ -90,14 +92,15 @@ class ImageClassification(BaseTask):
                 lr_decay_period=0,
                 lr_decay_epoch='40,80',
                 warmup_lr=0.0,
-                warmup_epochs=0),
+                warmup_epochs=0
+            ),
             tricks=Dict(
                 last_gamma=False,
                 use_pretrained=True,
                 use_se=False,
                 mixup=False,
                 mixup_alpha=0.2,
-                mixup_off_epoch= 0,
+                mixup_off_epoch=0,
                 label_smoothing=False,
                 no_wd=False,
                 teacher_name=None,
@@ -106,6 +109,7 @@ class ImageClassification(BaseTask):
                 batch_norm=False,
                 use_gn=False)
             ):
+        # TODO: ensemble and hybridize are not in docstring
         """
         Fit image classification models to a given dataset.
 
@@ -113,7 +117,7 @@ class ImageClassification(BaseTask):
         ----------
         dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
             Training dataset containing images and their associated class labels. 
-            Popular image datasets built into AutoGluon can be used by specifying their name as a string (options: ‘mnist’, ‘cifar’, ‘cifar10’, ‘cifar100’, ‘imagenet’).
+            Popular image datasets built into AutoGluon can be used by specifying their name as a string (options: ‘mnist’, ‘fashionmnist’, ‘cifar’, ‘cifar10’, ‘cifar100’, ‘imagenet’).
         input_size : int
             Size of images in the dataset (pixels).
         net : str or :class:`autogluon.space.Categorical`
@@ -142,8 +146,6 @@ class ImageClassification(BaseTask):
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : int
             How many GPUs to use in each trial (ie. single training run of a model). 
-        resources_per_trial : dict
-            Machine resources to allocate per trial.
         output_directory : str
             Dir to save search results.
         search_strategy : str
@@ -258,7 +260,7 @@ class ImageClassification(BaseTask):
             final_fit=False,
             tricks=tricks,
             lr_config=lr_config
-            )
+        )
 
         scheduler_options = {
             'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
@@ -275,10 +277,13 @@ class ImageClassification(BaseTask):
             'plot_results': plot_results
         }
         if search_strategy == 'hyperband':
-            scheduler_options.update({
-                'searcher': 'random',
-                'max_t': epochs,
-                'grace_period': grace_period if grace_period else epochs//4})
+            scheduler_options.update(
+                {
+                    'searcher': 'random',
+                    'max_t': epochs,
+                    'grace_period': grace_period if grace_period else epochs // 4
+                }
+            )
 
         results = BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
         args = sample_config(train_image_classification.args, results['best_config'])
@@ -300,7 +305,7 @@ class ImageClassification(BaseTask):
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
                 kwargs = {'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
-                model = get_network(args.net,  **kwargs)
+                model = get_network(args.net, **kwargs)
                 update_params(model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
