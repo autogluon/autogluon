@@ -6,6 +6,7 @@ from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMet
 import gluonnlp as nlp
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
+# from gluonnlp.data.utils import (Splitter, concat_sequence, line_splitter, whitespace_splitter)
 from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
@@ -28,7 +29,10 @@ def get_dataset(path=None, name=None, train=True, *args, **kwargs):
             Whether this data will be used for training models.
     """
     if path is not None:
-        raise NotImplementedError
+        if '.tsv' or '.csv' in path:
+            return CustomTSVClassificationTask(path, *args, **kwargs)
+        else:
+            raise NotImplementedError
     if name is not None and name.lower() in built_in_tasks:
         return built_in_tasks[name.lower()](*args, **kwargs)
     else:
@@ -118,6 +122,44 @@ class ToySSTTask(AbstractGlueTask):
         dataset = GlueSST2(segment=segment)
         sampler, _ = get_split_samplers(dataset, split_ratio=0.2)
         return SampledDataset(dataset, sampler)
+
+class CustomTSVClassificationTask(AbstractGlueTask):
+    """
+    Parameters
+    ----------
+    filename : str or list of str
+        Path to the input text file or list of paths to the input text files.
+    encoding : str, default 'utf8'
+        File encoding format.
+    sample_splitter : function, default str.splitlines
+        A function that splits the dataset string into samples.
+    field_separator : function or None, default Splitter('\t')
+        A function that splits each sample string into list of text fields.
+        If None, raw samples are returned according to `sample_splitter`.
+    num_discard_samples : int, default 0
+        Number of samples discarded at the head of the first file.
+    field_indices : list of int or None, default None
+        If set, for each sample, only fields with provided indices are selected as the output.
+        Otherwise all fields are returned.
+    allow_missing : bool, default False
+        If set to True, no exception will be thrown if the number of fields is smaller than the
+        maximum field index provided.
+    class_labels : list
+        Class labels
+    """
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        is_pair = False
+        class_labels = args.class_labels
+        metric = CompositeEvalMetric()
+        metric.add(F1())
+        metric.add(Accuracy())
+        dataset = nlp.data.TSVDataset(*args, **kwargs)
+        super(CustomTSVClassificationTask, self).__init__(class_labels, metric, is_pair)
+
+    def dataset_train(self):
+        return 'train', self.dataset
 
 class TSVClassificationTask(AbstractGlueTask):
     def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
