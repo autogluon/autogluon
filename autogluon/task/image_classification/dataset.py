@@ -130,8 +130,10 @@ def get_dataset(path=None, train=True, name=None,
 
     resize = int(math.ceil(input_size / crop_ratio))
     transform = generate_transform(train, resize, _is_osx, input_size, jitter_param)
+
     if isinstance(name, str) and name.lower() in built_in_datasets:
         return get_built_in_dataset(name, train=train, input_size=input_size, *args, **kwargs)
+
     if '.rec' in path:
         dataset = RecordDataset(
             path,
@@ -227,13 +229,15 @@ class IndexImageDataset(MXImageFolderDataset):
             for row in reader:
                 assert len(row) == 2
                 label_dict[row[0]] = row[1]
+
         if 'id' in label_dict:
             label_dict.pop('id')
+
         labels = list(set(label_dict.values()))
-        samples = []
-        for k, v in label_dict.items():
-            samples.append((os.path.join(root, f"{k}{extension}"),
-                            label_to_index(labels, v)))
+        samples = [
+            (os.path.join(root, f"{k}{extension}"), label_to_index(labels, v))
+            for k, v in label_dict.items()
+        ]
         return samples, labels
 
     @property
@@ -315,21 +319,25 @@ class TestImageFolderDataset(MXImageFolderDataset):
                 label = len(self.synsets)
                 ext = os.path.splitext(filename)[1]
                 if ext.lower() not in self._exts:
-                    warnings.warn('Ignoring %s of type %s. Only support %s' % (
-                        filename, ext, ', '.join(self._exts)))
+                    warnings.warn(
+                        f'Ignoring {filename} of type {ext}.'
+                        f' Only support {", ".join(self._exts)}'
+                    )
                     continue
                 self.items.append((filename, label))
             else:
                 folder = filename
                 if not os.path.isdir(folder):
-                    raise ValueError('Ignoring %s, which is not a directory.' % path, stacklevel=3)
+                    raise ValueError(f'Ignoring {path}, which is not a directory.', stacklevel=3)
                 label = len(self.synsets)
                 for sub_filename in sorted(os.listdir(folder)):
                     sub_filename = os.path.join(folder, sub_filename)
                     ext = os.path.splitext(sub_filename)[1]
                     if ext.lower() not in self._exts:
-                        warnings.warn('Ignoring %s of type %s. Only support %s' % (
-                            sub_filename, ext, ', '.join(self._exts)))
+                        warnings.warn(
+                            f'Ignoring {sub_filename} of type {ext}.'
+                            f' Only support {", ".join(self._exts)}'
+                        )
                         continue
                     self.items.append((sub_filename, label))
                 self.synsets.append(label)
@@ -402,7 +410,8 @@ class ImageFolderDataset(object):
         self.targets = [s[1] for s in samples]
         self.imgs = self.samples
 
-    def make_dataset(self, dir, class_to_idx, extensions=None, is_valid_file=None):
+    @staticmethod
+    def make_dataset(dir, class_to_idx, extensions=None, is_valid_file=None):
         images = []
         dir = os.path.expanduser(dir)
         if not ((extensions is None) ^ (is_valid_file is None)):
@@ -446,7 +455,8 @@ class ImageFolderDataset(object):
             img = Image.open(f)
             return img.convert('RGB')
 
-    def _find_classes(self, dir):
+    @staticmethod
+    def _find_classes(dir):
         """Finds the class folders in a dataset.
         
         Parameters
@@ -496,9 +506,9 @@ class ImageFolderDataset(object):
 
     def __repr__(self):
         head = "Dataset " + self.__class__.__name__
-        body = ["Number of datapoints: {}".format(self.__len__())]
+        body = [f"Number of datapoints: {self.__len__()}"]
         if self.root is not None:
-            body.append("Root location: {}".format(self.root))
+            body.append(f"Root location: {self.root}")
         lines = [head] + [" " * self._repr_indent + line for line in body]
         return '\n'.join(lines)
 
