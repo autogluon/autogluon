@@ -7,8 +7,10 @@ from ...utils import plot_performance_vs_trials, plot_summary_of_models, plot_ta
 from ...utils.tabular.ml.constants import REGRESSION
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.utils import setup_outputdir
+from ...utils.tabular.utils.loaders import load_pd
 
 __all__ = ['TabularPredictor']
+
 
 logger = logging.getLogger()  # return root logger
 
@@ -100,7 +102,7 @@ class TabularPredictor(BasePredictor):
         """
         dataset = self.__get_dataset(dataset)
         if type(dataset) == str:
-            dataset = pd.read_csv(dataset)
+            dataset = load_pd.load(dataset)
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
@@ -129,7 +131,7 @@ class TabularPredictor(BasePredictor):
         """
         dataset = self.__get_dataset(dataset)
         if type(dataset) == str:
-            dataset = pd.read_csv(dataset)
+            dataset = load_pd.load(dataset)
         if isinstance(dataset, pd.Series):
             raise TypeError("dataset must be pandas.DataFrame, not pandas.Series. \
                 To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
@@ -354,7 +356,7 @@ class TabularPredictor(BasePredictor):
     @staticmethod
     def __get_dataset(dataset):
         if isinstance(dataset, str):
-            return pd.read_csv(dataset)
+            return load_pd.load(dataset)
         if isinstance(dataset, pd.DataFrame):
             return dataset
         if isinstance(dataset, pd.Series):

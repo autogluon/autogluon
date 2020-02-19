@@ -14,6 +14,7 @@ from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
 from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
+from ...utils.tabular.utils.loaders import load_pd
 
 __all__ = ['TabularPrediction']
 
@@ -219,10 +220,10 @@ class TabularPrediction(BaseTask):
         --------
         >>> from autogluon import TabularPrediction as task
         >>> import pandas as pd
-        >>> train_data = pd.read_csv('https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv')
+        >>> train_data = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv'
         >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column)
-        >>> test_data = pd.read_csv('https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv')
+        >>> test_data = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv'
         >>> y_test = test_data[label_column]
         >>> test_data = test_data.drop(labels=[label_column], axis=1)
         >>> y_pred = predictor.predict(test_data)
@@ -247,9 +248,9 @@ class TabularPrediction(BaseTask):
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
         if isinstance(train_data,  str):
-            train_data = pd.read_csv(train_data)
+            train_data = load_pd.load(train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
-            tuning_data = pd.read_csv(tuning_data)
+            tuning_data = load_pd.load(tuning_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
