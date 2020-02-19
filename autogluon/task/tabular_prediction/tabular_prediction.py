@@ -219,7 +219,6 @@ class TabularPrediction(BaseTask):
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
-        >>> import pandas as pd
         >>> train_data = 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv'
         >>> label_column = 'class'
         >>> predictor = task.fit(train_data=train_data, label=label_column)
