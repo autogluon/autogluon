@@ -1,20 +1,21 @@
+import argparse
 import copy
 import logging
-import argparse
 import multiprocessing as mp
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['Task']
 
-class Task(object):
-    """Individual training task, containing the lauch function, default arguments and
+
+class Task:
+    """Individual training task, containing the launch function, default arguments and
     required resources.
 
     Args:
-        fn (callable): Lauch function for the training task.
+        fn (callable): Launch function for the training task.
         args (argparse.ArgumentParser): Default function arguments.
-        resources (autogluon.scheduler.Resources): Required resources for lauching the task.
+        resources (autogluon.scheduler.Resources): Required resources for launching the task.
 
     Example:
         >>> def my_task():
@@ -24,6 +25,7 @@ class Task(object):
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
+
     def __init__(self, fn, args, resources):
         self.fn = fn
         self.args = copy.deepcopy(args)
@@ -40,17 +42,20 @@ class Task(object):
 
     @classmethod
     def set_id(cls, taskid):
-        logger.info('Seting TASK ID: {}'.format(taskid))
+        logger.info(f'Seting TASK ID: {taskid}')
         cls.TASK_ID.value = taskid
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ +  \
-            ' (' + 'task_id: ' + str(self.task_id) + \
-            ',\n\tfn: ' + str(self.fn) + \
-            ',\n\targs: {'
+        reprstr = (
+            f'{self.__class__.__name__} ('
+            f'task_id: {self.task_id},'
+            f'\n\tfn: {self.fn},'
+            f'\n\targs: {{'
+        )
+
         for k, v in self.args.items():
             data = str(v)
             info = (data[:100] + '..') if len(data) > 100 else data
-            reprstr +=  '{}'.format(k) + ': ' + info + ', '
-        reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
+            reprstr += f'{k}: {info}, '
+        reprstr += f'}},\n\tresource: {self.resources})\n'
         return reprstr

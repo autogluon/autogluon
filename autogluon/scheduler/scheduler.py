@@ -1,26 +1,20 @@
 """Distributed Task Scheduler"""
+import logging
+import multiprocessing as mp
 import os
 import pickle
-import logging
-import subprocess
-from warnings import warn
-from threading import Thread
-import multiprocessing as mp
 from collections import OrderedDict
-
-from distributed import worker_client
+from warnings import warn
 
 from .remote import RemoteManager
+from .reporter import *
 from .resource import DistributedResourceManager
 from ..core import Task
-from .reporter import *
 from ..utils import AutoGluonWarning, AutoGluonEarlyStop
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
-
-
 
 
 class TaskScheduler(object):
@@ -29,11 +23,12 @@ class TaskScheduler(object):
     LOCK = mp.Lock()
     RESOURCE_MANAGER = DistributedResourceManager()
     REMOTE_MANAGER = RemoteManager()
+
     def __init__(self, dist_ip_addrs=None):
         if dist_ip_addrs is None:
-            dist_ip_addrs=[]
+            dist_ip_addrs = []
         cls = TaskScheduler
-        remotes = cls.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
+        cls.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
         cls.RESOURCE_MANAGER.add_remote(cls.REMOTE_MANAGER.get_remotes())
         self.scheduled_tasks = []
         self.finished_tasks = []
@@ -90,7 +85,8 @@ class TaskScheduler(object):
             new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
 
-    def run_job(self, task):
+    @staticmethod
+    def run_job(task):
         """Run a training task to the scheduler (Sync).
         """
         cls = TaskScheduler
@@ -102,12 +98,14 @@ class TaskScheduler(object):
     def _start_distributed_job(task, resource_manager):
         """Async Execute the job in remote and release the resources
         """
-        logger.debug('\nScheduling {}'.format(task))
+        logger.debug(f'\nScheduling {task}')
         job = task.resources.node.submit(TaskScheduler._run_dist_job,
                                          task.fn, task.args, task.resources.gpu_ids)
+
         def _release_resource_callback(fut):
             logger.debug('Start Releasing Resource')
             resource_manager._release(task.resources)
+
         job.add_done_callback(_release_resource_callback)
         return job
 
@@ -118,13 +116,14 @@ class TaskScheduler(object):
         if '_default_config' in args['args']:
             args['args'].pop('_default_config')
 
-        if 'reporter' in args:	
-            local_reporter = LocalStatusReporter()	
-            dist_reporter = args['reporter']	
+        if 'reporter' in args:
+            local_reporter = LocalStatusReporter()
+            dist_reporter = args['reporter']
             args['reporter'] = local_reporter
 
         manager = mp.Manager()
         return_list = manager.list()
+
         def _worker(return_list, gpu_ids, args):
             """Worker function in thec client
             """
@@ -142,13 +141,13 @@ class TaskScheduler(object):
 
         try:
             # start local progress
-            p = mp.Process(target=_worker, args=(return_list,gpu_ids, args))
+            p = mp.Process(target=_worker, args=(return_list, gpu_ids, args))
             p.start()
             if 'reporter' in args:
-                cp = Communicator.Create(p, local_reporter, dist_reporter)
+                Communicator.Create(p, local_reporter, dist_reporter)
             p.join()
         except Exception as e:
-            logger.error('Exception in worker process: {}'.format(e))
+            logger.error(f'Exception in worker process: {e}')
         ret = return_list[0] if len(return_list) > 0 else None
         return ret
 
@@ -222,6 +221,4 @@ class TaskScheduler(object):
         return len(self.finished_tasks)
 
     def __repr__(self):
-        reprstr = self.__class__.__name__ + '(\n' + \
-            str(self.RESOURCE_MANAGER) +')\n'
-        return reprstr
+        return f'{self.__class__.__name__}(\n{self.RESOURCE_MANAGER})\n'

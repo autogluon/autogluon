@@ -64,6 +64,9 @@ class DistStatusReporter(object):
             raise AutoGluonEarlyStop('Stopping!')
 
     def fetch(self, block=True):
+        if not self._queue.qsize():
+            return None
+
         try:
             kwargs = self._queue.get()
         except CommClosedError:

@@ -239,6 +239,7 @@ class FIFOScheduler(TaskScheduler):
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
+
         # checkpoint thread
         if self._checkpoint is not None:
             def _save_checkpoint_callback(fut):
@@ -257,6 +258,9 @@ class FIFOScheduler(TaskScheduler):
         last_result = None
         while not task_job.done():
             reported_result = reporter.fetch()
+            if reported_result is None:
+                continue
+
             if reported_result.get('done', False):
                 reporter.move_on()
                 break
@@ -264,6 +268,7 @@ class FIFOScheduler(TaskScheduler):
                 task.task_id, reported_result, config=task.args['config'])
             reporter.move_on()
             last_result = reported_result
+
         if last_result is not None:
             last_result['done'] = True
             searcher.update(
