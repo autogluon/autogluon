@@ -75,7 +75,7 @@ class LGBModel(AbstractModel):
         logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
-        seed_val = params.pop('seed_value', None)
+        seed_val = params.pop('seed_value', 0)
 
         eval_metric = self.get_eval_metric()
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
@@ -118,6 +118,7 @@ class LGBModel(AbstractModel):
         # Train lgbm model:
         self.model = lgb.train(**train_params)
         self.best_iteration = self.model.best_iteration
+        self.params_trained['num_boost_round'] = self.model.best_iteration
 
     def predict_proba(self, X, preprocess=True):
         if preprocess:

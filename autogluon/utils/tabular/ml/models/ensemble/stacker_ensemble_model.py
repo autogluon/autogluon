@@ -1,4 +1,5 @@
 import copy, logging, time
+from typing import Dict
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -15,18 +16,20 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
+    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
         super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, random_state=random_state, debug=debug)
         if base_model_names is None:
             base_model_names = []
+        if base_models_dict is None:
+            base_models_dict = {}
         if base_model_paths_dict is None:
             base_model_paths_dict = {}
         if base_model_types_dict is None:
             base_model_types_dict = {}
         self.base_model_names = base_model_names
+        self.base_models_dict: Dict[str, AbstractModel] = base_models_dict  # String name -> Model objects
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict
-        self.bagged_mode = None
         self.use_orig_features = use_orig_features
         self.num_classes = num_classes
 
@@ -35,6 +38,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 self.base_model_names = self.limit_models_per_type(models=self.base_model_names, model_types=base_model_types_inner_dict, model_scores=base_model_performances_dict, max_models_per_type=self.params['max_models_per_type'])
             if self.params['max_models'] > 0:
                 self.base_model_names = self.limit_models(models=self.base_model_names, model_scores=base_model_performances_dict, max_models=self.params['max_models'])
+
+        for model_name, model in self.base_models_dict.items():
+            if model_name not in self.base_model_names:
+                self.base_models_dict.pop(model_name)
+
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
 
     @staticmethod
@@ -68,14 +76,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
         if compute_base_preds:
             X_stacker = []
-            for model_name in self.base_model_names:
-                model_type = self.base_model_types_dict[model_name]
-                model_path = self.base_model_paths_dict[model_name]
-                model_loaded = model_type.load(model_path)
+            for base_model_name in self.base_model_names:
+                base_model = self.load_base_model(base_model_name)
                 if fit:
-                    y_pred_proba = model_loaded.oof_pred_proba
+                    y_pred_proba = base_model.oof_pred_proba
                 else:
-                    y_pred_proba = model_loaded.predict_proba(X)
+                    y_pred_proba = base_model.predict_proba(X)
                 X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
             X_stacker = self.pred_probas_to_df(X_stacker)
             X_stacker.index = X.index
@@ -111,20 +117,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     self.feature_types_metadata['float'] += self.stack_columns
                 else:
                     self.feature_types_metadata['float'] = self.stack_columns
-        if k_fold >= 2:
-            super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
-            self.bagged_mode = True
-        else:
-            self.models = [copy.deepcopy(self.model_base)]
-            self.model_base = None
-            self.bagged_mode = False
-            self.models[0].set_contexts(path_context=self.path + self.models[0].name + '/')
-            self.models[0].feature_types_metadata = self.feature_types_metadata  # TODO: Move this
-            self.models[0].fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
-            self._oof_pred_proba = self.models[0].predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X))
-            self._n_repeats = 1
-            self._n_repeats_finished = 1
+        super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_stack_columns(self, base_model_names):
         if self.problem_type == MULTICLASS:
@@ -210,3 +203,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
+
+    def load_base_model(self, model_name):
+        if model_name in self.base_models_dict.keys():
+            model = self.base_models_dict[model_name]
+        else:
+            model_type = self.base_model_types_dict[model_name]
+            model_path = self.base_model_paths_dict[model_name]
+            model = model_type.load(model_path)
+        return model

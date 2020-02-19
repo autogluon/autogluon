@@ -1,5 +1,8 @@
 #!/bin/bash
 set -euo pipefail
+
+tests/check_style.py
+
 FILES=./tests/unittests/*.py
 for f in $FILES
 do

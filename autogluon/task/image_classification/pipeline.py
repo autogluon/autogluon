@@ -36,8 +36,8 @@ def train_image_classification(args, reporter):
                                     args.net,
                                     args.tricks.teacher_name,
                                     args.tricks.hard_weight,
-                                    args.optimizer.multi_precision,
                                     args.hybridize,
+                                    args.optimizer.multi_precision,
                                     args.tricks.use_pretrained,
                                     args.tricks.use_gn,
                                     args.tricks.last_gamma,
@@ -74,13 +74,13 @@ def train_image_classification(args, reporter):
     train_data, val_data, batch_fn, num_batches = \
         get_data_loader(args.dataset, input_size, batch_size, args.num_workers, args.final_fit, args.split_ratio)
 
-    if isinstance(args.lr_config.lr_mode, str):
+    if isinstance(args.lr_config.lr_mode, str): # fix
         target_lr = LR_params(args.optimizer.lr, args.lr_config.lr_mode, args.epochs, num_batches,
-                             args.lr_config.lr_decay_epoch,
-                             args.lr_config.lr_decay ,
-                             args.lr_config.lr_decay_period,
-                             args.lr_config.warmup_epochs,
-                             args.lr_config.warmup_lr)
+                              args.lr_config.lr_decay_epoch,
+                              args.lr_config.lr_decay ,
+                              args.lr_config.lr_decay_period,
+                              args.lr_config.warmup_epochs,
+                              args.lr_config.warmup_lr)
         lr_scheduler = target_lr.get_lr_scheduler
     else:
         lr_scheduler = args.lr_config.lr_mode

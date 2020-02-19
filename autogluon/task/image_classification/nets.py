@@ -115,6 +115,7 @@ def get_built_in_network(name, *args, **kwargs):
                 finetune_net.fc.initialize(init.Xavier(), ctx=ctx)
         # initialize and context
         finetune_net.collect_params().reset_ctx(ctx)
+        # finetune_net.load_parameters(opt.resume_params, ctx=context, cast_dtype=True)
         finetune_net.hybridize()
         return finetune_net
 

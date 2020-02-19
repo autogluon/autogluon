@@ -202,3 +202,4 @@ class CatboostModel(AbstractModel):
                 self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
 
         self.best_iteration = self.model.tree_count_ - 1
+        self.params_trained['iterations'] = self.model.tree_count_ - 1
