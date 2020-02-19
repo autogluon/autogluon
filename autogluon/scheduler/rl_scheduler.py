@@ -183,6 +183,9 @@ class RLScheduler(FIFOScheduler):
                 config = task.args['config']
                 while task_thread.is_alive():
                     reported_result = reporter.fetch()
+                    if reported_result is None:
+                        continue
+
                     if 'done' in reported_result and reported_result['done'] is True:
                         reporter.move_on()
                         task_thread.join()
@@ -237,6 +240,8 @@ class RLScheduler(FIFOScheduler):
             config = task.args['config']
             while not task_job.done():
                 reported_result = reporter.fetch()
+                if reported_result is None:
+                    continue
                 #print('reported_result', reported_result)
                 if 'done' in reported_result and reported_result['done'] is True:
                     reporter.move_on()

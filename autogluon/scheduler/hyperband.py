@@ -1,14 +1,13 @@
-import pickle
 import logging
+import pickle
 import threading
+
 import numpy as np
-import multiprocessing as mp
 
 from .fifo import FIFOScheduler
-from .hyperband_stopping import HyperbandStopping_Manager
 from .hyperband_promotion import HyperbandPromotion_Manager
-from .reporter import DistStatusReporter, DistSemaphore
-from ..utils import DeprecationHelper
+from .hyperband_stopping import HyperbandStopping_Manager
+from .reporter import DistStatusReporter
 
 __all__ = ['HyperbandScheduler', 'HyperbandStopping_Manager', 'HyperbandPromotion_Manager']
 
@@ -219,6 +218,9 @@ class HyperbandScheduler(FIFOScheduler):
         last_updated = None
         while not task_job.done():
             reported_result = reporter.fetch()
+            if reported_result is None:
+                continue
+
             if reported_result.get('done', False):
                 reporter.move_on()
                 terminator.on_task_complete(task, last_result)
