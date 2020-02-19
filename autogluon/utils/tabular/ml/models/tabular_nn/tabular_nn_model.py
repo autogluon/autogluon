@@ -61,7 +61,6 @@ class TabularNeuralNetModel(AbstractModel):
     # TODO: remove: metric_map = {REGRESSION: 'Rsquared', BINARY: 'accuracy', MULTICLASS: 'accuracy'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
     # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
     rescale_losses = {gluon.loss.L1Loss:'std', gluon.loss.HuberLoss:'std', gluon.loss.L2Loss:'var'} # dict of loss names where we should rescale loss, value indicates how to rescale. Call self.loss_func.name
-    model_file_name = 'tabularNN.pkl'
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
     
@@ -188,8 +187,6 @@ class TabularNeuralNetModel(AbstractModel):
               (train_dataset.num_examples, train_dataset.num_features, 
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
                len(train_dataset.feature_groups['language']) ))
-        # train_dataset.save()
-        # test_dataset.save()
         # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
         
         self.get_net(train_dataset)
@@ -198,7 +195,7 @@ class TabularNeuralNetModel(AbstractModel):
             time_elapsed = time.time() - start_time
             time_limit = time_limit - time_elapsed
 
-        self.train_net(params=self.params, train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True, time_limit=time_limit)
+        self.train_net(train_dataset=train_dataset, test_dataset=test_dataset, initialize=True, setup_trainer=True, time_limit=time_limit)
         """
         # TODO: if we don't want to save intermediate network parameters, need to do something like saving in temp directory to clean up after training:
         with make_temp_directory() as temp_dir:
@@ -228,26 +225,24 @@ class TabularNeuralNetModel(AbstractModel):
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         return
-    
-    def train_net(self, params, train_dataset, test_dataset=None,
-                  initialize=True, setup_trainer=True, file_prefix="", time_limit=None):
+
+    def train_net(self, train_dataset, test_dataset=None,
+                  initialize=True, setup_trainer=True, time_limit=None):
         """ Trains neural net on given train dataset, early stops based on test_dataset.
             Args:
-                params (dict): various hyperparameter values
                 train_dataset (TabularNNDataset): training data used to learn network weights
                 test_dataset (TabularNNDataset): validation data used for hyperparameter tuning
                 initialize (bool): set = False to continue training of a previously trained model, otherwise initializes network weights randomly
                 setup_trainer (bool): set = False to reuse the same trainer from a previous training run, otherwise creates new trainer from scratch
-                file_prefix (str): prefix to append to all file-names created here. Can use to make sure different trials create different files
         """
         start_time = time.time()
         logger.log(15, "Training neural network for up to %s epochs..." % self.params['num_epochs'])
         seed_value = self.params.get('seed_value')
-        if seed_value is not None: # Set seed
+        if seed_value is not None:  # Set seed
             random.seed(seed_value)
             np.random.seed(seed_value)
             mx.random.seed(seed_value)
-        if initialize: # Initialize the weights of network
+        if initialize:  # Initialize the weights of network
             logging.debug("initializing neural network...")
             self.model.collect_params().initialize(ctx=self.ctx)
             self.model.hybridize()
@@ -260,28 +255,26 @@ class TabularNeuralNetModel(AbstractModel):
                 from mxboard import SummaryWriter
                 self.summary_writer = SummaryWriter(logdir=self.path, flush_secs=5, verbose=False)
             self.setup_trainer()
-        best_val_metric = -np.inf # higher = better
+        best_val_metric = -np.inf  # higher = better
         val_metric = None
         best_val_epoch = 0
-        best_train_epoch = 0 # epoch with best training loss so far
-        best_train_loss = np.inf # smaller = better
         num_epochs = self.params['num_epochs']
         if test_dataset is not None:
             y_test = test_dataset.get_labels()
         else:
             y_test = None
-        
-        loss_scaling_factor = 1.0 # we divide loss by this quantity to stabilize gradients
+
+        loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
         loss_torescale = [key for key in self.rescale_losses if isinstance(self.loss_func, key)]
         if len(loss_torescale) > 0:
             loss_torescale = loss_torescale[0]
             if self.rescale_losses[loss_torescale] == 'std':
-                loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS # std-dev of labels
+                loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS  # std-dev of labels
             elif self.rescale_losses[loss_torescale] == 'var':
-                loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS # variance of labels
+                loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS  # variance of labels
             else:
                 raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale],self.loss_func))
-        
+
         if self.verbosity <= 1:
             verbose_eval = -1  # Print losses every verbose epochs, Never if -1
         elif self.verbosity == 2:
@@ -290,8 +283,8 @@ class TabularNeuralNetModel(AbstractModel):
             verbose_eval = 10
         else:
             verbose_eval = 1
-        
-        if num_epochs == 0: # use dummy training loop that stops immediately (useful for using NN just for data preprocessing / debugging)
+
+        if num_epochs == 0:  # use dummy training loop that stops immediately (useful for using NN just for data preprocessing / debugging)
             logger.log(20, "Not training Neural Net since num_epochs == 0.  Neural network architecture is:")
             for batch_idx, data_batch in enumerate(train_dataset.dataloader):
                 data_batch = train_dataset.format_batch_data(data_batch, self.ctx)
@@ -299,7 +292,7 @@ class TabularNeuralNetModel(AbstractModel):
                     output = self.model(data_batch)
                     labels = data_batch['label']
                     loss = self.loss_func(output, labels) / loss_scaling_factor
-                    # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
+                    # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
                 if batch_idx > 0:
@@ -307,10 +300,10 @@ class TabularNeuralNetModel(AbstractModel):
             self.model.save_parameters(self.net_filename)
             logger.log(15, "untrained Neural Net saved to file")
             return
-        
+
         # Training Loop:
         for e in range(num_epochs):
-            if e == 0: # special actions during first epoch:
+            if e == 0:  # special actions during first epoch:
                 logger.log(15, "Neural network architecture:")
                 logger.log(15, str(self.model))  # TODO: remove?
             cumulative_loss = 0
@@ -320,20 +313,22 @@ class TabularNeuralNetModel(AbstractModel):
                     output = self.model(data_batch)
                     labels = data_batch['label']
                     loss = self.loss_func(output, labels) / loss_scaling_factor
-                    # print(str(nd.mean(loss).asscalar()), end="\r") # prints per-batch losses
+                    # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
                 cumulative_loss += loss.sum()
-            train_loss = cumulative_loss/float(train_dataset.num_examples) # training loss this epoch
+            train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if test_dataset is not None:
-                # val_metric = self.evaluate_metric(test_dataset) # Evaluate after each epoch
+                # val_metric = self.evaluate_metric(test_dataset)  # Evaluate after each epoch
                 val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if (test_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if test_dataset is not None:
                     if not np.isnan(val_metric):
                         best_val_metric = val_metric
                 best_val_epoch = e
-                self.model.save_parameters(self.net_filename)  # TODO: Should we be saving every epoch when test_dataset is None? Probably not.
+                # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
+                if test_dataset is not None:
+                    self.model.save_parameters(self.net_filename)
             if test_dataset is not None:
                 if verbose_eval > 0 and e % verbose_eval == 0:
                     logger.log(15, "Epoch %s.  Train loss: %s, Val %s: %s" %
@@ -355,8 +350,9 @@ class TabularNeuralNetModel(AbstractModel):
                     logger.log(20, "\tRan out of time, stopping training early.")
                     break
 
-        self.model.load_parameters(self.net_filename) # Revert back to best model
-        if test_dataset is None: # evaluate one final time:
+        if test_dataset is not None:
+            self.model.load_parameters(self.net_filename)  # Revert back to best model
+        if test_dataset is None:  # evaluate one final time:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else:
             final_val_metric = self.score(X=test_dataset, y=y_test, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
@@ -440,7 +436,7 @@ class TabularNeuralNetModel(AbstractModel):
             return preds[:,1].asnumpy() # for binary problems, only return P(Y==1)
         return preds.asnumpy() # return 2D numpy array
 
-    def process_data(self, df, labels = None, is_test=True):
+    def process_data(self, df, labels=None, is_test=True):
         """ Process train or test DataFrame into a form fit for neural network models.
         Args:
             df (pd.DataFrame): Data to be processed (X)
@@ -464,7 +460,8 @@ class TabularNeuralNetModel(AbstractModel):
         df = self.ensure_onehot_object(df)
         df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
         return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map, 
-                                self.params, self.problem_type, labels=labels, is_test=True)
+                                batch_size=self.params['batch_size'], num_dataloading_workers=self.params['num_dataloading_workers'],
+                                problem_type=self.problem_type, labels=labels, is_test=True)
 
     def process_train_data(self, df, labels):
         """ Preprocess training data and create self.processor object that can be used to process future data.
@@ -475,18 +472,6 @@ class TabularNeuralNetModel(AbstractModel):
         # TODO: how to add new features such as time features and remember to do the same for test data?
         # TODO: no filtering of data-frame columns based on statistics, e.g. categorical columns with all unique variables or zero-variance features. 
                 This should be done in default_learner class for all models not just TabularNeuralNetModel...
-        
-        Here is old Grail code for column-filtering of data-frame Xtrain based on statistics:
-        try:
-            X_train_stats = X_train.describe(include='all').T.reset_index()
-            cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.max_unique_categorical_values) | (X_train_stats['unique'].isna())]['index'].values
-        except:
-            cols_to_drop = []
-        cols_to_keep = [col for col in list(X_train.columns) if col not in cols_to_drop]
-        cols_to_use = [col for col in self.cat_names if col in cols_to_keep]
-        print(f'Using {len(cols_to_use)}/{len(self.cat_names)} categorical features')
-        self.cat_names = cols_to_use
-        print(f'Using {len(self.cont_names)} cont features')
         """
         if labels is None:
             raise ValueError("Attempting process training data without labels")
@@ -510,7 +495,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
         return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
-                                self.params, self.problem_type, labels=labels, is_test=False)
+                                batch_size=self.params['batch_size'], num_dataloading_workers=self.params['num_dataloading_workers'],
+                                problem_type=self.problem_type, labels=labels, is_test=False)
 
     def setup_trainer(self):
         """ Set up stuff needed for training: 
