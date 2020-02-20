@@ -773,18 +773,42 @@ class AbstractTrainer:
     def save(self):
         save_pkl.save(path=self.path + self.trainer_file_name, object=self)
 
+    def load_models_into_memory(self, model_names=None):
+        if model_names is None:
+            model_names = self.get_model_names_all()
+        models = []
+        for model_name in model_names:
+            model = self.load_model(model_name)
+            self.models[model.name] = model
+            models.append(model)
+
+        for model in models:
+            if isinstance(model, StackerEnsembleModel):
+                for base_model_name in model.base_model_names:
+                    if base_model_name not in model.base_models_dict.keys():
+                        if base_model_name in self.models.keys():
+                            model.base_models_dict[base_model_name] = self.models[base_model_name]
+            if isinstance(model, BaggedEnsembleModel):
+                for fold, fold_model in enumerate(model.models):
+                    if isinstance(fold_model, str):
+                        model.models[fold] = model.load_child(fold_model)
+
     def load_model(self, model_name: str) -> AbstractModel:
-        if self.low_memory:
-            return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
-        else:
+        if model_name in self.models.keys():
             return self.models[model_name]
+        else:
+            return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
 
     def _get_dummy_stacker(self, level, use_orig_features=True):
         model_names = self.models_level['core'][level-1]
+        base_models_dict = {}
+        for model_name in model_names:
+            if model_name in self.models.keys():
+                base_models_dict[model_name] = self.models[model_name]
         dummy_stacker = StackerEnsembleModel(
             path='', name='',
             model_base=AbstractModel(path='', name='', problem_type=self.problem_type, objective_func=self.objective_func),
-            base_model_names=model_names, base_model_paths_dict=self.model_paths,
+            base_model_names=model_names, base_models_dict=base_models_dict, base_model_paths_dict=self.model_paths,
             base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level
         )
         return dummy_stacker

@@ -64,7 +64,7 @@ requirements = [
     'scikit-optimize',
     'catboost',
     'boto3',
-    'lightgbm==2.3.0',
+    'lightgbm>=2.3.0,<3.0',
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0',
     'scikit-learn>=0.20.0',

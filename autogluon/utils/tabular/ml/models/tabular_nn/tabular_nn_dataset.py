@@ -39,7 +39,7 @@ class TabularNNDataset:
     DATAOBJ_SUFFIX = '_tabNNdataset.pkl' # hard-coded names for files. This file contains pickled TabularNNDataset object
     DATAVALUES_SUFFIX = '_tabNNdata.npz' # This file contains raw data values as data_list of NDArrays
 
-    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, params, problem_type,
+    def __init__(self, processed_array, feature_arraycol_map, feature_type_map, batch_size, num_dataloading_workers, problem_type,
                  labels=None, is_test=True):
         """ Args:
                 processed_array: 2D numpy array returned by preprocessor. Contains raw data of all features as columns
@@ -48,12 +48,13 @@ class TabularNNDataset:
                 params (dict): various hyperparameters for our neural network model and the NN-specific data processing steps
                 labels (pd.Series): list of labels (y) if available
         """
-        self.params = params
-        self.is_test = is_test
-        self.problem_type = problem_type
+        self.dataset = None
+        self.dataloader = None
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map) # number of features (!=dim(processed_array) because some features may be vector-valued, eg one-hot)
-        self.batch_size = min(self.num_examples, params['batch_size'])
+        self.batch_size = min(self.num_examples, batch_size)
+        self.is_test = is_test
+        self.num_dataloading_workers = num_dataloading_workers
         last_batch_size = self.num_examples % self.batch_size
         if last_batch_size == 0:
             last_batch_size = self.batch_size
@@ -125,26 +126,29 @@ class TabularNNDataset:
                     self.data_desc.append("language")
                     self.feature_dataindex_map[feature]  = len(data_list)-1
 
+        self.num_classes = None
         if labels is not None:
             labels = np.array(labels)
-            if self.problem_type == REGRESSION and labels.dtype != np.float32:
+            if problem_type == REGRESSION and labels.dtype != np.float32:
                     labels = labels.astype('float32') # Convert to proper float-type if not already
             data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
             self.data_desc.append("label")
             self.label_index = len(data_list) - 1 # To access data labels, use: self.dataset._data[self.label_index]
-            self.num_classes = None
-            if self.problem_type in [BINARY, MULTICLASS]:
+            if problem_type in [BINARY, MULTICLASS]:
                 self.num_classes = len(set(labels))
         
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
         self.num_categories_per_embed_feature = None
-        self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list) # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
-        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle= not is_test,
-                                last_batch = 'keep' if is_test else 'rollover',
-                                num_workers=self.params['num_dataloading_workers']) # no need to shuffle test data
-        if not is_test: 
+        self.generate_dataset_and_dataloader(data_list=data_list)
+        if not self.is_test:
             self.num_categories_per_embedfeature = self.getNumCategoriesEmbeddings()
+
+    def generate_dataset_and_dataloader(self, data_list):
+        self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)  # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
+        self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle=not self.is_test,
+                                                   last_batch='keep' if self.is_test else 'rollover',
+                                                   num_workers=self.num_dataloading_workers)  # no need to shuffle test data
 
     def has_vector_features(self):
         """ Returns boolean indicating whether this dataset contains vector features """
@@ -281,7 +285,7 @@ class TabularNNDataset:
         dataobj_file = file_prefix + self.DATAOBJ_SUFFIX
         datalist_file = file_prefix + self.DATAVALUES_SUFFIX
         data_list = self.dataset._data
-        self.dataset = None # Avoid pickling these
+        self.dataset = None  # Avoid pickling these
         self.dataloader = None
         save_pkl.save(path=dataobj_file, object=self)
         mx.nd.save(datalist_file, data_list)
@@ -292,10 +296,8 @@ class TabularNNDataset:
         """ Additional naming changes will be appended to end of file_prefix (must contain full absolute path) """
         dataobj_file = file_prefix + cls.DATAOBJ_SUFFIX
         datalist_file = file_prefix + cls.DATAVALUES_SUFFIX
-        tabNNdataset = load_pkl.load(path=dataobj_file)
+        dataset: TabularNNDataset = load_pkl.load(path=dataobj_file)
         data_list = mx.nd.load(datalist_file)
-        tabNNdataset.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)
-        tabNNdataset.dataloader = mx.gluon.data.DataLoader(tabNNdataset.dataset, tabNNdataset.batch_size, shuffle= not tabNNdataset.is_test, 
-                                   last_batch = 'keep' if tabNNdataset.is_test else 'rollover', num_workers=tabNNdataset.params['num_dataloading_workers'])
+        dataset.generate_dataset_and_dataloader(data_list=data_list)
         logger.debug("TabularNN Dataset loaded from files: \n %s \n %s" % (dataobj_file, datalist_file))
-        return tabNNdataset
+        return dataset

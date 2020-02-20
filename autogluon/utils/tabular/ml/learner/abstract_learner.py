@@ -560,3 +560,14 @@ class AbstractLearner:
             return self.trainer
         else:
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+
+    # TODO: Add to predictor
+    # TODO: Make this safe in large ensemble situations that would result in OOM
+    # Loads all models in memory so that they don't have to loaded during predictions
+    def persist_trainer(self, low_memory=False):
+        self.trainer = self.load_trainer()
+        self.is_trainer_present = True
+        if not low_memory:
+            self.trainer.load_models_into_memory()
+            # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
+            #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown

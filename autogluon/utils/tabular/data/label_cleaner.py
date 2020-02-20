@@ -1,6 +1,7 @@
 import logging
-from pandas import Series
+
 import numpy as np
+from pandas import Series
 
 from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
@@ -53,7 +54,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         self.label_index_to_remove = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 1]
 
     def transform(self, y: Series) -> Series:
-        if type(y) == np.ndarray:
+        if isinstance(y, np.ndarray):
             y = Series(y)
         y = y.map(self.inv_map)
         return y
@@ -65,9 +66,8 @@ class LabelCleanerMulticlass(LabelCleaner):
     # TODO: Unused?
     def transform_proba(self, y):
         if self.invalid_class_count > 0:
-            # This assumes y has only 0's for any columns it is about to remove, if it does not, weird things may start to happen since rows will not sum to 1
-            y_transformed = np.delete(y, self.label_index_to_remove, axis=1)
-            return y_transformed
+            # this assumes y has only 0's for any columns it is about to remove, if it does not, weird things may start to happen since rows will not sum to 1
+            return np.delete(y, self.label_index_to_remove, axis=1)
         else:
             return y
 
@@ -79,7 +79,8 @@ class LabelCleanerMulticlass(LabelCleaner):
         else:
             return y
 
-    def _generate_categorical_mapping(self, y: Series) -> dict:
+    @staticmethod
+    def _generate_categorical_mapping(y: Series) -> dict:
         categories = y.astype('category')
         cat_mappings_dependent_var = dict(enumerate(categories.cat.categories))
         return cat_mappings_dependent_var
@@ -97,10 +98,10 @@ class LabelCleanerBinary(LabelCleaner):
             self.inv_map: dict = {1: 0, 2: 1}
         elif ('1' in self.unique_values) and ('2' in self.unique_values):
             self.inv_map: dict = {'1': 0, '2': 1}
-        elif ((str(False) in [str(val) for val in self.unique_values]) and 
+        elif ((str(False) in [str(val) for val in self.unique_values]) and
               (str(True) in [str(val) for val in self.unique_values])):
-            false_val = [val for val in self.unique_values if str(val)==str(False)][0]  # may be str or bool 
-            true_val = [val for val in self.unique_values if str(val)==str(True)][0] # may be str or bool
+            false_val = [val for val in self.unique_values if str(val) == str(False)][0]  # may be str or bool
+            true_val = [val for val in self.unique_values if str(val) == str(True)][0]  # may be str or bool
             self.inv_map: dict = {false_val: 0, true_val: 1}
         elif (0 in self.unique_values) and (1 in self.unique_values):
             self.inv_map: dict = {0: 0, 1: 1}
@@ -125,14 +126,13 @@ class LabelCleanerBinary(LabelCleaner):
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
 
     def transform(self, y: Series) -> Series:
-        if type(y) == np.ndarray:
+        if isinstance(y, np.ndarray):
             y = Series(y)
         y = y.map(self.inv_map)
         return y
 
     def inverse_transform(self, y: Series) -> Series:
-        y = y.map(self.cat_mappings_dependent_var)
-        return y
+        return y.map(self.cat_mappings_dependent_var)
 
 
 class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
@@ -162,7 +162,7 @@ class LabelCleanerDummy(LabelCleaner):
         self.num_classes = None
 
     def transform(self, y: Series) -> Series:
-        if type(y) == np.ndarray:
+        if isinstance(y, np.ndarray):
             y = Series(y)
         return y
 
