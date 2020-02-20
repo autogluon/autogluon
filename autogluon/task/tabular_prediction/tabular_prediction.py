@@ -272,7 +272,7 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs = []
 
         if search_options is None:
-            search_options = {}
+            search_options = dict()
 
         if hyperparameters is None:
             hyperparameters = {
@@ -355,7 +355,15 @@ class TabularPrediction(BaseTask):
         }
         if isinstance(search_strategy, str):
             scheduler = schedulers[search_strategy.lower()]
+            # This is a fix for now. But we need to separate between scheduler
+            # (mainly FIFO and Hyperband) and searcher. Currently, most searchers
+            # only work with FIFO, and Hyperband works only with random searcher,
+            # but this will be different in the future.
+            if search_strategy == 'hyperband':
+                # Currently, HyperbandScheduler only supports random searcher
+                scheduler_options['searcher'] = 'random'
         else:
+            # TODO: Check that search_strategy is a subclass of TaskScheduler
             assert callable(search_strategy)
             scheduler = search_strategy
             scheduler_options['searcher'] = 'random'
