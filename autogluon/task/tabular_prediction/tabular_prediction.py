@@ -57,7 +57,7 @@ class TabularPrediction(BaseTask):
     
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
-            hyperparameter_tune=False, feature_prune=False, auto_stack=False, holdout_frac=None,
+            auto_stack=False, hyperparameter_tune=False, feature_prune=False, holdout_frac=None,
             num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters=None, enable_fit_continuation=False,
             time_limits=None, num_trials=None, search_strategy='random', search_options=None,
@@ -102,19 +102,21 @@ class TabularPrediction(BaseTask):
             
             You can also pass your own evaluation function here as long as it follows formatting of the functions defined in `autogluon/utils/tabular/metrics/`.
         stopping_metric : function or str, default = None
-            Metric which models use to early stop to avoid overfitting.
+            Metric which iteratively-trained models use to early stop to avoid overfitting.
             `stopping_metric` is not used by weighted ensembles, instead weighted ensembles maximize `eval_metric`.
             Defaults to `eval_metric` value except when `eval_metric='roc_auc'`, where it defaults to `log_loss`.
             Options are identical to options for `eval_metric`.
+        auto_stack : bool, default = False
+            Whether AutoGluon should automatically utilize bagging and multi-layer stack ensembling to boost predictive accuracy.
+            Set this = True if you are willing to tolerate longer training times in order to maximize predictive accuracy!
+            Note: This overrides `num_bagging_folds` and `stack_ensemble_levels` arguments (selects optimal values for these parameters based on dataset properties).
+            Note: This can increase training time (and inference time) by up to 20x, but can greatly improve predictive performance.
         hyperparameter_tune : bool, default = False
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
+            It is currently not recommended to use `hyperparameter_tune` with `auto_stack` due to potential overfitting. 
+            Use `auto_stack` to maximize predictive accuracy; use `hyperparameter_tune` if you prefer to deploy just a single model rather an ensemble.
         feature_prune : bool, default = False
             Whether or not to perform feature selection.
-        auto_stack : bool, default = False
-            Whether to have AutoGluon automatically attempt to select optimal num_bagging_folds and stack_ensemble_levels based on data properties.
-            Note: Overrides num_bagging_folds and stack_ensemble_levels values.
-            Note: This can increase training time by up to 20x, but can produce much better results.
-            Note: This can increase inference time by up to 20x.
         hyperparameters : dict
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
@@ -144,7 +146,7 @@ class TabularPrediction(BaseTask):
                 KNN: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'weights' parameter will be overriden. Both 'distance' and 'uniform' are used automatically, training two models.
-
+        
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`). 
             Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
@@ -159,11 +161,10 @@ class TabularPrediction(BaseTask):
         num_bagging_sets : int
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
             Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
-            Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled.
-            Increasing num_bagged_sets reduces the bagged aggregated variance without increasing the amount each model is overfit.
+            Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
         stack_ensemble_levels : int, default = 0
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling). 
-            Disabled by default, but we recommend values between 1-3 to maximize predictive performance. 
+            Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
         enable_fit_continuation : bool, default = False
             Whether the predictor returned by this `fit()` call should be able to be further trained via another future `fit()` call.
@@ -172,16 +173,16 @@ class TabularPrediction(BaseTask):
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
         num_trials : int
-            Maximal number of different hyperparameter settings of each model type to evaluate during HPO. 
+            Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent. 
         search_strategy : str
-            Which hyperparameter search algorithm to use. 
+            Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
         nthreads_per_trial : int
-            How many CPUs to use in each trial (ie. single training run of a model).
-            This is automatically determined by AutoGluon when left as None.
+            How many CPUs to use in each training run of an individual model.
+            This is automatically determined by AutoGluon when left as None (based on available compute).
         ngpus_per_trial : int
             How many GPUs to use in each trial (ie. single training run of a model). 
             This is automatically determined by AutoGluon when left as None. 

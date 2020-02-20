@@ -242,12 +242,14 @@ class TabularPredictor(BasePredictor):
 
         if verbosity > 0:  # print stuff
             print("*** Summary of fit() ***")
+            print("Performance of each model on held-out data:")
+            results['leaderboard'] = self._learner.leaderboard(silent=False)
+            # self._summarize('model_performance', 'Validation performance of individual models', results)
+            #  self._summarize('model_best', 'Best model (based on validation performance)', results)
+            # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
             print("Number of models trained: %s" % len(results['model_performance']))
-            print("Types of models trained: ")
+            print("Types of models trained:")
             print(unique_model_types)
-            self._summarize('model_performance', 'Validation performance of individual models', results)
-            self._summarize('model_best', 'Best model (based on validation performance)', results)
-            self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
             num_fold_str = ""
             bagging_used = results['num_bagging_folds'] > 0
             if bagging_used:
