@@ -78,6 +78,7 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
                 Dict created during TabularPredictor.fit_summary().
                 Must at least contain key: 'model_performance'.
     """
+    save_path = output_directory + save_file if output_directory else None
     hidden_keys = []
     model_performancedict = results['model_performance']
     model_names = list(model_performancedict.keys())
@@ -85,13 +86,16 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
     model_types = [results['model_types'][key] for key in model_names]
     hidden_keys.append(model_types)
     model_hyperparams = [_formatDict(results['model_hyperparams'][key]) for key in model_names]
-    inference_latencies = [results['leaderboard']['pred_time_val'][results['leaderboard']['model']==m].values[0] for m in model_names]
-    training_times = [results['leaderboard']['fit_time'][results['leaderboard']['model']==m].values[0] for m in model_names]
-    datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types, 'inference_latency': inference_latencies,
-                'training_time': training_times, 'hyperparameters': model_hyperparams}
-    save_path = output_directory + save_file if output_directory else None
-    mousover_plot(datadict, attr_x='inference_latency', attr_y='performance', attr_color='model_type', 
-                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+    datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types, 'hyperparameters': model_hyperparams}
+    hpo_used = results['hyperparameter_tune']
+    if not hpo_used:  # currently, times are only stored without HPO
+        datadict['inference_latency'] = [results['leaderboard']['pred_time_val'][results['leaderboard']['model']==m].values[0] for m in model_names]
+        datadict['training_time'] = [results['leaderboard']['fit_time'][results['leaderboard']['model']==m].values[0] for m in model_names]
+        mousover_plot(datadict, attr_x='inference_latency', attr_y='performance', attr_color='model_type', 
+                      save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+    else:
+        mousover_plot(datadict, attr_x='model_type', attr_y='performance',
+                      save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
 
 def _formatDict(d):
     """ Returns dict as string with HTML new-line tags <br> between key-value pairs. """

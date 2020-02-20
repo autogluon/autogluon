@@ -260,6 +260,10 @@ class TabularPredictor(BasePredictor):
             if stacking_used:
                 num_stack_str = f" (with {results['stack_ensemble_levels']} levels)"
             print("Stack-ensembling used: %s %s" % (stacking_used, num_stack_str))
+            hpo_str = ""
+            if hpo_used and verbosity <= 2:
+                hpo_str = " (call fit_summary() with verbosity >= 3 to see detailed HPO info)"
+            print("Hyperparameter-tuning used: %s %s" % (hpo_used, hpo_str))
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
             print("User-specified hyperparameters:")
             print(results['hyperparameters_userspecified'])
