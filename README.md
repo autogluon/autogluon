@@ -9,9 +9,8 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # First install package from terminal:  pip install mxnet autogluon
 
 from autogluon import TabularPrediction as task
-import pandas as pd
-train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+train_data = 'https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv'
+test_data = 'https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv'
 predictor = task.fit(train_data=train_data, label='class')
 performance = predictor.evaluate(test_data)
 ```
