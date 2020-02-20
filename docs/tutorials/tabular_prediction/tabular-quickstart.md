@@ -1,5 +1,4 @@
-# Predicting Columns in a Table - Quick Start
-:label:`sec_tabularquick`
+# Predicting Columns in a Table - Quick Start :label:`sec_tabularquick`
 
 Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predict the values in one column of a data table based on the rest of the columns' values. Use AutoGluon with tabular data for both classification and regression problems. This tutorial demonstrates how to use AutoGluon to produce a classification model that predicts whether or not a person's income exceeds $50,000. 
 
@@ -14,7 +13,7 @@ import pandas as pd
 Load training data from a CSV file into a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html).
 
 ```{.python .input}
-train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+train_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv', low_memory=False)
 train_data = train_data.head(500) # subsample 500 data points for faster demo
 print(train_data.head())
 ```
@@ -39,7 +38,7 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
 Next, load separate test data to demonstrate how to make predictions on new examples at inference time:
 
 ```{.python .input}
-test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+test_data = pd.read_csv('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv', low_memory=False)
 y_test = test_data[label_column]  # values to predict
 test_data_nolab = test_data.drop(labels=[label_column],axis=1) # delete label column to prove we're not cheating
 print(test_data_nolab.head())
