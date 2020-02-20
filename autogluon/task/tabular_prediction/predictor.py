@@ -214,6 +214,16 @@ class TabularPredictor(BasePredictor):
         """
         hpo_used = len(self._trainer.hpo_results) > 0
         model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
+        model_innertypenames = {key: self._trainer.model_types_inner[key].__name__ for key in self._trainer.model_types if key in self._trainer.model_types_inner}
+        MODEL_STR = 'Model'
+        ENSEMBLE_STR = 'Ensemble'
+        for model in model_typenames:
+            if (model in model_innertypenames) and (ENSEMBLE_STR not in model_innertypenames[model]) and (ENSEMBLE_STR in model_typenames[model]):
+                new_model_typename = model_typenames[model] + "_" + model_innertypenames[model]
+                if new_model_typename.endswith(MODEL_STR):
+                    new_model_typename = new_model_typename[:-len(MODEL_STR)]
+                model_typenames[model] = new_model_typename
+        
         unique_model_types = set(model_typenames.values())  # no more class info
         # all fit() information that is returned:
         results = {
