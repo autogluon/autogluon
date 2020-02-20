@@ -1,8 +1,11 @@
 import mxnet as mx
+
 from .nets import get_network
+
 
 class Sample_params(object):
     propose = "Sample params"
+
     def __init__(self, *args):
         batch_size, num_gpus, num_workers = args
         self._batch_size = batch_size * max(1, num_gpus)
@@ -11,7 +14,7 @@ class Sample_params(object):
 
     @classmethod
     def tell_info(cls):
-        print("propose:",cls.propose)
+        print("propose:", cls.propose)
 
     @property
     def get_batchsize(self):
@@ -22,7 +25,7 @@ class Sample_params(object):
         return self._context
 
 
-class Getmodel_kwargs():
+class Getmodel_kwargs:
     def __init__(self,
                  context,
                  classes,
@@ -46,9 +49,11 @@ class Getmodel_kwargs():
             self._dtype = 'float16'
         else:
             self._dtype = 'float32'
+
         if use_gn:
             from gluoncv.nn import GroupNorm
             self._kwargs['norm_layer'] = GroupNorm
+
         if isinstance(model_name, str):
             if model_name.startswith('vgg'):
                 self._kwargs['batch_norm'] = batch_norm
@@ -62,7 +67,6 @@ class Getmodel_kwargs():
             self.distillation = True
         else:
             self.distillation = False
-
 
     @property
     def dtype(self):
@@ -83,4 +87,3 @@ class Getmodel_kwargs():
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
         return net
-

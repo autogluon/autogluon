@@ -1,23 +1,19 @@
-import warnings
 import logging
+
 import mxnet as mx
-from mxnet.gluon import nn
-from mxnet import gluon, init, autograd, nd
-from mxnet.gluon.data.vision import transforms
-from gluoncv.model_zoo import get_model
 from gluoncv.loss import DistillationSoftmaxCrossEntropyLoss
+from mxnet import gluon, nd
+
 from .metrics import get_metric_instance
-from ...core.optimizer import SGD, NAG
-from ...core import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ...utils import tqdm
-from ...utils.mxutils import collect_params
-from .nets import get_network
-from .utils import *
 from .processing_params import Sample_params, Getmodel_kwargs
+from .utils import *
+from ...core import *
+from ...utils import tqdm
 from ...utils.learning_rate import LR_params
+from ...utils.mxutils import collect_params
 
 __all__ = ['train_image_classification']
+
 
 @args()
 def train_image_classification(args, reporter):
@@ -50,19 +46,24 @@ def train_image_classification(args, reporter):
     if args.tricks.no_wd:
         for k, v in net.collect_params('.*beta|.*gamma|.*bias').items():
             v.wd_mult = 0.0
+
     if args.tricks.label_smoothing or args.tricks.mixup:
         sparse_label_loss = False
     else:
         sparse_label_loss = True
+
     if distillation:
         teacher = target_kwargs.get_teacher
+
         def teacher_prob(data):
-            teacher_prob = [nd.softmax(teacher(X.astype(target_kwargs.dtype, copy=False)) / args.tricks.temperature) \
-                                for X in data]
-            return teacher_prob
+            return [
+                nd.softmax(teacher(X.astype(target_kwargs.dtype, copy=False)) / args.tricks.temperature)
+                for X in data
+            ]
+
         L = DistillationSoftmaxCrossEntropyLoss(temperature=args.tricks.temperature,
-                                                         hard_weight=args.tricks.hard_weight,
-                                                         sparse_label=sparse_label_loss)
+                                                hard_weight=args.tricks.hard_weight,
+                                                sparse_label=sparse_label_loss)
     else:
         L = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=sparse_label_loss)
         teacher_prob = None
@@ -71,13 +72,14 @@ def train_image_classification(args, reporter):
     else:
         metric = get_metric_instance(args.metric)
 
-    train_data, val_data, batch_fn, num_batches = \
-        get_data_loader(args.dataset, input_size, batch_size, args.num_workers, args.final_fit, args.split_ratio)
+    train_data, val_data, batch_fn, num_batches = get_data_loader(
+        args.dataset, input_size, batch_size, args.num_workers, args.final_fit, args.split_ratio
+    )
 
-    if isinstance(args.lr_config.lr_mode, str): # fix
+    if isinstance(args.lr_config.lr_mode, str):  # fix
         target_lr = LR_params(args.optimizer.lr, args.lr_config.lr_mode, args.epochs, num_batches,
                               args.lr_config.lr_decay_epoch,
-                              args.lr_config.lr_decay ,
+                              args.lr_config.lr_decay,
                               args.lr_config.lr_decay_period,
                               args.lr_config.warmup_epochs,
                               args.lr_config.warmup_lr)
@@ -87,6 +89,7 @@ def train_image_classification(args, reporter):
     args.optimizer.lr_scheduler = lr_scheduler
 
     trainer = gluon.Trainer(net.collect_params(), args.optimizer)
+
     def train(epoch, num_epochs, metric):
         for i, batch in enumerate(train_data):
             metric = default_train_fn(epoch, num_epochs, net, batch, batch_size, L, trainer,
@@ -108,11 +111,10 @@ def train_image_classification(args, reporter):
     for epoch in tbar:
         metric = train(epoch, args.epochs, metric)
         train_metric_name, train_metric_score = metric.get()
-        tbar.set_description('[Epoch %d] training: %s=%.3f' %(epoch, train_metric_name, train_metric_score))
+        tbar.set_description(f'[Epoch {epoch}] training: {train_metric_name}={train_metric_score :.3f}')
         if not args.final_fit:
             reward = test(epoch)
-            tbar.set_description('[Epoch {}] Validation: {:.3f}'.format(epoch, reward))
+            tbar.set_description(f'[Epoch {epoch}] Validation: {reward :.3f}')
 
     if args.final_fit:
-        return {'model_params': collect_params(net),
-                'num_classes': classes}
+        return {'model_params': collect_params(net), 'num_classes': classes}
