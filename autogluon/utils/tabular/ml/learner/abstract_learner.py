@@ -533,8 +533,9 @@ class AbstractLearner:
         save_pkl.save(path=self.save_path, object=self)
 
     # reset_paths=True if the learner files have changed location since fitting.
+    # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
     @classmethod
-    def load(cls, path_context, reset_paths=False):
+    def load(cls, path_context, reset_paths=True):
         load_path = path_context + cls.save_file_name
         obj = load_pkl.load(path=load_path)
         if reset_paths:
