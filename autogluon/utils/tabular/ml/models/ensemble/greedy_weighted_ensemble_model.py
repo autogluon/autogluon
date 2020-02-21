@@ -1,7 +1,6 @@
 import logging
 from ..abstract.abstract_model import AbstractModel
-from ....metrics import accuracy
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import MULTICLASS
 from ...tuning.ensemble_selection import EnsembleSelection
 
 logger = logging.getLogger(__name__)

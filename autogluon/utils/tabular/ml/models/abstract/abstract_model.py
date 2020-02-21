@@ -90,10 +90,6 @@ class AbstractModel:
         self.features = features
         self.debug = debug
 
-        # TODO: there is no load_model method, implement it or replace with load
-        if isinstance(model, str):
-            self.model = self.load_model(model)
-
         self.params = {}
         self._set_default_params()
         self.nondefault_params = []
@@ -142,7 +138,7 @@ class AbstractModel:
             return X[self.features]
         return X
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
@@ -195,10 +191,6 @@ class AbstractModel:
             return eval_metric(y, y_pred)
         else:
             return eval_metric(y, y_pred_proba)
-
-    # TODO: Add simple generic CV logic
-    def cv(self, X, y, k_fold=5):
-        raise NotImplementedError
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         if directory is None:

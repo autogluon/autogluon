@@ -144,47 +144,6 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
-    def cv(self, X=None, y=None, k_fold=5, dataset_train=None):
-        logger.warning("Warning: Running GBM cross-validation. This is currently unstable.")
-        try_import_lightgbm()
-        import lightgbm as lgb
-        if dataset_train is None:
-            dataset_train, _ = self.generate_datasets(X_train=X, Y_train=y)
-        gc.collect()
-        params = copy.deepcopy(self.params)
-        eval_metric = self.get_eval_metric()
-        # TODO: Either edit lgb.cv to return models / oof preds or make custom implementation!
-        cv_params = {
-            'params': params,
-            'train_set': dataset_train,
-            'num_boost_round': self.num_boost_round,
-            'nfold': k_fold,
-            'early_stopping_rounds': 150,
-            'verbose_eval': 1000,
-            'seed': 0,
-        }
-        if type(eval_metric) != str:
-            cv_params['feval'] = eval_metric
-            cv_params['params']['metric'] = 'None'
-        else:
-            cv_params['params']['metric'] = eval_metric
-        if self.problem_type == REGRESSION:
-            cv_params['stratified'] = False
-
-        logger.log(15, 'Current parameters:')
-        logger.log(15, params)
-        eval_hist = lgb.cv(**cv_params)  # TODO: Try to use customer early stopper to enable dart
-        best_score = eval_hist[self.eval_metric_name + '-mean'][-1]
-        logger.log(15, 'Best num_boost_round: %s ', len(eval_hist[self.eval_metric_name+'-mean']))
-        logger.log(15, 'Best CV score: %s' % best_score)
-        return best_score
-
-    def convert_to_weight(self, X: DataFrame):
-        logger.debug(X)
-        w = X['count']
-        X = X.drop(['count'], axis=1)
-        return X, w
-
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round','num_threads', 'num_classes', 'verbose'] # Keys that are specific to lightGBM Dataset object construction.
         data_params = {}
