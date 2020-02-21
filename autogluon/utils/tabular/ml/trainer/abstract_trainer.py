@@ -1,4 +1,5 @@
 import copy, time, traceback, logging
+import os
 from typing import List
 import numpy as np
 import pandas as pd
@@ -129,15 +130,15 @@ class AbstractTrainer:
     # path_root is the directory containing learner.pkl
     @property
     def path_root(self):
-        return self.path.rsplit('/', maxsplit=2)[0] + '/'
+        return self.path.rsplit(os.path.sep, maxsplit=2)[0] + os.path.sep
 
     @property
     def path_utils(self):
-        return self.path_root + 'utils/'
+        return self.path_root + 'utils' + os.path.sep
 
     @property
     def path_data(self):
-        return self.path_utils + 'data/'
+        return self.path_utils + 'data' + os.path.sep
 
     def load_X_train(self):
         path = self.path_data + 'X_train.pkl'
