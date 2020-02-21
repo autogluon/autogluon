@@ -38,7 +38,9 @@ predictor = task.load(savedir, verbosity=4) # use high-verbosity to see distilla
 # Distill ensemble into single model:
 learner = predictor._learner
 
-num_augmented_samples = max(100000, 2*len(train_data)) # distillation-training will take longer the bigger this value is, but bigger values can produce superior distilled models.
+num_augmented_samples = int(1.0*len(train_data)) # distillation-training will take longer the bigger this value is, but bigger values can produce superior distilled models.
+print(num_augmented_samples)
+
 learner.augment_distill(num_augmented_samples=num_augmented_samples, time_limits=time_limits)
 
 # Compare best compressed single model with best distilled model:

@@ -819,6 +819,7 @@ class AbstractTrainer:
             num_augmented_samples: higher values will take longer, but likely improved distillation performance.
             time_limits: only controls time-limit for each model, not overall time-limit (to ensure every model type gets fair chance)
         """
+        EPS_bin2regress = 0.01 # truncate predicted probabilities to [EPS, 1-EPS] when converting binary problems -> regression
         og_bagged_mode = self.bagged_mode
         og_verbosity = self.verbosity
         self.bagged_mode = False # turn off bagging
@@ -828,34 +829,85 @@ class AbstractTrainer:
         if y is None:
             y = self.load_y_train() # TODO: doesn't appear anywhere?
 
-        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, 
-                                                        objective_func=self.objective_func, 
-                                                        stopping_metric=self.stopping_metric, 
-                                                        num_classes=self.num_classes, 
-                                                        hyperparameters=self.hyperparameters)
-        X = self.augment_data_preserve_joint(X, num_augmented_samples)
-        y_distill = self.predict_proba(X)
+        X_aug = self.augment_data_preserve_joint(X, num_augmented_samples)
+        y_aug = self.predict_proba(X_aug)
+        X_train, X_test, y_train, y_test = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=0.2)
         if self.problem_type == MULTICLASS:
-            y_distill = pd.DataFrame(y_distill)
-            X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=SOFTCLASS, test_size=0.1)
+            y_aug = pd.DataFrame(y_aug)
+            # y_train = convertToOneHot?? # TODO 
+            # y_test = convertToOneHot?? # TODO 
             self.normalize_predprobs = True
         else:
+            y_aug = pd.Series(y_aug)
             if self.problem_type == BINARY:
-                EPS_bin2regress = 0.03
-                min_pred = np.min(y_distill)
-                max_pred = np.max(y_distill)
-                if min_pred < EPS_bin2regress or max_pred > 1 - EPS_bin2regress: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
-                    y_distill =  EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_distill - min_pred)
-                self.normalize_predprobs = True # make sure resulting regression predictions will become normalized probabilities
-            y_distill = pd.Series(y_distill)
-            X_train, X_test, y_train, y_test = generate_train_test_split(X, y_distill, problem_type=REGRESSION, test_size=0.1)
+                min_pred = 0.0
+                max_pred = 1.0
+                y_train = EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_train - min_pred)
+                y_test = EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_test - min_pred)
+                y_aug = EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_aug - min_pred)
+                self.normalize_predprobs = True
+        
+        X_train = pd.concat([X_train, X_aug])
+        X_train.reset_index(drop=True, inplace=True)
+        y_train = pd.concat([y_train, y_aug])
+        y_train.reset_index(drop=True, inplace=True)
+        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, 
+                                                        objective_func=self.objective_func, stopping_metric=self.stopping_metric, 
+                                                        num_classes=self.num_classes, hyperparameters=self.hyperparameters)
         for model in models_distill:
-            model_distill = self.train_single_full(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, model=model,
+            print("Distilling with model: %s ..." % str(model.name))
+            model = self.train_single_full(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, model=model,
                                                    hyperparameter_tune=False, stack_name='distill', time_limit=time_limits)
         # reset trainer to old state:
         self.bagged_mode = og_bagged_mode
         self.verbosity = og_verbosity
         self.save()
+        
+    
+    # TODO: experimental code.
+    def augment_data_preserve_joint(self, X, num_augmented_samples = 10000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
+        """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
+            num_augmented_samples: number of additional augmented data points to return
+            frac_feature_perturb: fraction of features perturbed in each data point. Set smaller to ensure augmented samples remain closer to real data.
+            continuous_feature_noise: we noise numeric features by this factor times their std-dev.
+            These data are NOT marginally sampled, rather we replace randomly selected subset of features for each datapoint. Larger subset -> augmented data is more different than original.
+        """
+        if len(X) >= num_augmented_samples:
+            print("No data augmentation performed since training data is large enough.")
+            return X
+        if frac_feature_perturb > 1.0:
+            raise ValueError("frac_feature_perturb must be <= 1")
+        print("Augmenting training data with synthetic samples for distillation...")
+        num_feature_perturb = max(1, int(frac_feature_perturb*len(X.columns)))
+        num_augmented_samples = num_augmented_samples - len(X)
+        X_aug = pd.concat([X.iloc[[0]]]*num_augmented_samples)
+        X_aug.reset_index(drop=True, inplace=True)
+        continuous_types = ['float','int', 'datetime']
+        continuous_featnames = [] # these features will have shuffled values with added noise
+        for contype in continuous_types:
+            if contype in self.feature_types_metadata:
+                continuous_featnames += self.feature_types_metadata[contype]
+        
+        for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
+            og_ind = i % len(X)
+            augdata_i = X.iloc[og_ind].copy()
+            cols_toperturb = np.random.choice(list(X.columns), size=num_feature_perturb, replace=False)
+            for feature in cols_toperturb:
+                feature_data = X[feature]
+                augdata_i[feature] = feature_data.sample(n=1).values[0]
+            X_aug.iloc[i] = augdata_i
+
+        for feature in X.columns:
+            if feature in continuous_featnames:
+                feature_data = X[feature]
+                aug_data = X_aug[feature]
+                noise = np.random.normal(scale=np.std(feature_data)*continuous_feature_noise, size=num_augmented_samples)
+                aug_data = aug_data + noise
+                X_aug[feature] = pd.Series(aug_data, index=X_aug.index)
+
+        X_aug.drop_duplicates(keep='first', inplace=True)
+        print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
+        return X_aug
     
     # TODO: experimental code.
     def augment_data_hotdeck(self, X, num_augmented_samples = 50000, continuous_feature_noise = 0.1):
@@ -892,7 +944,7 @@ class AbstractTrainer:
         return X_aug
     
     # TODO: experimental code.
-    def augment_data_preserve_joint(self, X, num_augmented_samples = 50000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
+    def augment_munge(self, X, num_augmented_samples = 50000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
             num_augmented_samples: number of total augmented data points to return (we add extra points to training set until this number is reached)
             frac_feature_perturb: fraction of features perturbed in each data point. Set smaller to ensure augmented samples remain closer to real data.
