@@ -1,4 +1,5 @@
 import datetime, json, warnings, logging, time
+import os
 from collections import OrderedDict
 import pandas as pd
 from pandas import DataFrame, Series
@@ -17,9 +18,11 @@ from ..tuning.ensemble_selection import EnsembleSelection
 
 logger = logging.getLogger(__name__)
 
+
 # TODO: - Semi-supervised learning
 # TODO: - Minimize memory usage of DataFrames (convert int64 -> uint8 when possible etc.)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
+# TODO: Loading learner from S3 on Windows may cause issues due to os.path.sep
 class AbstractLearner:
     save_file_name = 'learner.pkl'
 
@@ -60,7 +63,7 @@ class AbstractLearner:
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
-        model_context = path_context + 'models/'
+        model_context = path_context + 'models' + os.path.sep
         latest_model_checkpoint = model_context + 'model_checkpoint_latest.pointer'
         eval_result_path = model_context + 'eval_result.pkl'
         predictions_path = path_context + 'predictions.csv'
@@ -436,8 +439,8 @@ class AbstractLearner:
         if save:
             utcnow = datetime.datetime.utcnow()
             timestamp_str_now = utcnow.strftime("%Y%m%d_%H%M%S")
-            path_submission = self.model_context + 'submissions/submission_' + timestamp_str_now + '.csv'
-            path_submission_proba = self.model_context + 'submissions/submission_proba_' + timestamp_str_now + '.csv'
+            path_submission = self.model_context + 'submissions' + os.path.sep + 'submission_' + timestamp_str_now + '.csv'
+            path_submission_proba = self.model_context + 'submissions' + os.path.sep + 'submission_proba_' + timestamp_str_now + '.csv'
             save_pd.save(path=path_submission, df=submission)
             if save_proba:
                 submission_proba = pd.DataFrame(y_pred_proba)  # TODO: Fix for multiclass
