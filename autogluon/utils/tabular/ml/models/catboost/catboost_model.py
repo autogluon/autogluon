@@ -24,7 +24,7 @@ class CatboostModel(AbstractModel):
         from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         self.best_iteration = 0
-        if type(self.params['eval_metric']) == str:
+        if isinstance(self.params['eval_metric'], str):
             self.metric_name = self.params['eval_metric']
         else:
             self.metric_name = type(self.params['eval_metric']).__name__

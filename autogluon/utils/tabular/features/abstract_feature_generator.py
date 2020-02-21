@@ -350,7 +350,7 @@ class AbstractFeatureGenerator:
         # print(X_unique)
         if unique_ratio <= 0.01:
             return False
-        avg_words = np.mean([len(re.sub(' +', ' ', value).split(' ')) if type(value) is str else 0 for value in X_unique])
+        avg_words = np.mean([len(re.sub(' +', ' ', value).split(' ')) if isinstance(value, str) else 0 for value in X_unique])
         # print(avg_words)
         if avg_words < 3:
             return False

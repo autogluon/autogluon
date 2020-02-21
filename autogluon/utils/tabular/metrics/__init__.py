@@ -28,11 +28,10 @@ class Scorer(object, metaclass=ABCMeta):
         return self.name
 
     def sklearn_scorer(self):
-        print("creating sklearn scorer of", type(self))
-        if type(self) == _ProbaScorer:
+        if isinstance(self, _ProbaScorer):
             needs_proba = True
             needs_threshold = False
-        elif type(self) == _ThresholdScorer:
+        elif isinstance(self, _ThresholdScorer):
             needs_proba = False
             needs_threshold = True
         else:
@@ -161,9 +160,9 @@ class _ThresholdScorer(Scorer):
 
 
 def scorer_expects_y_pred(scorer: Scorer):
-    if type(scorer) == _ProbaScorer:
+    if isinstance(scorer, _ProbaScorer):
         return False
-    elif type(scorer) == _ThresholdScorer:
+    elif isinstance(scorer, _ThresholdScorer):
         return False
     else:
         return True

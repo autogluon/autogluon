@@ -236,7 +236,7 @@ class AbstractTrainer:
             model_fit_kwargs = {'verbosity': self.verbosity, 
                                 'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
-        if self.bagged_mode or (type(model) == WeightedEnsembleModel):
+        if self.bagged_mode or isinstance(model, WeightedEnsembleModel):
             model.fit(X=X_train, y=y_train, k_fold=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit, **model_fit_kwargs)
@@ -346,7 +346,7 @@ class AbstractTrainer:
                 raise ValueError('k_fold_start must be 0 to hyperparameter_tune, value = ' + str(k_fold_start))
             # hpo_models (dict): keys = model_names, values = model_paths
             try:  # TODO: Make exception handling more robust? Return successful HPO models?
-                if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=kfolds, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
                 else:
                     if (X_test is None) or (y_test is None):
@@ -367,7 +367,7 @@ class AbstractTrainer:
                 self.model_performance.update(hpo_model_performances)
                 self.hpo_results[model.name] = hpo_results
                 self.model_types.update({name: type(model) for name in model_names_trained})
-                if type(model) in [BaggedEnsembleModel, StackerEnsembleModel, WeightedEnsembleModel]:
+                if isinstance(model, BaggedEnsembleModel):
                     self.model_types_inner.update({name: model._child_type for name in model_names_trained})
                 else:
                     self.model_types_inner.update({name: type(model) for name in model_names_trained})
@@ -398,7 +398,7 @@ class AbstractTrainer:
                     break
             logger.log(20, 'Repeating k-fold bagging: ' + str(n+1) + '/' + str(n_repeats))
             for i, model in enumerate(models_valid):
-                if type(model) == str:
+                if isinstance(model, str):
                     model = self.load_model(model)
                 if time_limit is None:
                     time_left = None
@@ -454,7 +454,7 @@ class AbstractTrainer:
         models_valid = []
         time_start = time.time()
         for i, model in enumerate(models):
-            if type(model) == str:
+            if isinstance(model, str):
                 model = self.load_model(model)
             elif self.low_memory:
                 model = copy.deepcopy(model)
@@ -629,19 +629,19 @@ class AbstractTrainer:
             raise Exception('Trainer has no fit models to predict with.')
 
     def predict_model(self, X, model, level_start=0):
-        if type(model) == str:
+        if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
         return model.predict(X=X, preprocess=False)
 
     def predict_proba_model(self, X, model, level_start=0):
-        if type(model) == str:
+        if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
         return model.predict_proba(X=X, preprocess=False)
 
     def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
-        if type(model) == str:
+        if isinstance(model, str):
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
         if model_level >= 1:
@@ -673,7 +673,7 @@ class AbstractTrainer:
     def pred_proba_predictions(self, models, X_test):
         preds = []
         for model in models:
-            if type(model) is str:
+            if isinstance(model, str):
                 model = self.load_model(model)
             model_pred = model.predict_proba(X_test)
             preds.append(model_pred)
