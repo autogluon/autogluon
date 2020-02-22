@@ -170,12 +170,17 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         stackers = {}
         stackers_performance = {}
+        num_models = len(hpo_models.keys())
         for i, model_name in enumerate(hpo_models.keys()):
 
             model_path = hpo_models[model_name]
             model_performance = hpo_model_performances[model_name]
-            child = self._child_type.load(path=model_path)
+            child: AbstractModel = self._child_type.load(path=model_path)
+            time_train_end = time.time()
             pred_proba = child.predict_proba(X_test)
+            time_predict_end = time.time()
+            child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
+            child.predict_time = time_predict_end - time_train_end
 
             # TODO: Create new StackerEnsemble Here
             stacker = copy.deepcopy(self)
@@ -202,7 +207,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 stacker.models.append(child.name)
             else:
                 stacker.models.append(child)
-
+            stacker._add_child_times_to_bag(model=child)
             stacker.model_base = None
             stacker.save_model_base(child.convert_to_template())
             stacker.save()

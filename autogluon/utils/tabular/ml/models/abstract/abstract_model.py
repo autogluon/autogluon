@@ -90,6 +90,9 @@ class AbstractModel:
         self.features = features
         self.debug = debug
 
+        self.fit_time = None  # Time taken to fit in seconds (Training data)
+        self.predict_time = None  # Time taken to predict in seconds (Validation data)
+
         self.params = {}
         self._set_default_params()
         self.nondefault_params = []
