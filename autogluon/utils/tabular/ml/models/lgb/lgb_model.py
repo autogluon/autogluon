@@ -109,7 +109,7 @@ class LGBModel(AbstractModel):
             'callbacks': callbacks,
             'verbose_eval': verbose_eval,
         }
-        if type(eval_metric) != str:
+        if not isinstance(eval_metric, str):
             train_params['feval'] = eval_metric
         if seed_val is not None:
             train_params['params']['seed'] = seed_val
@@ -163,7 +163,7 @@ class LGBModel(AbstractModel):
             'verbose_eval': 1000,
             'seed': 0,
         }
-        if type(eval_metric) != str:
+        if not isinstance(eval_metric, str):
             cv_params['feval'] = eval_metric
             cv_params['params']['metric'] = 'None'
         else:
