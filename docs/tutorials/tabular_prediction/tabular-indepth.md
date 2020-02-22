@@ -141,7 +141,7 @@ By default, `predict()` and `predict_proba()` will utilize the model that AutoGl
 We can instead specify a particular model to use for predictions (e.g. to reduce inference latency).  Before deciding which model to use, let's use our test dataset to evaluate all of the models AutoGluon has previously trained:
 
 ```{.python .input}
-results = predictor.leaderboard(test_data)
+results = predictor.leaderboard(val_data)
 ```
 
 Here's how to specify one particular model to use for prediction instead of AutoGluon's default choice:
