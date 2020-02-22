@@ -29,9 +29,9 @@ class EnsembleSelection:
             self.random_state = random_state
         else:
             self.random_state = np.random.RandomState(seed=0)
-        if type(metric) == _ProbaScorer:
+        if isinstance(metric, _ProbaScorer):
             self.objective_func_expects_y_pred = False
-        elif type(metric) == _ThresholdScorer:
+        elif isinstance(metric, _ThresholdScorer):
             self.objective_func_expects_y_pred = False
         else:
             self.objective_func_expects_y_pred = True

@@ -63,8 +63,7 @@ class BaggedEnsembleModel(AbstractModel):
             if len(self.models) == 0:
                 return X
             model = self.models[0]
-        if type(model) == str:
-            model = self.load_child(model)
+        model = self.load_child(model)
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
@@ -222,8 +221,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
 
-    def load_child(self, model, verbose=False):
-        if type(model) == str:
+    def load_child(self, model, verbose=False) -> AbstractModel:
+        if isinstance(model, str):
             child_path = self.create_contexts(self.path + model + os.path.sep)
             return self._child_type.load(path=child_path, verbose=verbose)
         else:
@@ -295,7 +294,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     def persist_child_models(self, reset_paths=True):
         for i, model_name in enumerate(self.models):
-            if type(model_name) == str:
+            if isinstance(model_name, str):
                 child_path = self.create_contexts(self.path + model_name + os.path.sep)
                 child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
                 self.models[i] = child_model
