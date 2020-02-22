@@ -87,7 +87,8 @@ Performance in certain applications may be measured by different metrics than th
 
 ```{.python .input}
 metric = 'balanced_accuracy'
-predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric, time_limits=60)
+predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
+                     output_directory=output_directory, time_limits=60)
 
 performance = predictor.evaluate(val_data)
 ```
@@ -100,7 +101,9 @@ Some other non-default metrics you might use include things like: `f1` (for bina
 Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two other methods to boost predictive performance are bagging and stack-ensembling.  You'll often see performance improve if you specify `num_bagging_folds` = 5-10, `stack_ensemble_levels` = 1-3 in the call to `fit()`, but this will increase training times.
 
 ```{.python .input}
-predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric, num_bagging_folds=5, stack_ensemble_levels=1, hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}})
+predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
+                     num_bagging_folds=5, stack_ensemble_levels=1,
+                     hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}})
 ```
 
 You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
@@ -138,20 +141,36 @@ print(class_probs)
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models.
-We can instead specify a particular model to use for predictions (e.g. to reduce inference latency).  Before deciding which model to use, let's use our test dataset to evaluate all of the models AutoGluon has previously trained:
+We can instead specify a particular model to use for predictions (e.g. to reduce inference latency).  Before deciding which model to use, let's evaluate all of the models AutoGluon has previously trained using our validation dataset:
 
 ```{.python .input}
 results = predictor.leaderboard(val_data)
 ```
 
-Here's how to specify one particular model to use for prediction instead of AutoGluon's default choice:
+Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
 ```{.python .input}
-i = 0 # index of model to use
+i = 0  # index of model to use
 model_to_use = predictor.model_names[i]
 model_pred = predictor.predict(datapoint, model=model_to_use)
 print("Prediction from %s model: %s" % (model_to_use, model_pred))
 ```
+
+The `predictor` also remembers what metric predictions should be evaluated with, which can be done with ground truth labels as follows:
+
+```
+y_pred = predictor.predict(test_data)
+predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
+```
+
+However, you must be careful here as certain metrics require predicted probabilities rather than classes.
+Since the label columns remains in the `val_data` DataFrame, we can instead use the shorthand:
+
+```
+predictor.evaluate(val_data)
+```
+
+which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
 
 
 ## Maximizing predictive performance
