@@ -27,18 +27,18 @@ test_data = test_data.head(subsample_size) # subsample for faster run
 
 # Fit models:
 # shutil.rmtree(savedir, ignore_errors=True) # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                     enable_fit_continuation=True, auto_stack=True, hyperparameters=hyperparameters, 
+predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir,
+                     enable_fit_continuation=True, auto_stack=True, hyperparameters=hyperparameters,
                      verbosity=3, time_limits = time_limits, eval_metric='roc_auc')
 
-# If you have previously-trained ensemble predictor from task.fit(), 
+# If you have previously-trained ensemble predictor from task.fit(),
 # you can instead skip above  task.fit() and just load it:
 predictor = task.load(savedir, verbosity=4) # use high-verbosity to see distillation process details.
 
 # Distill ensemble into single model:
 learner = predictor._learner
 
-num_augmented_samples = int(1.0*len(train_data)) # distillation-training will take longer the bigger this value is, but bigger values can produce superior distilled models.
+num_augmented_samples = int(3.0*len(train_data)) # distillation-training will take longer the bigger this value is, but bigger values can produce superior distilled models.
 print(num_augmented_samples)
 
 learner.augment_distill(num_augmented_samples=num_augmented_samples, time_limits=time_limits)

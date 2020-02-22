@@ -236,7 +236,7 @@ class AbstractTrainer:
             model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
-            model_fit_kwargs = {'verbosity': self.verbosity, 
+            model_fit_kwargs = {'verbosity': self.verbosity,
                                 'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or isinstance(model, WeightedEnsembleModel):
@@ -327,7 +327,7 @@ class AbstractTrainer:
         if self.low_memory:
             del model
 
-    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
+    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False,
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
             model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
@@ -768,10 +768,10 @@ class AbstractTrainer:
             y = self.load_y_train()
 
         model_best = self.load_model(self.model_best)
-        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, 
-                                                        objective_func=self.objective_func, 
-                                                        stopping_metric=self.stopping_metric, 
-                                                        num_classes=self.num_classes, 
+        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
+                                                        objective_func=self.objective_func,
+                                                        stopping_metric=self.stopping_metric,
+                                                        num_classes=self.num_classes,
                                                         hyperparameters=self.hyperparameters)
         if not self.bagged_mode:
             raise NotImplementedError
@@ -810,7 +810,7 @@ class AbstractTrainer:
             # TODO: Do stratified for binary/multiclass, folds are not aligned!
             models_trained = self.stack_new_level_core(X=X, y=y_distill, models=models_distill, level=0, stack_name='distilled', hyperparameter_tune=False, feature_prune=False)
             self.compress(X=X, y=y_distill, models=models_trained)
-        
+
         self.save()
 
 
@@ -834,8 +834,8 @@ class AbstractTrainer:
         X_train, X_test, y_train, y_test = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=0.2)
         if self.problem_type == MULTICLASS:
             y_aug = pd.DataFrame(y_aug)
-            # y_train = convertToOneHot?? # TODO 
-            # y_test = convertToOneHot?? # TODO 
+            # y_train = convertToOneHot?? # TODO
+            # y_test = convertToOneHot?? # TODO
             self.normalize_predprobs = True
         else:
             y_aug = pd.Series(y_aug)
@@ -846,24 +846,25 @@ class AbstractTrainer:
                 y_test = EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_test - min_pred)
                 y_aug = EPS_bin2regress + ((1-2*EPS_bin2regress)/(max_pred-min_pred)) * (y_aug - min_pred)
                 self.normalize_predprobs = True
-        
+
         X_train = pd.concat([X_train, X_aug])
         X_train.reset_index(drop=True, inplace=True)
         y_train = pd.concat([y_train, y_aug])
         y_train.reset_index(drop=True, inplace=True)
-        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, 
-                                                        objective_func=self.objective_func, stopping_metric=self.stopping_metric, 
+        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
+                                                        objective_func=self.objective_func, stopping_metric=self.stopping_metric,
                                                         num_classes=self.num_classes, hyperparameters=self.hyperparameters)
         for model in models_distill:
             print("Distilling with model: %s ..." % str(model.name))
             model = self.train_single_full(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, model=model,
                                                    hyperparameter_tune=False, stack_name='distill', time_limit=time_limits)
+            trainer.model_performance[model.name] = self.score(X_test, y_test, model=model.name) # measure original metric on validation data
         # reset trainer to old state:
         self.bagged_mode = og_bagged_mode
         self.verbosity = og_verbosity
         self.save()
-        
-    
+
+
     # TODO: experimental code.
     def augment_data_preserve_joint(self, X, num_augmented_samples = 10000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
@@ -887,7 +888,7 @@ class AbstractTrainer:
         for contype in continuous_types:
             if contype in self.feature_types_metadata:
                 continuous_featnames += self.feature_types_metadata[contype]
-        
+
         for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
             og_ind = i % len(X)
             augdata_i = X.iloc[og_ind].copy()
@@ -908,7 +909,7 @@ class AbstractTrainer:
         X_aug.drop_duplicates(keep='first', inplace=True)
         print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
         return X_aug
-    
+
     # TODO: experimental code.
     def augment_data_hotdeck(self, X, num_augmented_samples = 50000, continuous_feature_noise = 0.1):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
@@ -920,7 +921,7 @@ class AbstractTrainer:
             print("No data augmentation performed since training data is large enough.")
             return X
         num_augmented_samples = num_augmented_samples - len(X)
-        
+
         X_aug = pd.concat([X.iloc[[0]]]*num_augmented_samples)
         X_aug.reset_index(drop=True, inplace=True)
         continuous_types = ['float','int', 'datetime']
@@ -942,7 +943,7 @@ class AbstractTrainer:
         X_aug.reset_index(drop=True, inplace=True)
         print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
         return X_aug
-    
+
     # TODO: experimental code.
     def augment_munge(self, X, num_augmented_samples = 50000, frac_feature_perturb=0.1, continuous_feature_noise = 0.05):
         """ Generates synthetic datapoints for learning to mimic teacher model in distillation.
@@ -966,7 +967,7 @@ class AbstractTrainer:
         for contype in continuous_types:
             if contype in self.feature_types_metadata:
                 continuous_featnames += self.feature_types_metadata[contype]
-        
+
         for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
             og_ind = i % len(X)
             augdata_i = X.iloc[og_ind].copy()
@@ -990,7 +991,7 @@ class AbstractTrainer:
         X_aug.reset_index(drop=True, inplace=True)
         print("Augmented training dataset has %s datapoints" % X_aug.shape[0])
         return X_aug
-    
+
     # TODO: experimental code.
     def augment_trade(self, X = None):
         if X is None:
@@ -1030,11 +1031,11 @@ class AbstractTrainer:
                 num_categories[feat] = len(X[feat].unique())
         X = X.to_numpy()
         """
-    
-    def best_single_model(self, stack_name, stack_level): 
-        """ Returns name of best single (compressed) model in this trainer object. 
-            
-            Examples: 
+
+    def best_single_model(self, stack_name, stack_level):
+        """ Returns name of best single (compressed) model in this trainer object.
+
+            Examples:
                 To get get best single (compressed) model:
                     trainer.best_single_model('compressed', 0)  # TODO: does not work because compressed models have no validation score.
                 To get best single (distilled) model:
@@ -1043,7 +1044,7 @@ class AbstractTrainer:
         single_models = self.models_level[stack_name][stack_level]
         perfs = [self.model_performance[m] for m in single_models]
         return single_models[perfs.index(max(perfs))]
-    
+
     def save_model(self, model):
         if self.low_memory:
             model.save()
