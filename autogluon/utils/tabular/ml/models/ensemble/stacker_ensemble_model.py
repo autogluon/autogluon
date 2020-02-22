@@ -1,4 +1,5 @@
 import copy, logging, time
+import os
 from typing import Dict
 import numpy as np
 import pandas as pd
@@ -72,7 +73,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None):
         if infer:
-            if (set(self.stack_columns).issubset(set(list(X.columns)))):
+            if set(self.stack_columns).issubset(set(list(X.columns))):
                 compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
         if compute_base_preds:
             X_stacker = []
@@ -118,6 +119,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 else:
                     self.feature_types_metadata['float'] = self.stack_columns
         super().fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
+
+    def set_contexts(self, path_context):
+        path_root_orig = self.path_root
+        super().set_contexts(path_context=path_context)
+        for model, model_path in self.base_model_paths_dict.items():
+            model_local_path = model_path.split(path_root_orig, 1)[1]
+            self.base_model_paths_dict[model] = self.path_root + model_local_path
 
     def set_stack_columns(self, base_model_names):
         if self.problem_type == MULTICLASS:
@@ -180,15 +188,15 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             oof_pred_proba[test_index] += pred_proba
             oof_pred_model_repeats[test_index] += 1
 
-            stacker.set_contexts(self.path + str(i) + '/')
-            stacker.name = stacker.name + '/' + str(i)
+            stacker.set_contexts(self.path + str(i) + os.path.sep)
+            stacker.name = stacker.name + os.path.sep + str(i)
             stacker._k = k_fold
             stacker._k_fold_end = 1
             stacker._n_repeats = 1
             stacker._oof_pred_proba = oof_pred_proba
             stacker._oof_pred_model_repeats = oof_pred_model_repeats
             child.name = child.name + '_fold_0'
-            child.path = child.create_contexts(stacker.path + child.name + '/')
+            child.set_contexts(stacker.path + child.name + os.path.sep)
             if stacker.low_memory:
                 stacker.save_child(child, verbose=False)
                 stacker.models.append(child.name)

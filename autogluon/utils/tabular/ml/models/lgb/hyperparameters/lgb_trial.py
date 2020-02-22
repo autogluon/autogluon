@@ -64,7 +64,7 @@ def lgb_trial(args, reporter):
             'callbacks': callbacks,
             'verbose_eval': -1,
         }
-        if type(eval_metric) != str:
+        if not isinstance(eval_metric, str):
             train_params['feval'] = eval_metric
         if seed_value is not None:
             train_params['seed'] = seed_value

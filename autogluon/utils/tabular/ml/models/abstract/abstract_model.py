@@ -60,7 +60,9 @@ class AbstractModel:
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values)
         """
         self.name = name
-        self.path = self.create_contexts(path + name + os.path.sep)  # TODO: Keep original path, make this path a function for consistency.
+        self.path_root = path
+        self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
+        self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func  # Note: we require higher values = better performance
@@ -88,10 +90,6 @@ class AbstractModel:
         self.features = features
         self.debug = debug
 
-        # TODO: there is no load_model method, implement it or replace with load
-        if isinstance(model, str):
-            self.model = self.load_model(model)
-
         self.params = {}
         self._set_default_params()
         self.nondefault_params = []
@@ -117,6 +115,11 @@ class AbstractModel:
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
+        self.path_suffix = self.name + os.path.sep
+        # TODO: This should be added in future once naming conventions have been standardized for WeightedEnsembleModel
+        # if self.path_suffix not in self.path:
+        #     raise ValueError('Expected path_suffix not in given path! Values: (%s, %s)' % (self.path_suffix, self.path))
+        self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
 
     @staticmethod
     def create_contexts(path_context):
@@ -135,7 +138,7 @@ class AbstractModel:
             return X[self.features]
         return X
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
@@ -188,10 +191,6 @@ class AbstractModel:
             return eval_metric(y, y_pred)
         else:
             return eval_metric(y, y_pred_proba)
-
-    # TODO: Add simple generic CV logic
-    def cv(self, X, y, k_fold=5):
-        raise NotImplementedError
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         if directory is None:

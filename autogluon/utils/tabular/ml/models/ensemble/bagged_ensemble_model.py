@@ -1,4 +1,5 @@
 import copy, logging, time
+import os
 import numpy as np
 import pandas as pd
 from statistics import mean
@@ -62,8 +63,7 @@ class BaggedEnsembleModel(AbstractModel):
             if len(self.models) == 0:
                 return X
             model = self.models[0]
-        if type(model) == str:
-            model = self.load_child(model)
+        model = self.load_child(model)
         return model.preprocess(X)
 
     # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
@@ -103,7 +103,7 @@ class BaggedEnsembleModel(AbstractModel):
             if self._n_repeats != 0:
                 raise ValueError('n_repeats must equal 0 when fitting a single model with k_fold < 2, values: (%s, %s)' % (self._n_repeats, k_fold))
             self.model_base = None
-            model_base.set_contexts(path_context=self.path + model_base.name + '/')
+            model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X))
@@ -158,7 +158,7 @@ class BaggedEnsembleModel(AbstractModel):
                 y_train, y_test = y.iloc[train_index], y.iloc[test_index]
                 fold_model = copy.deepcopy(model_base)
                 fold_model.name = fold_model.name + '_fold_' + str(i)
-                fold_model.path = fold_model.create_contexts(self.path + fold_model.name + '/')
+                fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
                     if i != (fold_end-1):
@@ -221,16 +221,16 @@ class BaggedEnsembleModel(AbstractModel):
 
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
 
-    def load_child(self, model, verbose=False):
-        if type(model) == str:
-            child_path = self.create_contexts(self.path + model + '/')
+    def load_child(self, model, verbose=False) -> AbstractModel:
+        if isinstance(model, str):
+            child_path = self.create_contexts(self.path + model + os.path.sep)
             return self._child_type.load(path=child_path, verbose=verbose)
         else:
             return model
 
     def save_child(self, model, verbose=False):
         child = self.load_child(model)
-        child.path = self.create_contexts(self.path + child.name + '/')
+        child.set_contexts(self.path + child.name + os.path.sep)
         child.save(verbose=verbose)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
@@ -247,7 +247,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         model_compressed.params = compressed_params
         model_compressed.name = model_compressed.name + '_C'
-        model_compressed.path = model_compressed.create_contexts(self.path + model_compressed.name + '/')
+        model_compressed.set_contexts(self.path + model_compressed.name + os.path.sep)
         return model_compressed
 
     def _get_compressed_params(self):
@@ -282,27 +282,28 @@ class BaggedEnsembleModel(AbstractModel):
         return model_base
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, low_memory=True, verbose=True):
+    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, verbose=True):
         path = path + file_prefix
         load_path = path + cls.model_file_name
         obj = load_pkl.load(path=load_path, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
-        if low_memory:
-            pass
-        else:
-            for i, model_name in enumerate(obj.models):
-                if type(model_name) == str:
-                    child_path = obj.create_contexts(obj.path + model_name + '/')
-                    child_model = obj._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
-                    obj.models[i] = child_model
+        if not low_memory:
+            obj.persist_child_models(reset_paths=reset_paths)
         return obj
 
+    def persist_child_models(self, reset_paths=True):
+        for i, model_name in enumerate(self.models):
+            if isinstance(model_name, str):
+                child_path = self.create_contexts(self.path + model_name + os.path.sep)
+                child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
+                self.models[i] = child_model
+
     def load_model_base(self):
-        return load_pkl.load(path=self.path + 'utils/model_template.pkl')
+        return load_pkl.load(path=self.path + 'utils' + os.path.sep + 'model_template.pkl')
 
     def save_model_base(self, model_base):
-        save_pkl.save(path=self.path + 'utils/model_template.pkl', object=model_base)
+        save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, save_children=False):
         if directory is None:
@@ -313,7 +314,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_names = []
             for child in self.models:
                 child = self.load_child(child)
-                child.path = self.create_contexts(self.path + child.name + '/')
+                child.set_contexts(self.path + child.name + os.path.sep)
                 child.save(verbose=False)
                 model_names.append(child.name)
             self.models = model_names
