@@ -73,7 +73,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
     def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None):
         if infer:
-            if (set(self.stack_columns).issubset(set(list(X.columns)))):
+            if set(self.stack_columns).issubset(set(list(X.columns))):
                 compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
         if compute_base_preds:
             X_stacker = []

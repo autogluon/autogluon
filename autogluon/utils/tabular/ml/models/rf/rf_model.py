@@ -28,6 +28,7 @@ class RFModel(SKLearnModel):
         else:
             raise ValueError('model_type arg must be one of [\'rf\', \'xt\'], but value %s was given.' % self.params['model_type'])
 
+    # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
         X = super().preprocess(X)
         X = X.fillna(0)
@@ -53,7 +54,7 @@ class RFModel(SKLearnModel):
 
         return spaces
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+    def fit(self, X_train, Y_train, time_limit=None, **kwargs):
         time_start = time.time()
         hyperparams = self.params.copy()
         hyperparams.pop('model_type')
@@ -115,8 +116,7 @@ class RFModel(SKLearnModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
+        self.fit(X_train=X_train, Y_train=Y_train, **kwargs)
         hpo_model_performances = {self.name: self.score(X_test, Y_test)}
         hpo_results = {}
         self.save()
