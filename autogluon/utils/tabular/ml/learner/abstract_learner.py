@@ -1,20 +1,25 @@
-import datetime, json, warnings, logging, time
+import datetime
+import json
+import logging
 import os
+import time
+import warnings
 from collections import OrderedDict
-import pandas as pd
-from pandas import DataFrame, Series
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report # , roc_curve, auc
-from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error # , max_error
+
 import numpy as np
+import pandas as pd
 from numpy import corrcoef
+from pandas import DataFrame, Series
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
+from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
 from ..constants import BINARY, MULTICLASS, REGRESSION
-from ...data.label_cleaner import LabelCleaner
-from ..utils import get_pred_from_proba
-from ...utils.loaders import load_pkl, load_pd
-from ...utils.savers import save_pkl, save_pd
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
+from ..utils import get_pred_from_proba
+from ...data.label_cleaner import LabelCleaner
+from ...utils.loaders import load_pkl, load_pd
+from ...utils.savers import save_pkl, save_pd
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +31,7 @@ logger = logging.getLogger(__name__)
 class AbstractLearner:
     save_file_name = 'learner.pkl'
 
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10, 
+    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
                  problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False):
         self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
@@ -70,7 +75,7 @@ class AbstractLearner:
         save_path = path_context + self.save_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True, 
+    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, hyperparameters={}, verbosity=2):
         raise NotImplementedError
 
@@ -104,11 +109,13 @@ class AbstractLearner:
                 pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X_test[self.submission_columns].dtypes.to_dict())
             except Exception:
                 pass
+
         if use_pred_cache and (pred_cache is not None):
             X_id = X_test[self.submission_columns]
             X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
             X_test_cache_miss = X_test[~X_test.index.isin(X_in_cache_with_pred.index)]
-            logger.log(20, 'Using cached predictions for '+str(len(X_in_cache_with_pred))+' out of '+str(len(X_test))+' rows, which have already been predicted previously. To make new predictions, set use_pred_cache=False')
+            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X_test)} rows, '
+                           f'which have already been predicted previously. To make new predictions, set use_pred_cache=False')
         else:
             X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
             X_test_cache_miss = X_test
@@ -207,7 +214,7 @@ class AbstractLearner:
             else:
                 # Log loss
                 if -1 in y.unique():
-                    raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
+                    raise ValueError(f'Multiclass scoring with eval_metric={self.objective_func.name} does not support unknown classes.')
                 return trainer.score(X=X, y=y, model=model)
         else:
             return trainer.score(X=X, y=y, model=model)
@@ -223,7 +230,7 @@ class AbstractLearner:
             y = y.fillna(-1)
             if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
                 # Log loss
-                raise ValueError('Multiclass scoring with eval_metric=' + self.objective_func.name + ' does not support unknown classes.')
+                raise ValueError(f'Multiclass scoring with eval_metric={self.objective_func.name} does not support unknown classes.')
         # TODO: Move below into trainer, should not live in learner
 
         max_level_to_check = trainer.get_max_level_all()
@@ -235,7 +242,7 @@ class AbstractLearner:
         stack_names = list(trainer.models_level.keys())
         stack_names_not_core = [name for name in stack_names if name != 'core']
 
-        for level in range(max_level_to_check+1):
+        for level in range(max_level_to_check + 1):
             X_stack = trainer.get_inputs_to_stacker(X, level_start=0, level_end=level, y_pred_probas=pred_probas)
 
             for stack_name in stack_names_not_core:
@@ -248,6 +255,7 @@ class AbstractLearner:
                         pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
                         if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                             pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+
                         if trainer.objective_func_expects_y_pred:
                             pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                             scores[model_name] = self.objective_func(y, pred)
@@ -263,6 +271,7 @@ class AbstractLearner:
                     pred_times_full[model_name] = pred_probas_time[i] + pred_time_offset
                     if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                         pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+
                     if trainer.objective_func_expects_y_pred:
                         pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                         scores[model_name] = self.objective_func(y, pred)
@@ -279,31 +288,24 @@ class AbstractLearner:
                 if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                     oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
                 oracle_pred_time = time.time() - oracle_pred_time_start
-                pred_times['oracle_ensemble_l' + str(level+1)] = oracle_pred_time
-                pred_times_full['oracle_ensemble_l' + str(level+1)] = oracle_pred_time + pred_time_offset
+                pred_times[f'oracle_ensemble_l' + str(level + 1)] = oracle_pred_time
+                pred_times_full['oracle_ensemble_l' + str(level + 1)] = oracle_pred_time + pred_time_offset
                 if trainer.objective_func_expects_y_pred:
                     oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
-                    scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_ensemble)
+                    scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_ensemble)
                 else:
-                    scores['oracle_ensemble_l' + str(level+1)] = self.objective_func(y, oracle_pred_proba_ensemble)
+                    scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
         logger.debug('Model scores:')
         logger.debug(str(scores))
-        model_names = []
-        scores_test = []
-        pred_times_lst = []
-        pred_times_full_lst = []
-        for model in scores.keys():
-            model_names.append(model)
-            scores_test.append(scores[model])
-            pred_times_lst.append(pred_times[model])
-            pred_times_full_lst.append(pred_times_full[model])
-        df = pd.DataFrame(data={
-            'model': model_names,
-            'score_test': scores_test,
-            'pred_time_test': pred_times_lst,
-            'pred_time_test_full': pred_times_full_lst,
-        })
+        df = pd.DataFrame(
+            data={
+                'model': list(scores.keys()),
+                'score_test': list(scores.values()),
+                'pred_time_test': [pred_times[model] for model in scores.keys()],
+                'pred_time_test_full': [pred_times_full[model] for model in scores.keys()],
+            }
+        )
 
         df = df.sort_values(by='score_test', ascending=False).reset_index(drop=True)
 
@@ -356,63 +358,66 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
-        
+
         # Remove missing labels and produce warning if any are found:
         if self.problem_type == REGRESSION:
             missing_indicators = [(y is None or np.isnan(y)) for y in y_true]
         else:
-            missing_indicators = [(y is None or y=='') for y in y_true]
-        missing_inds = [i for i,j in enumerate(missing_indicators) if j]
+            missing_indicators = [(y is None or y == '') for y in y_true]
+        missing_inds = [i for i, j in enumerate(missing_indicators) if j]
         if len(missing_inds) > 0:
-            nonmissing_inds = [i for i,j in enumerate(missing_indicators) if j]
+            nonmissing_inds = [i for i, j in enumerate(missing_indicators) if not j]
             y_true = y_true[nonmissing_inds]
             y_pred = y_pred[nonmissing_inds]
-            warnings.warn("There are %s (out of %s) evaluation datapoints for which the label is missing. " 
-                          "AutoGluon removed these points from the evaluation, which thus may not be entirely representative. " 
-                          "You should carefully study why there are missing labels in your evaluation data." % (len(missing_inds),len(y_true)))
-        
+            warnings.warn(f"There are {len(missing_inds)} (out of {len(y_true)}) evaluation datapoints for which the label is missing. "
+                          f"AutoGluon removed these points from the evaluation, which thus may not be entirely representative. "
+                          f"You should carefully study why there are missing labels in your evaluation data.")
+
         perf = self.objective_func(y_true, y_pred)
         metric = self.objective_func.name
         if not high_always_good:
             sign = self.objective_func._sign
-            perf = perf * sign # flip negative once again back to positive (so higher is no longer necessarily better)
+            perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
-            logger.log(20, "Evaluation: %s on test data: %f" % (metric, perf))
+            logger.log(20, f"Evaluation: {metric} on test data: {perf}")
         if not auxiliary_metrics:
             return perf
+
         # Otherwise compute auxiliary metrics:
         perf_dict = OrderedDict({metric: perf})
-        if self.problem_type == REGRESSION: # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation
-            pearson_corr = lambda x,y: corrcoef(x,y)[0][1]
+        if self.problem_type == REGRESSION:  # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation
+            pearson_corr = lambda x, y: corrcoef(x, y)[0][1]
             pearson_corr.__name__ = 'pearson_correlation'
-            regression_metrics = [mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error,
-                                  # max_error
-                                  ]
+            regression_metrics = [
+                mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error,
+                # max_error
+            ]
             for reg_metric in regression_metrics:
                 metric_name = reg_metric.__name__
                 if metric_name not in perf_dict:
                     perf_dict[metric_name] = reg_metric(y_true, y_pred)
-        else: # Compute classification metrics
+        else:  # Compute classification metrics
             classif_metrics = [accuracy_score, balanced_accuracy_score, matthews_corrcoef]
-            if self.problem_type == BINARY: # binary-specific metrics
+            if self.problem_type == BINARY:  # binary-specific metrics
                 # def auc_score(y_true, y_pred): # TODO: this requires y_pred to be probability-scores
                 #     fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label)
                 #   return auc(fpr, tpr)
                 f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
                 f1micro_score.__name__ = f1_score.__name__
-                classif_metrics += [f1micro_score] # TODO: add auc?
-            elif self.problem_type == MULTICLASS: # multiclass metrics
-                classif_metrics += [] # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
+                classif_metrics += [f1micro_score]  # TODO: add auc?
+            elif self.problem_type == MULTICLASS:  # multiclass metrics
+                classif_metrics += []  # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
             for cl_metric in classif_metrics:
                 metric_name = cl_metric.__name__
                 if metric_name not in perf_dict:
                     perf_dict[metric_name] = cl_metric(y_true, y_pred)
+
         if not silent:
             logger.log(20, "Evaluations on test data:")
             logger.log(20, json.dumps(perf_dict, indent=4))
         if detailed_report and (self.problem_type != REGRESSION):
             # One final set of metrics to report
-            cl_metric = lambda y_true,y_pred: classification_report(y_true,y_pred, output_dict=True)
+            cl_metric = lambda y_true, y_pred: classification_report(y_true, y_pred, output_dict=True)
             metric_name = cl_metric.__name__
             if metric_name not in perf_dict:
                 perf_dict[metric_name] = cl_metric(y_true, y_pred)
@@ -423,7 +428,7 @@ class AbstractLearner:
 
     def extract_label(self, X):
         if self.label not in list(X.columns):
-            raise ValueError("Provided Dataframe does not contain label column: %s" % self.label)
+            raise ValueError(f"Provided DataFrame does not contain label column: {self.label}")
         y = X[self.label].copy()
         X = X.drop(self.label, axis=1)
         return X, y
@@ -434,7 +439,6 @@ class AbstractLearner:
 
         submission[self.label] = y_pred
         submission[self.label] = self.label_cleaner.inverse_transform(submission[self.label])
-
 
         if save:
             utcnow = datetime.datetime.utcnow()
@@ -488,13 +492,14 @@ class AbstractLearner:
         unique_vals = y.unique()
         num_rows = len(y)
         # print(unique_vals)
-        logger.log(20, 'Here are the first 10 unique label values in your data:  '+str(unique_vals[:10]))
+        logger.log(20, f'Here are the first 10 unique label values in your data:  {unique_vals[:10]}')
         unique_count = len(unique_vals)
         MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
         if num_rows > 1000:
             REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
         else:
             REGRESS_THRESHOLD = 0.1
+
         if len(unique_vals) == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
@@ -519,7 +524,7 @@ class AbstractLearner:
             problem_type = MULTICLASS
             reason = "dtype of label-column == object"
         elif np.issubdtype(unique_vals.dtype, np.integer):
-            unique_ratio = len(unique_vals)/float(len(y))
+            unique_ratio = len(unique_vals) / float(len(y))
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
                 reason = "dtype of label-column == int, but few unique label-values observed"

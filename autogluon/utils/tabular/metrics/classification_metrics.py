@@ -1,9 +1,10 @@
 import logging
+
 import numpy as np
-import scipy as sp
 from sklearn.metrics.classification import _check_targets, type_of_target
 
 logger = logging.getLogger(__name__)
+
 
 def balanced_accuracy(solution, prediction):
     y_type, solution, prediction = _check_targets(solution, prediction)
@@ -30,11 +31,9 @@ def balanced_accuracy(solution, prediction):
         solution = solution.toarray()
         prediction = prediction.toarray()
     else:
-        raise NotImplementedError('bac_metric does not support task type %s'
-                                  % y_type)
+        raise NotImplementedError(f'bac_metric does not support task type {y_type}')
 
-    fn = np.sum(np.multiply(solution, (1 - prediction)), axis=0,
-                dtype=float)
+    fn = np.sum(np.multiply(solution, (1 - prediction)), axis=0, dtype=float)
     tp = np.sum(np.multiply(solution, prediction), axis=0, dtype=float)
     # Bounding to avoid division by 0
     eps = 1e-15
@@ -43,16 +42,19 @@ def balanced_accuracy(solution, prediction):
     tpr = tp / pos_num  # true positive rate (sensitivity)
 
     if y_type in ('binary', 'multilabel-indicator'):
-        tn = np.sum(np.multiply((1 - solution), (1 - prediction)),
-                    axis=0, dtype=float)
-        fp = np.sum(np.multiply((1 - solution), prediction), axis=0,
-                    dtype=float)
+        tn = np.sum(
+            np.multiply((1 - solution), (1 - prediction)),
+            axis=0, dtype=float
+        )
+        fp = np.sum(
+            np.multiply((1 - solution), prediction),
+            axis=0, dtype=float
+        )
         tn = np.maximum(eps, tn)
         neg_num = np.maximum(eps, tn + fp)
         tnr = tn / neg_num  # true negative rate (specificity)
         bac = 0.5 * (tpr + tnr)
     elif y_type == 'multiclass':
-        label_num = solution.shape[1]
         bac = tpr
     else:
         raise ValueError(y_type)
@@ -138,7 +140,9 @@ def pac_score(solution, prediction):
             # The multi-label case is a bunch of binary problems.
             # The second class is the negative class for each column.
             neg_class_log_loss = -np.mean(
-                (1 - solution) * np.log(1 - prediction), axis=0)
+                (1 - solution) * np.log(1 - prediction),
+                axis=0
+            )
             log_loss = pos_class_log_loss + neg_class_log_loss
             # Each column is an independent problem, so we average.
             # The probabilities in one line do not add up to one.
@@ -156,7 +160,7 @@ def pac_score(solution, prediction):
 
     def prior_log_loss(frac_pos, task):
         """Baseline log loss.
-        For multiplr classes ot labels return the volues for each column
+        For multiple classes ot labels return the values for each column
         """
         eps = 1e-15
         frac_pos_ = np.maximum(eps, frac_pos)
@@ -188,19 +192,19 @@ def pac_score(solution, prediction):
             prediction = prediction.reshape((-1, 1))
         if len(prediction.shape) == 2:
             if prediction.shape[1] > 2:
-                raise ValueError('A prediction array with probability values '
-                                 'for %d classes is not a binary '
-                                 'classification problem' % prediction.shape[1])
+                raise ValueError(f'A prediction array with probability values '
+                                 f'for {prediction.shape[1]} classes is not a binary '
+                                 f'classification problem')
             # Prediction will be copied into a new binary array - no copy
             prediction = prediction[:, 1].reshape((-1, 1))
         else:
-            raise ValueError('Invalid prediction shape %s' % prediction.shape)
+            raise ValueError(f'Invalid prediction shape {prediction.shape}')
 
     elif y_type == 'multiclass':
         if len(solution.shape) == 2:
             if solution.shape[1] > 1:
-                raise ValueError('Solution array must only contain one class '
-                                 'label, but contains %d' % solution.shape[1])
+                raise ValueError(f'Solution array must only contain one class '
+                                 f'label, but contains {solution.shape[1]}')
         elif len(solution.shape) == 1:
             pass
         else:
@@ -217,8 +221,7 @@ def pac_score(solution, prediction):
         solution = solution.copy()
 
     else:
-        raise NotImplementedError('pac_score does not support task type %s'
-                                  % y_type)
+        raise NotImplementedError(f'pac_score does not support task {y_type}')
 
     solution, prediction = normalize_array(solution, prediction.copy())
 
