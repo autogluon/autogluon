@@ -254,6 +254,8 @@ class TabularPredictor(BasePredictor):
             print("*** Summary of fit() ***")
             print("Estimated performance of each model:")
             results['leaderboard'] = self._learner.leaderboard(silent=False)
+            results['leaderboard']['fit_time'] = results['leaderboard']['fit_time'].fillna(0)
+            results['leaderboard']['pred_time_val'] = results['leaderboard']['pred_time_val'].fillna(0)
             # self._summarize('model_performance', 'Validation performance of individual models', results)
             #  self._summarize('model_best', 'Best model (based on validation performance)', results)
             # self._summarize('hyperparameter_tune', 'Hyperparameter-tuning used', results)
