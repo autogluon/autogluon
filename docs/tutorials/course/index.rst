@@ -33,7 +33,7 @@ Tutorials for customizing AutoGluon using advanced APIs.
 
    .. card::
       :title: Distributed Search Tutorial
-      :link: distributed.htmk
+      :link: distributed.html
 
       Easily distribute the hyperparameter search arcross multiple machines to improve efficiency.
 
