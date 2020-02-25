@@ -167,9 +167,6 @@ class SKoptSearcher(BaseSearcher):
                                       -reward)  # provide negative reward since skopt performs minimization
         except self.errors_tohandle:
             logger.info("surrogate model not updated this trial")
-        logger.info(
-            'Finished Task with config: {} and reward: {}'.format(pickle.dumps(config), reward))
-        logger.info('Finished Task with config: {} and reward: {}'.format(pickle.dumps(config), reward))
 
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).
