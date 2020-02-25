@@ -145,7 +145,7 @@ class Classifier(BasePredictor):
 
             for c in result.keys():
                 proba_all = sum([*result[c]]) / len(different_dataset)
-                proba_all = mx.nd.array(np.where(proba_all.asnumpy() >= threshold, proba_all.asnumpy(), 0))
+                proba_all = (proba_all > threshold) * proba_all
                 ind = mx.nd.argmax(proba_all, axis=1).astype('int')
                 idx = mx.nd.stack(mx.nd.arange(proba_all.shape[0], ctx=proba_all.context), ind.astype('float32'))
                 proba = mx.nd.gather_nd(proba_all, idx)
