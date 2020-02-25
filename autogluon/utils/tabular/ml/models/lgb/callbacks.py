@@ -74,6 +74,10 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
        Whether to use only the first metric for early stopping.
     verbose : bool, optional (default=True)
         Whether to print message with early stopping information.
+    train_loss_name : str, optional (default=None):
+        Name of metric that contains training loss value.
+    reporter : optional (default=None):
+        reporter object from AutoGluon scheduler.
 
     Returns
     -------
