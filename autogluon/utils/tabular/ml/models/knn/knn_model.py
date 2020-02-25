@@ -1,3 +1,4 @@
+import time
 import logging
 import pickle
 import psutil
@@ -55,10 +56,11 @@ class KNNModel(SKLearnModel):
         self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        # verbosity = kwargs.get('verbosity', 2)
+        time_start = time.time()
         self.fit(X_train=X_train, Y_train=Y_train, **kwargs)
+        time_end = time.time()
         hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {}
+        hpo_results = {'total_time': time_end - time_start}
         self.save()
         hpo_models = {self.name: self.path}
 

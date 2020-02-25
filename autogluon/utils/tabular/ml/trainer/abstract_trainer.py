@@ -36,10 +36,12 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
-                 num_classes=None, low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1,
+                 num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
         self.path = path
         self.problem_type = problem_type
+        if feature_types_metadata is None:
+            feature_types_metadata = {}
         self.feature_types_metadata = feature_types_metadata
         self.save_data = save_data
         self.verbosity = verbosity
@@ -264,33 +266,35 @@ class AbstractTrainer:
             else:
                 score = model.score(X=X_test, y=y_test)
             pred_end_time = time.time()
-            fit_time = fit_end_time - fit_start_time
-            if np.isnan(score):
-                pred_time = np.nan
-            else:
-                pred_time = pred_end_time - fit_end_time
+            if model.fit_time is None:
+                model.fit_time = fit_end_time - fit_start_time
+            if model.predict_time is None:
+                if np.isnan(score):
+                    model.predict_time = np.nan
+                else:
+                    model.predict_time = pred_end_time - fit_end_time
             self.save_model(model=model)
-        except TimeLimitExceeded as err:
-            logger.log(20, '\tTime limit exceeded... Skipping ' + model.name + '.')
+        except TimeLimitExceeded:
+            logger.log(20, '\tTime limit exceeded... Skipping %s.' % model.name)
             # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
             del model
-        except NotEnoughMemoryError as err:
-            logger.warning('\tNot enough memory to train model... Skipping ' + model.name + '.')
+        except NotEnoughMemoryError:
+            logger.warning('\tNot enough memory to train %s... Skipping this model.' % model.name)
             del model
         except Exception as err:
             if self.verbosity >= 1:
                 traceback.print_tb(err.__traceback__)
-            logger.exception('Warning: Exception caused ' +str(model.name)+' to fail during training... Skipping this model.')
+            logger.exception('Warning: Exception caused %s to fail during training... Skipping this model.' % model.name)
             logger.log(20, err)
             del model
         else:
-            self.add_model(model=model, stack_name=stack_name, level=level, score=score, fit_time=fit_time, pred_time=pred_time, n_repeat_start=n_repeat_start)
+            self.add_model(model=model, stack_name=stack_name, level=level, score=score)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         return model_names_trained
 
-    def add_model(self, model, stack_name, level, score, fit_time, pred_time, n_repeat_start=0):
+    def add_model(self, model: AbstractModel, stack_name: str, level: int, score):
         stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have train_multi handle this
         self.model_performance[model.name] = score
         self.model_paths[model.name] = model.path
@@ -301,18 +305,13 @@ class AbstractTrainer:
             self.model_types_inner[model.name] = type(model)
         if not np.isnan(score):
             logger.log(20, '\t' + str(round(score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
-        if not np.isnan(fit_time):
-            logger.log(20, '\t' + str(round(fit_time, 2)) + 's' + '\t = Training runtime')
-        if not np.isnan(pred_time):
-            logger.log(20, '\t' + str(round(pred_time, 2)) + 's' + '\t = Validation runtime')
-        # TODO: Should model have fit-time/pred-time information?
+        if not np.isnan(model.fit_time):
+            logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
+        if not np.isnan(model.predict_time):
+            logger.log(20, '\t' + str(round(model.predict_time, 2)) + 's' + '\t = Validation runtime')
         # TODO: Add to HPO
-        if n_repeat_start > 0:
-            self.model_fit_times[model.name] += fit_time
-            self.model_pred_times[model.name] += pred_time
-        else:
-            self.model_fit_times[model.name] = fit_time
-            self.model_pred_times[model.name] = pred_time
+        self.model_fit_times[model.name] = model.fit_time
+        self.model_pred_times[model.name] = model.predict_time
         if model.is_valid():
             if model.name not in stack_loc[level]:
                 stack_loc[level].append(model.name)
@@ -820,6 +819,7 @@ class AbstractTrainer:
         model_types = {model_name: self.model_types[model_name] for model_name in model_names}
         return model_names, model_paths, model_types
 
+    # TODO: Add pred_time_val_full (Will be incorrect unless graph representation is added)
     def leaderboard(self):
         model_names = self.get_model_names_all()
         score_val = []

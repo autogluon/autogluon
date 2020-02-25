@@ -21,6 +21,9 @@ def lgb_trial(args, reporter):
         directory = args.directory
         file_prefix = "trial_"+str(trial_id)+"_" # append to all file names created during this trial. Do NOT change!
         lgb_model = args.lgb_model
+        # FIXME: Refactor this function, use the below 2 lines potentially or get rid of file_prefix altogether
+        # lgb_model.name = lgb_model.name + '_' + file_prefix
+        # lgb_model.set_contexts(path_context=lgb_model.path_root + lgb_model.name + os.path.sep)
         lgb_model.params = lgb_model.params.copy() # ensure no remaining pointers across trials
         for key in args:
             if key not in nonparam_args:
@@ -75,7 +78,6 @@ def lgb_trial(args, reporter):
         lgb_model.params['num_boost_round'] = num_boost_round # re-set this value after training
         if seed_value is not None:
             lgb_model.params['seed_value'] = seed_value
-        lgb_model.best_iteration = lgb_model.model.best_iteration
         # TODO: difficult to ensure these iters always match
         # if lgb_model.eval_results['best_iter'] != lgb_model.best_iteration:
         #     raise ValueError('eval_results[best_iter]=%s does not match lgb_model.best_iteration=%s' % (lgb_model.eval_results['best_iter'], lgb_model.best_iteration) )

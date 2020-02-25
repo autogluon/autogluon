@@ -66,7 +66,6 @@ class BaggedEnsembleModel(AbstractModel):
         model = self.load_child(model)
         return model.preprocess(X)
 
-    # TODO: compute_base_preds is unused here, it is present for compatibility with StackerEnsembleModel, consider merging the two.
     def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
         if k_fold < 1:
             k_fold = 1
@@ -90,7 +89,7 @@ class BaggedEnsembleModel(AbstractModel):
                 raise ValueError('k_fold must equal previously fit k_fold value for the current n_repeat, values: (' + str(k_fold) + ', ' + str(self._k) + ')')
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats-1) * k_fold + k_fold_end
-        start_time = time.time()
+        time_start = time.time()
         if self.problem_type == REGRESSION:
             stratified = False
         else:
@@ -104,7 +103,10 @@ class BaggedEnsembleModel(AbstractModel):
                 raise ValueError('n_repeats must equal 0 when fitting a single model with k_fold < 2, values: (%s, %s)' % (self._n_repeats, k_fold))
             self.model_base = None
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
+            time_start_fit = time.time()
             model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
+            model_base.fit_time = time.time() - time_start_fit
+            model_base.predict_time = np.nan
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1
@@ -115,6 +117,7 @@ class BaggedEnsembleModel(AbstractModel):
                 self.models = [model_base.name]
             else:
                 self.models = [model_base]
+            self._add_child_times_to_bag(model=model_base)
             return
 
         # TODO: Preprocess data here instead of repeatedly
@@ -136,11 +139,12 @@ class BaggedEnsembleModel(AbstractModel):
             is_training_from_start = fold_end_n_repeat - fold_start_n_repeat == k_fold
             if is_training_from_start:
                 self._k_per_n_repeat.append(k_fold)
+            # TODO: Consider moving model fit inner for loop to a function to simply this code
             for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
                 folds_finished = i - fold_start
                 folds_left = fold_end - i
                 fold = kfolds[i]
-                time_elapsed = time.time() - start_time
+                time_elapsed = time.time() - time_start
                 if time_limit is not None:
                     time_left = time_limit - time_elapsed
                     required_time_per_fold = time_left / folds_left
@@ -153,6 +157,7 @@ class BaggedEnsembleModel(AbstractModel):
                     if time_left <= 0:
                         raise TimeLimitExceeded
 
+                time_start_fold = time.time()
                 train_index, test_index = fold
                 X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
                 y_train, y_test = y.iloc[train_index], y.iloc[test_index]
@@ -160,15 +165,19 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model.name = fold_model.name + '_fold_' + str(i)
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
                 fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
+                time_train_end_fold = time.time()
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
                     if i != (fold_end-1):
-                        time_elapsed = time.time() - start_time
+                        time_elapsed = time.time() - time_start
                         time_left = time_limit - time_elapsed
                         expected_time_required = time_elapsed * folds_to_fit / (folds_finished+1)
                         expected_remaining_time_required = expected_time_required * (folds_left-1) / folds_to_fit
                         if expected_remaining_time_required > time_left:
                             raise TimeLimitExceeded
                 pred_proba = fold_model.predict_proba(X_test)
+                time_predict_end_fold = time.time()
+                fold_model.fit_time = time_train_end_fold - time_start_fold
+                fold_model.predict_time = time_predict_end_fold - time_train_end_fold
                 if self.low_memory:
                     self.save_child(fold_model, verbose=False)
                     models.append(fold_model.name)
@@ -176,6 +185,7 @@ class BaggedEnsembleModel(AbstractModel):
                     models.append(fold_model)
                 oof_pred_proba[test_index] += pred_proba
                 oof_pred_model_repeats[test_index] += 1
+                self._add_child_times_to_bag(model=fold_model)
         self.models += models
 
         self.bagged_mode = True
@@ -280,6 +290,16 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             model_base = self.model_base
         return model_base
+
+    def _add_child_times_to_bag(self, model):
+        if self.fit_time is None:
+            self.fit_time = model.fit_time
+        else:
+            self.fit_time += model.fit_time
+        if self.predict_time is None:
+            self.predict_time = model.predict_time
+        else:
+            self.predict_time += model.predict_time
 
     @classmethod
     def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, verbose=True):

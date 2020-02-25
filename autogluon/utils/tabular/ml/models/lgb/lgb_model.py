@@ -186,6 +186,10 @@ class LGBModel(AbstractModel):
         logger.debug(str(features_to_use))
         return features_to_use
 
+    # FIXME: Requires major refactor + refactor lgb_trial.py
+    #  model names are not aligned with what is communicated to trainer!
+    # FIXME: Likely tabular_nn_trial.py and abstract trial also need to be refactored heavily + hyperparameter functions
+    # FIXME: Don't alter self.params, only alter the copy!
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         start_time = time.time()
@@ -200,8 +204,8 @@ class LGBModel(AbstractModel):
                     lower_minleaf = max(1, int(upper_minleaf/3.0))
                 self.params['min_data_in_leaf'] = Int(lower=lower_minleaf, upper=upper_minleaf)
         params_copy = self.params.copy()
-        seed_val = self.params.pop('seed_value', None)
-        num_boost_round = self.params.pop('num_boost_round', 1000)
+        seed_val = self.params.pop('seed_value', None)  # FIXME: DEFECT?
+        num_boost_round = self.params.pop('num_boost_round', 1000)  # FIXME: DEFECT?
 
         directory = self.path # also create model directory if it doesn't exist
         # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
