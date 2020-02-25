@@ -19,8 +19,7 @@ class Detector(BasePredictor):
     Trained Object Detector returned by `task.fit()`
     """
 
-    def __init__(self, model, results, scheduler_checkpoint,
-                 args, **kwargs):
+    def __init__(self, model, results, scheduler_checkpoint, args, **kwargs):
         self.model = model
         self.results = self._format_results(results)
         self.scheduler_checkpoint = scheduler_checkpoint
@@ -38,7 +37,6 @@ class Detector(BasePredictor):
         """
         args = self.args
         net = self.model
-        batch_size = args.batch_size * max(len(ctx), 1)
 
         def _get_dataloader(net, test_dataset, data_shape, batch_size, num_workers, num_devices,
                             args):
@@ -48,8 +46,12 @@ class Detector(BasePredictor):
                 val_batchify_fn = Tuple(Stack(), Pad(pad_val=-1))
                 test_loader = gluon.data.DataLoader(
                     test_dataset.transform(YOLO3DefaultValTransform(width, height)),
-                    batch_size, False, batchify_fn=val_batchify_fn, last_batch='keep',
-                    num_workers=num_workers)
+                    batch_size,
+                    False,
+                    batchify_fn=val_batchify_fn,
+                    last_batch='keep',
+                    num_workers=num_workers
+                )
                 return test_loader
             elif args.meta_arch == 'faster_rcnn':
                 """Get faster rcnn dataloader."""
@@ -58,8 +60,12 @@ class Detector(BasePredictor):
                 # validation use 1 sample per device
                 test_loader = gluon.data.DataLoader(
                     test_dataset.transform(FasterRCNNDefaultValTransform(short, net.max_size)),
-                    num_devices, False, batchify_fn=test_bfn, last_batch='keep',
-                    num_workers=args.num_workers)
+                    num_devices,
+                    False,
+                    batchify_fn=test_bfn,
+                    last_batch='keep',
+                    num_workers=args.num_workers
+                )
                 return test_loader
             else:
                 raise NotImplementedError('%s not implemented.' % args.meta_arch)
@@ -73,16 +79,25 @@ class Detector(BasePredictor):
             net.hybridize()
             for batch in val_data:
                 if args.meta_arch == 'yolo3':
-                    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0,
-                                                      even_split=False)
-                    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0,
-                                                       even_split=False)
+                    data = gluon.utils.split_and_load(
+                        batch[0],
+                        ctx_list=ctx,
+                        batch_axis=0,
+                        even_split=False
+                    )
+                    label = gluon.utils.split_and_load(
+                        batch[1],
+                        ctx_list=ctx,
+                        batch_axis=0,
+                        even_split=False
+                    )
                     split_batch = data, label
                 elif args.meta_arch == 'faster_rcnn':
                     split_batch = rcnn_split_and_load(batch, ctx_list=ctx)
                     clipper = gcv.nn.bbox.BBoxClipToImage()
                 else:
-                    raise NotImplementedError('%s not implemented.' % args.meta_arch)
+                    raise NotImplementedError(f'{args.meta_arch} not implemented.')
+
                 det_bboxes = []
                 det_ids = []
                 det_scores = []
@@ -95,7 +110,8 @@ class Detector(BasePredictor):
                     elif args.meta_arch == 'faster_rcnn':
                         x, y, im_scale = data
                     else:
-                        raise NotImplementedError('%s not implemented.' % args.meta_arch)
+                        raise NotImplementedError(f'{args.meta_arch} not implemented.')
+
                     # get prediction results
                     ids, scores, bboxes = net(x)
                     det_ids.append(ids)
@@ -109,26 +125,26 @@ class Detector(BasePredictor):
                         im_scale = im_scale.reshape((-1)).asscalar()
                         det_bboxes[-1] *= im_scale
                     else:
-                        raise NotImplementedError('%s not implemented.' % args.meta_arch)
+                        raise NotImplementedError(f'{args.meta_arch} not implemented.')
+
                     # split ground truths
                     gt_ids.append(y.slice_axis(axis=-1, begin=4, end=5))
                     gt_bboxes.append(y.slice_axis(axis=-1, begin=0, end=4))
                     if args.meta_arch == 'faster_rcnn':
                         gt_bboxes[-1] *= im_scale
                     gt_difficults.append(
-                        y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None)
+                        y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None
+                    )
 
                 # update metric
                 if args.meta_arch == 'yolo3':
-                    eval_metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids,
-                                       gt_difficults)
+                    eval_metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults)
                 elif args.meta_arch == 'faster_rcnn':
                     for det_bbox, det_id, det_score, gt_bbox, gt_id, gt_diff in \
-                            zip(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids,
-                                gt_difficults):
+                            zip(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults):
                         eval_metric.update(det_bbox, det_id, det_score, gt_bbox, gt_id, gt_diff)
                 else:
-                    raise NotImplementedError('%s not implemented.' % args.meta_arch)
+                    raise NotImplementedError(f'{args.meta_arch} not implemented.')
             return eval_metric.get()
 
         if isinstance(dataset, AutoGluonObject):
@@ -137,32 +153,6 @@ class Detector(BasePredictor):
         test_data = _get_dataloader(net, test_dataset, args.data_shape, args.batch_size,
                                     args.num_workers, len(ctx), args)
         return _validate(net, test_data, ctx, eval_metric)
-
-    @staticmethod
-    def _format_results(results):
-        def _merge_scheduler_history(training_history, config_history, reward_attr):
-            trial_info = {}
-            for tid, config in config_history.items():
-                trial_info[tid] = {}
-                trial_info[tid]['config'] = config
-                if tid in training_history:
-                    trial_info[tid]['history'] = training_history[tid]
-                    trial_info[tid]['metadata'] = {}
-
-                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
-                        last_history = training_history[tid][-1]
-                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
-                        trial_info[tid]['metadata'].update(last_history)
-            return trial_info
-
-        training_history = results.pop('training_history')
-        config_history = results.pop('config_history')
-        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                         results['reward_attr'])
-        results[results['reward_attr']] = results.pop('best_reward')
-        results['search_space'] = results['metadata'].pop('search_space')
-        results['search_strategy'] = results['metadata'].pop('search_strategy')
-        return results
 
     def predict(self, X, input_size=224, thresh=0.15, plot=True):
         """ Use this object detector to make predictions on test data.
@@ -190,11 +180,14 @@ class Detector(BasePredictor):
         ids, scores, bboxes = [xx[0].asnumpy() for xx in net(x)]
 
         if plot:
-            ax = gcv.utils.viz.plot_bbox(img, bboxes, scores, ids, thresh=thresh,
-                                         class_names=net.classes, ax=None)
-            plt.show()
+            gcv.utils.viz.plot_bbox(img, bboxes, scores, ids,
+                                    thresh=thresh,
+                                    class_names=net.classes,
+                                    ax=None)
+        plt.show()
         return ids, scores, bboxes
 
+    @classmethod
     def load(cls, checkpoint):
         raise NotImplemented
 
