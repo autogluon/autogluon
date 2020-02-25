@@ -314,7 +314,7 @@ class AbstractModel:
         template.path = template.create_contexts(self.path + template.name + os.path.sep)
         return template
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
         start_time = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
