@@ -192,7 +192,7 @@ This command implements the following strategy to maximize accuracy:
 
 - Do not specify the `hyperparameter_tune` argument (counterintuitively, hyperparameter tuning is not the best way to spend a limited training time budgets, as model ensembling is often superior). We recommend you only use `hyperparameter_tune` if your goal is to deploy a single model rather than an ensemble.
 
-- Do not specify `hyperparameters` argument (allow AutoGluuon to adaptively select which models/hyperparameters to use).
+- Do not specify `hyperparameters` argument (allow AutoGluon to adaptively select which models/hyperparameters to use).
 
 - Set `time_limits` to the longest amount of time (in seconds) that you are willing to wait. AutoGluon's predictive performance improves the longer `fit()` is allowed to run.
 
