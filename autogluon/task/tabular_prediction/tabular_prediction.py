@@ -177,7 +177,7 @@ class TabularPrediction(BaseTask):
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
         search_strategy : str
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband)
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         nthreads_per_trial : int
@@ -229,6 +229,12 @@ class TabularPrediction(BaseTask):
         >>> y_pred = predictor.predict(test_data)
         >>> perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred)
         >>> results = predictor.fit_summary()
+
+        To maximize predictive performance, use the following:
+
+        >>> eval_metric = 'roc_auc'  # set this to the metric you ultimately care about
+        >>> time_limits = 360  # set as long as you are willing to wait (in sec)
+        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
         """
         if verbosity < 0:
             verbosity = 0
