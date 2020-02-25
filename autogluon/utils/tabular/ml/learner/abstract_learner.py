@@ -361,13 +361,13 @@ class AbstractLearner:
         return pred_probas_lst, pred_probas_time_lst
 
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
-        """ Evaluate predictions. 
+        """ Evaluate predictions.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
                 detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
                 high_always_good (bool): If True, this means higher values of returned metric are ALWAYS superior (so metrics like MSE should be returned negated)
-            
+
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
@@ -497,7 +497,7 @@ class AbstractLearner:
     @staticmethod
     def get_problem_type(y: Series):
         """ Identifies which type of prediction problem we are interested in (if user has not specified).
-            Ie. binary classification, multi-class classification, or regression. 
+            Ie. binary classification, multi-class classification, or regression.
         """
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")

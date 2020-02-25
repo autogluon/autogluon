@@ -744,9 +744,13 @@ class AbstractTrainer:
 
         models_compressed = {}
         model_levels = defaultdict(dd_list)
+        ignore_models = []
+        ignore_stack_names = ['compressed']
+        for stack_name in ignore_stack_names:
+            ignore_models += self.get_model_names(stack_name)  # get_model_names returns [] if stack_name does not exist
         for model_name in models:
             model = self.load_model(model_name)
-            if isinstance(model, WeightedEnsembleModel):
+            if isinstance(model, WeightedEnsembleModel) or model_name in ignore_models:
                 continue
             model_level = self.get_model_level(model_name)
             model_levels['compressed'][model_level] += [model_name]

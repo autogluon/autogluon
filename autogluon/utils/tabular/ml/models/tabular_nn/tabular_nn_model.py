@@ -44,19 +44,19 @@ EPS = 10e-8 # small number
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
 #  Suspect issue is coming from embeddings due to text features with extremely large categorical counts.
 class TabularNeuralNetModel(AbstractModel):
-    """ Class for neural network models that operate on tabular data. 
+    """ Class for neural network models that operate on tabular data.
         These networks use different types of input layers to process different types of data in various columns.
-    
+
         Attributes:
             types_of_features (dict): keys = 'continuous', 'skewed', 'onehot', 'embed', 'language'; values = column-names of Dataframe corresponding to the features of this type
             feature_arraycol_map (OrderedDict): maps feature-name -> list of column-indices in df corresponding to this feature
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
-        
+
         Note: This model always assumes higher values of self.objective_func indicate better performance.
-        
+
     """
-    
+
     # Constants used throughout this class:
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
@@ -65,18 +65,18 @@ class TabularNeuralNetModel(AbstractModel):
     rescale_losses = {gluon.loss.L1Loss:'std', gluon.loss.HuberLoss:'std', gluon.loss.L2Loss:'var'} # dict of loss names where we should rescale loss, value indicates how to rescale. Call self.loss_func.name
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
-    
+
     def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, hyperparameters=None, features=None):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features)
         """
         TabularNeuralNetModel object.
-        
+
         Parameters
         ----------
         path (str): file-path to directory where to save files associated with this model
         name (str): name used to refer to this model
         problem_type (str): what type of prediction problem is this model used for
-        objective_func (func): function used to evaluate performance (Note: we assume higher = better) 
+        objective_func (func): function used to evaluate performance (Note: we assume higher = better)
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
@@ -129,7 +129,7 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_net_outputs = 2
         else:
             raise ValueError("unknown problem_type specified: %s" % self.problem_type)
-            
+
         if self.params['layers'] is None: # Use default choices for MLP architecture
             if self.problem_type == REGRESSION:
                 default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
@@ -146,21 +146,21 @@ class TabularNeuralNetModel(AbstractModel):
             max_layer_width = self.params['max_layer_width']
             self.params['layers'] = [int(min(max_layer_width, layer_expansion_factor*defaultsize))
                                      for defaultsize in default_layer_sizes]
-        
+
         if train_dataset.has_vector_features() and self.params['numeric_embed_dim'] is None:
             # Use default choices for numeric embedding size
             vector_dim = train_dataset.dataset._data[train_dataset.vectordata_index].shape[1]  # total dimensionality of vector features
-            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features) # Fraction of features that are numeric 
+            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features) # Fraction of features that are numeric
             min_numeric_embed_dim = 32
             max_numeric_embed_dim = self.params['max_layer_width']
             self.params['numeric_embed_dim'] = int(min(max_numeric_embed_dim, max(min_numeric_embed_dim,
                                                     self.params['layers'][0]*prop_vector_features*np.log10(vector_dim+10) )))
         return
-    
+
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         """ X_train (pd.DataFrame): training data features (not necessarily preprocessed yet)
             X_test (pd.DataFrame): test data features (should have same column names as Xtrain)
-            Y_train (pd.Series): 
+            Y_train (pd.Series):
             Y_test (pd.Series): are pandas Series
             kwargs: Can specify amount of compute resources to utilize (num_cpus, num_gpus).
         """
@@ -187,12 +187,12 @@ class TabularNeuralNetModel(AbstractModel):
             test_dataset = self.process_data(X_test, Y_test, is_test=True) # Dataset object to use for validation
         else:
             test_dataset = None
-        logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" % 
-              (train_dataset.num_examples, train_dataset.num_features, 
+        logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" %
+              (train_dataset.num_examples, train_dataset.num_features,
                len(train_dataset.feature_groups['vector']), len(train_dataset.feature_groups['embed']),
                len(train_dataset.feature_groups['language']) ))
         # self._save_preprocessor() # TODO: should save these things for hyperparam tunning. Need one HP tuner for network-specific HPs, another for preprocessing HPs.
-        
+
         self.get_net(train_dataset)
 
         if time_limit:
@@ -214,7 +214,7 @@ class TabularNeuralNetModel(AbstractModel):
                 print(f'Model validation metrics: {model.validate()}')
                 model.path = original_path\
         """
-    
+
     def get_net(self, train_dataset):
         """ Creates a Gluon neural net and context for this dataset.
             Also sets up trainer/optimizer as necessary.
@@ -390,10 +390,10 @@ class TabularNeuralNetModel(AbstractModel):
             return mx_metric.get()[1] # accuracy
 
     def predict_proba(self, X, preprocess=True):
-        """ To align predict wiht abstract_model API. 
-            Preprocess here only refers to feature processing stesp done by all AbstractModel objects, 
+        """ To align predict wiht abstract_model API.
+            Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
-            If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions, 
+            If X is not DataFrame but instead TabularNNDataset object, we can still produce predictions,
             but cannot use preprocess in this case (needs to be already processed).
         """
         if isinstance(X, TabularNNDataset):
@@ -406,7 +406,7 @@ class TabularNeuralNetModel(AbstractModel):
             raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
 
     def _predict_tabular_data(self, new_data, process=True, predict_proba=True):  # TODO ensure API lines up with tabular.Model class.
-        """ Specific TabularNN method to produce predictions on new (unprocessed) data. 
+        """ Specific TabularNN method to produce predictions on new (unprocessed) data.
             Returns 1D numpy array unless predict_proba=True and task is multi-class classification (not binary).
             Args:
                 new_data (pd.Dataframe or TabularNNDataset): new data to make predictions on.
@@ -427,7 +427,7 @@ class TabularNeuralNetModel(AbstractModel):
             data_batch = new_data.format_batch_data(data_batch, self.ctx)
             preds_batch = self.model(data_batch)
             batch_size = len(preds_batch)
-            if self.problem_type != REGRESSION: 
+            if self.problem_type != REGRESSION:
                 if not predict_proba: # need to take argmax
                     preds_batch = nd.argmax(preds_batch, axis=1, keepdims=True)
                 else: # need to take softmax
@@ -444,7 +444,7 @@ class TabularNeuralNetModel(AbstractModel):
                 if min_pred < EPS or max_pred > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
                     preds =  EPS + ((1-2*EPS)/(max_pred-min_pred)) * (preds - min_pred)
             return preds
-        elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and 
+        elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and
               (self.stopping_metric == log_loss or self.objective_func == log_loss)):
             # Ensure nonzero predicted probabilities under log-loss:
             preds = preds.asnumpy()
@@ -452,7 +452,7 @@ class TabularNeuralNetModel(AbstractModel):
             preds = preds - most_negative_rowvals[:,None] # ensure nonnegative rows
             preds = np.clip(preds, a_min = EPS, a_max = None) # ensure no zeros
             return preds / preds.sum(axis=1, keepdims=1) # renormalize
-        
+
         return preds.asnumpy() # return 2D numpy array
 
     def process_data(self, df, labels=None, is_test=True):
@@ -460,7 +460,7 @@ class TabularNeuralNetModel(AbstractModel):
         Args:
             df (pd.DataFrame): Data to be processed (X)
             labels (pd.Series): labels to be processed (y)
-            test (bool): Is this test data where each datapoint should be processed separately using predetermined preprocessing steps. 
+            test (bool): Is this test data where each datapoint should be processed separately using predetermined preprocessing steps.
                          Otherwise preprocessor uses all data to determine propreties like best scaling factors, number of categories, etc.
         Returns:
             Dataset object
@@ -473,23 +473,23 @@ class TabularNeuralNetModel(AbstractModel):
         if not is_test:
             return self.process_train_data(df, labels)
         # Otherwise we are processing test data:
-        if (self.processor is None or self.types_of_features is None 
+        if (self.processor is None or self.types_of_features is None
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
         df = self.ensure_onehot_object(df)
         df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
-        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map, 
+        return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 batch_size=self.params['batch_size'], num_dataloading_workers=self.params['num_dataloading_workers'],
                                 problem_type=self.problem_type, labels=labels, is_test=True)
 
     def process_train_data(self, df, labels):
         """ Preprocess training data and create self.processor object that can be used to process future data.
             This method should only be used once per TabularNeuralNetModel object, otherwise will produce Warning.
-        
+
         # TODO no label processing for now
         # TODO: language features are ignored for now
         # TODO: how to add new features such as time features and remember to do the same for test data?
-        # TODO: no filtering of data-frame columns based on statistics, e.g. categorical columns with all unique variables or zero-variance features. 
+        # TODO: no filtering of data-frame columns based on statistics, e.g. categorical columns with all unique variables or zero-variance features.
                 This should be done in default_learner class for all models not just TabularNeuralNetModel...
         """
         if labels is None:
@@ -509,7 +509,7 @@ class TabularNeuralNetModel(AbstractModel):
         # print("df.shape",df.shape)
         if num_array_cols != df.shape[1]:
             raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
-        
+
         # print(self.feature_arraycol_map)
         self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
@@ -518,11 +518,11 @@ class TabularNeuralNetModel(AbstractModel):
                                 problem_type=self.problem_type, labels=labels, is_test=False)
 
     def setup_trainer(self, train_dataset):
-        """ Set up stuff needed for training: 
+        """ Set up stuff needed for training:
             optimizer, loss, and summary writer (for mxboard).
-            Network must first be initialized before this. 
+            Network must first be initialized before this.
         """
-        optimizer_opts = {'learning_rate': self.params['learning_rate'],  
+        optimizer_opts = {'learning_rate': self.params['learning_rate'],
             'wd': self.params['weight_decay'], 'clip_gradient': self.params['clip_gradient']}
         if 'lr_scheduler' in self.params and self.params['lr_scheduler'] is not None:
             base_lr = self.params.get('base_lr', 1e-6)
@@ -563,8 +563,8 @@ class TabularNeuralNetModel(AbstractModel):
     # Helper functions for tabular NN:
 
     def ensure_onehot_object(self, df):
-        """ Converts all numerical one-hot columns to object-dtype. 
-            Note: self.types_of_features must already exist! 
+        """ Converts all numerical one-hot columns to object-dtype.
+            Note: self.types_of_features must already exist!
         """
         new_df = df.copy() # To avoid SettingWithCopyWarning
         for feature in self.types_of_features['onehot']:
@@ -648,7 +648,7 @@ class TabularNeuralNetModel(AbstractModel):
             else:
                 raise ValueError("unknown transformer encountered: %s" % transformer_name)
         if set(feature_arraycol_map.keys()) != set(self.features):
-            raise ValueError("failed to account for all features when determining column indices in processed array") 
+            raise ValueError("failed to account for all features when determining column indices in processed array")
         return OrderedDict([(key, feature_arraycol_map[key]) for key in feature_arraycol_map])
 
     def _get_feature_type_map(self):
@@ -664,7 +664,7 @@ class TabularNeuralNetModel(AbstractModel):
                 feature_type_map[feature_name] = 'embed'
             elif feature_name in self.types_of_features['language']:
                 feature_type_map[feature_name] = 'language'
-            else: 
+            else:
                 raise ValueError("unknown feature type encountered")
         return feature_type_map
 
@@ -714,7 +714,7 @@ class TabularNeuralNetModel(AbstractModel):
             path = directory + file_prefix
         else:
             path = self.path + file_prefix
-        
+
         params_filepath = path + self.params_file_name
         modelobj_filepath = path + self.model_file_name
         if self.model is not None:
@@ -763,7 +763,7 @@ class TabularNeuralNetModel(AbstractModel):
         else:
             self.params['ctx'] = mx.cpu()
         # self.params['ctx'] = mx.cpu() # use this in case embedding layer complains during predict() for HPO with GPU
-        
+
         start_time = time.time()
         X_train = self.preprocess(X_train)
         if self.features is None:
@@ -846,8 +846,8 @@ class TabularNeuralNetModel(AbstractModel):
         """
 
     def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from 
-            default fixed value to default spearch space. 
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default spearch space.
         """
         search_space = get_default_searchspace(self.problem_type)
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space

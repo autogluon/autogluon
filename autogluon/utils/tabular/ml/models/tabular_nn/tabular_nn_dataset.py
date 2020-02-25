@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__) # TODO: Currently unused
 class TabularNNDataset:
     """ Class for preprocessing & storing/feeding data batches used by tabular data neural networks. Assumes entire dataset can be loaded into numpy arrays.
         Original Data table may contain numerical, categorical, and text (language) fields.
-        
+
         Attributes:
-            dataset (mxnet.gluon.data.dataset): Contains the raw data (use dataset._data to access). 
+            dataset (mxnet.gluon.data.dataset): Contains the raw data (use dataset._data to access).
                                                 Different indices in this list correspond to different types of inputs to the neural network (each is 2D ND array)
                                                 All vector-valued (continuous & one-hot) features are concatenated together into a single index of the dataset.
             data_desc (list[str]): Describes the data type of each index of dataset (options: 'vector','embed_<featname>', 'language_<featname>')
@@ -32,7 +32,7 @@ class TabularNNDataset:
             num_examples (int): number of examples in this dataset
             num_features (int): number of features (we only consider original variables as features, so num_features may not correspond to dimensionality of the data eg in the case of one-hot encoding)
             num_classes (int): number of classes (only used for multiclass classification)
-        
+
         Note: Default numerical data-type is converted to float32 (as well as labels in regression).
     """
 
@@ -47,10 +47,11 @@ class TabularNNDataset:
                 feature_type_map (OrderedDict): Maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
                 labels (pd.Series): list of labels (y) if available
                 batch_size (int): number of examples to put in each mini-batch
-                num_dataloading_workers (int): number of threads to devote to loading mini-batches of data rather than model-training 
+                num_dataloading_workers (int): number of threads to devote to loading mini-batches of data rather than model-training
         """
         self.dataset = None
         self.dataloader = None
+        self.problem_type = problem_type
         self.num_examples = processed_array.shape[0]
         self.num_features = len(feature_arraycol_map) # number of features (!=dim(processed_array) because some features may be vector-valued, eg one-hot)
         self.batch_size = min(self.num_examples, batch_size)
@@ -115,7 +116,7 @@ class TabularNNDataset:
             for feature in feature_type_map:
                 if feature_type_map[feature] == 'embed':
                     feature_colind = feature_arraycol_map[feature]
-                    data_list.append(mx.nd.array(processed_array[:,feature_colind], dtype='int32')) # array of ints with data for this embedding feature 
+                    data_list.append(mx.nd.array(processed_array[:,feature_colind], dtype='int32')) # array of ints with data for this embedding feature
                     self.data_desc.append("embed")
                     self.feature_dataindex_map[feature]  = len(data_list)-1
 
@@ -123,7 +124,7 @@ class TabularNNDataset:
             for feature in feature_type_map:
                 if feature_type_map[feature] == 'language':
                     feature_colinds = feature_arraycol_map[feature]
-                    data_list.append(mx.nd.array(processed_array[:,feature_colinds], dtype='int32')) # array of ints with data for this language feature 
+                    data_list.append(mx.nd.array(processed_array[:,feature_colinds], dtype='int32')) # array of ints with data for this language feature
                     self.data_desc.append("language")
                     self.feature_dataindex_map[feature]  = len(data_list)-1
 
@@ -142,7 +143,7 @@ class TabularNNDataset:
                 data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
                 if self.problem_type in [BINARY, MULTICLASS]:
                     self.num_classes = len(set(labels))
-        
+
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!
         self.num_categories_per_embed_feature = None
@@ -201,7 +202,7 @@ class TabularNNDataset:
             return num_categories_per_embedfeature
 
     def get_feature_data(self, feature, asnumpy=True):
-        """ Returns all data for this feature. 
+        """ Returns all data for this feature.
             Args:
                 feature (str): name of feature of interest (in processed dataframe)
                 asnumpy (bool): should we return 2D numpy array or MXNet NDarray
@@ -223,11 +224,11 @@ class TabularNNDataset:
             return feature_data
 
     def get_feature_batch(self, feature, data_batch, asnumpy=False):
-        """ Returns part of this batch corresponding to data from a single feature 
+        """ Returns part of this batch corresponding to data from a single feature
             Args:
-                data_batch (nd.array): the batch of data as provided by self.dataloader 
+                data_batch (nd.array): the batch of data as provided by self.dataloader
             Returns:
-            
+
         """
         nonvector_featuretypes = set(['embed', 'language'])
         if feature not in self.feature_type_map:
@@ -248,11 +249,11 @@ class TabularNNDataset:
     def format_batch_data(self, data_batch, ctx):
         """ Partitions data from this batch into different data types.
             Args:
-                data_batch (nd.array): the batch of data as provided by self.dataloader 
+                data_batch (nd.array): the batch of data as provided by self.dataloader
             Returns:
-                formatted_batch (dict): {'vector': array of vector_datamatrix, 
-                                         'embed': list of embedding features' batch data, 
-                                         'language': list of language features batch data, 
+                formatted_batch (dict): {'vector': array of vector_datamatrix,
+                                         'embed': list of embedding features' batch data,
+                                         'language': list of language features batch data,
                                          'label': array of labels}
                                         where each key in dict may be missing.
         """
@@ -278,7 +279,7 @@ class TabularNNDataset:
         return formatted_batch
 
     def mask_features_batch(self, features, mask_value, data_batch):
-        """ Returns new batch where all values of the indicated features have been replaced by the provided mask_value. 
+        """ Returns new batch where all values of the indicated features have been replaced by the provided mask_value.
             Args:
                 features (list[str]): list of feature names that should be masked.
                 mask_value (float): value of mask which original feature values should be replaced by. If None, we replace by mean/mode/unknown
