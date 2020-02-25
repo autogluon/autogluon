@@ -6,7 +6,7 @@ from .....try_import import try_import_lightgbm
 
 logger = logging.getLogger(__name__)
 
-# callback
+
 def save_model_callback(path, latest_model_checkpoint, interval, offset):
     def _callback(env):
         if ((env.iteration - offset) % interval == 0) & (env.iteration != 0):
@@ -149,7 +149,7 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         if not enabled[0]:
             return
         if train_loss_name is not None:
-            train_loss_evals = [eval for i, eval in enumerate(env.evaluation_result_list) if eval[0] == 'train_set' and eval[1] == train_loss_name]
+            train_loss_evals = [eval for eval in env.evaluation_result_list if eval[0] == 'train_set' and eval[1] == train_loss_name]
             train_loss_val = train_loss_evals[0][2]
         else:
             train_loss_val = 0.0
@@ -196,7 +196,6 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
         if time_limit:
             time_elapsed = time.time() - start_time
             time_left = time_limit - time_elapsed
-            # print('time left:', time_left)
             if time_left <= 0:
                 i = indices_to_check[0]
                 logger.log(20, '\tRan out of time, early stopping on iteration ' + str(env.iteration+1) + '. Best iteration is:\n\t[%d]\t%s' % (
