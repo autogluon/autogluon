@@ -178,6 +178,7 @@ class BaggedEnsembleModel(AbstractModel):
                 time_predict_end_fold = time.time()
                 fold_model.fit_time = time_train_end_fold - time_start_fold
                 fold_model.predict_time = time_predict_end_fold - time_train_end_fold
+                fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)
                 if self.low_memory:
                     self.save_child(fold_model, verbose=False)
                     models.append(fold_model.name)

@@ -52,6 +52,7 @@ def model_trial(args, reporter: LocalStatusReporter):
         time_pred_end = time.time()
         model.fit_time = time_fit_end - time_fit_start
         model.predict_time = time_pred_end - time_fit_end
+        model.val_score = val_perf
         model.save()
 
     except Exception as e:

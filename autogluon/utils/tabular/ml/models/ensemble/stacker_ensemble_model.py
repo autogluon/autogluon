@@ -183,6 +183,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 # TODO: Remove this once all HPO functions set fit_time for models
                 child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
             child.predict_time = time_predict_end - time_train_end
+            child.val_score = child.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)  # FIXME: Remove once all HPO calculates val_score already
 
             # TODO: Create new StackerEnsemble Here
             stacker = copy.deepcopy(self)

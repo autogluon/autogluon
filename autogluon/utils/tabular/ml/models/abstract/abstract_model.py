@@ -92,6 +92,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
         self._set_default_params()

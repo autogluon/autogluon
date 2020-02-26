@@ -49,6 +49,7 @@ def lgb_trial(args, reporter):
         time_pred_end = time.time()
         model.fit_time = time_fit_end - time_fit_start
         model.predict_time = time_pred_end - time_fit_end
+        model.val_score = score
         model.save()
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
