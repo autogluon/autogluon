@@ -174,38 +174,6 @@ class AbstractLearner:
         trainer = self.load_trainer()
         return trainer.refit_single_full(X=X, y=y, models=models)
 
-    # TODO: Experimental, not integrated with core code, highly subject to change
-    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
-    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
-    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
-    # Distills the full ensemble into a single model trained on 100% of the data.
-    # Results in significantly worse model quality (--), but extremely faster inference times (++++), minimal memory usage (++++), and minimal space usage (++++).
-    def distill(self):
-        X = None
-        y = None
-        if X is not None:
-            if y is None:
-                X, y = self.extract_label(X)
-            X = self.transform_features(X)
-            if self.problem_type != MULTICLASS and self.problem_type != SOFTCLASS:
-                y = self.label_cleaner.transform(y)
-        else:
-            y = None
-        trainer = self.load_trainer()
-        trainer.distill(X=X, y=y)
-
-    def augment_distill(self, X=None, y=None, num_augmented_samples=50000, time_limits=None):
-        if X is not None:
-            if y is None:
-                X, y = self.extract_label(X)
-            X = self.transform_features(X)
-            if self.problem_type != MULTICLASS and self.problem_type != SOFTCLASS:
-                y = self.label_cleaner.transform(y)
-        else:
-            y = None
-        trainer = self.load_trainer()
-        trainer.augment_distill(X=X,y=y,num_augmented_samples=num_augmented_samples,time_limits=time_limits)
-
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
