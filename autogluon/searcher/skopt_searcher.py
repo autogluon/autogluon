@@ -114,7 +114,7 @@ class SKoptSearcher(BaseSearcher):
                 new_config_cs.is_valid_configuration()
                 new_config = new_config_cs.get_dictionary()
                 if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                    self._results[pickle.dumps(new_config)] = 0
+                    self._results[pickle.dumps(new_config)] = self._reward_while_pending()
                     return new_config
             except self.errors_tohandle:
                 pass
@@ -126,7 +126,7 @@ class SKoptSearcher(BaseSearcher):
                     new_config_cs.is_valid_configuration()
                     new_config = new_config_cs.get_dictionary()
                     if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                        self._results[pickle.dumps(new_config)] = 0
+                        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
                         return new_config
                 except self.errors_tohandle:
                     pass
@@ -145,7 +145,7 @@ class SKoptSearcher(BaseSearcher):
         """
         new_config_cs = self.configspace.get_default_configuration()
         new_config = new_config_cs.get_dictionary()
-        self._results[pickle.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
         
     def random_config(self):
@@ -155,7 +155,7 @@ class SKoptSearcher(BaseSearcher):
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[pickle.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
 
     def update(self, config, reward, **kwargs):
