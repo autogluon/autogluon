@@ -676,6 +676,8 @@ class TabularNeuralNetModel(AbstractModel):
         
         params_filepath = path + self.params_file_name
         modelobj_filepath = path + self.model_file_name
+        # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if self.model is not None:
             self.model.save_parameters(params_filepath)
         temp_model = self.model
@@ -722,7 +724,7 @@ class TabularNeuralNetModel(AbstractModel):
         else:
             self.params['ctx'] = mx.cpu()
         # self.params['ctx'] = mx.cpu() # use this in case embedding layer complains during predict() for HPO with GPU
-        
+
         start_time = time.time()
         X_train = self.preprocess(X_train)
         if self.features is None:
