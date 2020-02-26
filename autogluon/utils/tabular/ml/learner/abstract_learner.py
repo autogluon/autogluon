@@ -159,6 +159,8 @@ class AbstractLearner:
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
     # Compresses bagged ensembles to a single model fit on 100% of the data.
     # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
+    # TODO: this currently only works for bagged models.
+    # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
     def refit_single_full(self, models=None):
         X = None
         y = None
@@ -170,7 +172,7 @@ class AbstractLearner:
         else:
             y = None
         trainer = self.load_trainer()
-        trainer.refit_single_full(X=X, y=y, models=models)
+        return trainer.refit_single_full(X=X, y=y, models=models)
 
     # TODO: Experimental, not integrated with core code, highly subject to change
     # TODO: Add X, y parameters -> Requires proper preprocessing of train data

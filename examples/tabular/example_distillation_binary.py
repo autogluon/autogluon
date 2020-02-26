@@ -47,9 +47,9 @@ learner.augment_distill(num_augmented_samples=num_augmented_samples, time_limits
 trainer = learner.load_trainer()
 best_baggedbase_model = trainer.best_single_model(stack_name='core', stack_level=0)
 best_compressed_model = trainer.refit_single_full(models=[best_baggedbase_model])[0]
-all_compressed_models = trainer.refit_single_full()
 best_distilled_model = trainer.best_single_model(stack_name='distill', stack_level=0)
 print("Best compressed: %s, best distill: %s" % (best_compressed_model,best_distilled_model))
+all_compressed_models = trainer.refit_single_full() # tries to refit single full version of all model types.
 
 # Compare performance of different models on test data after distillation:
 # Note: validation metrics may change during distillation so cannot compare validation metrics of distilled predictors with original predictors:
