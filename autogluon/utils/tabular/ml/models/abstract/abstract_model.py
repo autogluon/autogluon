@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .model_trial import model_trial
-from ...constants import BINARY, REGRESSION
+from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
 from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split
 from .... import metrics
@@ -53,7 +53,7 @@ class AbstractModel:
     model_file_name = 'model.pkl'
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
-        """ Creates a new model. 
+        """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs
                 name (str): name of subdirectory inside path where model will be saved
@@ -306,11 +306,11 @@ class AbstractModel:
         return template
 
     # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
-    def convert_to_compressed_template(self):
+    def convert_to_refitfull_template(self):
         params_trained = self.params_trained.copy()
         template = self.convert_to_template()
         template.params.update(params_trained)
-        template.name = template.name + '_compressed'
+        template.name = template.name + REFIT_FULL_SUFFIX
         template.path = template.create_contexts(self.path + template.name + os.path.sep)
         return template
 

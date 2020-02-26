@@ -6,7 +6,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from collections import defaultdict
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
@@ -734,7 +734,7 @@ class AbstractTrainer:
         return X
 
     # TODO: add compress support for non-bagged models
-    def compress(self, X=None, y=None, models=None):
+    def refit_single_full(self, X=None, y=None, models=None):
         if X is None:
             X = self.load_X_train()
         if y is None:
@@ -745,7 +745,7 @@ class AbstractTrainer:
         models_compressed = {}
         model_levels = defaultdict(dd_list)
         ignore_models = []
-        ignore_stack_names = ['compressed']
+        ignore_stack_names = [REFIT_FULL_NAME]
         for stack_name in ignore_stack_names:
             ignore_models += self.get_model_names(stack_name)  # get_model_names returns [] if stack_name does not exist
         for model_name in models:
@@ -753,15 +753,15 @@ class AbstractTrainer:
             if isinstance(model, WeightedEnsembleModel) or model_name in ignore_models:
                 continue
             model_level = self.get_model_level(model_name)
-            model_levels['compressed'][model_level] += [model_name]
-            model_compressed = model.convert_to_compressed_template()
+            model_levels[REFIT_FULL_NAME][model_level] += [model_name]
+            model_compressed = model.convert_to_refitfull_template()
             models_compressed[model_name] = model_compressed
-        levels = sorted(model_levels['compressed'].keys())
+        levels = sorted(model_levels[REFIT_FULL_NAME].keys())
         models_trained_full = []
         for level in levels:
-            models_level = model_levels['compressed'][level]
+            models_level = model_levels[REFIT_FULL_NAME][level]
             models_level = [models_compressed[model_name] for model_name in models_level]
-            models_trained = self.stack_new_level_core(X=X, y=y, models=models_level, level=level, stack_name='compressed', hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1)
+            models_trained = self.stack_new_level_core(X=X, y=y, models=models_level, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1)
             models_trained_full += models_trained
         return models_trained_full
 
@@ -813,7 +813,7 @@ class AbstractTrainer:
                                       feature_prune=False)
             # TODO: Do stratified for binary/multiclass, folds are not aligned!
             models_trained = self.stack_new_level_core(X=X, y=y_distill, models=models_distill, level=0, stack_name='distilled', hyperparameter_tune=False, feature_prune=False)
-            self.compress(X=X, y=y_distill, models=models_trained)
+            self.refit_single_full(X=X, y=y_distill, models=models_trained)
 
         self.save()
 

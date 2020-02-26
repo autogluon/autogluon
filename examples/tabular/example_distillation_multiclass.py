@@ -37,11 +37,11 @@ test_data = test_data.head(subsample_size) # subsample for faster run
 print(train_data.head())
 
 # Fit models:
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                     enable_fit_continuation=True, auto_stack=True, hyperparameters=hyperparameters, 
+predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir,
+                     enable_fit_continuation=True, auto_stack=True, hyperparameters=hyperparameters,
                      verbosity=3, time_limits = time_limits, eval_metric='log_loss')
 
-# If you have previously-trained ensemble predictor from task.fit(), 
+# If you have previously-trained ensemble predictor from task.fit(),
 # you can instead skip above  task.fit() and just load it:
 predictor = task.load(savedir, verbosity=4) # use high-verbosity to see distillation process details.
 
