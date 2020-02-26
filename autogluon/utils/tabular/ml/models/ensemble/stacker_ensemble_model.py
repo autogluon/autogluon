@@ -179,7 +179,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             time_train_end = time.time()
             pred_proba = child.predict_proba(X_test)
             time_predict_end = time.time()
-            child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
+            if np.isnan(child.fit_time):
+                # TODO: Remove this once all HPO functions set fit_time for models
+                child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
             child.predict_time = time_predict_end - time_train_end
 
             # TODO: Create new StackerEnsemble Here

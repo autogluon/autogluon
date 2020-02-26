@@ -5,7 +5,7 @@ from pandas import DataFrame, Series
 
 from ......core import Int, Space
 from .....try_import import try_import_lightgbm
-from ......task.base import BasePredictor
+from ....utils.savers import save_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...utils import construct_dataset
 from .callbacks import early_stopping_custom
@@ -222,6 +222,9 @@ class LGBModel(AbstractModel):
         if os.path.exists(val_file):  # clean up old files first
             os.remove(val_file)
         dataset_val.save_binary(val_file)
+        dataset_val_pkl_filename = 'dataset_val.pkl'
+        val_pkl_path = directory + dataset_val_pkl_filename
+        save_pkl.save(path=val_pkl_path, object=(X_test, Y_test))
 
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
@@ -231,12 +234,21 @@ class LGBModel(AbstractModel):
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, str(hyperparam)+":   " + str(params_copy[hyperparam]))
 
-        lgb_trial.register_args(dataset_train_filename=dataset_train_filename, dataset_val_filename=dataset_val_filename, directory=directory, model=self, time_start=time_start, time_limit=scheduler_options['time_out'], **params_copy)
+        util_args = dict(
+            dataset_train_filename=dataset_train_filename,
+            dataset_val_filename=dataset_val_filename,
+            dataset_val_pkl_filename=dataset_val_pkl_filename,
+            directory=directory,
+            model=self,
+            time_start=time_start,
+            time_limit=scheduler_options['time_out']
+        )
+        lgb_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_func(lgb_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_file, val_file]) # TODO: currently does not work.
+            scheduler.upload_files([train_file, val_file, val_pkl_path]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             lgb_trial.update(directory=directory)
             logger.log(15, "uploaded")
@@ -244,36 +256,7 @@ class LGBModel(AbstractModel):
         scheduler.run()
         scheduler.join_jobs()
 
-        # Store results / models from this HPO run:
-        best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
-        hpo_results = {'best_reward': scheduler.get_best_reward(),
-                       'best_config': best_hp,
-                       'total_time': time.time() - time_start,
-                       'metadata': scheduler.metadata,
-                       'training_history': scheduler.training_history,
-                       'config_history': scheduler.config_history,
-                       'reward_attr': scheduler._reward_attr,
-                       'args': lgb_trial.args
-                      }
-        hpo_results = BasePredictor._format_results(hpo_results) # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers")
-            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
-            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
-        hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
-        hpo_model_performances = {}
-        for trial in sorted(hpo_results['trial_info'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
-            trial_model_name = self.name + os.path.sep + file_id
-            trial_model_path = self.path_root + trial_model_name + os.path.sep
-            hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
-
-        logger.log(15, "Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
-        logger.log(15, "Best hyperparameter configuration for Gradient Boosting Model: ")
-        logger.log(15, best_hp)
-        return hpo_models, hpo_model_performances, hpo_results
+        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:
