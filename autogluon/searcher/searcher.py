@@ -1,14 +1,14 @@
-import os
-import pickle
 import logging
-from collections import OrderedDict
 import multiprocessing as mp
+import pickle
+from collections import OrderedDict
 
-from ..utils import load, DeprecationHelper
+from ..utils import DeprecationHelper
 
 __all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 
 logger = logging.getLogger(__name__)
+
 
 class BaseSearcher(object):
     """Base Searcher (virtual class to inherit from if you are creating a custom Searcher).
@@ -20,6 +20,7 @@ class BaseSearcher(object):
         specification of the Hyperparameters with their priors
     """
     LOCK = mp.Lock()
+
     def __init__(self, configspace):
         self.configspace = configspace
         self._results = OrderedDict()
@@ -36,7 +37,7 @@ class BaseSearcher(object):
         returns: (config, info_dict)
             must return a valid configuration and a (possibly empty) info dict
         """
-        raise NotImplementedError('This function needs to be overwritten in %s.'%(self.__class__.__name__))
+        raise NotImplementedError(f'This function needs to be overwritten in {self.__class__.__name__}.')
 
     def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report
@@ -59,8 +60,7 @@ class BaseSearcher(object):
                 config_pkl = pickle.dumps(config)
                 old_reward = self._results.get(config_pkl, reward)
                 self._results[config_pkl] = max(reward, old_reward)
-            logger.info('Finished Task with config: {} and reward: {}'.format(
-                config, reward))
+            logger.info(f'Finished Task with config: {config} and reward: {reward}')
 
     def register_pending(self, config, milestone=None):
         """
@@ -80,9 +80,8 @@ class BaseSearcher(object):
            Assumes higher reward values indicate better performance.
         """
         with self.LOCK:
-            if len(self._results) > 0:
-                config = max(self._results, key=self._results.get)
-                return self._results[config]
+            if self._results:
+                return max(self._results.values())
         return 0.0
 
     def get_reward(self, config):
@@ -97,17 +96,17 @@ class BaseSearcher(object):
         """Returns the best configuration found so far.
         """
         with self.LOCK:
-            if len(self._results) > 0:
-                config = max(self._results, key=self._results.get)
-                return pickle.loads(config)
+            if self._results:
+                config_pkl = max(self._results, key=self._results.get)
+                return pickle.loads(config_pkl)
             else:
-                return {}
+                return dict()
 
     def get_best_config_reward(self):
         """Returns the best configuration found so far, as well as the reward associated with this best config.
         """
         with self.LOCK:
-            if len(self._results) > 0:
+            if self._results:
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl), self._results[config_pkl]
             else:
@@ -115,12 +114,14 @@ class BaseSearcher(object):
 
     def __repr__(self):
         config, reward = self.get_best_config_reward()
-        reprstr = self.__class__.__name__ + '(' +  \
-            '\nConfigSpace: {}.'.format(str(self.configspace)) + \
-            '\nNumber of Trials: {}.'.format(len(self._results)) + \
-            '\nBest Config: {}'.format(config) + \
-            '\nBest Reward: {}'.format(reward) + \
-            ')'
+        reprstr = (
+                f'{self.__class__.__name__}(' +
+                f'\nConfigSpace: {self.configspace}.' +
+                f'\nNumber of Trials: {len(self._results)}.' +
+                f'\nBest Config: {config}' +
+                f'\nBest Reward: {reward}' +
+                f')'
+        )
         return reprstr
 
 
@@ -155,7 +156,7 @@ class RandomSearcher(BaseSearcher):
         -------
         A new configuration that is valid.
         """
-        if len(self._results) == 0: # no hyperparams have been tried yet, first try default config
+        if not self._results:  # no hyperparams have been tried yet, first try default config
             new_config = self.configspace.get_default_configuration().get_dictionary()
         else:
             new_config = self.configspace.sample_configuration().get_dictionary()
@@ -163,17 +164,11 @@ class RandomSearcher(BaseSearcher):
             num_tries = 1
             while pickle.dumps(new_config) in self._results.keys():
                 assert num_tries <= self.MAX_RETRIES, \
-                    "Cannot find new config in BaseSearcher, even after {} trials".format(
-                        self.MAX_RETRIES)
+                    f"Cannot find new config in BaseSearcher, even after {self.MAX_RETRIES} trials"
                 new_config = self.configspace.sample_configuration().get_dictionary()
                 num_tries += 1
-            self._results[pickle.dumps(new_config)] = 0
+            self._results[pickle.dumps(new_config)] = float("-inf")
         return new_config
 
-    def update(self, config, reward, **kwargs):
-        """Update the searcher with the newest metric report
-        """
-        super(RandomSearcher, self).update(config, reward, **kwargs)
-
-
+   
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
