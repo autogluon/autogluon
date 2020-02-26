@@ -26,6 +26,11 @@ class BaseSearcher(object):
         self._results = OrderedDict()
         self._best_state_path = None
 
+    @staticmethod
+    def _reward_while_pending():
+        """Defines the reward value which is assigned to config, while it is pending."""
+        return float("-inf")
+
     def get_config(self, **kwargs):
         """Function to sample a new configuration
 
@@ -82,7 +87,7 @@ class BaseSearcher(object):
         with self.LOCK:
             if self._results:
                 return max(self._results.values())
-        return float("-inf")
+        return self._reward_while_pending()
 
     def get_reward(self, config):
         """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
@@ -110,7 +115,7 @@ class BaseSearcher(object):
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl), self._results[config_pkl]
             else:
-                return dict(), float("-inf")
+                return dict(), self._reward_while_pending()
 
     def __repr__(self):
         config, reward = self.get_best_config_reward()
@@ -167,7 +172,7 @@ class RandomSearcher(BaseSearcher):
                     f"Cannot find new config in BaseSearcher, even after {self.MAX_RETRIES} trials"
                 new_config = self.configspace.sample_configuration().get_dictionary()
                 num_tries += 1
-            self._results[pickle.dumps(new_config)] = float("-inf")
+            self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
 
 
