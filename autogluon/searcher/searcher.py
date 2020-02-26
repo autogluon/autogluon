@@ -82,7 +82,7 @@ class BaseSearcher(object):
         with self.LOCK:
             if self._results:
                 return max(self._results.values())
-        return 0.0
+        return float("-inf")
 
     def get_reward(self, config):
         """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
@@ -110,7 +110,7 @@ class BaseSearcher(object):
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl), self._results[config_pkl]
             else:
-                return dict(), 0.0
+                return dict(), float("-inf")
 
     def __repr__(self):
         config, reward = self.get_best_config_reward()
@@ -170,5 +170,5 @@ class RandomSearcher(BaseSearcher):
             self._results[pickle.dumps(new_config)] = float("-inf")
         return new_config
 
-   
+
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
