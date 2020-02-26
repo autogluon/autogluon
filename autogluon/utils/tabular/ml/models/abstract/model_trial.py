@@ -1,16 +1,17 @@
+import os
+import time
 import logging
-import pickle
-import random
 
-import numpy as np
+from ....utils.loaders import load_pkl
+from ....utils.exceptions import TimeLimitExceeded
+from ......core import args
+from ......scheduler.reporter import LocalStatusReporter
 
-from autogluon.core import args
-
-logger = logging.getLogger(__name__)  # TODO: Currently unused
+logger = logging.getLogger(__name__)
 
 
 @args()
-def model_trial(args, reporter):
+def model_trial(args, reporter: LocalStatusReporter):
     """ Training script for hyperparameter evaluation of an arbitrary model that subclasses AbstractModel.
         
         Notes:
@@ -21,32 +22,41 @@ def model_trial(args, reporter):
             - model.save() must have return_filename, file_prefix, directory options
     """
     try:
-        trial_id = args.pop('task_id')  # Note may not start at 0 if HPO has been run for other models with same scheduler
-        directory = args.pop('directory')  # TODO: Separate model parameters vs HPO
-        file_prefix = f"trial_{trial_id}_"  # append to all file names created during this trial. Do NOT change!
-        model = args.pop('model')  # the model object must be passed into model_trial() here
+        task_id = args.pop('task_id')
+        util_args = args.pop('util_args')
 
-        dataset_train_filename = args.pop('dataset_train_filename')
-        X_train, Y_train = pickle.load(open(directory + dataset_train_filename, 'rb'))
-        dataset_val_filename = args.pop('dataset_val_filename', None)
-        if dataset_val_filename is None:
-            raise NotImplementedError("must provide validation data for model_trial()")
-        X_val, Y_val = pickle.load(open(directory + dataset_val_filename, 'rb'))
-        model.params = model.params.copy()  # all hyperparameters must be stored in this dict
+        file_prefix = f"trial_{task_id}"  # append to all file names created during this trial. Do NOT change!
+        model = util_args.model  # the model object must be passed into model_trial() here
+        model.name = model.name + os.path.sep + file_prefix
+        model.set_contexts(path_context=model.path_root + model.name + os.path.sep)
+
+        X_train, Y_train = load_pkl.load(util_args.directory + util_args.dataset_train_filename)
+        X_val, Y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
+
+        time_start = util_args.pop('time_start')
+        time_limit = util_args.pop('time_limit', None)
+        time_current = time.time()
+        time_elapsed = time_current - time_start
+        if time_limit is not None:
+            time_left = time_limit - time_elapsed
+            if time_left <= 0:
+                raise TimeLimitExceeded
+        else:
+            time_left = None
+
         model.params.update(args)
-        if 'seed_value' in model.params:
-            random.seed(model.params['seed_value'])
-            np.random.seed(model.params['seed_value'])
-
-            model.params.pop('seed_value')  # TODO: Should we be popping this?
-
-        model.fit(X_train, Y_train, X_val, Y_val)
+        time_fit_start = time.time()
+        model.fit(X_train, Y_train, X_val, Y_val, time_limit=time_left)
+        time_fit_end = time.time()
         val_perf = model.score(X_val, Y_val)
-        trial_model_file = model.save(file_prefix=file_prefix, directory=directory, return_filename=True)
+        time_pred_end = time.time()
+        model.fit_time = time_fit_end - time_fit_start
+        model.predict_time = time_pred_end - time_fit_end
+        model.save()
 
     except Exception as e:
-        logger.exception(e, exc_info=True)
+        if not isinstance(e, TimeLimitExceeded):
+            logger.exception(e, exc_info=True)
         reporter.terminate()
     else:
-        reporter(epoch=0, validation_performance=val_perf, directory=directory, file_prefix=file_prefix,
-                 trial_model_file=trial_model_file)  # auxiliary_info = ?)
+        reporter(epoch=0, validation_performance=val_perf)
