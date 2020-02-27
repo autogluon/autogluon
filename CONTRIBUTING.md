@@ -21,7 +21,7 @@ reported the issue. Please try to include as much information as you can. Detail
 
 
 ## Contributing via Pull Requests
-Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
+Code contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
 
 1. You are working against the latest source on the *master* branch.
 2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
@@ -30,7 +30,7 @@ Contributions via pull requests are much appreciated. Before sending us a pull r
 To send us a pull request, please:
 
 1. Fork the repository.
-2. Modify the source; please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
+2. Modify the source (see details below); please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
 3. Ensure local tests pass.
 4. Commit to your fork using clear commit messages.
 5. Send us a pull request, answering any default questions in the pull request interface.
@@ -40,7 +40,36 @@ GitHub provides additional document on [forking a repository](https://help.githu
 [creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
 
 
-## Finding contributions to work on
+## Tips for Modifying the Source Code
+
+- Using a fresh virtualenv, install the package via [these instructions](https://autogluon.mxnet.io/install.html).
+Be sure to select the *Source* option from the installation preferences, and install the package after cloning this repository via:
+```
+python setup.py develop
+```
+
+- We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
+
+- Please use Python >= 3.6 for development, as these are the only versions where AutoGluon is fully functional.
+
+- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package.
+
+- All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
+
+- After you have edited the code, ensure your changes pass our unit tests via:
+```
+bash tests/run_all.sh
+```
+
+- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models with the lowest values of  training iterations and time-limits that suffice to evaluate the intended functionality).
+
+- We also encourage you to contribute new tutorials using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/awslabs/autogluon/tree/master/docs/tutorials) for examples. All tutorials should be Jupyter notebooks converted into markdown (our build system will rebuild the .ipynb files from the markdown file and execute the notebooks).
+
+- After you open your pull request, our CI system will run for little while to check your code and report found errors. Please check back and fix any errors encountered at this stage (you can retrigger a new CI check by pushing updated code to the PR).
+
+
+
+## Finding Contributions to Work On
 Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any ['help wanted'](https://github.com/awslabs/auto-ml-with-gluon/labels/help%20wanted) issues is a great place to start.
 
 
@@ -50,7 +79,7 @@ For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of
 opensource-codeofconduct@amazon.com with any additional questions or comments.
 
 
-## Security issue notifications
+## Security Issue Notifications
 If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public github issue.
 
 
