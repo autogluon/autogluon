@@ -7,7 +7,7 @@ import mxnet as mx
 logger = logging.getLogger(__name__)
 
 
-EPS = 1e-9 # clipping threshold to prevent NaN
+EPS = 1e-10 # clipping threshold to prevent NaN
 softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True) # assumes predictions are already log-probabilities.
 
 def soft_log_loss(true_probs, predicted_probs):
@@ -18,7 +18,7 @@ def soft_log_loss(true_probs, predicted_probs):
         raise ValueError("both truth and prediction must be 2D numpy arrays")
     if true_probs.shape != predicted_probs.shape:
         raise ValueError("truth and prediction must be 2D numpy arrays with the same shape")
-    
+
     # true_probs = np.clip(true_probs, a_min=EPS, a_max=None)
     predicted_probs = np.clip(predicted_probs, a_min=EPS, a_max=None) # clip 0s to avoid NaN
     true_probs = true_probs / true_probs.sum(axis=1, keepdims=1) # renormalize

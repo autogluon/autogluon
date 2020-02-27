@@ -128,6 +128,7 @@ class AbstractTrainer:
 
         self.is_data_saved = False
         self.normalize_predprobs = False # whether or not probabilistic predictions may need to be renormalized (eg. distillation with BINARY -> REGRESSION)
+        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
 
     # path_root is the directory containing learner.pkl
     @property
@@ -637,7 +638,8 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
-        EPS = 1e-8 # predicted probabilities can be at most this confident if we normalize predicted probabilities
+        EPS = 1e-10 # predicted probabilities can be at most this confident if we normalize predicted probabilities
+        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
         if not self.normalize_predprobs:
             return model.predict_proba(X=X, preprocess=False)
         elif self.problem_type == MULTICLASS:

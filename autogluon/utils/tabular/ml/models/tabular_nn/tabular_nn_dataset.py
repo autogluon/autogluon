@@ -134,15 +134,15 @@ class TabularNNDataset:
             self.data_desc.append("label")
             self.label_index = len(data_list) # To access data labels, use: self.dataset._data[self.label_index]
             self.num_classes = None
-            if self.problem_type == REGRESSION and labels.dtype != np.float32:
-                    labels = labels.astype('float32') # Convert to proper float-type if not already
             if self.problem_type == SOFTCLASS:
-                data_list.append(mx.nd.array(labels))
                 self.num_classes = labels.shape[1]
+                data_list.append(mx.nd.array(labels))
             else:
-                data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
-                if self.problem_type in [BINARY, MULTICLASS]:
+                if self.problem_type == REGRESSION and labels.dtype != np.float32:
+                    labels = labels.astype('float32') # Convert to proper float-type if not already
+                elif self.problem_type in [BINARY, MULTICLASS]:
                     self.num_classes = len(set(labels))
+                data_list.append(mx.nd.array(labels.reshape(len(labels),1)))
 
         self.embed_indices = [i for i in range(len(self.data_desc)) if 'embed' in self.data_desc[i]] # list of indices of embedding features in self.dataset, order matters!
         self.language_indices = [i for i in range(len(self.data_desc)) if 'language' in self.data_desc[i]]  # list of indices of language features in self.dataset, order matters!

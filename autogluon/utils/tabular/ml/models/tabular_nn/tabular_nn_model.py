@@ -38,7 +38,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
-EPS = 10e-8 # small number
+EPS = 1e-10 # small number
 
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
@@ -252,14 +252,14 @@ class TabularNeuralNetModel(AbstractModel):
             self.model.hybridize()
             logging.debug("initialized")
         if setup_trainer:
-            # Also setup mxboard if visualizer has been specified:
+            # Also setup mxboard to monitor training if visualizer has been specified:
             visualizer = self.params.get('visualizer', 'none')
             if visualizer == 'tensorboard' or visualizer == 'mxboard':
                 try_import_mxboard()
                 from mxboard import SummaryWriter
                 self.summary_writer = SummaryWriter(logdir=self.path, flush_secs=5, verbose=False)
             self.setup_trainer(train_dataset)
-        best_val_metric = -np.inf # higher = better
+        best_val_metric = -np.inf  # higher = better
         val_metric = None
         best_val_epoch = 0
         num_epochs = self.params['num_epochs']
@@ -439,10 +439,10 @@ class TabularNeuralNetModel(AbstractModel):
         elif self.problem_type == BINARY and predict_proba:
             preds = preds[:,1].asnumpy() # for binary problems, only return P(Y==+1)
             if self.stopping_metric == log_loss or self.objective_func == log_loss: # Ensure nonzero predicted probabilities under log-loss:
-                min_pred = np.min(preds)
-                max_pred = np.max(preds)
-                if min_pred < EPS or max_pred > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
-                    preds =  EPS + ((1-2*EPS)/(max_pred-min_pred)) * (preds - min_pred)
+                # remap predicted probs to line that goes through: (min_pred, EPS), (max_pred, 1-EPS):
+                min_pred = 0.0
+                max_pred = 1.0
+                preds =  EPS + ((1 - 2*EPS)/(max_pred - min_pred)) * (preds - min_pred)
             return preds
         elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and
               (self.stopping_metric == log_loss or self.objective_func == log_loss)):
