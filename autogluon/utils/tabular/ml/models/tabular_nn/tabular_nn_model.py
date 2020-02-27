@@ -438,8 +438,8 @@ class TabularNeuralNetModel(AbstractModel):
             return preds.asnumpy().flatten() # return 1D numpy array
         elif self.problem_type == BINARY and predict_proba:
             preds = preds[:,1].asnumpy() # for binary problems, only return P(Y==+1)
-            if self.stopping_metric == log_loss or self.objective_func == log_loss: # Ensure nonzero predicted probabilities under log-loss:
-                # remap predicted probs to line that goes through: (min_pred, EPS), (max_pred, 1-EPS):
+            if self.stopping_metric == log_loss or self.objective_func == log_loss:
+                # Ensure nonzero predicted probabilities under log-loss:
                 min_pred = 0.0
                 max_pred = 1.0
                 preds =  EPS + ((1 - 2*EPS)/(max_pred - min_pred)) * (preds - min_pred)
