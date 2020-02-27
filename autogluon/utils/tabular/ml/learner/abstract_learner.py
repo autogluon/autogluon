@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba
@@ -159,7 +159,9 @@ class AbstractLearner:
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
     # Compresses bagged ensembles to a single model fit on 100% of the data.
     # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
-    def compress(self):
+    # TODO: this currently only works for bagged models.
+    # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
+    def refit_single_full(self, models=None):
         X = None
         y = None
         if X is not None:
@@ -170,26 +172,7 @@ class AbstractLearner:
         else:
             y = None
         trainer = self.load_trainer()
-        trainer.compress(X=X, y=y)
-
-    # TODO: Experimental, not integrated with core code, highly subject to change
-    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
-    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
-    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
-    # Distills the full ensemble into a single model trained on 100% of the data.
-    # Results in significantly worse model quality (--), but extremely faster inference times (++++), minimal memory usage (++++), and minimal space usage (++++).
-    def distill(self):
-        X = None
-        y = None
-        if X is not None:
-            if y is None:
-                X, y = self.extract_label(X)
-            X = self.transform_features(X)
-            y = self.label_cleaner.transform(y)
-        else:
-            y = None
-        trainer = self.load_trainer()
-        trainer.distill(X=X, y=y)
+        return trainer.refit_single_full(X=X, y=y, models=models)
 
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
@@ -348,13 +331,13 @@ class AbstractLearner:
         return pred_probas_lst, pred_probas_time_lst
 
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
-        """ Evaluate predictions. 
+        """ Evaluate predictions.
             Args:
                 silent (bool): Should we print which metric is being used as well as performance.
                 auxiliary_metrics (bool): Should we compute other (problem_type specific) metrics in addition to the default metric?
                 detailed_report (bool): Should we computed more-detailed versions of the auxiliary_metrics? (requires auxiliary_metrics=True).
                 high_always_good (bool): If True, this means higher values of returned metric are ALWAYS superior (so metrics like MSE should be returned negated)
-            
+
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
@@ -484,7 +467,7 @@ class AbstractLearner:
     @staticmethod
     def get_problem_type(y: Series):
         """ Identifies which type of prediction problem we are interested in (if user has not specified).
-            Ie. binary classification, multi-class classification, or regression. 
+            Ie. binary classification, multi-class classification, or regression.
         """
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")

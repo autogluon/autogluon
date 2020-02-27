@@ -6,7 +6,7 @@ from pandas import DataFrame, Series
 from datetime import datetime
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
 
-from .constants import BINARY, REGRESSION
+from .constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
 from ..utils.savers import save_pd
 from ..utils.decorators import calculate_time
 from ...try_import import try_import_lightgbm
@@ -49,7 +49,7 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
 def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
-    if problem_type == REGRESSION:
+    if problem_type in [REGRESSION, SOFTCLASS]:
         stratify = None
     else:
         stratify = y
@@ -59,9 +59,12 @@ def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_s
     #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
     #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
     X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
-    y_train = pd.Series(y_train, index=X_train.index)
-    y_test = pd.Series(y_test, index=X_test.index)
-
+    if problem_type != SOFTCLASS:
+        y_train = pd.Series(y_train, index=X_train.index)
+        y_test = pd.Series(y_test, index=X_test.index)
+    else:
+        y_train = pd.DataFrame(y_train, index=X_train.index)
+        y_test = pd.DataFrame(y_test, index=X_test.index)
     return X_train, X_test, y_train, y_test
 
 
@@ -232,3 +235,18 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters={'NN': None}):
 
 def dd_list():
     return defaultdict(list)
+
+
+def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):
+    """ Used in distillation, combines true (integer) classes with 2D array of predicted probabilities.
+        Returns new 2D array of predicted probabilities where true classes are upweighted by upweight_factor (and then probabilities are renormalized)
+    """
+    if len(y_predprob) != len(y_true):
+        raise ValueError("y_predprob and y_true cannot have different lengths for distillation. Perhaps some classes' data was deleted during label cleaning.")
+    
+    y_trueprob = np.zeros((y_true.size, y_true.max()+1))
+    y_trueprob[np.arange(y_true.size),y_true] = upweight_factor
+    y_predprob = y_predprob + y_trueprob
+    y_predprob = y_predprob / y_predprob.sum(axis=1, keepdims=1) # renormalize
+    return y_predprob
+

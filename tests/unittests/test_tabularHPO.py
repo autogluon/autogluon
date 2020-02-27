@@ -1,4 +1,4 @@
-""" Runs autogluon.tabular on multiple benchmark datasets. 
+""" Runs autogluon.tabular on multiple benchmark datasets.
     Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
@@ -32,11 +32,11 @@ def test_tabularHPO():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 3} 
-        gbm_options = {'num_boost_round': 30}
+        nn_options = {'num_epochs': 2}
+        gbm_options = {'num_boost_round': 20}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
         time_limits = 60
-        num_trials = 3
+        num_trials = 5
 
     fit_args = {
         'hyperparameter_tune': hyperparameter_tune,

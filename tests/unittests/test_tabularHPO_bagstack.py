@@ -1,4 +1,4 @@
-""" Runs autogluon.tabular on multiple benchmark datasets. 
+""" Runs autogluon.tabular on multiple benchmark datasets.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
 """
@@ -20,7 +20,7 @@ def test_tabularHPObagstack():
     subsample_size = None
     hyperparameter_tune = True
     stack_ensemble_levels = 2
-    num_bagging_folds = 3
+    num_bagging_folds = 2
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
@@ -33,10 +33,10 @@ def test_tabularHPObagstack():
     #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
     if fast_benchmark:
         subsample_size = 100
-        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01)} 
+        nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01), 'lr_scheduler': ag.Categorical(None, 'cosine','step')}
         gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
+        time_limits = 150
         num_trials = 3
 
     fit_args = {

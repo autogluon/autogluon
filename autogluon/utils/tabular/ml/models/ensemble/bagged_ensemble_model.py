@@ -7,7 +7,7 @@ from collections import Counter
 
 from ..abstract.abstract_model import AbstractModel
 from ...utils import generate_kfold
-from ...constants import MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
 from ....utils.exceptions import TimeLimitExceeded
@@ -90,7 +90,7 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats-1) * k_fold + k_fold_end
         time_start = time.time()
-        if self.problem_type == REGRESSION:
+        if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
             stratified = False
         else:
             stratified = True
@@ -125,6 +125,8 @@ class BaggedEnsembleModel(AbstractModel):
 
         if self.problem_type == MULTICLASS:
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
+        elif self.problem_type == SOFTCLASS:
+            oof_pred_proba = np.zeros(shape=y.shape)
         else:
             oof_pred_proba = np.zeros(shape=len(X))
         oof_pred_model_repeats = np.zeros(shape=len(X))
@@ -251,12 +253,12 @@ class BaggedEnsembleModel(AbstractModel):
         model_compressed.fit(X_train=X, Y_train=y)  # TODO: This only works for stacker, not for bagged
         return model_compressed
 
-    def convert_to_compressed_template(self):
+    def convert_to_refitfull_template(self):
         compressed_params = self._get_compressed_params()
         model_compressed = copy.deepcopy(self._get_model_base())
         model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         model_compressed.params = compressed_params
-        model_compressed.name = model_compressed.name + '_C'
+        model_compressed.name = model_compressed.name + REFIT_FULL_SUFFIX
         model_compressed.set_contexts(self.path + model_compressed.name + os.path.sep)
         return model_compressed
 

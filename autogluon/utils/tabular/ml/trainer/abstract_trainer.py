@@ -6,18 +6,17 @@ import pandas as pd
 from pandas import DataFrame, Series
 from collections import defaultdict
 
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
-from ..trainer.model_presets.presets_distill import get_preset_models_distillation
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +127,8 @@ class AbstractTrainer:
         self.num_cols_train = None
 
         self.is_data_saved = False
+        self.normalize_predprobs = False # whether or not probabilistic predictions may need to be renormalized (eg. distillation with BINARY -> REGRESSION)
+        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
 
     # path_root is the directory containing learner.pkl
     @property
@@ -235,7 +236,7 @@ class AbstractTrainer:
             model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
-            model_fit_kwargs = {'verbosity': self.verbosity, 
+            model_fit_kwargs = {'verbosity': self.verbosity,
                                 'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or isinstance(model, WeightedEnsembleModel):
@@ -326,7 +327,7 @@ class AbstractTrainer:
         if self.low_memory:
             del model
 
-    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False, 
+    def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False,
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
             model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
@@ -637,6 +638,23 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
+        EPS = 1e-10 # predicted probabilities can be at most this confident if we normalize predicted probabilities
+        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
+        if not self.normalize_predprobs:
+            return model.predict_proba(X=X, preprocess=False)
+        elif self.problem_type == MULTICLASS:
+           y_predproba = model.predict_proba(X=X, preprocess=False)
+           most_negative_rowvals = np.clip(np.min(y_predproba, axis=1), a_min=None, a_max=0)
+           y_predproba = y_predproba - most_negative_rowvals[:,None] # ensure nonnegative rows
+           y_predproba = np.clip(y_predproba, a_min = EPS, a_max = None) # ensure no zeros
+           return y_predproba / y_predproba.sum(axis=1, keepdims=1) # renormalize
+        elif self.problem_type == BINARY:
+            y_predproba = model.predict_proba(X=X, preprocess=False)
+            min_y = np.min(y_predproba)
+            max_y = np.max(y_predproba)
+            if min_y < EPS or max_y > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
+                y_predproba =  EPS + ((1-2*EPS)/(max_y-min_y)) * (y_predproba - min_y)
+            return y_predproba
         return model.predict_proba(X=X, preprocess=False)
 
     def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
@@ -716,8 +734,9 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
-    # TODO: add compress support for non-bagged models
-    def compress(self, X=None, y=None, models=None):
+    # TODO: this currently only works for bagged models.
+    # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
+    def refit_single_full(self, X=None, y=None, models=None):
         if X is None:
             X = self.load_X_train()
         if y is None:
@@ -727,42 +746,39 @@ class AbstractTrainer:
 
         models_compressed = {}
         model_levels = defaultdict(dd_list)
+        ignore_models = []
+        ignore_stack_names = [REFIT_FULL_NAME]
+        for stack_name in ignore_stack_names:
+            ignore_models += self.get_model_names(stack_name)  # get_model_names returns [] if stack_name does not exist
         for model_name in models:
             model = self.load_model(model_name)
-            if isinstance(model, WeightedEnsembleModel):
+            if isinstance(model, WeightedEnsembleModel) or model_name in ignore_models:
                 continue
             model_level = self.get_model_level(model_name)
-            model_levels['compressed'][model_level] += [model_name]
-            model_compressed = model.convert_to_compressed_template()
+            model_levels[REFIT_FULL_NAME][model_level] += [model_name]
+            model_compressed = model.convert_to_refitfull_template()
             models_compressed[model_name] = model_compressed
-        levels = sorted(model_levels['compressed'].keys())
+        levels = sorted(model_levels[REFIT_FULL_NAME].keys())
         models_trained_full = []
         for level in levels:
-            models_level = model_levels['compressed'][level]
+            models_level = model_levels[REFIT_FULL_NAME][level]
             models_level = [models_compressed[model_name] for model_name in models_level]
-            models_trained = self.stack_new_level_core(X=X, y=y, models=models_level, level=level, stack_name='compressed', hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1)
+            models_trained = self.stack_new_level_core(X=X, y=y, models=models_level, level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1)
             models_trained_full += models_trained
         return models_trained_full
 
-    def distill(self, X=None, y=None):
-        if X is None:
-            X = self.load_X_train()
-        if y is None:
-            y = self.load_y_train()
+    def best_single_model(self, stack_name, stack_level):
+        """ Returns name of best single model in this trainer object, at a particular stack_level with particular stack_name.
 
-        model_best = self.load_model(self.model_best)
-        if self.problem_type == MULTICLASS:
-            raise NotImplementedError
-        if not self.bagged_mode:
-            raise NotImplementedError
-        models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, num_classes=self.num_classes, hyperparameters=self.hyperparameters)
-        y_distill = pd.Series(model_best.oof_pred_proba)
-
-        # TODO: Do stratified for binary/multiclass, folds are not aligned!
-        models_trained = self.stack_new_level_core(X=X, y=y_distill, models=models_distill, level=0, stack_name='distilled', hyperparameter_tune=False, feature_prune=False)
-        self.compress(X=X, y=y_distill, models=models_trained)
-
-        self.save()
+            Examples:
+                To get get best single (refit_single_full) model:
+                    trainer.best_single_model('refit_single_full', 0)  # TODO: does not work because compressed models have no validation score.
+                To get best single (distilled) model:
+                    trainer.best_single_model('distill', 0)
+        """
+        single_models = self.models_level[stack_name][stack_level]
+        perfs = [self.model_performance[m] for m in single_models]
+        return single_models[perfs.index(max(perfs))]
 
     def save_model(self, model):
         if self.low_memory:
