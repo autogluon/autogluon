@@ -38,7 +38,7 @@ def tabular_nn_trial(args, reporter):
         tabNN.model.collect_params().initialize(ctx=ctx)
         tabNN.model.hybridize()
         # TODO: Not used for now, we always setup the trainer:  if setup_trainer:
-        tabNN.setup_trainer()
+        tabNN.setup_trainer(train_dataset)
         best_val_metric = -np.inf  # we always assume higher = better
         val_metric = None
         best_val_epoch = 0

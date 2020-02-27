@@ -517,7 +517,7 @@ class TabularNeuralNetModel(AbstractModel):
                                 batch_size=self.params['batch_size'], num_dataloading_workers=self.params['num_dataloading_workers'],
                                 problem_type=self.problem_type, labels=labels, is_test=False)
 
-    def setup_trainer(self, train_dataset):
+    def setup_trainer(self, train_dataset=None):
         """ Set up stuff needed for training:
             optimizer, loss, and summary writer (for mxboard).
             Network must first be initialized before this.
@@ -525,6 +525,8 @@ class TabularNeuralNetModel(AbstractModel):
         optimizer_opts = {'learning_rate': self.params['learning_rate'],
             'wd': self.params['weight_decay'], 'clip_gradient': self.params['clip_gradient']}
         if 'lr_scheduler' in self.params and self.params['lr_scheduler'] is not None:
+            if train_dataset is None:
+                raise ValueError("train_dataset cannot be None when lr_scheduler is specified.")
             base_lr = self.params.get('base_lr', 1e-6)
             target_lr = self.params.get('target_lr', 1.0)
             warmup_epochs = self.params.get('warmup_epochs', 10)

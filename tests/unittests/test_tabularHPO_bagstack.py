@@ -20,7 +20,7 @@ def test_tabularHPObagstack():
     subsample_size = None
     hyperparameter_tune = True
     stack_ensemble_levels = 2
-    num_bagging_folds = 3
+    num_bagging_folds = 2
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
@@ -36,8 +36,8 @@ def test_tabularHPObagstack():
         nn_options = {'num_epochs': 2, 'learning_rate': ag.Real(0.001,0.01), 'lr_scheduler': ag.Categorical(None, 'cosine','step')}
         gbm_options = {'num_boost_round': 20, 'learning_rate': ag.Real(0.01,0.1)}
         hyperparameters = {'GBM': gbm_options, 'NN': nn_options}
-        time_limits = 60
-        num_trials = 5
+        time_limits = 150
+        num_trials = 3
 
     fit_args = {
         'num_bagging_folds': num_bagging_folds,
