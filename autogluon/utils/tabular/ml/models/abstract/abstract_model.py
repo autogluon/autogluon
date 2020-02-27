@@ -1,7 +1,6 @@
 import copy
 import logging
 import os
-import pickle
 import time
 
 import numpy as np
@@ -16,6 +15,7 @@ from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
+from ......scheduler.scheduler import TaskScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,7 @@ class AbstractModel:
 
         self.fit_time = None  # Time taken to fit in seconds (Training data)
         self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
         self._set_default_params()
@@ -316,28 +317,24 @@ class AbstractModel:
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
-        start_time = time.time()
+        time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         self._set_default_searchspace()
         params_copy = self.params.copy()
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        os.makedirs(directory, exist_ok=True)
         scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        self.params['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
-        self.params['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
+        params_copy['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
+        params_copy['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
         dataset_train_filename = 'dataset_train.p'
         train_path = directory + dataset_train_filename
-        pickle.dump((X_train, Y_train), open(train_path, 'wb'))
+        save_pkl.save(path=train_path, object=(X_train, Y_train))
 
-        if (X_test is not None) and (Y_test is not None):
-            dataset_val_filename = 'dataset_val.p'
-            val_path = directory + dataset_val_filename
-            pickle.dump((X_test, Y_test), open(val_path, 'wb'))
-        else:
-            dataset_val_filename = None
+        dataset_val_filename = 'dataset_val.p'
+        val_path = directory + dataset_val_filename
+        save_pkl.save(path=val_path, object=(X_test, Y_test))
 
         if not any(isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
@@ -347,14 +344,17 @@ class AbstractModel:
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
-        model_trial.register_args(
+        util_args = dict(
             dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
             directory=directory,
             model=self,
-            **params_copy
+            time_start=time_start,
+            time_limit=scheduler_options['time_out'],
         )
-        scheduler = scheduler_func(model_trial, **scheduler_options)
+
+        model_trial.register_args(util_args=util_args, **params_copy)
+        scheduler: TaskScheduler = scheduler_func(model_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
@@ -366,12 +366,15 @@ class AbstractModel:
         scheduler.run()
         scheduler.join_jobs()
 
+        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+
+    def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:
         best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
         hpo_results = {
             'best_reward': scheduler.get_best_reward(),
             'best_config': best_hp,
-            'total_time': time.time() - start_time,
+            'total_time': time.time() - time_start,
             'metadata': scheduler.metadata,
             'training_history': scheduler.training_history,
             'config_history': scheduler.config_history,
@@ -389,23 +392,16 @@ class AbstractModel:
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = f"trial_{trial}"  # unique identifier to files from this trial
-            file_prefix = f"{file_id}_"
-            trial_model_name = f"{self.name}_{file_id}"
-            trial_model_path = f"{self.path}{file_prefix}"
+            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            trial_model_name = self.name + os.path.sep + file_id
+            trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path
             hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
         logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
-        self.params.update(best_hp)
-        # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
         logger.log(15, str(best_hp))
         return hpo_models, hpo_model_performances, hpo_results
-        # TODO: do final fit here?
-        # args.final_fit = True
-        # final_model = scheduler.run_with_config(best_config)
-        # save(final_model)
 
     def feature_prune(self, X_train, X_holdout, Y_train, Y_holdout):
         feature_pruner = FeaturePruner(model_base=self)

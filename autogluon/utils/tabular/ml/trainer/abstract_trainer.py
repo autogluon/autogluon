@@ -274,6 +274,8 @@ class AbstractTrainer:
                     model.predict_time = np.nan
                 else:
                     model.predict_time = pred_end_time - fit_end_time
+            if model.val_score is None:
+                model.val_score = score
             self.save_model(model=model)
         except TimeLimitExceeded:
             logger.log(20, '\tTime limit exceeded... Skipping %s.' % model.name)
@@ -289,23 +291,23 @@ class AbstractTrainer:
             logger.log(20, err)
             del model
         else:
-            self.add_model(model=model, stack_name=stack_name, level=level, score=score)
+            self.add_model(model=model, stack_name=stack_name, level=level)
             model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         return model_names_trained
 
-    def add_model(self, model: AbstractModel, stack_name: str, level: int, score):
+    def add_model(self, model: AbstractModel, stack_name: str, level: int):
         stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have train_multi handle this
-        self.model_performance[model.name] = score
+        self.model_performance[model.name] = model.val_score
         self.model_paths[model.name] = model.path
         self.model_types[model.name] = type(model)
         if isinstance(model, BaggedEnsembleModel):
             self.model_types_inner[model.name] = model._child_type
         else:
             self.model_types_inner[model.name] = type(model)
-        if not np.isnan(score):
-            logger.log(20, '\t' + str(round(score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
+        if not np.isnan(model.val_score):
+            logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
         if not np.isnan(model.fit_time):
             logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
         if not np.isnan(model.predict_time):
@@ -364,13 +366,23 @@ class AbstractTrainer:
                 model_names_trained = list(sorted(hpo_models.keys()))
                 self.models_level_hpo[stack_name][level] += model_names_trained
                 self.model_paths.update(hpo_models)
-                self.model_performance.update(hpo_model_performances)
+
                 self.hpo_results[model.name] = hpo_results
                 self.model_types.update({name: type(model) for name in model_names_trained})
                 if isinstance(model, BaggedEnsembleModel):
                     self.model_types_inner.update({name: model._child_type for name in model_names_trained})
                 else:
                     self.model_types_inner.update({name: type(model) for name in model_names_trained})
+
+                for model_hpo_name in model_names_trained:
+                    model_hpo = self.load_model(model_hpo_name)
+                    if model_hpo.val_score is not None:
+                        # TODO: Remove this once HPO scheduler results are fixed
+                        hpo_model_performances[model_hpo_name] = model_hpo.val_score
+
+                    # TODO: Uncomment self.add_model() once HPO is fixed
+                    # self.add_model(model=model_hpo, stack_name=stack_name, level=level)
+                self.model_performance.update(hpo_model_performances)
         else:
             model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_limit)
         self.save()
