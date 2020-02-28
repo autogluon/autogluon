@@ -236,6 +236,28 @@ def setup_trial_limits(time_limits, num_trials, hyperparameters={'NN': None}):
 def dd_list():
     return defaultdict(list)
 
+def normalize_pred_probas(y_predprob, problem_type, min_pred=0.0, max_pred=1.0, eps=1e-7):
+    """ Clips predicted probabilities to ensure there are no zeros (eg. for log-loss).
+        Will also ensure no predicted probability exceeds [0,1].
+        Args:
+            y_predprob: 1D (binary classification) or 2D (multi-class) numpy array of predicted probabilities
+            problem_type: must be BINARY, MULTICLASS, or SOFTCLASS
+            min_pred: minimum prediction value that may be encountered (for BINARY only)
+            max_pred: maximum prediction value that may be encountered (for BINARY only)
+            eps: how far from 0 remapped predicted probabilities should be
+    """
+    if problem_type == BINARY:
+        y_predprob = ((1 - 2*eps) * ((y_predprob - min_pred)/(max_pred - min_pred))) + eps
+        return y_predprob
+    elif problem_type in [MULTICLASS, SOFTCLASS]:
+        y_predprob = y_predprob.asnumpy()
+        most_negative_rowvals = np.clip(np.min(y_predprob, axis=1), a_min=None, a_max=0)
+        y_predprob = y_predprob - most_negative_rowvals[:,None]  # ensure nonnegative rows
+        y_predprob = np.clip(y_predprob, a_min=eps, a_max=None)  # ensure no zeros
+        return y_predprob / y_predprob.sum(axis=1, keepdims=1)  # renormalize
+    else:
+        raise ValueError("problem_type must be either BINARY or MULTICLASS")
+
 
 def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):
     """ Used in distillation, combines true (integer) classes with 2D array of predicted probabilities.
@@ -243,7 +265,7 @@ def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):
     """
     if len(y_predprob) != len(y_true):
         raise ValueError("y_predprob and y_true cannot have different lengths for distillation. Perhaps some classes' data was deleted during label cleaning.")
-    
+
     y_trueprob = np.zeros((y_true.size, y_true.max()+1))
     y_trueprob[np.arange(y_true.size),y_true] = upweight_factor
     y_predprob = y_predprob + y_trueprob

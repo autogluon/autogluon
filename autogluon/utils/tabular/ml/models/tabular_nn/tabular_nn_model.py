@@ -26,6 +26,7 @@ from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ...utils import normalize_pred_probas
 from ....metrics import log_loss
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .tabular_nn_dataset import TabularNNDataset
@@ -368,11 +369,11 @@ class TabularNeuralNetModel(AbstractModel):
         return
 
     def evaluate_metric(self, dataset, mx_metric=None):
-        """ Evaluates metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
+        """ Evaluates MXNet metric on the given dataset (TabularNNDataset object), used for early stopping and to tune hyperparameters.
             If provided, mx_metric must be a function that follows the mxnet.metric API. Higher values = better!
             By default, returns accuracy in the case of classification, R^2 for regression.
 
-            TODO: currently hard-coded metrics used only. Does not respect user-supplied metrics. This method is not currently employed by the neural network.
+            Note: this method is not currently employed by the neural network.
         """
         if mx_metric is None:
             if self.problem_type == REGRESSION:
@@ -428,32 +429,24 @@ class TabularNeuralNetModel(AbstractModel):
             preds_batch = self.model(data_batch)
             batch_size = len(preds_batch)
             if self.problem_type != REGRESSION:
-                if not predict_proba: # need to take argmax
+                if not predict_proba:  # need to take argmax
                     preds_batch = nd.argmax(preds_batch, axis=1, keepdims=True)
                 else: # need to take softmax
                     preds_batch = nd.softmax(preds_batch, axis=1)
             preds[i:(i+batch_size)] = preds_batch
             i = i+batch_size
         if self.problem_type == REGRESSION or not predict_proba:
-            return preds.asnumpy().flatten() # return 1D numpy array
+            return preds.asnumpy().flatten()
         elif self.problem_type == BINARY and predict_proba:
-            preds = preds[:,1].asnumpy() # for binary problems, only return P(Y==+1)
-            if self.stopping_metric == log_loss or self.objective_func == log_loss:
-                # Ensure nonzero predicted probabilities under log-loss:
-                min_pred = 0.0
-                max_pred = 1.0
-                preds =  EPS + ((1 - 2*EPS)/(max_pred - min_pred)) * (preds - min_pred)
+            preds = preds[:,1].asnumpy()  # for binary problems, only return P(Y==+1)
+            if self.stopping_metric.name == log_loss.name or self.objective_func.name == log_loss.name:
+                preds = normalize_pred_probas(preds, problem_type=BINARY)  # Ensure nonzero
             return preds
         elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and
-              (self.stopping_metric == log_loss or self.objective_func == log_loss)):
-            # Ensure nonzero predicted probabilities under log-loss:
-            preds = preds.asnumpy()
-            most_negative_rowvals = np.clip(np.min(preds, axis=1), a_min=None, a_max=0)
-            preds = preds - most_negative_rowvals[:,None] # ensure nonnegative rows
-            preds = np.clip(preds, a_min = EPS, a_max = None) # ensure no zeros
-            return preds / preds.sum(axis=1, keepdims=1) # renormalize
+              (self.stopping_metric.name == log_loss.name or self.objective_func.name == log_loss.name)):
+            return normalize_pred_probas(preds.asnumpy(), problem_type=MULTICLASS)  # Ensure nonzero
 
-        return preds.asnumpy() # return 2D numpy array
+        return preds.asnumpy()
 
     def process_data(self, df, labels=None, is_test=True):
         """ Process train or test DataFrame into a form fit for neural network models.
@@ -644,7 +637,6 @@ class TabularNeuralNetModel(AbstractModel):
                     if feature in feature_arraycol_map:
                         raise ValueError("same feature is processed by two different column transformers: %s" % feature)
                     oh_dimensionality = min(len(oh_encoder.categories_[i]), self.params['proc.max_category_levels']+1)
-                    # print("feature: %s, oh_dimensionality: %s" % (feature, oh_dimensionality)) # TODO! debug
                     feature_arraycol_map[feature] = list(range(current_colindex, current_colindex+oh_dimensionality))
                     current_colindex += oh_dimensionality
             else:

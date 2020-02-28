@@ -10,7 +10,7 @@ from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NA
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true, normalize_pred_probas
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -127,7 +127,8 @@ class AbstractTrainer:
         self.num_cols_train = None
 
         self.is_data_saved = False
-        self.normalize_predprobs = False # whether or not probabilistic predictions may need to be renormalized (eg. distillation with BINARY -> REGRESSION)
+        self.normalize_predprobs = False  # whether or not probabilistic predictions may need to be renormalized (eg. distillation with BINARY -> REGRESSION)
+        self.normalize_range = (0.0, 1.0)  # min/max y-values (used for normalization of predicted probabilities)
         # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
 
     # path_root is the directory containing learner.pkl
@@ -650,24 +651,15 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
-        EPS = 1e-10 # predicted probabilities can be at most this confident if we normalize predicted probabilities
         # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
+        y_predproba = model.predict_proba(X=X, preprocess=False)
         if not self.normalize_predprobs:
-            return model.predict_proba(X=X, preprocess=False)
-        elif self.problem_type == MULTICLASS:
-           y_predproba = model.predict_proba(X=X, preprocess=False)
-           most_negative_rowvals = np.clip(np.min(y_predproba, axis=1), a_min=None, a_max=0)
-           y_predproba = y_predproba - most_negative_rowvals[:,None] # ensure nonnegative rows
-           y_predproba = np.clip(y_predproba, a_min = EPS, a_max = None) # ensure no zeros
-           return y_predproba / y_predproba.sum(axis=1, keepdims=1) # renormalize
-        elif self.problem_type == BINARY:
-            y_predproba = model.predict_proba(X=X, preprocess=False)
-            min_y = np.min(y_predproba)
-            max_y = np.max(y_predproba)
-            if min_y < EPS or max_y > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
-                y_predproba =  EPS + ((1-2*EPS)/(max_y-min_y)) * (y_predproba - min_y)
             return y_predproba
-        return model.predict_proba(X=X, preprocess=False)
+        elif self.problem_type == MULTICLASS:
+           return normalize_pred_probas(y_predproba, problem_type=MULTICLASS)
+        elif self.problem_type == BINARY:
+            return normalize_pred_probas(y_predproba, problem_type=BINARY, min_pred=self.normalize_range[0], max_pred=self.normalize_range[1])
+        return y_predproba
 
     def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
         if isinstance(model, str):
