@@ -270,8 +270,10 @@ class TabularNeuralNetModel(AbstractModel):
             else:
                 params['loss_function'] = gluon.loss.SoftmaxCrossEntropyLoss(from_logits=self.model.from_logits)
 
+        loss_func = params['loss_function']
+        epochs_wo_improve = params['epochs_wo_improve']
         loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
-        loss_torescale = [key for key in self.rescale_losses if isinstance(params['loss_function'], key)]
+        loss_torescale = [key for key in self.rescale_losses if isinstance(loss_func, key)]
         if len(loss_torescale) > 0:
             loss_torescale = loss_torescale[0]
             if self.rescale_losses[loss_torescale] == 'std':
@@ -279,7 +281,7 @@ class TabularNeuralNetModel(AbstractModel):
             elif self.rescale_losses[loss_torescale] == 'var':
                 loss_scaling_factor = np.var(train_dataset.get_labels())/5.0 + EPS  # variance of labels
             else:
-                raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale], params['loss_function']))
+                raise ValueError("Unknown loss-rescaling type %s specified for loss_func==%s" % (self.rescale_losses[loss_torescale], loss_func))
 
         if self.verbosity <= 1:
             verbose_eval = -1  # Print losses every verbose epochs, Never if -1
@@ -298,7 +300,7 @@ class TabularNeuralNetModel(AbstractModel):
                 with autograd.record():
                     output = self.model(data_batch)
                     labels = data_batch['label']
-                    loss = params['loss_function'](output, labels) / loss_scaling_factor
+                    loss = loss_func(output, labels) / loss_scaling_factor
                     # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
@@ -319,7 +321,7 @@ class TabularNeuralNetModel(AbstractModel):
                 with autograd.record():
                     output = self.model(data_batch)
                     labels = data_batch['label']
-                    loss = params['loss_function'](output, labels) / loss_scaling_factor
+                    loss = loss_func(output, labels) / loss_scaling_factor
                     # print(str(nd.mean(loss).asscalar()), end="\r")  # prints per-batch losses
                 loss.backward()
                 self.optimizer.step(labels.shape[0])
@@ -349,9 +351,10 @@ class TabularNeuralNetModel(AbstractModel):
             if self.summary_writer is not None:
                 self.summary_writer.add_scalar(tag='train_loss', value=train_loss.asscalar(), global_step=e)  # TODO: do we want to keep mxboard support?
             if reporter is not None:
+                # TODO: Ensure reporter/scheduler properly handle None/nan values after refactor
                 if test_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     reporter(epoch=e, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
-            if e - best_val_epoch > params['epochs_wo_improve']:
+            if e - best_val_epoch > epochs_wo_improve:
                 break
             if time_limit:
                 time_elapsed = time.time() - start_time
@@ -531,12 +534,10 @@ class TabularNeuralNetModel(AbstractModel):
                                 problem_type=self.problem_type, labels=labels, is_test=False)
 
     def setup_trainer(self, params, train_dataset=None):
-        """ Set up stuff needed for training:
-            optimizer, loss, and summary writer (for mxboard).
+        """ Set up optimizer needed for training.
             Network must first be initialized before this.
         """
-        optimizer_opts = {'learning_rate': params['learning_rate'],
-            'wd': params['weight_decay'], 'clip_gradient': params['clip_gradient']}
+        optimizer_opts = {'learning_rate': params['learning_rate'], 'wd': params['weight_decay'], 'clip_gradient': params['clip_gradient']}
         if 'lr_scheduler' in params and params['lr_scheduler'] is not None:
             if train_dataset is None:
                 raise ValueError("train_dataset cannot be None when lr_scheduler is specified.")
@@ -549,13 +550,9 @@ class TabularNeuralNetModel(AbstractModel):
             lr_decay_epoch = [max(warmup_epochs, int(params['num_epochs']/3)), max(warmup_epochs+1, int(params['num_epochs']/2)),
                               max(warmup_epochs+2, int(2*params['num_epochs']/3))]
             lr_scheduler = LRSequential([
-                LRScheduler('linear', base_lr=base_lr, target_lr=target_lr,
-                    nepochs=warmup_epochs, iters_per_epoch=num_batches),
-                LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr,
-                    nepochs=params['num_epochs'] - warmup_epochs,
-                    iters_per_epoch=num_batches,
-                    step_epoch=lr_decay_epoch,
-                    step_factor=lr_decay, power=2)
+                LRScheduler('linear', base_lr=base_lr, target_lr=target_lr, nepochs=warmup_epochs, iters_per_epoch=num_batches),
+                LRScheduler(lr_mode, base_lr=target_lr, target_lr=base_lr, nepochs=params['num_epochs'] - warmup_epochs,
+                            iters_per_epoch=num_batches, step_epoch=lr_decay_epoch, step_factor=lr_decay, power=2)
             ])
             optimizer_opts['lr_scheduler'] = lr_scheduler
         if params['optimizer'] == 'sgd':
@@ -796,6 +793,7 @@ class TabularNeuralNetModel(AbstractModel):
         tabular_nn_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_func(tabular_nn_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
+            # TODO: Ensure proper working directory setup on remote machines
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading preprocessed data to remote workers...")
             scheduler.upload_files([train_path+TabularNNDataset.DATAOBJ_SUFFIX,
