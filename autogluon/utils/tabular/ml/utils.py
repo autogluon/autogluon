@@ -237,8 +237,9 @@ def dd_list():
     return defaultdict(list)
 
 def normalize_pred_probas(y_predprob, problem_type, min_pred=0.0, max_pred=1.0, eps=1e-7):
-    """ Clips predicted probabilities to ensure there are no zeros (eg. for log-loss).
-        Will also ensure no predicted probability exceeds [0,1].
+    """ Remaps the predicted probabilities to ensure there are no zeros (eg. for log-loss).
+        Will also ensure no predicted probability exceeds [0,1] when the smallest/largest possibilities that may ever be encountered
+        have been specified in min_pred/max_pred.
         Args:
             y_predprob: 1D (binary classification) or 2D (multi-class) numpy array of predicted probabilities
             problem_type: must be BINARY, MULTICLASS, or SOFTCLASS
