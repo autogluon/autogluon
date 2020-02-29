@@ -348,6 +348,15 @@ class BaggedEnsembleModel(AbstractModel):
         if return_filename:
             return file_name
 
+    def _get_model_names(self):
+        model_names = []
+        for model in self.models:
+            if isinstance(model, str):
+                model_names.append(model)
+            else:
+                model_names.append(model.name)
+        return model_names
+
     def get_info(self):
         info = super().get_info()
         bagged_info = dict(
