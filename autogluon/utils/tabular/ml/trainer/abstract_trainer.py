@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME
 from ...utils.loaders import load_pkl
-from ...utils.savers import save_pkl
+from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
 from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true
 from ..models.abstract.abstract_model import AbstractModel
@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
 class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
+    trainer_info_name = 'info.pkl'
+    trainer_info_json_name = 'info.json'
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
@@ -190,7 +192,7 @@ class AbstractTrainer:
 
     def get_max_level(self, stack_name: str):
         try:
-            return np.sort(list(self.models_level[stack_name].keys()))[-1]
+            return sorted(list(self.models_level[stack_name].keys()))[-1]
         except IndexError:
             return -1
 
@@ -263,19 +265,21 @@ class AbstractTrainer:
                 if model.bagged_mode or isinstance(model, WeightedEnsembleModel):
                     score = model.score_with_oof(y=y_train)
                 else:
-                    score = np.nan
+                    score = None
             else:
                 score = model.score(X=X_test, y=y_test)
             pred_end_time = time.time()
             if model.fit_time is None:
                 model.fit_time = fit_end_time - fit_start_time
             if model.predict_time is None:
-                if np.isnan(score):
-                    model.predict_time = np.nan
+                if score is None:
+                    model.predict_time = None
                 else:
+                    # TODO: Correct weighted ensembles + compressed models to have either None pred time or 0 pred time
                     model.predict_time = pred_end_time - fit_end_time
             if model.val_score is None:
                 model.val_score = score
+            model.save_info()  # TODO: Potentially add parameter to avoid doing this if specified
             self.save_model(model=model)
         except TimeLimitExceeded:
             logger.log(20, '\tTime limit exceeded... Skipping %s.' % model.name)
@@ -567,7 +571,7 @@ class AbstractTrainer:
             if level == 0:
                 (base_model_names, base_model_paths, base_model_types) = ([], {}, {})
             elif level > 0:
-                base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level - 1])
+                base_model_names, base_model_paths, base_model_types = self.get_models_load_info(model_names=self.models_level['core'][level - 1])
                 if len(base_model_names) == 0:
                     logger.log(20, 'No base models to train on, skipping stack level...')
                     return
@@ -610,7 +614,7 @@ class AbstractTrainer:
         return weighted_ensemble_model.name
 
     def generate_stack_log_reg(self, X, y, level, kfolds=0, stack_name=None):
-        base_model_names, base_model_paths, base_model_types = self.get_models_info(model_names=self.models_level['core'][level-1])
+        base_model_names, base_model_paths, base_model_types = self.get_models_load_info(model_names=self.models_level['core'][level - 1])
         stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
         name_new = stacker_model_lr.name + '_STACKER_k' + str(kfolds) + '_l' + str(level)
 
@@ -841,7 +845,7 @@ class AbstractTrainer:
         )
         return dummy_stacker
 
-    def get_models_info(self, model_names):
+    def get_models_load_info(self, model_names):
         model_names = copy.deepcopy(model_names)
         model_paths = {model_name: self.model_paths[model_name] for model_name in model_names}
         model_types = {model_name: self.model_types[model_name] for model_name in model_names}
@@ -869,8 +873,8 @@ class AbstractTrainer:
         df_sorted = df.sort_values(by=['score_val', 'model'], ascending=False)
         return df_sorted
 
-    def info(self):
-        model_count = len(self.get_model_names_all())
+    def get_info(self, include_model_info=False):
+        num_models_trained = len(self.get_model_names_all())
         if self.model_best is not None:
             best_model = self.model_best
         else:
@@ -878,10 +882,12 @@ class AbstractTrainer:
         best_model_score_val = self.model_performance.get(best_model)
         # fit_time = None
         num_bagging_folds = self.kfolds
-        max_stack_level = self.get_max_level('core')
+        max_core_stack_level = self.get_max_level('core')
+        max_stack_level = self.get_max_level_all()
         best_model_stack_level = self.get_model_level(best_model)
         problem_type = self.problem_type
         objective_func = self.objective_func.name
+        stopping_metric = self.stopping_metric.name
         time_train_start = self.time_train_start
         num_rows_train = self.num_rows_train
         num_cols_train = self.num_cols_train
@@ -899,21 +905,43 @@ class AbstractTrainer:
         #  CPU count used / GPU count used
 
         info = {
-            'model_count': model_count,
-            'best_model': best_model,
-            'best_model_score_val': best_model_score_val,
-            'num_bagging_folds': num_bagging_folds,
-            'max_stack_level': max_stack_level,
-            'best_model_stack_level': best_model_stack_level,
-            'problem_type': problem_type,
-            'objective_func': objective_func,
             'time_train_start': time_train_start,
             'num_rows_train': num_rows_train,
             'num_cols_train': num_cols_train,
             'num_classes': num_classes,
+            'problem_type': problem_type,
+            'eval_metric': objective_func,
+            'stopping_metric': stopping_metric,
+            'best_model': best_model,
+            'best_model_score_val': best_model_score_val,
+            'best_model_stack_level': best_model_stack_level,
+            'num_models_trained': num_models_trained,
+            'num_bagging_folds': num_bagging_folds,
+            'max_stack_level': max_stack_level,
+            'max_core_stack_level': max_core_stack_level,
+            'model_stack_info': self.models_level.copy(),
         }
 
+        if include_model_info:
+            info['model_info'] = self.get_models_info()
+
         return info
+
+    def get_models_info(self, models=None):
+        if models is None:
+            models = self.get_model_names_all()
+        model_info_dict = dict()
+        for model in models:
+            if isinstance(model, str):
+                if model in self.models.keys():
+                    model = self.models[model]
+            if isinstance(model, str):
+                model_type = self.model_types[model]
+                model_path = self.model_paths[model]
+                model_info_dict[model] = model_type.load_info(path=model_path)
+            else:
+                model_info_dict[model.name] = model.get_info()
+        return model_info_dict
 
     @classmethod
     def load(cls, path, reset_paths=False):
@@ -925,3 +953,22 @@ class AbstractTrainer:
             obj.set_contexts(path)
             obj.reset_paths = reset_paths
             return obj
+
+    @classmethod
+    def load_info(cls, path, reset_paths=False, load_model_if_required=True):
+        load_path = path + cls.trainer_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                trainer = cls.load(path=path, reset_paths=reset_paths)
+                return trainer.get_info()
+            else:
+                raise
+
+    def save_info(self, include_model_info=False):
+        info = self.get_info(include_model_info=include_model_info)
+
+        save_pkl.save(path=self.path + self.trainer_info_name, object=info)
+        save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
+        return info
