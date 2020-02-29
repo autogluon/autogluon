@@ -106,7 +106,7 @@ class BaggedEnsembleModel(AbstractModel):
             time_start_fit = time.time()
             model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
             model_base.fit_time = time.time() - time_start_fit
-            model_base.predict_time = np.nan
+            model_base.predict_time = None
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
             self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1
@@ -347,3 +347,43 @@ class BaggedEnsembleModel(AbstractModel):
         save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name
+
+    def _get_model_names(self):
+        model_names = []
+        for model in self.models:
+            if isinstance(model, str):
+                model_names.append(model)
+            else:
+                model_names.append(model.name)
+        return model_names
+
+    def get_info(self):
+        info = super().get_info()
+        bagged_info = dict(
+            child_type=self._child_type.__name__,
+            num_child_models=len(self.models),
+            child_model_names=self._get_model_names(),
+            _n_repeats=self._n_repeats,
+            # _n_repeats_finished=self._n_repeats_finished,  # commented out because these are too technical
+            # _k_fold_end=self._k_fold_end,
+            # _k=self._k,
+            _k_per_n_repeat=self._k_per_n_repeat,
+            _random_state=self._random_state,
+            low_memory=self.low_memory,
+            bagged_mode=self.bagged_mode,
+        )
+        info['bagged_info'] = bagged_info
+        children_info = self._get_child_info()
+        info['children_info'] = children_info
+
+        return info
+
+    def _get_child_info(self):
+        child_info_dict = dict()
+        for model in self.models:
+            if isinstance(model, str):
+                child_path = self.create_contexts(self.path + model + os.path.sep)
+                child_info_dict[model] = self._child_type.load_info(child_path)
+            else:
+                child_info_dict[model.name] = model.get_info()
+        return child_info_dict

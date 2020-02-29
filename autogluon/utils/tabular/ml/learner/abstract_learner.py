@@ -19,7 +19,7 @@ from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba
 from ...data.label_cleaner import LabelCleaner
 from ...utils.loaders import load_pkl, load_pd
-from ...utils.savers import save_pkl, save_pd
+from ...utils.savers import save_pkl, save_pd, save_json
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,13 @@ logger = logging.getLogger(__name__)
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 # TODO: Loading learner from S3 on Windows may cause issues due to os.path.sep
 class AbstractLearner:
-    save_file_name = 'learner.pkl'
+    learner_file_name = 'learner.pkl'
+    learner_info_name = 'info.pkl'
+    learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
                  problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False):
-        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
         self.threshold = label_count_threshold
@@ -65,14 +67,14 @@ class AbstractLearner:
             return None
 
     def set_contexts(self, path_context):
-        self.path_context, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
         model_context = path_context + 'models' + os.path.sep
         latest_model_checkpoint = model_context + 'model_checkpoint_latest.pointer'
         eval_result_path = model_context + 'eval_result.pkl'
         predictions_path = path_context + 'predictions.csv'
-        save_path = path_context + self.save_file_name
+        save_path = path_context + self.learner_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
@@ -450,19 +452,22 @@ class AbstractLearner:
                 print(leaderboard)
         return leaderboard
 
-    def info(self):
+    # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
+    # TODO: Add feature inference / feature engineering info to get_info output
+    def get_info(self, include_model_info=False):
         trainer = self.load_trainer()
-        trainer_info = trainer.info()
+        trainer_info = trainer.get_info(include_model_info=include_model_info)
         learner_info = {
-            'path_context': self.path_context,
+            'path': self.path,
+            'label': self.label,
             'time_fit_preprocessing': self.time_fit_preprocessing,
             'time_fit_training': self.time_fit_training,
             'time_fit_total': self.time_fit_total,
             'time_limit': self.time_limit,
         }
 
-        trainer_info.update(learner_info)
-        return trainer_info
+        learner_info.update(trainer_info)
+        return learner_info
 
     @staticmethod
     def get_problem_type(y: Series):
@@ -525,9 +530,10 @@ class AbstractLearner:
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
+    # TODO: path_context -> path
     @classmethod
     def load(cls, path_context, reset_paths=True):
-        load_path = path_context + cls.save_file_name
+        load_path = path_context + cls.learner_file_name
         obj = load_pkl.load(path=load_path)
         if reset_paths:
             obj.set_contexts(path_context)
@@ -563,3 +569,22 @@ class AbstractLearner:
             self.trainer.load_models_into_memory()
             # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
             #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown
+
+    @classmethod
+    def load_info(cls, path, reset_paths=True, load_model_if_required=True):
+        load_path = path + cls.learner_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                learner = cls.load(path_context=path, reset_paths=reset_paths)
+                return learner.get_info()
+            else:
+                raise
+
+    def save_info(self, include_model_info=False):
+        info = self.get_info(include_model_info=include_model_info)
+
+        save_pkl.save(path=self.path + self.learner_info_name, object=info)
+        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
+        return info

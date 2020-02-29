@@ -48,7 +48,7 @@ class DefaultLearner(AbstractLearner):
         else:
             self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
-        logger.log(20, 'AutoGluon will save models to %s' % self.path_context)
+        logger.log(20, 'AutoGluon will save models to %s' % self.path)
         logger.log(20, 'Train Data Rows:    %s' % len(X))
         logger.log(20, 'Train Data Columns: %s' % len(X.columns))
         if X_test is not None:

@@ -228,3 +228,15 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model_path = self.base_model_paths_dict[model_name]
             model = model_type.load(model_path)
         return model
+
+    def get_info(self):
+        info = super().get_info()
+        stacker_info = dict(
+            num_base_models=len(self.base_model_names),
+            base_model_names=self.base_model_names,
+            use_orig_features=self.use_orig_features,
+        )
+        children_info = info.pop('children_info')
+        info['stacker_info'] = stacker_info
+        info['children_info'] = children_info  # Ensure children_info is last in order
+        return info

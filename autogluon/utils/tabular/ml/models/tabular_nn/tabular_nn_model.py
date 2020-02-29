@@ -817,6 +817,11 @@ class TabularNeuralNetModel(AbstractModel):
             _ = search_space.pop(key, None)
         self.params.update(search_space)
 
+    def get_info(self):
+        info = super().get_info()
+        info['hyperparameters_post_fit'] = self.params_post_fit
+        return info
+
 
 """ General TODOs:
 

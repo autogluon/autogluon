@@ -12,10 +12,10 @@ from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split
 from .... import metrics
 from ....utils.loaders import load_pkl
-from ....utils.savers import save_pkl
+from ....utils.savers import save_pkl, save_json
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
-from ......scheduler.scheduler import TaskScheduler
+from ......scheduler.fifo import FIFOScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,8 @@ def hp_default_value(hp_value):
 
 class AbstractModel:
     model_file_name = 'model.pkl'
+    model_info_name = 'info.pkl'
+    model_info_json_name = 'info.json'
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         """ Creates a new model.
@@ -354,7 +356,7 @@ class AbstractModel:
         )
 
         model_trial.register_args(util_args=util_args, **params_copy)
-        scheduler: TaskScheduler = scheduler_func(model_trial, **scheduler_options)
+        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
@@ -410,3 +412,39 @@ class AbstractModel:
         features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
         logger.debug(str(features_to_keep))
         self.features = features_to_keep
+
+    def get_info(self):
+        info = dict(
+            name=self.name,
+            model_type=type(self).__name__,
+            problem_type=self.problem_type,
+            eval_metric=self.objective_func.name,
+            stopping_metric=self.stopping_metric.name,
+            fit_time=self.fit_time,
+            predict_time=self.predict_time,
+            val_score=self.val_score,
+            hyperparameters=self.params,
+            hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
+            hyperparameters_nondefault=self.nondefault_params,
+        )
+        return info
+
+    @classmethod
+    def load_info(cls, path, load_model_if_required=True):
+        load_path = path + cls.model_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                model = cls.load(path=path, reset_paths=True)
+                return model.get_info()
+            else:
+                raise
+
+    def save_info(self):
+        info = self.get_info()
+
+        save_pkl.save(path=self.path + self.model_info_name, object=info)
+        json_path = self.path + self.model_info_json_name
+        save_json.save(path=json_path, obj=info)
+        return info

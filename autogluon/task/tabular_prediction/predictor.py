@@ -6,7 +6,8 @@ from .dataset import TabularDataset
 from ..base.base_predictor import BasePredictor
 from ...utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...utils.tabular.ml.constants import REGRESSION
-from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
+from ...utils.tabular.ml.learner.abstract_learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
+from ...utils.tabular.ml.trainer.abstract_trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading
 from ...utils.tabular.ml.utils import setup_outputdir
 
 __all__ = ['TabularPredictor']
@@ -61,9 +62,9 @@ class TabularPredictor(BasePredictor):
             To access any learner method `func()` from this Predictor, use: `predictor._learner.func()`.
             To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
-        self._learner = learner  # Learner object
-        self._trainer = self._learner.load_trainer()  # Trainer object
-        self.output_directory = self._learner.path_context
+        self._learner: Learner = learner  # Learner object
+        self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
+        self.output_directory = self._learner.path
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
