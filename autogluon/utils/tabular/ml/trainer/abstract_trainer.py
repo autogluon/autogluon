@@ -310,11 +310,11 @@ class AbstractTrainer:
             self.model_types_inner[model.name] = model._child_type
         else:
             self.model_types_inner[model.name] = type(model)
-        if not np.isnan(model.val_score):
+        if model.val_score is not None:
             logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
-        if not np.isnan(model.fit_time):
+        if model.fit_time is not None:
             logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
-        if not np.isnan(model.predict_time):
+        if model.predict_time is not None:
             logger.log(20, '\t' + str(round(model.predict_time, 2)) + 's' + '\t = Validation runtime')
         # TODO: Add to HPO
         self.model_fit_times[model.name] = model.fit_time
@@ -327,9 +327,10 @@ class AbstractTrainer:
             else:
                 best_score = self.model_performance[self.model_best_core]
                 cur_score = self.model_performance[model.name]
-                if cur_score > best_score:
-                    # new best core model
-                    self.model_best_core = model.name
+                if cur_score is not None:
+                    if cur_score > best_score:
+                        # new best core model
+                        self.model_best_core = model.name
         if self.low_memory:
             del model
 
