@@ -1,7 +1,6 @@
 import os
 import socket
 import logging
-from threading import Thread 
 import multiprocessing as mp
 
 from .remote import Remote
@@ -10,6 +9,7 @@ from ...utils import warning_filter
 __all__ = ['RemoteManager']
 
 logger = logging.getLogger(__name__)
+
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -22,6 +22,7 @@ def get_ip():
     finally:
         s.close()
     return IP
+
 
 class RemoteManager(object):
     NODES = {}
@@ -97,7 +98,7 @@ class RemoteManager(object):
         return self
 
     def __exit__(self, *args):
-        for node in cls.NODES.values():
+        for node in self.NODES.values():
             node.shutdown()
 
     def __repr__(self):

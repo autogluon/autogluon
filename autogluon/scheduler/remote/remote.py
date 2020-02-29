@@ -64,11 +64,11 @@ class Remote(Client):
             ssh_port=22, ssh_private_key=None, remote_python=None):
         self.service = None
         if local:
-            super(Remote, self).__init__(processes=False)
+            super().__init__(processes=False)
         else:
             remote_addr = (remote_ip + ':{}'.format(port))
             self.service = start_service(remote_ip, port)
-            super(Remote, self).__init__(remote_addr)
+            super().__init__(remote_addr)
         with Remote.LOCK:
             self.remote_id = Remote.REMOTE_ID.value
             Remote.REMOTE_ID.value += 1
@@ -84,7 +84,7 @@ class Remote(Client):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + ' REMOTE_ID: {}, \n\t'.format(self.remote_id) + \
-            super(Remote, self).__repr__()
+            super().__repr__()
         return reprstr
 
 class DaskRemoteService(object):
