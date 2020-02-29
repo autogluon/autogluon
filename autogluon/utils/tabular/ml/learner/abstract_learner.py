@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba
@@ -575,12 +575,12 @@ class AbstractLearner:
         load_path = path + cls.learner_info_name
         try:
             return load_pkl.load(path=load_path)
-        except:
+        except Exception as e:
             if load_model_if_required:
                 learner = cls.load(path_context=path, reset_paths=reset_paths)
                 return learner.get_info()
             else:
-                raise
+                raise e
 
     def save_info(self, include_model_info=False):
         info = self.get_info(include_model_info=include_model_info)
