@@ -14,7 +14,7 @@ from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
 from .reporter import *
-from ..utils import AutoGluonWarning, AutoGluonEarlyStop
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ class TaskScheduler(object):
 
         try:
             # start local progress
-            p = mp.Process(target=_worker, args=(return_list,gpu_ids, args))
+            p = CustomProcess(target=_worker, args=(return_list, gpu_ids, args))
             p.start()
             if 'reporter' in args:
                 cp = Communicator.Create(p, local_reporter, dist_reporter)

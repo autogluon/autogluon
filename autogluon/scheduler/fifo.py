@@ -257,6 +257,10 @@ class FIFOScheduler(TaskScheduler):
         last_result = None
         while not task_job.done():
             reported_result = reporter.fetch()
+            if 'traceback' in reported_result:
+                logger.exception(reported_result['traceback'])
+                break
+
             if reported_result.get('done', False):
                 reporter.move_on()
                 break

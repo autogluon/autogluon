@@ -174,15 +174,29 @@ class Communicator(threading.Thread):
 
     def run(self):
         while self.process.is_alive():
+
+            # breaking communication if process raises exception
+            if self.process.exception is not None:
+                error, traceback = self.process.exception
+                self.local_reporter.terminate()
+                self.dist_reporter(done=True, traceback=traceback)
+                self.process.join()
+                break
+
             try:
+                # waiting until process reports results or raises exception
+                if self.local_reporter._queue.empty():
+                    continue
                 reported_result = self.local_reporter.fetch()
             except BrokenPipeError:
                 break
+
             try:
                 self.dist_reporter(**reported_result)
                 self.local_reporter.move_on()
             except AutoGluonEarlyStop:
                 self.local_reporter.terminate()
+
             if 'done' in reported_result and reported_result['done'] is True:
                 self.process.join()
                 break
