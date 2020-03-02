@@ -17,6 +17,7 @@ stage("Unit Test") {
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip install --upgrade --force-reinstall -e .
+        pip install pytest
         python3 -m pytest --junitxml=results.xml --runslow tests
         """
       }
