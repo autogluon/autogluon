@@ -1,5 +1,3 @@
-import logging
-import numpy as np
 import autogluon as ag
 
 @ag.obj(
@@ -48,6 +46,7 @@ def train_fn(args, reporter):
     assert i in ['mxnet', 'pytorch']
     reporter(epoch=0, accuracy=0)
 
+
 def test_search_space():
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 4, 'num_gpus': 0},
@@ -58,5 +57,3 @@ def test_search_space():
     scheduler.run()
     scheduler.join_jobs()
 
-if __name__ == '__main__':
-    test_search_space()
