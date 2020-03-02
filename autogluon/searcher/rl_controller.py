@@ -12,6 +12,7 @@ from collections import OrderedDict
 
 __all__ = ['RLSearcher', 'LSTMController']
 
+
 class RLSearcher(BaseSearcher):
     """Reinforcement Learning Searcher for ConfigSpace
 
@@ -115,6 +116,7 @@ class BaseController(mx.gluon.Block):
         except Exception:
             self._worker_pool.terminate()
             raise
+
 
 # Reference: https://github.com/carpedm20/ENAS-pytorch/
 class LSTMController(BaseController):
@@ -233,6 +235,7 @@ class LSTMController(BaseController):
         else:
             return configs
 
+
 class Alpha(mx.gluon.Block):
     def __init__(self, shape):
         super().__init__()
@@ -240,6 +243,7 @@ class Alpha(mx.gluon.Block):
 
     def forward(self, batch_size):
         return self.weight.data().expand_dims(0).repeat(batch_size, axis=0)
+
 
 class AttenController(BaseController):
     def __init__(self, kwspaces, softmax_temperature=1.0, hidden_size=100,
@@ -337,6 +341,7 @@ class AttenController(BaseController):
             return configs, F.stack(*log_probs, axis=1), entropies
         else:
             return configs
+
 
 class AlphaController(BaseController):
     def __init__(self, kwspaces, softmax_temperature=1.0, ctx=mx.cpu(), **kwargs):
