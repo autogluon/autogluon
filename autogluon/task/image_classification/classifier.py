@@ -1,24 +1,24 @@
-import os
-import math
 import copy
+import math
+import os
+from collections import OrderedDict, defaultdict
+
 import cloudpickle as pkl
+import matplotlib.pyplot as plt
+import mxnet as mx
 import numpy as np
 from PIL import Image
-from collections import OrderedDict
-
-import mxnet as mx
-import matplotlib.pyplot as plt
 from mxnet.gluon.data.vision import transforms
 
-from ...core import AutoGluonObject
-from .utils import *
-from .nets import get_network
 from .metrics import get_metric_instance
+from .nets import get_network
+from .utils import *
 from ..base.base_predictor import BasePredictor
+from ...core import AutoGluonObject
 from ...utils import save, load, tqdm, collect_params, update_params
-from ...utils.pil_transforms import *
 
 __all__ = ['Classifier']
+
 
 class Classifier(BasePredictor):
     """Trained Image Classifier returned by fit() that can be used to make predictions on new images.
@@ -39,6 +39,7 @@ class Classifier(BasePredictor):
     >>> image = 'data/test/BabyShirt/BabyShirt_323.jpg'
     >>> ind, prob = classifier.predict(image)
     """
+
     def __init__(self, model, results, eval_func, scheduler_checkpoint,
                  args, ensemble=0, format_results=True, **kwargs):
         self.model = model
@@ -136,15 +137,15 @@ class Classifier(BasePredictor):
                 return ind, probai, proba
 
         def avg_prediction(different_dataset, threshold=0.001):
-            result = {}
+            result = defaultdict(list)
             inds, probas, probals_all = [], [], []
             for i in range(len(different_dataset)):
-                items = len(different_dataset[0])
-                for j in range(items):
-                    result.setdefault(j, []).append(different_dataset[i][j])
+                for j in range(len(different_dataset[0])):
+                    result[j].append(different_dataset[i][j])
+
             for c in result.keys():
                 proba_all = sum([*result[c]]) / len(different_dataset)
-                proba_all = mx.nd.array(np.where(proba_all.asnumpy() >= threshold, proba_all.asnumpy(), 0))
+                proba_all = (proba_all >= threshold) * proba_all
                 ind = mx.nd.argmax(proba_all, axis=1).astype('int')
                 idx = mx.nd.stack(mx.nd.arange(proba_all.shape[0], ctx=proba_all.context), ind.astype('float32'))
                 proba = mx.nd.gather_nd(proba_all, idx)
@@ -172,8 +173,10 @@ class Classifier(BasePredictor):
                 for i, x in enumerate(X):
                     tbar.update(1)
                     ind, proba, proba_all = predict_img(x[0])
-                    tbar.set_description('The input picture [%d] is classified as [%d], with probability %.2f ' %
-                      (i, ind.asscalar(), proba.asscalar()))
+                    tbar.set_description(
+                        'The input picture [%d] is classified as [%d], with probability %.2f ' %
+                        (i, ind.asscalar(), proba.asscalar())
+                    )
                     inds.append(ind.asscalar())
                     probas.append(proba.asnumpy())
                     probals_all.append(proba_all.asnumpy().flatten())
@@ -192,7 +195,7 @@ class Classifier(BasePredictor):
             X = X.init()
             return predict_imgs(X)
 
-        if isinstance(X, list) and len(X)>1:
+        if isinstance(X, list) and len(X) > 1:
             X_group = []
             for X_item in X:
                 X_item = X_item.init()
@@ -249,30 +252,4 @@ class Classifier(BasePredictor):
         return test_reward
 
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplementedError # TODO
-
-    @staticmethod
-    def _format_results(results): # TODO: remove since this has been moved to base_predictor.py
-        def _merge_scheduler_history(training_history, config_history, reward_attr):
-            trial_info = {}
-            for tid, config in config_history.items():
-                trial_info[tid] = {}
-                trial_info[tid]['config'] = config
-                if tid in training_history:
-                    trial_info[tid]['history'] = training_history[tid]
-                    trial_info[tid]['metadata'] = {}
-
-                    if len(training_history[tid]) > 0 and reward_attr in training_history[tid][-1]:
-                        last_history = training_history[tid][-1]
-                        trial_info[tid][reward_attr] = last_history.pop(reward_attr)
-                        trial_info[tid]['metadata'].update(last_history)
-            return trial_info
-
-        training_history = results.pop('training_history')
-        config_history = results.pop('config_history')
-        results['trial_info'] = _merge_scheduler_history(training_history, config_history,
-                                                         results['reward_attr'])
-        results[results['reward_attr']] = results['best_reward']
-        results['search_space'] = results['metadata'].pop('search_space')
-        results['search_strategy'] = results['metadata'].pop('search_strategy')
-        return results
+        raise NotImplementedError  # TODO

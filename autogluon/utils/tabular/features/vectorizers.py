@@ -1,5 +1,6 @@
-from sklearn.feature_extraction.text import CountVectorizer
 from collections import Counter
+
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def vectorizer_auto_ml_default():
@@ -9,9 +10,7 @@ def vectorizer_auto_ml_default():
 def get_ngram_freq(vectorizer, transform_matrix):
     names = vectorizer.get_feature_names()
     frequencies = transform_matrix.sum(axis=0).tolist()[0]
-    ngram_freq = {}
-    for ngram, freq in zip(names, frequencies):
-        ngram_freq[ngram] = freq
+    ngram_freq = {ngram: freq for ngram, freq in zip(names, frequencies)}
     return ngram_freq
 
 
@@ -19,11 +18,6 @@ def get_ngram_freq(vectorizer, transform_matrix):
 def downscale_vectorizer(vectorizer, ngram_freq, vocab_size):
     counter = Counter(ngram_freq)
     top_n = counter.most_common(vocab_size)
-    top_n_names = [name for name, _ in top_n]
-
-    top_n_names.sort()
-    new_vocab = {}
-    for i, name in enumerate(top_n_names):
-        new_vocab[name] = i
-
+    top_n_names = sorted([name for name, _ in top_n])
+    new_vocab = {name: i for i, name in enumerate(top_n_names)}
     vectorizer.vocabulary_ = new_vocab

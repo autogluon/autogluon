@@ -116,9 +116,11 @@ class RFModel(SKLearnModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        time_start = time.time()
         self.fit(X_train=X_train, Y_train=Y_train, **kwargs)
+        time_end = time.time()
         hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {}
+        hpo_results = {'total_time': time_end - time_start}
         self.save()
         hpo_models = {self.name: self.path}
 

@@ -177,7 +177,7 @@ class TabularPrediction(BaseTask):
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
         search_strategy : str
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband)
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         nthreads_per_trial : int
@@ -229,6 +229,12 @@ class TabularPrediction(BaseTask):
         >>> y_pred = predictor.predict(test_data)
         >>> perf = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred)
         >>> results = predictor.fit_summary()
+
+        To maximize predictive performance, use the following:
+
+        >>> eval_metric = 'roc_auc'  # set this to the metric you ultimately care about
+        >>> time_limits = 360  # set as long as you are willing to wait (in sec)
+        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
         """
         if verbosity < 0:
             verbosity = 0
@@ -263,8 +269,8 @@ class TabularPrediction(BaseTask):
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
         if enable_fit_continuation:
-            enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
-            logger.log(30, 'Warning: enable_fit_continuation does not currently work, setting to False.')
+        #     enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
+            logger.log(30, 'Warning: `enable_fit_continuation=True` is an experimental feature, it is recommended to set to `False` unless you are developing AutoGluon.')
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')

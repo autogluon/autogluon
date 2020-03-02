@@ -170,12 +170,20 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         stackers = {}
         stackers_performance = {}
+        num_models = len(hpo_models.keys())
         for i, model_name in enumerate(hpo_models.keys()):
 
             model_path = hpo_models[model_name]
             model_performance = hpo_model_performances[model_name]
-            child = self._child_type.load(path=model_path)
+            child: AbstractModel = self._child_type.load(path=model_path)
+            time_train_end = time.time()
             pred_proba = child.predict_proba(X_test)
+            time_predict_end = time.time()
+            if child.fit_time is None:
+                # TODO: Remove this once all HPO functions set fit_time for models
+                child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
+            child.predict_time = time_predict_end - time_train_end
+            child.val_score = child.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)  # FIXME: Remove once all HPO calculates val_score already
 
             # TODO: Create new StackerEnsemble Here
             stacker = copy.deepcopy(self)
@@ -202,7 +210,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 stacker.models.append(child.name)
             else:
                 stacker.models.append(child)
-
+            stacker._add_child_times_to_bag(model=child)
             stacker.model_base = None
             stacker.save_model_base(child.convert_to_template())
             stacker.save()
@@ -220,3 +228,15 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model_path = self.base_model_paths_dict[model_name]
             model = model_type.load(model_path)
         return model
+
+    def get_info(self):
+        info = super().get_info()
+        stacker_info = dict(
+            num_base_models=len(self.base_model_names),
+            base_model_names=self.base_model_names,
+            use_orig_features=self.use_orig_features,
+        )
+        children_info = info.pop('children_info')
+        info['stacker_info'] = stacker_info
+        info['children_info'] = children_info  # Ensure children_info is last in order
+        return info

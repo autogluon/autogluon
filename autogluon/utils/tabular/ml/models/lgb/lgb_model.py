@@ -5,7 +5,7 @@ from pandas import DataFrame, Series
 
 from ......core import Int, Space
 from .....try_import import try_import_lightgbm
-from ......task.base import BasePredictor
+from ....utils.savers import save_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...utils import construct_dataset
 from .callbacks import early_stopping_custom
@@ -28,7 +28,6 @@ class LGBModel(AbstractModel):
 
         self.eval_metric_name = self.stopping_metric.name
         self.is_higher_better = True
-        self.best_iteration = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -38,29 +37,13 @@ class LGBModel(AbstractModel):
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
 
-    # TODO: Avoid deleting X_train and X_test to not corrupt future runs
     def fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
         start_time = time.time()
         params = self.params.copy()
 
-        # TODO: Do this for dataset_train and dataset_val instead
-        # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
-        if (X_test is not None) and (X_train is not None):
-            num_rows_train = len(X_train)
-            if num_rows_train <= 10000:
-                modifier = 1
-            else:
-                modifier = 10000 / num_rows_train
-            early_stopping_rounds = max(round(modifier * 150), 10)
-        else:
-            early_stopping_rounds = 150
-
         # TODO: kwargs can have num_cpu, num_gpu. Currently these are ignored.
         verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
-        if 'min_data_in_leaf' in params:
-            if params['min_data_in_leaf'] > X_train.shape[0]: # TODO: may not be necessary
-                params['min_data_in_leaf'] = max(1, int(X_train.shape[0]/5.0))
 
         if verbosity <= 1:
             verbose_eval = False
@@ -71,37 +54,49 @@ class LGBModel(AbstractModel):
         else:
             verbose_eval = 1
 
+        eval_metric = self.get_eval_metric()
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
+        gc.collect()
+
         num_boost_round = params.pop('num_boost_round', 1000)
         logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
-        seed_val = params.pop('seed_value', 0)
 
-        eval_metric = self.get_eval_metric()
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
-        gc.collect()
+        num_rows_train = len(dataset_train.data)
+        if 'min_data_in_leaf' in params:
+            if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary
+                params['min_data_in_leaf'] = max(1, int(num_rows_train/5.0))
+
+        # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
+        if (dataset_val is not None) and (dataset_train is not None):
+            if num_rows_train <= 10000:
+                modifier = 1
+            else:
+                modifier = 10000 / num_rows_train
+            early_stopping_rounds = max(round(modifier * 150), 10)
+        else:
+            early_stopping_rounds = 150
 
         callbacks = []
         valid_names = ['train_set']
         valid_sets = [dataset_train]
         if dataset_val is not None:
+            reporter = kwargs.get('reporter', None)
+            if reporter is not None:
+                train_loss_name = self._get_train_loss_name()
+            else:
+                train_loss_name = None
             callbacks += [
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
-                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False),
+                                      ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
                 ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
 
-        try_import_lightgbm()
-        import lightgbm as lgb
-        callbacks += [
-            # lgb.reset_parameter(learning_rate=lambda iter: alpha * (0.999 ** iter)),
-        ]
-        # lr_over_time = lambda iter: 0.05 * (0.99 ** iter)
-        # alpha = 0.1
-        
+        seed_val = params.pop('seed_value', 0)
         train_params = {
-            'params': params.copy(),
+            'params': params,
             'train_set': dataset_train,
             'num_boost_round': num_boost_round,
             'valid_sets': valid_sets,
@@ -115,9 +110,11 @@ class LGBModel(AbstractModel):
             train_params['params']['seed'] = seed_val
             random.seed(seed_val)
             np.random.seed(seed_val)
-        # Train lgbm model:
+
+        # Train LightGBM model:
+        try_import_lightgbm()
+        import lightgbm as lgb
         self.model = lgb.train(**train_params)
-        self.best_iteration = self.model.best_iteration
         self.params_trained['num_boost_round'] = self.model.best_iteration
 
     def predict_proba(self, X, preprocess=True):
@@ -186,49 +183,48 @@ class LGBModel(AbstractModel):
         logger.debug(str(features_to_use))
         return features_to_use
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        # verbosity = kwargs.get('verbosity', 2)
-        start_time = time.time()
+    # FIXME: Requires major refactor + refactor lgb_trial.py
+    #  model names are not aligned with what is communicated to trainer!
+    # FIXME: Likely tabular_nn_trial.py and abstract trial also need to be refactored heavily + hyperparameter functions
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
+        time_start = time.time()
         logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
         self._set_default_searchspace()
-        if isinstance(self.params['min_data_in_leaf'], Int):
-            upper_minleaf = self.params['min_data_in_leaf'].upper
-            if upper_minleaf > X_train.shape[0]: # TODO: this min_data_in_leaf adjustment based on sample size may not be necessary
+        params_copy = self.params.copy()
+        if isinstance(params_copy['min_data_in_leaf'], Int):
+            upper_minleaf = params_copy['min_data_in_leaf'].upper
+            if upper_minleaf > X_train.shape[0]:  # TODO: this min_data_in_leaf adjustment based on sample size may not be necessary
                 upper_minleaf = max(1, int(X_train.shape[0]/5.0))
-                lower_minleaf = self.params['min_data_in_leaf'].lower
+                lower_minleaf = params_copy['min_data_in_leaf'].lower
                 if lower_minleaf > upper_minleaf:
                     lower_minleaf = max(1, int(upper_minleaf/3.0))
-                self.params['min_data_in_leaf'] = Int(lower=lower_minleaf, upper=upper_minleaf)
-        params_copy = self.params.copy()
-        seed_val = self.params.pop('seed_value', None)
-        num_boost_round = self.params.pop('num_boost_round', 1000)
+                params_copy['min_data_in_leaf'] = Int(lower=lower_minleaf, upper=upper_minleaf)
 
         directory = self.path # also create model directory if it doesn't exist
         # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
         if not os.path.exists(directory):
             os.makedirs(directory)
-        scheduler_func = scheduler_options[0] # Unpack tuple
-        scheduler_options = scheduler_options[1]
+        scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
         num_threads = scheduler_options['resource'].get('num_cpus', -1)
-        self.params['num_threads'] = num_threads
+        params_copy['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
 
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=self.params, X_test=X_test, Y_test=Y_test)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params_copy, X_test=X_test, Y_test=Y_test)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
         if os.path.exists(train_file): # clean up old files first
             os.remove(train_file)
         dataset_train.save_binary(train_file)
-        if dataset_val is not None:
-            dataset_val_filename = "dataset_val.bin" # names without directory info
-            val_file = self.path + dataset_val_filename
-            if os.path.exists(val_file): # clean up old files first
-                os.remove(val_file)
-            dataset_val.save_binary(val_file)
-        else:
-            dataset_val_filename = None
+        dataset_val_filename = "dataset_val.bin"  # names without directory info
+        val_file = self.path + dataset_val_filename
+        if os.path.exists(val_file):  # clean up old files first
+            os.remove(val_file)
+        dataset_val.save_binary(val_file)
+        dataset_val_pkl_filename = 'dataset_val.pkl'
+        val_pkl_path = directory + dataset_val_pkl_filename
+        save_pkl.save(path=val_pkl_path, object=(X_test, Y_test))
 
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
@@ -238,14 +234,21 @@ class LGBModel(AbstractModel):
                 if isinstance(params_copy[hyperparam], Space):
                     logger.log(15, str(hyperparam)+":   " + str(params_copy[hyperparam]))
 
-        lgb_trial.register_args(dataset_train_filename=dataset_train_filename,
+        util_args = dict(
+            dataset_train_filename=dataset_train_filename,
             dataset_val_filename=dataset_val_filename,
-            directory=directory, lgb_model=self, **params_copy)
+            dataset_val_pkl_filename=dataset_val_pkl_filename,
+            directory=directory,
+            model=self,
+            time_start=time_start,
+            time_limit=scheduler_options['time_out']
+        )
+        lgb_trial.register_args(util_args=util_args, **params_copy)
         scheduler = scheduler_func(lgb_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_file, val_file]) # TODO: currently does not work.
+            scheduler.upload_files([train_file, val_file, val_pkl_path]) # TODO: currently does not work.
             directory = self.path # TODO: need to change to path to working directory used on every remote machine
             lgb_trial.update(directory=directory)
             logger.log(15, "uploaded")
@@ -253,43 +256,18 @@ class LGBModel(AbstractModel):
         scheduler.run()
         scheduler.join_jobs()
 
-        # Store results / models from this HPO run:
-        best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
-        hpo_results = {'best_reward': scheduler.get_best_reward(),
-                       'best_config': best_hp,
-                       'total_time': time.time() - start_time,
-                       'metadata': scheduler.metadata,
-                       'training_history': scheduler.training_history,
-                       'config_history': scheduler.config_history,
-                       'reward_attr': scheduler._reward_attr,
-                       'args': lgb_trial.args
-                      }
-        hpo_results = BasePredictor._format_results(hpo_results) # results summarizing HPO for this model
-        if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
-            raise NotImplementedError("need to fetch model files from remote Workers")
-            # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
-            # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
-        hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
-        hpo_model_performances = {}
-        for trial in sorted(hpo_results['trial_info'].keys()):
-            # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = "trial_"+str(trial) # unique identifier to files from this trial
-            file_prefix = file_id + "_"
-            trial_model_name = self.name+"_"+file_id
-            trial_model_path = self.path + file_prefix
-            hpo_models[trial_model_name] = trial_model_path
-            hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
+        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
-        logger.log(15, "Time for Gradient Boosting hyperparameter optimization: %s" % str(hpo_results['total_time']))
-        self.params.update(best_hp)
-        # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
-        logger.log(15, "Best hyperparameter configuration for Gradient Boosting Model: ")
-        logger.log(15, best_hp)
-        return (hpo_models, hpo_model_performances, hpo_results)
-        # TODO: do final fit here?
-        # args.final_fit = True
-        # final_model = scheduler.run_with_config(best_config)
-        # save(final_model)
+    def _get_train_loss_name(self):
+        if self.problem_type == BINARY:
+            train_loss_name = 'binary_logloss'
+        elif self.problem_type == MULTICLASS:
+            train_loss_name = 'multi_logloss'
+        elif self.problem_type == REGRESSION:
+            train_loss_name = 'l2'
+        else:
+            raise ValueError("unknown problem_type for LGBModel: %s" % self.problem_type)
+        return train_loss_name
 
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
