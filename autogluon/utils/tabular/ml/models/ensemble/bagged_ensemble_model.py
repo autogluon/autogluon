@@ -89,7 +89,7 @@ class BaggedEnsembleModel(AbstractModel):
             # TODO: Remove this limitation
             raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
         if self._k is not None and self._k != k_fold:
-            raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold_end}, {self._k})')
+            raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         time_start = time.time()
