@@ -28,8 +28,8 @@ def model_trial(args, reporter: LocalStatusReporter):
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_filename)
 
         fit_model_args = dict(X_train=X_train, Y_train=y_train, X_test=X_val, Y_test=y_val)
-        score_model_args = dict(X=X_val, y=y_val)
-        model = fit_and_save_model(model=model, params=args, fit_model_args=fit_model_args, score_model_args=score_model_args,
+        predict_proba_args = dict(X=X_val)
+        model = fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=y_val,
                                    time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=None)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):
@@ -50,7 +50,7 @@ def prepare_inputs(args):
     return model, args, util_args
 
 
-def fit_and_save_model(model, params, fit_model_args, score_model_args, time_start, time_limit=None, reporter=None):
+def fit_and_save_model(model, params, fit_args, predict_proba_args, y_test, time_start, time_limit=None, reporter=None):
     time_current = time.time()
     time_elapsed = time_current - time_start
     if time_limit is not None:
@@ -62,12 +62,12 @@ def fit_and_save_model(model, params, fit_model_args, score_model_args, time_sta
 
     model.params.update(params)
     time_fit_start = time.time()
-    model.fit(**fit_model_args, time_limit=time_left, reporter=reporter)
+    model.fit(**fit_args, time_limit=time_left, reporter=reporter)
     time_fit_end = time.time()
-    val_score = model.score(**score_model_args)
+    y_pred_proba = model.predict_proba(**predict_proba_args)
     time_pred_end = time.time()
+    model.val_score = model.score_with_y_pred_proba(y=y_test, y_pred_proba=y_pred_proba)
     model.fit_time = time_fit_end - time_fit_start
     model.predict_time = time_pred_end - time_fit_end
-    model.val_score = val_score
     model.save()
     return model

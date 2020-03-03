@@ -26,8 +26,8 @@ def lgb_trial(args, reporter):
         X_val, y_val = load_pkl.load(util_args.directory + util_args.dataset_val_pkl_filename)
 
         fit_model_args = dict(dataset_train=dataset_train, dataset_val=dataset_val)
-        score_model_args = dict(X=X_val, y=y_val)
-        model_trial.fit_and_save_model(model=model, params=args, fit_model_args=fit_model_args, score_model_args=score_model_args,
+        predict_proba_args = dict(X=X_val)
+        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):

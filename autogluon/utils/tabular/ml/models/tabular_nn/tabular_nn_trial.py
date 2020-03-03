@@ -19,8 +19,8 @@ def tabular_nn_trial(args, reporter):
         y_test = test_dataset.get_labels()
 
         fit_model_args = dict(X_train=train_dataset, Y_train=None, X_test=test_dataset)
-        score_model_args = dict(X=test_dataset, y=y_test)
-        model_trial.fit_and_save_model(model=model, params=args, fit_model_args=fit_model_args, score_model_args=score_model_args,
+        predict_proba_args = dict(X=test_dataset)
+        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=y_test,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):

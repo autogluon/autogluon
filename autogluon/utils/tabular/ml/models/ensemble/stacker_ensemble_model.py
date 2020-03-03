@@ -170,34 +170,27 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         stackers = {}
         stackers_performance = {}
-        num_models = len(hpo_models.keys())
-        for i, model_name in enumerate(hpo_models.keys()):
-
-            model_path = hpo_models[model_name]
-            model_performance = hpo_model_performances[model_name]
+        for i, (model_name, model_path) in enumerate(hpo_models.items()):
             child: AbstractModel = self._child_type.load(path=model_path)
-            time_train_end = time.time()
-            pred_proba = child.predict_proba(X_test)
-            time_predict_end = time.time()
-            if child.fit_time is None:
-                # TODO: Remove this once all HPO functions set fit_time for models
-                child.fit_time = hpo_results['total_time'] / num_models  # FIXME: Not correct! Capture individual model fit times!
-            child.predict_time = time_predict_end - time_train_end
-            child.val_score = child.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)  # FIXME: Remove once all HPO calculates val_score already
+            y_pred_proba = child.predict_proba(X_test)
 
             # TODO: Create new StackerEnsemble Here
             stacker = copy.deepcopy(self)
+            stacker.name = stacker.name + os.path.sep + str(i)
+            stacker.set_contexts(self.path_root + stacker.name + os.path.sep)
 
             if self.problem_type == MULTICLASS:
                 oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
             else:
                 oof_pred_proba = np.zeros(shape=len(X))
             oof_pred_model_repeats = np.zeros(shape=len(X))
-            oof_pred_proba[test_index] += pred_proba
+            oof_pred_proba[test_index] += y_pred_proba
             oof_pred_model_repeats[test_index] += 1
 
-            stacker.set_contexts(self.path + str(i) + os.path.sep)
-            stacker.name = stacker.name + os.path.sep + str(i)
+            stacker.model_base = None
+            child.set_contexts(stacker.path + child.name + os.path.sep)
+            stacker.save_model_base(child.convert_to_template())
+
             stacker._k = k_fold
             stacker._k_fold_end = 1
             stacker._n_repeats = 1
@@ -211,11 +204,10 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             else:
                 stacker.models.append(child)
             stacker._add_child_times_to_bag(model=child)
-            stacker.model_base = None
-            stacker.save_model_base(child.convert_to_template())
+
             stacker.save()
             stackers[stacker.name] = stacker.path
-            stackers_performance[stacker.name] = model_performance
+            stackers_performance[stacker.name] = child.val_score
 
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
