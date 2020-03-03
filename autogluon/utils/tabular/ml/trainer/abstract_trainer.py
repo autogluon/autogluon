@@ -282,7 +282,8 @@ class AbstractTrainer:
                     model.predict_time = pred_end_time - fit_end_time
             if model.val_score is None:
                 model.val_score = score
-            model.save_info()  # TODO: Potentially add parameter to avoid doing this if specified
+            # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
+            # model.save_info()  # TODO: Potentially add parameter to avoid doing this if specified
             self.save_model(model=model)
         except TimeLimitExceeded:
             logger.log(20, '\tTime limit exceeded... Skipping %s.' % model.name)
