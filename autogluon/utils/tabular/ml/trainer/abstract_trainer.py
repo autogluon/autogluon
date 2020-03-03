@@ -21,7 +21,6 @@ from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 logger = logging.getLogger(__name__)
 
 
-# TODO: Try to optimize for log loss at level 0 for stacking, only optimize for objective func at later levels or in aux models. Might work better.
 # FIXME: Below is major defect!
 #  Weird interaction for metrics like AUC during bagging.
 #  If kfold = 5, scores are 0.9, 0.85, 0.8, 0.75, and 0.7, the score is not 0.8! It is much lower because probs are combined together and AUC is recalculated
