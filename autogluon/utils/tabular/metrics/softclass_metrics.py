@@ -1,14 +1,17 @@
 """ Metrics for classification with soft (probabilistic) labels """
 
 import logging
-import numpy as np
+
 import mxnet as mx
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
+EPS = 1e-10  # clipping threshold to prevent NaN
 
-EPS = 1e-10 # clipping threshold to prevent NaN
-softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True) # assumes predictions are already log-probabilities.
+# assumes predictions are already log-probabilities.
+softloss = mx.gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False, from_logits=True)
+
 
 def soft_log_loss(true_probs, predicted_probs):
     """ Both args must be 2D pandas/numpy arrays """
@@ -20,10 +23,8 @@ def soft_log_loss(true_probs, predicted_probs):
         raise ValueError("truth and prediction must be 2D numpy arrays with the same shape")
 
     # true_probs = np.clip(true_probs, a_min=EPS, a_max=None)
-    predicted_probs = np.clip(predicted_probs, a_min=EPS, a_max=None) # clip 0s to avoid NaN
-    true_probs = true_probs / true_probs.sum(axis=1, keepdims=1) # renormalize
+    predicted_probs = np.clip(predicted_probs, a_min=EPS, a_max=None)  # clip 0s to avoid NaN
+    true_probs = true_probs / true_probs.sum(axis=1, keepdims=1)  # renormalize
     predicted_probs = predicted_probs / predicted_probs.sum(axis=1, keepdims=1)
     losses = softloss(mx.nd.log(mx.nd.array(predicted_probs)), mx.nd.array(true_probs))
     return mx.nd.mean(losses).asscalar()
-
-

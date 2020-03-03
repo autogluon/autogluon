@@ -10,7 +10,7 @@ def balanced_accuracy(solution, prediction):
     y_type, solution, prediction = _check_targets(solution, prediction)
 
     if y_type not in ["binary", "multiclass", 'multilabel-indicator']:
-        raise ValueError("{0} is not supported".format(y_type))
+        raise ValueError(f"{y_type} is not supported")
 
     if y_type == 'binary':
         # Do not transform into any multiclass representation
@@ -175,9 +175,7 @@ def pac_score(solution, prediction):
             # In the multilabel case, the right thing i to AVERAGE not sum
             # We return all the scores so we can normalize correctly later on
         else:  # multiclass case
-            fp = frac_pos_ / sum(
-                frac_pos_
-            )  # Need to renormalize the lines in multiclass case
+            fp = frac_pos_ / sum(frac_pos_)  # Need to renormalize the lines in multiclass case
             # Only ONE label is 1 in the multiclass case active for each line
             pos_class_log_loss_ = -frac_pos * np.log(fp)
             base_log_loss = np.sum(pos_class_log_loss_)
