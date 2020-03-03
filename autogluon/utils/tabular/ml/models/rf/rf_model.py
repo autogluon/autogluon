@@ -4,6 +4,7 @@ import psutil
 import sys
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 
+from ..abstract import model_trial
 from ..sklearn.sklearn_model import SKLearnModel
 from ...constants import MULTICLASS, REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
@@ -116,12 +117,10 @@ class RFModel(SKLearnModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        time_start = time.time()
-        self.fit(X_train=X_train, Y_train=Y_train, **kwargs)
-        time_end = time.time()
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {'total_time': time_end - time_start}
-        self.save()
+        fit_model_args = dict(X_train=X_train, Y_train=Y_train, **kwargs)
+        score_model_args = dict(X=X_test, y=Y_test)
+        model_trial.fit_and_save_model(model=self, params=dict(), fit_model_args=fit_model_args, score_model_args=score_model_args, time_start=time.time(), time_limit=None)
+        hpo_results = {'total_time': self.fit_time}
+        hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}
-
         return hpo_models, hpo_model_performances, hpo_results

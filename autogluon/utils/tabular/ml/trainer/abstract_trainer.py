@@ -68,7 +68,7 @@ class AbstractTrainer:
             logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "To change this, specify the eval_metric argument of fit()")
-        logger.log(25, "AutoGluon will early stop models using evaluation metric: %s" % self.stopping_metric.name)  # TODO: stopping_metric is likely not used during HPO, fix this
+        logger.log(25, "AutoGluon will early stop models using evaluation metric: %s" % self.stopping_metric.name)
         self.num_classes = num_classes
         self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
@@ -91,7 +91,6 @@ class AbstractTrainer:
         # self.models_level_all['aux1'][1] # Stacker level 1 aux models, such as weighted_ensemble
         # self.models_level_all['core'][2] # Stacker level 2
         self.models_level = defaultdict(dd_list)
-        self.models_level_hpo = defaultdict(dd_list)  # stores additional models produced during HPO
 
         self.model_best = None
         self.model_best_core = None
@@ -355,14 +354,11 @@ class AbstractTrainer:
             elif k_fold_start != 0:
                 raise ValueError('k_fold_start must be 0 to hyperparameter_tune, value = ' + str(k_fold_start))
             # hpo_models (dict): keys = model_names, values = model_paths
-            try:  # TODO: Make exception handling more robust? Return successful HPO models?
+            try:
                 if isinstance(model, BaggedEnsembleModel):
                     hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=kfolds, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
                 else:
-                    if (X_test is None) or (y_test is None):
-                        X_train, X_test, y_train, y_test = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=0.2)  # TODO: Adjust test_size, perhaps user specified?
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test,
-                        Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, X_test=X_test, Y_train=y_train, Y_test=y_test, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
             except Exception as err:
                 if self.verbosity >= 1:
                     traceback.print_tb(err.__traceback__)
@@ -371,26 +367,12 @@ class AbstractTrainer:
                 del model
                 model_names_trained = []
             else:
-                model_names_trained = list(sorted(hpo_models.keys()))
-                self.models_level_hpo[stack_name][level] += model_names_trained
-                self.model_paths.update(hpo_models)
-
                 self.hpo_results[model.name] = hpo_results
-                self.model_types.update({name: type(model) for name in model_names_trained})
-                if isinstance(model, BaggedEnsembleModel):
-                    self.model_types_inner.update({name: model._child_type for name in model_names_trained})
-                else:
-                    self.model_types_inner.update({name: type(model) for name in model_names_trained})
-
-                for model_hpo_name in model_names_trained:
-                    model_hpo = self.load_model(model_hpo_name)
-                    if model_hpo.val_score is not None:
-                        # TODO: Remove this once HPO scheduler results are fixed
-                        hpo_model_performances[model_hpo_name] = model_hpo.val_score
-
-                    # TODO: Uncomment self.add_model() once HPO is fixed
-                    # self.add_model(model=model_hpo, stack_name=stack_name, level=level)
-                self.model_performance.update(hpo_model_performances)
+                model_names_trained = []
+                for model_hpo_name, model_path in hpo_models.items():
+                    model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                    self.add_model(model=model_hpo, stack_name=stack_name, level=level)
+                    model_names_trained.append(model_hpo.name)
         else:
             model_names_trained = self.train_and_save(X_train, y_train, X_test, y_test, model, stack_name=stack_name, kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_limit)
         self.save()
@@ -435,8 +417,6 @@ class AbstractTrainer:
     def train_multi_initial(self, X_train, y_train, X_test, y_test, models: List[AbstractModel], kfolds, n_repeats, hyperparameter_tune=True, feature_prune=False, stack_name='core', level=0, time_limit=None):
         stack_loc = self.models_level[stack_name]
 
-        model_names_trained = []
-        model_names_trained_hpo = []
         models_valid = models
         if kfolds == 0:
             models_valid = self.train_multi_fold(X_train, y_train, X_test, y_test, models_valid, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name,
@@ -454,13 +434,7 @@ class AbstractTrainer:
             models_valid = self.train_multi_fold(X_train, y_train, X_test, y_test, models_valid, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name,
                                                  kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=kfolds, n_repeats=n_repeats, n_repeat_start=0, level=level, time_limit=time_limit)
 
-        if hyperparameter_tune:
-            model_names_trained_hpo += models_valid
-        else:
-            model_names_trained += models_valid
-
-        stack_loc[level] += model_names_trained_hpo  # Update model list with (potentially empty) list of new models created during HPO
-        model_names_trained += model_names_trained_hpo
+        model_names_trained = models_valid
         unique_names = []
         for item in stack_loc[level]:
             if item not in unique_names: unique_names.append(item)
@@ -828,11 +802,15 @@ class AbstractTrainer:
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
 
-    def load_model(self, model_name: str) -> AbstractModel:
+    def load_model(self, model_name: str, path: str = None, model_type=None) -> AbstractModel:
         if model_name in self.models.keys():
             return self.models[model_name]
         else:
-            return self.model_types[model_name].load(path=self.model_paths[model_name], reset_paths=self.reset_paths)
+            if path is None:
+                path = self.model_paths[model_name]
+            if model_type is None:
+                model_type = self.model_types[model_name]
+            return model_type.load(path=path, reset_paths=self.reset_paths)
 
     def _get_dummy_stacker(self, level, use_orig_features=True):
         model_names = self.models_level['core'][level-1]
