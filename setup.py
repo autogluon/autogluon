@@ -70,6 +70,10 @@ requirements = [
     'scikit-learn>=0.20.0',
 ]
 
+test_requirements = [
+    'pytest',
+]
+
 setup(
     # Metadata
     name='autogluon',
@@ -84,7 +88,7 @@ setup(
     packages=find_packages(exclude=('docs', 'tests', 'scripts')),
     zip_safe=True,
     include_package_data=True,
-    install_requires=requirements,
+    install_requires=requirements + test_requirements,
     python_requires=MIN_PYTHON_VERSION,
     package_data={'autogluon': [
         'LICENSE',
