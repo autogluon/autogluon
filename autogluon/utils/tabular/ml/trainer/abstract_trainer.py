@@ -267,7 +267,10 @@ class AbstractTrainer:
                 else:
                     score = None
             else:
-                score = model.score(X=X_test, y=y_test)
+                if X_test is not None and y_test is not None:
+                    score = model.score(X=X_test, y=y_test)
+                else:
+                    score = None
             pred_end_time = time.time()
             if model.fit_time is None:
                 model.fit_time = fit_end_time - fit_start_time
@@ -751,7 +754,6 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
-    # TODO: this currently only works for bagged models.
     # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
     def refit_single_full(self, X=None, y=None, models=None):
         if X is None:

@@ -96,13 +96,6 @@ class TabularNeuralNetModel(AbstractModel):
         self.optimizer = None
         self.verbosity = None
 
-    # TODO: Fix model to not have tabNN in params
-    def convert_to_template(self):
-        new_model = TabularNeuralNetModel(path=self.path, name=self.name, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric, features=self.features, hyperparameters=self.params)
-        new_model.path = self.path
-        new_model.params['tabNN'] = None
-        return new_model
-
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
         default_params = get_default_param(self.problem_type)
