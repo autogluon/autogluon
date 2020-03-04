@@ -99,6 +99,8 @@ class BaggedEnsembleModel(AbstractModel):
             stratified = True
 
         model_base = self._get_model_base()
+        if self.features is not None:
+            model_base.features = self.features
         model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
 
         if k_fold == 1:
@@ -135,7 +137,6 @@ class BaggedEnsembleModel(AbstractModel):
         oof_pred_model_repeats = np.zeros(shape=len(X))
 
         models = []
-        time_limit_fold = None
         folds_to_fit = fold_end - fold_start
         for j in range(n_repeat_start, n_repeats):  # For each n_repeat
             cur_repeat_count = j - n_repeat_start
@@ -161,6 +162,8 @@ class BaggedEnsembleModel(AbstractModel):
                             raise TimeLimitExceeded
                     if time_left <= 0:
                         raise TimeLimitExceeded
+                else:
+                    time_limit_fold = None
 
                 time_start_fold = time.time()
                 train_index, test_index = fold
@@ -237,6 +240,46 @@ class BaggedEnsembleModel(AbstractModel):
         y_pred_proba = self.oof_pred_proba[valid_indices]
 
         return self.score_with_y_pred_proba(y=y, y_pred_proba=y_pred_proba)
+
+    # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
+    # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True):
+        if self.problem_type == REGRESSION:
+            stratified = False
+        else:
+            stratified = True
+
+        feature_importance_fold_list = []
+        fold_weights = []
+        # TODO: Preprocess data here instead of repeatedly
+        model_index = 0
+        for n_repeat, k in enumerate(self._k_per_n_repeat):
+            kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=stratified, random_state=self._random_state, n_repeats=n_repeat + 1)
+            cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
+            for i, fold in enumerate(cur_kfolds):
+                train_index, test_index = fold
+                model = self.load_child(self.models[model_index + i])
+                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess)
+                feature_importance_fold_list.append(feature_importance_fold)
+                fold_weights.append(len(test_index))
+            model_index += k
+
+        weight_total = sum(fold_weights)
+        fold_weights = [weight/weight_total for weight in fold_weights]
+
+        for i, result in enumerate(feature_importance_fold_list):
+            feature_importance_fold_list[i] = feature_importance_fold_list[i] * fold_weights[i]
+
+        feature_importance = pd.concat(feature_importance_fold_list, axis=1, sort=True).sum(1).sort_values(ascending=False)
+
+        # TODO: Consider utilizing z scores and stddev to make threshold decisions
+        # stddev = pd.concat(feature_importance_fold_list, axis=1, sort=True).std(1).sort_values(ascending=False)
+        # feature_importance_df = pd.DataFrame(index=feature_importance.index)
+        # feature_importance_df['importance'] = feature_importance
+        # feature_importance_df['stddev'] = stddev
+        # feature_importance_df['z'] = feature_importance_df['importance'] / feature_importance_df['stddev']
+
+        return feature_importance
 
     def load_child(self, model, verbose=False) -> AbstractModel:
         if isinstance(model, str):

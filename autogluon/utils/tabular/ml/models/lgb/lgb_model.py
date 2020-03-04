@@ -277,3 +277,9 @@ class LGBModel(AbstractModel):
         for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
             _ = def_search_space.pop(key, None)
         self.params.update(def_search_space)
+
+    def get_model_feature_importance(self):
+        feature_names = self.model.feature_name()
+        importances = self.model.feature_importance()
+        importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
+        return importance_dict

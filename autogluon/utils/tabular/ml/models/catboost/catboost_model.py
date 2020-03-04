@@ -201,3 +201,10 @@ class CatboostModel(AbstractModel):
                 self.model.shrink(ntree_start=0, ntree_end=best_iteration+1)
 
         self.params_trained['iterations'] = self.model.tree_count_
+
+    def get_model_feature_importance(self):
+        importance_df = self.model.get_feature_importance(prettified=True)
+        importance_df['Importances'] = importance_df['Importances'] / 100
+        importance_series = importance_df.set_index('Feature Id')['Importances']
+        importance_dict = importance_series.to_dict()
+        return importance_dict
