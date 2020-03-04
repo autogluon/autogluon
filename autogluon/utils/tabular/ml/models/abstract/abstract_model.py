@@ -297,14 +297,12 @@ class AbstractModel:
         trained_params.update(self.params_trained)
         return trained_params
 
-    # TODO: currently inplace and destructive. This won't work well for in-memory models.
-    #  Problem with not inplace -> 2x memory usage, try to avoid somehow
-    # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
+    # After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
         model = self.model
         self.model = None
         template = copy.deepcopy(self)
-        template.params_trained = dict()
+        template.reset_metrics()
         self.model = model
         return template
 
@@ -412,6 +410,13 @@ class AbstractModel:
         features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
         logger.debug(str(features_to_keep))
         self.features = features_to_keep
+
+    # Resets metrics for the model
+    def reset_metrics(self):
+        self.fit_time = None
+        self.predict_time = None
+        self.val_score = None
+        self.params_trained = dict()
 
     def get_info(self):
         info = dict(

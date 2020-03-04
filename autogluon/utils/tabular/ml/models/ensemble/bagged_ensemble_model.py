@@ -251,16 +251,6 @@ class BaggedEnsembleModel(AbstractModel):
         child.save(verbose=verbose)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
-    # Trains a single model on all of the data, averaging the hyperparameters of all the bagged models (such as epochs trained)
-    # Generally expected to have lower accuracy but faster inference time
-    def compress(self, X, y):
-        model_compressed = self.convert_to_compressed_template()
-        model_compressed.fit(X_train=X, Y_train=y)  # TODO: This only works for stacker, not for bagged
-        return model_compressed
-
-    def convert_to_compressed_template(self):
-        raise NotImplementedError
-
     def convert_to_refitfull_template(self):
         compressed_params = self._get_compressed_params()
         model_compressed = copy.deepcopy(self._get_model_base())
