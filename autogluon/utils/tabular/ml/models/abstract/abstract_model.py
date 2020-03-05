@@ -179,16 +179,16 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None):
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
         if eval_metric is None:
             eval_metric = self.objective_func
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
-            y_pred = self.predict(X=X)
+            y_pred = self.predict(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X)
+            y_pred_proba = self.predict_proba(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred_proba)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
@@ -221,7 +221,7 @@ class AbstractModel:
             return obj
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True):
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, **kwargs):
         sample_size = 10000
         if len(X) > sample_size:
             X = X.sample(sample_size, random_state=0)
@@ -256,6 +256,7 @@ class AbstractModel:
 
         return feature_importances
 
+    # TODO: Consider repeating with different random seeds and averaging to increase confidence
     # TODO: Optimize this
     # TODO: Check memory usage to avoid OOM
     # Compute feature importance via permutation importance
@@ -266,10 +267,11 @@ class AbstractModel:
             X = self.preprocess(X)
 
         feature_count = len(features)
-        model_score_base = self.score(X=X, y=y)
+        model_score_base = self.score(X=X, y=y, preprocess=False)
         model_score_diff = []
 
         row_count = X.shape[0]
+        np.random.seed(0)
         rand_shuffle = np.random.randint(0, row_count, size=row_count)
 
         X_test_shuffled = X.iloc[rand_shuffle].reset_index(drop=True)

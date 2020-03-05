@@ -802,7 +802,10 @@ class AbstractTrainer:
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
 
+    # TODO: model_name change to model in params
     def load_model(self, model_name: str, path: str = None, model_type=None) -> AbstractModel:
+        if isinstance(model_name, AbstractModel):
+            return model_name
         if model_name in self.models.keys():
             return self.models[model_name]
         else:
@@ -825,6 +828,38 @@ class AbstractTrainer:
             base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level
         )
         return dummy_stacker
+
+    # TODO: Add option for raw=True, which uses black-box method to get importances for original features instead of whatever features the model uses.
+    #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
+    def get_feature_importance(self, model, X=None, y=None):
+        model: AbstractModel = self.load_model(model)
+        if X is None and model.val_score is None:
+            raise AssertionError(f'Model {model.name} is not valid for generating feature importances on original training data because no validation data was used during training, please specify new test data to compute feature importances.')
+
+        if X is None:
+            if isinstance(model, BaggedEnsembleModel):
+                if isinstance(model, WeightedEnsembleModel):
+                    X = None
+                else:
+                    X = self.load_X_train()
+                    X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=True)
+                is_oof = True
+            else:
+                X = self.load_X_val()
+                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
+                is_oof = False
+        else:
+            X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
+            is_oof = False
+
+        if y is None and X is not None:
+            if isinstance(model, BaggedEnsembleModel):
+                y = self.load_y_train()
+            else:
+                y = self.load_y_val()
+
+        feature_importance = model.compute_feature_importance(X=X, y=y, is_oof=is_oof)
+        return feature_importance
 
     def get_models_load_info(self, model_names):
         model_names = copy.deepcopy(model_names)

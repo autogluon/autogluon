@@ -6,6 +6,7 @@ from collections import Counter
 from statistics import mean
 
 import numpy as np
+import pandas as pd
 
 from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_SUFFIX
@@ -116,6 +117,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_model_repeats = np.ones(shape=len(X))
             self._n_repeats = 1
             self._n_repeats_finished = 1
+            self._k_per_n_repeat = [1]
             self.bagged_mode = False
             if self.low_memory:
                 self.save_child(model_base, verbose=False)
@@ -243,7 +245,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True):
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, **kwargs):
         if self.problem_type == REGRESSION:
             stratified = False
         else:
@@ -254,10 +256,15 @@ class BaggedEnsembleModel(AbstractModel):
         # TODO: Preprocess data here instead of repeatedly
         model_index = 0
         for n_repeat, k in enumerate(self._k_per_n_repeat):
-            kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=stratified, random_state=self._random_state, n_repeats=n_repeat + 1)
-            cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
+            if is_oof:
+                if not self.bagged_mode:
+                    raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
+                kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=stratified, random_state=self._random_state, n_repeats=n_repeat + 1)
+                cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
+            else:
+                cur_kfolds = [(None, X.index)]*k
             for i, fold in enumerate(cur_kfolds):
-                train_index, test_index = fold
+                _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
                 feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess)
                 feature_importance_fold_list.append(feature_importance_fold)
