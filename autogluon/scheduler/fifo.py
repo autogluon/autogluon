@@ -76,7 +76,7 @@ class FIFOScheduler(TaskScheduler):
                  time_out=None, max_reward=1.0, time_attr='epoch',
                  reward_attr='accuracy',
                  visualizer='none', dist_ip_addrs=None):
-        super(FIFOScheduler, self).__init__(dist_ip_addrs)
+        super().__init__(dist_ip_addrs)
 
         if resource is None:
             resource = {'num_cpus': 1, 'num_gpus': 0}
@@ -88,10 +88,10 @@ class FIFOScheduler(TaskScheduler):
         if isinstance(searcher, str):
             kwargs = search_options.copy() if search_options else dict()
             kwargs['configspace'] = train_fn.cs
-            self.searcher = searcher_factory(searcher, **kwargs)
+            self.searcher: BaseSearcher = searcher_factory(searcher, **kwargs)
         else:
             assert isinstance(searcher, BaseSearcher)
-            self.searcher = searcher
+            self.searcher: BaseSearcher = searcher
 
         assert isinstance(train_fn, _autogluon_method)
         self.train_fn = train_fn
@@ -369,7 +369,7 @@ class FIFOScheduler(TaskScheduler):
         --------
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
-        destination = super(FIFOScheduler, self).state_dict(destination)
+        destination = super().state_dict(destination)
         destination['searcher'] = pickle.dumps(self.searcher)
         with self.log_lock:
             destination['training_history'] = json.dumps(self.training_history)
@@ -384,7 +384,7 @@ class FIFOScheduler(TaskScheduler):
         --------
         >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
-        super(FIFOScheduler, self).load_state_dict(state_dict)
+        super().load_state_dict(state_dict)
         self.searcher = pickle.loads(state_dict['searcher'])
         with self.log_lock:
             self.training_history = json.loads(state_dict['training_history'])

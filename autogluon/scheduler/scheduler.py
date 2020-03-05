@@ -2,13 +2,9 @@
 import os
 import pickle
 import logging
-import subprocess
 from warnings import warn
-from threading import Thread
 import multiprocessing as mp
 from collections import OrderedDict
-
-from distributed import worker_client
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
@@ -19,8 +15,6 @@ from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
-
-
 
 
 class TaskScheduler(object):

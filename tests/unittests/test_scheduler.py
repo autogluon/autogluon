@@ -1,4 +1,3 @@
-from unittest import TestCase
 import numpy as np
 import autogluon as ag
 
@@ -18,41 +17,35 @@ def rl_train_fn(args, reporter):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-def test_schedulers():
-    def test_fifo_scheduler():
-        scheduler = ag.scheduler.FIFOScheduler(train_fn,
-                                               resource={'num_cpus': 4, 'num_gpus': 0},
-                                               num_trials=10,
-                                               reward_attr='accuracy',
-                                               time_attr='epoch',
-                                               checkpoint=None)
-        scheduler.run()
-        scheduler.join_jobs()
 
-    def test_hyperband_scheduler():
-        scheduler = ag.scheduler.HyperbandScheduler(train_fn,
-                                                    resource={'num_cpus': 4, 'num_gpus': 0},
-                                                    num_trials=10,
-                                                    reward_attr='accuracy',
-                                                    time_attr='epoch',
-                                                    grace_period=1,
-                                                    checkpoint=None)
-        scheduler.run()
-        scheduler.join_jobs()
+def test_fifo_scheduler():
+    scheduler = ag.scheduler.FIFOScheduler(train_fn,
+                                           resource={'num_cpus': 4, 'num_gpus': 0},
+                                           num_trials=10,
+                                           reward_attr='accuracy',
+                                           time_attr='epoch',
+                                           checkpoint=None)
+    scheduler.run()
+    scheduler.join_jobs()
 
-    def test_rl_scheduler():
-        scheduler = ag.scheduler.RLScheduler(rl_train_fn,
-                                             resource={'num_cpus': 4, 'num_gpus': 0},
-                                             num_trials=10,
-                                             reward_attr='accuracy',
-                                             time_attr='epoch',
-                                             checkpoint=None)
-        scheduler.run()
-        scheduler.join_jobs()
+def test_hyperband_scheduler():
+    scheduler = ag.scheduler.HyperbandScheduler(train_fn,
+                                                resource={'num_cpus': 4, 'num_gpus': 0},
+                                                num_trials=10,
+                                                reward_attr='accuracy',
+                                                time_attr='epoch',
+                                                grace_period=1,
+                                                checkpoint=None)
+    scheduler.run()
+    scheduler.join_jobs()
 
-    test_fifo_scheduler()
-    test_hyperband_scheduler()
-    test_rl_scheduler()
+def test_rl_scheduler():
+    scheduler = ag.scheduler.RLScheduler(rl_train_fn,
+                                         resource={'num_cpus': 4, 'num_gpus': 0},
+                                         num_trials=10,
+                                         reward_attr='accuracy',
+                                         time_attr='epoch',
+                                         checkpoint=None)
+    scheduler.run()
+    scheduler.join_jobs()
 
-if __name__ == '__main__':
-    test_schedulers()

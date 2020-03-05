@@ -166,7 +166,7 @@ class LocalStatusReporter(object):
 
 class Communicator(threading.Thread):
     def __init__(self, process, local_reporter, dist_reporter):
-        super(Communicator, self).__init__()
+        super().__init__()
         self.process = process
         self.local_reporter = local_reporter
         self.dist_reporter = dist_reporter

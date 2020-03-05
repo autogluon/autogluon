@@ -1,4 +1,7 @@
 import os
+
+import pytest
+
 import autogluon as ag
 from autogluon import ImageClassification as task
 from mxnet import optimizer as optim
@@ -33,6 +36,7 @@ tricks_combination = [
         batch_norm=True,
         use_gn=False)]
 
+
 def download_shopee(data_dir, dataset):
     if not os.path.exists(os.path.join(data_dir, dataset + '.zip')):
         filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip', path=data_dir)
@@ -40,6 +44,7 @@ def download_shopee(data_dir, dataset):
         ag.unzip(filename, root=filename[:-4])
     else:
         print(dataset + '.zip already exists.\n')
+
 
 def config_choice(dataset, data_path, tricks):
     dataset_path = os.path.join(data_path, dataset, 'data', 'train')
@@ -73,38 +78,36 @@ def config_choice(dataset, data_path, tricks):
                      'num_trials': 1}
     return kaggle_choice
 
-def test_tricks(test_trials):
+
+@pytest.mark.slow
+@pytest.mark.parametrize("combination", tricks_combination)
+def test_tricks(combination):
     dataset = 'shopee-iet'
     data_dir = './'
     download_shopee(data_dir, dataset)
 
-    for i in range(test_trials):
-        print('Test:{}\n'.format(i))
-        target = config_choice(dataset, data_dir, tricks_combination[i])
-        classifier = task.fit(dataset = task.Dataset(target['dataset']),
-                              net = target['net'],
-                              optimizer = target['optimizer'],
-                              epochs = target['epochs'],
-                              ngpus_per_trial = target['ngpus_per_trial'],
-                              num_trials = target['num_trials'],
-                              batch_size = target['batch_size'],
-                              verbose = True,
-                              search_strategy='random',
-                              tricks = target['tricks'],
-                              lr_config = target['lr_config'],
-                              plot_results = True)
+    target = config_choice(dataset, data_dir, combination)
+    classifier = task.fit(dataset = task.Dataset(target['dataset']),
+                          net = target['net'],
+                          optimizer = target['optimizer'],
+                          epochs = target['epochs'],
+                          ngpus_per_trial = target['ngpus_per_trial'],
+                          num_trials = target['num_trials'],
+                          batch_size = target['batch_size'],
+                          verbose = True,
+                          search_strategy='random',
+                          tricks = target['tricks'],
+                          lr_config = target['lr_config'],
+                          plot_results = True)
 
-        test_dataset = task.Dataset(target['dataset'].replace('train', 'test/BabyPants'), train=False,
-                                    scale_ratio_choice=[0.7, 0.8, 0.875])
-        inds, probs, probs_all = classifier.predict(test_dataset, set_prob_thresh=0.001)
-        print(inds[0],probs[0],probs_all[0])
+    test_dataset = task.Dataset(target['dataset'].replace('train', 'test/BabyPants'), train=False,
+                                scale_ratio_choice=[0.7, 0.8, 0.875])
+    inds, probs, probs_all = classifier.predict(test_dataset, set_prob_thresh=0.001)
+    print(inds[0],probs[0],probs_all[0])
 
-        print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
-        # summary = classifier.fit_summary(output_directory=dataset, verbosity=3)
-        # print(summary)
-
-if __name__ == '__main__':
-    test_tricks(2)
+    print('Top-1 val acc: %.3f' % classifier.results['best_reward'])
+    # summary = classifier.fit_summary(output_directory=dataset, verbosity=3)
+    # print(summary)
 
 
 

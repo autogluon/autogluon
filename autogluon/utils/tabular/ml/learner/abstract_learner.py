@@ -13,7 +13,7 @@ from pandas import DataFrame, Series
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, matthews_corrcoef, f1_score, classification_report  # , roc_curve, auc
 from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_score, mean_squared_error, median_absolute_error  # , max_error
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba
@@ -452,6 +452,23 @@ class AbstractLearner:
                 print(leaderboard)
         return leaderboard
 
+    # TODO: Should this return a dictionary or pandas Series? Current it returns a Series
+    # TODO: enable_fit_continuation must be set to True to be able to pass X and y as None in this function, otherwise it will error.
+    # Warning: This can take a very, very long time to compute if the data is large and the model is complex.
+    # TODO: Warning: This is not memory safe, large datasets may result in OOM errors during feature importance calculation.
+    # A value of 0.01 means that the objective metric error would be expected to increase by 0.01 if the feature were removed.
+    # Negative values mean the feature is likely harmful.
+    def get_feature_importance(self, model, X=None, y=None) -> Series:
+        if X is not None:
+            if y is None:
+                X, y = self.extract_label(X)
+            X = self.transform_features(X)
+            y = self.label_cleaner.transform(y)
+        else:
+            y = None
+        trainer = self.load_trainer()
+        return trainer.get_feature_importance(X=X, y=y, model=model)
+
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output
     def get_info(self, include_model_info=False):
@@ -575,12 +592,12 @@ class AbstractLearner:
         load_path = path + cls.learner_info_name
         try:
             return load_pkl.load(path=load_path)
-        except:
+        except Exception as e:
             if load_model_if_required:
                 learner = cls.load(path_context=path, reset_paths=reset_paths)
                 return learner.get_info()
             else:
-                raise
+                raise e
 
     def save_info(self, include_model_info=False):
         info = self.get_info(include_model_info=include_model_info)

@@ -1,12 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Check style"""
-import sys
 from subprocess import Popen, PIPE
 import logging
 
 
-def main():
+def test_check_style():
     logging.getLogger().setLevel(logging.INFO)
     logging.info("PEP8 Style check")
     flake8_proc = Popen(['flake8', '--count'], stdout=PIPE)
@@ -21,6 +17,3 @@ def main():
     logging.info("Passed")
     return 0
 
-
-if __name__ == '__main__':
-    sys.exit(main())

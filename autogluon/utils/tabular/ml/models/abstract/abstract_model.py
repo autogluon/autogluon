@@ -141,7 +141,11 @@ class AbstractModel:
     # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
     def preprocess(self, X):
         if self.features is not None:
-            return X[self.features]
+            # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
+            if list(X.columns) != self.features:
+                return X[self.features]
+        else:
+            self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
         return X
 
     def fit(self, X_train, Y_train, **kwargs):
@@ -175,16 +179,16 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None):
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
         if eval_metric is None:
             eval_metric = self.objective_func
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
-            y_pred = self.predict(X=X)
+            y_pred = self.predict(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X)
+            y_pred_proba = self.predict_proba(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred_proba)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
@@ -216,7 +220,8 @@ class AbstractModel:
             obj.set_contexts(path)
             return obj
 
-    def compute_feature_importance(self, X, y, features_to_use=None):
+    # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, **kwargs):
         sample_size = 10000
         if len(X) > sample_size:
             X = X.sample(sample_size, random_state=0)
@@ -228,19 +233,45 @@ class AbstractModel:
         X.reset_index(drop=True, inplace=True)
         y.reset_index(drop=True, inplace=True)
 
-        X = self.preprocess(X)
+        if preprocess:
+            X = self.preprocess(X)
 
         if not features_to_use:
             features = X.columns.values
         else:
             features = features_to_use
+
+        feature_importance_quick_dict = self.get_model_feature_importance()
+        # TODO: Also consider banning features with close to 0 importance
+        # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
+        banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
+        features = [feature for feature in features if feature not in banned_features]
+
+        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False)
+
+        feature_importances = pd.Series(permutation_importance_dict)
+        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features)
+        feature_importances = pd.concat([feature_importances, results_banned])
+        feature_importances = feature_importances.sort_values(ascending=False)
+
+        return feature_importances
+
+    # TODO: Consider repeating with different random seeds and averaging to increase confidence
+    # TODO: Optimize this
+    # TODO: Check memory usage to avoid OOM
+    # Compute feature importance via permutation importance
+    # Note: Expensive to compute
+    #  Time to compute is O(predict_time*num_features)
+    def compute_permutation_importance(self, X, y, features: list, preprocess=True) -> dict:
+        if preprocess:
+            X = self.preprocess(X)
+
         feature_count = len(features)
-
-        model_score_base = self.score(X=X, y=y)
-
+        model_score_base = self.score(X=X, y=y, preprocess=False)
         model_score_diff = []
 
         row_count = X.shape[0]
+        np.random.seed(0)
         rand_shuffle = np.random.randint(0, row_count, size=row_count)
 
         X_test_shuffled = X.iloc[rand_shuffle].reset_index(drop=True)
@@ -252,7 +283,6 @@ class AbstractModel:
             if indice + compute_count > feature_count:
                 compute_count = feature_count - indice
 
-            logger.debug(indice)
             x = [X.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
             for j, val in enumerate(x):
                 feature = features[indice + j]
@@ -272,10 +302,12 @@ class AbstractModel:
                 score = self.objective_func(y, Y_pred_cur)
                 model_score_diff.append(model_score_base - score)
 
-        results = pd.Series(data=model_score_diff, index=features)
-        results = results.sort_values(ascending=False)
+        permutation_importance_dict = {feature: score_diff for feature, score_diff in zip(features, model_score_diff)}
+        return permutation_importance_dict
 
-        return results
+    # Custom feature importance values for a model (such as those calculated from training)
+    def get_model_feature_importance(self) -> dict:
+        return dict()
 
     def _get_default_searchspace(self, problem_type):
         return NotImplementedError
@@ -297,14 +329,12 @@ class AbstractModel:
         trained_params.update(self.params_trained)
         return trained_params
 
-    # TODO: currently inplace and destructive. This won't work well for in-memory models.
-    #  Problem with not inplace -> 2x memory usage, try to avoid somehow
-    # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
+    # After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
     def convert_to_template(self):
         model = self.model
         self.model = None
         template = copy.deepcopy(self)
-        template.params_trained = dict()
+        template.reset_metrics()
         self.model = model
         return template
 
@@ -412,6 +442,13 @@ class AbstractModel:
         features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
         logger.debug(str(features_to_keep))
         self.features = features_to_keep
+
+    # Resets metrics for the model
+    def reset_metrics(self):
+        self.fit_time = None
+        self.predict_time = None
+        self.val_score = None
+        self.params_trained = dict()
 
     def get_info(self):
         info = dict(

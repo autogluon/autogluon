@@ -1,4 +1,7 @@
 import logging
+from collections import defaultdict
+
+import pandas as pd
 
 from .stacker_ensemble_model import StackerEnsembleModel
 from .greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
@@ -23,3 +26,25 @@ class WeightedEnsembleModel(StackerEnsembleModel):
             base_model_names = base_model_names + [base_model_name for base_model_name in model.base_model_names if base_model_name not in base_model_names]
         self.base_model_names = [base_model_name for base_model_name in self.base_model_names if base_model_name in base_model_names]
         self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
+
+    def _get_model_weights(self):
+        weights_dict = defaultdict(int)
+        num_models = len(self.models)
+        for model in self.models:
+            model: GreedyWeightedEnsembleModel = self.load_child(model, verbose=False)
+            model_weight_dict = model._get_model_weights()
+            for key in model_weight_dict.keys():
+                weights_dict[key] += model_weight_dict[key]
+        for key in weights_dict:
+            weights_dict[key] = weights_dict[key] / num_models
+        return weights_dict
+
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, **kwargs):
+        if is_oof:
+            feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
+        else:
+            logger.warning('Warning: Feature importance calculation is not yet implemented for WeightedEnsembleModel on unseen data, returning generic feature importance...')
+            feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
+            # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
+            # feature_importance = super().compute_feature_importance(X=X, y=y, features_to_use=features_to_use, preprocess=preprocess, is_oof=is_oof, **kwargs)
+        return feature_importance

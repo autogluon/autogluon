@@ -4,6 +4,7 @@ import psutil
 import sys
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 
+from ..abstract import model_trial
 from ..sklearn.sklearn_model import SKLearnModel
 from ...constants import MULTICLASS, REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
@@ -116,12 +117,20 @@ class RFModel(SKLearnModel):
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        time_start = time.time()
-        self.fit(X_train=X_train, Y_train=Y_train, **kwargs)
-        time_end = time.time()
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {'total_time': time_end - time_start}
-        self.save()
+        fit_model_args = dict(X_train=X_train, Y_train=Y_train, **kwargs)
+        predict_proba_args = dict(X=X_test)
+        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=Y_test, time_start=time.time(), time_limit=None)
+        hpo_results = {'total_time': self.fit_time}
+        hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}
-
         return hpo_models, hpo_model_performances, hpo_results
+
+    def get_model_feature_importance(self):
+        if self.features is None:
+            # TODO: Consider making this raise an exception
+            logger.warning('Warning: get_model_feature_importance called when self.features is None!')
+            return dict()
+        feature_names = self.features
+        importances = self.model.feature_importances_
+        importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
+        return importance_dict
