@@ -24,7 +24,8 @@ class KNNModel(SKLearnModel):
 
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns
-        X = X.drop(cat_columns, axis=1).fillna(0)  # TODO: Test if crash when all columns are categorical
+        X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
+        X = super().preprocess(X).fillna(0)
         return X
 
     def _set_default_params(self):

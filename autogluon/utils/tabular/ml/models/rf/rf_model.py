@@ -124,3 +124,13 @@ class RFModel(SKLearnModel):
         hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}
         return hpo_models, hpo_model_performances, hpo_results
+
+    def get_model_feature_importance(self):
+        if self.features is None:
+            # TODO: Consider making this raise an exception
+            logger.warning('Warning: get_model_feature_importance called when self.features is None!')
+            return dict()
+        feature_names = self.features
+        importances = self.model.feature_importances_
+        importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
+        return importance_dict
