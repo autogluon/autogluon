@@ -1,19 +1,25 @@
-import gc, copy, random, time, os, logging, warnings
+import gc
+import logging
+import os
+import random
+import time
+import warnings
+
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from ......core import Int, Space
-from .....try_import import try_import_lightgbm
-from ....utils.savers import save_pkl
-from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from ...utils import construct_dataset
-from .callbacks import early_stopping_custom
-from ...constants import BINARY, MULTICLASS, REGRESSION
 from . import lgb_utils
-from .hyperparameters.searchspaces import get_default_searchspace
+from .callbacks import early_stopping_custom
 from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
+from .lgb_utils import construct_dataset
+from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
+from ...constants import BINARY, MULTICLASS, REGRESSION
+from ....utils.savers import save_pkl
+from .....try_import import try_import_lightgbm
+from ......core import Int, Space
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -59,14 +65,14 @@ class LGBModel(AbstractModel):
         gc.collect()
 
         num_boost_round = params.pop('num_boost_round', 1000)
-        logger.log(15, 'Training Gradient Boosting Model for %s rounds...' % num_boost_round)
+        logger.log(15, f'Training Gradient Boosting Model for {num_boost_round} rounds...')
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
 
         num_rows_train = len(dataset_train.data)
         if 'min_data_in_leaf' in params:
             if params['min_data_in_leaf'] > num_rows_train:  # TODO: may not be necessary
-                params['min_data_in_leaf'] = max(1, int(num_rows_train/5.0))
+                params['min_data_in_leaf'] = max(1, int(num_rows_train / 5.0))
 
         # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
         if (dataset_val is not None) and (dataset_train is not None):
@@ -90,7 +96,7 @@ class LGBModel(AbstractModel):
             callbacks += [
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
-                ]
+            ]
             valid_names = ['valid_set'] + valid_names
             valid_sets = [dataset_val] + valid_sets
 
@@ -142,7 +148,7 @@ class LGBModel(AbstractModel):
                 return y_pred_proba[:, 1]
 
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
-        lgb_dataset_params_keys = ['objective', 'two_round','num_threads', 'num_classes', 'verbose'] # Keys that are specific to lightGBM Dataset object construction.
+        lgb_dataset_params_keys = ['two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {}
         for key in lgb_dataset_params_keys:
             if key in params:
@@ -158,11 +164,11 @@ class LGBModel(AbstractModel):
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
         if not dataset_train:
             # X_train, W_train = self.convert_to_weight(X=X_train)
-            dataset_train = construct_dataset(x=X_train, y=Y_train, location=self.path + 'datasets/train', params=data_params, save=save, weight=W_train)
+            dataset_train = construct_dataset(x=X_train, y=Y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=W_train)
             # dataset_train = construct_dataset_lowest_memory(X=X_train, y=Y_train, location=self.path + 'datasets/train', params=data_params)
         if (not dataset_val) and (X_test is not None) and (Y_test is not None):
             # X_test, W_test = self.convert_to_weight(X=X_test)
-            dataset_val = construct_dataset(x=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=data_params, save=save, weight=W_test)
+            dataset_val = construct_dataset(x=X_test, y=Y_test, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
             # dataset_val = construct_dataset_lowest_memory(X=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         return dataset_train, dataset_val
 
@@ -174,11 +180,11 @@ class LGBModel(AbstractModel):
         feature_importances = pd.DataFrame(data=feature_names, columns=['feature'])
         feature_importances['splits'] = feature_splits
         feature_importances_unused = feature_importances[feature_importances['splits'] == 0]
-        feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits/feature_count)]
+        feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits / feature_count)]
         logger.debug(feature_importances_unused)
         logger.debug(feature_importances_used)
-        logger.debug('feature_importances_unused: %s' % len(feature_importances_unused))
-        logger.debug('feature_importances_used: %s' % len(feature_importances_used))
+        logger.debug(f'feature_importances_unused: {len(feature_importances_unused)}' )
+        logger.debug(f'feature_importances_used: {len(feature_importances_used)}')
         features_to_use = list(feature_importances_used['feature'].values)
         logger.debug(str(features_to_use))
         return features_to_use
@@ -194,13 +200,13 @@ class LGBModel(AbstractModel):
         if isinstance(params_copy['min_data_in_leaf'], Int):
             upper_minleaf = params_copy['min_data_in_leaf'].upper
             if upper_minleaf > X_train.shape[0]:  # TODO: this min_data_in_leaf adjustment based on sample size may not be necessary
-                upper_minleaf = max(1, int(X_train.shape[0]/5.0))
+                upper_minleaf = max(1, int(X_train.shape[0] / 5.0))
                 lower_minleaf = params_copy['min_data_in_leaf'].lower
                 if lower_minleaf > upper_minleaf:
-                    lower_minleaf = max(1, int(upper_minleaf/3.0))
+                    lower_minleaf = max(1, int(upper_minleaf / 3.0))
                 params_copy['min_data_in_leaf'] = Int(lower=lower_minleaf, upper=upper_minleaf)
 
-        directory = self.path # also create model directory if it doesn't exist
+        directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -214,7 +220,7 @@ class LGBModel(AbstractModel):
         dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params_copy, X_test=X_test, Y_test=Y_test)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
-        if os.path.exists(train_file): # clean up old files first
+        if os.path.exists(train_file):  # clean up old files first
             os.remove(train_file)
         dataset_train.save_binary(train_file)
         dataset_val_filename = "dataset_val.bin"  # names without directory info
@@ -232,7 +238,7 @@ class LGBModel(AbstractModel):
             logger.log(15, "Hyperparameter search space for Gradient Boosting Model: ")
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, str(hyperparam)+":   " + str(params_copy[hyperparam]))
+                    logger.log(15, f'{hyperparam}:   {params_copy[hyperparam]}')
 
         util_args = dict(
             dataset_train_filename=dataset_train_filename,
@@ -248,8 +254,8 @@ class LGBModel(AbstractModel):
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_file, val_file, val_pkl_path]) # TODO: currently does not work.
-            directory = self.path # TODO: need to change to path to working directory used on every remote machine
+            scheduler.upload_files([train_file, val_file, val_pkl_path])  # TODO: currently does not work.
+            directory = self.path  # TODO: need to change to path to working directory used on every remote machine
             lgb_trial.update(directory=directory)
             logger.log(15, "uploaded")
 
@@ -271,11 +277,11 @@ class LGBModel(AbstractModel):
 
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default spearch space.
+            default fixed value to default search space.
         """
         def_search_space = get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes).copy()
-        for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
-            _ = def_search_space.pop(key, None)
+        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
+            def_search_space.pop(key, None)
         self.params.update(def_search_space)
 
     def get_model_feature_importance(self):
