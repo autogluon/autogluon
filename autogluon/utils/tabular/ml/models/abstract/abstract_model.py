@@ -9,7 +9,7 @@ import pandas as pd
 from .model_trial import model_trial
 from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows
 from .... import metrics
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
@@ -230,9 +230,6 @@ class AbstractModel:
             X = X.copy()
             y = y.copy()
 
-        X.reset_index(drop=True, inplace=True)
-        y.reset_index(drop=True, inplace=True)
-
         if preprocess:
             X = self.preprocess(X)
 
@@ -271,10 +268,8 @@ class AbstractModel:
         model_score_diff = []
 
         row_count = X.shape[0]
-        np.random.seed(0)
-        rand_shuffle = np.random.randint(0, row_count, size=row_count)
+        X_test_shuffled = shuffle_df_rows(X=X, seed=0)
 
-        X_test_shuffled = X.iloc[rand_shuffle].reset_index(drop=True)
         compute_count = 200
         indices = [x for x in range(0, feature_count, compute_count)]
 
@@ -286,7 +281,7 @@ class AbstractModel:
             x = [X.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
             for j, val in enumerate(x):
                 feature = features[indice + j]
-                val[feature] = X_test_shuffled[feature]
+                val[feature] = X_test_shuffled[feature].values
             X_test_raw = pd.concat(x, ignore_index=True)
 
             if self.metric_needs_y_pred:

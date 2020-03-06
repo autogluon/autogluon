@@ -50,6 +50,12 @@ class BaggedEnsembleModel(AbstractModel):
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
 
+    def is_stratified(self):
+        if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
+            return False
+        else:
+            return True
+
     def is_fit(self):
         return len(self.models) != 0
 
@@ -94,10 +100,6 @@ class BaggedEnsembleModel(AbstractModel):
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         time_start = time.time()
-        if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
-            stratified = False
-        else:
-            stratified = True
 
         model_base = self._get_model_base()
         if self.features is not None:
@@ -128,7 +130,7 @@ class BaggedEnsembleModel(AbstractModel):
             return
 
         # TODO: Preprocess data here instead of repeatedly
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=n_repeats)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
             oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
@@ -246,11 +248,6 @@ class BaggedEnsembleModel(AbstractModel):
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
     def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, **kwargs):
-        if self.problem_type == REGRESSION:
-            stratified = False
-        else:
-            stratified = True
-
         feature_importance_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
@@ -259,10 +256,10 @@ class BaggedEnsembleModel(AbstractModel):
             if is_oof:
                 if not self.bagged_mode:
                     raise AssertionError('Model trained with no validation data cannot get feature importances on training data, please specify new test data to compute feature importances (model=%s)' % self.name)
-                kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=stratified, random_state=self._random_state, n_repeats=n_repeat + 1)
+                kfolds = generate_kfold(X=X, y=y, n_splits=k, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeat + 1)
                 cur_kfolds = kfolds[n_repeat * k:(n_repeat+1) * k]
             else:
-                cur_kfolds = [(None, X.index)]*k
+                cur_kfolds = [(None, list(range(len(X))))]*k
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])

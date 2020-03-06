@@ -452,13 +452,16 @@ class AbstractLearner:
                 print(leaderboard)
         return leaderboard
 
-    # TODO: Should this return a dictionary or pandas Series? Current it returns a Series
     # TODO: enable_fit_continuation must be set to True to be able to pass X and y as None in this function, otherwise it will error.
     # Warning: This can take a very, very long time to compute if the data is large and the model is complex.
     # TODO: Warning: This is not memory safe, large datasets may result in OOM errors during feature importance calculation.
+    # TODO: Rewrite description before adding to Predictor
     # A value of 0.01 means that the objective metric error would be expected to increase by 0.01 if the feature were removed.
     # Negative values mean the feature is likely harmful.
-    def get_feature_importance(self, model, X=None, y=None) -> Series:
+    # model: model (str) to get feature importances for, if None will choose best model.
+    # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
+    # raw: Whether to compute feature importance on raw original features or on the features used by the particular model.
+    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, raw=True) -> Series:
         if X is not None:
             if y is None:
                 X, y = self.extract_label(X)
@@ -467,7 +470,7 @@ class AbstractLearner:
         else:
             y = None
         trainer = self.load_trainer()
-        return trainer.get_feature_importance(X=X, y=y, model=model)
+        return trainer.get_feature_importance(X=X, y=y, model=model, features=features, raw=raw)
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

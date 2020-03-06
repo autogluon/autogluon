@@ -250,3 +250,13 @@ def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):
     y_predprob = y_predprob / y_predprob.sum(axis=1, keepdims=1) # renormalize
     return y_predprob
 
+
+# Returns DataFrame with rows shuffled based on seed value
+def shuffle_df_rows(X: DataFrame, seed=0, reset_index=True):
+    row_count = X.shape[0]
+    np.random.seed(seed)
+    rand_shuffle = np.random.randint(0, row_count, size=row_count)
+    X_shuffled = X.iloc[rand_shuffle]
+    if reset_index:
+        X_shuffled.reset_index(inplace=True, drop=True)
+    return X_shuffled

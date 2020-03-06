@@ -10,7 +10,7 @@ from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NA
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true, shuffle_df_rows
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -829,28 +829,43 @@ class AbstractTrainer:
         )
         return dummy_stacker
 
-    # TODO: Add option for raw=True, which uses black-box method to get importances for original features instead of whatever features the model uses.
+    # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
-    def get_feature_importance(self, model, X=None, y=None):
+    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True):
+        if model is None:
+            model = self.model_best
         model: AbstractModel = self.load_model(model)
         if X is None and model.val_score is None:
             raise AssertionError(f'Model {model.name} is not valid for generating feature importances on original training data because no validation data was used during training, please specify new test data to compute feature importances.')
 
         if X is None:
-            if isinstance(model, BaggedEnsembleModel):
-                if isinstance(model, WeightedEnsembleModel):
+            if isinstance(model, WeightedEnsembleModel):
+                if self.bagged_mode:
+                    if raw:
+                        raise AssertionError('raw feature importance on the original training data is not supported when bagging is enabled, please specify new test data to compute raw feature importances.')
                     X = None
+                    is_oof = True
                 else:
-                    X = self.load_X_train()
-                    X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=True)
+                    if raw:
+                        X = self.load_X_val()
+                    else:
+                        X = None
+                    is_oof = False
+            elif isinstance(model, BaggedEnsembleModel):
+                if raw:
+                    raise AssertionError('raw feature importance on the original training data is not supported when bagging is enabled, please specify new test data to compute raw feature importances.')
+                X = self.load_X_train()
+                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=True)
                 is_oof = True
             else:
                 X = self.load_X_val()
-                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
+                if not raw:
+                    X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
                 is_oof = False
         else:
-            X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
             is_oof = False
+            if not raw:
+                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
 
         if y is None and X is not None:
             if isinstance(model, BaggedEnsembleModel):
@@ -858,8 +873,41 @@ class AbstractTrainer:
             else:
                 y = self.load_y_val()
 
-        feature_importance = model.compute_feature_importance(X=X, y=y, is_oof=is_oof)
+        if raw:
+            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features)
+        else:
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, is_oof=is_oof)
         return feature_importance
+
+    # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model
+    #  Could solve by adding a self.score_all() function which takes model as input and also returns scores of all children models.
+    #  This would be best solved after adding graph representation, it lives most naturally in AbstractModel
+    # TODO: Can skip features which were pruned on all models that model depends on (Complex to implement, requires graph representation)
+    # TODO: Note that raw importance will not equal non-raw importance for bagged models, even if raw features are identical to the model features.
+    #  This is because for non-raw, we do an optimization where each fold model calls .compute_feature_importance(), and then the feature importances are averaged across the folds.
+    #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
+    #  Consider aligning these methods so they produce the same result.
+    # The output of this function is identical to non-raw when model is level 0 and non-bagged
+    def _get_feature_importance_raw(self, model, X, y, features_to_use=None):
+        model: AbstractModel = self.load_model(model)
+        if features_to_use is None:
+            features_to_use = list(X.columns)
+
+        score_baseline = self.score(X=X, y=y, model=model)
+        X_shuffled = shuffle_df_rows(X=X, seed=0)
+
+        # Assuming X_test or X_val
+        # TODO: Can check multiple features at a time only if non-OOF
+        # TODO: Consider having X_to_check reassign values instead of creating new for each feature
+        permutation_importance_dict = dict()
+        for feature in features_to_use:
+            X_to_check = X.copy()
+            X_to_check[feature] = X_shuffled[feature].values
+            score_feature = self.score(X=X_to_check, y=y, model=model)
+            score_diff = score_baseline - score_feature
+            permutation_importance_dict[feature] = score_diff
+        feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
+        return feature_importances
 
     def get_models_load_info(self, model_names):
         model_names = copy.deepcopy(model_names)

@@ -8,7 +8,7 @@ from collections import defaultdict
 from ...utils import generate_kfold
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
-from ...constants import MULTICLASS, REGRESSION
+from ...constants import MULTICLASS
 
 logger = logging.getLogger(__name__)
 
@@ -140,10 +140,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
     def hyperparameter_tune(self, X, y, k_fold, scheduler_options=None, compute_base_preds=True, **kwargs):
         if len(self.models) != 0:
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
-        if self.problem_type == REGRESSION:
-            stratified = False
-        else:
-            stratified = True
 
         if len(self.models) == 0:
             if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
@@ -158,7 +154,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
 
         # TODO: Preprocess data here instead of repeatedly
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
-        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=stratified, random_state=self._random_state, n_repeats=1)
+        kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
         train_index, test_index = kfolds[0]
         X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
