@@ -239,7 +239,7 @@ class RLScheduler(FIFOScheduler):
                 reported_result = reporter.fetch()
                 if 'traceback' in reported_result:
                     logger.exception(reported_result['traceback'])
-                    # reporter.move_on()
+                    reporter.move_on()
                     break
 
                 if 'done' in reported_result and reported_result['done'] is True:
