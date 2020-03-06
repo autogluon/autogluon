@@ -221,6 +221,8 @@ class HyperbandScheduler(FIFOScheduler):
             reported_result = reporter.fetch()
             if 'traceback' in reported_result:
                 logger.exception(reported_result['traceback'])
+                # reporter.move_on()
+                # terminator.on_task_remove(task)
                 break
 
             if reported_result.get('done', False):
