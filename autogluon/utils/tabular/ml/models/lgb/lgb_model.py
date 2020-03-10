@@ -148,7 +148,7 @@ class LGBModel(AbstractModel):
                 return y_pred_proba[:, 1]
 
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
-        lgb_dataset_params_keys = ['two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
+        lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {}
         for key in lgb_dataset_params_keys:
             if key in params:
