@@ -38,6 +38,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
     # data train
     # task.dataset_train returns (segment_name, dataset)
     train_tsv = task.dataset_train()[1]
+    # train_tsv = task.dataset_train
     data_train = mx.gluon.data.SimpleDataset(pool.map(trans, train_tsv))
     data_train_len = data_train.transform(
         lambda input_id, length, segment_id, label_id: length, lazy=False)
@@ -63,7 +64,12 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
 
     # data dev. For MNLI, more than one dev set is available
     dev_tsv = task.dataset_dev()
+    # dev_tsv = 'dev', task.dataset_dev
     dev_tsv_list = dev_tsv if isinstance(dev_tsv, list) else [dev_tsv]
+    # print('dev_tsv_list')
+    # print(dev_tsv_list)
+    # print(dev_tsv_list[0])
+    # time.sleep(10)
     loader_dev_list = []
     for segment, data in dev_tsv_list:
         data_dev = mx.gluon.data.SimpleDataset(pool.map(trans, data))

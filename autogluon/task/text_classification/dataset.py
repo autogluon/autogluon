@@ -1,5 +1,6 @@
-import multiprocessing
+import multiprocessing as mp
 from typing import AnyStr
+import pandas as pd
 
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
@@ -9,12 +10,13 @@ from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 # from gluonnlp.data.utils import (Splitter, concat_sequence, line_splitter, whitespace_splitter)
 from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
+from ...utils.tabular.utils.loaders import load_pd
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
            'WNLITask', 'SSTTask', 'AbstractGlueTask', 'get_dataset']
 
 @func()
-def get_dataset(path=None, name=None, train=True, *args, **kwargs):
+def get_dataset(name=None, *args, **kwargs):
     """Load a text classification dataset to train AutoGluon models on.
         
         Parameters
@@ -25,12 +27,14 @@ def get_dataset(path=None, name=None, train=True, *args, **kwargs):
             Name describing which built-in popular text dataset to use (mostly from the GLUE NLP benchmark).
             Options include: 'mrpc', 'qqp', 'qnli', 'rte', 'sts-b', 'cola', 'mnli', 'wnli', 'sst', 'toysst'. 
             Detailed descriptions can be found in the file: `autogluon/task/text_classification/dataset.py`
-        train : bool
-            Whether this data will be used for training models.
     """
+    path = kwargs.get('filepath', None)
+    # name = kwargs.get('name', None)
+    print('get_dataset path:%s !!!' % path)
+    print('get_dataset name:%s !!!' % name)
     if path is not None:
         if '.tsv' or '.csv' in path:
-            return CustomTSVClassificationTask(path, *args, **kwargs)
+            return CustomTSVClassificationTask(*args, **kwargs)
         else:
             raise NotImplementedError
     if name is not None and name.lower() in built_in_tasks:
@@ -148,18 +152,68 @@ class CustomTSVClassificationTask(AbstractGlueTask):
         Class labels
     """
     def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        is_pair = False
-        class_labels = args.class_labels
-        metric = CompositeEvalMetric()
-        metric.add(F1())
-        metric.add(Accuracy())
-        dataset = nlp.data.TSVDataset(*args, **kwargs)
-        super(CustomTSVClassificationTask, self).__init__(class_labels, metric, is_pair)
+        self._read(**kwargs)
+        self.is_pair = False
+        self.class_labels = list(set([sample[1] for sample in self.dataset]))
+        # class_labels = None
+        self.metric = Accuracy()
+        super(CustomTSVClassificationTask, self).__init__(self.class_labels, self.metric, self.is_pair)
+
+    def get_dataset(self, segment='train'):
+        """Get the corresponding dataset for the task.
+
+        Parameters
+        ----------
+        segment : str, default 'train'
+            Dataset segments.
+
+        Returns
+        -------
+        TSVDataset : the dataset of target segment.
+        """
+        if segment == 'train':
+            return SampledDataset(self.dataset, self.train_sampler)
+        elif segment == 'dev':
+            return SampledDataset(self.dataset, self.dev_sampler)
+        else:
+            raise NotImplementedError
+
+    def _read(self, **kwargs):
+        path = kwargs.get('filepath', None)
+        print('_read path: %s !!!' % path)
+        kwargs['filepath_or_buffer'] = path
+        kwargs.pop("filepath")
+        dataset_df = pd.read_csv(**kwargs)
+        # dataset_df = load_pd.load(path)
+        print('_read dataset_df !!!')
+        print(len(dataset_df))
+        dataset_df_lst = dataset_df.values.tolist()
+        print('_read dataset_df_lst !!!')
+        print(type(dataset_df_lst))
+        # pool = mp.Pool(processes=(mp.cpu_count() - 1))
+        # dataset_df_lst = [1,2,3]
+        self.dataset = gluon.data.SimpleDataset(dataset_df_lst)
+        # # self.dataset = pool.map(gluon.data.SimpleDataset(dataset_df_lst))
+        # # pool.close()
+        # # pool.join()
+        print('_read self.dataset !!!')
+        print(type(self.dataset))
+        print(len(self.dataset[0]))
+        print(self.dataset[0])
+        # import time
+        # time.sleep(10)
+        print('_read self.dataset[0] !!!')
+        split_ratio = kwargs.get('split_ratio', None) if 'split_ratio' in kwargs else 0.8
+        self.train_sampler, self.dev_sampler = get_split_samplers(self.dataset, split_ratio=split_ratio)
+        # self.dataset_train = self.dataset
+        # self.dataset_dev = self.dataset
 
     def dataset_train(self):
-        return 'train', self.dataset
+        return 'train', self.get_dataset('train')
+
+    def dataset_dev(self):
+        return 'dev', self.get_dataset('dev')
+
 
 class TSVClassificationTask(AbstractGlueTask):
     def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
