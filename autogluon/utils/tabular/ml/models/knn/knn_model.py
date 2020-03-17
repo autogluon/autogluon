@@ -44,7 +44,7 @@ class KNNModel(SKLearnModel):
     def fit(self, X_train, Y_train, **kwargs):
         X_train = self.preprocess(X_train)
 
-        model_size_bytes = sys.getsizeof(pickle.dumps(X_train))
+        model_size_bytes = sys.getsizeof(pickle.dumps(X_train, protocol=4))
         expected_final_model_size_bytes = model_size_bytes * 2.1  # Roughly what can be expected of the final KNN model in memory size
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
