@@ -109,7 +109,7 @@ class DefaultLearner(AbstractLearner):
         #     X[self.label] = X[self.label].fillna('')
 
         # Remove all examples with missing labels from this dataset:
-        missinglabel_inds = [i for i, j in enumerate(X[self.label].isna()) if j]
+        missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
         if len(missinglabel_inds) > 0:
             logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
             X = X.drop(missinglabel_inds, axis=0)
