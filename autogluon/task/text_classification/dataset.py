@@ -21,17 +21,12 @@ def get_dataset(name=None, *args, **kwargs):
         
         Parameters
         ----------
-        path : str
-            Path to local directory containing text dataset. This dataset should be in GLUE format.
         name : str
             Name describing which built-in popular text dataset to use (mostly from the GLUE NLP benchmark).
             Options include: 'mrpc', 'qqp', 'qnli', 'rte', 'sts-b', 'cola', 'mnli', 'wnli', 'sst', 'toysst'. 
             Detailed descriptions can be found in the file: `autogluon/task/text_classification/dataset.py`
     """
     path = kwargs.get('filepath', None)
-    # name = kwargs.get('name', None)
-    print('get_dataset path:%s !!!' % path)
-    print('get_dataset name:%s !!!' % name)
     if path is not None:
         if '.tsv' or '.csv' in path:
             return CustomTSVClassificationTask(*args, **kwargs)
@@ -129,33 +124,116 @@ class ToySSTTask(AbstractGlueTask):
 
 class CustomTSVClassificationTask(AbstractGlueTask):
     """
+
     Parameters
     ----------
-    filename : str or list of str
-        Path to the input text file or list of paths to the input text files.
-    encoding : str, default 'utf8'
-        File encoding format.
-    sample_splitter : function, default str.splitlines
-        A function that splits the dataset string into samples.
-    field_separator : function or None, default Splitter('\t')
-        A function that splits each sample string into list of text fields.
-        If None, raw samples are returned according to `sample_splitter`.
-    num_discard_samples : int, default 0
-        Number of samples discarded at the head of the first file.
-    field_indices : list of int or None, default None
-        If set, for each sample, only fields with provided indices are selected as the output.
-        Otherwise all fields are returned.
-    allow_missing : bool, default False
-        If set to True, no exception will be thrown if the number of fields is smaller than the
-        maximum field index provided.
-    class_labels : list
-        Class labels
+    filepath: str, path of the file
+        Any valid string path is acceptable.
+    sep : str
+        Delimiter to use.
+    delimiter : str, default ``None``
+        Alias for sep.
+    header : int, list of int, default 'infer'
+        Row number(s) to use as the column names, and the start of the
+        data.
+    names : array-like, optional
+        List of column names to use.
+    index_col : int, str, sequence of int / str, or False, default ``None``
+    usecols : list-like or callable, optional
+        Return a subset of the columns.
+    squeeze : bool, default False
+    prefix : str, optional
+        Prefix to add to column numbers when no header, e.g. 'X' for X0, X1, ...
+    mangle_dupe_cols : bool, default True
+        Duplicate columns will be specified as 'X', 'X.1', ...'X.N', rather than
+        'X'...'X'. Passing in False will cause data to be overwritten if there
+        are duplicate names in the columns.
+    dtype : Type name or dict of column -> type, optional
+        Data type for data or columns.
+    engine : {{'c', 'python'}}, optional
+        Parser engine to use.
+    converters : dict, optional
+        Dict of functions for converting values in certain columns. Keys can either
+        be integers or column labels.
+    true_values : list, optional
+        Values to consider as True.
+    false_values : list, optional
+        Values to consider as False.
+    skipinitialspace : bool, default False
+        Skip spaces after delimiter.
+    skiprows : list-like, int or callable, optional
+        Line numbers to skip (0-indexed) or number of lines to skip (int)
+        at the start of the file.
+        If callable, the callable function will be evaluated against the row
+        indices, returning True if the row should be skipped and False otherwise.
+        An example of a valid callable argument would be ``lambda x: x in [0, 2]``.
+    skipfooter : int, default 0
+        Number of lines at bottom of file to skip (Unsupported with engine='c').
+    nrows : int, optional
+        Number of rows of file to read. Useful for reading pieces of large files.
+    na_values : scalar, str, list-like, or dict, optional
+    keep_default_na : bool, default True
+        Whether or not to include the default NaN values when parsing the data.
+    na_filter : bool, default True
+        Detect missing value markers (empty strings and the value of na_values).
+    verbose : bool, default False
+        Indicate number of NA values placed in non-numeric columns.
+    skip_blank_lines : bool, default True
+        If True, skip over blank lines rather than interpreting as NaN values.
+    parse_dates : bool or list of int or names or list of lists or dict
+    infer_datetime_format : bool, default False
+    keep_date_col : bool, default False
+        If True and `parse_dates` specifies combining multiple columns then
+        keep the original columns.
+    date_parser : function, optional
+        Function to use for converting a sequence of string columns to an array of
+        datetime instances.
+    dayfirst : bool, default False
+        DD/MM format dates, international and European format.
+    cache_dates : bool, default True
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    iterator : bool, default False
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    chunksize : int, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    compression : {{'infer', 'gzip', 'bz2', 'zip', 'xz', None}}, default 'infer'
+    thousands : str, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    decimal : str, default '.'
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    lineterminator : str (length 1), optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    quotechar : str (length 1), optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    quoting : int or csv.QUOTE_* instance, default 0
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    doublequote : bool, default ``True``
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    escapechar : str (length 1), optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    comment : str, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    encoding : str, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    dialect : str or csv.Dialect, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    error_bad_lines : bool, default True
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    warn_bad_lines : bool, default True
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    delim_whitespace : bool, default False
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    low_memory : bool, default True
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    memory_map : bool, default False
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
+    float_precision : str, optional
+        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
     """
     def __init__(self, *args, **kwargs):
         self._read(**kwargs)
         self.is_pair = False
         self.class_labels = list(set([sample[1] for sample in self.dataset]))
-        # class_labels = None
         self.metric = Accuracy()
         super(CustomTSVClassificationTask, self).__init__(self.class_labels, self.metric, self.is_pair)
 
@@ -169,7 +247,7 @@ class CustomTSVClassificationTask(AbstractGlueTask):
 
         Returns
         -------
-        TSVDataset : the dataset of target segment.
+        The dataset of target segment.
         """
         if segment == 'train':
             return SampledDataset(self.dataset, self.train_sampler)
@@ -180,63 +258,31 @@ class CustomTSVClassificationTask(AbstractGlueTask):
 
     def _read(self, **kwargs):
         path = kwargs.get('filepath', None)
-        print('_read path: %s !!!' % path)
         kwargs['filepath_or_buffer'] = path
         kwargs.pop("filepath")
         dataset_df = pd.read_csv(**kwargs)
-        # dataset_df = load_pd.load(path)
-        print('_read dataset_df !!!')
-        print(len(dataset_df))
         dataset_df_lst = dataset_df.values.tolist()
-        print('_read dataset_df_lst !!!')
-        print(type(dataset_df_lst))
-        # pool = mp.Pool(processes=(mp.cpu_count() - 1))
-        # dataset_df_lst = [1,2,3]
         self.dataset = gluon.data.SimpleDataset(dataset_df_lst)
-        # # self.dataset = pool.map(gluon.data.SimpleDataset(dataset_df_lst))
-        # # pool.close()
-        # # pool.join()
-        print('_read self.dataset !!!')
-        print(type(self.dataset))
-        print(len(self.dataset[0]))
-        print(self.dataset[0])
-        # import time
-        # time.sleep(10)
-        print('_read self.dataset[0] !!!')
         split_ratio = kwargs.get('split_ratio', None) if 'split_ratio' in kwargs else 0.8
         self.train_sampler, self.dev_sampler = get_split_samplers(self.dataset, split_ratio=split_ratio)
-        # self.dataset_train = self.dataset
-        # self.dataset_dev = self.dataset
 
     def dataset_train(self):
+        """Get the training segment of the dataset for the task.
+
+        Returns
+        -------
+        tuple of str, Dataset : the segment name, and the dataset.
+        """
         return 'train', self.get_dataset('train')
 
     def dataset_dev(self):
+        """Get the dev segment of the dataset for the task.
+
+        Returns
+        -------
+        tuple of str, Dataset : the segment name, and the dataset.
+        """
         return 'dev', self.get_dataset('dev')
-
-
-class TSVClassificationTask(AbstractGlueTask):
-    def __init__(self, *args, **kwargs): # passthrough arguments to TSVDataset
-        # (filename, field_separator=nlp.data.Splitter(','), num_discard_samples=1, field_indices=[2,1])
-        self.args = args
-        self.kwargs = kwargs
-        is_pair = False
-        class_labels = ['0', '1']
-        metric = CompositeEvalMetric()
-        metric.add(F1())
-        metric.add(Accuracy())
-        super(TSVClassificationTask, self).__init__(class_labels, metric, is_pair)
-        dataset = nlp.data.TSVDataset(*self.args, **self.kwargs)
-        # do the split
-        train_sampler, val_sampler = get_split_samplers(dataset, split_ratio=0.8)
-        self.trainset = SampledDataset(dataset, train_sampler)
-        self.valset = SampledDataset(dataset, val_sampler)
-
-    def dataset_train(self):
-        return 'train', self.trainset
-
-    def dataset_dev(self):
-        return 'dev', self.valset
 
 class MRPCTask(AbstractGlueTask):
     """The MRPC task on GLUE benchmark."""
