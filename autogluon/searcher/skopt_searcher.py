@@ -1,9 +1,5 @@
-import os
-import json
 import pickle
-import copy
 import logging
-from collections import OrderedDict
 
 from ..utils import warning_filter
 with warning_filter():
@@ -14,6 +10,7 @@ from .searcher import BaseSearcher
 
 __all__ = ['SKoptSearcher']
 logger = logging.getLogger(__name__)
+
 
 class SKoptSearcher(BaseSearcher):
     """SKopt Searcher that uses Bayesian optimization to suggest new hyperparameter configurations. 
@@ -113,8 +110,8 @@ class SKoptSearcher(BaseSearcher):
             try:
                 new_config_cs.is_valid_configuration()
                 new_config = new_config_cs.get_dictionary()
-                if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                    self._results[pickle.dumps(new_config)] = 0
+                if pickle.dumps(new_config) not in self._results.keys(): # have not encountered this config
+                    self._results[pickle.dumps(new_config)] = self._reward_while_pending()
                     return new_config
             except self.errors_tohandle:
                 pass
@@ -126,7 +123,7 @@ class SKoptSearcher(BaseSearcher):
                     new_config_cs.is_valid_configuration()
                     new_config = new_config_cs.get_dictionary()
                     if (pickle.dumps(new_config) not in self._results.keys()): # have not encountered this config
-                        self._results[pickle.dumps(new_config)] = 0
+                        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
                         return new_config
                 except self.errors_tohandle:
                     pass
@@ -145,7 +142,7 @@ class SKoptSearcher(BaseSearcher):
         """
         new_config_cs = self.configspace.get_default_configuration()
         new_config = new_config_cs.get_dictionary()
-        self._results[pickle.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
         
     def random_config(self):
@@ -155,21 +152,18 @@ class SKoptSearcher(BaseSearcher):
         new_config = self.configspace.sample_configuration().get_dictionary()
         while pickle.dumps(new_config) in self._results.keys():
             new_config = self.configspace.sample_configuration().get_dictionary()
-        self._results[pickle.dumps(new_config)] = 0
+        self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
 
     def update(self, config, reward, **kwargs):
         """Update the searcher with the newest metric report.
         """
-        super(SKoptSearcher, self).update(config, reward, **kwargs)
+        super().update(config, reward, **kwargs)
         try:
             self.bayes_optimizer.tell(self.config2skopt(config),
                                       -reward)  # provide negative reward since skopt performs minimization
         except self.errors_tohandle:
             logger.info("surrogate model not updated this trial")
-        logger.info(
-            'Finished Task with config: {} and reward: {}'.format(pickle.dumps(config), reward))
-        logger.info('Finished Task with config: {} and reward: {}'.format(pickle.dumps(config), reward))
 
     def config2skopt(self, config):
         """ Converts autogluon config (dict object) to skopt format (list object).

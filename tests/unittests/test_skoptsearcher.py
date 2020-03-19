@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore", message=".*skopt failed to produce new config,
 
 logger = logging.getLogger(__name__)
 
+
 def test_skoptsearcher():
     logger.debug('Start testing SKoptSearcher')
     random.seed(1)
@@ -69,6 +70,7 @@ def test_skoptsearcher():
     assert (max(skopt_reward_list) >= 0.6),"SKopt performed poorly"
     logger.debug('Test Finished.')
 
+
 def toy_reward(config):
     """ The reward function to maximize (ie. returns performance from a fake training trial).
     
@@ -83,5 +85,3 @@ def toy_reward(config):
         reward *= 2
     return reward
 
-if __name__ == '__main__':
-    test_skoptsearcher()

@@ -1,30 +1,27 @@
 import logging
 
 import mxnet as mx
-from mxnet import gluon, nd
+from mxnet import gluon
 
-from ...core.optimizer import *
-from ...core.optimizer import *
-from ...core import *
-from ...searcher import *
-from ...scheduler import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ..base import BaseTask
-
-from .dataset import *
-from .pipeline import train_object_detection
-from .utils import *
-from ...utils import update_params
-
+from .dataset import get_dataset
 from .detector import Detector
+from .pipeline import train_object_detection
+from .utils import get_network
+from ..base import BaseTask
+from ...core.decorator import sample_config
+from ...core.space import Categorical
+from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ...utils import update_params
 
 __all__ = ['ObjectDetection']
 
 logger = logging.getLogger(__name__)
 
+
 class ObjectDetection(BaseTask):
     """AutoGluon Task for detecting and locating objects in images
     """
+
     @staticmethod
     def Dataset(*args, **kwargs):
         """ Dataset of images in which to detect objects.
@@ -34,6 +31,7 @@ class ObjectDetection(BaseTask):
     @staticmethod
     def fit(dataset='voc',
             net=Categorical('mobilenet1.0'),
+            meta_arch='yolo3',
             lr=Categorical(5e-4, 1e-4),
             loss=gluon.loss.SoftmaxCrossEntropyLoss(),
             split_ratio=0.8,
@@ -64,6 +62,8 @@ class ObjectDetection(BaseTask):
             lr_decay_epoch='160,180',
             warmup_lr=0.0,
             warmup_epochs=2,
+            warmup_iters=1000,
+            warmup_factor=1. / 3.,
             momentum=0.9,
             wd=0.0005,
             log_interval=100,
@@ -88,7 +88,10 @@ class ObjectDetection(BaseTask):
         dataset : str or :class:`autogluon.task.ObjectDectection.Dataset`
             Training dataset containing images and corresponding object bounding boxes.
         net : str, :class:`autogluon.space.AutoGluonObject`
-            Which existing neural network models to consider as candidates.
+            Which existing neural network base models to consider as candidates.
+        meta_arch : str
+            Meta architecture of the model. Currently support YoloV3 (Default) and FasterRCNN.
+            YoloV3 is faster, while FasterRCNN is more accurate.
         lr : float or :class:`autogluon.space`
             The learning rate to use in each update of the neural network weights during training.
         loss : mxnet.gluon.loss
@@ -150,6 +153,11 @@ class ObjectDetection(BaseTask):
             Learning rate to use during warm up period at the start of training.
         warmup_epochs : int
             How many initial epochs constitute the "warm up" period of model training.
+        warmup_iters : int
+            How many initial iterations constitute the "warm up" period of model training.
+            This is used by R-CNNs
+        warmup_factor : float
+            warmup factor of target lr. initial lr starts from target lr * warmup_factor
         momentum : float or  :class:`autogluon.space`
             Momentum to use in optimization of neural network weights during training.
         wd : float or :class:`autogluon.space`
@@ -192,13 +200,15 @@ class ObjectDetection(BaseTask):
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         if ngpus_per_trial > get_gpu_count():
-            logger.warning("The number of requested GPUs is greater than the number of available GPUs.")
+            logger.warning(
+                "The number of requested GPUs is greater than the number of available GPUs.")
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
 
         train_object_detection.register_args(
+            meta_arch=meta_arch,
             dataset=dataset,
             net=net,
-            lr = lr,
+            lr=lr,
             loss=loss,
             num_gpus=ngpus_per_trial,
             batch_size=batch_size,
@@ -218,6 +228,8 @@ class ObjectDetection(BaseTask):
             lr_decay_epoch=lr_decay_epoch,
             warmup_lr=warmup_lr,
             warmup_epochs=warmup_epochs,
+            warmup_iters=warmup_iters,
+            warmup_factor=warmup_factor,
             momentum=momentum,
             wd=wd,
             log_interval=log_interval,
@@ -251,14 +263,13 @@ class ObjectDetection(BaseTask):
             scheduler_options.update({
                 'searcher': 'random',
                 'max_t': epochs,
-                'grace_period': grace_period if grace_period else epochs//4})
-                
+                'grace_period': grace_period if grace_period else epochs // 4})
         results = BaseTask.run_fit(train_object_detection, search_strategy,
                                    scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
         logger.info('The best config: {}'.format(results['best_config']))
 
-        model = get_network(args.net, dataset.init().get_classes(), mx.cpu(0))
+        model = get_network(args.meta_arch, args.net, dataset.init().get_classes(), mx.cpu(0))
         update_params(model, results.pop('model_params'))
         return Detector(model, results, checkpoint, args)

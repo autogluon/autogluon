@@ -1,13 +1,17 @@
-import copy, logging, time, math
-from pandas import DataFrame
-import pandas as pd
+import copy
+import logging
+import math
+import time
+
 import numpy as np
+import pandas as pd
+from pandas import DataFrame
 
 from .abstract_learner import AbstractLearner
+from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..trainer.auto_trainer import AutoTrainer
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
-from ..trainer.auto_trainer import AutoTrainer
-from ..constants import BINARY, MULTICLASS, REGRESSION
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +25,13 @@ class DefaultLearner(AbstractLearner):
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
                  problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False, trainer_type=AutoTrainer):
         super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold,
-            problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, is_trainer_present=is_trainer_present)
+                         problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, is_trainer_present=is_trainer_present)
         self.random_state = 0  # TODO: Add as input param
         self.trainer_type = trainer_type
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters= {'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, save_data=False, verbosity=2):
+            hyperparameters={'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, save_data=False, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -44,22 +48,22 @@ class DefaultLearner(AbstractLearner):
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
         if time_limit:
             self.time_limit = time_limit
-            logger.log(20, 'Beginning AutoGluon training ... Time limit = ' + str(time_limit) + 's')
+            logger.log(20, f'Beginning AutoGluon training ... Time limit = {str(time_limit)}s')
         else:
             self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
-        logger.log(20, 'AutoGluon will save models to %s' % self.path_context)
-        logger.log(20, 'Train Data Rows:    %s' % len(X))
-        logger.log(20, 'Train Data Columns: %s' % len(X.columns))
+        logger.log(20, f'AutoGluon will save models to {self.path}')
+        logger.log(20, f'Train Data Rows:    {len(X)}')
+        logger.log(20, f'Train Data Columns: {len(X.columns)}')
         if X_test is not None:
-            logger.log(20, 'Tuning Data Rows:    %s' % len(X_test))
-            logger.log(20, 'Tuning Data Columns: %s' % len(X_test.columns))
+            logger.log(20, f'Tuning Data Rows:    {len(X_test)}')
+            logger.log(20, f'Tuning Data Columns: {len(X_test.columns)}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_test, y_test, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_test, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, '\tData preprocessing and feature engineering runtime = ' + str(round(self.time_fit_preprocessing, 2)) + 's ...')
+        logger.log(20, f'\tData preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
         if time_limit:
             time_limit_trainer = time_limit - self.time_fit_preprocessing
         else:
@@ -95,7 +99,7 @@ class DefaultLearner(AbstractLearner):
         time_end = time.time()
         self.time_fit_training = time_end - time_preprocessing_end
         self.time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, 'AutoGluon training complete, total runtime = ' + str(round(self.time_fit_total, 2)) + 's ...')
+        logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
 
     def general_data_processing(self, X: DataFrame, X_test: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
@@ -103,19 +107,17 @@ class DefaultLearner(AbstractLearner):
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
         # if self.problem_type == MULTICLASS:
         #     X[self.label] = X[self.label].fillna('')
-        
+
         # Remove all examples with missing labels from this dataset:
-        n = len(X)
-        missinglabel_indicators = X[self.label].isna().tolist()
-        missinglabel_inds = [i for i,j in enumerate(missinglabel_indicators) if j]
+        missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
         if len(missinglabel_inds) > 0:
-            logger.warning("Warning: Ignoring %s (out of %s) training examples for which the label value in column '%s' is missing" % (len(missinglabel_inds),n, self.label))
-        X = X.drop(missinglabel_inds, axis=0)
+            logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
+            X = X.drop(missinglabel_inds, axis=0)
 
         if self.problem_type is None:
             self.problem_type = self.get_problem_type(X[self.label])
 
-        if X_test is not None and self.label in list(X_test.columns):
+        if X_test is not None and self.label in X_test.columns:
             # TODO: This is not an ideal solution, instead check if bagging and X_test exists with label, then merge them prior to entering general data processing.
             #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
             self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
@@ -169,11 +171,11 @@ class DefaultLearner(AbstractLearner):
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
         if new_threshold != threshold:
-            logger.warning('Warning: Updated label_count_threshold from %s to %s to avoid cutting too many classes.' % (threshold, new_threshold))
+            logger.warning(f'Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes.')
         if new_holdout_frac != holdout_frac:
-            logger.warning('Warning: Updated holdout_frac from %s to %s to avoid cutting too many classes.' % (holdout_frac, new_holdout_frac))
+            logger.warning(f'Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes.')
         if new_num_bagging_folds != num_bagging_folds:
-            logger.warning('Warning: Updated num_bagging_folds from %s to %s to avoid cutting too many classes.' % (num_bagging_folds, new_num_bagging_folds))
+            logger.warning(f'Warning: Updated num_bagging_folds from {num_bagging_folds} to {new_num_bagging_folds} to avoid cutting too many classes.')
         return new_threshold, new_holdout_frac, new_num_bagging_folds
 
     def _adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
@@ -240,11 +242,9 @@ class DefaultLearner(AbstractLearner):
             logger.debug("augment_rare_classes did not need to duplicate any data from rare classes")
             return X
 
-        invalid_classes = list(class_counts_invalid.index)
         aug_df = None
-        for clss in invalid_classes:
-            n_clss = class_counts_invalid[clss]
-            n_toadd = self.threshold - class_counts_invalid[clss]
+        for clss, n_clss in class_counts_invalid.iteritems():
+            n_toadd = self.threshold - n_clss
             clss_df = X.loc[X[self.label] == clss]
             if aug_df is None:
                 aug_df = clss_df[:0].copy()
@@ -253,7 +253,7 @@ class DefaultLearner(AbstractLearner):
             new_df = clss_df.copy()
             new_df = new_df[:remainder]
             while duplicate_times > 0:
-                logger.debug("Duplicating data from rare class: " + str(clss))
+                logger.debug(f"Duplicating data from rare class: {clss}")
                 duplicate_times -= 1
                 new_df = new_df.append(clss_df.copy())
             aug_df = aug_df.append(new_df.copy())

@@ -63,11 +63,15 @@ requirements = [
     'graphviz',
     'scikit-optimize',
     'catboost',
-    'boto3==1.9.187',
-    'lightgbm==2.3.0',
+    'boto3',
+    'lightgbm>=2.3.0,<3.0',
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0',
-    'scikit-learn==0.21.2',
+    'scikit-learn>=0.20.0',
+]
+
+test_requirements = [
+    'pytest',
 ]
 
 setup(
@@ -84,7 +88,7 @@ setup(
     packages=find_packages(exclude=('docs', 'tests', 'scripts')),
     zip_safe=True,
     include_package_data=True,
-    install_requires=requirements,
+    install_requires=requirements + test_requirements,
     python_requires=MIN_PYTHON_VERSION,
     package_data={'autogluon': [
         'LICENSE',

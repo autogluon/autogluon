@@ -1,8 +1,11 @@
 import mxnet as mx
+
 from .nets import get_network
+
 
 class Sample_params(object):
     propose = "Sample params"
+
     def __init__(self, *args):
         batch_size, num_gpus, num_workers = args
         self._batch_size = batch_size * max(1, num_gpus)
@@ -11,7 +14,7 @@ class Sample_params(object):
 
     @classmethod
     def tell_info(cls):
-        print("propose:",cls.propose)
+        print("propose:", cls.propose)
 
     @property
     def get_batchsize(self):
@@ -22,13 +25,15 @@ class Sample_params(object):
         return self._context
 
 
-class Getmodel_kwargs():
-    def __init__(self, context,
+class Getmodel_kwargs:
+    def __init__(self,
+                 context,
                  classes,
-                 model_name, model_teacher,
+                 model_name,
+                 model_teacher,
                  hard_weight,
-                 multi_precision,
                  hybridize,
+                 multi_precision=False,
                  use_pretrained=True,
                  use_gn=False,
                  last_gamma=False,
@@ -44,9 +49,11 @@ class Getmodel_kwargs():
             self._dtype = 'float16'
         else:
             self._dtype = 'float32'
+
         if use_gn:
             from gluoncv.nn import GroupNorm
             self._kwargs['norm_layer'] = GroupNorm
+
         if isinstance(model_name, str):
             if model_name.startswith('vgg'):
                 self._kwargs['batch_norm'] = batch_norm
@@ -57,18 +64,9 @@ class Getmodel_kwargs():
             self._kwargs['last_gamma'] = True
 
         if self._model_teacher is not None and self._hard_weight < 1.0:
-            self._distillation = True
+            self.distillation = True
         else:
-            self._distillation = False
-
-
-    @property
-    def get_kwargs(self):
-        return self._kwargs
-
-    @property
-    def distillation(self):
-        return self._distillation
+            self.distillation = False
 
     @property
     def dtype(self):
@@ -76,8 +74,7 @@ class Getmodel_kwargs():
 
     @property
     def get_teacher(self):
-        net_kwargs = self.get_kwargs
-        net = get_network(self._model_teacher, **net_kwargs)
+        net = get_network(self._model_teacher, **self._kwargs)
         net.cast(self._dtype)
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
@@ -85,10 +82,8 @@ class Getmodel_kwargs():
 
     @property
     def get_net(self):
-        net_kwargs = self.get_kwargs
-        net = get_network(self._model_name, **net_kwargs)
+        net = get_network(self._model_name, **self._kwargs)
         net.cast(self._dtype)
         if self._hybridize:
             net.hybridize(static_alloc=True, static_shape=True)
         return net
-

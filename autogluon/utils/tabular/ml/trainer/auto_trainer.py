@@ -3,8 +3,10 @@ import pandas as pd
 
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models
+from ..utils import generate_train_test_split
 
 logger = logging.getLogger(__name__)
+
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
@@ -33,7 +35,7 @@ class AutoTrainer(AbstractTrainer):
             y_test = None
         else:
             if (y_test is None) or (X_test is None):
-                X_train, X_test, y_train, y_test = self.generate_train_test_split(X_train, y_train, test_size=holdout_frac)
+                X_train, X_test, y_train, y_test = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac)
         self.train_multi_and_ensemble(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         # self.cleanup()
         # TODO: cleanup temp files, eg. those from HPO

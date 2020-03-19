@@ -2,25 +2,19 @@
 import os
 import pickle
 import logging
-import subprocess
 from warnings import warn
-from threading import Thread
 import multiprocessing as mp
 from collections import OrderedDict
-
-from distributed import worker_client
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
 from .reporter import *
-from ..utils import AutoGluonWarning, AutoGluonEarlyStop
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['TaskScheduler']
-
-
 
 
 class TaskScheduler(object):
@@ -142,7 +136,7 @@ class TaskScheduler(object):
 
         try:
             # start local progress
-            p = mp.Process(target=_worker, args=(return_list,gpu_ids, args))
+            p = CustomProcess(target=_worker, args=(return_list, gpu_ids, args))
             p.start()
             if 'reporter' in args:
                 cp = Communicator.Create(p, local_reporter, dist_reporter)

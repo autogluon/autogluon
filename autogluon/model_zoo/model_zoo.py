@@ -17,6 +17,7 @@ models = {
     'standford_dog_resnext101_64x4d': standford_dog_resnext101_64x4d,
     }
 
+
 def get_model(name, **kwargs):
     """Returns a pre-defined model by name
     Parameters
@@ -42,6 +43,7 @@ def get_model(name, **kwargs):
         raise ValueError('%s\n\t%s' % (str(name), '\n\t'.join(sorted(models.keys()))))
     return net
 
+
 def get_model_list():
     """Get the entire list of model names in model_zoo.
     Returns
@@ -49,4 +51,4 @@ def get_model_list():
     list of str
         Entire list of model names in model_zoo.
     """
-    return models.keys()
+    return list(models.keys()) + list(gcv.model_zoo.get_model_list())

@@ -1,4 +1,3 @@
-from ....core import *
 from .base import *
 from .voc import *
 from .coco import *

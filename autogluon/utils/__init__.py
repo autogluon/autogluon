@@ -16,4 +16,4 @@ from .file_helper import *
 from .plot_network import plot_network
 from .defaultdict import keydefaultdict
 from .util_decorator import classproperty
-
+from .custom_process import CustomProcess

@@ -1,9 +1,11 @@
+import time
 import logging
 import pickle
 import psutil
 import sys
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
+from ..abstract import model_trial
 from ...constants import REGRESSION
 from ..sklearn.sklearn_model import SKLearnModel
 from ....utils.exceptions import NotEnoughMemoryError
@@ -22,7 +24,8 @@ class KNNModel(SKLearnModel):
 
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns
-        X = X.drop(cat_columns, axis=1).fillna(0)  # TODO: Test if crash when all columns are categorical
+        X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
+        X = super().preprocess(X).fillna(0)
         return X
 
     def _set_default_params(self):
@@ -38,10 +41,10 @@ class KNNModel(SKLearnModel):
         spaces = {}
         return spaces
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, **kwargs):
         X_train = self.preprocess(X_train)
 
-        model_size_bytes = sys.getsizeof(pickle.dumps(X_train))
+        model_size_bytes = sys.getsizeof(pickle.dumps(X_train, protocol=4))
         expected_final_model_size_bytes = model_size_bytes * 2.1  # Roughly what can be expected of the final KNN model in memory size
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
@@ -55,11 +58,10 @@ class KNNModel(SKLearnModel):
         self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        # verbosity = kwargs.get('verbosity', 2)
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
-        hpo_results = {}
-        self.save()
+        fit_model_args = dict(X_train=X_train, Y_train=Y_train, **kwargs)
+        predict_proba_args = dict(X=X_test)
+        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=Y_test, time_start=time.time(), time_limit=None)
+        hpo_results = {'total_time': self.fit_time}
+        hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}
-
         return hpo_models, hpo_model_performances, hpo_results

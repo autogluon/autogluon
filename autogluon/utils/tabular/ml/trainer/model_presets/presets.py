@@ -1,7 +1,8 @@
 import logging
+import mxnet as mx
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
@@ -9,19 +10,21 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
+from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 
 
 def get_preset_models(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, name_suffix=''):
     if problem_type in [BINARY, MULTICLASS]:
         return get_preset_models_classification(path=path, problem_type=problem_type,
-                    objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
-                    hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+                                                objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
+                                                hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
     elif problem_type == REGRESSION:
         return get_preset_models_regression(path=path, problem_type=problem_type,
-                    objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune)
+                                            objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters,
+                                            hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
     else:
         raise NotImplementedError
 
@@ -40,7 +43,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
 
 
 def get_preset_models_classification(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
+                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
     # TODO: define models based on additional keys in hyperparameters
 
     models = []
@@ -95,10 +98,14 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
         # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func)
 
+    for model in models:
+        model.rename(model.name + name_suffix)
+
+    # TODO: Update name_suffix to only apply here so its not repeated code! Add .rename function to model
     return models
 
 
-def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False):
+def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
     models = []
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
@@ -145,4 +152,27 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
             models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
 
+    for model in models:
+        model.rename(model.name + name_suffix)
+
     return models
+
+
+
+def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
+    # print("Neural Net is currently the only model supported for multi-class distillation.")
+    models = []
+    # TODO: only NN supported for now. add other models. We use a big NN for distillation to ensure it has high capacity to approximate ensemble:
+    nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*2 + [512], 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
+    models.append(
+        TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
+                              objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
+    )
+    rf_options = {}
+    models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=REGRESSION, objective_func=soft_log_loss)
+    for model in models:
+        model.rename(model.name + name_suffix)
+    
+    return models
+
+

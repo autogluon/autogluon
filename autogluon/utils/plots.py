@@ -78,6 +78,7 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
                 Dict created during TabularPredictor.fit_summary().
                 Must at least contain key: 'model_performance'.
     """
+    save_path = output_directory + save_file if output_directory else None
     hidden_keys = []
     model_performancedict = results['model_performance']
     model_names = list(model_performancedict.keys())
@@ -85,13 +86,20 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
     model_types = [results['model_types'][key] for key in model_names]
     hidden_keys.append(model_types)
     model_hyperparams = [_formatDict(results['model_hyperparams'][key]) for key in model_names]
-    datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types,
-                'hyperparameters': model_hyperparams}
-    save_path = output_directory + save_file if output_directory else None
-    mousover_plot(datadict, attr_x='model_type', attr_y='performance',
-                  save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
-    if save_path is not None:
-        print("Plot summary of models saved to file: %s" % save_file)
+    datadict = {'performance': val_perfs, 'model': model_names, 'model_type': model_types, 'hyperparameters': model_hyperparams}
+    hpo_used = results['hyperparameter_tune']
+    if not hpo_used:  # currently, times are only stored without HPO
+        leaderboard = results['leaderboard'].copy()
+        leaderboard['fit_time'] = leaderboard['fit_time'].fillna(0)
+        leaderboard['pred_time_val'] = leaderboard['pred_time_val'].fillna(0)
+
+        datadict['inference_latency'] = [leaderboard['pred_time_val'][leaderboard['model'] == m].values[0] for m in model_names]
+        datadict['training_time'] = [leaderboard['fit_time'][leaderboard['model'] == m].values[0] for m in model_names]
+        mousover_plot(datadict, attr_x='inference_latency', attr_y='performance', attr_color='model_type', 
+                      save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
+    else:
+        mousover_plot(datadict, attr_x='model_type', attr_y='performance',
+                      save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
 
 def _formatDict(d):
     """ Returns dict as string with HTML new-line tags <br> between key-value pairs. """
@@ -130,7 +138,7 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         bokeh_imported = False
     
     if not bokeh_imported:
-        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. Please do: "pip install bokeh"')
+        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh"')
         return None
     
     n = len(datadict[attr_x])
@@ -171,6 +179,8 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
     
     if save_file is not None:
         output_file(save_file, title=plot_title)
+        print("Plot summary of models saved to file: %s" % save_file)
+    
     source = ColumnDataSource(datadict)
     TOOLS="crosshair,pan,wheel_zoom,box_zoom,reset,hover,previewsave"
     p = figure(title=plot_title, tools=TOOLS)
@@ -206,4 +216,4 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         p.add_layout(Legend(items=[LegendItem(label='Size of points based on "'+attr_size + '"')]), 'below')
     
     show(p)
-
+    

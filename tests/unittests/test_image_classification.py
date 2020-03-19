@@ -1,6 +1,7 @@
 import autogluon as ag
 from autogluon import ImageClassification as task
 
+
 def test_ensemble():
     dataset = task.Dataset(name='FashionMNIST')
     test_dataset = task.Dataset(name='FashionMNIST', train=False)
@@ -10,6 +11,7 @@ def test_ensemble():
                           verbose=False,
                           ensemble=2)
     test_acc = classifier.evaluate(test_dataset)
+
 
 def test_classifier_save_load():
     dataset = task.Dataset(name='FashionMNIST')
@@ -21,6 +23,3 @@ def test_classifier_save_load():
     classifier.save('classifier.ag')
     classifier2 = task.Classifier.load('classifier.ag')
     test_acc = classifier2.evaluate(test_dataset)
-
-if __name__ == '__main__':
-    test_ensemble()

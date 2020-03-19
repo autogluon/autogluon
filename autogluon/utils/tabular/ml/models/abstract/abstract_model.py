@@ -1,16 +1,21 @@
-import logging, time, pickle, os
+import copy
+import logging
+import os
+import time
+
 import numpy as np
 import pandas as pd
 
-from ...utils import get_pred_from_proba
-from ...constants import BINARY, REGRESSION
+from .model_trial import model_trial
+from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
+from ...tuning.feature_pruner import FeaturePruner
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows
+from .... import metrics
+from ....utils.loaders import load_pkl
+from ....utils.savers import save_pkl, save_json
 from ......core import Space, Categorical, List, NestedSpace
 from ......task.base import BasePredictor
-from .... import metrics
-from ....utils.decorators import calculate_time
-from ....utils.loaders import load_pkl
-from ....utils.savers import save_pkl
-from .model_trial import model_trial
+from ......scheduler.fifo import FIFOScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +23,9 @@ logger = logging.getLogger(__name__)
 # Methods useful for all models:
 def fixedvals_from_searchspaces(params):
     """ Converts any search space hyperparams in params dict into fixed default values. """
-    if np.any([isinstance(params[hyperparam], Space) for hyperparam in params]):
+    if any(isinstance(params[hyperparam], Space) for hyperparam in params):
         logger.warning("Attempting to fit model without HPO, but search space is provided. fit() will only consider default hyperparameter values from search space.")
-        bad_keys = [hyperparam for hyperparam in params if isinstance(params[hyperparam], Space)][:] # delete all keys which are of type autogluon Space
+        bad_keys = [hyperparam for hyperparam in params if isinstance(params[hyperparam], Space)][:]  # delete all keys which are of type autogluon Space
         params = params.copy()
         for hyperparam in bad_keys:
             params[hyperparam] = hp_default_value(params[hyperparam])
@@ -46,49 +51,58 @@ def hp_default_value(hp_value):
 
 class AbstractModel:
     model_file_name = 'model.pkl'
+    model_info_name = 'info.pkl'
+    model_info_json_name = 'info.json'
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
-        """ Creates a new model. 
+        """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs
                 name (str): name of subdirectory inside path where model will be saved
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values)
         """
         self.name = name
-        self.path = self.create_contexts(path + name + '/')
+        self.path_root = path
+        self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
+        self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func  # Note: we require higher values = better performance
+
         if stopping_metric is None:
             self.stopping_metric = self.objective_func
         else:
             self.stopping_metric = stopping_metric
-        self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
 
-        if type(self.objective_func) == metrics._ProbaScorer:
+        if isinstance(self.objective_func, metrics._ProbaScorer):
             self.metric_needs_y_pred = False
-        elif type(self.objective_func) == metrics._ThresholdScorer:
+        elif isinstance(self.objective_func, metrics._ThresholdScorer):
             self.metric_needs_y_pred = False
         else:
             self.metric_needs_y_pred = True
-        if type(self.stopping_metric) == metrics._ProbaScorer:
+
+        if isinstance(self.stopping_metric, metrics._ProbaScorer):
             self.stopping_metric_needs_y_pred = False
-        elif type(self.stopping_metric) == metrics._ThresholdScorer:
+        elif isinstance(self.stopping_metric, metrics._ThresholdScorer):
             self.stopping_metric_needs_y_pred = False
         else:
             self.stopping_metric_needs_y_pred = True
 
+        self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
         self.debug = debug
-        if type(model) == str:
-            self.model = self.load_model(model)
+
+        self.fit_time = None  # Time taken to fit in seconds (Training data)
+        self.predict_time = None  # Time taken to predict in seconds (Validation data)
+        self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
         self._set_default_params()
         self.nondefault_params = []
         if hyperparameters is not None:
             self.params.update(hyperparameters.copy())
-            self.nondefault_params = list(hyperparameters.keys())[:] # These are hyperparameters that user has specified.
+            self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
+        self.params_trained = dict()
 
     # Checks if model is ready to make predictions for final result
     def is_valid(self):
@@ -107,20 +121,34 @@ class AbstractModel:
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
+        self.path_suffix = self.name + os.path.sep
+        # TODO: This should be added in future once naming conventions have been standardized for WeightedEnsembleModel
+        # if self.path_suffix not in self.path:
+        #     raise ValueError('Expected path_suffix not in given path! Values: (%s, %s)' % (self.path_suffix, self.path))
+        self.path_root = self.path.rsplit(self.path_suffix, 1)[0]
 
-    def create_contexts(self, path_context):
+    @staticmethod
+    def create_contexts(path_context):
         path = path_context
         return path
+
+    def rename(self, name):
+        self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
+        self.name = name
 
     # Extensions of preprocess must act identical in bagged situations, otherwise test-time predictions will be incorrect
     # This means preprocess cannot be used for normalization
     # TODO: Add preprocess_stateful() to enable stateful preprocessing for models such as KNN
     def preprocess(self, X):
         if self.features is not None:
-            return X[self.features]
+            # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
+            if list(X.columns) != self.features:
+                return X[self.features]
+        else:
+            self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
         return X
 
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+    def fit(self, X_train, Y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
@@ -133,6 +161,7 @@ class AbstractModel:
     def predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
+
         if self.problem_type == REGRESSION:
             return self.model.predict(X)
 
@@ -150,16 +179,16 @@ class AbstractModel:
         else:
             return y_pred_proba[:, 1]
 
-    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None):
+    def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
         if eval_metric is None:
             eval_metric = self.objective_func
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
-            y_pred = self.predict(X=X)
+            y_pred = self.predict(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred)
         else:
-            y_pred_proba = self.predict_proba(X=X)
+            y_pred_proba = self.predict_proba(X=X, preprocess=preprocess)
             return eval_metric(y, y_pred_proba)
 
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
@@ -173,11 +202,7 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    # TODO: Add simple generic CV logic
-    def cv(self, X, y, k_fold=5):
-        raise NotImplementedError
-
-    def save(self, file_prefix ="", directory = None, return_filename=False, verbose=True):
+    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         if directory is None:
             directory = self.path
         file_name = directory + file_prefix + self.model_file_name
@@ -195,35 +220,56 @@ class AbstractModel:
             obj.set_contexts(path)
             return obj
 
-    @calculate_time
-    def debug_feature_gain(self, X_test, Y_test, model, features_to_use=None):
+    # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, **kwargs):
         sample_size = 10000
-        if len(X_test) > sample_size:
-            X_test = X_test.sample(sample_size, random_state=0)
-            Y_test = Y_test.loc[X_test.index]
+        if len(X) > sample_size:
+            X = X.sample(sample_size, random_state=0)
+            y = y.loc[X.index]
         else:
-            X_test = X_test.copy()
-            Y_test = Y_test.copy()
+            X = X.copy()
+            y = y.copy()
 
-        X_test.reset_index(drop=True, inplace=True)
-        Y_test.reset_index(drop=True, inplace=True)
-
-        X_test = model.preprocess(X_test)
+        if preprocess:
+            X = self.preprocess(X)
 
         if not features_to_use:
-            features = X_test.columns.values
+            features = X.columns.values
         else:
             features = features_to_use
+
+        feature_importance_quick_dict = self.get_model_feature_importance()
+        # TODO: Also consider banning features with close to 0 importance
+        # TODO: Consider adding 'golden' features if the importance is high enough to avoid unnecessary computation when doing feature selection
+        banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
+        features = [feature for feature in features if feature not in banned_features]
+
+        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False)
+
+        feature_importances = pd.Series(permutation_importance_dict)
+        results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features)
+        feature_importances = pd.concat([feature_importances, results_banned])
+        feature_importances = feature_importances.sort_values(ascending=False)
+
+        return feature_importances
+
+    # TODO: Consider repeating with different random seeds and averaging to increase confidence
+    # TODO: Optimize this
+    # TODO: Check memory usage to avoid OOM
+    # Compute feature importance via permutation importance
+    # Note: Expensive to compute
+    #  Time to compute is O(predict_time*num_features)
+    def compute_permutation_importance(self, X, y, features: list, preprocess=True) -> dict:
+        if preprocess:
+            X = self.preprocess(X)
+
         feature_count = len(features)
-
-        model_score_base = model.score(X=X_test, y=Y_test)
-
+        model_score_base = self.score(X=X, y=y, preprocess=False)
         model_score_diff = []
 
-        row_count = X_test.shape[0]
-        rand_shuffle = np.random.randint(0, row_count, size=row_count)
+        row_count = X.shape[0]
+        X_test_shuffled = shuffle_df_rows(X=X, seed=0)
 
-        X_test_shuffled = X_test.iloc[rand_shuffle].reset_index(drop=True)
         compute_count = 200
         indices = [x for x in range(0, feature_count, compute_count)]
 
@@ -232,28 +278,31 @@ class AbstractModel:
             if indice + compute_count > feature_count:
                 compute_count = feature_count - indice
 
-            logger.debug(indice)
-            x = [X_test.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
+            x = [X.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
             for j, val in enumerate(x):
-                feature = features[indice+j]
-                val[feature] = X_test_shuffled[feature]
+                feature = features[indice + j]
+                val[feature] = X_test_shuffled[feature].values
             X_test_raw = pd.concat(x, ignore_index=True)
-            if model.metric_needs_y_pred:
-                Y_pred = model.predict(X_test_raw, preprocess=False)
+
+            if self.metric_needs_y_pred:
+                Y_pred = self.predict(X_test_raw, preprocess=False)
             else:
-                Y_pred = model.predict_proba(X_test_raw, preprocess=False)
+                Y_pred = self.predict_proba(X_test_raw, preprocess=False)
+
             row_index = 0
             for j in range(compute_count):
                 row_index_end = row_index + row_count
                 Y_pred_cur = Y_pred[row_index:row_index_end]
                 row_index = row_index_end
-                score = model.objective_func(Y_test, Y_pred_cur)
+                score = self.objective_func(y, Y_pred_cur)
                 model_score_diff.append(model_score_base - score)
 
-        results = pd.Series(data=model_score_diff, index=features)
-        results = results.sort_values(ascending=False)
+        permutation_importance_dict = {feature: score_diff for feature, score_diff in zip(features, model_score_diff)}
+        return permutation_importance_dict
 
-        return results
+    # Custom feature importance values for a model (such as those calculated from training)
+    def get_model_feature_importance(self) -> dict:
+        return dict()
 
     def _get_default_searchspace(self, problem_type):
         return NotImplementedError
@@ -264,96 +313,170 @@ class AbstractModel:
         """
         def_search_space = self._get_default_searchspace(problem_type=self.problem_type).copy()
         # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
-        for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
-            _ = def_search_space.pop(key, None)
+        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
+            def_search_space.pop(key, None)
         if self.params is not None:
             self.params.update(def_search_space)
 
-    # After calling this function, model should be able to be fit as if it was new, as well as deep-copied.
-    def convert_to_template(self):
-        self.model = None
-        return self
+    # Hyperparameters of trained model
+    def get_trained_params(self):
+        trained_params = self.params.copy()
+        trained_params.update(self.params_trained)
+        return trained_params
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+    # After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
+    def convert_to_template(self):
+        model = self.model
+        self.model = None
+        template = copy.deepcopy(self)
+        template.reset_metrics()
+        self.model = model
+        return template
+
+    # After calling this function, model should be able to be fit without test data using the iterations trained by the original model
+    def convert_to_refitfull_template(self):
+        params_trained = self.params_trained.copy()
+        template = self.convert_to_template()
+        template.params.update(params_trained)
+        template.name = template.name + REFIT_FULL_SUFFIX
+        template.path = template.create_contexts(self.path + template.name + os.path.sep)
+        return template
+
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
         # verbosity = kwargs.get('verbosity', 2)
-        start_time = time.time()
+        time_start = time.time()
         logger.log(15, "Starting generic AbstractModel hyperparameter tuning for %s model..." % self.name)
         self._set_default_searchspace()
         params_copy = self.params.copy()
-        directory = self.path # also create model directory if it doesn't exist
+        directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3. Use tabular/utils/savers for datasets, add new function
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        scheduler_func = scheduler_options[0] # Unpack tuple
-        scheduler_options = scheduler_options[1]
+        scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
-        self.params['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
-        self.params['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
+        params_copy['num_threads'] = scheduler_options['resource'].get('num_cpus', None)
+        params_copy['num_gpus'] = scheduler_options['resource'].get('num_gpus', None)
         dataset_train_filename = 'dataset_train.p'
-        train_path = directory+dataset_train_filename
-        pickle.dump((X_train,Y_train), open(train_path, 'wb'))
-        if (X_test is not None) and (Y_test is not None):
-            dataset_val_filename = 'dataset_val.p'
-            val_path = directory+dataset_val_filename
-            pickle.dump((X_test,Y_test), open(val_path, 'wb'))
-        else:
-            dataset_val_filename = None
-        if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
+        train_path = directory + dataset_train_filename
+        save_pkl.save(path=train_path, object=(X_train, Y_train))
+
+        dataset_val_filename = 'dataset_val.p'
+        val_path = directory + dataset_val_filename
+        save_pkl.save(path=val_path, object=(X_test, Y_test))
+
+        if not any(isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")
         else:
             logger.log(15, "Hyperparameter search space for %s model: " % self.name)
             for hyperparam in params_copy:
                 if isinstance(params_copy[hyperparam], Space):
-                    logger.log(15, str(hyperparam)+ ":   " +str(params_copy[hyperparam]))
+                    logger.log(15, f"{hyperparam}:   {params_copy[hyperparam]}")
 
-        model_trial.register_args(dataset_train_filename=dataset_train_filename,
-            dataset_val_filename=dataset_val_filename, directory=directory, model=self, **params_copy)
-        scheduler = scheduler_func(model_trial, **scheduler_options)
+        util_args = dict(
+            dataset_train_filename=dataset_train_filename,
+            dataset_val_filename=dataset_val_filename,
+            directory=directory,
+            model=self,
+            time_start=time_start,
+            time_limit=scheduler_options['time_out'],
+        )
+
+        model_trial.register_args(util_args=util_args, **params_copy)
+        scheduler: FIFOScheduler = scheduler_func(model_trial, **scheduler_options)
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             # This is multi-machine setting, so need to copy dataset to workers:
             logger.log(15, "Uploading data to remote workers...")
-            scheduler.upload_files([train_path, val_path]) # TODO: currently does not work.
-            directory = self.path # TODO: need to change to path to working directory used on every remote machine
+            scheduler.upload_files([train_path, val_path])  # TODO: currently does not work.
+            directory = self.path  # TODO: need to change to path to working directory used on every remote machine
             model_trial.update(directory=directory)
             logger.log(15, "uploaded")
 
         scheduler.run()
         scheduler.join_jobs()
+
+        return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+
+    def _get_hpo_results(self, scheduler, scheduler_options, time_start):
         # Store results / models from this HPO run:
-        best_hp = scheduler.get_best_config() # best_hp only contains searchable stuff
-        hpo_results = {'best_reward': scheduler.get_best_reward(),
-                       'best_config': best_hp,
-                       'total_time': time.time() - start_time,
-                       'metadata': scheduler.metadata,
-                       'training_history': scheduler.training_history,
-                       'config_history': scheduler.config_history,
-                       'reward_attr': scheduler._reward_attr,
-                       'args': model_trial.args
-                      }
-        hpo_results = BasePredictor._format_results(hpo_results) # results summarizing HPO for this model
+        best_hp = scheduler.get_best_config()  # best_hp only contains searchable stuff
+        hpo_results = {
+            'best_reward': scheduler.get_best_reward(),
+            'best_config': best_hp,
+            'total_time': time.time() - time_start,
+            'metadata': scheduler.metadata,
+            'training_history': scheduler.training_history,
+            'config_history': scheduler.config_history,
+            'reward_attr': scheduler._reward_attr,
+            'args': model_trial.args
+        }
+
+        hpo_results = BasePredictor._format_results(hpo_results)  # results summarizing HPO for this model
         if ('dist_ip_addrs' in scheduler_options) and (len(scheduler_options['dist_ip_addrs']) > 0):
             raise NotImplementedError("need to fetch model files from remote Workers")
             # TODO: need to handle locations carefully: fetch these files and put them into self.path directory:
             # 1) hpo_results['trial_info'][trial]['metadata']['trial_model_file']
-        hpo_models = {} # stores all the model names and file paths to model objects created during this HPO run.
+
+        hpo_models = {}  # stores all the model names and file paths to model objects created during this HPO run.
         hpo_model_performances = {}
         for trial in sorted(hpo_results['trial_info'].keys()):
             # TODO: ignore models which were killed early by scheduler (eg. in Hyperband). How to ID these?
-            file_id = "trial_"+str(trial) # unique identifier to files from this trial
-            file_prefix = file_id + "_"
-            trial_model_name = self.name+"_"+file_id
-            trial_model_path = self.path + file_prefix
+            file_id = "trial_" + str(trial)  # unique identifier to files from this trial
+            trial_model_name = self.name + os.path.sep + file_id
+            trial_model_path = self.path_root + trial_model_name + os.path.sep
             hpo_models[trial_model_name] = trial_model_path
             hpo_model_performances[trial_model_name] = hpo_results['trial_info'][trial][scheduler._reward_attr]
 
         logger.log(15, "Time for %s model HPO: %s" % (self.name, str(hpo_results['total_time'])))
-        self.params.update(best_hp)
-        # TODO: reload model params from best trial? Do we want to save this under cls.model_file as the "optimal model"
         logger.log(15, "Best hyperparameter configuration for %s model: " % self.name)
         logger.log(15, str(best_hp))
-        return (hpo_models, hpo_model_performances, hpo_results)
-        # TODO: do final fit here?
-        # args.final_fit = True
-        # final_model = scheduler.run_with_config(best_config)
-        # save(final_model)
+        return hpo_models, hpo_model_performances, hpo_results
+
+    def feature_prune(self, X_train, X_holdout, Y_train, Y_holdout):
+        feature_pruner = FeaturePruner(model_base=self)
+        X_train, X_test, y_train, y_test = generate_train_test_split(X_train, Y_train, problem_type=self.problem_type, test_size=0.2)
+        feature_pruner.tune(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, X_holdout=X_holdout, y_holdout=Y_holdout)
+        features_to_keep = feature_pruner.features_in_iter[feature_pruner.best_iteration]
+        logger.debug(str(features_to_keep))
+        self.features = features_to_keep
+
+    # Resets metrics for the model
+    def reset_metrics(self):
+        self.fit_time = None
+        self.predict_time = None
+        self.val_score = None
+        self.params_trained = dict()
+
+    def get_info(self):
+        info = dict(
+            name=self.name,
+            model_type=type(self).__name__,
+            problem_type=self.problem_type,
+            eval_metric=self.objective_func.name,
+            stopping_metric=self.stopping_metric.name,
+            fit_time=self.fit_time,
+            predict_time=self.predict_time,
+            val_score=self.val_score,
+            hyperparameters=self.params,
+            hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
+            hyperparameters_nondefault=self.nondefault_params,
+        )
+        return info
+
+    @classmethod
+    def load_info(cls, path, load_model_if_required=True):
+        load_path = path + cls.model_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except:
+            if load_model_if_required:
+                model = cls.load(path=path, reset_paths=True)
+                return model.get_info()
+            else:
+                raise
+
+    def save_info(self):
+        info = self.get_info()
+
+        save_pkl.save(path=self.path + self.model_info_name, object=info)
+        json_path = self.path + self.model_info_json_name
+        save_json.save(path=json_path, obj=info)
+        return info
