@@ -185,7 +185,7 @@ def generate_csv(inds, path):
         writer.writerow(row)
         id = 1
         for ind in inds:
-            row = [id, ind.asscalar()]
+            row = [id, ind]
             writer = csv.writer(csvFile)
             writer.writerow(row)
             id += 1
