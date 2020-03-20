@@ -1,6 +1,8 @@
 
 
-![AutoGluon](https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png)
+<div align="left">
+  <img src="https://user-images.githubusercontent.com/16392542/77208906-224aa500-6aba-11ea-96bd-e81806074030.png" width="410">
+</div>
 
 ## AutoML Toolkit for Deep Learning
 
