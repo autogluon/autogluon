@@ -59,7 +59,7 @@ class TabularPrediction(BaseTask):
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
             auto_stack=False, hyperparameter_tune=False, feature_prune=False, holdout_frac=None,
             num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters=None, enable_fit_continuation=False,
+            hyperparameters=None, cache_data=True,
             time_limits=None, num_trials=None, search_strategy='random', search_options=None,
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
             verbosity=2, **kwargs):
@@ -166,9 +166,9 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
-        enable_fit_continuation : bool, default = False
-            Whether the predictor returned by this `fit()` call should be able to be further trained via another future `fit()` call.
+        cache_data : bool, default = True
             When enabled, the training and validation data are saved to disk for future reuse.
+            Enables advanced functionality in the resulting Predictor object such as feature importance calculation on the original data.
         time_limits : int
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
@@ -247,7 +247,8 @@ class TabularPrediction(BaseTask):
             'feature_generator_kwargs',
             'trainer_type',
             'label_count_threshold',
-            'id_columns'
+            'id_columns',
+            'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -268,9 +269,13 @@ class TabularPrediction(BaseTask):
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
-        if enable_fit_continuation:
-        #     enable_fit_continuation = False  # TODO: Add fit_continue function to enable this
-            logger.log(30, 'Warning: `enable_fit_continuation=True` is an experimental feature, it is recommended to set to `False` unless you are developing AutoGluon.')
+        # TODO: Remove on 0.1.0 release
+        if 'enable_fit_continuation' in kwargs.keys():
+            logger.log(30, 'Warning: `enable_fit_continuation` is a deprecated parameter. It has been renamed to `cache_data`. Starting from AutoGluon 0.1.0, specifying `enable_fit_continuation` as a parameter will cause an exception.')
+            logger.log(30, 'Setting `cache_data` value equal to `enable_fit_continuation` value.')
+            cache_data = kwargs['enable_fit_continuation']
+        if not cache_data:
+            logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
@@ -381,5 +386,5 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=enable_fit_continuation, verbosity=verbosity)
+                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, verbosity=verbosity)
         return TabularPredictor(learner=learner)

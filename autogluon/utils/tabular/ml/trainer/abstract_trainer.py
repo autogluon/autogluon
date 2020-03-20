@@ -831,7 +831,8 @@ class AbstractTrainer:
 
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
-    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True):
+    # TODO: Consider limiting X to 10k rows here instead of inside the model call
+    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, silent=False):
         if model is None:
             model = self.model_best
         model: AbstractModel = self.load_model(model)
@@ -868,15 +869,15 @@ class AbstractTrainer:
                 X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
 
         if y is None and X is not None:
-            if isinstance(model, BaggedEnsembleModel):
+            if is_oof:
                 y = self.load_y_train()
             else:
                 y = self.load_y_val()
 
         if raw:
-            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features)
+            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, silent=silent)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, is_oof=is_oof)
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, is_oof=is_oof, silent=silent)
         return feature_importance
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model
@@ -888,12 +889,29 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, model, X, y, features_to_use=None):
+    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, silent=False):
+        time_start = time.time()
         model: AbstractModel = self.load_model(model)
         if features_to_use is None:
             features_to_use = list(X.columns)
+        feature_count = len(features_to_use)
 
+        if not silent:
+            logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
+
+        sample_size = 10000
+        if len(X) > sample_size:
+            X = X.sample(sample_size, random_state=0)
+            y = y.loc[X.index]
+
+        time_start_score = time.time()
         score_baseline = self.score(X=X, y=y, model=model)
+        time_score = time.time() - time_start_score
+
+        if not silent:
+            time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
+            logger.log(20, f'\tExpected runtime: {time_estimated}s')
+
         X_shuffled = shuffle_df_rows(X=X, seed=0)
 
         # Assuming X_test or X_val
@@ -907,6 +925,10 @@ class AbstractTrainer:
             score_diff = score_baseline - score_feature
             permutation_importance_dict[feature] = score_diff
         feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
+
+        if not silent:
+            logger.log(20, f'\tActual runtime:   {time.time() - time_start}s')
+
         return feature_importances
 
     def get_models_load_info(self, model_names):
