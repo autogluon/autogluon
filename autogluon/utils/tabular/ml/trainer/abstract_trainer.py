@@ -832,7 +832,7 @@ class AbstractTrainer:
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
     # TODO: Consider limiting X to 10k rows here instead of inside the model call
-    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, silent=False):
+    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, subsample_size=10000, silent=False):
         if model is None:
             model = self.model_best
         model: AbstractModel = self.load_model(model)
@@ -875,9 +875,9 @@ class AbstractTrainer:
                 y = self.load_y_val()
 
         if raw:
-            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, silent=silent)
+            feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, silent=silent)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, is_oof=is_oof, silent=silent)
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
         return feature_importance
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model
@@ -889,7 +889,7 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, silent=False):
+    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, subsample_size=10000, silent=False):
         time_start = time.time()
         model: AbstractModel = self.load_model(model)
         if features_to_use is None:
@@ -899,9 +899,8 @@ class AbstractTrainer:
         if not silent:
             logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
 
-        sample_size = 10000
-        if len(X) > sample_size:
-            X = X.sample(sample_size, random_state=0)
+        if (subsample_size is not None) and (len(X) > subsample_size):
+            X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
 
         time_start_score = time.time()

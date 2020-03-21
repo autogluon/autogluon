@@ -225,10 +225,9 @@ class AbstractModel:
             return obj
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, silent=False, **kwargs):
-        sample_size = 10000
-        if len(X) > sample_size:
-            X = X.sample(sample_size, random_state=0)
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs):
+        if (subsample_size is not None) and (len(X) > subsample_size):
+            X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
         else:
             X = X.copy()

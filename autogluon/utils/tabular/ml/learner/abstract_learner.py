@@ -459,7 +459,7 @@ class AbstractLearner:
     # model: model (str) to get feature importances for, if None will choose best model.
     # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
     # raw: Whether to compute feature importance on raw original features or on the features used by the particular model.
-    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, raw=True, silent=False) -> Series:
+    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, raw=True, subsample_size=10000, silent=False) -> Series:
         if X is not None:
             if y is None:
                 X, y = self.extract_label(X)
@@ -468,7 +468,7 @@ class AbstractLearner:
         else:
             y = None
         trainer = self.load_trainer()
-        return trainer.get_feature_importance(X=X, y=y, model=model, features=features, raw=raw, silent=silent)
+        return trainer.get_feature_importance(X=X, y=y, model=model, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output

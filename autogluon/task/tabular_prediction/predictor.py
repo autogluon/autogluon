@@ -318,7 +318,7 @@ class TabularPredictor(BasePredictor):
         return results
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
-    def feature_importance(self, model=None, dataset=None, features=None, raw=True, silent=False):
+    def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
         """
         Calculates feature importance scores for the given model.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -346,6 +346,11 @@ class TabularPredictor(BasePredictor):
             Whether to compute feature importance on raw features in the original data (after automated feature engineering) or on the features used by the particular model.
             For example, a stacker model uses both the original features and the predictions of the lower-level models.
             Note that for bagged models, feature importance calculation is not yet supported when both `raw=True` and `dataset=None`. Doing so will raise an exception.
+        subsample_size : int, default = 10000
+            The number of rows to sample from `dataset` when computing feature importance.
+            If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
+            Larger values increase the accuracy of the feature importance scores.
+            Runtime linearly scales with `subsample_size`.
         silent : bool, default = False
             Whether to suppress logging output
 
@@ -357,7 +362,7 @@ class TabularPredictor(BasePredictor):
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, silent=silent)
+        return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
