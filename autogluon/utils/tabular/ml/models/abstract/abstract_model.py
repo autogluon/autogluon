@@ -277,7 +277,7 @@ class AbstractModel:
 
         if not silent:
             time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
-            logger.log(20, f'\tExpected runtime: {time_estimated}s')
+            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
 
         model_score_diff = []
 
@@ -323,7 +323,7 @@ class AbstractModel:
         permutation_importance_dict = {feature: score_diff for feature, score_diff in zip(features, model_score_diff)}
 
         if not silent:
-            logger.log(20, f'\tActual runtime:   {time.time() - time_start}s')
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
 
         return permutation_importance_dict
 

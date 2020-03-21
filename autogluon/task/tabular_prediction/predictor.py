@@ -354,6 +354,9 @@ class TabularPredictor(BasePredictor):
         Pandas `pandas.Series` of feature importance scores.
 
         """
+        if (dataset is None) and (not self._trainer.is_data_saved):
+            raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
+
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, silent=silent)
 
     @classmethod

@@ -843,7 +843,7 @@ class AbstractTrainer:
             if isinstance(model, WeightedEnsembleModel):
                 if self.bagged_mode:
                     if raw:
-                        raise AssertionError('raw feature importance on the original training data is not supported when bagging is enabled, please specify new test data to compute raw feature importances.')
+                        raise AssertionError('Raw feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute raw feature importances.')
                     X = None
                     is_oof = True
                 else:
@@ -854,7 +854,7 @@ class AbstractTrainer:
                     is_oof = False
             elif isinstance(model, BaggedEnsembleModel):
                 if raw:
-                    raise AssertionError('raw feature importance on the original training data is not supported when bagging is enabled, please specify new test data to compute raw feature importances.')
+                    raise AssertionError('Raw feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute raw feature importances.')
                 X = self.load_X_train()
                 X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=True)
                 is_oof = True
@@ -910,7 +910,7 @@ class AbstractTrainer:
 
         if not silent:
             time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
-            logger.log(20, f'\tExpected runtime: {time_estimated}s')
+            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
 
         X_shuffled = shuffle_df_rows(X=X, seed=0)
 
@@ -927,7 +927,7 @@ class AbstractTrainer:
         feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
 
         if not silent:
-            logger.log(20, f'\tActual runtime:   {time.time() - time_start}s')
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
 
         return feature_importances
 
