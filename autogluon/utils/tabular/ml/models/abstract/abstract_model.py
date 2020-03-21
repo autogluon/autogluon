@@ -1,7 +1,11 @@
 import copy
 import logging
 import os
+import math
 import time
+import pickle
+import psutil
+import sys
 
 import numpy as np
 import pandas as pd
@@ -221,10 +225,9 @@ class AbstractModel:
             return obj
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, **kwargs):
-        sample_size = 10000
-        if len(X) > sample_size:
-            X = X.sample(sample_size, random_state=0)
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs):
+        if (subsample_size is not None) and (len(X) > subsample_size):
+            X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
         else:
             X = X.copy()
@@ -244,7 +247,7 @@ class AbstractModel:
         banned_features = [feature for feature, importance in feature_importance_quick_dict.items() if importance == 0 and feature in features]
         features = [feature for feature in features if feature not in banned_features]
 
-        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False)
+        permutation_importance_dict = self.compute_permutation_importance(X=X, y=y, features=features, preprocess=False, silent=silent)
 
         feature_importances = pd.Series(permutation_importance_dict)
         results_banned = pd.Series(data=[0 for _ in range(len(banned_features))], index=banned_features)
@@ -255,22 +258,41 @@ class AbstractModel:
 
     # TODO: Consider repeating with different random seeds and averaging to increase confidence
     # TODO: Optimize this
-    # TODO: Check memory usage to avoid OOM
     # Compute feature importance via permutation importance
     # Note: Expensive to compute
     #  Time to compute is O(predict_time*num_features)
-    def compute_permutation_importance(self, X, y, features: list, preprocess=True) -> dict:
+    def compute_permutation_importance(self, X, y, features: list, preprocess=True, silent=False) -> dict:
+        time_start = time.time()
+
+        feature_count = len(features)
+        if not silent:
+            logger.log(20, f'Computing permutation importance for {feature_count} features on {self.name} ...')
         if preprocess:
             X = self.preprocess(X)
 
-        feature_count = len(features)
+        time_start_score = time.time()
         model_score_base = self.score(X=X, y=y, preprocess=False)
+        time_score = time.time() - time_start_score
+
+        if not silent:
+            time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
+            logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
+
         model_score_diff = []
 
         row_count = X.shape[0]
         X_test_shuffled = shuffle_df_rows(X=X, seed=0)
 
-        compute_count = 200
+        X_memory_ratio_max = 0.2
+        compute_count_max = 200
+
+        X_size_bytes = sys.getsizeof(pickle.dumps(X, protocol=4))
+        available_mem = psutil.virtual_memory().available
+        X_memory_ratio = X_size_bytes / available_mem
+
+        compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
+
+        compute_count = max(1, (min(compute_count_max, compute_count_safe)))
         indices = [x for x in range(0, feature_count, compute_count)]
 
         # TODO: Make this faster by multi-threading?
@@ -298,6 +320,10 @@ class AbstractModel:
                 model_score_diff.append(model_score_base - score)
 
         permutation_importance_dict = {feature: score_diff for feature, score_diff in zip(features, model_score_diff)}
+
+        if not silent:
+            logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
+
         return permutation_importance_dict
 
     # Custom feature importance values for a model (such as those calculated from training)

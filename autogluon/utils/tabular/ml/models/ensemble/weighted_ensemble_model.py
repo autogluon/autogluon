@@ -40,6 +40,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
         return weights_dict
 
     def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, **kwargs):
+        logger.warning('Warning: non-raw feature importance calculation is not valid for weighted ensemble since it does not have features, returning ensemble weights instead...')
         if is_oof:
             feature_importance = pd.Series(self._get_model_weights()).sort_values(ascending=False)
         else:

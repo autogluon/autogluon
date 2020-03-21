@@ -84,6 +84,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+                Valid models are listed in this `predictor` by calling `predictor.model_names`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -112,6 +113,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
+                Valid models are listed in this `predictor` by calling `predictor.model_names`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False).
                 Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
@@ -315,6 +317,53 @@ class TabularPredictor(BasePredictor):
             print("*** End of fit() summary ***")
         return results
 
+    # TODO: Consider adding time_limit option to early stop the feature importance process
+    def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
+        """
+        Calculates feature importance scores for the given model.
+        A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
+        A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
+        The higher the score a feature has, the more important it is to the model's performance.
+        If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
+        Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
+        To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
+
+        Parameters
+        ----------
+        model : str, default = None
+            Model to get feature importances for, if None the best model is chosen.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`
+        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+            This Dataset must also contain the label-column with the same column-name as specified during fit().
+            If specified, then the dataset is used to calculate the feature importance scores.
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If not specified, the original dataset used during fit() will be used if `cache_data=True`. Otherwise, an exception will be raised.
+            Do not pass the training data through this argument, as the feature importance scores calculated will be inaccurate.
+        features : list, default = None
+            List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
+            If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
+        raw : bool, default = True
+            Whether to compute feature importance on raw features in the original data (after automated feature engineering) or on the features used by the particular model.
+            For example, a stacker model uses both the original features and the predictions of the lower-level models.
+            Note that for bagged models, feature importance calculation is not yet supported when both `raw=True` and `dataset=None`. Doing so will raise an exception.
+        subsample_size : int, default = 10000
+            The number of rows to sample from `dataset` when computing feature importance.
+            If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
+            Larger values increase the accuracy of the feature importance scores.
+            Runtime linearly scales with `subsample_size`.
+        silent : bool, default = False
+            Whether to suppress logging output
+
+        Returns
+        -------
+        Pandas `pandas.Series` of feature importance scores.
+
+        """
+        if (dataset is None) and (not self._trainer.is_data_saved):
+            raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
+
+        return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
+
     @classmethod
     def load(cls, output_directory, verbosity=2):
         """
@@ -349,7 +398,7 @@ class TabularPredictor(BasePredictor):
             (we do not recommend modifying the Predictor object yourself as it tracks many trained models).
         """
         self._learner.save()
-        logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(%s)" % self.output_directory)
+        logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.output_directory)
 
     @staticmethod
     def _summarize(key, msg, results):
