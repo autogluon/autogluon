@@ -915,14 +915,17 @@ class AbstractTrainer:
 
         # Assuming X_test or X_val
         # TODO: Can check multiple features at a time only if non-OOF
-        # TODO: Consider having X_to_check reassign values instead of creating new for each feature
         permutation_importance_dict = dict()
+        X_to_check = X.copy()
+        last_processed = None
         for feature in features_to_use:
-            X_to_check = X.copy()
+            if last_processed is not None:  # resetting original values
+                X_to_check[last_processed] = X[last_processed].values
             X_to_check[feature] = X_shuffled[feature].values
             score_feature = self.score(X=X_to_check, y=y, model=model)
             score_diff = score_baseline - score_feature
             permutation_importance_dict[feature] = score_diff
+            last_processed = feature
         feature_importances = pd.Series(permutation_importance_dict).sort_values(ascending=False)
 
         if not silent:
