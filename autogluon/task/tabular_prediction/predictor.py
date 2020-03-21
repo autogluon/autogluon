@@ -84,6 +84,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
+                Valid models are listed in this `predictor` by calling `predictor.model_names`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -112,6 +113,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
+                Valid models are listed in this `predictor` by calling `predictor.model_names`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False).
                 Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
@@ -319,10 +321,10 @@ class TabularPredictor(BasePredictor):
     def feature_importance(self, model=None, dataset=None, features=None, raw=True, silent=False):
         """
         Calculates feature importance scores for the given model.
-        Feature scores represent the score reduction the model achieves when the provided data's feature is randomly shuffled among its rows.
-        A score of 0.01 would indicate that the score dropped by 0.01 when the feature was randomly shuffled.
+        A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
+        A feature score of 0.01 would indicate that the predictive performance dropped by 0.01 when the feature was randomly shuffled.
         The higher the score a feature has, the more important it is to the model's performance.
-        If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better score.
+        If a feature has a negative score, this means that the feature is likely harmful to the final model, and a model trained with the feature removed would be expected to achieve a better predictive performance.
         Note that calculating feature importance can be a very computationally expensive process, particularly if the model uses hundreds or thousands of features. In many cases, this can take longer than the original model training.
         To estimate how long `feature_importance(model, dataset, features)` will take, it is roughly the time taken by `predict_proba(dataset, model)` multiplied by the number of features.
 
@@ -330,6 +332,7 @@ class TabularPredictor(BasePredictor):
         ----------
         model : str, default = None
             Model to get feature importances for, if None the best model is chosen.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`
         dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
             This Dataset must also contain the label-column with the same column-name as specified during fit().
             If specified, then the dataset is used to calculate the feature importance scores.
@@ -338,9 +341,11 @@ class TabularPredictor(BasePredictor):
             Do not pass the training data through this argument, as the feature importance scores calculated will be inaccurate.
         features : list, default = None
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
+            If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
         raw : bool, default = True
-            Whether to compute feature importance on raw original features (after automated feature engineering) or on the features used by the particular model.
-            Note that for bagged models, feature importance calculation is not supported when both `raw=True` and `dataset=None`. Doing so will raise an exception.
+            Whether to compute feature importance on raw features in the original data (after automated feature engineering) or on the features used by the particular model.
+            For example, a stacker model uses both the original features and the predictions of the lower-level models.
+            Note that for bagged models, feature importance calculation is not yet supported when both `raw=True` and `dataset=None`. Doing so will raise an exception.
         silent : bool, default = False
             Whether to suppress logging output
 
