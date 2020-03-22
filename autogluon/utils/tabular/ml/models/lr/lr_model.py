@@ -49,23 +49,10 @@ class LRModel(AbstractModel):
             self.features = list(df.columns)
 
         types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'language': []}
-        # continuous = numeric features to rescale
-        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
-        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        one_hot_threshold = 2 if len(language_featnames) > 0 else 10000
-        for feature in self.features:
-            feature_data = df[feature]
-            num_unique_vals = len(feature_data.unique())
-            if feature in language_featnames:
-                types_of_features['language'].append(feature)
-            elif feature in continuous_featnames:
-                if np.abs(feature_data.skew()) > self.params['proc.skew_threshold']:
-                    types_of_features['skewed'].append(feature)
-                else:
-                    types_of_features['continuous'].append(feature)
-            elif (feature in categorical_featnames) and (num_unique_vals <= one_hot_threshold):
-                types_of_features['onehot'].append(feature)
-        return types_of_features
+        return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
+
+    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+        raise NotImplementedError()
 
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
@@ -166,3 +153,53 @@ class LRModel(AbstractModel):
         hpo_models = {self.name: self.path}
 
         return hpo_models, hpo_model_performances, hpo_results
+
+
+class LRModelAll(LRModel):
+    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+        # continuous = numeric features to rescale
+        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
+        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
+        one_hot_threshold = 2 if len(language_featnames) > 0 else 10000
+        for feature in self.features:
+            feature_data = df[feature]
+            num_unique_vals = len(feature_data.unique())
+            if feature in language_featnames:
+                types_of_features['language'].append(feature)
+            elif feature in continuous_featnames:
+                if np.abs(feature_data.skew()) > self.params['proc.skew_threshold']:
+                    types_of_features['skewed'].append(feature)
+                else:
+                    types_of_features['continuous'].append(feature)
+            elif (feature in categorical_featnames) and (num_unique_vals <= one_hot_threshold):
+                types_of_features['onehot'].append(feature)
+        return types_of_features
+
+
+class LRModelNLP(LRModel):
+    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+        for feature in self.features:
+            if feature in language_featnames:
+                types_of_features['language'].append(feature)
+        return types_of_features
+
+
+class LRModelPlain(LRModel):
+    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+        # continuous = numeric features to rescale
+        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
+        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
+        one_hot_threshold = 2 if len(language_featnames) > 0 else 10000
+        for feature in self.features:
+            feature_data = df[feature]
+            num_unique_vals = len(feature_data.unique())
+            if feature in continuous_featnames:
+                if '__nlp__' in feature:
+                    continue
+                if np.abs(feature_data.skew()) > self.params['proc.skew_threshold']:
+                    types_of_features['skewed'].append(feature)
+                else:
+                    types_of_features['continuous'].append(feature)
+            elif (feature in categorical_featnames) and (num_unique_vals <= one_hot_threshold):
+                types_of_features['onehot'].append(feature)
+        return types_of_features

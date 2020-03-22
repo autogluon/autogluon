@@ -337,10 +337,10 @@ class TabularPrediction(BaseTask):
                'CAT': {'iterations': 10000},
                'RF': {'n_estimators': 300},
                'XT': {'n_estimators': 300},
-               'LR': {'C': 1},
                'KNN': {},
                'custom': ['GBM'],
-             }
+                'LR': {'C': 1},
+            }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
