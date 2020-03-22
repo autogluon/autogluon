@@ -6,7 +6,6 @@ from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
 from ...models.lr.lr_model import LRModelNLP, LRModelPlain
-from ...models.lr.lr_model import LRModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel

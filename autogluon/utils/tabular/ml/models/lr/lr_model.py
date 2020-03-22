@@ -58,6 +58,7 @@ class LRModel(AbstractModel):
         """ Returns crude categorization of feature types """
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
+    # TODO: handle collinear features - they will impact results quality
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000):
         X = X.copy()
         feature_types = self._get_types_of_features(X)
