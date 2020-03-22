@@ -339,7 +339,7 @@ class TabularPrediction(BaseTask):
                'XT': {'n_estimators': 300},
                'KNN': {},
                'custom': ['GBM'],
-                'LR': {'C': 1},
+                # 'LR': {'C': 1}, # Enable linear models
             }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
