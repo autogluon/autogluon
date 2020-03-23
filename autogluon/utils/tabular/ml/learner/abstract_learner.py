@@ -124,10 +124,7 @@ class AbstractLearner:
 
         if len(X_test_cache_miss) > 0:
             y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False, sample=sample)
-            if self.trainer_problem_type is not None:
-                problem_type = self.trainer_problem_type
-            else:
-                problem_type = self.problem_type
+            problem_type = self.trainer_problem_type or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_test_cache_miss.index
@@ -332,6 +329,22 @@ class AbstractLearner:
             pred_probas_time_lst.append(time_diff)
         return pred_probas_lst, pred_probas_time_lst
 
+    def _remove_missing_labels(self, y_true, y_pred):
+        """Removes missing labels and produces warning if any are found."""
+        if self.problem_type == REGRESSION:
+            non_missing_boolean_mask = [(y is not None and not np.isnan(y)) for y in y_true]
+        else:
+            non_missing_boolean_mask = [(y is not None and y != '') for y in y_true]
+
+        n_missing = len([x for x in non_missing_boolean_mask if not x])
+        if n_missing > 0:
+            y_true = y_true[non_missing_boolean_mask]
+            y_pred = y_pred[non_missing_boolean_mask]
+            warnings.warn(f"There are {n_missing} (out of {len(y_true)}) evaluation datapoints for which the label is missing. "
+                          f"AutoGluon removed these points from the evaluation, which thus may not be entirely representative. "
+                          f"You should carefully study why there are missing labels in your evaluation data.")
+        return y_true, y_pred
+
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions.
             Args:
@@ -343,73 +356,64 @@ class AbstractLearner:
             Returns single performance-value if auxiliary_metrics=False.
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
+        assert isinstance(y_true, (np.ndarray, pd.Series))
+        assert isinstance(y_pred, (np.ndarray, pd.Series))
 
-        # Remove missing labels and produce warning if any are found:
-        if self.problem_type == REGRESSION:
-            missing_indicators = [(y is None or np.isnan(y)) for y in y_true]
-        else:
-            missing_indicators = [(y is None or y == '') for y in y_true]
-        missing_inds = [i for i, j in enumerate(missing_indicators) if j]
-        if len(missing_inds) > 0:
-            nonmissing_inds = [i for i, j in enumerate(missing_indicators) if not j]
-            y_true = y_true[nonmissing_inds]
-            y_pred = y_pred[nonmissing_inds]
-            warnings.warn(f"There are {len(missing_inds)} (out of {len(y_true)}) evaluation datapoints for which the label is missing. "
-                          f"AutoGluon removed these points from the evaluation, which thus may not be entirely representative. "
-                          f"You should carefully study why there are missing labels in your evaluation data.")
-
-        perf = self.objective_func(y_true, y_pred)
+        y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
+        performance = self.objective_func(y_true, y_pred)
         metric = self.objective_func.name
+
         if not high_always_good:
             sign = self.objective_func._sign
-            perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+            performance = performance * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+
         if not silent:
-            logger.log(20, f"Evaluation: {metric} on test data: {perf}")
+            logger.log(20, f"Evaluation: {metric} on test data: {performance}")
+
         if not auxiliary_metrics:
-            return perf
+            return performance
 
         # Otherwise compute auxiliary metrics:
-        perf_dict = OrderedDict({metric: perf})
-        if self.problem_type == REGRESSION:  # Additional metrics: R^2, Mean-Absolute-Error, Pearson correlation
+        auxiliary_metrics = []
+        if self.problem_type == REGRESSION:  # Adding regression metrics
             pearson_corr = lambda x, y: corrcoef(x, y)[0][1]
             pearson_corr.__name__ = 'pearson_correlation'
-            regression_metrics = [
+            auxiliary_metrics += [
                 mean_absolute_error, explained_variance_score, r2_score, pearson_corr, mean_squared_error, median_absolute_error,
                 # max_error
             ]
-            for reg_metric in regression_metrics:
-                metric_name = reg_metric.__name__
-                if metric_name not in perf_dict:
-                    perf_dict[metric_name] = reg_metric(y_true, y_pred)
-        else:  # Compute classification metrics
-            classif_metrics = [accuracy_score, balanced_accuracy_score, matthews_corrcoef]
+        else:  # Adding classification metrics
+            auxiliary_metrics += [accuracy_score, balanced_accuracy_score, matthews_corrcoef]
             if self.problem_type == BINARY:  # binary-specific metrics
                 # def auc_score(y_true, y_pred): # TODO: this requires y_pred to be probability-scores
                 #     fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label)
                 #   return auc(fpr, tpr)
                 f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
                 f1micro_score.__name__ = f1_score.__name__
-                classif_metrics += [f1micro_score]  # TODO: add auc?
+                auxiliary_metrics += [f1micro_score]  # TODO: add auc?
             elif self.problem_type == MULTICLASS:  # multiclass metrics
-                classif_metrics += []  # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
-            for cl_metric in classif_metrics:
-                metric_name = cl_metric.__name__
-                if metric_name not in perf_dict:
-                    perf_dict[metric_name] = cl_metric(y_true, y_pred)
+                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
+
+        performance_dict = OrderedDict({metric: performance})
+        for metric_function in auxiliary_metrics:
+            metric_name = metric_function.__name__
+            if metric_name not in performance_dict:
+                performance_dict[metric_name] = metric_function(y_true, y_pred)
 
         if not silent:
             logger.log(20, "Evaluations on test data:")
-            logger.log(20, json.dumps(perf_dict, indent=4))
+            logger.log(20, json.dumps(performance_dict, indent=4))
+
         if detailed_report and (self.problem_type != REGRESSION):
             # One final set of metrics to report
             cl_metric = lambda y_true, y_pred: classification_report(y_true, y_pred, output_dict=True)
-            metric_name = cl_metric.__name__
-            if metric_name not in perf_dict:
-                perf_dict[metric_name] = cl_metric(y_true, y_pred)
+            metric_name = 'classification_report'
+            if metric_name not in performance_dict:
+                performance_dict[metric_name] = cl_metric(y_true, y_pred)
                 if not silent:
                     logger.log(20, "Detailed (per-class) classification report:")
-                    logger.log(20, json.dumps(perf_dict[metric_name], indent=4))
-        return perf_dict
+                    logger.log(20, json.dumps(performance_dict[metric_name], indent=4))
+        return performance_dict
 
     def extract_label(self, X):
         if self.label not in list(X.columns):
@@ -495,22 +499,26 @@ class AbstractLearner:
         if len(y) == 0:
             raise ValueError("provided labels cannot have length = 0")
         y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
-        unique_vals = y.unique()
         num_rows = len(y)
-        # print(unique_vals)
-        logger.log(20, f'Here are the first 10 unique label values in your data:  {unique_vals[:10]}')
-        unique_count = len(unique_vals)
+
+        unique_values = y.unique()
+        unique_count = len(unique_values)
+        logger.log(20, f'Here are the first 10 unique label values in your data:  {unique_values[:10]}')
+
         MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
         if num_rows > 1000:
             REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
         else:
             REGRESS_THRESHOLD = 0.1
 
-        if len(unique_vals) == 2:
+        if unique_count == 2:
             problem_type = BINARY
             reason = "only two unique label-values observed"
-        elif np.issubdtype(unique_vals.dtype, np.floating):
-            unique_ratio = len(unique_vals) / float(len(y))
+        elif unique_values.dtype == 'object':
+            problem_type = MULTICLASS
+            reason = "dtype of label-column == object"
+        elif np.issubdtype(unique_values.dtype, np.floating):
+            unique_ratio = unique_count / float(num_rows)
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 try:
                     can_convert_to_int = np.array_equal(y, y.astype(int))
@@ -526,11 +534,8 @@ class AbstractLearner:
             else:
                 problem_type = REGRESSION
                 reason = "dtype of label-column == float and many unique label-values observed"
-        elif unique_vals.dtype == 'object':
-            problem_type = MULTICLASS
-            reason = "dtype of label-column == object"
-        elif np.issubdtype(unique_vals.dtype, np.integer):
-            unique_ratio = len(unique_vals) / float(len(y))
+        elif np.issubdtype(unique_values.dtype, np.integer):
+            unique_ratio = unique_count / float(num_rows)
             if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
                 problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
                 reason = "dtype of label-column == int, but few unique label-values observed"
@@ -538,9 +543,10 @@ class AbstractLearner:
                 problem_type = REGRESSION
                 reason = "dtype of label-column == int and many unique label-values observed"
         else:
-            raise NotImplementedError('label dtype', unique_vals.dtype, 'not supported!')
-        logger.log(25, "AutoGluon infers your prediction problem is: %s  (because %s)" % (problem_type, reason))
-        logger.log(25, "If this is wrong, please specify `problem_type` argument in fit() instead (You may specify problem_type as one of: ['%s', '%s', '%s'])\n" % (BINARY, MULTICLASS, REGRESSION))
+            raise NotImplementedError('label dtype', unique_values.dtype, 'not supported!')
+        logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
+        logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
+                       f"(You may specify problem_type as one of: [{BINARY, MULTICLASS, REGRESSION}])\n")
         return problem_type
 
     def save(self):
