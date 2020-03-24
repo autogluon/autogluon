@@ -7,7 +7,6 @@ from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMet
 import gluonnlp as nlp
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
-# from gluonnlp.data.utils import (Splitter, concat_sequence, line_splitter, whitespace_splitter)
 from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 from ...utils.tabular.utils.loaders import load_pd
@@ -28,7 +27,7 @@ def get_dataset(name=None, *args, **kwargs):
     """
     path = kwargs.get('filepath', None)
     if path is not None:
-        if '.tsv' or '.csv' in path:
+        if path.endswith('.tsv') or path.endswith('.csv'):
             return CustomTSVClassificationTask(*args, **kwargs)
         else:
             raise NotImplementedError
@@ -131,8 +130,6 @@ class CustomTSVClassificationTask(AbstractGlueTask):
         Any valid string path is acceptable.
     sep : str
         Delimiter to use.
-    delimiter : str, default ``None``
-        Alias for sep.
     header : int, list of int, default 'infer'
         Row number(s) to use as the column names, and the start of the
         data.
@@ -141,93 +138,7 @@ class CustomTSVClassificationTask(AbstractGlueTask):
     index_col : int, str, sequence of int / str, or False, default ``None``
     usecols : list-like or callable, optional
         Return a subset of the columns.
-    squeeze : bool, default False
-    prefix : str, optional
-        Prefix to add to column numbers when no header, e.g. 'X' for X0, X1, ...
-    mangle_dupe_cols : bool, default True
-        Duplicate columns will be specified as 'X', 'X.1', ...'X.N', rather than
-        'X'...'X'. Passing in False will cause data to be overwritten if there
-        are duplicate names in the columns.
-    dtype : Type name or dict of column -> type, optional
-        Data type for data or columns.
-    engine : {{'c', 'python'}}, optional
-        Parser engine to use.
-    converters : dict, optional
-        Dict of functions for converting values in certain columns. Keys can either
-        be integers or column labels.
-    true_values : list, optional
-        Values to consider as True.
-    false_values : list, optional
-        Values to consider as False.
-    skipinitialspace : bool, default False
-        Skip spaces after delimiter.
-    skiprows : list-like, int or callable, optional
-        Line numbers to skip (0-indexed) or number of lines to skip (int)
-        at the start of the file.
-        If callable, the callable function will be evaluated against the row
-        indices, returning True if the row should be skipped and False otherwise.
-        An example of a valid callable argument would be ``lambda x: x in [0, 2]``.
-    skipfooter : int, default 0
-        Number of lines at bottom of file to skip (Unsupported with engine='c').
-    nrows : int, optional
-        Number of rows of file to read. Useful for reading pieces of large files.
-    na_values : scalar, str, list-like, or dict, optional
-    keep_default_na : bool, default True
-        Whether or not to include the default NaN values when parsing the data.
-    na_filter : bool, default True
-        Detect missing value markers (empty strings and the value of na_values).
-    verbose : bool, default False
-        Indicate number of NA values placed in non-numeric columns.
-    skip_blank_lines : bool, default True
-        If True, skip over blank lines rather than interpreting as NaN values.
-    parse_dates : bool or list of int or names or list of lists or dict
-    infer_datetime_format : bool, default False
-    keep_date_col : bool, default False
-        If True and `parse_dates` specifies combining multiple columns then
-        keep the original columns.
-    date_parser : function, optional
-        Function to use for converting a sequence of string columns to an array of
-        datetime instances.
-    dayfirst : bool, default False
-        DD/MM format dates, international and European format.
-    cache_dates : bool, default True
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    iterator : bool, default False
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    chunksize : int, optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    compression : {{'infer', 'gzip', 'bz2', 'zip', 'xz', None}}, default 'infer'
-    thousands : str, optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    decimal : str, default '.'
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    lineterminator : str (length 1), optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    quotechar : str (length 1), optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    quoting : int or csv.QUOTE_* instance, default 0
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    doublequote : bool, default ``True``
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    escapechar : str (length 1), optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    comment : str, optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    encoding : str, optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    dialect : str or csv.Dialect, optional
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    error_bad_lines : bool, default True
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    warn_bad_lines : bool, default True
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    delim_whitespace : bool, default False
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    low_memory : bool, default True
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    memory_map : bool, default False
-        See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
-    float_precision : str, optional
+    For our keyword argument, plesase see
         See <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
     """
     def __init__(self, *args, **kwargs):
