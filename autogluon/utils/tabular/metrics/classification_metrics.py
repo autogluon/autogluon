@@ -17,15 +17,19 @@ def balanced_accuracy(solution, prediction):
         pass
 
     elif y_type == 'multiclass':
-        # Need to create a multiclass solution and a multiclass predictions
-        max_class = int(np.max((np.max(solution), np.max(prediction))))
-        solution_binary = np.zeros((len(solution), max_class + 1))
-        prediction_binary = np.zeros((len(prediction), max_class + 1))
-        for i in range(len(solution)):
-            solution_binary[i, int(solution[i])] = 1
-            prediction_binary[i, int(prediction[i])] = 1
-        solution = solution_binary
-        prediction = prediction_binary
+        n = len(solution)
+        unique_sol, encoded_sol = np.unique(solution, return_inverse=True)
+        unique_pred, encoded_pred = np.unique(prediction, return_inverse=True)
+        classes = np.unique(np.concatenate((unique_sol, unique_pred)))
+        map_sol = np.array([np.where(classes==c)[0][0] for c in unique_sol])
+        map_pred = np.array([np.where(classes==c)[0][0] for c in unique_pred])
+        # one hot encoding
+        sol_ohe = np.zeros((n, len(classes)))
+        pred_ohe = np.zeros((n, len(classes)))
+        sol_ohe[np.arange(n), map_sol[encoded_sol]] = 1
+        pred_ohe[np.arange(n), map_pred[encoded_pred]] = 1
+        solution = sol_ohe
+        prediction = pred_ohe
 
     elif y_type == 'multilabel-indicator':
         solution = solution.toarray()
