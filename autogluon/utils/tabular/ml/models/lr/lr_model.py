@@ -16,7 +16,7 @@ from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataP
 logger = logging.getLogger(__name__)
 
 
-class LRModel(AbstractModel):
+class AbstractLinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None,
                  feature_types_metadata=None, debug=0):
@@ -82,44 +82,41 @@ class LRModel(AbstractModel):
         X = X.copy()
         feature_types = self._get_types_of_features(X)
         if is_train:
-            transformer_list = []
-
-            if len(feature_types['language']) > 0:
-                pipeline = Pipeline(steps=[
-                    ("preparator", NlpDataPreprocessor(nlp_cols=feature_types['language'])),
-                    ("vectorizer",
-                     TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self.tokenize))
-                ])
-                transformer_list.append(('vect', pipeline))
-
-            if len(feature_types['onehot']) > 0:
-                pipeline = Pipeline(steps=[
-                    ('generator', OheFeaturesGenerator(cats_cols=feature_types['onehot'])),
-                ])
-                transformer_list.append(('cats', pipeline))
-
-            if len(feature_types['continuous']) > 0:
-                pipeline = Pipeline(steps=[
-                    ('generator', NumericDataPreprocessor(cont_cols=feature_types['continuous'])),
-                    ('imputer', SimpleImputer(strategy=self.params['proc.impute_strategy'])),
-                    ('scaler', StandardScaler())
-                ])
-                transformer_list.append(('cont', pipeline))
-
-            if len(feature_types['skewed']) > 0:
-                pipeline = Pipeline(steps=[
-                    ('generator', NumericDataPreprocessor(cont_cols=feature_types['skewed'])),
-                    ('imputer', SimpleImputer(strategy=self.params['proc.impute_strategy'])),
-                    ('quantile', QuantileTransformer(output_distribution='normal')),  # Or output_distribution = 'uniform'
-                ])
-                transformer_list.append(('skew', pipeline))
-
-            self.pipeline = FeatureUnion(transformer_list=transformer_list)
-            self.pipeline.fit(X)
-
+            self.preprocess_train(X, feature_types, vect_max_features)
         X = self.pipeline.transform(X)
 
         return X
+
+    def preprocess_train(self, X, feature_types, vect_max_features):
+        transformer_list = []
+        if len(feature_types['language']) > 0:
+            pipeline = Pipeline(steps=[
+                ("preparator", NlpDataPreprocessor(nlp_cols=feature_types['language'])),
+                ("vectorizer",
+                 TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self.tokenize))
+            ])
+            transformer_list.append(('vect', pipeline))
+        if len(feature_types['onehot']) > 0:
+            pipeline = Pipeline(steps=[
+                ('generator', OheFeaturesGenerator(cats_cols=feature_types['onehot'])),
+            ])
+            transformer_list.append(('cats', pipeline))
+        if len(feature_types['continuous']) > 0:
+            pipeline = Pipeline(steps=[
+                ('generator', NumericDataPreprocessor(cont_cols=feature_types['continuous'])),
+                ('imputer', SimpleImputer(strategy=self.params['proc.impute_strategy'])),
+                ('scaler', StandardScaler())
+            ])
+            transformer_list.append(('cont', pipeline))
+        if len(feature_types['skewed']) > 0:
+            pipeline = Pipeline(steps=[
+                ('generator', NumericDataPreprocessor(cont_cols=feature_types['skewed'])),
+                ('imputer', SimpleImputer(strategy=self.params['proc.impute_strategy'])),
+                ('quantile', QuantileTransformer(output_distribution='normal')),  # Or output_distribution = 'uniform'
+            ])
+            transformer_list.append(('skew', pipeline))
+        self.pipeline = FeatureUnion(transformer_list=transformer_list)
+        self.pipeline.fit(X)
 
     def _set_default_params(self):
         default_params = {
@@ -163,7 +160,7 @@ class LRModel(AbstractModel):
         return hpo_models, hpo_model_performances, hpo_results
 
 
-class LRModelAll(LRModel):
+class LinearModel(AbstractLinearModel):
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
@@ -184,7 +181,7 @@ class LRModelAll(LRModel):
         return types_of_features
 
 
-class LRModelNLP(LRModel):
+class LinearModelOnlyTextFeatures(AbstractLinearModel):
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         for feature in self.features:
             if feature in language_featnames:
@@ -192,7 +189,7 @@ class LRModelNLP(LRModel):
         return types_of_features
 
 
-class LRModelPlain(LRModel):
+class LinearModelNoTextFeatures(AbstractLinearModel):
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization

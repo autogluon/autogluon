@@ -5,7 +5,7 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
-from ...models.lr.lr_model import LRModelNLP, LRModelPlain
+from ...models.lr.lr_model import LinearModelNoTextFeatures, LinearModelOnlyTextFeatures
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
@@ -91,7 +91,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
         )
     if lr_options is not None:
         models.append(
-            LRModelPlain(path=path, name='LinearRegressionPlain', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
+            LinearModelNoTextFeatures(path=path, name='LinearModelNoTextFeatures', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
