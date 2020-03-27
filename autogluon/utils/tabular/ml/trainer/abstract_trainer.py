@@ -1,6 +1,7 @@
 import copy, time, traceback, logging
 import os
 from typing import List
+import networkx as nx
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
@@ -102,6 +103,7 @@ class AbstractTrainer:
         self.model_fit_times = {}
         self.model_pred_times = {}
         self.models = {}
+        self.model_graph = nx.DiGraph()
         self.reset_paths = False
 
         self.hpo_results = {}  # Stores summary of HPO process
@@ -322,6 +324,10 @@ class AbstractTrainer:
         self.model_fit_times[model.name] = model.fit_time
         self.model_pred_times[model.name] = model.predict_time
         if model.is_valid():
+            self.model_graph.add_node(model.name, fit_time=model.fit_time, predict_time=model.predict_time, val_score=model.val_score)
+            if isinstance(model, StackerEnsembleModel):
+                for base_model_name in model.base_model_names:
+                    self.model_graph.add_edge(base_model_name, model.name)
             if model.name not in stack_loc[level]:
                 stack_loc[level].append(model.name)
             if self.model_best_core is None:
@@ -936,26 +942,50 @@ class AbstractTrainer:
         model_types = {model_name: self.model_types[model_name] for model_name in model_names}
         return model_names, model_paths, model_types
 
-    # TODO: Add pred_time_val_full (Will be incorrect unless graph representation is added)
+    # Sums the attribute value across all models that the provided model depends on, including itself.
+    # For instance, this function can return the expected total predict_time of a model.
+    # attribute is the name of the desired attribute to be summed.
+    def get_model_attribute_full(self, model, attribute):
+        base_model_set = self.get_minimum_model_set(model)
+        if len(base_model_set) == 1:
+            return self.model_graph.nodes[base_model_set[0]][attribute]
+        attribute_full = 0
+        for base_model in base_model_set:
+            attribute_full += self.model_graph.nodes[base_model][attribute]
+        return attribute_full
+
+    # Gets the minimum set of models that the provided model depends on, including itself
+    # Returns a list of model names
+    def get_minimum_model_set(self, model):
+        if not isinstance(model, str):
+            model = model.name
+        return list(nx.bfs_tree(self.model_graph, model, reverse=True))
+
     def leaderboard(self):
         model_names = self.get_model_names_all()
         score_val = []
         fit_time = []
         pred_time_val = []
         stack_level = []
+        fit_time_full = []
+        pred_time_val_full = []
         for model_name in model_names:
             score_val.append(self.model_performance.get(model_name))
             fit_time.append(self.model_fit_times.get(model_name))
+            fit_time_full.append(self.get_model_attribute_full(model=model_name, attribute='fit_time'))
             pred_time_val.append(self.model_pred_times.get(model_name))
+            pred_time_val_full.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
+            'fit_time_full': fit_time_full,
+            'pred_time_val_full': pred_time_val_full,
             'fit_time': fit_time,
             'pred_time_val': pred_time_val,
             'stack_level': stack_level,
         })
-        df_sorted = df.sort_values(by=['score_val', 'model'], ascending=False)
+        df_sorted = df.sort_values(by=['score_val', 'pred_time_val_full', 'model'], ascending=[False, True, False]).reset_index(drop=True)
         return df_sorted
 
     def get_info(self, include_model_info=False):

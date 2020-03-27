@@ -180,7 +180,7 @@ class TabularPredictor(BasePredictor):
     def leaderboard(self, dataset=None, silent=False):
         """
             Output summary of information about models produced during fit() as a pandas DataFrame.
-            Includes information on test and validation scores for all models, model training times and stack levels.
+            Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
 
             Parameters
             ----------

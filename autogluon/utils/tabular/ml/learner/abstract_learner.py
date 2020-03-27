@@ -202,7 +202,7 @@ class AbstractLearner:
             return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, silent=False):
+    def score_debug(self, X: DataFrame, y=None, compute_oracle=False, silent=False):
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -218,8 +218,6 @@ class AbstractLearner:
         max_level_to_check = trainer.get_max_level_all()
         scores = {}
         pred_times = {}
-        pred_times_full = {}
-        pred_time_offset = 0
         pred_probas = None
         stack_names = list(trainer.models_level.keys())
         stack_names_not_core = [name for name in stack_names if name != 'core']
@@ -234,7 +232,6 @@ class AbstractLearner:
                     for i, model_name in enumerate(model_names_aux):
                         pred_proba = pred_probas_auxiliary[i]
                         pred_times[model_name] = pred_probas_time_auxiliary[i]
-                        pred_times_full[model_name] = pred_probas_time_auxiliary[i] + pred_time_offset
                         if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                             pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
 
@@ -250,7 +247,6 @@ class AbstractLearner:
                 for i, model_name in enumerate(model_names_core):
                     pred_proba = pred_probas[i]
                     pred_times[model_name] = pred_probas_time[i]
-                    pred_times_full[model_name] = pred_probas_time[i] + pred_time_offset
                     if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                         pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
 
@@ -259,24 +255,39 @@ class AbstractLearner:
                         scores[model_name] = self.objective_func(y, pred)
                     else:
                         scores[model_name] = self.objective_func(y, pred_proba)
-                pred_time_offset += sum(pred_probas_time)
 
-                ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.objective_func)
-                ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
-                oracle_weights = ensemble_selection.weights_
-                oracle_pred_time_start = time.time()
-                oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
-                oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
-                if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                    oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
-                oracle_pred_time = time.time() - oracle_pred_time_start
-                pred_times[f'oracle_ensemble_l' + str(level + 1)] = oracle_pred_time
-                pred_times_full['oracle_ensemble_l' + str(level + 1)] = oracle_pred_time + pred_time_offset
-                if trainer.objective_func_expects_y_pred:
-                    oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
-                    scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_ensemble)
+                if compute_oracle:
+                    ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.objective_func)
+                    ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
+                    oracle_weights = ensemble_selection.weights_
+                    oracle_pred_time_start = time.time()
+                    oracle_pred_proba_norm = [pred * weight for pred, weight in zip(pred_probas, oracle_weights)]
+                    oracle_pred_proba_ensemble = np.sum(oracle_pred_proba_norm, axis=0)
+                    if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
+                        oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
+                    oracle_pred_time = time.time() - oracle_pred_time_start
+                    pred_times[f'oracle_ensemble_l' + str(level + 1)] = oracle_pred_time
+                    if trainer.objective_func_expects_y_pred:
+                        oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
+                        scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_ensemble)
+                    else:
+                        scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_proba_ensemble)
+
+        pred_time_full = {}
+        all_trained_models = trainer.get_model_names_all()
+        # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
+        for model in scores.keys():
+            if model in all_trained_models:
+                base_model_set = trainer.get_minimum_model_set(model)
+                if len(base_model_set) == 1:
+                    pred_time_full[model] = pred_times[base_model_set[0]]
                 else:
-                    scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_proba_ensemble)
+                    pred_time_test_full_num = 0
+                    for base_model in base_model_set:
+                        pred_time_test_full_num += pred_times[base_model]
+                    pred_time_full[model] = pred_time_test_full_num
+            else:
+                pred_time_full[model] = None
 
         logger.debug('Model scores:')
         logger.debug(str(scores))
@@ -285,22 +296,24 @@ class AbstractLearner:
                 'model': list(scores.keys()),
                 'score_test': list(scores.values()),
                 'pred_time_test': [pred_times[model] for model in scores.keys()],
-                'pred_time_test_full': [pred_times_full[model] for model in scores.keys()],
+                'pred_time_test_full': [pred_time_full[model] for model in scores.keys()],
             }
         )
 
-        df = df.sort_values(by='score_test', ascending=False).reset_index(drop=True)
+        df = df.sort_values(by=['score_test', 'pred_time_test_full'], ascending=[False, True]).reset_index(drop=True)
 
         leaderboard_df = self.leaderboard(silent=silent)
 
-        df_merged = pd.merge(df, leaderboard_df, on='model')
+        df_merged = pd.merge(df, leaderboard_df, on='model', how='left')
         df_columns_lst = df_merged.columns.tolist()
         explicit_order = [
             'model',
             'score_test',
             'score_val',
-            'fit_time',
+            'fit_time_full',
             'pred_time_test_full',
+            'pred_time_val_full',
+            'fit_time',
             'pred_time_test',
             'pred_time_val',
             'stack_level',
@@ -309,9 +322,6 @@ class AbstractLearner:
         df_columns_new = explicit_order + df_columns_other
         df_merged = df_merged[df_columns_new]
 
-        # TODO: Fix pred_time_test_full value for weighted_ensembles / models who only have X base_models instead of the full level.
-        #  Currently it is over-estimating prediction time
-        #  Fix by implementing DAG representation
         return df_merged
 
     def get_pred_probas_models_and_time(self, X, trainer, model_names):

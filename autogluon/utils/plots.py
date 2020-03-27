@@ -90,11 +90,11 @@ def plot_tabular_models(results, output_directory=None, save_file="SummaryOfMode
     hpo_used = results['hyperparameter_tune']
     if not hpo_used:  # currently, times are only stored without HPO
         leaderboard = results['leaderboard'].copy()
-        leaderboard['fit_time'] = leaderboard['fit_time'].fillna(0)
-        leaderboard['pred_time_val'] = leaderboard['pred_time_val'].fillna(0)
+        leaderboard['fit_time_full'] = leaderboard['fit_time_full'].fillna(0)
+        leaderboard['pred_time_val_full'] = leaderboard['pred_time_val_full'].fillna(0)
 
-        datadict['inference_latency'] = [leaderboard['pred_time_val'][leaderboard['model'] == m].values[0] for m in model_names]
-        datadict['training_time'] = [leaderboard['fit_time'][leaderboard['model'] == m].values[0] for m in model_names]
+        datadict['inference_latency'] = [leaderboard['pred_time_val_full'][leaderboard['model'] == m].values[0] for m in model_names]
+        datadict['training_time'] = [leaderboard['fit_time_full'][leaderboard['model'] == m].values[0] for m in model_names]
         mousover_plot(datadict, attr_x='inference_latency', attr_y='performance', attr_color='model_type', 
                       save_file=save_path, plot_title=plot_title, hidden_keys=hidden_keys)
     else:
