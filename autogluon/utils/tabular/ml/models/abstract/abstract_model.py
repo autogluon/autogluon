@@ -1,14 +1,13 @@
 import copy
 import logging
-import os
 import math
-import time
+import os
 import pickle
-import psutil
 import sys
+import time
 
-import numpy as np
 import pandas as pd
+import psutil
 
 from .model_trial import model_trial
 from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
@@ -18,8 +17,8 @@ from .... import metrics
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
 from ......core import Space, Categorical, List, NestedSpace
-from ......task.base import BasePredictor
 from ......scheduler.fifo import FIFOScheduler
+from ......task.base import BasePredictor
 
 logger = logging.getLogger(__name__)
 
@@ -278,11 +277,10 @@ class AbstractModel:
             time_estimated = (feature_count + 1) * time_score + time_start_score - time_start
             logger.log(20, f'\t{round(time_estimated, 2)}s\t= Expected runtime')
 
-        model_score_diff = []
-
-        row_count = X.shape[0]
         X_test_shuffled = shuffle_df_rows(X=X, seed=0)
+        row_count = X.shape[0]
 
+        # calculating maximum number of features, which is safe to process parallel
         X_memory_ratio_max = 0.2
         compute_count_max = 200
 
@@ -291,20 +289,28 @@ class AbstractModel:
         X_memory_ratio = X_size_bytes / available_mem
 
         compute_count_safe = math.floor(X_memory_ratio_max / X_memory_ratio)
+        compute_count = max(1, min(compute_count_max, compute_count_safe))
+        compute_count = min(compute_count, feature_count)
 
-        compute_count = max(1, (min(compute_count_max, compute_count_safe)))
-        indices = [x for x in range(0, feature_count, compute_count)]
+        # creating copy of original data N=compute_count times for parallel processing
+        X_test_raw = pd.concat([X.copy() for _ in range(compute_count)], ignore_index=True, sort=False).reset_index(drop=True)
 
-        # TODO: Make this faster by multi-threading?
-        for i, indice in enumerate(indices):
-            if indice + compute_count > feature_count:
-                compute_count = feature_count - indice
+        #  TODO: Make this faster by multi-threading?
+        permutation_importance_dict = {}
+        for i in range(0, feature_count, compute_count):
+            parallel_computed_features = features[i:i + compute_count]
 
-            x = [X.copy() for _ in range(compute_count)]  # TODO Make this much faster, only make this and concat it once. Then just update values and reset the values edited each iteration
-            for j, val in enumerate(x):
-                feature = features[indice + j]
-                val[feature] = X_test_shuffled[feature].values
-            X_test_raw = pd.concat(x, ignore_index=True)
+            # if final iteration, leaving only necessary part of X_test_raw
+            num_features_processing = len(parallel_computed_features)
+            final_iteration = i + num_features_processing == feature_count
+            if (num_features_processing < compute_count) and final_iteration:
+                X_test_raw = X_test_raw.loc[:row_count * num_features_processing - 1]
+
+            row_index = 0
+            for feature in parallel_computed_features:
+                row_index_end = row_index + row_count
+                X_test_raw.loc[row_index:row_index_end - 1, feature] = X_test_shuffled[feature].values
+                row_index = row_index_end
 
             if self.metric_needs_y_pred:
                 Y_pred = self.predict(X_test_raw, preprocess=False)
@@ -312,14 +318,18 @@ class AbstractModel:
                 Y_pred = self.predict_proba(X_test_raw, preprocess=False)
 
             row_index = 0
-            for j in range(compute_count):
+            for feature in parallel_computed_features:
+                # calculating importance score for given feature
                 row_index_end = row_index + row_count
                 Y_pred_cur = Y_pred[row_index:row_index_end]
-                row_index = row_index_end
                 score = self.objective_func(y, Y_pred_cur)
-                model_score_diff.append(model_score_base - score)
+                permutation_importance_dict[feature] = model_score_base - score
 
-        permutation_importance_dict = {feature: score_diff for feature, score_diff in zip(features, model_score_diff)}
+                if not final_iteration:
+                    # resetting to original values for processed feature
+                    X_test_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+
+                row_index = row_index_end
 
         if not silent:
             logger.log(20, f'\t{round(time.time() - time_start, 2)}s\t= Actual runtime')
