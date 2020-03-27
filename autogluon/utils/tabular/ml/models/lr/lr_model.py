@@ -5,13 +5,13 @@ import numpy as np
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
+from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, get_one_hot_features, NumericDataPreprocessor
+from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,19 @@ class LRModel(AbstractModel):
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
         self.pipeline = None
-        self.cat_one_hot = None
+        self._model_type = LinearRegression if self.problem_type == REGRESSION else LogisticRegression
+        self.model_params = None
+        self.set_default_params()
+
+    def set_default_params(self):
+        # TODO: get seed from seeds provider
+        if self.problem_type == REGRESSION:
+            default_params = {'n_jobs': -1, 'fit_intercept': True}
+        else:
+            default_params = {'C': None, 'random_state': 0, 'solver': self._get_solver(), 'n_jobs': -1, 'fit_intercept': True}
+        self.model_params = list(default_params.keys())
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
 
     def tokenize(self, s):
         return re.split('[ ]+', s)
@@ -35,18 +47,16 @@ class LRModel(AbstractModel):
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
         if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
+            logger.warning("Attempting to _get_types_of_features for LRModel, but previously already did this.")
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
         continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present(
             'datetime')
         language_featnames = self.feature_types_metadata['nlp']
         valid_features = categorical_featnames + continuous_featnames + language_featnames
-        if len(categorical_featnames) + len(continuous_featnames) \
-                + len(language_featnames) \
-                != df.shape[1]:
+        if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
             df = df.drop(columns=unknown_features)
-            self.features = list(df.columns)
+        self.features = list(df.columns)
 
         types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'language': []}
         return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
@@ -58,12 +68,19 @@ class LRModel(AbstractModel):
         """ Returns crude categorization of feature types """
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
+    def _get_solver(self):
+        if self.problem_type == BINARY:
+            solver = 'lbfgs'  # TODO use liblinear for smaller datasets
+        elif self.problem_type == MULTICLASS:
+            solver = 'saga'  # another option is lbfgs
+        else:
+            solver = 'lbfgs'
+        return solver
+
     # TODO: handle collinear features - they will impact results quality
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000):
         X = X.copy()
         feature_types = self._get_types_of_features(X)
-        logger.log(15, "Applying model-specific pre-processing")
-        logger.log(15, " - input shape %s" % str(X.shape))
         if is_train:
             transformer_list = []
 
@@ -98,18 +115,14 @@ class LRModel(AbstractModel):
                 transformer_list.append(('skew', pipeline))
 
             self.pipeline = FeatureUnion(transformer_list=transformer_list)
-            logger.log(15, " - fitting pre-processing pipeline")
             self.pipeline.fit(X)
 
-        logger.log(15, " - transforming inputs using pre-processing pipeline")
         X = self.pipeline.transform(X)
-        logger.log(15, " - output shape %s" % str(X.shape))
 
         return X
 
     def _set_default_params(self):
         default_params = {
-            'model_type': 'LR',
             'C': 1,
             'vectorizer_dict_size': 75000,
             'proc.ngram_range': (1, 5),
@@ -126,25 +139,19 @@ class LRModel(AbstractModel):
         }
         return spaces
 
+    # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
+    #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         hyperparams = self.params.copy()
 
-        self.cat_one_hot = get_one_hot_features(X_train)
-
-        # See solver options here: https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
         if self.problem_type == BINARY:
             Y_train = Y_train.astype(int).values
-            solver = 'lbfgs'  # TODO use liblinear for smaller datasets
-        elif self.problem_type == MULTICLASS:
-            solver = 'saga'  # another option is lbfgs
-        else:
-            solver = 'lbfgs'
 
         X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
 
-        # TODO: get seed from seeds provider
-        self.model = LogisticRegression(C=hyperparams['C'], random_state=17, solver=solver, n_jobs=-1)
-        self.model.fit(X_train, Y_train)
+        params = {k: v for k, v in self.params.items() if k in self.model_params}
+        model = self._model_type(**params)
+        self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)

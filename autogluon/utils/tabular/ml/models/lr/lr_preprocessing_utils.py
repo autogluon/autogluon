@@ -3,13 +3,6 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder
 
 
-def get_one_hot_features(df):
-    ohe_cats = df.nunique()
-    ohe_cats = ohe_cats[ohe_cats < 50].index.values.tolist()
-    ohe_cats = [f for f in ohe_cats]
-    return ohe_cats
-
-
 class OheFeaturesGenerator(BaseEstimator, TransformerMixin):
 
     def __init__(self, cats_cols):
