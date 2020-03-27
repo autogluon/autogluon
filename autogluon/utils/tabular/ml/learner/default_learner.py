@@ -40,6 +40,8 @@ class DefaultLearner(AbstractLearner):
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
                 holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None, ignored if kfolds != 0)
                 num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
+                num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
+                    total number of models trained during bagging = num_bagging_folds * num_bagging_sets
                 stack_ensemble_levels : (int) Number of stacking levels to use in ensemble stacking. Roughly increases model training time by factor of stack_levels+1 (0: disabled)
                     Default is 0 (disabled). Use values between 1-3 to improve model quality.
                     Ignored unless kfolds is also set >= 2
@@ -48,7 +50,7 @@ class DefaultLearner(AbstractLearner):
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
         if time_limit:
             self.time_limit = time_limit
-            logger.log(20, f'Beginning AutoGluon training ... Time limit = {str(time_limit)}s')
+            logger.log(20, f'Beginning AutoGluon training ... Time limit = {time_limit}s')
         else:
             self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
