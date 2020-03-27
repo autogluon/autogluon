@@ -227,7 +227,8 @@ class FIFOScheduler(TaskScheduler):
             - milestone: config promoted to this milestone (next from resume_from)
         """
         cls = FIFOScheduler
-        cls.RESOURCE_MANAGER._request(task.resources)
+        if not task.resources.is_ready:
+            cls.RESOURCE_MANAGER._request(task.resources)
         # reporter
         reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter

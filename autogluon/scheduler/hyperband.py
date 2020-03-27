@@ -166,7 +166,8 @@ class HyperbandScheduler(FIFOScheduler):
         - milestone: config promoted to this milestone (next from resume_from)
         """
         cls = HyperbandScheduler
-        cls.RESOURCE_MANAGER._request(task.resources)
+        if not task.resources.is_ready:
+            cls.RESOURCE_MANAGER._request(task.resources)
         # reporter and terminator
         reporter = DistStatusReporter(remote=task.resources.node)
         task.args['reporter'] = reporter
