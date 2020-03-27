@@ -159,6 +159,12 @@ class AbstractLinearModel(AbstractModel):
 
         return hpo_models, hpo_model_performances, hpo_results
 
+    def get_info(self):
+        # TODO: All AG-Tabular models now offer a get_info method:
+        # https://github.com/awslabs/autogluon/blob/master/autogluon/utils/tabular/ml/models/abstract/abstract_model.py#L474
+        # dict of weights?
+        return super().get_info()
+
 
 class LinearModel(AbstractLinearModel):
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
