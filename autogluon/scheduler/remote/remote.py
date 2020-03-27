@@ -71,7 +71,7 @@ class Remote(Client):
             _set_global_remote_service(self.service)
             import time
             time.sleep(10)
-            super(Remote, self).__init__(remote_addr)
+            super().__init__(remote_addr)
         with Remote.LOCK:
             self.remote_id = Remote.REMOTE_ID.value
             Remote.REMOTE_ID.value += 1
