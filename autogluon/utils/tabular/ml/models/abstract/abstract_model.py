@@ -280,7 +280,7 @@ class AbstractModel:
         X_test_shuffled = shuffle_df_rows(X=X, seed=0)
         row_count = X.shape[0]
 
-        # calculating maximum number of features, which is save to process parallel
+        # calculating maximum number of features, which is safe to process parallel
         X_memory_ratio_max = 0.2
         compute_count_max = 200
 
@@ -299,6 +299,12 @@ class AbstractModel:
         permutation_importance_dict = {}
         for i in range(0, feature_count, compute_count):
             parallel_computed_features = features[i:i + compute_count]
+
+            # if final iteration, leaving only necessary part of X_test_raw
+            num_features_processing = len(parallel_computed_features)
+            final_iteration = i + num_features_processing == feature_count
+            if (num_features_processing < compute_count) and final_iteration:
+                X_test_raw = X_test_raw.loc[:row_count * num_features_processing - 1]
 
             row_index = 0
             for feature in parallel_computed_features:
@@ -319,8 +325,9 @@ class AbstractModel:
                 score = self.objective_func(y, Y_pred_cur)
                 permutation_importance_dict[feature] = model_score_base - score
 
-                # resetting to original values for processed feature
-                X_test_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
+                if not final_iteration:
+                    # resetting to original values for processed feature
+                    X_test_raw.loc[row_index:row_index_end - 1, feature] = X[feature].values
 
                 row_index = row_index_end
 
