@@ -65,10 +65,12 @@ class DistributedResource(Resources):
     def __init__(self, num_cpus=1, num_gpus=0):
         super(DistributedResource, self).__init__(num_cpus, num_gpus)
         self.node = None
+        self.is_ready = False
 
     def _ready(self, remote, cids, gids):
         super(DistributedResource, self)._ready(cids, gids)
         self.node = remote
+        self.is_ready = True
  
     def _release(self):
         super(DistributedResource, self)._release()

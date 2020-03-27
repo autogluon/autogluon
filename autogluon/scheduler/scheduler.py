@@ -77,7 +77,8 @@ class TaskScheduler(object):
         """
         # adding the task
         cls = TaskScheduler
-        cls.RESOURCE_MANAGER._request(task.resources)
+        if not task.resources.is_ready:
+            cls.RESOURCE_MANAGER._request(task.resources)
         job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
         with self.LOCK:
             new_dict = self._dict_from_task(task)

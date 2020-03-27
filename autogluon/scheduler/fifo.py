@@ -167,6 +167,11 @@ class FIFOScheduler(TaskScheduler):
         # Allow for the promotion of a previously chosen config. Also,
         # extra_kwargs contains extra info passed to both add_job and to
         # get_config (if no config is promoted)
+
+        # request resource first
+        resources = DistributedResource(**self.resource)
+        cls.RESOURCE_MANAGER._request(resources)
+
         config, extra_kwargs = self._promote_config()
         if config is None:
             # No config to promote: Query next config to evaluate from searcher
@@ -178,7 +183,7 @@ class FIFOScheduler(TaskScheduler):
         task = Task(
             self.train_fn,
             {'args': self.args, 'config': config},
-            DistributedResource(**self.resource)
+            resources
         )
         self.add_job(task, **extra_kwargs)
 
