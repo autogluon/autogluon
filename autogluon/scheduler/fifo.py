@@ -170,7 +170,7 @@ class FIFOScheduler(TaskScheduler):
 
         # request resource first
         resources = DistributedResource(**self.resource)
-        cls.RESOURCE_MANAGER._request(resources)
+        FIFOScheduler.RESOURCE_MANAGER._request(resources)
 
         config, extra_kwargs = self._promote_config()
         if config is None:
