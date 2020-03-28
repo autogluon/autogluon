@@ -364,6 +364,8 @@ class AbstractLearner:
         if trainer.objective_func_expects_y_pred:
             y_pred_cleaned = self.label_cleaner.transform(y_pred)
             y_true_cleaned = self.label_cleaner.transform(y_true)
+            if self.problem_type == MULTICLASS:
+                y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
             performance = self.objective_func(y_true_cleaned, y_pred_cleaned)
         else:
             performance = self.objective_func(y_true, y_pred)
