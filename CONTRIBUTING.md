@@ -56,12 +56,19 @@ python setup.py develop
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
-- After you have edited the code, ensure your changes pass our unit tests via:
+- After you have edited the code, ensure your changes pass the unit tests via:
 ```
-bash tests/run_all.sh
+python3 -m pytest tests
 ```
 
-- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models with the lowest values of  training iterations and time-limits that suffice to evaluate the intended functionality).
+- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
+```
+python3 -m pytest path_to_file::test_mytest
+```
+Or remove the ::test_mytest suffix to run all tests in the file:
+```
+python3 -m pytest path_to_file
+```
 
 - We also encourage you to contribute new tutorials using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/awslabs/autogluon/tree/master/docs/tutorials) for examples. All tutorials should be Jupyter notebooks converted into markdown (our build system will rebuild the .ipynb files from the markdown file and execute the notebooks).
 

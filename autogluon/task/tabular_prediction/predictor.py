@@ -154,6 +154,7 @@ class TabularPredictor(BasePredictor):
 
     def evaluate_predictions(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True):
         """ Evaluate the provided predictions against ground truth labels.
+            Evaluation is based on the `eval_metric` previously specifed to `fit()`, or default metrics if none was specified.
 
             Parameters
             ----------
@@ -161,7 +162,7 @@ class TabularPredictor(BasePredictor):
                 The ordered collection of ground-truth labels.
             y_pred : list or `numpy.array`
                 The ordered collection of predictions.
-                For certain types of `eval_metric` (such as AUC), `y_pred` must be predicted-probabilities rather than predicted labels.
+                Caution: For certain types of `eval_metric` (such as 'roc_auc'), `y_pred` must be predicted-probabilities rather than predicted labels.
             silent : bool (optional)
                 Should performance results be printed?
             auxiliary_metrics: bool (optional)
