@@ -5,7 +5,7 @@ import numpy as np
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, Ridge, Lasso
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
@@ -19,19 +19,37 @@ logger = logging.getLogger(__name__)
 class AbstractLinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None,
-                 feature_types_metadata=None, debug=0):
+                 feature_types_metadata=None, debug=0, **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
         self.pipeline = None
-        self._model_type = LinearRegression if self.problem_type == REGRESSION else LogisticRegression
+
+        if self.problem_type == REGRESSION:
+            self._get_regression_model(kwargs)
+        else:
+            self._model_type = LogisticRegression
+
         self.model_params = None
         self.set_default_params()
+
+    def _get_regression_model(self, kwargs):
+        self.reg_type = kwargs.get('regression_option', 'ridge')
+        if self.reg_type == 'ridge':
+            self._model_type = Ridge
+        elif self.reg_type == 'lasso':
+            self._model_type = Lasso
+        else:
+            logger.warning('Unknown value for regression_option {} - supported types are [ridge, lasso] - falling back to ridge'.format(self.reg_type))
+            self.reg_type = 'ridge'
+            self._model_type = Ridge
 
     def set_default_params(self):
         # TODO: get seed from seeds provider
         if self.problem_type == REGRESSION:
-            default_params = {'n_jobs': -1, 'fit_intercept': True}
+            default_params = {'C': None, 'random_state': 0, 'fit_intercept': True}
+            if self.reg_type == 'ridge':
+                default_params['solver'] = 'auto'
         else:
             default_params = {'C': None, 'random_state': 0, 'solver': self._get_solver(), 'n_jobs': -1, 'fit_intercept': True}
         self.model_params = list(default_params.keys())
@@ -147,6 +165,14 @@ class AbstractLinearModel(AbstractModel):
         X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
 
         params = {k: v for k, v in self.params.items() if k in self.model_params}
+
+        # Ridge/Lasso are using alpha instead of C, which is C^-1
+        # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
+        if self.problem_type == REGRESSION:
+            # For numerical reasons, using alpha = 0 with the Lasso object is not advised, so we add epsilon
+            params['alpha'] = 1 / (params['C'] if params['C'] != 0 else 1e-8)
+            params.pop('C', None)
+
         model = self._model_type(**params)
         self.model = model.fit(X_train, Y_train)
 
