@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 class AbstractLinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None,
-                 feature_types_metadata=None, debug=0, **kwargs):
+                 feature_types_metadata=None, debug=0, regression_option='ridge', **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
+        self.regression_option = regression_option
         self.pipeline = None
 
         if self.problem_type == REGRESSION:
@@ -33,22 +34,21 @@ class AbstractLinearModel(AbstractModel):
         self.model_params = None
         self.set_default_params()
 
-    def _get_regression_model(self, kwargs):
-        self.reg_type = kwargs.get('regression_option', 'ridge')
-        if self.reg_type == 'ridge':
+    def _get_regression_model(self):
+        if self.regression_option == 'ridge':
             self._model_type = Ridge
-        elif self.reg_type == 'lasso':
+        elif self.regression_option == 'lasso':
             self._model_type = Lasso
         else:
-            logger.warning('Unknown value for regression_option {} - supported types are [ridge, lasso] - falling back to ridge'.format(self.reg_type))
-            self.reg_type = 'ridge'
+            logger.warning('Unknown value for regression_option {} - supported types are [ridge, lasso] - falling back to ridge'.format(self.regression_option))
+            self.regression_option = 'ridge'
             self._model_type = Ridge
 
     def set_default_params(self):
         # TODO: get seed from seeds provider
         if self.problem_type == REGRESSION:
             default_params = {'C': None, 'random_state': 0, 'fit_intercept': True}
-            if self.reg_type == 'ridge':
+            if self.regression_option == 'ridge':
                 default_params['solver'] = 'auto'
         else:
             default_params = {'C': None, 'random_state': 0, 'solver': self._get_solver(), 'n_jobs': -1, 'fit_intercept': True}
