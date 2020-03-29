@@ -18,7 +18,7 @@ def sagemaker_setup():
     if current_host == sorted(hosts)[0]:
         _wait_for_worker_nodes_to_start_sshd(hosts)
     else:
-        sync_training_processes('autogluon.scheduler.remote.dask_scheduler', current_host)
+        sync_training_processes('agremote', current_host)
 
 def _wait_for_worker_nodes_to_start_sshd(hosts, interval=1, timeout_in_seconds=180):
     with timeout(seconds=timeout_in_seconds):
