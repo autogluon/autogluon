@@ -217,7 +217,7 @@ class AbstractLearner:
 
         max_level_to_check = trainer.get_max_level_all()
         scores = {}
-        pred_times = {}
+        pred_time_test_marginal = {}
         pred_probas = None
         stack_names = list(trainer.models_level.keys())
         stack_names_not_core = [name for name in stack_names if name != 'core']
@@ -231,7 +231,7 @@ class AbstractLearner:
                     pred_probas_auxiliary, pred_probas_time_auxiliary = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_aux)
                     for i, model_name in enumerate(model_names_aux):
                         pred_proba = pred_probas_auxiliary[i]
-                        pred_times[model_name] = pred_probas_time_auxiliary[i]
+                        pred_time_test_marginal[model_name] = pred_probas_time_auxiliary[i]
                         if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                             pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
 
@@ -246,7 +246,7 @@ class AbstractLearner:
                 pred_probas, pred_probas_time = self.get_pred_probas_models_and_time(X=X_stack, trainer=trainer, model_names=model_names_core)
                 for i, model_name in enumerate(model_names_core):
                     pred_proba = pred_probas[i]
-                    pred_times[model_name] = pred_probas_time[i]
+                    pred_time_test_marginal[model_name] = pred_probas_time[i]
                     if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                         pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
 
@@ -266,28 +266,28 @@ class AbstractLearner:
                     if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                         oracle_pred_proba_ensemble = self.label_cleaner.inverse_transform_proba(oracle_pred_proba_ensemble)
                     oracle_pred_time = time.time() - oracle_pred_time_start
-                    pred_times[f'oracle_ensemble_l' + str(level + 1)] = oracle_pred_time
+                    pred_time_test_marginal[f'oracle_ensemble_l' + str(level + 1)] = oracle_pred_time
                     if trainer.objective_func_expects_y_pred:
                         oracle_pred_ensemble = get_pred_from_proba(y_pred_proba=oracle_pred_proba_ensemble, problem_type=self.problem_type)
                         scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_ensemble)
                     else:
                         scores['oracle_ensemble_l' + str(level + 1)] = self.objective_func(y, oracle_pred_proba_ensemble)
 
-        pred_time_full = {}
+        pred_time_test = {}
         all_trained_models = trainer.get_model_names_all()
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
         for model in scores.keys():
             if model in all_trained_models:
                 base_model_set = trainer.get_minimum_model_set(model)
                 if len(base_model_set) == 1:
-                    pred_time_full[model] = pred_times[base_model_set[0]]
+                    pred_time_test[model] = pred_time_test_marginal[base_model_set[0]]
                 else:
                     pred_time_test_full_num = 0
                     for base_model in base_model_set:
-                        pred_time_test_full_num += pred_times[base_model]
-                    pred_time_full[model] = pred_time_test_full_num
+                        pred_time_test_full_num += pred_time_test_marginal[base_model]
+                    pred_time_test[model] = pred_time_test_full_num
             else:
-                pred_time_full[model] = None
+                pred_time_test[model] = None
 
         logger.debug('Model scores:')
         logger.debug(str(scores))
@@ -295,12 +295,12 @@ class AbstractLearner:
             data={
                 'model': list(scores.keys()),
                 'score_test': list(scores.values()),
-                'pred_time_test': [pred_times[model] for model in scores.keys()],
-                'pred_time_test_full': [pred_time_full[model] for model in scores.keys()],
+                'pred_time_test': [pred_time_test[model] for model in scores.keys()],
+                'pred_time_test_marginal': [pred_time_test_marginal[model] for model in scores.keys()],
             }
         )
 
-        df = df.sort_values(by=['score_test', 'pred_time_test_full'], ascending=[False, True]).reset_index(drop=True)
+        df = df.sort_values(by=['score_test', 'pred_time_test'], ascending=[False, True]).reset_index(drop=True)
 
         leaderboard_df = self.leaderboard(silent=silent)
 
@@ -310,12 +310,12 @@ class AbstractLearner:
             'model',
             'score_test',
             'score_val',
-            'fit_time_full',
-            'pred_time_test_full',
-            'pred_time_val_full',
-            'fit_time',
             'pred_time_test',
             'pred_time_val',
+            'fit_time',
+            'pred_time_test_marginal',
+            'pred_time_val_marginal',
+            'fit_time_marginal',
             'stack_level',
         ]
         df_columns_other = [column for column in df_columns_lst if column not in explicit_order]

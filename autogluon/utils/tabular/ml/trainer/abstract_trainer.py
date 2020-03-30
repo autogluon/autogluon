@@ -951,6 +951,8 @@ class AbstractTrainer:
             return self.model_graph.nodes[base_model_set[0]][attribute]
         attribute_full = 0
         for base_model in base_model_set:
+            if self.model_graph.nodes[base_model][attribute] is None:
+                return None
             attribute_full += self.model_graph.nodes[base_model][attribute]
         return attribute_full
 
@@ -964,28 +966,28 @@ class AbstractTrainer:
     def leaderboard(self):
         model_names = self.get_model_names_all()
         score_val = []
+        fit_time_marginal = []
+        pred_time_val_marginal = []
+        stack_level = []
         fit_time = []
         pred_time_val = []
-        stack_level = []
-        fit_time_full = []
-        pred_time_val_full = []
         for model_name in model_names:
             score_val.append(self.model_performance.get(model_name))
-            fit_time.append(self.model_fit_times.get(model_name))
-            fit_time_full.append(self.get_model_attribute_full(model=model_name, attribute='fit_time'))
-            pred_time_val.append(self.model_pred_times.get(model_name))
-            pred_time_val_full.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
+            fit_time_marginal.append(self.model_fit_times.get(model_name))
+            fit_time.append(self.get_model_attribute_full(model=model_name, attribute='fit_time'))
+            pred_time_val_marginal.append(self.model_pred_times.get(model_name))
+            pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
-            'fit_time_full': fit_time_full,
-            'pred_time_val_full': pred_time_val_full,
-            'fit_time': fit_time,
             'pred_time_val': pred_time_val,
+            'fit_time': fit_time,
+            'pred_time_val_marginal': pred_time_val_marginal,
+            'fit_time_marginal': fit_time_marginal,
             'stack_level': stack_level,
         })
-        df_sorted = df.sort_values(by=['score_val', 'pred_time_val_full', 'model'], ascending=[False, True, False]).reset_index(drop=True)
+        df_sorted = df.sort_values(by=['score_val', 'pred_time_val', 'model'], ascending=[False, True, False]).reset_index(drop=True)
         return df_sorted
 
     def get_info(self, include_model_info=False):
