@@ -360,7 +360,16 @@ class AbstractLearner:
         assert isinstance(y_pred, (np.ndarray, pd.Series))
 
         y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
-        performance = self.objective_func(y_true, y_pred)
+        trainer = self.load_trainer()
+        if trainer.objective_func_expects_y_pred:
+            y_pred_cleaned = self.label_cleaner.transform(y_pred)
+            y_true_cleaned = self.label_cleaner.transform(y_true)
+            if self.problem_type == MULTICLASS:
+                y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
+            performance = self.objective_func(y_true_cleaned, y_pred_cleaned)
+        else:
+            performance = self.objective_func(y_true, y_pred)
+
         metric = self.objective_func.name
 
         if not high_always_good:
@@ -392,13 +401,16 @@ class AbstractLearner:
                 f1micro_score.__name__ = f1_score.__name__
                 auxiliary_metrics += [f1micro_score]  # TODO: add auc?
             elif self.problem_type == MULTICLASS:  # multiclass metrics
-                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include, top-1, top-5, top-10 accuracy here.
+                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
 
         performance_dict = OrderedDict({metric: performance})
         for metric_function in auxiliary_metrics:
             metric_name = metric_function.__name__
             if metric_name not in performance_dict:
-                performance_dict[metric_name] = metric_function(y_true, y_pred)
+                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                    performance_dict[metric_name] = metric_function(y_true, y_pred)
+                except ValueError:
+                    pass
 
         if not silent:
             logger.log(20, "Evaluations on test data:")
@@ -409,8 +421,11 @@ class AbstractLearner:
             cl_metric = lambda y_true, y_pred: classification_report(y_true, y_pred, output_dict=True)
             metric_name = 'classification_report'
             if metric_name not in performance_dict:
-                performance_dict[metric_name] = cl_metric(y_true, y_pred)
-                if not silent:
+                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                    performance_dict[metric_name] = cl_metric(y_true, y_pred)
+                except ValueError:
+                    pass
+                if not silent and metric_name in performance_dict:
                     logger.log(20, "Detailed (per-class) classification report:")
                     logger.log(20, json.dumps(performance_dict[metric_name], indent=4))
         return performance_dict
