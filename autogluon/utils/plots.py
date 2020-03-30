@@ -182,7 +182,7 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         print("Plot summary of models saved to file: %s" % save_file)
     
     source = ColumnDataSource(datadict)
-    TOOLS="crosshair,pan,wheel_zoom,box_zoom,reset,hover,previewsave"
+    TOOLS="crosshair,pan,wheel_zoom,box_zoom,reset,hover,save"
     p = figure(title=plot_title, tools=TOOLS)
     if attr_x_is_string:
         circ = p.circle(attr_x2, attr_y, line_color=default_color, line_alpha = point_transparency,
