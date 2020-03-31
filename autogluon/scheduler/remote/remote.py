@@ -50,7 +50,7 @@ class Service(object):
         self.status = 'live'
 
     def shutdown(self):
-        self.proc.kill()
+        os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
 def start_service(remote_ip, port):
     cmd = ['agremote', '--address', remote_ip, '--port', str(port)]
@@ -68,6 +68,9 @@ class Remote(Client):
         else:
             remote_addr = (remote_ip + ':{}'.format(port))
             self.service = start_service(remote_ip, port)
+            _set_global_remote_service(self.service)
+            import time
+            time.sleep(10)
             super().__init__(remote_addr)
         with Remote.LOCK:
             self.remote_id = Remote.REMOTE_ID.value
@@ -77,6 +80,7 @@ class Remote(Client):
         if self.service:
             self.service.shutdown()
         super().close(timeout)
+        self.shutdown()
 
     def upload_files(self, files, **kwargs):
         for filename in files:
