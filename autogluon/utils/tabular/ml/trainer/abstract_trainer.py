@@ -732,7 +732,7 @@ class AbstractTrainer:
                     X = X.drop(cols_to_drop, axis=1)
         return X
 
-    # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
+    # You must have previously called fit() with cache_data=True
     def refit_single_full(self, X=None, y=None, models=None):
         if X is None:
             X = self.load_X_train()
