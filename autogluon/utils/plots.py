@@ -138,7 +138,7 @@ def mousover_plot(datadict, attr_x, attr_y, attr_color=None, attr_size=None, sav
         bokeh_imported = False
     
     if not bokeh_imported:
-        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh"')
+        warnings.warn('AutoGluon summary plots cannot be created because bokeh is not installed. To see plots, please do: "pip install bokeh==2.0.1"')
         return None
     
     n = len(datadict[attr_x])
