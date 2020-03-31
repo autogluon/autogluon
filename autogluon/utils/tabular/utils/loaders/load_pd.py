@@ -36,12 +36,13 @@ def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=Non
         format = 'parquet'
     else:
         format = 'csv'
-        if path.endswith('.tsv'):
-            if delimiter is None:
+        if delimiter is None:
+            if path.endswith('.tsv'):
                 delimiter = '\t'
-
-    if delimiter is None:
-        delimiter = ','
+                logger.debug(f'File delimiter for {path} inferred as \'\\t\' (tab). If this is incorrect, please manually load the data as a pandas DataFrame.')
+            else:
+                delimiter = ','
+                logger.debug(f'File delimiter for {path} inferred as \',\' (comma). If this is incorrect, please manually load the data as a pandas DataFrame.')
 
     if format == 'pointer':
         content_path = load_pointer.get_pointer_content(path)
