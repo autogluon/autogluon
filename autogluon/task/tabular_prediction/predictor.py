@@ -181,14 +181,30 @@ class TabularPredictor(BasePredictor):
     def leaderboard(self, dataset=None, silent=False):
         """
             Output summary of information about models produced during fit() as a pandas DataFrame.
-            Includes information on test and validation scores for all models, model training times and stack levels.
+            Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
+            Output DataFrame columns include:
+                'model': The name of the model.
+                'score_val': The validation score of the model on the 'eval_metric'.
+                'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
+                    Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
+                'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
+                    Equivalent to the sum of all 'fit_time_marginal' values for the model and all of its base models.
+                'pred_time_val_marginal': The inference time required to compute predictions on the validation data (Ignoring inference times for base models).
+                    Note that this ignores the time required to load the model into memory when bagging is disabled.
+                'fit_time_marginal': The fit time required to train the model (Ignoring base models).
+                'stack_level': The stack level of the model.
+                    A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
 
             Parameters
             ----------
             dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
                 This Dataset must also contain the label-column with the same column-name as specified during fit().
-                If specified, then the leaderboard returned will contain an additional column 'score_test'
-                'score_test' is the score of the model on the validation_metric for the dataset provided
+                If specified, then the leaderboard returned will contain additional columns 'score_test', 'pred_time_test', and 'pred_time_test_marginal'.
+                    'score_test': The score of the model on the 'eval_metric' for the dataset provided.
+                    'pred_time_test': The true end-to-end wall-clock inference time of the model for the dataset provided.
+                        Equivalent to the sum of all 'pred_time_test_marginal' values for the model and all of its base models.
+                    'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
+                        Note that this ignores the time required to load the model into memory when bagging is disabled.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             silent: bool (optional)
                 Should leaderboard DataFrame be printed?
