@@ -120,7 +120,7 @@ def dd_list():
     return defaultdict(list)
 
 
-def get_leaderboard_breakpoints(leaderboard: DataFrame, score_col='score_val', inference_time_col='pred_time_val_full') -> DataFrame:
+def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col='score_val', inference_time_col='pred_time_val_full') -> DataFrame:
     """
     Given a set of models, returns in ranked order from best score to worst score models which satisfy the criteria:
     1. No other model in the set has both a lower inference time and a better or equal score.
@@ -133,19 +133,16 @@ def get_leaderboard_breakpoints(leaderboard: DataFrame, score_col='score_val', i
     leaderboard = leaderboard.sort_values(by=[score_col, inference_time_col], ascending=[False, True]).reset_index(drop=True)
     leaderboard_unique = leaderboard.drop_duplicates(subset=[score_col])
 
-    breakpoints = []
+    pareto_frontier = []
     inference_time_min = None
     for index, row in leaderboard_unique.iterrows():
         if row[inference_time_col] is None or row[score_col] is None:
             pass
-        elif inference_time_min is None:
+        elif (inference_time_min is None) or (row[inference_time_col] < inference_time_min):
             inference_time_min = row[inference_time_col]
-            breakpoints.append(index)
-        elif row[inference_time_col] < inference_time_min:
-            inference_time_min = row[inference_time_col]
-            breakpoints.append(index)
-    leaderboard_breakpoints = leaderboard_unique.loc[breakpoints].reset_index(drop=True)
-    return leaderboard_breakpoints
+            pareto_frontier.append(index)
+    leaderboard_pareto_frontier = leaderboard_unique.loc[pareto_frontier].reset_index(drop=True)
+    return leaderboard_pareto_frontier
 
 
 def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):

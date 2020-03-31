@@ -16,7 +16,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from ..utils import get_pred_from_proba, get_leaderboard_breakpoints
+from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier
 from ...data.label_cleaner import LabelCleaner
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
@@ -469,20 +469,20 @@ class AbstractLearner:
         y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
         return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
-    def leaderboard(self, X=None, y=None, only_breakpoints=False, silent=False):
+    def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
         if X is not None:
             leaderboard = self.score_debug(X=X, y=y, silent=True)
         else:
             trainer = self.load_trainer()
             leaderboard = trainer.leaderboard()
-        if only_breakpoints:
+        if only_pareto_frontier:
             if 'score_test' in leaderboard.columns and 'pred_time_test' in leaderboard.columns:
                 score_col = 'score_test'
                 inference_time_col = 'pred_time_test'
             else:
                 score_col = 'score_val'
                 inference_time_col = 'pred_time_val'
-            leaderboard = get_leaderboard_breakpoints(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
+            leaderboard = get_leaderboard_pareto_frontier(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
         if not silent:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
                 print(leaderboard)
