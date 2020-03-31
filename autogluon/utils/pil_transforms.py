@@ -8,7 +8,7 @@ from PIL import Image, ImageEnhance
 import collections
 
 __all__ = ['Compose', 'RandomResizedCrop', 'RandomHorizontalFlip', 'ColorJitter',
-           'Resize', 'CenterCrop', 'ToTensor', 'RandomCrop', 'ToNDArray']
+           'Resize', 'CenterCrop', 'ToTensor', 'RandomCrop', 'ToNDArray', 'ToPIL']
 
 class Compose(object):
     """Composes several transforms together.
@@ -36,6 +36,13 @@ class Compose(object):
             format_string += '    {0}'.format(t)
         format_string += '\n)'
         return format_string
+
+class ToPIL(object):
+    """Convert image from ndarray format to PIL
+    """
+    def __call__(self, img):
+        x = Image.fromarray(img.asnumpy())
+        return x
 
 class ToNDArray(object):
     def __call__(self, img):
