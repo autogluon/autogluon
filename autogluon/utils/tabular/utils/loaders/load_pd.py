@@ -11,7 +11,8 @@ from .load_s3 import list_bucket_prefix_suffix_s3
 
 logger = logging.getLogger(__name__)
 
-def load(path, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None, error_bad_lines=True, header=0, 
+
+def load(path, delimiter=None, encoding='utf-8', columns_to_keep=None, dtype=None, error_bad_lines=True, header=0,
          names=None, format=None, nrows=None, skiprows=None, usecols=None, low_memory=False, converters=None, 
          filters=None, sample_count=None, worker_count=None, multiprocessing_method='forkserver') -> DataFrame:
     if isinstance(path, list):
@@ -35,6 +36,12 @@ def load(path, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None
         format = 'parquet'
     else:
         format = 'csv'
+        if path.endswith('.tsv'):
+            if delimiter is None:
+                delimiter = '\t'
+
+    if delimiter is None:
+        delimiter = ','
 
     if format == 'pointer':
         content_path = load_pointer.get_pointer_content(path)
@@ -59,10 +66,9 @@ def load(path, delimiter=',', encoding='utf-8', columns_to_keep=None, dtype=None
     elif format == 'parquet':
         try:
             df = pd.read_parquet(path, columns=columns_to_keep, engine='fastparquet')  # TODO: Deal with extremely strange issue resulting from torch being present in package, will cause read_parquet to either freeze or Segmentation Fault when performing multiprocessing
-            column_count_full = len(df.columns)
         except:
             df = pd.read_parquet(path, columns=columns_to_keep, engine='pyarrow')
-            column_count_full = len(df.columns)
+        column_count_full = len(df.columns)
     elif format == 'csv':
         df = pd.read_csv(path, converters=converters, delimiter=delimiter, encoding=encoding, header=header, names=names, dtype=dtype, 
                          error_bad_lines=error_bad_lines, low_memory=low_memory, nrows=nrows, skiprows=skiprows, usecols=usecols)
