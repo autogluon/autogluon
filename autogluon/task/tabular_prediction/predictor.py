@@ -207,7 +207,7 @@ class TabularPredictor(BasePredictor):
                         Note that this ignores the time required to load the model into memory when bagging is disabled.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             only_pareto_frontier : bool (optional)
-                If `True`, only return model information of models in the Pareto frontier (Models which achieve the highest score within their end-to-end inference time).
+                If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
                 At minimum this will include the model with the highest score and the model with the lowest inference time.
                 This is useful when deciding which model to use during inference if inference time is a consideration.
                 Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
