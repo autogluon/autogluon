@@ -1,7 +1,10 @@
 import logging
 
 import numpy as np
-from sklearn.metrics.classification import _check_targets, type_of_target
+try:
+    from sklearn.metrics._classification import _check_targets, type_of_target
+except:
+    from sklearn.metrics.classification import _check_targets, type_of_target
 
 logger = logging.getLogger(__name__)
 
