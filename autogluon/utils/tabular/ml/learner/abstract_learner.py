@@ -16,7 +16,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from ..utils import get_pred_from_proba
+from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier
 from ...data.label_cleaner import LabelCleaner
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
@@ -158,8 +158,7 @@ class AbstractLearner:
     # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
     # Compresses bagged ensembles to a single model fit on 100% of the data.
     # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
-    # TODO: this currently only works for bagged models.
-    # You must have previously called fit() with enable_fit_continuation=True, and either num_bagging_folds > 1 or auto_stack=True.
+    # You must have previously called fit() with cache_data=True.
     def refit_single_full(self, models=None):
         X = None
         y = None
@@ -470,12 +469,20 @@ class AbstractLearner:
         y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
         return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
-    def leaderboard(self, X=None, y=None, silent=False):
+    def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
         if X is not None:
             leaderboard = self.score_debug(X=X, y=y, silent=True)
         else:
             trainer = self.load_trainer()
             leaderboard = trainer.leaderboard()
+        if only_pareto_frontier:
+            if 'score_test' in leaderboard.columns and 'pred_time_test' in leaderboard.columns:
+                score_col = 'score_test'
+                inference_time_col = 'pred_time_test'
+            else:
+                score_col = 'score_val'
+                inference_time_col = 'pred_time_val'
+            leaderboard = get_leaderboard_pareto_frontier(leaderboard=leaderboard, score_col=score_col, inference_time_col=inference_time_col)
         if not silent:
             with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
                 print(leaderboard)

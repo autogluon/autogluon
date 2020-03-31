@@ -178,7 +178,7 @@ class TabularPredictor(BasePredictor):
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, dataset=None, silent=False):
+    def leaderboard(self, dataset=None, only_pareto_frontier=False, silent=False):
         """
             Output summary of information about models produced during fit() as a pandas DataFrame.
             Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -206,7 +206,12 @@ class TabularPredictor(BasePredictor):
                     'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
                         Note that this ignores the time required to load the model into memory when bagging is disabled.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
-            silent: bool (optional)
+            only_pareto_frontier : bool (optional)
+                If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
+                At minimum this will include the model with the highest score and the model with the lowest inference time.
+                This is useful when deciding which model to use during inference if inference time is a consideration.
+                Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
+            silent : bool (optional)
                 Should leaderboard DataFrame be printed?
 
             Returns
@@ -214,7 +219,7 @@ class TabularPredictor(BasePredictor):
             Pandas `pandas.DataFrame` of model performance summary information.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.leaderboard(X=dataset, silent=silent)
+        return self._learner.leaderboard(X=dataset, only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
