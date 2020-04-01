@@ -11,8 +11,11 @@ def test_fit():
                          num_trials=1,
                          batch_size=4,
                          dev_batch_size=4,
-                         max_len=16)
+                         max_len=16,
+                         ngpus_per_trial=0,
+                         seed=2)
     test_acc = predictor.evaluate(dataset)
+    print('accuracy is %.2f' % test_acc)
     print('finished')
 
 def test_custom_dataset_fit():
@@ -26,6 +29,9 @@ def test_custom_dataset_fit():
                          num_trials=1,
                          batch_size=4,
                          dev_batch_size=4,
-                         max_len=16)
+                         max_len=16,
+                         ngpus_per_trial=0,
+                         seed=2)
     test_acc = predictor.evaluate(dataset)
+    print('accuracy is %.2f' % test_acc)
     print('finished')
