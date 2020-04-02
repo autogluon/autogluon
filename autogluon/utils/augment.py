@@ -375,6 +375,14 @@ class Augmentation(object):
         return img
 
 class AugmentationBlock(Block):
+    r"""
+    AutoAugment Block
+
+    Example
+    -------
+    >>> from autogluon.utils.augment import AugmentationBlock, autoaug_imagenet_policies
+    >>> aa_transform = AugmentationBlock(autoaug_imagenet_policies())
+    """
     def __init__(self, policies):
         """
         plicies : list of (name, pr, level)
@@ -401,7 +409,6 @@ class RandAugment(object):
         self.m = m
         self.augment_list = rand_augment_list()
         self.topil = ToPIL()
-        #self.tond = ToNDArray()
 
     def __call__(self, img):
         img = self.topil(img)
@@ -411,6 +418,5 @@ class RandAugment(object):
                 continue
             val = (float(self.m) / 30) * float(maxval - minval) + minval
             img = op(img, val)
-        #img = self.tond(img)
         return img
 
