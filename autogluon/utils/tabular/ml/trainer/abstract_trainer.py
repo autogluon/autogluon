@@ -279,8 +279,7 @@ class AbstractTrainer:
                     model.predict_time = None
                 else:
                     model.predict_time = pred_end_time - fit_end_time
-            if model.val_score is None:
-                model.val_score = score
+            model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
         except TimeLimitExceeded:
