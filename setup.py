@@ -53,7 +53,7 @@ requirements = [
     'requests',
     'matplotlib',
     'tqdm>=4.38.0',
-    'paramiko>=2.5.0',
+    'paramiko~=2.4',
     'dask==2.6.0',
     'cryptography>=2.8',
     'distributed==2.6.0',
