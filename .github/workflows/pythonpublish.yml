@@ -1,6 +1,9 @@
 # This workflows will upload a Python Package using Twine when a release is created
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
 
+# Note: the first change per day is used to build daily/night release.
+# Therefore, merging one PR per day is recommanded. Otherwise, the we need to mannual trigger the CI later.
+
 name: Upload Python Package
 
 on:
