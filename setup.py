@@ -9,7 +9,7 @@ import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.6'
+version = '0.0.7'
 try:
     from datetime import date
     today = date.today()
