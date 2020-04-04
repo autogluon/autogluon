@@ -11,9 +11,10 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 
 version = '0.0.6'
 try:
-    sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'],
-        cwd=cwd).decode('ascii').strip()
-    version += '+' + sha[:7]
+    from datetime import date
+    today = date.today()
+    day = today.strftime("b%d%m%Y")
+    version += day
 except Exception:
     pass
 
@@ -36,11 +37,7 @@ class develop(setuptools.command.develop.develop):
         create_version_file()
         setuptools.command.develop.develop.run(self)
 
-try:
-    import pypandoc
-    long_description = pypandoc.convert('README.md', 'rst')
-except(IOError, ImportError):
-    long_description = open('README.md').read()
+long_description = open('README.md').read()
 
 MIN_PYTHON_VERSION = '>=3.6.*'
 
@@ -83,6 +80,7 @@ setup(
     url='https://github.com/awslabs/autogluon',
     description='AutoML Toolkit with MXNet Gluon',
     long_description=long_description,
+    long_description_content_type='text/markdown',
     license='Apache',
 
     # Package info
