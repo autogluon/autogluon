@@ -4,6 +4,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 class OheFeaturesGenerator(BaseEstimator, TransformerMixin):
+    missing_category_str = '!missing!'
 
     def __init__(self, cats_cols):
         self._feature_names = []
@@ -32,7 +33,7 @@ class OheFeaturesGenerator(BaseEstimator, TransformerMixin):
         return hstack(Xs)
 
     def _normalize(self, col):
-        return col.astype(str).fillna('#NA#').values.reshape(-1, 1)
+        return col.astype(str).fillna(self.missing_category_str).values.reshape(-1, 1)
 
     def get_feature_names(self):
         return self._feature_names

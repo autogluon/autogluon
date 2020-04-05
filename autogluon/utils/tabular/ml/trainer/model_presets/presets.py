@@ -5,7 +5,7 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
-from ...models.lr.lr_model import LinearModelNoTextFeatures, LinearModelOnlyTextFeatures
+from ...models.lr.lr_model import LinearModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_preset_models(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, name_suffix=''):
+                      hyperparameters={'NN': {}, 'GBM': {}}, hyperparameter_tune=False, name_suffix=''):
     if problem_type in [BINARY, MULTICLASS]:
         return get_preset_models_classification(path=path, problem_type=problem_type,
                                                 objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
@@ -31,10 +31,10 @@ def get_preset_models(path, problem_type, objective_func, stopping_metric=None, 
 
 
 def get_preset_stacker_model(path, problem_type, objective_func, num_classes=None,
-                      hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False):
+                             hyperparameters={'NN': {}, 'GBM': {}}, hyperparameter_tune=False):
     # TODO: Expand options to RF and NN
     if problem_type == REGRESSION:
-        model = RFModel(path=path, name='LinearRegression', model=LinearRegression(), 
+        model = RFModel(path=path, name='LinearRegression', model=LinearRegression(),
                         problem_type=problem_type, objective_func=objective_func)
     else:
         model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
@@ -44,7 +44,7 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
 
 
 def get_preset_models_classification(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                                     hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
+                                     hyperparameters={'NN': {}, 'GBM': {}, 'custom': {}}, hyperparameter_tune=False, name_suffix=''):
     # TODO: define models based on additional keys in hyperparameters
 
     models = []
@@ -91,14 +91,14 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
         )
     if lr_options is not None:
         models.append(
-            LinearModelNoTextFeatures(path=path, name='LinearModelNoTextFeatures', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
+            LinearModel(path=path, name='LinearModelNoTextFeatures', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
         if 'GBM' in custom_options:
             models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric,
-                                num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes))
-                      ]
+                         num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes))
+                ]
         # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
         # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
@@ -130,7 +130,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
         knn_unif_params['weights'] = 'uniform'
         models.append(
             KNNModel(path=path, name='KNeighborsRegressorUnif', problem_type=problem_type,
-                    objective_func=objective_func, hyperparameters=knn_unif_params),
+                     objective_func=objective_func, hyperparameters=knn_unif_params),
         )
         knn_dist_params = knn_options.copy()
         knn_dist_params['weights'] = 'distance'
@@ -178,7 +178,7 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
     models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=REGRESSION, objective_func=soft_log_loss)
     for model in models:
         model.rename(model.name + name_suffix)
-    
+
     return models
 
 

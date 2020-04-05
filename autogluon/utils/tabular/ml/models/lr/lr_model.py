@@ -10,14 +10,14 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
 from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.models.lr.hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params
+from autogluon.utils.tabular.ml.models.lr.hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
 from autogluon.utils.tabular.ml.models.lr.hyperparameters.searchspaces import get_default_searchspace
 from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractLinearModel(AbstractModel):
+class LinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None,
                  feature_types_metadata=None, debug=0, **kwargs):
@@ -25,12 +25,12 @@ class AbstractLinearModel(AbstractModel):
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
         self.pipeline = None
-
-        self.model_type, self.penalty = get_model_params(self.problem_type, hyperparameters)
-
+        self.model_class, self.penalty, self.handle_text = get_model_params(self.problem_type, hyperparameters)
         self.model_params, default_params = get_default_params(self.problem_type, self.penalty)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+        self.name = self.name + '-' + self.model_class.__name__
+        self.name = self.name + '-text_' + self.handle_text
 
     def tokenize(self, s):
         return re.split('[ ]+', s)
@@ -56,7 +56,12 @@ class AbstractLinearModel(AbstractModel):
         return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
-        raise NotImplementedError()
+        features_seclector = {
+            INCLUDE: self._select_features_handle_text_include,
+            ONLY: self._select_features_handle_text_only,
+            IGNORE: self._select_features_handle_text_ignore,
+        }.get(self.handle_text, self._select_features_handle_text_ignore)
+        return features_seclector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
@@ -108,7 +113,7 @@ class AbstractLinearModel(AbstractModel):
             self._set_default_param_value(param, val)
 
     def _get_default_searchspace(self, problem_type):
-        return get_default_searchspace()
+        return get_default_searchspace(problem_type)
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
@@ -129,7 +134,7 @@ class AbstractLinearModel(AbstractModel):
             params['alpha'] = 1 / (params['C'] if params['C'] != 0 else 1e-8)
             params.pop('C', None)
 
-        model = self.model_type(**params)
+        model = self.model_class(**params)
         self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
@@ -147,13 +152,11 @@ class AbstractLinearModel(AbstractModel):
         # dict of weights?
         return super().get_info()
 
-
-class LinearModel(AbstractLinearModel):
-    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+    def _select_features_handle_text_include(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        one_hot_threshold = 2 if len(language_featnames) > 0 else 10000
+        one_hot_threshold = 10000  # FIXME research memory constraints
         for feature in self.features:
             feature_data = df[feature]
             num_unique_vals = len(feature_data.unique())
@@ -168,21 +171,17 @@ class LinearModel(AbstractLinearModel):
                 types_of_features['onehot'].append(feature)
         return types_of_features
 
-
-class LinearModelOnlyTextFeatures(AbstractLinearModel):
-    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+    def _select_features_handle_text_only(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         for feature in self.features:
             if feature in language_featnames:
                 types_of_features['language'].append(feature)
         return types_of_features
 
-
-class LinearModelNoTextFeatures(AbstractLinearModel):
-    def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
+    def _select_features_handle_text_ignore(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
         # continuous = numeric features to rescale
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        one_hot_threshold = 2 if len(language_featnames) > 0 else 10000
+        one_hot_threshold = 10000  # FIXME research memory constraints
         for feature in self.features:
             feature_data = df[feature]
             num_unique_vals = len(feature_data.unique())
