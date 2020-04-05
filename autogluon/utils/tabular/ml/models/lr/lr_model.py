@@ -13,21 +13,24 @@ from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 
+LASSO = 'lasso'
+RIDGE = 'ridge'
+
 logger = logging.getLogger(__name__)
 
 
 class AbstractLinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None,
-                 feature_types_metadata=None, debug=0, regression_option='ridge', **kwargs):
+                 feature_types_metadata=None, debug=0, regression_option=RIDGE, **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
-        self.regression_option = regression_option
+        self.regression_option = hyperparameters.get('regression_option', RIDGE)
         self.pipeline = None
 
         if self.problem_type == REGRESSION:
-            self._get_regression_model(kwargs)
+            self._get_regression_model()
         else:
             self._model_type = LogisticRegression
 
@@ -35,20 +38,20 @@ class AbstractLinearModel(AbstractModel):
         self.set_default_params()
 
     def _get_regression_model(self):
-        if self.regression_option == 'ridge':
+        if self.regression_option == RIDGE:
             self._model_type = Ridge
-        elif self.regression_option == 'lasso':
+        elif self.regression_option == LASSO:
             self._model_type = Lasso
         else:
             logger.warning('Unknown value for regression_option {} - supported types are [ridge, lasso] - falling back to ridge'.format(self.regression_option))
-            self.regression_option = 'ridge'
+            self.regression_option = RIDGE
             self._model_type = Ridge
 
     def set_default_params(self):
         # TODO: get seed from seeds provider
         if self.problem_type == REGRESSION:
             default_params = {'C': None, 'random_state': 0, 'fit_intercept': True}
-            if self.regression_option == 'ridge':
+            if self.regression_option == RIDGE:
                 default_params['solver'] = 'auto'
         else:
             default_params = {'C': None, 'random_state': 0, 'solver': self._get_solver(), 'n_jobs': -1, 'fit_intercept': True}
@@ -139,10 +142,11 @@ class AbstractLinearModel(AbstractModel):
     def _set_default_params(self):
         default_params = {
             'C': 1,
-            'vectorizer_dict_size': 75000,
-            'proc.ngram_range': (1, 5),
-            'proc.skew_threshold': 0.99,
+            'vectorizer_dict_size': 75000,  # size of TFIDF vectorizer dictionary; used only in text model
+            'proc.ngram_range': (1, 5),  # range of n-grams for TFIDF vectorizer dictionary; used only in text model
+            'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
             'proc.impute_strategy': 'median',  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
+            'regression_option': RIDGE,  #
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
