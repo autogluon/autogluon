@@ -48,15 +48,15 @@ def get_default_params(problem_type: str, penalty: str):
         if penalty == L2:
             default_params['solver'] = 'auto'
     else:
-        default_params = {'C': None, 'random_state': 0, 'solver': _get_solver(), 'n_jobs': -1, 'fit_intercept': True}
+        default_params = {'C': None, 'random_state': 0, 'solver': _get_solver(problem_type), 'n_jobs': -1, 'fit_intercept': True}
     model_params = list(default_params.keys())
     return model_params, default_params
 
 
-def _get_solver(self):
-    if self.problem_type == BINARY:
+def _get_solver(problem_type):
+    if problem_type == BINARY:
         solver = 'lbfgs'  # TODO use liblinear for smaller datasets
-    elif self.problem_type == MULTICLASS:
+    elif problem_type == MULTICLASS:
         solver = 'saga'  # another option is lbfgs
     else:
         solver = 'lbfgs'
