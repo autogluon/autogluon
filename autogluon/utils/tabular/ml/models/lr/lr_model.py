@@ -5,57 +5,30 @@ import numpy as np
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression, Ridge, Lasso
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
+from autogluon.utils.tabular.ml.models.lr.hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params
+from autogluon.utils.tabular.ml.models.lr.hyperparameters.searchspaces import get_default_searchspace
 from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
-
-LASSO = 'lasso'
-RIDGE = 'ridge'
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractLinearModel(AbstractModel):
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None,
-                 feature_types_metadata=None, debug=0, regression_option=RIDGE, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None,
+                 feature_types_metadata=None, debug=0, **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
         self.types_of_features = None
-        self.regression_option = hyperparameters.get('regression_option', RIDGE)
         self.pipeline = None
 
-        if self.problem_type == REGRESSION:
-            self._get_regression_model()
-        else:
-            self._model_type = LogisticRegression
+        self.model_type, self.penalty = get_model_params(self.problem_type, hyperparameters)
 
-        self.model_params = None
-        self.set_default_params()
-
-    def _get_regression_model(self):
-        if self.regression_option == RIDGE:
-            self._model_type = Ridge
-        elif self.regression_option == LASSO:
-            self._model_type = Lasso
-        else:
-            logger.warning('Unknown value for regression_option {} - supported types are [ridge, lasso] - falling back to ridge'.format(self.regression_option))
-            self.regression_option = RIDGE
-            self._model_type = Ridge
-
-    def set_default_params(self):
-        # TODO: get seed from seeds provider
-        if self.problem_type == REGRESSION:
-            default_params = {'C': None, 'random_state': 0, 'fit_intercept': True}
-            if self.regression_option == RIDGE:
-                default_params['solver'] = 'auto'
-        else:
-            default_params = {'C': None, 'random_state': 0, 'solver': self._get_solver(), 'n_jobs': -1, 'fit_intercept': True}
-        self.model_params = list(default_params.keys())
+        self.model_params, default_params = get_default_params(self.problem_type, self.penalty)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -88,15 +61,6 @@ class AbstractLinearModel(AbstractModel):
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
-
-    def _get_solver(self):
-        if self.problem_type == BINARY:
-            solver = 'lbfgs'  # TODO use liblinear for smaller datasets
-        elif self.problem_type == MULTICLASS:
-            solver = 'saga'  # another option is lbfgs
-        else:
-            solver = 'lbfgs'
-        return solver
 
     # TODO: handle collinear features - they will impact results quality
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000):
@@ -140,23 +104,11 @@ class AbstractLinearModel(AbstractModel):
         self.pipeline.fit(X)
 
     def _set_default_params(self):
-        default_params = {
-            'C': 1,
-            'vectorizer_dict_size': 75000,  # size of TFIDF vectorizer dictionary; used only in text model
-            'proc.ngram_range': (1, 5),  # range of n-grams for TFIDF vectorizer dictionary; used only in text model
-            'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
-            'proc.impute_strategy': 'median',  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
-            'regression_option': RIDGE,  #
-        }
-        for param, val in default_params.items():
+        for param, val in get_param_baseline().items():
             self._set_default_param_value(param, val)
 
     def _get_default_searchspace(self, problem_type):
-        spaces = {
-            # 'C': Real(lower=1e-4, upper=1e5, default=1),
-            # 'tokenizer': Categorical('split', 'sentencepiece')
-        }
-        return spaces
+        return get_default_searchspace()
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
@@ -177,7 +129,7 @@ class AbstractLinearModel(AbstractModel):
             params['alpha'] = 1 / (params['C'] if params['C'] != 0 else 1e-8)
             params.pop('C', None)
 
-        model = self._model_type(**params)
+        model = self.model_type(**params)
         self.model = model.fit(X_train, Y_train)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
