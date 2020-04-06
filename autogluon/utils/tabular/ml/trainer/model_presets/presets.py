@@ -91,7 +91,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
         )
     if lr_options is not None:
         models.append(
-            LinearModel(path=path, name='LinearModelNoTextFeatures', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
+            LinearModel(path=path, name='LinearModel', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
@@ -113,6 +113,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
 
 def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
     models = []
+    lr_options = hyperparameters.get('LR', None)
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
     cat_options = hyperparameters.get('CAT', None)
@@ -157,6 +158,10 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
         if 'GBM' in custom_options:
             models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
+    if lr_options is not None:
+        models.append(
+            LinearModel(path=path, name='LinearModel', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_options.copy())
+        )
 
     for model in models:
         model.rename(model.name + name_suffix)
