@@ -75,6 +75,5 @@ detector.save(savefile)
 
 from autogluon import Detector
 new_detector = Detector.load(savefile)
-ind2, prob2, loc2 = new_detector.predict(image_path)
 ```
 
