@@ -10,7 +10,7 @@ def get_built_in_network(meta_arch, name, *args, **kwargs):
             net = gcv.model_zoo.get_model(net_name,
                                           classes=transfer_classes,
                                           pretrained_base=False,
-                                          transfer='coco')
+                                          transfer=None)
             net.initialize(ctx=ctx, force_reinit=True)
         elif meta_arch == 'faster_rcnn':
             net_name = '_'.join(('custom', meta_arch, 'fpn'))

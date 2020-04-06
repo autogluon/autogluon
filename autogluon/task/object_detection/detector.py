@@ -1,3 +1,6 @@
+from collections import OrderedDict
+import cloudpickle as pkl
+
 import gluoncv as gcv
 import matplotlib.pyplot as plt
 import mxnet as mx
@@ -7,9 +10,10 @@ from gluoncv.data.transforms.presets.rcnn import FasterRCNNDefaultValTransform
 from gluoncv.data.transforms.presets.yolo import YOLO3DefaultValTransform
 from mxnet import gluon
 
-from .utils import rcnn_split_and_load
+from .utils import rcnn_split_and_load, get_network
 from ..base.base_predictor import BasePredictor
-from ...core.space import AutoGluonObject
+from ...core import AutoGluonObject
+from ...utils import save, load, collect_params, update_params
 
 __all__ = ['Detector']
 
@@ -19,9 +23,9 @@ class Detector(BasePredictor):
     Trained Object Detector returned by `task.fit()`
     """
 
-    def __init__(self, model, results, scheduler_checkpoint, args, **kwargs):
+    def __init__(self, model, results, scheduler_checkpoint, args, format_results=True, **kwargs):
         self.model = model
-        self.results = self._format_results(results)
+        self.results = self._format_results(results) if format_results else results
         self.scheduler_checkpoint = scheduler_checkpoint
         self.args = args
 
@@ -189,16 +193,47 @@ class Detector(BasePredictor):
 
     @classmethod
     def load(cls, checkpoint):
-        raise NotImplemented
+        """ load trained object detector from the file specified by 'checkpoint'
+        """
+        state_dict = load(checkpoint)
+        args = state_dict['args']
+        results = pkl.loads(state_dict['results'])
+        scheduler_checkpoint = state_dict['scheduler_checkpoint']
+        model_params = state_dict['model_params']
+        classes = state_dict['classes']
+
+        model = get_network(args.meta_arch, args.net, classes, mx.cpu(0))
+        update_params(model, model_params)
+
+        return cls(model, results, scheduler_checkpoint, args, format_results=False)
+
+
+    def state_dict(self, destination=None):
+        if destination is None:
+            destination = OrderedDict()
+            destination._metadata = OrderedDict()
+        model_params = collect_params(self.model)
+        destination['model_params'] = model_params
+        destination['results'] = pkl.dumps(self.results)
+        destination['scheduler_checkpoint'] = self.scheduler_checkpoint
+        destination['args'] = self.args
+        destination['classes'] = destination['args'].pop('dataset').get_classes()
+        return destination
 
     def save(self, checkpoint):
-        raise NotImplemented
-
-    def predict_proba(self, X):
-        raise NotImplemented
-
-    def _save_model(self, *args, **kwargs):
-        raise NotImplemented
+        """save object detector to the file specified by 'checkpoint'
+        """
+        state_dict = self.state_dict()
+        save(state_dict, checkpoint)
 
     def evaluate_predictions(self, y_true, y_pred):
-        raise NotImplemented
+        raise NotImplementedError
+
+    def predict_proba(self, X):
+        raise NotImplementedError
+
+
+
+
+
+

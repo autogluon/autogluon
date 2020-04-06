@@ -67,3 +67,13 @@ image_path = os.path.join(data_root, 'JPEGImages', image)
 
 ind, prob, loc = detector.predict(image_path)
 ```
+
+We can also save the trained model, and use it later. 
+```{.python .input}
+savefile = 'model.pkl'
+detector.save(savefile)
+
+from autogluon import Detector
+new_detector = Detector.load(savefile)
+```
+
