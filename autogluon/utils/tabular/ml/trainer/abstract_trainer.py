@@ -323,7 +323,8 @@ class AbstractTrainer:
         if model.is_valid():
             self.model_graph.add_node(model.name, fit_time=model.fit_time, predict_time=model.predict_time, val_score=model.val_score)
             if isinstance(model, StackerEnsembleModel):
-                for base_model_name in model.base_model_names:
+                for stack_column_prefix in model.stack_column_prefix_lst:
+                    base_model_name = model.stack_column_prefix_to_model_map[stack_column_prefix]
                     self.model_graph.add_edge(base_model_name, model.name)
             if model.name not in stack_loc[level]:
                 stack_loc[level].append(model.name)
@@ -625,16 +626,16 @@ class AbstractTrainer:
         else:
             raise Exception('Trainer has no fit models to predict with.')
 
-    def predict_model(self, X, model, level_start=0):
+    def predict_model(self, X, model, model_pred_proba_dict=None):
         if isinstance(model, str):
             model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
+        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
         return model.predict(X=X, preprocess=False)
 
-    def predict_proba_model(self, X, model, level_start=0):
+    def predict_proba_model(self, X, model, model_pred_proba_dict=None):
         if isinstance(model, str):
             model = self.load_model(model)
-        X = self.get_inputs_to_model(model=model, X=X, level_start=level_start, fit=False)
+        X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
         EPS = 1e-10 # predicted probabilities can be at most this confident if we normalize predicted probabilities
         # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
         if not self.normalize_predprobs:
@@ -654,16 +655,21 @@ class AbstractTrainer:
             return y_predproba
         return model.predict_proba(X=X, preprocess=False)
 
-    def get_inputs_to_model(self, model, X, level_start, fit=False, preprocess=True):
+    # Note: model_pred_proba_dict is mutated in this function to minimize memory usage
+    def get_inputs_to_model(self, model, X, model_pred_proba_dict=None, fit=False, preprocess=True):
         if isinstance(model, str):
             model = self.load_model(model)
         model_level = self.get_model_level(model.name)
-        if model_level >= 1:
-            X = self.get_inputs_to_stacker(X=X, level_start=level_start, level_end=model_level-1, fit=fit)
-            X = model.preprocess(X, fit=fit, preprocess=preprocess)
-        else:
-            if preprocess:
-                X = model.preprocess(X)
+        if model_level >= 1 and isinstance(model, StackerEnsembleModel):
+            if fit:
+                X = model.preprocess(X=X, preprocess=preprocess, fit=fit, model_pred_proba_dict=None)
+            else:
+                model_set = self.get_minimum_model_set(model)
+                model_set = [m for m in model_set if m != model.name]  # TODO: Can probably be faster, get this result from graph
+                model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=model_set, model_pred_proba_dict=model_pred_proba_dict, fit=fit)
+                X = model.preprocess(X=X, preprocess=preprocess, fit=fit, model_pred_proba_dict=model_pred_proba_dict)
+        elif preprocess:
+            X = model.preprocess(X)
         return X
 
     def score(self, X, y, model=None):
@@ -693,24 +699,92 @@ class AbstractTrainer:
             preds.append(model_pred)
         return preds
 
-    def get_inputs_to_stacker(self, X, level_start, level_end, y_pred_probas=None, fit=False):
+    # TODO: Consider adding persist to disk functionality for pred_proba dictionary to lessen memory burden on large multiclass problems.
+    #  For datasets with 100+ classes, this function could potentially run the system OOM due to each pred_proba numpy array taking significant amounts of space.
+    #  This issue already existed in the previous level-based version but only had the minimum required predictions in memory at a time, whereas this has all model predictions in memory.
+    # TODO: Add memory optimal topological ordering -> Minimize amount of pred_probas in memory at a time, delete pred probas that are no longer required
+    # Optimally computes pred_probas for each model in `models`. Will compute each necessary model only once and store its predictions in a dictionary.
+    # Note: Mutates model_pred_proba_dict and model_pred_time_dict input if present to minimize memory usage
+    # fit = get oof pred proba
+    # if record_pred_time is `True`, outputs tuple of dicts (model_pred_proba_dict, model_pred_time_dict), else output only model_pred_proba_dict
+    def get_model_pred_proba_dict(self, X, models, model_pred_proba_dict=None, model_pred_time_dict=None, fit=False, record_pred_time=False):
+        if model_pred_proba_dict is None:
+            model_pred_proba_dict = {}
+        if model_pred_time_dict is None:
+            model_pred_time_dict = {}
+
+        if fit:
+            model_pred_order = [model for model in models if model not in model_pred_proba_dict.keys()]
+        else:
+            model_set = set()
+            for model in models:
+                if model in model_set:
+                    continue
+                min_model_set = set(self.get_minimum_model_set(model))
+                model_set = model_set.union(min_model_set)
+            model_set = model_set.difference(set(model_pred_proba_dict.keys()))
+            models_to_load = list(model_set)
+            subgraph = nx.subgraph(self.model_graph, models_to_load)
+
+            # For model in model_pred_proba_dict, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
+            models_to_ignore = [model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))]
+            while models_to_ignore:
+                model = models_to_ignore[0]
+                predecessors = list(subgraph.predecessors(model))
+                subgraph.remove_node(model)
+                models_to_ignore = models_to_ignore[1:]
+                for predecessor in predecessors:
+                    if (predecessor not in models) and (not list(subgraph.successors(predecessor))) and (predecessor not in models_to_ignore):
+                        models_to_ignore.append(predecessor)
+
+            # Get model prediction order
+            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+
+        # Compute model predictions in topological order
+        for model_name in model_pred_order:
+            if record_pred_time:
+                time_start = time.time()
+            model = self.load_model(model_name=model_name)
+            if fit:
+                if isinstance(model, BaggedEnsembleModel):
+                    model_pred_proba_dict[model_name] = model.oof_pred_proba
+                else:
+                    raise AssertionError(f'Model {model.name} must be a BaggedEnsembleModel to return oof_pred_proba')
+            elif isinstance(model, StackerEnsembleModel):
+                X_input = model.preprocess(X=X, preprocess=True, infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                model_pred_proba_dict[model_name] = model.predict_proba(X_input, preprocess=False)
+            else:
+                model_pred_proba_dict[model_name] = model.predict_proba(X)
+
+            if record_pred_time:
+                time_end = time.time()
+                model_pred_time_dict[model_name] = time_end - time_start
+
+        if record_pred_time:
+            return model_pred_proba_dict, model_pred_time_dict
+        else:
+            return model_pred_proba_dict
+
+    # TODO: Legacy code, still used during training because it is technically slightly faster and more memory efficient than get_model_pred_proba_dict()
+    #  Remove in future as it limits flexibility in stacker inputs during training
+    def get_inputs_to_stacker(self, X, level_start, level_end, model_levels=None, y_pred_probas=None, fit=False):
         if level_start > level_end:
             raise AssertionError('level_start cannot be greater than level end:' + str(level_start) + ', ' + str(level_end))
         if (level_start == 0) and (level_end == 0):
             return X
         if fit:
             if level_start >= 1:
-                dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
+                dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
                 cols_to_drop = dummy_stacker_start.stack_columns
                 X = X.drop(cols_to_drop, axis=1)
-            dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
+            dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
             X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
-            dummy_stacker = self._get_dummy_stacker(level=level_end, use_orig_features=True)
+            dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
             X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas)
             if dummy_stacker.use_orig_features:
                 if level_start >= 1:
-                    dummy_stacker_start = self._get_dummy_stacker(level=level_start, use_orig_features=True)
+                    dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)
                     cols_to_drop = dummy_stacker_start.stack_columns
                     X = X.drop(cols_to_drop, axis=1)
                 X = pd.concat([X_stacker, X], axis=1)
@@ -720,7 +794,7 @@ class AbstractTrainer:
             dummy_stackers = {}
             for level in range(level_start, level_end+1):
                 if level >= 1:
-                    dummy_stackers[level] = self._get_dummy_stacker(level=level, use_orig_features=True)
+                    dummy_stackers[level] = self._get_dummy_stacker(level=level, model_levels=model_levels, use_orig_features=True)
             for level in range(level_start, level_end):
                 if level >= 1:
                     cols_to_drop = dummy_stackers[level].stack_columns
@@ -818,8 +892,10 @@ class AbstractTrainer:
                 model_type = self.model_types[model_name]
             return model_type.load(path=path, reset_paths=self.reset_paths)
 
-    def _get_dummy_stacker(self, level, use_orig_features=True):
-        model_names = self.models_level['core'][level-1]
+    def _get_dummy_stacker(self, level, model_levels=None, use_orig_features=True):
+        if model_levels is None:
+            model_levels = self.models_level['core']
+        model_names = model_levels[level - 1]
         base_models_dict = {}
         for model_name in model_names:
             if model_name in self.models.keys():
@@ -859,17 +935,17 @@ class AbstractTrainer:
                 if raw:
                     raise AssertionError('Raw feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute raw feature importances.')
                 X = self.load_X_train()
-                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=True)
+                X = self.get_inputs_to_model(model=model, X=X, fit=True)
                 is_oof = True
             else:
                 X = self.load_X_val()
                 if not raw:
-                    X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
+                    X = self.get_inputs_to_model(model=model, X=X, fit=False)
                 is_oof = False
         else:
             is_oof = False
             if not raw:
-                X = self.get_inputs_to_model(model=model, X=X, level_start=0, fit=False)
+                X = self.get_inputs_to_model(model=model, X=X, fit=False)
 
         if y is None and X is not None:
             if is_oof:

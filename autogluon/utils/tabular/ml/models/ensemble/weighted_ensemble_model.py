@@ -14,18 +14,20 @@ class WeightedEnsembleModel(StackerEnsembleModel):
     def __init__(self, path: str, name: str, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
         model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
         super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, base_model_types_inner_dict=base_model_types_inner_dict, base_model_performances_dict=base_model_performances_dict, use_orig_features=False, num_classes=num_classes, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, random_state=random_state, debug=debug)
-        self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.base_model_names, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric)
+        self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric)
         self._child_type = type(self.model_base)
         self.low_memory = False
 
     def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
         super().fit(X, y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=compute_base_preds, time_limit=time_limit, **kwargs)
-        base_model_names = []
+        stack_columns = []
         for model in self.models:
             model = self.load_child(model, verbose=False)
-            base_model_names = base_model_names + [base_model_name for base_model_name in model.base_model_names if base_model_name not in base_model_names]
-        self.base_model_names = [base_model_name for base_model_name in self.base_model_names if base_model_name in base_model_names]
-        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
+            stack_columns = stack_columns + [stack_column for stack_column in model.base_model_names if stack_column not in stack_columns]
+        self.stack_column_prefix_lst = [stack_column for stack_column in self.stack_column_prefix_lst if stack_column in stack_columns]
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
+        min_stack_column_prefix_to_model_map = {k: v for k, v in self.stack_column_prefix_to_model_map.items() if k in self.stack_column_prefix_lst}
+        self.base_model_names = [base_model_name for base_model_name in self.base_model_names if base_model_name in min_stack_column_prefix_to_model_map.values()]
 
     def _get_model_weights(self):
         weights_dict = defaultdict(int)

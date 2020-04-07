@@ -44,7 +44,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             if model_name not in self.base_model_names:
                 self.base_models_dict.pop(model_name)
 
-        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
+        self.stack_column_prefix_lst = copy.deepcopy(self.base_model_names)
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=self.stack_column_prefix_lst)
+        self.stack_column_prefix_to_model_map = {stack_column_prefix: self.base_model_names[i] for i, stack_column_prefix in enumerate(self.stack_column_prefix_lst)}
 
     @staticmethod
     def limit_models_per_type(models, model_types, model_scores, max_models_per_type):
@@ -71,27 +73,32 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None):
-        if infer:
-            if set(self.stack_columns).issubset(set(list(X.columns))):
-                compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
-        if compute_base_preds:
-            X_stacker = []
-            for base_model_name in self.base_model_names:
-                base_model = self.load_base_model(base_model_name)
-                if fit:
-                    y_pred_proba = base_model.oof_pred_proba
+    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None):
+        if self.stack_column_prefix_lst:
+            if infer:
+                if set(self.stack_columns).issubset(set(list(X.columns))):
+                    compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
+            if compute_base_preds:
+                X_stacker = []
+                for stack_column_prefix in self.stack_column_prefix_lst:
+                    base_model_name = self.stack_column_prefix_to_model_map[stack_column_prefix]
+                    if fit:
+                        base_model = self.load_base_model(base_model_name)
+                        y_pred_proba = base_model.oof_pred_proba
+                    elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
+                        y_pred_proba = model_pred_proba_dict[base_model_name]
+                    else:
+                        base_model = self.load_base_model(base_model_name)
+                        y_pred_proba = base_model.predict_proba(X)
+                    X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
+                X_stacker = self.pred_probas_to_df(X_stacker)
+                X_stacker.index = X.index
+                if self.use_orig_features:
+                    X = pd.concat([X_stacker, X], axis=1)
                 else:
-                    y_pred_proba = base_model.predict_proba(X)
-                X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
-            X_stacker = self.pred_probas_to_df(X_stacker)
-            X_stacker.index = X.index
-            if self.use_orig_features:
-                X = pd.concat([X_stacker, X], axis=1)
-            else:
-                X = X_stacker
-        elif not self.use_orig_features:
-            X = X[self.stack_columns]
+                    X = X_stacker
+            elif not self.use_orig_features:
+                X = X[self.stack_columns]
         if preprocess:
             X = super().preprocess(X, model=model)
         return X
@@ -127,12 +134,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             model_local_path = model_path.split(path_root_orig, 1)[1]
             self.base_model_paths_dict[model] = self.path_root + model_local_path
 
-    def set_stack_columns(self, base_model_names):
+    def set_stack_columns(self, stack_column_prefix_lst):
         if self.problem_type == MULTICLASS:
-            stack_columns = [model_name + '_' + str(cls) for model_name in base_model_names for cls in range(self.num_classes)]
+            stack_columns = [stack_column_prefix + '_' + str(cls) for stack_column_prefix in stack_column_prefix_lst for cls in range(self.num_classes)]
             num_pred_cols_per_model = self.num_classes
         else:
-            stack_columns = base_model_names
+            stack_columns = stack_column_prefix_lst
             num_pred_cols_per_model = 1
         return stack_columns, num_pred_cols_per_model
 
