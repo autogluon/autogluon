@@ -106,10 +106,13 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.features = self.features
         model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
 
+        if self.model_base is not None:
+            self.save_model_base(self.model_base)
+            self.model_base = None
+
         if k_fold == 1:
             if self._n_repeats != 0:
                 raise ValueError(f'n_repeats must equal 0 when fitting a single model with k_fold < 2, values: ({self._n_repeats}, {k_fold})')
-            self.model_base = None
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             time_start_fit = time.time()
             model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
@@ -202,9 +205,6 @@ class BaggedEnsembleModel(AbstractModel):
         self.models += models
 
         self.bagged_mode = True
-        if self.model_base is not None:
-            self.save_model_base(self.model_base)
-            self.model_base = None
 
         if self._oof_pred_proba is None:
             self._oof_pred_proba = oof_pred_proba
