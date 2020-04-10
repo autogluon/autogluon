@@ -21,9 +21,9 @@ class LinearModel(AbstractModel):
 
     def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None,
                  feature_types_metadata=None, debug=0, **kwargs):
-        self.model_class, self.penalty, self.handle_text = get_model_params(self.problem_type, hyperparameters)
-        self.name = self.name + '-' + self.model_class.__name__
-        self.name = self.name + '-text_' + self.handle_text
+        self.model_class, self.penalty, self.handle_text = get_model_params(problem_type, hyperparameters)
+        name = name + '-' + self.model_class.__name__
+        name = name + '-text_' + self.handle_text
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
 
@@ -70,12 +70,13 @@ class LinearModel(AbstractModel):
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
     # TODO: handle collinear features - they will impact results quality
-    def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000):
-        X = X.copy()
-        feature_types = self._get_types_of_features(X)
-        if is_train:
-            self.preprocess_train(X, feature_types, vect_max_features)
-        X = self.pipeline.transform(X)
+    def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000, model_specific_preprocessing=False):
+        if model_specific_preprocessing:  # This is hack to work-around pre-processing caching in bagging/stacker models
+            X = X.copy()
+            if is_train:
+                feature_types = self._get_types_of_features(X)
+                self.preprocess_train(X, feature_types, vect_max_features)
+            X = self.pipeline.transform(X)
 
         return X
 
@@ -125,7 +126,7 @@ class LinearModel(AbstractModel):
         if self.problem_type == BINARY:
             Y_train = Y_train.astype(int).values
 
-        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'])
+        X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'], model_specific_preprocessing=True)
 
         params = {k: v for k, v in self.params.items() if k in self.model_params}
 
@@ -138,6 +139,10 @@ class LinearModel(AbstractModel):
 
         model = self.model_class(**params)
         self.model = model.fit(X_train, Y_train)
+
+    def predict_proba(self, X, preprocess=True):
+        X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
+        return self.model.predict(X)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
