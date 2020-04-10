@@ -798,11 +798,23 @@ class AbstractTrainer:
         return X
 
     # You must have previously called fit() with cache_data=True
-    def refit_single_full(self, X=None, y=None, models=None):
+    def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, models=None):
         if X is None:
             X = self.load_X_train()
+            if X_val is None and not self.bagged_mode:
+                X_val = self.load_X_val()
         if y is None:
             y = self.load_y_train()
+            if y_val is None and not self.bagged_mode:
+                y_val = self.load_y_val()
+
+        if X_val is not None and y_val is not None:
+            X_full = pd.concat([X, X_val])
+            y_full = pd.concat([y, y_val])
+        else:
+            X_full = X
+            y_full = y
+
         if models is None:
             models = self.get_model_names_all()
 
@@ -830,9 +842,15 @@ class AbstractTrainer:
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
-                    X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+                    if self.bagged_mode:
+                        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+                        y_input = y
+                    else:
+                        X_train_stack_preds = self.get_inputs_to_stacker(X_val, level_start=0, level_end=level, fit=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
+                        y_input = y_val
+
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_PREFIX)
+                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_PREFIX)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -842,7 +860,7 @@ class AbstractTrainer:
                         self.model_pred_times[model_weighted_ensemble] = None
                         self.save_model(model_loaded)
                 else:
-                    models_trained = self.stack_new_level_core(X=X, y=y, models=[model_compressed], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, stacker_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_compressed], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, stacker_type=stacker_type)
                 if len(models_trained) == 1:
                     model_compressed_dict[model_name] = models_trained[0]
                 models_trained_full += models_trained
@@ -893,6 +911,7 @@ class AbstractTrainer:
                     self.model_graph.add_edge(base_model_name, model_loaded.name)
 
         self.save()
+        return copy.deepcopy(self.model_compressed_dict)
 
     # TODO: Take best performance model with lowest inference
     def best_single_model(self, stack_name, stack_level):
