@@ -62,7 +62,7 @@ def _get_solver(problem_type):
     if problem_type == BINARY:
         solver = 'lbfgs'  # TODO use liblinear for smaller datasets
     elif problem_type == MULTICLASS:
-        solver = 'saga'  # another option is lbfgs
+        solver = 'lbfgs'  # another option is lbfgs
     else:
         solver = 'lbfgs'
     return solver
