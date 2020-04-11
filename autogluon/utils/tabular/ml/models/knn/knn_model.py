@@ -1,19 +1,20 @@
-import time
 import logging
 import pickle
-import psutil
 import sys
+import time
+
+import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.preprocessing import normalize
 
 from ..abstract import model_trial
+from ..abstract.abstract_model import SKLearnModel
 from ...constants import REGRESSION
-from ..sklearn.sklearn_model import SKLearnModel
 from ....utils.exceptions import NotEnoughMemoryError
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Normalize data!
 class KNNModel(SKLearnModel):
     def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
@@ -26,6 +27,7 @@ class KNNModel(SKLearnModel):
         cat_columns = X.select_dtypes(['category']).columns
         X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
         X = super().preprocess(X).fillna(0)
+        X = normalize(X, copy=True)
         return X
 
     def _set_default_params(self):
@@ -50,7 +52,7 @@ class KNNModel(SKLearnModel):
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem
             if model_memory_ratio > 0.35:
-                logger.warning('\tWarning: Model is expected to require %s percent of available memory...' % (model_memory_ratio * 100))
+                logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
             if model_memory_ratio > 0.45:
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
