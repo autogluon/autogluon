@@ -10,4 +10,3 @@ PROBLEM_TYPES = PROBLEM_TYPES_CLASSIFICATION + PROBLEM_TYPES_REGRESSION + [SOFTC
 
 REFIT_FULL_NAME = 'refit_single_full'  # stack-name used for refit_single_full (aka "compressed") models
 REFIT_FULL_SUFFIX = "_FULL"  # suffix appended to model name for refit_single_full (aka "compressed") models
-REFIT_FULL_PREFIX = "FULL_"

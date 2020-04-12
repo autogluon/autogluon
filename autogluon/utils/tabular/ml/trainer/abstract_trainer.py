@@ -7,7 +7,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from collections import defaultdict
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_PREFIX
+from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
@@ -103,7 +103,7 @@ class AbstractTrainer:
         self.model_pred_times = {}
         self.models = {}
         self.model_graph = nx.DiGraph()
-        self.model_compressed_dict = {}  # Dict of Uncompressed Model -> Compressed Model
+        self.model_full_dict = {}  # Dict of normal Model -> FULL Model
         self.reset_paths = False
 
         self.hpo_results = {}  # Stores summary of HPO process
@@ -573,7 +573,7 @@ class AbstractTrainer:
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble_' + name_suffix + 'k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
                                                         objective_func=self.objective_func, num_classes=self.num_classes, random_state=level)
 
@@ -798,6 +798,7 @@ class AbstractTrainer:
         return X
 
     # You must have previously called fit() with cache_data=True
+    # Fits _FULL versions of specified models, but does NOT link them (_FULL stackers will still use normal models as input)
     def refit_single_full(self, X=None, y=None, X_val=None, y_val=None, models=None):
         if X is None:
             X = self.load_X_train()
@@ -831,13 +832,13 @@ class AbstractTrainer:
 
         levels = sorted(model_levels[REFIT_FULL_NAME].keys())
         models_trained_full = []
-        model_compressed_dict = {}
+        model_full_dict = {}
         for level in levels:
             models_level = model_levels[REFIT_FULL_NAME][level]
             for model in models_level:
                 model = self.load_model(model)
                 model_name = model.name
-                model_compressed = model.convert_to_refitfull_template()
+                model_full = model.convert_to_refitfull_template()
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
@@ -850,7 +851,7 @@ class AbstractTrainer:
                         y_input = y_val
 
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_PREFIX)
+                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -860,23 +861,24 @@ class AbstractTrainer:
                         self.model_pred_times[model_weighted_ensemble] = None
                         self.save_model(model_loaded)
                 else:
-                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_compressed], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, stacker_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, stacker_type=stacker_type)
                 if len(models_trained) == 1:
-                    model_compressed_dict[model_name] = models_trained[0]
+                    model_full_dict[model_name] = models_trained[0]
                 models_trained_full += models_trained
 
         keys_to_del = []
-        for model in model_compressed_dict.keys():
-            if model_compressed_dict[model] not in models_trained_full:
+        for model in model_full_dict.keys():
+            if model_full_dict[model] not in models_trained_full:
                 keys_to_del.append(model)
         for key in keys_to_del:
-            del model_compressed_dict[key]
-        self.model_compressed_dict.update(model_compressed_dict)
+            del model_full_dict[key]
+        self.model_full_dict.update(model_full_dict)
         self.save()  # TODO: This could be more efficient by passing in arg to not save if called by refit_ensemble_full since it saves anyways later.
         return models_trained_full
 
-    # TODO: Rename _FULL -> _SINGLE / _SOLO?
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
+    # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
+    # If no model is specified, all models are refit and linked appropriately.
     def refit_ensemble_full(self, model=None):
         if model is None:
             ensemble_set = self.get_model_names_all()
@@ -885,14 +887,14 @@ class AbstractTrainer:
         models_trained_full = self.refit_single_full(models=ensemble_set)
 
         self.model_graph.remove_nodes_from(models_trained_full)
-        for model_compressed in models_trained_full:
+        for model_full in models_trained_full:
             # TODO: Consider moving base model info to a separate pkl file so that it can be edited without having to load/save the model again
             #  Downside: Slower inference speed when models are not persisted in memory prior.
-            model_loaded = self.load_model(model_compressed)
+            model_loaded = self.load_model(model_full)
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
-                    new_base_model = self.model_compressed_dict[base_model]
+                    new_base_model = self.model_full_dict[base_model]
                     new_base_model_type = self.model_types[new_base_model]
                     new_base_model_path = self.model_paths[new_base_model]
 
@@ -911,7 +913,7 @@ class AbstractTrainer:
                     self.model_graph.add_edge(base_model_name, model_loaded.name)
 
         self.save()
-        return copy.deepcopy(self.model_compressed_dict)
+        return copy.deepcopy(self.model_full_dict)
 
     # TODO: Take best performance model with lowest inference
     def best_single_model(self, stack_name, stack_level):
@@ -919,7 +921,7 @@ class AbstractTrainer:
 
             Examples:
                 To get get best single (refit_single_full) model:
-                    trainer.best_single_model('refit_single_full', 0)  # TODO: does not work because compressed models have no validation score.
+                    trainer.best_single_model('refit_single_full', 0)  # TODO: does not work because FULL models have no validation score.
                 To get best single (distilled) model:
                     trainer.best_single_model('distill', 0)
         """
