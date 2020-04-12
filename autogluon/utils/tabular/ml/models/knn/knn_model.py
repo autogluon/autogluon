@@ -5,7 +5,6 @@ import time
 
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.preprocessing import normalize
 
 from ..abstract import model_trial
 from ..abstract.abstract_model import SKLearnModel
@@ -15,6 +14,7 @@ from ....utils.exceptions import NotEnoughMemoryError
 logger = logging.getLogger(__name__)
 
 
+# TODO: Normalize data!
 class KNNModel(SKLearnModel):
     def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
@@ -27,7 +27,6 @@ class KNNModel(SKLearnModel):
         cat_columns = X.select_dtypes(['category']).columns
         X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
         X = super().preprocess(X).fillna(0)
-        X = normalize(X, copy=True)
         return X
 
     def _set_default_params(self):
