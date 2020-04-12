@@ -172,6 +172,13 @@ class AbstractLearner:
         trainer = self.load_trainer()
         return trainer.refit_single_full(X=X, y=y, models=models)
 
+    # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
+    # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
+    # If no model is specified, all models are refit and linked appropriately.
+    def refit_ensemble_full(self, model=None):
+        trainer = self.load_trainer()
+        return trainer.refit_ensemble_full(model=model)
+
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
             X = feature_generator.fit_transform(X, y)
