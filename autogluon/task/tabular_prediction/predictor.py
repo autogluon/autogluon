@@ -1,3 +1,4 @@
+import copy
 import logging
 
 import pandas as pd
@@ -386,6 +387,43 @@ class TabularPredictor(BasePredictor):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
+
+    def refit_full(self, model=None):
+        """
+        Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+        For bagged models, this process will typically result in a slight accuracy reduction and a large inference speedup.
+            The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+            The runtime is generally 10% or less of the original fit runtime.
+        This function can also be called on non-bagged models for a slight accuracy increase and no change to inference time.
+            In this instance, the runtime will be approximately equal to the original fit runtime.
+        This process does not alter the original models, but instead adds additional models.
+        Models produced by this process will not have validation scores, as they use all of the data for training.
+        Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+
+        Parameters
+        ----------
+        model : str, default = None
+            Model to refit. If None then all models are refitted.
+            All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+
+        Returns
+        -------
+        Dictionary of original model names -> refit full model names.
+        """
+        return self._learner.refit_ensemble_full(model=model)
+
+    def get_model_full_dict(self):
+        """
+        Returns a dictionary of original model name -> refit full model name.
+        Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
+        This can be useful when determining the best model based off of `predictor.leaderboard()`, then getting the _FULL version of the model by passing its name as the key to this dictionary.
+
+        Returns
+        -------
+        Dictionary of original model name -> refit full model name.
+        """
+        return copy.deepcopy(self._trainer.model_full_dict)
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
