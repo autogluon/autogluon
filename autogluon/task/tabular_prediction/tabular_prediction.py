@@ -57,8 +57,8 @@ class TabularPrediction(BaseTask):
 
     @staticmethod
     def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
-            auto_stack=False, hyperparameter_tune=False, feature_prune=False, holdout_frac=None,
-            num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
+            auto_stack=False, hyperparameter_tune=False, feature_prune=False, refit_full=False,
+            holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters=None, cache_data=True,
             time_limits=None, num_trials=None, search_strategy='random', search_options=None,
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
@@ -117,6 +117,20 @@ class TabularPrediction(BaseTask):
             Use `auto_stack` to maximize predictive accuracy; use `hyperparameter_tune` if you prefer to deploy just a single model rather than an ensemble.
         feature_prune : bool, default = False
             Whether or not to perform feature selection.
+        refit_full : bool, default = False
+            Whether to retrain all models on all of the data after the normal training procedure.
+            The time taken by this process is not enforced by `time_limits`.
+            If `True`, optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+            This process will typically result in a slight accuracy reduction and a large inference speedup.
+            The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+            The added fit runtime of this function is generally 10% or less of the original fit runtime.
+            This function can also be called on non-bagged models for a slight accuracy increase and no change to inference time.
+                In this instance, the added fit runtime will be approximately equal to the original fit runtime.
+            This process does not alter the original models, but instead fits additional models.
+            Models produced by this process will not have validation scores, as they use all of the data for training.
+                Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+            This is equivalent to calling `predictor.refit_full()` after training.
+            `cache_data` must be set to `True` to enable this functionality.
         hyperparameters : dict
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
@@ -125,10 +139,21 @@ class TabularPrediction(BaseTask):
             Values = dict of hyperparameter settings for each model type.
                 Each hyperparameter can either be single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
-                Caution: Any provided search spaces will be overriden by fixed defauls if `hyperparameter_tune = False`.
+                Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
 
             Note: `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
             If `hyperparameter_tune = False`, then these additional models will also be trained using custom pre-specified hyperparameter settings that are known to work well.
+
+            Default:
+                `hyperparameters = {
+                   'NN': {'num_epochs': 500},
+                   'GBM': {'num_boost_round': 10000},
+                   'CAT': {'iterations': 10000},
+                   'RF': {'n_estimators': 300},
+                   'XT': {'n_estimators': 300},
+                   'KNN': {},
+                   'custom': ['GBM'],
+                }`
 
             Details regarding the hyperparameters you can specify for each model are provided in the following files:
                 NN: `autogluon/utils/tabular/ml/models/tabular_nn/hyperparameters/parameters.py`
@@ -139,13 +164,13 @@ class TabularPrediction(BaseTask):
                      See also the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'criterion' parameter will be overriden. Both 'gini' and 'entropy' are used automatically, training two models.
+                    Note: 'criterion' parameter will be overridden. Both 'gini' and 'entropy' are used automatically, training two models.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'criterion' parameter will be overriden. Both 'gini' and 'entropy' are used automatically, training two models.
+                    Note: 'criterion' parameter will be overridden. Both 'gini' and 'entropy' are used automatically, training two models.
                 KNN: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'weights' parameter will be overriden. Both 'distance' and 'uniform' are used automatically, training two models.
+                    Note: 'weights' parameter will be overridden. Both 'distance' and 'uniform' are used automatically, training two models.
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
@@ -196,7 +221,7 @@ class TabularPrediction(BaseTask):
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
 
-        Kwargs can include addtional arguments for advanced users:
+        Kwargs can include additional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
                 A `FeatureGenerator` class specifying which feature engineering protocol to follow
                 (see autogluon.utils.tabular.features.abstract_feature_generator.AbstractFeatureGenerator).
@@ -212,6 +237,10 @@ class TabularPrediction(BaseTask):
             id_columns : list, default = []
                 Banned subset of column names that model may not use as predictive features (e.g. contains label, user-ID, etc).
                 These columns are ignored during `fit()`, but DataFrame of just these columns with appended predictions may be produced, for example to submit in a ML competition.
+            set_best_to_refit_full : bool, default = False
+                If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
+                This will change the default model used in Predictor for predictions when model is not specified to the refit_full version of the best model.
+                Only valid if `refit_full=True`.
 
         Returns
         -------
@@ -248,6 +277,7 @@ class TabularPrediction(BaseTask):
             'trainer_type',
             'label_count_threshold',
             'id_columns',
+            'set_best_to_refit_full',
             'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
         }
         for kwarg_name in kwargs.keys():
@@ -276,6 +306,12 @@ class TabularPrediction(BaseTask):
             cache_data = kwargs['enable_fit_continuation']
         if not cache_data:
             logger.log(30, 'Warning: `cache_data=False` will disable or limit advanced functionality after training such as feature importance calculations. It is recommended to set `cache_data=True` unless you explicitly wish to not have the data saved to disk.')
+            if refit_full:
+                raise ValueError('`refit_full=True` is only available when `cache_data=True`. Set `cache_data=True` to utilize `refit_full`.')
+
+        set_best_to_refit_full = kwargs.get('set_best_to_refit_full', False)
+        if set_best_to_refit_full and not refit_full:
+            raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
@@ -387,4 +423,17 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, verbosity=verbosity)
+
+        if refit_full:
+            learner.refit_ensemble_full()
+            if set_best_to_refit_full:
+                trainer = learner.load_trainer()
+                if trainer.model_best in trainer.model_full_dict.keys():
+                    trainer.model_best = trainer.model_full_dict[trainer.model_best]
+                    # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
+                    # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
+                    trainer.save()
+                else:
+                    logger.warning(f'Best model ({trainer.model_best}) is not present in refit_full dictionary. AutoGluon will default to using {trainer.model_best} for predictions.')
+
         return TabularPredictor(learner=learner)

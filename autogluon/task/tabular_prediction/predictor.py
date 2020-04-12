@@ -63,13 +63,14 @@ class TabularPredictor(BasePredictor):
             To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
         self._learner: Learner = learner  # Learner object
+        self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
-        self.model_names = self._trainer.get_model_names_all()
+        self.model_names = self._trainer.get_model_names_all()  # TODO: Will be outdated if new models are trained through refit_full()
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
 
