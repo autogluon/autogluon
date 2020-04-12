@@ -2,7 +2,7 @@ import logging
 
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso
 
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
+from autogluon.utils.tabular.ml.constants import BINARY
 from autogluon.utils.tabular.ml.constants import REGRESSION
 
 L1 = 'L1'
@@ -19,11 +19,10 @@ def get_param_baseline():
         'C': 1,
         'vectorizer_dict_size': 75000,  # size of TFIDF vectorizer dictionary; used only in text model
         'proc.ngram_range': (1, 5),  # range of n-grams for TFIDF vectorizer dictionary; used only in text model
-        'proc.skew_threshold': 0.99,
-        # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
+        'proc.skew_threshold': 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         'proc.impute_strategy': 'median',  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
         'penalty': L2,  # regularization to use with regression models
-        'handle_text': IGNORE,  # how text should be handled: `ignore` - don't use NLP features; `only` - only use NLP features; `include` - use both regular and NLP features
+        'handle_text': IGNORE, # how text should be handled: `ignore` - don't use NLP features; `only` - only use NLP features; `include` - use both regular and NLP features
     }
     return default_params
 
@@ -60,9 +59,8 @@ def get_default_params(problem_type: str, penalty: str):
 
 def _get_solver(problem_type):
     if problem_type == BINARY:
-        solver = 'lbfgs'  # TODO use liblinear for smaller datasets
-    elif problem_type == MULTICLASS:
-        solver = 'lbfgs'  # another option is lbfgs
+        # TODO explore using liblinear for smaller datasets
+        solver = 'lbfgs'
     else:
         solver = 'lbfgs'
     return solver
