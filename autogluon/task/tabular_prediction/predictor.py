@@ -388,7 +388,7 @@ class TabularPredictor(BasePredictor):
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
 
-    def refit_full(self, model=None):
+    def refit_full(self, model='all'):
         """
         Retrain model on all of the data (training + validation).
         For bagged models:
@@ -412,8 +412,10 @@ class TabularPredictor(BasePredictor):
 
         Parameters
         ----------
-        model : str, default = None
-            Model to refit. If None then all models are refitted.
+        model : str, default = 'all'
+            Model name of model to refit.
+                If 'all' then all models are refitted.
+                If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
             Valid models are listed in this `predictor` by calling `predictor.model_names`.
 
