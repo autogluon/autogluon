@@ -7,9 +7,8 @@
 name: Upload Python Package
 
 on:
-  push:
-    branches: 
-      - master
+  schedule:
+    - cron: "59 8 * * *"
 
 jobs:
   deploy:
