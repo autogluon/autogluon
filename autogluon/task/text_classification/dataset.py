@@ -1,10 +1,12 @@
 import multiprocessing as mp
+import warnings
 from typing import AnyStr
 import pandas as pd
 
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
 import gluonnlp as nlp
+
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 from ...core import *
@@ -32,11 +34,12 @@ def get_dataset(name=None, *args, **kwargs):
         if path.endswith('.tsv') or path.endswith('.csv'):
             return CustomTSVClassificationTask(*args, **kwargs)
         else:
-            raise NotImplementedError
+            raise ValueError('tsv or csv format is supported now, please use the according files ending with'
+                             '`.tsv` or `.csv`.')
     if name is not None and name.lower() in built_in_tasks:
         return built_in_tasks[name.lower()](*args, **kwargs)
     else:
-        raise NotImplementedError
+        raise ValueError('mrpc, qqp, qnli, rte, sts-b, cola, mnli, wnli, sst, toysst are supported now.')
 
 class AbstractGlueTask:
     """Abstract task class for datasets with GLUE format.
@@ -159,7 +162,8 @@ class AbstractCustomTask:
         -------
         Dataset : the dataset of target segment.
         """
-        raise NotImplementedError
+        raise ValueError('This is an abstract class. For custom dataset support, '
+                         'please use CustomTSVClassificationTask instead.')
 
     def dataset_train(self):
         """Get the training segment of the dataset for the task.
@@ -198,13 +202,16 @@ class CustomTSVClassificationTask(AbstractCustomTask):
         Any valid string path is acceptable.
     sep : str
         Delimiter to use.
-    header : int, list of int, default 'infer'
+    header : int, list of int
         Row number(s) to use as the column names, and the start of the
         data.
     names : array-like, optional
         List of column names to use.
     usecols : list-like or callable, optional
         Return a subset of the columns.
+    split_ratio: float
+        Split ratio of training data and HPO validation data. split_ratio of the data goes to training data,
+        (1-split_ratio) of th data goes to HPO validation data.
     For other keyword arguments, please see
         <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html#pandas.read_csv`_ .
     """
@@ -233,29 +240,45 @@ class CustomTSVClassificationTask(AbstractCustomTask):
         elif segment == 'dev':
             return SampledDataset(self.dataset, self.dev_sampler)
         else:
-            raise NotImplementedError
+            raise ValueError('Please specify either train or dev dataset.')
 
     def _read(self, **kwargs):
-        path = kwargs.get('filepath', None)
-        kwargs['filepath_or_buffer'] = path
-        kwargs.pop("filepath")
         low_memory = kwargs.get('low_memory', None)
         if low_memory is None:
             kwargs['low_memory'] = False
-        dataset_df = pd.read_csv(**kwargs)
+        split_ratio = kwargs.get('split_ratio', None) if 'split_ratio' in kwargs else 0.8
+        if split_ratio is None:
+            split_ratio = 0.8
+        if 'split_ratio' in kwargs:
+            kwargs.pop('split_ratio')
+        path = kwargs.get('filepath', None)
+        kwargs['filepath_or_buffer'] = path
+        dataset_df = kwargs.get('df', None)
+        if path is not None:
+            kwargs.pop('filepath')
+            if 'df' in kwargs:
+                kwargs.pop('df')
+            dataset_df = pd.read_csv(**kwargs)
+        elif dataset_df is not None:
+            dataset_df = dataset_df.copy(deep=True)
+        else:
+            raise ValueError('A dataset constructed from either an external csv/tsv file by setting filepath=x,'
+                             'or an in-memory python DataFrame by setting df=x is supported now.')
         dataset_df_lst = dataset_df.values.tolist()
         self.dataset = gluon.data.SimpleDataset(dataset_df_lst)
-        split_ratio = kwargs.get('split_ratio', None) if 'split_ratio' in kwargs else 0.8
         self.train_sampler, self.dev_sampler = get_split_samplers(self.dataset, split_ratio=split_ratio)
 
     def _index_label_column(self, **kwargs):
         label_column_id = kwargs.get('label', None)
         if label_column_id is None:
+            warnings.warn('By default we are using the last column as the label column, '
+                          'if you wish to specify the label column by yourself or the column is not label column,'
+                          'please specify label column using either the column name or index by using label=x.')
             return len(self.dataset[0]) - 1
         if isinstance(label_column_id, str):
             usecols = kwargs.get('usecols', None)
             if usecols is None:
-                raise NotImplementedError
+                raise ValueError('Please specify the `usecols` when specifying the label column.')
             else:
                 for i, col in enumerate(usecols):
                     if col == label_column_id:
@@ -263,7 +286,7 @@ class CustomTSVClassificationTask(AbstractCustomTask):
         elif isinstance(label_column_id, int):
             return label_column_id
         else:
-            raise NotImplementedError
+            raise ValueError('Please specify label column using either the column name (str) or index (int).')
 
     def dataset_train(self):
         """Get the training segment of the dataset for the task.

@@ -80,7 +80,7 @@ class Remote(Client):
         if self.service:
             self.service.shutdown()
         super().close(timeout)
-        self.shutdown()
+        # self.shutdown()
 
     def upload_files(self, files, **kwargs):
         for filename in files:
