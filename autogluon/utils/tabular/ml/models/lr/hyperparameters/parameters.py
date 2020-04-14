@@ -2,8 +2,8 @@ import logging
 
 from sklearn.linear_model import LogisticRegression, Ridge, Lasso
 
-from autogluon.utils.tabular.ml.constants import BINARY
-from autogluon.utils.tabular.ml.constants import REGRESSION
+from .....ml.constants import BINARY
+from .....ml.constants import REGRESSION
 
 L1 = 'L1'
 L2 = 'L2'

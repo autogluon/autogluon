@@ -8,11 +8,11 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import StandardScaler, QuantileTransformer
 
-from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.models.lr.hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
-from autogluon.utils.tabular.ml.models.lr.hyperparameters.searchspaces import get_default_searchspace
-from autogluon.utils.tabular.ml.models.lr.lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
+from .hyperparameters.parameters import get_param_baseline, get_model_params, get_default_params, INCLUDE, IGNORE, ONLY
+from .hyperparameters.searchspaces import get_default_searchspace
+from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
+from ...constants import BINARY, REGRESSION
+from ....ml.models.abstract.abstract_model import AbstractModel
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,6 @@ class LinearModel(AbstractModel):
     def __init__(self, path: str, name: str, problem_type: str, objective_func, hyperparameters=None, features=None,
                  feature_types_metadata=None, debug=0, **kwargs):
         self.model_class, self.penalty, self.handle_text = get_model_params(problem_type, hyperparameters)
-        name = name + '-' + self.model_class.__name__
-        name = name + '-text_' + self.handle_text
         super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
                          feature_types_metadata=feature_types_metadata, debug=debug)
 
