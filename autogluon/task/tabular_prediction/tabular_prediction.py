@@ -118,18 +118,26 @@ class TabularPrediction(BaseTask):
         feature_prune : bool, default = False
             Whether or not to perform feature selection.
         refit_full : bool, default = False
-            Whether to retrain all models on all of the data after the normal training procedure.
-            The time taken by this process is not enforced by `time_limits`.
-            If `True`, optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
-            This process will typically result in a slight accuracy reduction and a large inference speedup.
-            The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
-            The added fit runtime of this function is generally 10% or less of the original fit runtime.
-            This function can also be called on non-bagged models for a slight accuracy increase and no change to inference time.
-                In this instance, the added fit runtime will be approximately equal to the original fit runtime.
-            This process does not alter the original models, but instead fits additional models.
+            Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+            This is equivalent to calling `predictor.refit_full()` after training.
+            For bagged models:
+                Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+                This process will typically result in a slight accuracy reduction and a large inference speedup.
+                The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+                    The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+                The runtime is generally 10% or less of the original fit runtime.
+                    The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
+            For non-bagged models:
+                Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
+                Will typically result in a slight accuracy increase and no change to inference time.
+                The runtime will be approximately equal to the original fit runtime.
+            This process does not alter the original models, but instead adds additional models.
+            If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
             Models produced by this process will not have validation scores, as they use all of the data for training.
                 Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
-            This is equivalent to calling `predictor.refit_full()` after training.
+                If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
+                    Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
+            The time taken by this process is not enforced by `time_limits`.
             `cache_data` must be set to `True` to enable this functionality.
         hyperparameters : dict
             Keys are strings that indicate which model types to train.
@@ -239,7 +247,7 @@ class TabularPrediction(BaseTask):
                 These columns are ignored during `fit()`, but DataFrame of just these columns with appended predictions may be produced, for example to submit in a ML competition.
             set_best_to_refit_full : bool, default = False
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
-                This will change the default model used in Predictor for predictions when model is not specified to the refit_full version of the best model.
+                This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full=True`.
 
         Returns

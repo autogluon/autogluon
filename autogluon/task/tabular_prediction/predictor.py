@@ -71,7 +71,7 @@ class TabularPredictor(BasePredictor):
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
-        self.model_names = self._trainer.get_model_names_all()  # TODO: Will be outdated if new models are trained through refit_full()
+        self.model_names = self._trainer.get_model_names_all()  # TODO: Consider making this a function instead of a variable: This should never be de-synced with the output of self._trainer.get_model_names_all()
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
 
@@ -390,15 +390,25 @@ class TabularPredictor(BasePredictor):
 
     def refit_full(self, model=None):
         """
-        Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
-        For bagged models, this process will typically result in a slight accuracy reduction and a large inference speedup.
+        Retrain model on all of the data (training + validation).
+        For bagged models:
+            Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+            This process will typically result in a slight accuracy reduction and a large inference speedup.
             The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
             The runtime is generally 10% or less of the original fit runtime.
-        This function can also be called on non-bagged models for a slight accuracy increase and no change to inference time.
-            In this instance, the runtime will be approximately equal to the original fit runtime.
+                The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
+        For non-bagged models:
+            Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
+            Will typically result in a slight accuracy increase and no change to inference time.
+            The runtime will be approximately equal to the original fit runtime.
         This process does not alter the original models, but instead adds additional models.
+        If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
         Models produced by this process will not have validation scores, as they use all of the data for training.
-        Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+            Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+            If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
+                Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
+        `cache_data` must have been set to `True` during the original training to enable this functionality.
 
         Parameters
         ----------
@@ -409,9 +419,11 @@ class TabularPredictor(BasePredictor):
 
         Returns
         -------
-        Dictionary of original model names -> refit full model names.
+        Dictionary of original model names -> refit_full model names.
         """
-        return self._learner.refit_ensemble_full(model=model)
+        refit_full_dict = self._learner.refit_ensemble_full(model=model)
+        self.model_names = self._trainer.get_model_names_all()
+        return refit_full_dict
 
     def get_model_full_dict(self):
         """
