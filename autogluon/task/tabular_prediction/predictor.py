@@ -1,3 +1,4 @@
+import copy
 import logging
 
 import pandas as pd
@@ -63,13 +64,14 @@ class TabularPredictor(BasePredictor):
             To access any trainer method `func()` from this `Predictor`, use: `predictor._trainer.func()`.
         """
         self._learner: Learner = learner  # Learner object
+        self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
-        self.model_names = self._trainer.get_model_names_all()
+        self.model_names = self._trainer.get_model_names_all()  # TODO: Consider making this a function instead of a variable: This should never be de-synced with the output of self._trainer.get_model_names_all()
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
 
@@ -385,6 +387,57 @@ class TabularPredictor(BasePredictor):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
+
+    def refit_full(self, model='all'):
+        """
+        Retrain model on all of the data (training + validation).
+        For bagged models:
+            Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+            This process will typically result in a slight accuracy reduction and a large inference speedup.
+            The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+                The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+            The runtime is generally 10% or less of the original fit runtime.
+                The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
+        For non-bagged models:
+            Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
+            Will typically result in a slight accuracy increase and no change to inference time.
+            The runtime will be approximately equal to the original fit runtime.
+        This process does not alter the original models, but instead adds additional models.
+        If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
+        Models produced by this process will not have validation scores, as they use all of the data for training.
+            Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+            If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
+                Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
+        `cache_data` must have been set to `True` during the original training to enable this functionality.
+
+        Parameters
+        ----------
+        model : str, default = 'all'
+            Model name of model to refit.
+                If 'all' then all models are refitted.
+                If 'best' then the model with the highest validation score is refit.
+            All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+
+        Returns
+        -------
+        Dictionary of original model names -> refit_full model names.
+        """
+        refit_full_dict = self._learner.refit_ensemble_full(model=model)
+        self.model_names = self._trainer.get_model_names_all()
+        return refit_full_dict
+
+    def get_model_full_dict(self):
+        """
+        Returns a dictionary of original model name -> refit full model name.
+        Empty unless `refit_full=True` was set during fit or `predictor.refit_full()` was called.
+        This can be useful when determining the best model based off of `predictor.leaderboard()`, then getting the _FULL version of the model by passing its name as the key to this dictionary.
+
+        Returns
+        -------
+        Dictionary of original model name -> refit full model name.
+        """
+        return copy.deepcopy(self._trainer.model_full_dict)
 
     @classmethod
     def load(cls, output_directory, verbosity=2):

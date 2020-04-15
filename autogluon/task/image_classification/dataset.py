@@ -8,6 +8,8 @@ import warnings
 import numpy as np
 from PIL import Image
 from mxnet import gluon, nd
+from mxnet import recordio
+from mxnet.gluon.data import RecordFileDataset
 from mxnet.gluon.data.vision import ImageFolderDataset as MXImageFolderDataset
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms
 
@@ -100,8 +102,8 @@ def generate_transform(train, resize, _is_osx, input_size, jitter_param):
 def get_dataset(path=None, train=True, name=None,
                 input_size=224, crop_ratio=0.875, jitter_param=0.4, scale_ratio_choice=[],
                 *args, **kwargs):
-    """ Method to produce image classification dataset for AutoGluon, can either be a 
-    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a 
+    """ Method to produce image classification dataset for AutoGluon, can either be a
+    :class:`ImageFolderDataset`, :class:`RecordDataset`, or a
     popular dataset already built into AutoGluon ('mnist', 'cifar10', 'cifar100', 'imagenet').
 
     Parameters
@@ -124,8 +126,8 @@ def get_dataset(path=None, train=True, name=None,
 
     Returns
     -------
-    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
-    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.    
+    Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`.
+    To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
     """
 
     resize = int(math.ceil(input_size / crop_ratio))
@@ -199,8 +201,8 @@ class IndexImageDataset(MXImageFolderDataset):
         1. image name (e.g. xxxx or xxxx.jpg)
         2. label name or index (e.g. aaa or 1)
     gray_scale : False
-        If True, always convert images to greyscale. 
-        If False, always convert images to colored (RGB). 
+        If True, always convert images to greyscale.
+        If False, always convert images to colored (RGB).
     transform : function, default None
         A user defined callback that transforms each sample.
     """
@@ -258,8 +260,8 @@ class IndexImageDataset(MXImageFolderDataset):
 
 
 @obj()
-class RecordDataset(ImageRecordDataset):
-    """A dataset wrapping over a RecordIO file containing images. 
+class RecordDataset:
+    """A dataset wrapping over a RecordIO file containing images.
        Each sample is an image and its corresponding label.
 
     Parameters
@@ -267,23 +269,46 @@ class RecordDataset(ImageRecordDataset):
     filename : str
         Local path to the .rec file.
     gray_scale : False
-        If True, always convert images to greyscale. 
-        If False, always convert images to colored (RGB). 
+        If True, always convert images to greyscale.
+        If False, always convert images to colored (RGB).
     transform : function, default None
         A user defined callback that transforms each sample.
+    classes : iterable of str, default is None
+        User provided class names. If `None` is provide, will use
+        a list of increasing natural number ['0', '1', ..., 'N'] by default.
     """
 
-    def __init__(self, filename, gray_scale=False, transform=None):
+    def __init__(self, filename, gray_scale=False, transform=None, classes=None):
         flag = 0 if gray_scale else 1
-        super().__init__(filename, flag=flag, transform=transform)
+        # retrieve number of classes without decoding images
+        td = RecordFileDataset(filename)
+        s = set([recordio.unpack(td.__getitem__(i))[0].label[0] for i in range(len(td))])
+        self._num_classes = len(s)
+        if not classes:
+            self._classes = [str(i) for i in range(self._num_classes)]
+        else:
+            if len(self._num_classes) != len(classes):
+                warnings.warn('Provided class names do not match data, expected "num_class" is {} '
+                              'vs. provided: {}'.format(self._num_classes, len(classes)))
+                self._classes = list(classes) + \
+                    [str(i) for i in range(len(classes), self._num_classes)]
+        self._dataset = ImageRecordDataset(filename, flag=flag)
+        if transform:
+            self._dataset = self._dataset.transform_first(transform)
 
     @property
     def num_classes(self):
-        raise NotImplementedError
+        return self._num_classes
 
     @property
     def classes(self):
-        raise NotImplementedError
+        return self._classes
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, idx):
+        return self._dataset[idx]
 
 
 @obj()
@@ -362,9 +387,9 @@ class ImageFolderDataset(object):
         root/cat/x.png
         root/cat/y.png
         root/cat/z.png
-    
+
     Here, folder-names `dog` and `cat` are the class labels and the images with file-names 'a', `b`, `c` belong to the `dog` class while the others are `cat` images.
-    
+
     Parameters
     ----------
     root : string
@@ -458,7 +483,7 @@ class ImageFolderDataset(object):
     @staticmethod
     def _find_classes(dir):
         """Finds the class folders in a dataset.
-        
+
         Parameters
         ----------
         dir : string
