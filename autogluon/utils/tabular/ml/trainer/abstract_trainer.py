@@ -879,10 +879,12 @@ class AbstractTrainer:
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
-    def refit_ensemble_full(self, model=None):
-        if model is None:
+    def refit_ensemble_full(self, model='all'):
+        if model is 'all':
             ensemble_set = self.get_model_names_all()
         else:
+            if model is 'best':
+                model = self.get_model_best()
             ensemble_set = self.get_minimum_model_set(model)
         models_trained_full = self.refit_single_full(models=ensemble_set)
 
