@@ -122,6 +122,20 @@ class AbstractModel:
         if param_name not in self.params:
             self.params[param_name] = param_value
 
+    def _get_default_searchspace(self) -> dict:
+        return NotImplementedError
+
+    def _set_default_searchspace(self):
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default search space.
+        """
+        def_search_space = self._get_default_searchspace().copy()
+        # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
+        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
+            def_search_space.pop(key, None)
+        if self.params is not None:
+            self.params.update(def_search_space)
+
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
         self.path_suffix = self.name + os.path.sep
@@ -339,20 +353,6 @@ class AbstractModel:
     # Custom feature importance values for a model (such as those calculated from training)
     def get_model_feature_importance(self) -> dict:
         return dict()
-
-    def _get_default_searchspace(self, problem_type) -> dict:
-        return NotImplementedError
-
-    def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default search space.
-        """
-        def_search_space = self._get_default_searchspace(problem_type=self.problem_type).copy()
-        # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
-        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
-            def_search_space.pop(key, None)
-        if self.params is not None:
-            self.params.update(def_search_space)
 
     # Hyperparameters of trained model
     def get_trained_params(self):

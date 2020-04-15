@@ -102,6 +102,9 @@ class TabularNeuralNetModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type, num_classes=None)
+
     def set_net_defaults(self, train_dataset, params):
         """ Sets dataset-adaptive default values to use for our neural network """
         if (self.problem_type == MULTICLASS) or (self.problem_type == SOFTCLASS):
@@ -800,15 +803,6 @@ class TabularNeuralNetModel(AbstractModel):
         scheduler.get_training_curves(plot=False, use_legend=False)
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
-
-    def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default spearch space.
-        """
-        search_space = get_default_searchspace(self.problem_type)
-        for key in self.nondefault_params: # delete all user-specified hyperparams from the default search space
-            _ = search_space.pop(key, None)
-        self.params.update(search_space)
 
     def get_info(self):
         info = super().get_info()

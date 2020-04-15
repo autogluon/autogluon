@@ -39,8 +39,8 @@ class CatboostModel(AbstractModel):
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
         self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
 
-    def _get_default_searchspace(self, problem_type):
-        return get_default_searchspace(problem_type)
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
     def preprocess(self, X):
         X = super().preprocess(X)

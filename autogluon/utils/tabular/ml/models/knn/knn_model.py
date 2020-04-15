@@ -38,7 +38,7 @@ class KNNModel(SKLearnModel):
             self._set_default_param_value(param, val)
 
     # TODO: Enable HPO for KNN
-    def _get_default_searchspace(self, problem_type):
+    def _get_default_searchspace(self):
         spaces = {}
         return spaces
 

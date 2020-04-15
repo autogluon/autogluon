@@ -13,6 +13,7 @@ from . import lgb_utils
 from .callbacks import early_stopping_custom
 from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION
@@ -38,6 +39,9 @@ class LGBModel(AbstractModel):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
 
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)

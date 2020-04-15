@@ -47,13 +47,12 @@ class RFModel(SKLearnModel):
 
     # TODO: Add in documentation that Categorical default is the first index
     # TODO: enable HPO for RF models
-    def _get_default_searchspace(self, problem_type):
+    def _get_default_searchspace(self):
         spaces = {
             # 'n_estimators': Int(lower=10, upper=1000, default=300),
             # 'max_features': Categorical(['auto', 0.5, 0.25]),
             # 'criterion': Categorical(['gini', 'entropy']),
         }
-
         return spaces
 
     def fit(self, X_train, Y_train, time_limit=None, **kwargs):
