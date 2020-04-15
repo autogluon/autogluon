@@ -180,7 +180,7 @@ class TabularPrediction(BaseTask):
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'weights' parameter will be overridden. Both 'distance' and 'uniform' are used automatically, training two models.
                 LR: `autogluon/utils/tabular/ml/models/lr/hyperparameters/parameters.py`
-                    Note: a list of hyper-parameters should be passed; each set will create differen version of the model.
+                    Note: a list of hyper-parameters should be passed; each set will create different version of the model.
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
 
