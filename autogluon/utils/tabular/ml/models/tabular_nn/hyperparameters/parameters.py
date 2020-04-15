@@ -1,7 +1,7 @@
 """ Default (fixed) hyperparameter values used in Neural network model """
 
-import mxnet as mx
 from ....constants import BINARY, MULTICLASS, REGRESSION
+
 
 def get_fixed_params():
     """ Parameters that currently cannot be searched during HPO """
@@ -65,10 +65,10 @@ def get_hyper_params():
         'lr_scheduler': None,  # If not None, string specifying what type of learning rate scheduler to use (may override learning_rate).
         # Options: [None, 'cosine', 'step', 'poly', 'constant']
         # Below are hyperparameters specific to the LR scheduler (only used if lr_scheduler != None). For more info, see: https://gluon-cv.mxnet.io/api/utils.html#gluoncv.utils.LRScheduler
-        'base_lr': 3e-5, # smallest LR (float > 0)
-        'target_lr': 1.0, # largest LR (float > 0)
-        'lr_decay': 0.1, # step factor used to decay LR (float in (0,1))
-        'warmup_epochs': 10, # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
+        'base_lr': 3e-5,  # smallest LR (float > 0)
+        'target_lr': 1.0,  # largest LR (float > 0)
+        'lr_decay': 0.1,  # step factor used to decay LR (float in (0,1))
+        'warmup_epochs': 10,  # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
     }
     return hyper_params
 

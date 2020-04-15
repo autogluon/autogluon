@@ -1,13 +1,14 @@
-import time
 import logging
 import pickle
-import psutil
 import sys
+import time
+
+import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 
 from ..abstract import model_trial
+from ..abstract.abstract_model import SKLearnModel
 from ...constants import REGRESSION
-from ..sklearn.sklearn_model import SKLearnModel
 from ....utils.exceptions import NotEnoughMemoryError
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class KNNModel(SKLearnModel):
             self._set_default_param_value(param, val)
 
     # TODO: Enable HPO for KNN
-    def _get_default_searchspace(self, problem_type):
+    def _get_default_searchspace(self):
         spaces = {}
         return spaces
 
@@ -50,7 +51,7 @@ class KNNModel(SKLearnModel):
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem
             if model_memory_ratio > 0.35:
-                logger.warning('\tWarning: Model is expected to require %s percent of available memory...' % (model_memory_ratio * 100))
+                logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
             if model_memory_ratio > 0.45:
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 

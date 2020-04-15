@@ -1,14 +1,18 @@
-import logging, time
-import pickle, psutil, sys
+import logging
 import math
+import pickle
+import sys
+import time
 
-from .....try_import import try_import_catboost
-from ..abstract.abstract_model import AbstractModel
-from .hyperparameters.parameters import get_param_baseline
+import psutil
+
 from .catboost_utils import construct_custom_catboost_metric
+from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
+from ..abstract.abstract_model import AbstractModel
 from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS
-from ......core import Int, Real
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
+from .....try_import import try_import_catboost
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +39,8 @@ class CatboostModel(AbstractModel):
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
         self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
 
-    def _get_default_searchspace(self, problem_type):
-        spaces = {
-            'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
-            'depth': Int(lower=5, upper=8, default=6),
-            'l2_leaf_reg': Real(lower=1, upper=5, default=3),
-        }
-
-        return spaces
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
 
     def preprocess(self, X):
         X = super().preprocess(X)

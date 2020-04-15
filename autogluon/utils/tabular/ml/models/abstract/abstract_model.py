@@ -12,7 +12,7 @@ import psutil
 from .model_trial import model_trial
 from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int
 from .... import metrics
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
@@ -121,6 +121,20 @@ class AbstractModel:
     def _set_default_param_value(self, param_name, param_value):
         if param_name not in self.params:
             self.params[param_name] = param_value
+
+    def _get_default_searchspace(self) -> dict:
+        return NotImplementedError
+
+    def _set_default_searchspace(self):
+        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
+            default fixed value to default search space.
+        """
+        def_search_space = self._get_default_searchspace().copy()
+        # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
+        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
+            def_search_space.pop(key, None)
+        if self.params is not None:
+            self.params.update(def_search_space)
 
     def set_contexts(self, path_context):
         self.path = self.create_contexts(path_context)
@@ -340,20 +354,6 @@ class AbstractModel:
     def get_model_feature_importance(self) -> dict:
         return dict()
 
-    def _get_default_searchspace(self, problem_type):
-        return NotImplementedError
-
-    def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default spearch space.
-        """
-        def_search_space = self._get_default_searchspace(problem_type=self.problem_type).copy()
-        # Note: when subclassing AbstractModel, you must define or import get_default_searchspace() from the appropriate location.
-        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
-            def_search_space.pop(key, None)
-        if self.params is not None:
-            self.params.update(def_search_space)
-
     # Hyperparameters of trained model
     def get_trained_params(self):
         trained_params = self.params.copy()
@@ -516,3 +516,11 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
+
+
+class SKLearnModel(AbstractModel):
+    """Abstract model for all Sklearn models."""
+
+    def preprocess(self, X):
+        X = convert_categorical_to_int(X)
+        return super().preprocess(X)

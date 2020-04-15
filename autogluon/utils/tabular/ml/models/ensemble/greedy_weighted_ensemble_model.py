@@ -15,9 +15,8 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         self.base_model_names = base_model_names
         self.features, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)
 
-    def _get_default_searchspace(self, problem_type):
+    def _get_default_searchspace(self):
         spaces = {}
-
         return spaces
 
     def _set_default_params(self):

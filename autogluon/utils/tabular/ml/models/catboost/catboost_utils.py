@@ -2,6 +2,7 @@ import numpy as np
 
 from ...constants import BINARY, MULTICLASS, REGRESSION
 
+
 # TODO: Add weight support?
 # TODO: Can these be optimized? What computational cost do they have compared to the default catboost versions?
 class CustomMetric:
@@ -10,7 +11,8 @@ class CustomMetric:
         self.is_higher_better = is_higher_better
         self.needs_pred_proba = needs_pred_proba
 
-    def get_final_error(self, error, weight):
+    @staticmethod
+    def get_final_error(error, weight):
         return error
 
     def is_max_optimal(self):
@@ -21,10 +23,12 @@ class CustomMetric:
 
 
 class BinaryCustomMetric(CustomMetric):
-    def _get_y_pred_proba(self, approxes):
+    @staticmethod
+    def _get_y_pred_proba(approxes):
         return np.array(approxes[0])
 
-    def _get_y_pred(self, y_pred_proba):
+    @staticmethod
+    def _get_y_pred(y_pred_proba):
         return np.round(y_pred_proba)
 
     def evaluate(self, approxes, target, weight):
@@ -42,10 +46,12 @@ class BinaryCustomMetric(CustomMetric):
 
 
 class MulticlassCustomMetric(CustomMetric):
-    def _get_y_pred_proba(self, approxes):
+    @staticmethod
+    def _get_y_pred_proba(approxes):
         return np.array(approxes)
 
-    def _get_y_pred(self, y_pred_proba):
+    @staticmethod
+    def _get_y_pred(y_pred_proba):
         return y_pred_proba.argmax(axis=0)
 
     def evaluate(self, approxes, target, weight):
@@ -62,7 +68,8 @@ class MulticlassCustomMetric(CustomMetric):
 
 
 class RegressionCustomMetric(CustomMetric):
-    def _get_y_pred(self, approxes):
+    @staticmethod
+    def _get_y_pred(approxes):
         return np.array(approxes[0])
 
     def evaluate(self, approxes, target, weight):

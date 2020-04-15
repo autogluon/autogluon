@@ -1,11 +1,13 @@
-import logging, time
+import logging
 import pickle
-import psutil
 import sys
+import time
+
+import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
 
 from ..abstract import model_trial
-from ..sklearn.sklearn_model import SKLearnModel
+from ..abstract.abstract_model import SKLearnModel
 from ...constants import MULTICLASS, REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 
@@ -27,12 +29,11 @@ class RFModel(SKLearnModel):
             else:
                 self._model_type = ExtraTreesClassifier
         else:
-            raise ValueError('model_type arg must be one of [\'rf\', \'xt\'], but value %s was given.' % self.params['model_type'])
+            raise ValueError(f'model_type arg must be one of [\'rf\', \'xt\'], but value {self.params["model_type"]} was given.')
 
     # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
-        X = super().preprocess(X)
-        X = X.fillna(0)
+        X = super().preprocess(X).fillna(0)
         return X
 
     def _set_default_params(self):
@@ -46,13 +47,12 @@ class RFModel(SKLearnModel):
 
     # TODO: Add in documentation that Categorical default is the first index
     # TODO: enable HPO for RF models
-    def _get_default_searchspace(self, problem_type):
+    def _get_default_searchspace(self):
         spaces = {
             # 'n_estimators': Int(lower=10, upper=1000, default=300),
             # 'max_features': Categorical(['auto', 0.5, 0.25]),
             # 'criterion': Categorical(['gini', 'entropy']),
         }
-
         return spaces
 
     def fit(self, X_train, Y_train, time_limit=None, **kwargs):
@@ -79,7 +79,7 @@ class RFModel(SKLearnModel):
         expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
         # expected_min_memory_usage = bytes_per_estimator * minimum_n_estimators / available_mem
         if expected_memory_usage > 0.8:  # if estimated size is greater than 80% memory
-            logger.warning('\tWarning: Model is expected to require %s percent of available memory (Estimated before training)...' % (expected_memory_usage * 100))
+            logger.warning(f'\tWarning: Model is expected to require {expected_memory_usage * 100} percent of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
 
         if n_estimators_final > n_estimators_test * 2:
@@ -104,14 +104,14 @@ class RFModel(SKLearnModel):
                 time_elapsed = time.time() - time_train_start
                 time_expected = time_train_start - time_start + (time_elapsed * n_estimators_final / n_estimators)
                 if (time_limit is not None) and (time_expected > time_limit):
-                    logger.warning('\tWarning: Model is expected to require %ss to train, which exceeds the maximum time limit of %ss, skipping model...' % (round(time_expected, 2), round(time_limit, 2)))
+                    logger.warning(f'\tWarning: Model is expected to require {round(time_expected, 2)}s to train, which exceeds the maximum time limit of {round(time_limit, 2)}s, skipping model...')
                     raise TimeLimitExceeded
                 model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
                 if model_memory_ratio > 0.20:
-                    logger.warning('\tWarning: Model is expected to require %s percent of available memory...' % (model_memory_ratio*100))
+                    logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
                 if model_memory_ratio > 0.30:
                     raise NotEnoughMemoryError  # don't train full model to avoid OOM error
         self.params_trained['n_estimators'] = self.model.n_estimators
@@ -130,7 +130,4 @@ class RFModel(SKLearnModel):
             # TODO: Consider making this raise an exception
             logger.warning('Warning: get_model_feature_importance called when self.features is None!')
             return dict()
-        feature_names = self.features
-        importances = self.model.feature_importances_
-        importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
-        return importance_dict
+        return dict(zip(self.features, self.model.feature_importances_))

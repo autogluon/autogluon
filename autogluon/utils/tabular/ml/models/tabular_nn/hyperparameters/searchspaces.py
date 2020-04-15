@@ -1,6 +1,6 @@
 """ Default hyperparameter search spaces used in Neural network model """
-from .......core import Categorical, Real
 from ....constants import BINARY, MULTICLASS, REGRESSION
+from .......core import Categorical, Real
 
 
 def get_default_searchspace(problem_type, num_classes=None):
@@ -23,7 +23,7 @@ def get_searchspace_multiclass(num_classes):
         # 'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
         'layers': Categorical(None, [200, 100], [256], [100, 50], [200, 100, 50], [50, 25], [300, 150]),
         'embedding_size_factor': Real(0.5, 1.5, default=1.0),
-        'network_type': Categorical('widedeep','feedforward'), 
+        'network_type': Categorical('widedeep', 'feedforward'),
         'use_batchnorm': Categorical(True, False),
         'activation': Categorical('relu', 'softrelu'),
         # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
@@ -39,7 +39,7 @@ def get_searchspace_binary():
         # 'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
         'layers': Categorical(None, [200, 100], [256], [100, 50], [200, 100, 50], [50, 25], [300, 150]),
         'embedding_size_factor': Real(0.5, 1.5, default=1.0),
-        'network_type': Categorical('widedeep','feedforward'), 
+        'network_type': Categorical('widedeep', 'feedforward'),
         'use_batchnorm': Categorical(True, False),
         'activation': Categorical('relu', 'softrelu'),
         # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm
@@ -55,7 +55,7 @@ def get_searchspace_regression():
         # 'layers': Categorical(None, [200, 100], [256], [2056], [1024, 512, 128], [1024, 1024, 1024]),
         'layers': Categorical(None, [200, 100], [256], [100, 50], [200, 100, 50], [50, 25], [300, 150]),
         'embedding_size_factor': Real(0.5, 1.5, default=1.0),
-        'network_type': Categorical('widedeep','feedforward'), 
+        'network_type': Categorical('widedeep', 'feedforward'),
         'use_batchnorm': Categorical(True, False),
         'activation': Categorical('relu', 'softrelu', 'tanh'),
         # 'batch_size': Categorical(512, 1024, 2056, 128), # this is used in preprocessing so cannot search atm

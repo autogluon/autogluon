@@ -40,6 +40,9 @@ class LGBModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
+    def _get_default_searchspace(self):
+        return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
+
     def get_eval_metric(self):
         return lgb_utils.func_generator(metric=self.stopping_metric, is_higher_better=True, needs_pred_proba=not self.stopping_metric_needs_y_pred, problem_type=self.problem_type)
 
@@ -76,10 +79,7 @@ class LGBModel(AbstractModel):
 
         # TODO: Better solution: Track trend to early stop when score is far worse than best score, or score is trending worse over time
         if (dataset_val is not None) and (dataset_train is not None):
-            if num_rows_train <= 10000:
-                modifier = 1
-            else:
-                modifier = 10000 / num_rows_train
+            modifier = 1 if num_rows_train <= 10000 else 10000 / num_rows_train
             early_stopping_rounds = max(round(modifier * 150), 10)
         else:
             early_stopping_rounds = 150
@@ -89,10 +89,7 @@ class LGBModel(AbstractModel):
         valid_sets = [dataset_train]
         if dataset_val is not None:
             reporter = kwargs.get('reporter', None)
-            if reporter is not None:
-                train_loss_name = self._get_train_loss_name()
-            else:
-                train_loss_name = None
+            train_loss_name = self._get_train_loss_name() if reporter is not None else None
             callbacks += [
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
@@ -149,11 +146,7 @@ class LGBModel(AbstractModel):
 
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
-        data_params = {}
-        for key in lgb_dataset_params_keys:
-            if key in params:
-                data_params[key] = params[key]
-        data_params = data_params.copy()
+        data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
         W_train = None  # TODO: Add weight support
         W_test = None  # TODO: Add weight support
@@ -183,7 +176,7 @@ class LGBModel(AbstractModel):
         feature_importances_used = feature_importances[feature_importances['splits'] >= (total_splits / feature_count)]
         logger.debug(feature_importances_unused)
         logger.debug(feature_importances_used)
-        logger.debug(f'feature_importances_unused: {len(feature_importances_unused)}' )
+        logger.debug(f'feature_importances_unused: {len(feature_importances_unused)}')
         logger.debug(f'feature_importances_used: {len(feature_importances_used)}')
         features_to_use = list(feature_importances_used['feature'].values)
         logger.debug(str(features_to_use))
@@ -208,8 +201,7 @@ class LGBModel(AbstractModel):
 
         directory = self.path  # also create model directory if it doesn't exist
         # TODO: This will break on S3! Use tabular/utils/savers for datasets, add new function
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        os.makedirs(directory, exist_ok=True)
         scheduler_func, scheduler_options = scheduler_options  # Unpack tuple
         if scheduler_func is None or scheduler_options is None:
             raise ValueError("scheduler_func and scheduler_options cannot be None for hyperparameter tuning")
@@ -272,17 +264,8 @@ class LGBModel(AbstractModel):
         elif self.problem_type == REGRESSION:
             train_loss_name = 'l2'
         else:
-            raise ValueError("unknown problem_type for LGBModel: %s" % self.problem_type)
+            raise ValueError(f"unknown problem_type for LGBModel: {self.problem_type}")
         return train_loss_name
-
-    def _set_default_searchspace(self):
-        """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
-            default fixed value to default search space.
-        """
-        def_search_space = get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes).copy()
-        for key in self.nondefault_params:  # delete all user-specified hyperparams from the default search space
-            def_search_space.pop(key, None)
-        self.params.update(def_search_space)
 
     def get_model_feature_importance(self):
         feature_names = self.model.feature_name()
