@@ -155,7 +155,7 @@ class TabularNNDataset:
         self.dataset = mx.gluon.data.dataset.ArrayDataset(*data_list)  # Access ith embedding-feature via: self.dataset._data[self.data_desc.index('embed_'+str(i))].asnumpy()
         self.dataloader = mx.gluon.data.DataLoader(self.dataset, self.batch_size, shuffle=not self.is_test,
                                                    last_batch='keep' if self.is_test else 'rollover',
-                                                   num_workers=self.num_dataloading_workers)  # no need to shuffle test data
+                                                   thread_pool=True, num_workers=self.num_dataloading_workers)
 
     def has_vector_features(self):
         """ Returns boolean indicating whether this dataset contains vector features """
