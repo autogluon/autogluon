@@ -200,16 +200,18 @@ class CustomTSVClassificationTask(AbstractCustomTask):
     ----------
     filepath: str, path of the file
         Any valid string path is acceptable.
-    sep : str
+    sep : str, default ‘,’
         Delimiter to use.
-    header : int, list of int
+    usecols : list-like or callable
+        Return a subset of the columns.
+    header : int, list of int, default 'infer', optional
         Row number(s) to use as the column names, and the start of the
-        data.
+        data. Default behavior is to infer the column names: if no names are passed the behavior is identical
+        to header=0 and column names are inferred from the first line of the file,
+        if column names are passed explicitly then the behavior is identical to header=None.
     names : array-like, optional
         List of column names to use.
-    usecols : list-like or callable, optional
-        Return a subset of the columns.
-    split_ratio: float
+    split_ratio: float, default 0.8, optional
         Split ratio of training data and HPO validation data. split_ratio of the data goes to training data,
         (1-split_ratio) of th data goes to HPO validation data.
     For other keyword arguments, please see
@@ -246,18 +248,14 @@ class CustomTSVClassificationTask(AbstractCustomTask):
         low_memory = kwargs.get('low_memory', None)
         if low_memory is None:
             kwargs['low_memory'] = False
-        split_ratio = kwargs.get('split_ratio', None) if 'split_ratio' in kwargs else 0.8
-        if split_ratio is None:
-            split_ratio = 0.8
-        if 'split_ratio' in kwargs:
-            kwargs.pop('split_ratio')
-        path = kwargs.get('filepath', None)
+        split_ratio = kwargs.pop('split_ratio', 0.8)
+        path = kwargs.pop('filepath', None)
         kwargs['filepath_or_buffer'] = path
-        dataset_df = kwargs.get('df', None)
+        dataset_df = kwargs.pop('df', None)
         if path is not None:
-            kwargs.pop('filepath')
-            if 'df' in kwargs:
-                kwargs.pop('df')
+            if 'usecols' not in kwargs:
+                raise ValueError('`usecols` must be provided to support the '
+                                 'identification of text and target/label columns.')
             dataset_df = pd.read_csv(**kwargs)
         elif dataset_df is not None:
             dataset_df = dataset_df.copy(deep=True)
