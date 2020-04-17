@@ -179,6 +179,10 @@ class TabularPrediction(BaseTask):
                 KNN: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'weights' parameter will be overridden. Both 'distance' and 'uniform' are used automatically, training two models.
+                LR: `autogluon/utils/tabular/ml/models/lr/hyperparameters/parameters.py`
+                    Note: a list of hyper-parameters dicts can be passed; each set will create different version of the model.
+                    Note: Hyperparameter tuning is disabled for this model.
+                    Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
@@ -339,7 +343,7 @@ class TabularPrediction(BaseTask):
                'XT': {'n_estimators': 300},
                'KNN': {},
                'custom': ['GBM'],
-             }
+            }
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
