@@ -136,6 +136,10 @@ class LinearModel(AbstractModel):
             params.pop('C', None)
 
         model = self.model_class(**params)
+
+        logger.log(15, f'Training Model with the following hyperparameter settings:')
+        logger.log(15, model)
+
         self.model = model.fit(X_train, Y_train)
 
     def predict_proba(self, X, preprocess=True):

@@ -90,10 +90,10 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
         )
     if lr_options is not None:
-        for i, lr_option in enumerate(lr_options):
-            models.append(
-                LinearModel(path=path, name=f'LinearModel_{i}', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
-            )
+        _add_models(
+            models, lr_options, 'LinearModel',
+            lambda name_prefix, lr_option: LinearModel(path=path, name=name_prefix, problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
+        )
     if (not hyperparameter_tune) and (custom_options is not None):
         # Consider additional models with custom pre-specified hyperparameter settings:
         if 'GBM' in custom_options:
@@ -160,16 +160,15 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
             models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
         # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
     if lr_options is not None:
-        for i, lr_option in enumerate(lr_options):
-            models.append(
-                LinearModel(path=path, name=f'LinearModel_{i}', problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
-            )
+        _add_models(
+            models, lr_options, 'LinearModel',
+            lambda name_prefix, lr_option: LinearModel(path=path, name=name_prefix, problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
+        )
 
     for model in models:
         model.rename(model.name + name_suffix)
 
     return models
-
 
 
 def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
@@ -188,4 +187,12 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
 
     return models
 
+
+def _add_models(models, options, name_prefix, model_fn):
+    if isinstance(options, list):
+        for i, option in enumerate(options):
+            name = f'{name_prefix}_{i}' if len(options) > 1 else name_prefix
+            models.append(model_fn(name, option))
+    else:
+        models.append(model_fn(name_prefix, options))
 
