@@ -81,7 +81,8 @@ class RLScheduler(FIFOScheduler):
         self.ema_baseline_decay = ema_baseline_decay
         self.sync = sync
         # create RL searcher/controller
-        searcher = RLSearcher(train_fn.kwspaces)
+        if not isinstance(searcher, RLSearcher):
+            searcher = RLSearcher(train_fn.kwspaces)
         super(RLScheduler,self).__init__(
                 train_fn, train_fn.args, resource, searcher,
                 checkpoint=checkpoint, resume=False, num_trials=num_trials,
