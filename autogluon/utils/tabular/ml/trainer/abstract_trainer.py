@@ -38,13 +38,14 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
-                 stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
+                 stack_ensemble_levels=0, time_limit=None, save_data=False, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         if feature_types_metadata is None:
             feature_types_metadata = {}
         self.feature_types_metadata = feature_types_metadata
         self.save_data = save_data
+        self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
         if objective_func is not None:
             self.objective_func = objective_func
@@ -554,7 +555,7 @@ class AbstractTrainer:
             models = [
                 stacker_type(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
                                      base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                                     num_classes=self.num_classes, random_state=level)
+                                     num_classes=self.num_classes, random_state=level+self.random_seed)
                 for model in models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         if X_test is not None:
@@ -575,7 +576,7 @@ class AbstractTrainer:
             return []
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        objective_func=self.objective_func, num_classes=self.num_classes, random_state=level)
+                                                        objective_func=self.objective_func, num_classes=self.num_classes, random_state=level+self.random_seed)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if weighted_ensemble_model.name in self.get_model_names_all():
@@ -596,7 +597,7 @@ class AbstractTrainer:
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
                                                 use_orig_features=False,
-                                                num_classes=self.num_classes, random_state=level)
+                                                num_classes=self.num_classes, random_state=level+self.random_seed)
 
         return self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[stacker_model_lr], hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, kfolds=kfolds, level=level)
 
@@ -997,7 +998,7 @@ class AbstractTrainer:
             path='', name='',
             model_base=AbstractModel(path='', name='', problem_type=self.problem_type, objective_func=self.objective_func),
             base_model_names=model_names, base_models_dict=base_models_dict, base_model_paths_dict=self.model_paths,
-            base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level
+            base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level+self.random_seed
         )
         return dummy_stacker
 

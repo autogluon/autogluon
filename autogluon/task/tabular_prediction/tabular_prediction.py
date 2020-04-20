@@ -253,6 +253,12 @@ class TabularPrediction(BaseTask):
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full=True`.
+            random_seed : int, default = 0
+                Seed to use when generating data split indices such as kfold splits and train/validation splits.
+                If stacking is enabled:
+                    The seed used for stack level L is equal to `seed+L`.
+                    This means `random_seed=1` will have the same split indices at L=0 as `random_seed=0` will have at L=1.
+                If `random_seed=None`, a random integer is used.
 
         Returns
         -------
@@ -290,6 +296,7 @@ class TabularPrediction(BaseTask):
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
+            'random_seed',
             'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
         }
         for kwarg_name in kwargs.keys():
@@ -352,6 +359,7 @@ class TabularPrediction(BaseTask):
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
+        random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
         if auto_stack:
@@ -430,7 +438,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold)
+                          label_count_threshold=label_count_threshold, random_seed=random_seed)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
