@@ -70,7 +70,7 @@ class RLScheduler(FIFOScheduler):
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
     """
-    def __init__(self, train_fn, args=None, resource=None, checkpoint='./exp/checkpoint.ag',
+    def __init__(self, train_fn, args=None, resource=None, searcher=None, checkpoint='./exp/checkpoint.ag',
                  resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
                  visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
                  controller_resource={'num_cpus': 0, 'num_gpus': 0},
