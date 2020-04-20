@@ -90,6 +90,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.ctx = mx.cpu()
         self.batch_size = None
         self.num_dataloading_workers = None
+        self.num_dataloading_workers_inference = 0
         self.params_post_fit = None
         self.num_net_outputs = None
         self._architecture_desc = None
@@ -175,6 +176,8 @@ class TabularNeuralNetModel(AbstractModel):
             self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
         else:
             self.num_dataloading_workers = 1
+        if self.num_dataloading_workers == 1:
+            self.num_dataloading_workers = 0  # 0 is always faster and uses less memory than 1
         self.batch_size = params['batch_size']
         train_dataset, test_dataset = self.generate_datasets(X_train=X_train, y_train=Y_train, params=params, X_test=X_test, y_test=Y_test)
         logger.log(15, "Training data for neural network has: %d examples, %d features (%d vector, %d embedding, %d language)" %
@@ -398,7 +401,7 @@ class TabularNeuralNetModel(AbstractModel):
                 predict_proba (bool): should we output class-probabilities (not used for regression)
         """
         if process:
-            new_data = self.process_test_data(new_data, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers, labels=None)
+            new_data = self.process_test_data(new_data, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers_inference, labels=None)
         if not isinstance(new_data, TabularNNDataset):
             raise ValueError("new_data must of of type TabularNNDataset if process=False")
         if self.problem_type == REGRESSION or not predict_proba:
@@ -459,7 +462,7 @@ class TabularNeuralNetModel(AbstractModel):
                 test_dataset = X_test
             else:
                 X_test = self.preprocess(X_test)
-                test_dataset = self.process_test_data(df=X_test, labels=y_test, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers)
+                test_dataset = self.process_test_data(df=X_test, labels=y_test, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers_inference)
         else:
             test_dataset = None
         return train_dataset, test_dataset
