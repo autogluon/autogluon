@@ -126,12 +126,15 @@ class ENAS_Scheduler(object):
                     graph = self.supernet.graph
                     graph.attr(rankdir='LR', size='8,3')
                     tbar.set_svg(graph._repr_svg_())
-                tbar.set_description('avg reward: {:.2f}'.format(self.baseline))
+                if self.baseline:
+                    tbar.set_description('avg reward: {:.2f}'.format(self.baseline))
                 idx += 1
             self.validation()
             self.save()
-            tq.set_description('epoch {}, val_acc: {:.2f}, avg reward: {:.2f}' \
-                        .format(epoch, self.val_acc, self.baseline))
+            msg = 'epoch {}, val_acc: {:.2f}'.format(epoch, self.val_acc)
+            if self.baseline:
+                msg += ', avg reward: {:.2f}'.format(self.baseline)
+            tq.set_description(msg)
 
     def validation(self):
         if hasattr(self.val_data, 'reset'): self.val_data.reset()
