@@ -387,7 +387,17 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models)
+        # TODO: Make this index fix inside of learner/trainer once the defect is identified. For now, this resolves the issue.
+        if dataset is not None:
+            original_indices = copy.deepcopy(dataset.index)
+            dataset = dataset.reset_index(drop=True)
+        else:
+            original_indices = None
+
+        dataset_transformed = self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models)
+        if original_indices is not None:
+            dataset_transformed.index = original_indices
+        return dataset_transformed
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
     def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
