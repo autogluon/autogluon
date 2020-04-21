@@ -152,10 +152,10 @@ class AbstractLearner:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
 
-    def get_inputs_to_stacker(self, dataset=None, model_to_get_inputs_for=None, base_models: list = None):
-        if model_to_get_inputs_for is not None or base_models is not None:
-            if model_to_get_inputs_for is not None and base_models is not None:
-                raise AssertionError('Only one of `model_to_get_inputs_for`, `base_models` is allowed to be set.')
+    def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None):
+        if model is not None or base_models is not None:
+            if model is not None and base_models is not None:
+                raise AssertionError('Only one of `model`, `base_models` is allowed to be set.')
 
         trainer = self.load_trainer()
         if dataset is None:
@@ -170,8 +170,11 @@ class AbstractLearner:
             fit = False
         if base_models is not None:
             dataset_preprocessed = trainer.get_inputs_to_stacker_v2(X=dataset_preprocessed, base_models=base_models, fit=fit)
-        elif model_to_get_inputs_for is not None:
-            dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
+        elif model is not None:
+            base_models = list(trainer.model_graph.predecessors(model))
+            dataset_preprocessed = trainer.get_inputs_to_stacker_v2(X=dataset_preprocessed, base_models=base_models, fit=fit)
+            # Note: Below doesn't quite work here because weighted_ensemble has unique input format returned that isn't a DataFrame.
+            # dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
 
         return dataset_preprocessed
 

@@ -387,7 +387,7 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.get_inputs_to_stacker(dataset=dataset, model_to_get_inputs_for=model, base_models=base_models)
+        return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models)
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
     def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
