@@ -94,7 +94,7 @@ class TextClassificationPredictor(Classifier):
         net = self.model
         if isinstance(dataset, AutoGluonObject):
             dataset = dataset.init()
-        if isinstance(dataset, AbstractGlueTask):
+        if isinstance(dataset, AbstractGlueTask) or isinstance(dataset, AbstractCustomTask):
             dataset = dataset.get_dataset('dev')
         if isinstance(ctx, list):
             ctx = ctx[0]

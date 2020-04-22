@@ -143,9 +143,10 @@ class TextClassification(BaseTask):
         >>> predictor = task.fit(dataset)
         """
 
-        logger.warning('Warning: `TextClassification` is in preview mode and is not feature complete. '
-                       'Using `TextClassification` on custom datasets is not yet supported. '
-                       'For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.')
+        logger.warning('`TextClassification` is in preview mode.'
+                       'Please feel free to request new features in issues '
+                       'if it is not covered in the current implementation. '
+                       'If your dataset is in tabular format, you could also try out our `TabularPrediction` module.')
 
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
