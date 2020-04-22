@@ -346,6 +346,8 @@ class TabularPredictor(BasePredictor):
         Transforms dataset features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the dataset features.
         The output of this function can be used to train further models, even outside of AutoGluon.
+        Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
+        This method only applies universal transforms employed by all AutoGluon models.
         When `dataset=None`, `base_models=[{best_model}], and bagging was enabled during fit():
             This returns the out-of-fold predictions of the best model, which can be used as training input to a custom user stacker model.
 
@@ -355,7 +357,7 @@ class TabularPredictor(BasePredictor):
             The dataset to apply feature transformation to.
             This dataset does not require the label column.
             If str is passed, `dataset` will be loaded using the str value as the file path.
-            If not specified, the original dataset used during fit() will be used if `cache_data=True`. Otherwise, an exception will be raised.
+            If not specified, the original dataset used during fit() will be used if fit() was previously called with `cache_data=True`. Otherwise, an exception will be raised.
                 For non-bagged mode predictors:
                     The dataset used when not specified is the validation set.
                     This can either be an automatically generated validation set or the user-defined `tuning_data` if passed during fit().
@@ -384,6 +386,17 @@ class TabularPredictor(BasePredictor):
         Returns
         -------
         Pandas `pandas.DataFrame` of the provided `dataset` after feature transformation has been applied.
+        This output does not include the label column, and will remove it if present in the supplied `dataset`.
+
+        Examples
+        --------
+        >>> from autogluon import TabularPrediction as task
+        >>> train_data = task.Dataset('train.csv')
+        >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
+        >>> model = 'weighted_ensemble_k0_l1'
+        >>> test_data = task.Dataset('test.csv')
+        >>> train_data_transformed = predictor.transform_features(model=model)  # Internal training DataFrame used as input to `model.fit()` during `predictor = task.fit(train_data=train_data, ...)`
+        >>> test_data_transformed = predictor.transform_features(dataset=test_data, model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
 
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
