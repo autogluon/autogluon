@@ -341,6 +341,77 @@ class TabularPredictor(BasePredictor):
             print("*** End of fit() summary ***")
         return results
 
+    def transform_features(self, dataset=None, model=None, base_models=None):
+        """
+        Transforms dataset features through the AutoGluon feature generator.
+        This is useful to gain an understanding of how AutoGluon interprets the dataset features.
+        The output of this function can be used to train further models, even outside of AutoGluon.
+        Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
+        This method only applies universal transforms employed by all AutoGluon models.
+        When `dataset=None`, `base_models=[{best_model}], and bagging was enabled during fit():
+            This returns the out-of-fold predictions of the best model, which can be used as training input to a custom user stacker model.
+
+        Parameters
+        ----------
+        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+            The dataset to apply feature transformation to.
+            This dataset does not require the label column.
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If not specified, the original dataset used during fit() will be used if fit() was previously called with `cache_data=True`. Otherwise, an exception will be raised.
+                For non-bagged mode predictors:
+                    The dataset used when not specified is the validation set.
+                    This can either be an automatically generated validation set or the user-defined `tuning_data` if passed during fit().
+                    If the original training set is desired, it can be passed in through `dataset`.
+                        Warning: Do not pass the original training set if `model` or `base_models` are set. This will result in overfit feature transformation.
+                For bagged mode predictors:
+                    The dataset used when not specified is the full training set.
+                    `base_model` features generated in this instance will be from out-of-fold predictions.
+                    Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
+                    Warning: Do not pass the original training set through `dataset` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `dataset=None`.
+        model : str, default = None
+            Model to generate input features for.
+            The output data will be equivalent to the input data that would be sent into `model.predict_proba(data)`.
+                Note: This only applies to cases where `dataset` is not the training data.
+            If `None`, then only return generically preprocessed features prior to any model fitting.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+            Specifying a `refit_full` model will cause an exception if `dataset=None`.
+            `base_models=None` is a requirement when specifying `model`.
+        base_models : list, default = None
+            List of model names to use as base_models for a hypothetical stacker model when generating input features.
+            If `None`, then only return generically preprocessed features prior to any model fitting.
+            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+            If a stacker model S exists with `base_models=M`, then setting `base_models=M` is equivalent to setting `model=S`.
+            `model=None` is a requirement when specifying `base_models`.
+
+        Returns
+        -------
+        Pandas `pandas.DataFrame` of the provided `dataset` after feature transformation has been applied.
+        This output does not include the label column, and will remove it if present in the supplied `dataset`.
+
+        Examples
+        --------
+        >>> from autogluon import TabularPrediction as task
+        >>> train_data = task.Dataset('train.csv')
+        >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
+        >>> model = 'weighted_ensemble_k0_l1'
+        >>> test_data = task.Dataset('test.csv')
+        >>> train_data_transformed = predictor.transform_features(model=model)  # Internal training DataFrame used as input to `model.fit()` during `predictor = task.fit(train_data=train_data, ...)`
+        >>> test_data_transformed = predictor.transform_features(dataset=test_data, model=model)  # Internal test DataFrame used as input to `model.predict_proba()` during `predictor.predict_proba(test_data, model=model)`
+
+        """
+        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
+        # TODO: Make this index fix inside of learner/trainer once the defect is identified. For now, this resolves the issue.
+        if dataset is not None:
+            original_indices = copy.deepcopy(dataset.index)
+            dataset = dataset.reset_index(drop=True)
+        else:
+            original_indices = None
+
+        dataset_transformed = self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models)
+        if original_indices is not None:
+            dataset_transformed.index = original_indices
+        return dataset_transformed
+
     # TODO: Consider adding time_limit option to early stop the feature importance process
     def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
         """
@@ -358,7 +429,7 @@ class TabularPredictor(BasePredictor):
             Model to get feature importances for, if None the best model is chosen.
             Valid models are listed in this `predictor` by calling `predictor.model_names`
         dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
-            This Dataset must also contain the label-column with the same column-name as specified during fit().
+            This dataset must also contain the label-column with the same column-name as specified during fit().
             If specified, then the dataset is used to calculate the feature importance scores.
             If str is passed, `dataset` will be loaded using the str value as the file path.
             If not specified, the original dataset used during fit() will be used if `cache_data=True`. Otherwise, an exception will be raised.
@@ -383,6 +454,7 @@ class TabularPredictor(BasePredictor):
         Pandas `pandas.Series` of feature importance scores.
 
         """
+        dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
@@ -484,11 +556,11 @@ class TabularPredictor(BasePredictor):
     def __get_dataset(dataset):
         if isinstance(dataset, TabularDataset):
             return dataset
-        if isinstance(dataset, str):
-            return TabularDataset(file_path=dataset)
-        if isinstance(dataset, pd.DataFrame):
+        elif isinstance(dataset, pd.DataFrame):
             return TabularDataset(df=dataset)
-        if isinstance(dataset, pd.Series):
+        elif isinstance(dataset, str):
+            return TabularDataset(file_path=dataset)
+        elif isinstance(dataset, pd.Series):
             raise TypeError("dataset must be TabularDataset or pandas.DataFrame, not pandas.Series. \
                    To predict on just single example (ith row of table), use dataset.iloc[[i]] rather than dataset.iloc[i]")
         else:

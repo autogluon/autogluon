@@ -757,6 +757,18 @@ class AbstractTrainer:
         else:
             return model_pred_proba_dict
 
+    # TODO: Remove get_inputs_to_stacker eventually, move logic internally into this function instead
+    def get_inputs_to_stacker_v2(self, X, base_models, model_pred_proba_dict=None, fit=False):
+        if not fit:
+            model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=base_models, model_pred_proba_dict=model_pred_proba_dict)
+            model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
+        else:
+            # TODO: After get_inputs_to_stacker is removed, this if/else is not necessary, instead pass fit param to get_model_pred_proba_dict()
+            model_pred_proba_list = None
+
+        X_stacker_input = self.get_inputs_to_stacker(X=X, level_start=0, level_end=1, model_levels={0: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
+        return X_stacker_input
+
     # TODO: Legacy code, still used during training because it is technically slightly faster and more memory efficient than get_model_pred_proba_dict()
     #  Remove in future as it limits flexibility in stacker inputs during training
     def get_inputs_to_stacker(self, X, level_start, level_end, model_levels=None, y_pred_probas=None, fit=False):
