@@ -361,10 +361,14 @@ class TabularPredictor(BasePredictor):
                 For non-bagged mode predictors:
                     The dataset used when not specified is the validation set.
                     This can either be an automatically generated validation set or the user-defined `tuning_data` if passed during fit().
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_X_val(with_label=False)`.
+                    To get the label values of the output, call `predictor.load_y_val()`.
                     If the original training set is desired, it can be passed in through `dataset`.
                         Warning: Do not pass the original training set if `model` or `base_models` are set. This will result in overfit feature transformation.
                 For bagged mode predictors:
                     The dataset used when not specified is the full training set.
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_X_train(with_label=False)`.
+                    To get the label values of the output, call `predictor.load_y_train()`.
                     `base_model` features generated in this instance will be from out-of-fold predictions.
                     Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
                     Warning: Do not pass the original training set through `dataset` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `dataset=None`.
@@ -546,6 +550,92 @@ class TabularPredictor(BasePredictor):
         """
         self._learner.save()
         logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.output_directory)
+
+    def load_X_train(self, with_label=False):
+        """
+        Load the training data used during model training.
+        This is a transformed and augmented version of the `train_data` passed in `task.fit()`.
+            It may have different features compared to the original `train_data`.
+            It may have different row counts compared to the original `train_data`.
+            The DataFrame indices may not align with the original `train_data`.
+        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+
+        Parameters
+        ----------
+        with_label : bool, default = False
+            If True, then the output also includes the label column.
+            The label values may differ from those in `train_data`, as this is the internal representation of the labels.
+            Warning: In very rare cases a column name collision could occur if a generated feature name is the same as the label column name.
+                In this case, call `load_X_train()` and `load_y_train()` separately.
+
+        Returns
+        -------
+        Pandas `pandas.DataFrame` of the internal feature transformed training set.
+        """
+        X_train = self._trainer.load_X_train()
+        if with_label:
+            X_train[self.label_column] = self._trainer.load_y_train()
+        return X_train
+
+    def load_y_train(self):
+        """
+        Load the training data labels used during model training.
+        This is a transformed and augmented version of the `train_data` passed in `task.fit()`.
+            It may have different row counts compared to the original `train_data`.
+            The label values may differ from those in `train_data`, as this is the internal representation of the labels.
+            The Series indices may not align with the original `train_data`.
+        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+
+        Returns
+        -------
+        Pandas `pandas.Series` of the internal feature transformed training set's labels.
+        """
+        return self._trainer.load_y_train()
+
+    def load_X_val(self, with_label=False):
+        """
+        Load the validation data used during model training.
+        Warning: This will raise an exception if `predictor` was fit in bagged mode, as there is no validation data.
+        This is a transformed and augmented version of the `tuning_data` passed in `task.fit()`.
+            If `tuning_data=None` was set in `task.fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
+            It may have different features compared to the original `tuning_data`.
+            It may have different row counts compared to the original `tuning_data`.
+            The DataFrame indices may not align with the original `tuning_data`.
+        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+
+        Parameters
+        ----------
+        with_label : bool, default = False
+            If True, then the output also includes the label column.
+            The label values may differ from those in `tuning_data`, as this is the internal representation of the labels.
+            Warning: In very rare cases a column name collision could occur if a generated feature name is the same as the label column name.
+                In this case, call `load_X_val()` and `load_y_val()` separately.
+
+        Returns
+        -------
+        Pandas `pandas.DataFrame` of the internal feature transformed validation set.
+        """
+        X_val = self._trainer.load_X_val()
+        if with_label:
+            X_val[self.label_column] = self._trainer.load_y_val()
+        return X_val
+
+    def load_y_val(self):
+        """
+        Load the validation data labels used during model training.
+        Warning: This will raise an exception if `predictor` was fit in bagged mode, as there is no validation data.
+        This is a transformed and augmented version of the `tuning_data` passed in `task.fit()`.
+            If `tuning_data=None` was set in `task.fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
+            It may have different row counts compared to the original `tuning_data`.
+            The label values may differ from those in `tuning_data`, as this is the internal representation of the labels.
+            The Series indices may not align with the original `tuning_data`.
+        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+
+        Returns
+        -------
+        Pandas `pandas.Series` of the internal feature transformed validation set's labels.
+        """
+        return self._trainer.load_y_val()
 
     @staticmethod
     def _summarize(key, msg, results):
