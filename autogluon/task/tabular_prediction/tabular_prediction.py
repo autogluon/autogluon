@@ -255,6 +255,8 @@ class TabularPrediction(BaseTask):
                 Only valid if `refit_full=True`.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
+                Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
+                This seed is NOT used in the training of individual models, for that you need to explicitly set the corresponding seed hyperparameter (usually called 'seed_value') of each individual model.
                 If stacking is enabled:
                     The seed used for stack level L is equal to `seed+L`.
                     This means `random_seed=1` will have the same split indices at L=0 as `random_seed=0` will have at L=1.
