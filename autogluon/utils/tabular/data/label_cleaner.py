@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 # LabelCleaner cleans labels prior to entering feature generation
 class LabelCleaner:
+    num_classes = None
+    inv_map = None
+    ordered_class_labels = None
+    ordered_class_labels_transformed = None
+
     @staticmethod
     def construct(problem_type: str, y: Series, y_uncleaned: Series):
         if problem_type == BINARY:
@@ -48,6 +53,7 @@ class LabelCleanerMulticlass(LabelCleaner):
         self.num_classes = len(self.cat_mappings_dependent_var.keys())
         self.ordered_class_labels = list(y_uncleaned.astype('category').cat.categories)
         self.valid_ordered_class_labels = list(y.astype('category').cat.categories)
+        self.ordered_class_labels_transformed = list(range(len(self.valid_ordered_class_labels)))
         self.invalid_class_count = len(self.ordered_class_labels) - len(self.valid_ordered_class_labels)
         self.labels_to_zero_fill = [1 if label not in self.valid_ordered_class_labels else 0 for label in self.ordered_class_labels]
         self.label_index_to_keep = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 0]
@@ -158,9 +164,6 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
 
 
 class LabelCleanerDummy(LabelCleaner):
-    def __init__(self):
-        self.num_classes = None
-
     def transform(self, y: Series) -> Series:
         if isinstance(y, np.ndarray):
             y = Series(y)

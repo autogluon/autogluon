@@ -39,6 +39,15 @@ class TabularPredictor(BasePredictor):
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is = None for problems that are not multiclass.
             For example if `pred = predict_proba(x)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
+        class_labels_internal : list
+            For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output. Is = None for problems that are not multiclass.
+        class_labels_internal_map : dict
+            For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
+            For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
+                Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
+            This variable will be None if the problem is regression.
+            For multiclass, it is possible for not all of the label values to have a mapping.
+                This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
 
         Examples
         --------
@@ -74,6 +83,8 @@ class TabularPredictor(BasePredictor):
         self.model_names = self._trainer.get_model_names_all()  # TODO: Consider making this a function instead of a variable: This should never be de-synced with the output of self._trainer.get_model_names_all()
         self.model_performance = self._trainer.model_performance
         self.class_labels = self._learner.class_labels
+        self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
+        self.class_labels_internal_map = self._learner.label_cleaner.inv_map
 
     def predict(self, dataset, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
@@ -346,6 +357,7 @@ class TabularPredictor(BasePredictor):
         Transforms dataset features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the dataset features.
         The output of this function can be used to train further models, even outside of AutoGluon.
+        This can be useful for training your own models on the same data representation as AutoGluon.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
         When `dataset=None`, `base_models=[{best_model}], and bagging was enabled during fit():
@@ -387,6 +399,7 @@ class TabularPredictor(BasePredictor):
         -------
         Pandas `pandas.DataFrame` of the provided `dataset` after feature transformation has been applied.
         This output does not include the label column, and will remove it if present in the supplied `dataset`.
+        If a transformed label column is desired, use `predictor.transform_labels`.
 
         Examples
         --------
@@ -411,6 +424,51 @@ class TabularPredictor(BasePredictor):
         if original_indices is not None:
             dataset_transformed.index = original_indices
         return dataset_transformed
+
+    # TODO: Add support for DataFrame input and support for DataFrame output
+    #  Add support for retaining DataFrame/Series indices in output
+    #  Add as_pandas parameter
+    def transform_labels(self, labels, inverse=False, proba=False):
+        """
+        Transforms dataset labels to the internal label representation.
+        This can be useful for training your own models on the same data label representation as AutoGluon.
+        Regression problems do not differ between original and internal representation, and thus this method will return the provided labels.
+        Warning: When `inverse=False`, it is possible for the output to contain NaN label values in multiclass problems if the provided label was dropped during training.
+
+        Parameters
+        ----------
+        labels : `numpy.ndarray` or `pandas.Series`
+            Labels to transform.
+            If `proba=False`, an example input would be the output of `predictor.predict(test_data)`.
+            If `proba=True`, an example input would be the output of `predictor.predict_proba(test_data)`.
+        inverse : boolean, default = False
+            When `True`, the input labels are treated as being in the internal representation and the original representation is outputted.
+        proba : boolean, default = False
+            When `True`, the input labels are treated as probabilities and the output will be the internal representation of probabilities.
+                In this case, it is expected that `labels` be a `numpy.ndarray`.
+                If the `problem_type` is multiclass:
+                    The input column order must be equal to `predictor.class_labels`.
+                    The output column order will be equal to `predictor.class_labels_internal`.
+                    if `inverse=True`, the same logic applies, but with input and output columns interchanged.
+            When `False`, the input labels are treated as actual labels and the output will be the internal representation of the labels.
+                In this case, it is expected that `labels` be a `pandas.Series` or `numpy.ndarray`.
+
+        Returns
+        -------
+        Pandas `pandas.Series` of labels if `proba=False` or Numpy `numpy.ndarray` of label probabilities if `proba=True`
+
+        """
+        if inverse:
+            if proba:
+                labels_transformed = self._learner.label_cleaner.inverse_transform_proba(y=labels)
+            else:
+                labels_transformed = self._learner.label_cleaner.inverse_transform(y=labels)
+        else:
+            if proba:
+                labels_transformed = self._learner.label_cleaner.transform_proba(y=labels)
+            else:
+                labels_transformed = self._learner.label_cleaner.transform(y=labels)
+        return labels_transformed
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
     def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
