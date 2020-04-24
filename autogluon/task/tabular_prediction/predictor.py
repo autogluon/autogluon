@@ -553,7 +553,7 @@ class TabularPredictor(BasePredictor):
 
     def load_data_internal(self, dataset='train', return_X=True, return_y=True):
         """
-        Loads the generic internal data representation used during model training.
+        Loads the internal data representation used during model training.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
         This will raise an exception if `cache_data=False` was set in `task.fit()`.
