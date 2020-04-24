@@ -357,6 +357,7 @@ class TabularPredictor(BasePredictor):
         Transforms dataset features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the dataset features.
         The output of this function can be used to train further models, even outside of AutoGluon.
+        This can be useful for training your own models on the same data representation as AutoGluon.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
         When `dataset=None`, `base_models=[{best_model}], and bagging was enabled during fit():
@@ -430,6 +431,7 @@ class TabularPredictor(BasePredictor):
     def transform_labels(self, labels, inverse=False, proba=False):
         """
         Transforms dataset labels to the internal label representation.
+        This can be useful for training your own models on the same data label representation as AutoGluon.
         Regression problems do not differ between original and internal representation, and thus this method will return the provided labels.
         Warning: When `inverse=False`, it is possible for the output to contain NaN label values in multiclass problems if the provided label was dropped during training.
 
