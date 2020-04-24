@@ -373,10 +373,14 @@ class TabularPredictor(BasePredictor):
                 For non-bagged mode predictors:
                     The dataset used when not specified is the validation set.
                     This can either be an automatically generated validation set or the user-defined `tuning_data` if passed during fit().
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(dataset='val', return_X=True, return_y=False)[0]`.
+                    To get the label values of the output, call `predictor.load_data_internal(dataset='val', return_X=False, return_y=True)[1]`.
                     If the original training set is desired, it can be passed in through `dataset`.
                         Warning: Do not pass the original training set if `model` or `base_models` are set. This will result in overfit feature transformation.
                 For bagged mode predictors:
                     The dataset used when not specified is the full training set.
+                    If all parameters are unspecified, then the output is equivalent to `predictor.load_data_internal(dataset='train', return_X=True, return_y=False)[0]`.
+                    To get the label values of the output, call `predictor.load_data_internal(dataset='train', return_X=False, return_y=True)[1]`.
                     `base_model` features generated in this instance will be from out-of-fold predictions.
                     Note that the training set may differ from the training set originally passed during fit(), as AutoGluon may choose to drop or duplicate rows during training.
                     Warning: Do not pass the original training set through `dataset` if `model` or `base_models` are set. This will result in overfit feature transformation. Instead set `dataset=None`.
@@ -604,6 +608,56 @@ class TabularPredictor(BasePredictor):
         """
         self._learner.save()
         logger.log(20, "TabularPredictor saved. To load, use: TabularPredictor.load(\"%s\")" % self.output_directory)
+
+    def load_data_internal(self, dataset='train', return_X=True, return_y=True):
+        """
+        Loads the internal data representation used during model training.
+        Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
+        This method only applies universal transforms employed by all AutoGluon models.
+        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+        Warning, the internal representation may:
+            Have different features compared to the original data.
+            Have different row counts compared to the original data.
+            Have indices which do not align with the original data.
+            Have label values which differ from those in the original data.
+        Internal data representations should NOT be combined with the original data, in most cases this is not possible.
+
+        Parameters
+        ----------
+        dataset : str, default = 'train'
+            The dataset to load.
+            Valid values are:
+                'train':
+                    Load the training data used during model training.
+                    This is a transformed and augmented version of the `train_data` passed in `task.fit()`.
+                'val':
+                    Load the validation data used during model training.
+                    This is a transformed and augmented version of the `tuning_data` passed in `task.fit()`.
+                    If `tuning_data=None` was set in `task.fit()`, then `tuning_data` is an automatically generated validation set created by splitting `train_data`.
+                    Warning: Will raise an exception if called by a bagged predictor, as bagged predictors have no validation data.
+        return_X : bool, default = True
+            Whether to return the internal data features
+            If set to `False`, then the first element in the returned tuple will be None.
+        return_y : bool, default = True
+            Whether to return the internal data labels
+            If set to `False`, then the second element in the returned tuple will be None.
+
+        Returns
+        -------
+        Tuple of (`pandas.DataFrame`, `pandas.Series`) corresponding to the internal data features and internal data labels, respectively.
+
+        """
+        if dataset == 'train':
+            load_X = self._trainer.load_X_train
+            load_y = self._trainer.load_y_train
+        elif dataset == 'val':
+            load_X = self._trainer.load_X_val
+            load_y = self._trainer.load_y_val
+        else:
+            raise ValueError(f'dataset must be one of: [\'train\', \'val\'], but was \'{dataset}\'.')
+        X = load_X() if return_X else None
+        y = load_y() if return_y else None
+        return X, y
 
     @staticmethod
     def _summarize(key, msg, results):
