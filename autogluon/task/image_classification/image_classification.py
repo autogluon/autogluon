@@ -27,33 +27,38 @@ class ImageClassification(BaseTask):
     Classifier = Classifier
 
     @staticmethod
-    def Dataset(*args, **kwargs):
-        """Dataset for AutoGluon image classification tasks. 
-           May either be a :class:`autogluon.task.image_classification.ImageFolderDataset`, :class:`autogluon.task.image_classification.RecordDataset`, 
+    def Dataset(path=None, train=True, name=None, input_size=224, crop_ratio=0.875, *args, **kwargs):
+        """Dataset for AutoGluon image classification tasks.
+           May either be a :class:`autogluon.task.image_classification.ImageFolderDataset`, :class:`autogluon.task.image_classification.RecordDataset`,
            or a popular dataset already built into AutoGluon ('mnist', 'fashionmnist', 'cifar10', 'cifar100', 'imagenet').
 
         Parameters
         ----------
+        path : str
+            The data location. If using :class:`ImageFolderDataset`,
+            image folder`path/to/the/folder` should be provided.
+            If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
+        train : bool, default = True
+            Whether this dataset should be used for training or validation.
         name : str, optional
             Which built-in dataset to use, will override all other options if specified.
             The options are: 'mnist', 'fashionmnist', 'cifar', 'cifar10', 'cifar100', 'imagenet'
-        train : bool, default = True
-            Whether this dataset should be used for training or validation.
-        train_path : str
-            The training data location. If using :class:`ImageFolderDataset`,
-            image folder`path/to/the/folder` should be provided. 
-            If using :class:`RecordDataset`, the `path/to/*.rec` should be provided.
         input_size : int
             The input image size.
         crop_ratio : float
             Center crop ratio (for evaluation only).
-        
+
         Returns
         -------
-        Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`. 
+        Dataset object that can be passed to `task.fit()`, which is actually an :class:`autogluon.space.AutoGluonObject`.
         To interact with such an object yourself, you must first call `Dataset.init()` to instantiate the object in Python.
         """
-        return get_dataset(*args, **kwargs)
+        if name is None:
+            if path is None:
+                raise ValueError("Either `path` or `name` must be present in Dataset()")
+        return get_dataset(path=path, train=train, name=name,
+                           input_size=input_size, crop_ratio=crop_ratio,
+                           *args, **kwargs)
 
     @staticmethod
     def fit(dataset,
@@ -116,7 +121,7 @@ class ImageClassification(BaseTask):
         Parameters
         ----------
         dataset : str or :meth:`autogluon.task.ImageClassification.Dataset`
-            Training dataset containing images and their associated class labels. 
+            Training dataset containing images and their associated class labels.
             Popular image datasets built into AutoGluon can be used by specifying their name as a string (options: ‘mnist’, ‘fashionmnist’, ‘cifar’, ‘cifar10’, ‘cifar100’, ‘imagenet’).
         input_size : int
             Size of images in the dataset (pixels).
@@ -141,18 +146,18 @@ class ImageClassification(BaseTask):
             The final returned model may be fit to all of the data (after hyperparameters have been selected).
         time_limits : int
             Approximately how long `fit()` should run for (wallclock time in seconds).
-            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion).
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : int
-            How many GPUs to use in each trial (ie. single training run of a model). 
+            How many GPUs to use in each trial (ie. single training run of a model).
         output_directory : str
             Dir to save search results.
         search_strategy : str
-            Which hyperparameter search algorithm to use. 
+            Which hyperparameter search algorithm to use.
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
+            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         resume : bool
             If a model checkpoint file exists, model training will resume from there when specified.
         dist_ip_addrs : list
@@ -162,16 +167,16 @@ class ImageClassification(BaseTask):
         plot_results : bool
             Whether or not to generate plots summarizing training process.
         visualizer : str
-            Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
+            Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
         grace_period : int
             The grace period in early stopping when using Hyperband to tune hyperparameters. If None, this is set automatically.
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
-        
+
         Returns
         -------
             :class:`autogluon.task.image_classification.Classifier` object which can make predictions on new data and summarize what happened during `fit()`.
-        
+
         Examples
         --------
         >>> from autogluon import ImageClassification as task
