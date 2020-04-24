@@ -43,7 +43,7 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
         return [[train_index, test_index] for train_index, test_index in kf.split(X)]
 
 
-def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=42) -> (DataFrame, DataFrame, Series, Series):
+def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=0) -> (DataFrame, DataFrame, Series, Series):
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
 

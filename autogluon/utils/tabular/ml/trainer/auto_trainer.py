@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def __init__(self, path, problem_type, scheduler_options=None, objective_func=None, stopping_metric=None, num_classes=None,
-                 low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1, stack_ensemble_levels=0, time_limit=None, save_data=False, verbosity=2):
+                 low_memory=False, feature_types_metadata={}, kfolds=0, n_repeats=1, stack_ensemble_levels=0, time_limit=None, save_data=False, random_seed=0, verbosity=2):
         super().__init__(path=path, problem_type=problem_type, scheduler_options=scheduler_options,
                          objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, low_memory=low_memory,
                          feature_types_metadata=feature_types_metadata, kfolds=kfolds, n_repeats=n_repeats,
-                         stack_ensemble_levels=stack_ensemble_levels, time_limit=time_limit, save_data=save_data, verbosity=verbosity)
+                         stack_ensemble_levels=stack_ensemble_levels, time_limit=time_limit, save_data=save_data, random_seed=random_seed, verbosity=verbosity)
 
     def get_models(self, hyperparameters={'NN':{},'GBM':{}}, hyperparameter_tune=False, **kwargs):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric,
@@ -35,7 +35,7 @@ class AutoTrainer(AbstractTrainer):
             y_test = None
         else:
             if (y_test is None) or (X_test is None):
-                X_train, X_test, y_train, y_test = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac)
+                X_train, X_test, y_train, y_test = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
         self.train_multi_and_ensemble(X_train, y_train, X_test, y_test, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)
         # self.cleanup()
         # TODO: cleanup temp files, eg. those from HPO

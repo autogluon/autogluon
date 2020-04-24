@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import time
 import warnings
 from collections import OrderedDict
@@ -34,7 +35,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False):
+                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
@@ -44,6 +45,9 @@ class AbstractLearner:
         self.objective_func = objective_func
         self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
+        if random_seed is None:
+            random_seed = random.randint(0, 1000000)
+        self.random_seed = random_seed
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator = feature_generator
@@ -519,6 +523,7 @@ class AbstractLearner:
             'time_fit_training': self.time_fit_training,
             'time_fit_total': self.time_fit_total,
             'time_limit': self.time_limit,
+            'random_seed': self.random_seed,
         }
 
         learner_info.update(trainer_info)
