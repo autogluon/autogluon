@@ -1,6 +1,6 @@
 from collections import OrderedDict
-import cloudpickle as pkl
 
+import cloudpickle as pkl
 import gluoncv as gcv
 import matplotlib.pyplot as plt
 import mxnet as mx
@@ -78,30 +78,22 @@ class Detector(BasePredictor):
             """Test on validation dataset."""
             eval_metric.reset()
             # set nms threshold and topk constraint
-            net.set_nms(nms_thresh=0.45, nms_topk=400)
+            if args.meta_arch == 'yolo3':
+                net.set_nms(nms_thresh=0.45, nms_topk=400)
             mx.nd.waitall()
             net.hybridize()
             for batch in val_data:
                 if args.meta_arch == 'yolo3':
-                    data = gluon.utils.split_and_load(
-                        batch[0],
-                        ctx_list=ctx,
-                        batch_axis=0,
-                        even_split=False
-                    )
-                    label = gluon.utils.split_and_load(
-                        batch[1],
-                        ctx_list=ctx,
-                        batch_axis=0,
-                        even_split=False
-                    )
+                    data = gluon.utils.split_and_load(batch[0], ctx_list=ctx, batch_axis=0,
+                                                      even_split=False)
+                    label = gluon.utils.split_and_load(batch[1], ctx_list=ctx, batch_axis=0,
+                                                       even_split=False)
                     split_batch = data, label
                 elif args.meta_arch == 'faster_rcnn':
                     split_batch = rcnn_split_and_load(batch, ctx_list=ctx)
                     clipper = gcv.nn.bbox.BBoxClipToImage()
                 else:
-                    raise NotImplementedError(f'{args.meta_arch} not implemented.')
-
+                    raise NotImplementedError('%s not implemented.' % args.meta_arch)
                 det_bboxes = []
                 det_ids = []
                 det_scores = []
@@ -114,8 +106,7 @@ class Detector(BasePredictor):
                     elif args.meta_arch == 'faster_rcnn':
                         x, y, im_scale = data
                     else:
-                        raise NotImplementedError(f'{args.meta_arch} not implemented.')
-
+                        raise NotImplementedError('%s not implemented.' % args.meta_arch)
                     # get prediction results
                     ids, scores, bboxes = net(x)
                     det_ids.append(ids)
@@ -129,26 +120,24 @@ class Detector(BasePredictor):
                         im_scale = im_scale.reshape((-1)).asscalar()
                         det_bboxes[-1] *= im_scale
                     else:
-                        raise NotImplementedError(f'{args.meta_arch} not implemented.')
-
+                        raise NotImplementedError('%s not implemented.' % args.meta_arch)
                     # split ground truths
                     gt_ids.append(y.slice_axis(axis=-1, begin=4, end=5))
                     gt_bboxes.append(y.slice_axis(axis=-1, begin=0, end=4))
                     if args.meta_arch == 'faster_rcnn':
                         gt_bboxes[-1] *= im_scale
                     gt_difficults.append(
-                        y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None
-                    )
-
+                        y.slice_axis(axis=-1, begin=5, end=6) if y.shape[-1] > 5 else None)
                 # update metric
                 if args.meta_arch == 'yolo3':
-                    eval_metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults)
+                    eval_metric.update(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids,
+                                       gt_difficults)
                 elif args.meta_arch == 'faster_rcnn':
                     for det_bbox, det_id, det_score, gt_bbox, gt_id, gt_diff in \
                             zip(det_bboxes, det_ids, det_scores, gt_bboxes, gt_ids, gt_difficults):
                         eval_metric.update(det_bbox, det_id, det_score, gt_bbox, gt_id, gt_diff)
                 else:
-                    raise NotImplementedError(f'{args.meta_arch} not implemented.')
+                    raise NotImplementedError('%s not implemented.' % args.meta_arch)
             return eval_metric.get()
 
         if isinstance(dataset, AutoGluonObject):
@@ -202,11 +191,10 @@ class Detector(BasePredictor):
         model_params = state_dict['model_params']
         classes = state_dict['classes']
 
-        model = get_network(args.meta_arch, args.net, classes, mx.cpu(0))
+        model = get_network(args.meta_arch, args.net, classes, mx.cpu(0), args.syncbn)
         update_params(model, model_params)
 
         return cls(model, results, scheduler_checkpoint, args, format_results=False)
-
 
     def state_dict(self, destination=None):
         if destination is None:
@@ -231,9 +219,3 @@ class Detector(BasePredictor):
 
     def predict_proba(self, X):
         raise NotImplementedError
-
-
-
-
-
-
