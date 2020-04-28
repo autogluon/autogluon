@@ -192,7 +192,7 @@ class Detector(BasePredictor):
         model_params = state_dict['model_params']
         classes = state_dict['classes']
 
-        model = get_network(args.meta_arch, args.net, classes, mx.cpu(0), args.syncbn)
+        model = get_network(args.meta_arch, args.net, classes, ctx=mx.cpu(0), syncbn=args.syncbn)
         update_params(model, model_params)
 
         return cls(model, results, scheduler_checkpoint, args, format_results=False)

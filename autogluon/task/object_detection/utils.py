@@ -6,7 +6,7 @@ from gluoncv.utils.metrics.rcnn import RPNAccMetric, RPNL1LossMetric, RCNNAccMet
 from .nets import get_built_in_network
 
 
-def get_network(meta_arch, net, transfer_classes, transfer, ctx, syncbn):
+def get_network(meta_arch, net, transfer_classes, transfer=None, ctx=mx.cpu(), syncbn=False):
     if type(net) == str:
         net = get_built_in_network(meta_arch, net, transfer_classes, transfer, ctx=ctx,
                                    syncbn=syncbn)
@@ -51,9 +51,9 @@ def get_yolo3_metrics():
 
 def get_rcnn_losses(args):
     return mx.gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False), \
-       mx.gluon.loss.HuberLoss(rho=0.001), \
-       mx.gluon.loss.SoftmaxCrossEntropyLoss(), \
-       mx.gluon.loss.HuberLoss(rho=0.01)
+           mx.gluon.loss.HuberLoss(rho=0.001), \
+           mx.gluon.loss.SoftmaxCrossEntropyLoss(), \
+           mx.gluon.loss.HuberLoss(rho=0.01)
 
 
 def rcnn_split_and_load(batch, ctx_list):
