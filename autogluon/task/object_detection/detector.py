@@ -41,6 +41,7 @@ class Detector(BasePredictor):
         """
         args = self.args
         net = self.model
+        net.collect_params().reset_ctx(ctx)
 
         def _get_dataloader(net, test_dataset, data_shape, batch_size, num_workers, num_devices,
                             args):
