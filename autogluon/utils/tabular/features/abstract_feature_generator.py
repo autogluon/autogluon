@@ -114,20 +114,22 @@ class AbstractFeatureGenerator:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
                 self.features_to_remove_post.append(column)
-            # print(column, unique_value_count)
+            elif column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
+                self.features_to_remove_post.append(column)
+
         self.features_binned = set(self.features_binned) - set(self.features_to_remove_post)
         self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
             # print(X_features[column].value_counts().sort_index())
+        X_features = X_features.drop(self.features_to_remove_post, axis=1)
+        if drop_duplicates:
+            X_features = self.drop_duplicate_features(X_features)
         self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
             X_features = self.fix_categoricals_for_sklearn(X_features=X_features)
         for column in self.features_categorical_final:
             self.features_categorical_final_mapping[column] = X_features[column].cat.categories  # dict(enumerate(X_features[column].cat.categories))
-        X_features = X_features.drop(self.features_to_remove_post, axis=1)
-        if drop_duplicates:
-            X_features = self.drop_duplicate_features(X_features)
         X_features.index = X_index
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned

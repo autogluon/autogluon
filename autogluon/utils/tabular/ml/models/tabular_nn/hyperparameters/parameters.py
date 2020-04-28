@@ -69,6 +69,9 @@ def get_hyper_params():
         'target_lr': 1.0,  # largest LR (float > 0)
         'lr_decay': 0.1,  # step factor used to decay LR (float in (0,1))
         'warmup_epochs': 10,  # number of epochs at beginning of training in which LR is linearly ramped up (float > 1).
+        ## Feature-specific hyperparameters:
+        'use_ngram_features': False,  # If False, will drop automatically generated ngram features from language features. This results in worse model quality but far faster inference and training times.
+        # Options: [True, False]
     }
     return hyper_params
 
