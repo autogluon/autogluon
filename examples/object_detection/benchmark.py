@@ -95,7 +95,7 @@ if __name__ == '__main__':
                   'warmup_epochs': ag.Int(1, 10), 'warmup_iters': ag.Int(250, 1000),
                   'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': ag.Bool(),
                   'label_smooth': ag.Bool(), 'time_limits': time_limits, 'dist_ip_addrs': []}
-    else:
+    elif args.meta_arch == 'faster_rcnn':
         kwargs = {'num_trials': 30, 'epochs': ag.Categorical(30, 40, 50, 60),
                   'net': ag.Categorical('resnest101', 'resnest50'),
                   'meta_arch': args.meta_arch,
@@ -107,6 +107,8 @@ if __name__ == '__main__':
                   'warmup_iters': ag.Int(5, 500),
                   'wd': ag.Categorical(1e-4, 5e-4, 2.5e-4), 'syncbn': True,
                   'label_smooth': False, 'time_limits': time_limits, 'dist_ip_addrs': []}
+    else:
+        raise NotImplementedError('%s is not implemented.', args.meta_arch)
     detector = task.fit(dataset_train, **kwargs)
     ctx = [mx.gpu(i) for i in range(get_gpu_count())]
     if not ctx:

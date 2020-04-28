@@ -198,14 +198,15 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
     # logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
     best_map = [0]
 
+    if args.meta_arch == 'faster_rcnn':
+        rcnn_task = ForwardBackwardTask(net, trainer, rpn_cls_loss, rpn_box_loss, rcnn_cls_loss,
+                                        rcnn_box_loss, mix_ratio=1.0, enable_amp=False)
+        executor = Parallel(args.num_gpus // 2, rcnn_task)
+
     pre_current_map = 0
     for epoch in range(args.start_epoch, args.epochs):
         mix_ratio = 1.0
         net.hybridize()
-        if args.meta_arch == 'faster_rcnn':
-            rcnn_task = ForwardBackwardTask(net, trainer, rpn_cls_loss, rpn_box_loss, rcnn_cls_loss,
-                                            rcnn_box_loss, mix_ratio=1.0, enable_amp=False)
-            executor = Parallel(args.num_gpus // 2, rcnn_task)
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -260,7 +261,6 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
             else:
                 raise NotImplementedError('%s not implemented.' % args.meta_arch)
             trainer.step(batch_size)
-            mx.nd.waitall()
 
             for metric, record in zip(raw_metrics, raw_metrics_values):
                 metric.update(0, record)
