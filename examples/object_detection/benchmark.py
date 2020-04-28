@@ -109,6 +109,8 @@ if __name__ == '__main__':
                   'label_smooth': False, 'time_limits': time_limits, 'dist_ip_addrs': []}
     detector = task.fit(dataset_train, **kwargs)
     ctx = [mx.gpu(i) for i in range(get_gpu_count())]
+    if not ctx:
+        ctx = [mx.cpu()]
     test_map = detector.evaluate(dataset_test, ctx=ctx)
     print("mAP on test dataset: {}".format(test_map[-1][-1]))
     print(test_map)
