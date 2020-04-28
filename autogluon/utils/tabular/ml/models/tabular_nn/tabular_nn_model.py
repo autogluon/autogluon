@@ -446,6 +446,7 @@ class TabularNeuralNetModel(AbstractModel):
         max_category_levels = params['proc.max_category_levels']
         skew_threshold = params['proc.skew_threshold']
         embed_min_categories = params['proc.embed_min_categories']
+        use_ngram_features = params['use_ngram_features']
 
         if isinstance(X_train, TabularNNDataset):
             train_dataset = X_train
@@ -455,7 +456,7 @@ class TabularNeuralNetModel(AbstractModel):
                 self.features = list(X_train.columns)
             train_dataset = self.process_train_data(
                 df=X_train, labels=y_train, batch_size=self.batch_size, num_dataloading_workers=self.num_dataloading_workers,
-                impute_strategy=impute_strategy, max_category_levels=max_category_levels, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories,
+                impute_strategy=impute_strategy, max_category_levels=max_category_levels, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features,
             )
         if X_test is not None:
             if isinstance(X_test, TabularNNDataset):
@@ -491,7 +492,7 @@ class TabularNeuralNetModel(AbstractModel):
                                 batch_size=batch_size, num_dataloading_workers=num_dataloading_workers,
                                 problem_type=self.problem_type, labels=labels, is_test=True)
 
-    def process_train_data(self, df, batch_size, num_dataloading_workers, impute_strategy, max_category_levels, skew_threshold, embed_min_categories, labels):
+    def process_train_data(self, df, batch_size, num_dataloading_workers, impute_strategy, max_category_levels, skew_threshold, embed_min_categories, use_ngram_features, labels):
         """ Preprocess training data and create self.processor object that can be used to process future data.
             This method should only be used once per TabularNeuralNetModel object, otherwise will produce Warning.
 
@@ -509,7 +510,7 @@ class TabularNeuralNetModel(AbstractModel):
         if len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
 
-        self.types_of_features = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
+        self.types_of_features = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
         df = df[self.features]
         logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
         logger.log(15, json.dumps(self.types_of_features, indent=4))
@@ -578,17 +579,23 @@ class TabularNeuralNetModel(AbstractModel):
         """ Returns crude categorization of feature types """
         return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
 
-    def _get_types_of_features(self, df, skew_threshold, embed_min_categories):
+    def _get_types_of_features(self, df, skew_threshold, embed_min_categories, use_ngram_features):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
+
+        # TODO: Consider setting use_ngram_features=True by default once performance is improved
+        if not use_ngram_features:
+            vectorizers_featnames = self.__get_feature_type_if_present('vectorizers')
+            nlp_featnames = self.__get_feature_type_if_present('nlp')
+            self.feature_types_metadata['int'] = [feature for feature in self.feature_types_metadata['int'] if feature not in vectorizers_featnames]
+            self.feature_types_metadata['object'] = [feature for feature in self.feature_types_metadata['object'] if feature not in nlp_featnames]
+
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
         continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')
-        # print("categorical_featnames:", categorical_featnames)
-        # print("continuous_featnames:", continuous_featnames)
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:

@@ -4,7 +4,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 
 def vectorizer_auto_ml_default():
-    return CountVectorizer(min_df=30, ngram_range=(1, 5), max_features=30000)
+    return CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=30000)
 
 
 def get_ngram_freq(vectorizer, transform_matrix):
