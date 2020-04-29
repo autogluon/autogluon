@@ -24,6 +24,7 @@ Image Classification
 
       Participate Kaggle competition.
 
+
 Object Detection
 ----------------
 .. container:: cards
@@ -49,32 +50,39 @@ Tabular Prediction
       :title: In-depth FIT Tutorial
       :link: tabular_prediction/tabular-indepth.html
 
-      In-depth tutorial on controlling various aspects of model fitting.
+      In-depth tutorial on boosting accuracy and controlling model fitting.
 
-Customize AutoGluon
--------------------
+   .. card::
+      :title: Kaggle Tutorial
+      :link: tabular_prediction/tabular-kaggle.html
+
+      Using AutoGluon for Kaggle competitions with tabular data.
+
+
+Tuning Custom Models
+--------------------
 .. container:: cards
    
    .. card::
       :title: Search Space and Decorator
       :link: course/core.html
 
-      Learn AutoGluon Core API for customized search spaces,
-      customize searchable objects, and training functions.
+      AutoGluon's Core API for search spaces and searchable 
+      objects used to tune any training function's argument-values.
 
    .. card::
       :title: Search Algorithms
       :link: course/algorithm.html
 
-      Learning AutoGluon built-in search algorithms and
-      early-stopping scheduling strategy.
+      Use AutoGluon's search algorithms to tune 
+      arbitrary models/training-scripts.
 
    .. card::
       :title: Distributed Search Tutorial
-      :link: cource/distributed.md
+      :link: course/distributed.html
 
-      Easily scale up training across multiple machines using
-      automatic distributed search.
+      Easily distribute AutoGluon tuning 
+      across multiple machines.
 
 
 Neural Architecture Search
