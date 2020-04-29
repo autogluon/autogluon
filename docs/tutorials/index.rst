@@ -10,19 +10,19 @@ Image Classification
       :title: Quick Start Using FIT
       :link: image_classification/beginner.html
 
-      Quick start tutorial.
+      5 min tutorial on classifying images.
 
    .. card::
       :title: Customized Search and HPO
       :link: image_classification/hpo.html
 
-      Image classification HPO tutorial.
+      Hyperparameter tuning to improve image classification accuracy.
 
    .. card::
       :title: Use Your Own Dataset
       :link: image_classification/kaggle.html
 
-      Participate Kaggle competition.
+      Example use of AutoGluon for image classification competition on Kaggle.
 
 
 Object Detection
@@ -33,7 +33,7 @@ Object Detection
       :title: Quick Start Using FIT
       :link: object_detection/beginner.html
 
-      Quick start tutorial.
+      5 min tutorial on detecting objects in images.
 
 
 Tabular Prediction
@@ -44,7 +44,7 @@ Tabular Prediction
       :title: Quick Start Tutorial
       :link: tabular_prediction/tabular-quickstart.html
 
-      Quick tutorial on fitting models with tabular datasets.
+      5 min tutorial on fitting models with tabular datasets.
 
    .. card::
       :title: In-depth FIT Tutorial
@@ -90,17 +90,17 @@ Neural Architecture Search
 .. container:: cards
 
    .. card::
-      :title: Reinforcement Learing
+      :title: Reinforcement Learning
       :link: nas/rl_searcher.html
 
-      Compare Reinforcement Learning with Random Searcher.
+      Comparing search via Reinforcement Learning against Random search.
 
    .. card::
       :title: Efficient NAS on Target Hardware
       :link: nas/enas_mnist.html
 
       Efficient Neural Architecture Search for low latency model
-      on Target Hardware.
+      on target hardware.
 
 
 .. toctree::
