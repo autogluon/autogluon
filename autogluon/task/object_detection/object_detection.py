@@ -270,6 +270,8 @@ class ObjectDetection(BaseTask):
         args = sample_config(train_object_detection.args, results['best_config'])
         logger.info('The best config: {}'.format(results['best_config']))
 
-        model = get_network(args.meta_arch, args.net, dataset.init().get_classes(), mx.cpu(0))
+        ctx = [mx.gpu(i) for i in range(get_gpu_count())]
+        model = get_network(args.meta_arch, args.net, dataset.init().get_classes(), transfer, ctx,
+                            syncbn=args.syncbn)
         update_params(model, results.pop('model_params'))
         return Detector(model, results, checkpoint, args)

@@ -198,14 +198,15 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
     # logger.info('Start training from [Epoch {}]'.format(args.start_epoch))
     best_map = [0]
 
+    if args.meta_arch == 'faster_rcnn':
+        rcnn_task = ForwardBackwardTask(net, trainer, rpn_cls_loss, rpn_box_loss, rcnn_cls_loss,
+                                        rcnn_box_loss, mix_ratio=1.0, enable_amp=False)
+        executor = Parallel(args.num_gpus // 2, rcnn_task)
+
     pre_current_map = 0
     for epoch in range(args.start_epoch, args.epochs):
         mix_ratio = 1.0
         net.hybridize()
-        if args.meta_arch == 'faster_rcnn':
-            rcnn_task = ForwardBackwardTask(net, trainer, rpn_cls_loss, rpn_box_loss, rcnn_cls_loss,
-                                            rcnn_box_loss, mix_ratio=1.0, enable_amp=False)
-            executor = Parallel(args.num_gpus // 2, rcnn_task)
         if args.mixup:
             # TODO(zhreshold): more elegant way to control mixup during runtime
             try:
@@ -302,8 +303,8 @@ def train_object_detection(args, reporter):
         kwargs = {}
     elif args.meta_arch == 'faster_rcnn':
         net_name = '_'.join(('custom', args.meta_arch, 'fpn'))
-        kwargs = {'base_network_name': args.net, 'short': 600, 'max_size': 1000, 'nms_thresh': 0.5,
-                  'nms_topk': -1, 'min_stage': 2, 'max_stage': 6, 'post_nms': -1,
+        kwargs = {'base_network_name': args.net, 'short': args.data_shape, 'max_size': 1000,
+                  'nms_thresh': 0.5, 'nms_topk': -1, 'min_stage': 2, 'max_stage': 6, 'post_nms': -1,
                   'roi_mode': 'align', 'roi_size': (7, 7), 'strides': (4, 8, 16, 32, 64),
                   'clip': 4.14, 'rpn_channel': 256, 'base_size': 16, 'scales': (2, 4, 8, 16, 32),
                   'ratios': (0.5, 1, 2), 'alloc_size': (384, 384), 'rpn_nms_thresh': 0.7,
@@ -325,13 +326,13 @@ def train_object_detection(args, reporter):
                                       norm_kwargs={'num_devices': len(ctx)}, **kwargs)
         if not args.reuse_pred_weights:
             net.reset_class(args.dataset.get_classes(), reuse_weights=None)
-
-        async_net = gcv.model_zoo.get_model(net_name,
-                                            classes=args.dataset.get_classes(),
-                                            pretrained_base=True,
-                                            transfer=args.transfer, **kwargs)
-        if not args.reuse_pred_weights:
-            async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
+        if args.meta_arch == 'yolo3':
+            async_net = gcv.model_zoo.get_model(net_name,
+                                                classes=args.dataset.get_classes(),
+                                                pretrained_base=True,
+                                                transfer=args.transfer, **kwargs)
+            if not args.reuse_pred_weights:
+                async_net.reset_class(args.dataset.get_classes(), reuse_weights=None)
     else:
         net = gcv.model_zoo.get_model(net_name,
                                       classes=args.dataset.get_classes(),
@@ -343,12 +344,14 @@ def train_object_detection(args, reporter):
 
     if args.resume.strip():
         net.load_parameters(args.resume.strip())
-        async_net.load_parameters(args.resume.strip())
+        if args.meta_arch == 'yolo3':
+            async_net.load_parameters(args.resume.strip())
     else:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             net.initialize()
-            async_net.initialize()
+            if args.meta_arch == 'yolo3':
+                async_net.initialize()
 
     # training data
     train_dataset, eval_metric = args.dataset.get_dataset_and_metric()
