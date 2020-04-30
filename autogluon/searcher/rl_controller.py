@@ -32,8 +32,9 @@ class RLSearcher(BaseSearcher):
     >>> searcher = RLSearcher(train_fn.kwspaces)
     >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm', **kwargs):
-        self._results = OrderedDict()
+    def __init__(self, kwspaces, reward_attribute, ctx=mx.cpu(),
+                 controller_type='lstm', **kwargs):
+        super().__init__(configspace=None, reward_attribute=reward_attribute)
         self._best_state_path = None
         if controller_type == 'lstm':
             self.controller = LSTMController(kwspaces, ctx=ctx, **kwargs)

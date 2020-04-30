@@ -197,7 +197,7 @@ class Communicator(threading.Thread):
             except AutoGluonEarlyStop:
                 self.local_reporter.terminate()
 
-            if 'done' in reported_result and reported_result['done'] is True:
+            if reported_result.get('done', False):
                 self.process.join()
                 break
 

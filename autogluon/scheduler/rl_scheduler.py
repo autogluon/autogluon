@@ -82,7 +82,8 @@ class RLScheduler(FIFOScheduler):
         self.sync = sync
         # create RL searcher/controller
         if not isinstance(searcher, RLSearcher):
-            searcher = RLSearcher(train_fn.kwspaces)
+            searcher = RLSearcher(
+                train_fn.kwspaces, reward_attribute=reward_attr)
         super(RLScheduler,self).__init__(
                 train_fn, train_fn.args, resource, searcher,
                 checkpoint=checkpoint, resume=False, num_trials=num_trials,
@@ -184,15 +185,15 @@ class RLScheduler(FIFOScheduler):
                 config = task.args['config']
                 while task_thread.is_alive():
                     reported_result = reporter.fetch()
-                    if 'done' in reported_result and reported_result['done'] is True:
+                    if reported_result.get('done', False):
                         reporter.move_on()
                         task_thread.join()
                         break
                     self._add_training_result(task.task_id, reported_result, task.args['config'])
                     reporter.move_on()
                     last_result = reported_result
+                self.searcher.update(config, **last_result)
                 reward = last_result[self._reward_attr]
-                self.searcher.update(config, reward, done=True)
                 with self.lock:
                     if self.baseline is None:
                         self.baseline = reward
@@ -243,16 +244,17 @@ class RLScheduler(FIFOScheduler):
                     reporter.move_on()
                     break
 
-                if 'done' in reported_result and reported_result['done'] is True:
+                if reported_result.get('done', False):
                     reporter.move_on()
                     break
                 self._add_training_result(task.task_id, reported_result, task.args['config'])
                 reporter.move_on()
                 last_result = reported_result
             if last_result is not None:
-                self.searcher.update(config, last_result[self._reward_attr], done=True)
-            with self.lock:
-                results[pickle.dumps(config)] = last_result[self._reward_attr]
+                self.searcher.update(config, **last_result)
+                with self.lock:
+                    results[pickle.dumps(config)] = \
+                        last_result[self._reward_attr]
 
         # launch the tasks
         tasks = []
