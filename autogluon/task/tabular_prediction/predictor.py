@@ -573,6 +573,21 @@ class TabularPredictor(BasePredictor):
         """
         return copy.deepcopy(self._trainer.model_full_dict)
 
+    def info(self):
+        """
+        [EXPERIMENTAL] Returns a dictionary of `predictor` metadata.
+        Warning: This functionality is currently in preview mode.
+            The metadata information returned may change in structure in future versions without warning.
+            The definitions of various metadata values are not yet documented.
+            The output of this function should not be used for programmatic decisions.
+        Contains information such as row count, column count, model training time, validation scores, hyperparameters, and much more.
+
+        Returns
+        -------
+        Dictionary of `predictor` metadata.
+        """
+        return self._learner.get_info(include_model_info=True)
+
     @classmethod
     def load(cls, output_directory, verbosity=2):
         """
