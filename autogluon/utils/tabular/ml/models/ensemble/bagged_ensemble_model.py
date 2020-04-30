@@ -149,9 +149,6 @@ class BaggedEnsembleModel(AbstractModel):
             cur_repeat_count = j - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
             fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
-            is_training_from_start = fold_end_n_repeat - fold_start_n_repeat == k_fold
-            if is_training_from_start:
-                self._k_per_n_repeat.append(k_fold)
             # TODO: Consider moving model fit inner for loop to a function to simply this code
             for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
                 folds_finished = i - fold_start
@@ -202,6 +199,8 @@ class BaggedEnsembleModel(AbstractModel):
                 oof_pred_proba[test_index] += pred_proba
                 oof_pred_model_repeats[test_index] += 1
                 self._add_child_times_to_bag(model=fold_model)
+            if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
+                self._k_per_n_repeat.append(k_fold)
         self.models += models
 
         self.bagged_mode = True
