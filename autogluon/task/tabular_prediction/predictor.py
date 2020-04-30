@@ -37,10 +37,17 @@ class TabularPredictor(BasePredictor):
         model_performance : dict
             Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
         class_labels : list
-            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output. Is = None for problems that are not multiclass.
-            For example if `pred = predict_proba(x)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
+            For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
+            For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
+                `class_labels[0]` corresponds to internal 0 label, `class_labels[1]` corresponds to the internal 1 label.
+                This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
+            For other problem types, will equal None.
+            For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
         class_labels_internal : list
-            For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output. Is = None for problems that are not multiclass.
+            For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
+            For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
+                The value will always be `class_labels_internal=[0, 1]` for binary problems.
+            For other problem types, will equal None.
         class_labels_internal_map : dict
             For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
             For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
@@ -115,7 +122,7 @@ class TabularPredictor(BasePredictor):
         dataset = self.__get_dataset(dataset)
         return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
 
-    def predict_proba(self, dataset, model=None, as_pandas=False):
+    def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
 
             Parameters
@@ -129,15 +136,21 @@ class TabularPredictor(BasePredictor):
                 Valid models are listed in this `predictor` by calling `predictor.model_names`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False).
-                Pandas object is a DataFrame if this is a multiclass problem, otherwise it is a Series.
+                Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
+                If the output is a DataFrame, the column order will be equivalent to `predictor.class_labels`.
+            as_multiclass : bool (optional)
+                Whether to return binary classification probabilities as if they were for multiclass classification.
+                    Output will contain two columns, and if `as_pandas=True`, the column names will correspond to the binary class labels.
+                    The columns will be the same order as `predictor.class_labels`.
+                Only impacts output for binary classification problems.
 
             Returns
             -------
             Array of predicted class-probabilities, corresponding to each row in the given dataset.
-            May be a numpy Ndarray or pandas Series/Dataframe depending on `as_pandas` argument and the type of prediction problem.
+            May be a numpy ndarray or pandas Series/DataFrame depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas)
+        return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.

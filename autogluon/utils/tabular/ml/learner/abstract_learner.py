@@ -18,7 +18,7 @@ from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier
-from ...data.label_cleaner import LabelCleaner
+from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
 
@@ -65,10 +65,7 @@ class AbstractLearner:
 
     @property
     def class_labels(self):
-        if self.problem_type == MULTICLASS:
-            return self.label_cleaner.ordered_class_labels
-        else:
-            return None
+        return self.label_cleaner.ordered_class_labels
 
     def set_contexts(self, path_context):
         self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
@@ -86,7 +83,7 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, inverse_transform=True, sample=None):
+    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True, sample=None):
         ##########
         # Enable below for local testing # TODO: do we want to keep sample option?
         if sample is not None:
@@ -98,8 +95,10 @@ class AbstractLearner:
         y_pred_proba = trainer.predict_proba(X_test, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
+        if as_multiclass and (self.problem_type == BINARY):
+            y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
         if as_pandas:
-            if self.problem_type == MULTICLASS:
+            if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
                 y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels)
             else:
                 y_pred_proba = pd.Series(data=y_pred_proba, name=self.label)

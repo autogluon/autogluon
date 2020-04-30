@@ -130,6 +130,8 @@ class LabelCleanerBinary(LabelCleaner):
         neglabel = [lbl for lbl in self.inv_map.keys() if self.inv_map[lbl] == 0][0]
         logger.log(20, 'Selected class <--> label mapping:  class 1 = %s, class 0 = %s' % (poslabel, neglabel))
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
+        self.ordered_class_labels_transformed = [0, 1]
+        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]
 
     def transform(self, y: Series) -> Series:
         if isinstance(y, np.ndarray):
