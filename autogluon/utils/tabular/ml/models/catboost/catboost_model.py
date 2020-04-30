@@ -39,7 +39,8 @@ class CatboostModel(AbstractModel):
             self._set_default_param_value(param, val)
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
         self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
-        self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training
+        # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
+        self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
