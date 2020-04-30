@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 import pickle
 import sys
 import time
@@ -38,6 +39,7 @@ class CatboostModel(AbstractModel):
             self._set_default_param_value(param, val)
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
         self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
+        self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
@@ -104,6 +106,16 @@ class CatboostModel(AbstractModel):
         for invalid in invalid_params:
             if invalid in self.params:
                 self.params.pop(invalid)
+        train_dir = None
+        if 'allow_writing_files' in self.params and self.params['allow_writing_files']:
+            if 'train_dir' not in self.params:
+                try:
+                    # TODO: What if path is in S3?
+                    os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                except:
+                    pass
+                else:
+                    train_dir = self.path + 'catboost_info'
         logger.log(15, 'Catboost model hyperparameters:')
         logger.log(15, self.params)
 
@@ -130,6 +142,8 @@ class CatboostModel(AbstractModel):
             params_init = self.params.copy()
             num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
             params_init['iterations'] = num_sample_iter
+            if train_dir is not None:
+                params_init['train_dir'] = train_dir
             self.model = self.model_type(
                 **params_init,
             )
@@ -168,6 +182,8 @@ class CatboostModel(AbstractModel):
         else:
             params_final = self.params.copy()
 
+        if train_dir is not None:
+            params_final['train_dir'] = train_dir
         if params_final['iterations'] > 0:
             self.model = self.model_type(
                 **params_final,
