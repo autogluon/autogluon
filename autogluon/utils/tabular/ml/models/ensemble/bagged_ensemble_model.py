@@ -404,6 +404,20 @@ class BaggedEnsembleModel(AbstractModel):
 
     def get_info(self):
         info = super().get_info()
+        children_info = self._get_child_info()
+        child_memory_sizes = [child['memory_size'] for child in children_info.values()]
+        sum_memory_size_child = sum(child_memory_sizes)
+        if child_memory_sizes:
+            max_memory_size_child = max(child_memory_sizes)
+        else:
+            max_memory_size_child = 0
+        if self.low_memory:
+            max_memory_size = info['memory_size'] + sum_memory_size_child
+            min_memory_size = info['memory_size'] + max_memory_size_child
+        else:
+            max_memory_size = info['memory_size']
+            min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
+
         bagged_info = dict(
             child_type=self._child_type.__name__,
             num_child_models=len(self.models),
@@ -414,11 +428,12 @@ class BaggedEnsembleModel(AbstractModel):
             # _k=self._k,
             _k_per_n_repeat=self._k_per_n_repeat,
             _random_state=self._random_state,
-            low_memory=self.low_memory,
+            low_memory=self.low_memory,  # If True, then model will attempt to use at most min_memory_size memory by having at most one child in memory. If False, model will use max_memory_size memory.
             bagged_mode=self.bagged_mode,
+            max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
+            min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
         )
         info['bagged_info'] = bagged_info
-        children_info = self._get_child_info()
         info['children_info'] = children_info
 
         return info
