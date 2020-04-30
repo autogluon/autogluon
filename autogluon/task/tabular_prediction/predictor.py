@@ -39,20 +39,20 @@ class TabularPredictor(BasePredictor):
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
             For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
-                `class_labels[0]` corresponds to internal 0 label, `class_labels[1]` corresponds to the internal 1 label.
+                `class_labels[0]` corresponds to internal label = 0 (negative class), `class_labels[1]` corresponds to internal label = 1 (positive class).
                 This is relevant for certain metrics such as F1 where True and False labels impact the metric score differently.
             For other problem types, will equal None.
             For example if `pred = predict_proba(x, as_multiclass=True)`, then ith index of `pred` provides predicted probability that `x` belongs to class given by `class_labels[i]`.
         class_labels_internal : list
             For multiclass problems, this list contains the internal class labels in sorted order of internal `predict_proba()` output.
             For binary problems, this list contains the internal class labels in sorted order of internal `predict_proba(as_multiclass=True)` output.
-                The value will always be `class_labels_internal=[0, 1]` for binary problems.
+                The value will always be `class_labels_internal=[0, 1]` for binary problems, with 0 as the negative class, and 1 as the positive class.
             For other problem types, will equal None.
         class_labels_internal_map : dict
             For binary and multiclass classification problems, this dictionary contains the mapping of the original labels to the internal labels.
             For example, in binary classification, label values of 'True' and 'False' will be mapped to the internal representation `1` and `0`.
                 Therefore, class_labels_internal_map would equal {'True': 1, 'False': 0}
-            This variable will be None if the problem is regression.
+            For other problem types, will equal None.
             For multiclass, it is possible for not all of the label values to have a mapping.
                 This indicates that the internal models will never predict those missing labels, and training rows associated with the missing labels were dropped.
 
@@ -148,6 +148,7 @@ class TabularPredictor(BasePredictor):
             -------
             Array of predicted class-probabilities, corresponding to each row in the given dataset.
             May be a numpy ndarray or pandas Series/DataFrame depending on `as_pandas` and `as_multiclass` arguments and the type of prediction problem.
+            For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
         """
         dataset = self.__get_dataset(dataset)
         return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
