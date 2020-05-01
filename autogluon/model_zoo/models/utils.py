@@ -56,16 +56,16 @@ class SamePadding(HybridBlock):
 
     def hybrid_forward(self, F, x):
         if self.pad_h > 0 or self.pad_w > 0:
-            x = F.pad(x, mode='constant', pad_width=(0, 0, 0, 0, self.pad_w//2, self.pad_w -self.pad_w//2,
-                                                     self.pad_h//2, self.pad_h - self.pad_h//2))
+            x = F.pad(x, mode='constant', pad_width=(0, 0, 0, 0, self.pad_h//2, self.pad_h - self.pad_h//2,
+                                                     self.pad_w//2, self.pad_w -self.pad_w//2))
             return x
         return x
 
     def __repr__(self):
         s = '{}({}, {}, {}, {})'
         return s.format(self.__class__.__name__,
-                        self.pad_w//2, self.pad_w -self.pad_w//2,
-                        self.pad_h//2, self.pad_h - self.pad_h//2)
+                        self.pad_h//2, self.pad_h - self.pad_h//2,
+                        self.pad_w//2, self.pad_w -self.pad_w//2)
     
 
 #class swish(mx.autograd.Function):
