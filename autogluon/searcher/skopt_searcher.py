@@ -38,19 +38,32 @@ class SKoptSearcher(BaseSearcher):
     
     Examples
     --------
+    By default, the searcher is created along with the scheduler. For example:
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True))
+    >>> def train_fn(args, reporter):
+    >>>     reporter(accuracy = args.lr ** 2)
+    >>> search_options = {'base_estimator': 'RF', 'acq_func': 'EI'}
+    >>> scheduler = ag.scheduler.FIFOScheduler(
+    >>>     train_fn, searcher='skopt', search_options=search_options,
+    >>>     num_trials=10, reward_attr='accuracy')
+    This would result in a SKoptSearcher with cs = train_fn.cs and
+    reward_attribute = 'accuracy'. You can also create a SKoptSearcher by hand:
     >>> import autogluon as ag
     >>> @ag.args(
     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
     >>>     wd=ag.space.Real(1e-3, 1e-2))
     >>> def train_fn(args, reporter):
     >>>     pass
-    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs, reward_attribute='accuracy')
     >>> searcher.get_config()
     {'lr': 0.0031622777, 'wd': 0.0055}
-    >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI') # # BayesOpt searcher using RF surrogate model and Expected Improvement acquisition
+    >>> searcher = SKoptSearcher(
+    >>>     train_fn.cs, reward_attribute='accuracy', base_estimator='RF',
+    >>>     acq_func='EI')
     >>> next_config = searcher.get_config()
-    >>> next_reward = 10.0 # made-up value.
-    >>> searcher.update(next_config, next_reward)
+    >>> searcher.update(next_config, accuracy=10.0)  # made-up value
     
     .. note::
         

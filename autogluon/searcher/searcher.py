@@ -241,6 +241,17 @@ class RandomSearcher(BaseSearcher):
 
     Examples
     --------
+    By default, the searcher is created along with the scheduler. For example:
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True))
+    >>> def train_fn(args, reporter):
+    >>>     reporter(accuracy = args.lr ** 2)
+    >>> scheduler = ag.scheduler.FIFOScheduler(
+    >>>     train_fn, searcher='random', num_trials=10,
+    >>>     reward_attr='accuracy')
+    This would result in a BaseSearcher with cs = train_fn.cs and
+    reward_attribute = 'accuracy'. You can also create a BaseSearcher by hand:
     >>> import ConfigSpace as CS
     >>> import ConfigSpace.hyperparameters as CSH
     >>> # create configuration space
@@ -248,7 +259,7 @@ class RandomSearcher(BaseSearcher):
     >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
     >>> cs.add_hyperparameter(lr)
     >>> # create searcher
-    >>> searcher = RandomSearcher(cs)
+    >>> searcher = RandomSearcher(cs, reward_attribute='accuracy')
     >>> searcher.get_config()
     """
     MAX_RETRIES = 100
@@ -293,7 +304,8 @@ class RandomSearcher(BaseSearcher):
 
     def clone_from_state(self, state):
         new_searcher = RandomSearcher(
-            self.configspace, first_is_default=self._first_is_default)
+            self.configspace, reward_attribute=self._reward_attribute,
+            first_is_default=self._first_is_default)
         new_searcher.random_state = state['random_state']
         new_searcher._results = state['results']
         return new_searcher

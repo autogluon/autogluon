@@ -16,7 +16,8 @@ class GridSearcher(BaseSearcher):
     >>>     y=ag.space.Categorical('a', 'b', 'c'))
     >>> def train_fn(args, reporter):
     ...     pass
-    >>> searcher = ag.searcher.GridSearcher(train_fn.cs)
+    >>> searcher = ag.searcher.GridSearcher(
+    >>>     train_fn.cs, reward_attribute='accuracy')
     >>> searcher.get_config()
     Number of configurations for grid search is 9
     {'x.choice': 2, 'y.choice': 2}

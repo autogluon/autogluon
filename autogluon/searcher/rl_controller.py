@@ -29,7 +29,7 @@ class RLSearcher(BaseSearcher):
     >>>     wd=ag.space.Real(1e-3, 1e-2))
     >>> def train_fn(args, reporter)
     >>>     pass
-    >>> searcher = RLSearcher(train_fn.kwspaces)
+    >>> searcher = RLSearcher(train_fn.kwspaces, reward_attribute='accuracy')
     >>> searcher.get_config()
     """
     def __init__(self, kwspaces, reward_attribute, ctx=mx.cpu(),
