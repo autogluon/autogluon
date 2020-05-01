@@ -1,15 +1,16 @@
 import contextlib
 import shutil
 import tempfile
+from functools import partial
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from fastai.basic_data import DatasetType
 from fastai.basic_train import load_learner
-from fastai.callbacks import SaveModelCallback
+from fastai.callbacks import SaveModelCallback, EarlyStoppingCallback
 from fastai.data_block import FloatList
-from fastai.metrics import mean_absolute_error, accuracy, root_mean_squared_error, AUROC
+from fastai.metrics import mean_absolute_error, accuracy, root_mean_squared_error, AUROC, mean_squared_error, r2_score, FBeta, Precision, Recall
 from fastai.tabular import tabular_learner, TabularList, FillMissing, Categorify, Normalize
 from fastai.utils.mod_display import progress_disabled_ctx
 from sklearn.compose import ColumnTransformer
@@ -54,10 +55,34 @@ class NNFastAiTabularModel(AbstractModel):
     model_internals_file_name = 'model-internals.pkl'
     unique_category_str = '!missing!'
     metrics_map = {
-        'accuracy': accuracy,
-        'roc_auc': AUROC(),
+        # Regression
+        'root_mean_squared_error': root_mean_squared_error,
+        'mean_squared_error': mean_squared_error,
         'mean_absolute_error': mean_absolute_error,
-        'root_mean_squared_error': root_mean_squared_error
+        'r2': r2_score,
+        # Not supported: median_absolute_error
+
+        # Classification
+        'accuracy': accuracy,
+
+        'f1': FBeta(beta=1),
+        'f1_macro': FBeta(beta=1, average='macro'),
+        'f1_micro': FBeta(beta=1, average='micro'),
+        'f1_weighted': FBeta(beta=1, average='weigthed'),  # this one has some issues
+
+        'roc_auc': AUROC(),
+
+        'precision': Precision(),
+        'precision_macro': Precision(average='macro'),
+        'precision_micro': Precision(average='micro'),
+        'precision_weigthed': Precision(average='weigthed'),
+
+        'recall': Recall(),
+        'recall_macro': Recall(average='macro'),
+        'recall_micro': Recall(average='micro'),
+        'recall_weigthed': Recall(average='weigthed'),
+        # Not supported: pac_score
+
     }
 
     def __init__(self, path, name, problem_type, objective_func, stopping_metric=None, hyperparameters=None, features=None, feature_types_metadata=None,
@@ -160,14 +185,14 @@ class NNFastAiTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
+        print(f'Fitting Neural Networ with parameters {self.params}...')
         data = self.preprocess_train(X_train, Y_train, X_test, Y_test)
 
-        objective_func_name = self.objective_func.name
-        if objective_func_name in self.metrics_map.keys():
-            nn_metric = self.metrics_map[objective_func_name]
-        else:
-            objective_func_name = self.params['nn.tabular.metric']
-            nn_metric = self.metrics_map[self.params['nn.tabular.metric']]
+        nn_metric, objective_func_name = self.__get_objective_func_name()
+        objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
+        objective_optim_mode = 'min' if objective_func_name in [
+            'root_mean_squared_error', 'mean_squared_error', 'mean_absolute_error', 'r2'  # Regression objectives
+        ] else 'auto'
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
         if self.problem_type == REGRESSION or self.problem_type == BINARY:
@@ -176,13 +201,15 @@ class NNFastAiTabularModel(AbstractModel):
             base_size = max(len(data.classes) * 2, 100)
             layers = [base_size * 2, base_size]
 
-        self.model = tabular_learner(data, layers=layers, ps=[self.params['nn.tabular.dropout']], emb_drop=self.params['nn.tabular.dropout'], metrics=nn_metric)
+        early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, min_delta=0.01, patience=5)
+        self.model = tabular_learner(
+            data, layers=layers, ps=[self.params['nn.tabular.dropout']], emb_drop=self.params['nn.tabular.dropout'], metrics=nn_metric,
+            callback_fns=[early_stopping_fn]
+        )
         print(self.model.model)
 
-        objective_func_name_to_monitor = objective_func_name if objective_func_name != 'roc_auc' else 'auroc'
-        save_callback_mode = 'min' if objective_func_name in ['root_mean_squared_error', 'mean_absolute_error'] else 'auto'
         with make_temp_directory() as temp_dir:
-            save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=save_callback_mode, name=self.name)
+            save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name)
             with progress_disabled_ctx(self.model) as model:
                 original_path = model.path
                 model.path = Path(temp_dir)
@@ -191,15 +218,52 @@ class NNFastAiTabularModel(AbstractModel):
                 # Load the best one and export it
                 model.load(self.name)
 
-                self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
+                if objective_func_name == 'log_loss':
+                    self.eval_result = model.validate()[0]
+                else:
+                    self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
 
                 print(f'Model validation metrics: {self.eval_result}')
                 model.path = original_path
 
+    def __get_objective_func_name(self):
+        objective_func_name = self.objective_func.name
+        if objective_func_name in self.metrics_map.keys():
+            nn_metric = self.metrics_map[objective_func_name]
+        elif objective_func_name is None:
+            objective_func_name = self.params['nn.tabular.metric']
+            nn_metric = self.metrics_map[self.params['nn.tabular.metric']]
+        else:
+            nn_metric = None
+        return nn_metric, objective_func_name
+
+    def __get_objective_func_to_monitor(self, objective_func_name):
+        monitor_obj_func = {
+            'roc_auc': 'auroc',
+
+            'f1': 'f_beta',
+            'f1_macro': 'f_beta',
+            'f1_micro': 'f_beta',
+            'f1_weighted': 'f_beta',
+
+            'precision_macro': 'precision',
+            'precision_micro': 'precision',
+            'precision_weigthed': 'precision',
+
+            'recall_macro': 'recall',
+            'recall_micro': 'recall',
+            'recall_weigthed': 'recall',
+            'log_loss': 'valid_loss',
+        }
+        objective_func_name_to_monitor = objective_func_name
+        if objective_func_name in monitor_obj_func:
+            objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
+        return objective_func_name_to_monitor
+
     def predict(self, X):
         return super().predict(X)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, preprocess=False):
         self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
