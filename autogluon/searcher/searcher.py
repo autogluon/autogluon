@@ -22,18 +22,18 @@ class BaseSearcher(object):
     """
     LOCK = mp.Lock()
 
-    def __init__(self, configspace, reward_attribute, resource_attribute=None):
+    def __init__(self, configspace, reward_attribute=None):
         """
         :param configspace: Configuration space to sample from or search in
-        :param reward_attribute: Reward attribute passed to update
-        :param resource_attribute: Resource (or time) attribute passed to
-            update. This is required by multi-fidelity schedulers
+        :param reward_attribute: Reward attribute passed to update.
+            Default: 'accuracy'
 
         """
         self.configspace = configspace
         self._results = OrderedDict()
+        if reward_attribute is None:
+            reward_attribute = 'accuracy'
         self._reward_attribute = reward_attribute
-        self._resource_attribute = resource_attribute
 
     def configure_scheduler(self, scheduler):
         """
@@ -41,11 +41,18 @@ class BaseSearcher(object):
         used with, in order to configure themselves.
         This method has to be called before the searcher can be used.
 
+        The implementation here sets _reward_attribute for schedulers which
+        specify it.
+
         Args:
             scheduler: TaskScheduler
                 Scheduler the searcher is used with.
+
         """
-        pass
+        from autogluon.scheduler.fifo import FIFOScheduler
+
+        if isinstance(scheduler, FIFOScheduler):
+            self._reward_attribute = scheduler._reward_attr
 
     @staticmethod
     def _reward_while_pending():
@@ -250,8 +257,8 @@ class RandomSearcher(BaseSearcher):
     >>> scheduler = ag.scheduler.FIFOScheduler(
     >>>     train_fn, searcher='random', num_trials=10,
     >>>     reward_attr='accuracy')
-    This would result in a BaseSearcher with cs = train_fn.cs and
-    reward_attribute = 'accuracy'. You can also create a BaseSearcher by hand:
+    This would result in a BaseSearcher with cs = train_fn.cs. You can also
+    create a RandomSearcher by hand:
     >>> import ConfigSpace as CS
     >>> import ConfigSpace.hyperparameters as CSH
     >>> # create configuration space
@@ -259,13 +266,14 @@ class RandomSearcher(BaseSearcher):
     >>> lr = CSH.UniformFloatHyperparameter('lr', lower=1e-4, upper=1e-1, log=True)
     >>> cs.add_hyperparameter(lr)
     >>> # create searcher
-    >>> searcher = RandomSearcher(cs, reward_attribute='accuracy')
+    >>> searcher = RandomSearcher(cs)
     >>> searcher.get_config()
     """
     MAX_RETRIES = 100
 
-    def __init__(self, configspace, reward_attribute, **kwargs):
-        super().__init__(configspace, reward_attribute)
+    def __init__(self, configspace, **kwargs):
+        super().__init__(
+            configspace, reward_attribute=kwargs.get('reward_attribute'))
         self._first_is_default = kwargs.get('first_is_default', True)
         # We use an explicit random_state here, in order to better support
         # checkpoint and resume

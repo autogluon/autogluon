@@ -30,13 +30,13 @@ class FIFOScheduler(TaskScheduler):
 
     Parameters
     ----------
-    train_fn : callable
-        A task launch function for training. Note: please add the `@autogluon_method` decorater to the original function.
-    args : object (optional)
+    train_fn: callable
+        A task launch function for training.
+    args: object (optional)
         Default arguments for launching train_fn.
-    resource : dict
+    resource: dict
         Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-    searcher : str or BaseSearcher
+    searcher: str or BaseSearcher
         Searcher (get_config decisions). If str, this is passed to
         searcher_factory along with search_options.
     search_options: dict
@@ -61,9 +61,9 @@ class FIFOScheduler(TaskScheduler):
         This attribute is optional for FIFO scheduling, but becomes mandatory
         in multi-fidelity scheduling (e.g., Hyperband).
         Note: The type of resource must be int.
-    dist_ip_addrs : list of str
+    dist_ip_addrs: list of str
         IP addresses of remote machines.
-    training_history_callback:
+    training_history_callback: callable
         Callback function func called every time a job finishes, if at least
         training_history_callback_delta_secs seconds passed since the last
         recent call. The call has the form:
@@ -159,6 +159,8 @@ class FIFOScheduler(TaskScheduler):
         self._time_attr = time_attr
         self.visualizer = visualizer.lower()
         if self.visualizer == 'tensorboard' or self.visualizer == 'mxboard':
+            assert checkpoint is not None, \
+                "Need checkpoint to be set"
             try_import_mxboard()
             from mxboard import SummaryWriter
             self.mxboard = SummaryWriter(
@@ -175,6 +177,8 @@ class FIFOScheduler(TaskScheduler):
         self.config_history = OrderedDict()
         # Resume experiment from checkpoint?
         if resume:
+            assert checkpoint is not None, \
+                "Need checkpoint to be set if resume = True"
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
             else:
@@ -195,6 +199,8 @@ class FIFOScheduler(TaskScheduler):
     def run(self, **kwargs):
         """Run multiple number of trials
         """
+        # Make sure that this scheduler is configured at the searcher
+        self.searcher.configure_scheduler(self)
         start_time = time.time()
         self._start_time = start_time
         num_trials = kwargs.get('num_trials', self.num_trials)

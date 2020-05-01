@@ -51,8 +51,8 @@ class ENAS_Scheduler(object):
         self.baseline = None
         self.ema_decay = ema_baseline_decay
         self.searcher = RLSearcher(
-            kwspaces, reward_attribute='accuracy',
-            controller_type=controller_type, prefetch=4, num_workers=4)
+            kwspaces, controller_type=controller_type, prefetch=4,
+            num_workers=4)
         # controller setup
         self.controller = self.searcher.controller
         self.controller_optimizer = mx.gluon.Trainer(

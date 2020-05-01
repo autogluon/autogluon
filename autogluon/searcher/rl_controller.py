@@ -29,12 +29,13 @@ class RLSearcher(BaseSearcher):
     >>>     wd=ag.space.Real(1e-3, 1e-2))
     >>> def train_fn(args, reporter)
     >>>     pass
-    >>> searcher = RLSearcher(train_fn.kwspaces, reward_attribute='accuracy')
+    >>> searcher = RLSearcher(train_fn.kwspaces)
     >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, reward_attribute, ctx=mx.cpu(),
-                 controller_type='lstm', **kwargs):
-        super().__init__(configspace=None, reward_attribute=reward_attribute)
+    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm',
+                 **kwargs):
+        super().__init__(
+            configspace=None, reward_attribute=kwargs.get('reward_attribute'))
         self._best_state_path = None
         if controller_type == 'lstm':
             self.controller = LSTMController(kwspaces, ctx=ctx, **kwargs)

@@ -33,16 +33,18 @@ def test_skoptsearcher():
     optimal_reward = toy_reward(optimal_config) # should ~= 7025.58
     # Compare skopt searchers VS random sampling searcher:
     num_configs_totry = 15
-    skopt_searcher = SKoptSearcher(cs, reward_attribute)
+    skopt_searcher = SKoptSearcher(
+        cs, reward_attribute=reward_attribute)
     skopt_config_list = [None]*num_configs_totry
     skopt_reward_list = [0.0]*num_configs_totry # stores rewards scaled between 0-1
     # Also try skopt searcher which uses various kwargs (random forest surrgoate model, expected improvement acquisition):
     skrf_searcher = SKoptSearcher(
-        cs, reward_attribute, base_estimator='RF', acq_func='EI')
+        cs, reward_attribute=reward_attribute, base_estimator='RF',
+        acq_func='EI')
     skrf_config_list = [None]*num_configs_totry 
     skrf_reward_list = [0.0]*num_configs_totry # stores rewards scaled between 0-1
     # Benchmark against random searcher:
-    rs_searcher = RandomSearcher(cs, reward_attribute)
+    rs_searcher = RandomSearcher(cs, reward_attribute=reward_attribute)
     random_config_list = [None]*num_configs_totry
     random_reward_list = [0.0]*num_configs_totry
     # Run search:

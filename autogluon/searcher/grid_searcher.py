@@ -16,14 +16,14 @@ class GridSearcher(BaseSearcher):
     >>>     y=ag.space.Categorical('a', 'b', 'c'))
     >>> def train_fn(args, reporter):
     ...     pass
-    >>> searcher = ag.searcher.GridSearcher(
-    >>>     train_fn.cs, reward_attribute='accuracy')
+    >>> searcher = ag.searcher.GridSearcher(train_fn.cs)
     >>> searcher.get_config()
     Number of configurations for grid search is 9
     {'x.choice': 2, 'y.choice': 2}
     """
-    def __init__(self, configspace, reward_attribute, **kwargs):
-        super().__init__(configspace, reward_attribute)
+    def __init__(self, configspace, **kwargs):
+        super().__init__(
+            configspace, reward_attribute=kwargs.get('reward_attribute'))
         param_grid = {}
         hp_ordering = configspace.get_hyperparameter_names()
         for hp in hp_ordering:

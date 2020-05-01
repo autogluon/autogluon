@@ -48,15 +48,15 @@ class SKoptSearcher(BaseSearcher):
     >>> scheduler = ag.scheduler.FIFOScheduler(
     >>>     train_fn, searcher='skopt', search_options=search_options,
     >>>     num_trials=10, reward_attr='accuracy')
-    This would result in a SKoptSearcher with cs = train_fn.cs and
-    reward_attribute = 'accuracy'. You can also create a SKoptSearcher by hand:
+    This would result in a SKoptSearcher with cs = train_fn.cs. You can also
+    create a SKoptSearcher by hand:
     >>> import autogluon as ag
     >>> @ag.args(
     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
     >>>     wd=ag.space.Real(1e-3, 1e-2))
     >>> def train_fn(args, reporter):
     >>>     pass
-    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs, reward_attribute='accuracy')
+    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
     >>> searcher.get_config()
     {'lr': 0.0031622777, 'wd': 0.0055}
     >>> searcher = SKoptSearcher(
@@ -78,8 +78,9 @@ class SKoptSearcher(BaseSearcher):
     """
     errors_tohandle = (ValueError, TypeError, RuntimeError)
 
-    def __init__(self, configspace, reward_attribute, **kwargs):
-        super().__init__(configspace, reward_attribute)
+    def __init__(self, configspace, **kwargs):
+        super().__init__(
+            configspace, reward_attribute=kwargs.get('reward_attribute'))
         self.hp_ordering = configspace.get_hyperparameter_names() # fix order of hyperparams in configspace.
         skopt_hpspace = []
         for hp in self.hp_ordering:
