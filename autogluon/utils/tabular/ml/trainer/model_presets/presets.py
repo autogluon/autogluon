@@ -11,6 +11,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
+from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
 from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
     lr_options = hyperparameters.get('LR', None)
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
+    nn_fastai_options = hyperparameters.get('NN_fastai', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
     xt_options = hyperparameters.get('XT', None)
@@ -89,6 +91,11 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
             TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
         )
+    if nn_fastai_options is not None:
+        models.append(
+            NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
+                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
+        )
     if lr_options is not None:
         _add_models(
             models, lr_options, 'LinearModel',
@@ -117,6 +124,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
     lr_options = hyperparameters.get('LR', None)
     gbm_options = hyperparameters.get('GBM', None)
     nn_options = hyperparameters.get('NN', None)
+    nn_fastai_options = hyperparameters.get('NN_fastai', None)
     cat_options = hyperparameters.get('CAT', None)
     rf_options = hyperparameters.get('RF', None)
     xt_options = hyperparameters.get('XT', None)
@@ -154,6 +162,11 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
         models.append(
             TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
+        )
+    if nn_fastai_options is not None:
+        models.append(
+            NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
+                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
         )
     if (not hyperparameter_tune) and (custom_options is not None):
         if 'GBM' in custom_options:
