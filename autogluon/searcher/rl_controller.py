@@ -77,7 +77,7 @@ class RLSearcher(BaseSearcher):
 
 
 class BaseController(mx.gluon.Block):
-    def __init__(self, prefetch=4, num_workers=4, timeout=20):
+    def __init__(self, prefetch=4, num_workers=4, timeout=20, **kwargs):
         super().__init__()
         #manager = multiprocessing.Manager()
         self._data_buffer = {}#manager.dict()
