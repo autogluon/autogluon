@@ -15,9 +15,9 @@ def get_param_baseline(problem_type, num_classes=None):
 def get_param_multiclass_baseline():
     params = {
         'nn.tabular.dropout': 0.1,
-        'nn.tabular.bs': 1024,
+        'nn.tabular.bs': 256,
         'nn.tabular.lr': 1e-2,
-        'nn.tabular.epochs': 1,
+        'nn.tabular.epochs': 30,
         'nn.tabular.metric': 'accuracy',
     }
     return params
