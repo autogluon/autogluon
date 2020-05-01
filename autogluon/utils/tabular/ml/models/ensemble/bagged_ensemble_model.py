@@ -149,9 +149,6 @@ class BaggedEnsembleModel(AbstractModel):
             cur_repeat_count = j - n_repeat_start
             fold_start_n_repeat = fold_start + cur_repeat_count * k_fold
             fold_end_n_repeat = min(fold_start_n_repeat + k_fold, fold_end)
-            is_training_from_start = fold_end_n_repeat - fold_start_n_repeat == k_fold
-            if is_training_from_start:
-                self._k_per_n_repeat.append(k_fold)
             # TODO: Consider moving model fit inner for loop to a function to simply this code
             for i in range(fold_start_n_repeat, fold_end_n_repeat):  # For each fold
                 folds_finished = i - fold_start
@@ -202,6 +199,8 @@ class BaggedEnsembleModel(AbstractModel):
                 oof_pred_proba[test_index] += pred_proba
                 oof_pred_model_repeats[test_index] += 1
                 self._add_child_times_to_bag(model=fold_model)
+            if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
+                self._k_per_n_repeat.append(k_fold)
         self.models += models
 
         self.bagged_mode = True
@@ -404,6 +403,20 @@ class BaggedEnsembleModel(AbstractModel):
 
     def get_info(self):
         info = super().get_info()
+        children_info = self._get_child_info()
+        child_memory_sizes = [child['memory_size'] for child in children_info.values()]
+        sum_memory_size_child = sum(child_memory_sizes)
+        if child_memory_sizes:
+            max_memory_size_child = max(child_memory_sizes)
+        else:
+            max_memory_size_child = 0
+        if self.low_memory:
+            max_memory_size = info['memory_size'] + sum_memory_size_child
+            min_memory_size = info['memory_size'] + max_memory_size_child
+        else:
+            max_memory_size = info['memory_size']
+            min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
+
         bagged_info = dict(
             child_type=self._child_type.__name__,
             num_child_models=len(self.models),
@@ -414,11 +427,12 @@ class BaggedEnsembleModel(AbstractModel):
             # _k=self._k,
             _k_per_n_repeat=self._k_per_n_repeat,
             _random_state=self._random_state,
-            low_memory=self.low_memory,
+            low_memory=self.low_memory,  # If True, then model will attempt to use at most min_memory_size memory by having at most one child in memory. If False, model will use max_memory_size memory.
             bagged_mode=self.bagged_mode,
+            max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
+            min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
         )
         info['bagged_info'] = bagged_info
-        children_info = self._get_child_info()
         info['children_info'] = children_info
 
         return info

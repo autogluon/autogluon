@@ -206,11 +206,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 stacker.models.append(child.name)
             else:
                 stacker.models.append(child)
+            stacker.val_score = child.val_score
             stacker._add_child_times_to_bag(model=child)
 
             stacker.save()
             stackers[stacker.name] = stacker.path
-            stackers_performance[stacker.name] = child.val_score
+            stackers_performance[stacker.name] = stacker.val_score
 
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results

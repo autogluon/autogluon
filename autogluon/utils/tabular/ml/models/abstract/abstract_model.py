@@ -481,6 +481,24 @@ class AbstractModel:
         self.val_score = None
         self.params_trained = dict()
 
+    # TODO: Experimental, currently unused
+    #  Has not been tested on Windows
+    #  Does not work if model is located in S3
+    #  Does not work if called before model was saved to disk (Will output 0)
+    def get_disk_size(self):
+        # Taken from https://stackoverflow.com/a/1392549
+        from pathlib import Path
+        model_path = Path(self.path)
+        model_disk_size = sum(f.stat().st_size for f in model_path.glob('**/*') if f.is_file())
+        return model_disk_size
+
+    # TODO: This results in a doubling of memory usage of the model to calculate its size.
+    #  If the model takes ~40%+ of memory, this may result in an OOM error.
+    #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
+    #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
+    def get_memory_size(self):
+        return sys.getsizeof(pickle.dumps(self, protocol=4))
+
     def get_info(self):
         info = dict(
             name=self.name,
@@ -494,6 +512,8 @@ class AbstractModel:
             hyperparameters=self.params,
             hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             hyperparameters_nondefault=self.nondefault_params,
+            # disk_size=self.get_disk_size(),
+            memory_size=self.get_memory_size(),  # Memory usage of model in bytes
         )
         return info
 
