@@ -302,17 +302,20 @@ class ImageClassification(BaseTask):
         if ensemble > 1:
             models = [model]
             if isinstance(search_strategy, str):
-                scheduler = schedulers[search_strategy.lower()]
+                scheduler_cls = schedulers[search_strategy.lower()]
             else:
                 assert callable(search_strategy)
-                scheduler = search_strategy
+                scheduler_cls = search_strategy
                 scheduler_options['searcher'] = 'random'
-            scheduler = scheduler(train_image_classification, **scheduler_options)
+            scheduler = scheduler_cls(
+                train_image_classification, **scheduler_options)
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
-                kwargs = {'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
+                kwargs = {
+                    'num_classes': resultsi['num_classes'], 'ctx': mx.cpu(0)}
                 model = get_network(args.net, **kwargs)
-                update_params(model, resultsi.pop('model_params'), multi_precision)
+                update_params(
+                    model, resultsi.pop('model_params'), multi_precision)
                 models.append(model)
             model = Ensemble(models)
 

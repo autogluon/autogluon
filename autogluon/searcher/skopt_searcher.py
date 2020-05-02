@@ -117,6 +117,7 @@ class SKoptSearcher(BaseSearcher):
 
         assert isinstance(scheduler, FIFOScheduler), \
             "This searcher requires FIFOScheduler scheduler"
+        super().configure_scheduler(scheduler)
 
     def get_config(self, **kwargs):
         """Function to sample a new configuration
