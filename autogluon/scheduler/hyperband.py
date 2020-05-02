@@ -204,7 +204,7 @@ class HyperbandScheduler(FIFOScheduler):
                 brackets)
         elif type == 'promotion':
             assert not do_snapshots, \
-                "Snapshots are not supported for type = 'stopping'"
+                "Snapshots are supported only for type = 'stopping'"
             self.terminator = HyperbandPromotion_Manager(
                 time_attr, reward_attr, max_t, grace_period, reduction_factor,
                 brackets, keep_size_ratios=keep_size_ratios)
@@ -259,14 +259,15 @@ class HyperbandScheduler(FIFOScheduler):
 
         # Register task
         task_key = str(task.task_id)
-        assert task_key not in self._running_tasks, \
-            "Task {} is already registered as running".format(task_key)
-        self._running_tasks[task_key] = {
-            'config': task.args['config'],
-            'time_stamp': kwargs['elapsed_time'],
-            'bracket': kwargs['bracket'],
-            'reported_result': None,
-            'keep_case': False}
+        if self.LOCK:
+            assert task_key not in self._running_tasks, \
+                "Task {} is already registered as running".format(task_key)
+            self._running_tasks[task_key] = {
+                'config': task.args['config'],
+                'time_stamp': kwargs['elapsed_time'],
+                'bracket': kwargs['bracket'],
+                'reported_result': None,
+                'keep_case': False}
         milestones = self.terminator.on_task_add(task, **kwargs)
         if kwargs.get('new_config', True):
             first_milestone = milestones[-1]
@@ -347,7 +348,7 @@ class HyperbandScheduler(FIFOScheduler):
                     del self._running_tasks[task_key]
                 break
 
-            # Call before add_training_results, since we may be able to report
+            # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
             task_info = terminator.on_task_report(task, reported_result)
             task_continues = task_info['task_continues']
@@ -475,14 +476,15 @@ class HyperbandScheduler(FIFOScheduler):
         logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def _snapshot_tasks(self, bracket_id):
-        return {
-            k: {'config': v['config'],
-                'time': v['time_stamp'],
-                'level': 0 if v['reported_result'] is None
-                else v['reported_result'][self._time_attr]}
-            for k, v in self._running_tasks.items()
-            if v['bracket'] == bracket_id
-        }
+        with self.LOCK:
+            return {
+                k: {'config': v['config'],
+                    'time': v['time_stamp'],
+                    'level': 0 if v['reported_result'] is None
+                    else v['reported_result'][self._time_attr]}
+                for k, v in self._running_tasks.items()
+                if v['bracket'] == bracket_id
+            }
 
     # Snapshot (in extra_kwargs['snapshot']):
     # - max_resource

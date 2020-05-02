@@ -82,12 +82,13 @@ class HyperbandPromotion_Manager(object):
             bracket.on_task_add(task, **kwargs)
             self._task_info[str(task.task_id)] = bracket_id
             levels = [x[0] for x in bracket._rungs]
-            if levels[0] < self._max_t:
-                levels.insert(0, self._max_t)
-            return levels
+        if levels[0] < self._max_t:
+            levels.insert(0, self._max_t)
+        return levels
 
     def _get_bracket(self, task_id):
-        return self._brackets[self._task_info[str(task_id)]]
+        bracket_id = self._task_info[str(task_id)]
+        return self._brackets[bracket_id], bracket_id
 
     def on_task_report(self, task, result):
         """
@@ -106,34 +107,32 @@ class HyperbandPromotion_Manager(object):
             update_searcher = True
             next_milestone = None
             ignore_data = False
-            bracket_id = self._task_info[str(task.task_id)]
-            bracket = self._brackets[bracket_id]
+            bracket, bracket_id = self._get_bracket(task.task_id)
             rung_counts = bracket.get_rung_counts()
             if result[self._time_attr] < self._max_t:
                 action, update_searcher, next_milestone, ignore_data = \
                     bracket.on_result(task, result[self._time_attr],
                                       result[self._reward_attr])
-            return {
-                'task_continues': action,
-                'update_searcher': update_searcher,
-                'next_milestone': next_milestone,
-                'bracket_id': bracket_id,
-                'rung_counts': rung_counts,
-                'ignore_data': ignore_data}
+        return {
+            'task_continues': action,
+            'update_searcher': update_searcher,
+            'next_milestone': next_milestone,
+            'bracket_id': bracket_id,
+            'rung_counts': rung_counts,
+            'ignore_data': ignore_data}
 
     def on_task_complete(self, task, result):
         with HyperbandPromotion_Manager.LOCK:
-            task_id = task.task_id
-            bracket = self._get_bracket(task_id)
+            bracket, _ = self._get_bracket(task.task_id)
             bracket.on_result(
                 task, result[self._time_attr], result[self._reward_attr])
-            bracket.on_task_remove(task)
-            del self._task_info[str(task_id)]
+        self.on_task_remove(task)
 
     def on_task_remove(self, task):
         with HyperbandPromotion_Manager.LOCK:
             task_id = task.task_id
-            self._get_bracket(task_id).on_task_remove(task)
+            bracket, _ = self._get_bracket(task_id)
+            bracket.on_task_remove(task)
             del self._task_info[str(task_id)]
 
     def _sample_bracket(self):
@@ -158,14 +157,15 @@ class HyperbandPromotion_Manager(object):
             else:
                 # First milestone the new config will get to
                 extra_kwargs['milestone'] = bracket.get_first_milestone()
-            return config, extra_kwargs
+        return config, extra_kwargs
 
     def resource_to_index(self, resource):
         return map_resource_to_index(
             resource, self._reduction_factor, self._min_t, self._max_t)
 
     def snapshot_rungs(self, bracket_id):
-        return self._brackets[bracket_id].snapshot_rungs()
+        with HyperbandPromotion_Manager.LOCK:
+            return self._brackets[bracket_id].snapshot_rungs()
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \

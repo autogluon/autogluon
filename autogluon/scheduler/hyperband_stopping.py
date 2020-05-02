@@ -89,12 +89,13 @@ class HyperbandStopping_Manager(object):
             bracket = self._brackets[bracket_id]
             self._task_info[str(task.task_id)] = bracket_id
             levels = [x[0] for x in bracket._rungs]
-            if levels[0] < self._max_t:
-                levels.insert(0, self._max_t)
-            return levels
+        if levels[0] < self._max_t:
+            levels.insert(0, self._max_t)
+        return levels
 
     def _get_bracket(self, task_id):
-        return self._brackets[self._task_info[str(task_id)]]
+        bracket_id = self._task_info[str(task_id)]
+        return self._brackets[bracket_id], bracket_id
 
     def on_task_report(self, task, result):
         """
@@ -117,8 +118,7 @@ class HyperbandStopping_Manager(object):
             action = False
             update_searcher = True
             next_milestone = None
-            bracket_id = self._task_info[str(task.task_id)]
-            bracket = self._brackets[bracket_id]
+            bracket, bracket_id = self._get_bracket(task.task_id)
             if result[self._time_attr] < self._max_t:
                 action, update_searcher, next_milestone = bracket.on_result(
                     task, result[self._time_attr], result[self._reward_attr])
@@ -128,18 +128,18 @@ class HyperbandStopping_Manager(object):
                     next_milestone = self._max_t
             if action == False:
                 self._num_stopped += 1
-            return {
-                'task_continues': action,
-                'update_searcher': update_searcher,
-                'next_milestone': next_milestone,
-                'bracket_id': bracket_id}
+        return {
+            'task_continues': action,
+            'update_searcher': update_searcher,
+            'next_milestone': next_milestone,
+            'bracket_id': bracket_id}
 
     def on_task_complete(self, task, result):
         with HyperbandStopping_Manager.LOCK:
-            bracket = self._get_bracket(task.task_id)
+            bracket, _ = self._get_bracket(task.task_id)
             bracket.on_result(
                 task, result[self._time_attr], result[self._reward_attr])
-            del self._task_info[str(task.task_id)]
+        self.on_task_remove(task)
 
     def on_task_remove(self, task):
         with HyperbandStopping_Manager.LOCK:
@@ -159,10 +159,11 @@ class HyperbandStopping_Manager(object):
             extra_kwargs = {
                 'bracket': bracket_id,
                 'milestone': self._brackets[bracket_id].get_first_milestone()}
-            return None, extra_kwargs
+        return None, extra_kwargs
 
     def snapshot_rungs(self, bracket_id):
-        return self._brackets[bracket_id].snapshot_rungs()
+        with HyperbandStopping_Manager.LOCK:
+            return self._brackets[bracket_id].snapshot_rungs()
 
     def resource_to_index(self, resource):
         return map_resource_to_index(
