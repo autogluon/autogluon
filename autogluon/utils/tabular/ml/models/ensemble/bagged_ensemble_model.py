@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
+    _oof_filename = 'oof.pkl'
     def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
@@ -64,10 +65,14 @@ class BaggedEnsembleModel(AbstractModel):
     @property
     def oof_pred_proba(self):
         # TODO: Require is_valid == True (add option param to ignore is_valid)
-        oof_pred_model_repeats_without_0 = np.where(self._oof_pred_model_repeats == 0, 1, self._oof_pred_model_repeats)
-        if self._oof_pred_proba.ndim == 2:
+        return self._oof_pred_proba_func(self._oof_pred_proba, self._oof_pred_model_repeats)
+
+    @staticmethod
+    def _oof_pred_proba_func(oof_pred_proba, oof_pred_model_repeats):
+        oof_pred_model_repeats_without_0 = np.where(oof_pred_model_repeats == 0, 1, oof_pred_model_repeats)
+        if oof_pred_proba.ndim == 2:
             oof_pred_model_repeats_without_0 = oof_pred_model_repeats_without_0[:, None]
-        return self._oof_pred_proba / oof_pred_model_repeats_without_0
+        return oof_pred_proba / oof_pred_model_repeats_without_0
 
     def preprocess(self, X, model=None):
         if model is None:
@@ -83,6 +88,8 @@ class BaggedEnsembleModel(AbstractModel):
         if k_fold_end is None:
             k_fold_end = k_fold
 
+        if self._oof_pred_proba is None and (k_fold_start != 0 or n_repeat_start != 0):
+            self._load_oof()
         if n_repeat_start != self._n_repeats_finished:
             raise ValueError(f'n_repeat_start must equal self._n_repeats_finished, values: ({n_repeat_start}, {self._n_repeats_finished})')
         if n_repeats <= n_repeat_start:
@@ -240,6 +247,7 @@ class BaggedEnsembleModel(AbstractModel):
         return pred_proba
 
     def score_with_oof(self, y):
+        self._load_oof()
         valid_indices = self._oof_pred_model_repeats > 0
         y = y[valid_indices]
         y_pred_proba = self.oof_pred_proba[valid_indices]
@@ -351,7 +359,7 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time += model.predict_time
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, verbose=True):
+    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, load_oof=False, verbose=True):
         path = path + file_prefix
         load_path = path + cls.model_file_name
         obj = load_pkl.load(path=load_path, verbose=verbose)
@@ -359,7 +367,30 @@ class BaggedEnsembleModel(AbstractModel):
             obj.set_contexts(path)
         if not low_memory:
             obj.persist_child_models(reset_paths=reset_paths)
+        if load_oof:
+            obj._load_oof()
         return obj
+
+    @classmethod
+    def load_oof(cls, path, verbose=True):
+        try:
+            oof = load_pkl.load(path=path + 'utils' + os.path.sep + cls._oof_filename, verbose=verbose)
+            oof_pred_proba = oof['_oof_pred_proba']
+            oof_pred_model_repeats = oof['_oof_pred_model_repeats']
+        except FileNotFoundError:
+            model = cls.load(path=path, reset_paths=True, verbose=verbose)
+            model._load_oof()
+            oof_pred_proba = model._oof_pred_proba
+            oof_pred_model_repeats = model._oof_pred_model_repeats
+        return cls._oof_pred_proba_func(oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats)
+
+    def _load_oof(self):
+        if self._oof_pred_proba is not None:
+            pass
+        else:
+            oof = load_pkl.load(path=self.path + 'utils' + os.path.sep + self._oof_filename)
+            self._oof_pred_proba = oof['_oof_pred_proba']
+            self._oof_pred_model_repeats = oof['_oof_pred_model_repeats']
 
     def persist_child_models(self, reset_paths=True):
         for i, model_name in enumerate(self.models):
@@ -374,7 +405,7 @@ class BaggedEnsembleModel(AbstractModel):
     def save_model_base(self, model_base):
         save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, save_children=False):
+    def save(self, file_prefix="", directory=None, return_filename=False, save_oof=True, verbose=True, save_children=False):
         if directory is None:
             directory = self.path
         directory = directory + file_prefix
@@ -390,9 +421,35 @@ class BaggedEnsembleModel(AbstractModel):
 
         file_name = directory + self.model_file_name
 
+        if save_oof and self._oof_pred_proba is not None:
+            save_pkl.save(path=self.path + 'utils' + os.path.sep + self._oof_filename, object={
+                    '_oof_pred_proba': self._oof_pred_proba,
+                    '_oof_pred_model_repeats': self._oof_pred_model_repeats,
+            })
+            self._oof_pred_proba = None
+            self._oof_pred_model_repeats = None
         save_pkl.save(path=file_name, object=self, verbose=verbose)
         if return_filename:
             return file_name
+
+    # If `remove_fit_stack=True`, variables will be removed that are required to fit more folds and to fit new stacker models which use this model as a base model.
+    #  This includes OOF variables.
+    def reduce_memory_size(self, remove_fit_stack=False, remove_fit=True, remove_info=False, requires_save=True, reduce_children=False, **kwargs):
+        super().reduce_memory_size(remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs)
+        if remove_fit_stack:
+            try:
+                os.remove(self.path + 'utils' + os.path.sep + self._oof_filename)
+            except FileNotFoundError:
+                pass
+            if requires_save:
+                self._oof_pred_proba = None
+                self._oof_pred_model_repeats = None
+        if reduce_children:
+            for model in self.models:
+                model = self.load_child(model)
+                model.reduce_memory_size(remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs)
+                if requires_save and self.low_memory:
+                    self.save_child(model=model)
 
     def _get_model_names(self):
         model_names = []

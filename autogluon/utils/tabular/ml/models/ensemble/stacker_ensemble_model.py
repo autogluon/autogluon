@@ -83,8 +83,9 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                 for stack_column_prefix in self.stack_column_prefix_lst:
                     base_model_name = self.stack_column_prefix_to_model_map[stack_column_prefix]
                     if fit:
-                        base_model = self.load_base_model(base_model_name)
-                        y_pred_proba = base_model.oof_pred_proba
+                        base_model_type = self.base_model_types_dict[base_model_name]
+                        base_model_path = self.base_model_paths_dict[base_model_name]
+                        y_pred_proba = base_model_type.load_oof(path=base_model_path)
                     elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
                         y_pred_proba = model_pred_proba_dict[base_model_name]
                     else:

@@ -688,6 +688,75 @@ class TabularPredictor(BasePredictor):
         y = load_y() if return_y else None
         return X, y
 
+    def reduce_memory_size(self, remove_data=True, remove_fit_stack=True, requires_save=True, reduce_children=False):
+        """
+        Reduces the memory and disk size of `predictor`.
+        Note that most methods of reducing `predictor` size involve removing advanced functionality.
+
+        Parameters
+        ----------
+        remove_data : bool, default = True
+            Whether to remove cached files of the original training and validation data.
+            Only reduces disk usage, it has no impact on memory usage.
+            This is especially useful when the original data was large.
+            This is equivalent to setting `cache_data=False` during the original `fit()`.
+                Will disable all advanced functionality that requires `cache_data=True`.
+        remove_fit_stack : bool, default = True
+            Whether to remove information required to fit new stacking models and continue fitting bagged models with new folds.
+            Only reduces disk usage, it has no impact on memory usage.
+            This includes:
+                out-of-fold (OOF) predictions
+            This is useful for multiclass problems with many classes, as OOF predictions can become very large on disk. (1 GB per model in extreme cases)
+            This disables `predictor.refit_full()` for stacker models.
+        requires_save : bool, default = True
+            Whether to remove information that requires the model to be saved again to disk.
+            Typically this only includes flag variables that don't have significant impact on memory or disk usage, but should technically be updated due to the removal of more important information.
+                An example is the `is_data_saved` boolean variable in `trainer`, which should be updated to `False` if `remove_data=True` was set.
+        reduce_children : bool, default = False
+            Whether to apply the reduction rules to bagged ensemble children models.
+            This should generally be kept as `False` since the most important memory reduction techniques are automatically applied to these models during the original `fit()` call.
+
+        """
+        self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True, remove_info=False, requires_save=requires_save, reduce_children=reduce_children)
+
+    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+        """
+        Deletes models from `predictor`.
+        This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
+        This will remove all references to the models in `predictor`.
+            For example, removed models will not appear in `predictor.leaderboard()`.
+
+        Parameters
+        ----------
+        models_to_keep : str or list, default = None
+            Name of model or models to not delete.
+            All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
+            Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
+            `models_to_delete` must be None if `models_to_keep` is set.
+        models_to_delete : str or list, default = None
+            Name of model or models to delete.
+            All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
+            `models_to_keep` must be None if `models_to_delete` is set.
+        allow_delete_cascade : bool, default = False
+            If `False`, if unspecified dependent models of models in `models_to_delete` exist an exception will be raised instead of deletion occurring.
+            If `True`, all dependent models of models in `models_to_delete` will be deleted.
+            Has no effect if `models_to_delete=None`.
+        delete_from_disk : bool, default = True
+            If `True`, deletes the models from disk if they were persisted.
+            WARNING: This deletes the entire directory for the deleted models, and ALL FILES located there.
+                It is highly recommended to first run with `dry_run=True` to understand which directories will be deleted.
+        dry_run : bool, default = True
+            If `True`, then deletions don't occur, and logging statements are printed describing what would have occurred.
+            Set `dry_run=False` to perform the deletions.
+
+        """
+        if models_to_keep == 'best':
+            models_to_keep = self._trainer.model_best
+            if models_to_keep is None:
+                models_to_keep = self._trainer.get_model_best()
+        self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete, allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk, dry_run=dry_run)
+        self.model_names = self._trainer.get_model_names_all()
+
     @staticmethod
     def _summarize(key, msg, results):
         if key in results:

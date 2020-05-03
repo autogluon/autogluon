@@ -506,6 +506,16 @@ class AbstractModel:
     def reduce_memory_size(self, remove_fit=True, remove_info=False, requires_save=True, **kwargs):
         pass
 
+    # Deletes the model from disk.
+    # WARNING: This will DELETE ALL FILES in the self.path directory, regardless if they were created by AutoGluon or not.
+    #  DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
+    def delete_from_disk(self):
+        logger.log(30, f'Deleting model {self.name}. All files under {self.path} will be removed.')
+        from pathlib import Path
+        import shutil
+        model_path = Path(self.path)
+        shutil.rmtree(path=model_path, ignore_errors=True)
+
     def get_info(self):
         info = dict(
             name=self.name,
