@@ -499,6 +499,13 @@ class AbstractModel:
     def get_memory_size(self):
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
+    # Removes non-essential objects from the model to reduce memory and disk footprint.
+    # If `remove_fit=True`, enables the removal of variables which are required for fitting the model. If the model is already fully trained, then it is safe to remove these.
+    # If `remove_info=True`, enables the removal of variables which are used during model.get_info(). The values will be None when calling model.get_info().
+    # If `requires_save=True`, enables the removal of variables which are part of the model.pkl object, requiring an overwrite of the model to disk if it was previously persisted.
+    def reduce_memory_size(self, remove_fit=True, remove_info=False, requires_save=True, **kwargs):
+        pass
+
     def get_info(self):
         info = dict(
             name=self.name,

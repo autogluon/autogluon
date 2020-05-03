@@ -957,6 +957,8 @@ class AbstractTrainer:
         return max(perfs, key=lambda i: i[1])[0]
 
     def save_model(self, model):
+        # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
+        model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if self.low_memory:
             model.save()
         else:

@@ -124,6 +124,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
             self.bagged_mode = False
+            model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
             if self.low_memory:
                 self.save_child(model_base, verbose=False)
                 self.models = [model_base.name]
@@ -191,6 +192,7 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model.fit_time = time_train_end_fold - time_start_fold
                 fold_model.predict_time = time_predict_end_fold - time_train_end_fold
                 fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)
+                fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
                 if self.low_memory:
                     self.save_child(fold_model, verbose=False)
                     models.append(fold_model.name)
