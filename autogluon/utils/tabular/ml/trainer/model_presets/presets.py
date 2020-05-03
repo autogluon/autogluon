@@ -1,7 +1,10 @@
 import logging
+import warnings
+
 import mxnet as mx
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
+from autogluon import warning_filter
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
@@ -11,7 +14,6 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
-from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
 from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -91,7 +93,8 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
             TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
         )
-    if nn_fastai_options is not None:
+    if (nn_fastai_options is not None) & __is_fastai_available():
+        from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
         models.append(
             NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
@@ -163,7 +166,8 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
             TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
         )
-    if nn_fastai_options is not None:
+    if (nn_fastai_options is not None) & __is_fastai_available():
+        from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
         models.append(
             NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
@@ -209,3 +213,16 @@ def _add_models(models, options, name_prefix, model_fn):
     else:
         models.append(model_fn(name_prefix, options))
 
+
+def __is_fastai_available():
+    try:
+        with warning_filter():
+            import fastai
+            import torch
+        fastai_imported = True
+    except ImportError:
+        fastai_imported = False
+
+    if not fastai_imported:
+        warnings.warn('fastAI models cannot be created because fastai/torch are not installed.')
+    return fastai_imported
