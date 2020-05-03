@@ -18,6 +18,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 
 from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_param_baseline
+from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.searchspaces import get_default_searchspace
 from autogluon.utils.tabular.ml.constants import REGRESSION, BINARY
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.utils.tabular.ml.models.tabular_nn.categorical_encoders import OrdinalMergeRaresHandleUnknownEncoder
@@ -49,8 +50,6 @@ def make_temp_directory():
 
 # TODO: On regression problems, can sometimes give insane predictions on unseen data. Cap the y valuees between min and max seen, else this can give REALLY bad results to test data.
 # TODO: Takes extremely long (infinite?) time prior to training start if many (10000) continuous features from ngrams, debug
-# TODO: Model performance on Regression is dependent on the scale of y. If y is very large, learning rate has to be increased dramatically. Can be fixed by y being divided by ex: 1000. Debug the root cause, this shouldn't be happening.
-
 class NNFastAiTabularModel(AbstractModel):
     model_internals_file_name = 'model-internals.pkl'
     unique_category_str = '!missing!'
@@ -289,5 +288,14 @@ class NNFastAiTabularModel(AbstractModel):
         obj.model = load_pkl.load_with_fn(f'{obj.path}{obj.model_internals_file_name}', lambda p: load_learner(obj.path, p), verbose=verbose)
         return obj
 
-    def hyperparameter_tune(self, X, y, spaces=None):
-        return self.params  # TODO: Disabled currently, model must first be fixed to handle custom objective functions
+    def _get_default_searchspace(self, problem_type):
+        return get_default_searchspace(problem_type)
+
+    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
+        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
+        hpo_results = {}
+        self.save()
+        hpo_models = {self.name: self.path}
+
+        return hpo_models, hpo_model_performances, hpo_results
