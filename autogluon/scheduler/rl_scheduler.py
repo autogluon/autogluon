@@ -278,7 +278,7 @@ class RLScheduler(FIFOScheduler):
         for p1, p2 in zip(task_jobs, reporter_threads):
             p1.result()
             p2.join()
-        with self.obj_lock:
+        with self.LOCK:
             for task in tasks:
                 self.finished_tasks.append({'TASK_ID': task.task_id,
                                            'Config': task.args['config']})

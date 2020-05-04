@@ -259,7 +259,7 @@ class HyperbandScheduler(FIFOScheduler):
 
         # Register task
         task_key = str(task.task_id)
-        with self.log_lock:
+        if self.LOCK:
             assert task_key not in self._running_tasks, \
                 "Task {} is already registered as running".format(task_key)
             self._running_tasks[task_key] = {
@@ -306,13 +306,13 @@ class HyperbandScheduler(FIFOScheduler):
         if self._checkpoint is not None or \
                 self.training_history_callback is not None:
             self._add_checkpointing_to_job(job)
-        with self.obj_lock:
+        with self.LOCK:
             self.scheduled_tasks.append(task_dict)
 
     def _update_searcher(self, searcher, task, result):
         config = task.args['config']
         if self.searcher_data == 'rungs_and_last':
-            with self.log_lock:
+            with self.LOCK:
                 task_info = self._running_tasks[str(task.task_id)]
                 if task_info['reported_result'] is not None:
                     # Remove last recently added result for this task,
@@ -344,7 +344,7 @@ class HyperbandScheduler(FIFOScheduler):
                 if last_result is not None:
                     terminator.on_task_complete(task, last_result)
                 # Cleanup
-                with self.log_lock:
+                with self.LOCK:
                     del self._running_tasks[task_key]
                 break
 
@@ -404,7 +404,7 @@ class HyperbandScheduler(FIFOScheduler):
             # If searcher_data == 'rungs_and_last', the result is kept in
             # the dataset iff update_searcher == True (i.e., we are at a
             # rung level).
-            with self.log_lock:
+            with self.LOCK:
                 # Note: reported_result may contain all sorts of extra info.
                 # All we need to maintain in the snapshot are reward and
                 # resource level
@@ -433,7 +433,7 @@ class HyperbandScheduler(FIFOScheduler):
                         act_str, resource, task))
                 terminator.on_task_remove(task)
                 # Cleanup
-                with self.log_lock:
+                with self.LOCK:
                     del self._running_tasks[task_key]
                 reporter.terminate()
                 break
@@ -455,7 +455,7 @@ class HyperbandScheduler(FIFOScheduler):
         # The assumption is that if an experiment is resumed from a
         # checkpoint, tasks which did not finish at the checkpoint, are not
         # restarted
-        with self.log_lock:
+        with self.LOCK:
             destination['terminator'] = pickle.dumps(self.terminator)
         return destination
 
@@ -471,12 +471,12 @@ class HyperbandScheduler(FIFOScheduler):
         super().load_state_dict(state_dict)
         # Note: _running_tasks is empty from __init__, it is not recreated,
         # since running tasks are not part of the checkpoint
-        with self.log_lock:
+        with self.LOCK:
             self.terminator = pickle.loads(state_dict['terminator'])
         logger.info('Loading Terminator State {}'.format(self.terminator))
 
     def _snapshot_tasks(self, bracket_id):
-        with self.log_lock:
+        with self.LOCK:
             return {
                 k: {'config': v['config'],
                     'time': v['time_stamp'],

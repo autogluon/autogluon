@@ -20,6 +20,8 @@ class BaseSearcher(object):
         The configuration space to sample from. It contains the full
         specification of the Hyperparameters with their priors
     """
+    LOCK = mp.Lock()
+
     def __init__(self, configspace, reward_attribute=None):
         """
         :param configspace: Configuration space to sample from or search in
@@ -32,7 +34,6 @@ class BaseSearcher(object):
         if reward_attribute is None:
             reward_attribute = 'accuracy'
         self._reward_attribute = reward_attribute
-        self.obj_lock = mp.Lock()
 
     def configure_scheduler(self, scheduler):
         """
@@ -94,7 +95,7 @@ class BaseSearcher(object):
         reward = kwargs.get(self._reward_attribute)
         assert reward is not None, \
             "Missing reward attribute '{}'".format(self._reward_attribute)
-        with self.obj_lock:
+        with self.LOCK:
             # _results is updated if reward is larger than the previous entry.
             # This is the correct behaviour for multi-fidelity schedulers,
             # where update is called multiple times for a config, with
@@ -159,7 +160,7 @@ class BaseSearcher(object):
         """Calculates the reward (i.e. validation performance) produced by training under the best configuration identified so far.
            Assumes higher reward values indicate better performance.
         """
-        with self.obj_lock:
+        with self.LOCK:
             if self._results:
                 return max(self._results.values())
         return self._reward_while_pending()
@@ -168,14 +169,14 @@ class BaseSearcher(object):
         """Calculates the reward (i.e. validation performance) produced by training with the given configuration.
         """
         k = pickle.dumps(config)
-        with self.obj_lock:
+        with self.LOCK:
             assert k in self._results
             return self._results[k]
 
     def get_best_config(self):
         """Returns the best configuration found so far.
         """
-        with self.obj_lock:
+        with self.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl)
@@ -185,7 +186,7 @@ class BaseSearcher(object):
     def get_best_config_reward(self):
         """Returns the best configuration found so far, as well as the reward associated with this best config.
         """
-        with self.obj_lock:
+        with self.LOCK:
             if self._results:
                 config_pkl = max(self._results, key=self._results.get)
                 return pickle.loads(config_pkl), self._results[config_pkl]
@@ -293,7 +294,7 @@ class RandomSearcher(BaseSearcher):
             new_config = self.configspace.get_default_configuration().get_dictionary()
         else:
             new_config = self.configspace.sample_configuration().get_dictionary()
-        with self.obj_lock:
+        with self.LOCK:
             num_tries = 1
             while pickle.dumps(new_config) in self._results:
                 assert num_tries <= self.MAX_RETRIES, \
@@ -304,20 +305,18 @@ class RandomSearcher(BaseSearcher):
         return new_config
 
     def get_state(self):
-        with self.obj_lock:
-            return {
-                'random_state': self.random_state,
-                'results': self._results
-            }
+        return {
+            'random_state': self.random_state,
+            'results': self._results
+        }
 
     def clone_from_state(self, state):
-        with self.obj_lock:
-            new_searcher = RandomSearcher(
-                self.configspace, reward_attribute=self._reward_attribute,
-                first_is_default=self._first_is_default)
-            new_searcher.random_state = state['random_state']
-            new_searcher._results = state['results']
-            return new_searcher
+        new_searcher = RandomSearcher(
+            self.configspace, reward_attribute=self._reward_attribute,
+            first_is_default=self._first_is_default)
+        new_searcher.random_state = state['random_state']
+        new_searcher._results = state['results']
+        return new_searcher
 
 
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')
