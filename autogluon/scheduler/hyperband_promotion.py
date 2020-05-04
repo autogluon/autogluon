@@ -4,7 +4,7 @@ import multiprocessing as mp
 import heapq
 import copy
 
-from .hyperband_stopping import _sample_bracket
+from .hyperband_stopping import map_resource_to_index, _sample_bracket
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +38,19 @@ class HyperbandPromotion_Manager(object):
     not yet gone beyond level task.args['resume_from'].
 
     Args:
-        time_attr : str
+        time_attr: str
             See HyperbandScheduler.
-        reward_attr : str
+        reward_attr: str
             See HyperbandScheduler.
-        max_t : int
+        max_t: int
             See HyperbandScheduler.
-        grace_period : int
+        grace_period: int
             See HyperbandScheduler.
-        reduction_factor : int
+        reduction_factor: int
             See HyperbandScheduler.
-        brackets : int
+        brackets: int
             See HyperbandScheduler.
-        keep_size_ratios : bool
+        keep_size_ratios: bool
             See HyperbandScheduler.
 
     """
@@ -82,9 +82,9 @@ class HyperbandPromotion_Manager(object):
             bracket.on_task_add(task, **kwargs)
             self._task_info[str(task.task_id)] = bracket_id
             levels = [x[0] for x in bracket._rungs]
-            if levels[0] < self._max_t:
-                levels.insert(0, self._max_t)
-            return levels
+        if levels[0] < self._max_t:
+            levels.insert(0, self._max_t)
+        return levels
 
     def _get_bracket(self, task_id):
         bracket_id = self._task_info[str(task_id)]
@@ -113,30 +113,27 @@ class HyperbandPromotion_Manager(object):
                 action, update_searcher, next_milestone, ignore_data = \
                     bracket.on_result(task, result[self._time_attr],
                                       result[self._reward_attr])
-            return {
-                'task_continues': action,
-                'update_searcher': update_searcher,
-                'next_milestone': next_milestone,
-                'bracket_id': bracket_id,
-                'rung_counts': rung_counts,
-                'ignore_data': ignore_data}
+        return {
+            'task_continues': action,
+            'update_searcher': update_searcher,
+            'next_milestone': next_milestone,
+            'bracket_id': bracket_id,
+            'rung_counts': rung_counts,
+            'ignore_data': ignore_data}
 
     def on_task_complete(self, task, result):
         with HyperbandPromotion_Manager.LOCK:
             bracket, _ = self._get_bracket(task.task_id)
             bracket.on_result(
                 task, result[self._time_attr], result[self._reward_attr])
-            self._on_task_remove(task)
+        self.on_task_remove(task)
 
     def on_task_remove(self, task):
         with HyperbandPromotion_Manager.LOCK:
-            self._on_task_remove(task)
-
-    def _on_task_remove(self, task):
-        task_id = task.task_id
-        bracket, _ = self._get_bracket(task_id)
-        bracket.on_task_remove(task)
-        del self._task_info[str(task_id)]
+            task_id = task.task_id
+            bracket, _ = self._get_bracket(task_id)
+            bracket.on_task_remove(task)
+            del self._task_info[str(task_id)]
 
     def _sample_bracket(self):
         return _sample_bracket(
@@ -160,7 +157,15 @@ class HyperbandPromotion_Manager(object):
             else:
                 # First milestone the new config will get to
                 extra_kwargs['milestone'] = bracket.get_first_milestone()
-            return config, extra_kwargs
+        return config, extra_kwargs
+
+    def resource_to_index(self, resource):
+        return map_resource_to_index(
+            resource, self._reduction_factor, self._min_t, self._max_t)
+
+    def snapshot_rungs(self, bracket_id):
+        with HyperbandPromotion_Manager.LOCK:
+            return self._brackets[bracket_id].snapshot_rungs()
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \
@@ -386,6 +391,9 @@ class PromotionBracket(object):
 
     def get_first_milestone(self):
         return self._rungs[-1][0]
+
+    def snapshot_rungs(self):
+        return [(x[0], copy.copy(x[1])) for x in self._rungs]
 
     def _num_promotable_config(self, recorded):
         num_recorded = len(recorded)

@@ -30,40 +30,50 @@ class FIFOScheduler(TaskScheduler):
 
     Parameters
     ----------
-    train_fn : callable
+    train_fn: callable
         A task launch function for training.
-    args : object (optional)
+    args: object (optional)
         Default arguments for launching train_fn.
-    resource : dict
+    resource: dict
         Computation resources. For example, `{'num_cpus':2, 'num_gpus':1}`
-    searcher : str or BaseSearcher
+    searcher: str or BaseSearcher
         Searcher (get_config decisions). If str, this is passed to
         searcher_factory along with search_options.
-    search_options : dict
+    search_options: dict
         If searcher is str, these arguments are passed to searcher_factory.
-    checkpoint : str
+    checkpoint: str
         If filename given here, a checkpoint of scheduler (and searcher) state
         is written to file every time a job finishes.
         Note: May not be fully supported by all searchers.
-    resume : bool
+    resume: bool
         If True, scheduler state is loaded from checkpoint, and experiment
         starts from there.
         Note: May not be fully supported by all searchers.
-    num_trials : int
+    num_trials: int
         Maximum number of jobs run in experiment.
-    time_out : float
+    time_out: float
         If given, jobs are started only until this time_out (wall clock time)
-    reward_attr : str
+    reward_attr: str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter
-    time_attr : str
+    time_attr: str
         Name of resource (or time) attribute in data obtained from reporter.
         This attribute is optional for FIFO scheduling, but becomes mandatory
         in multi-fidelity scheduling (e.g., Hyperband).
         Note: The type of resource must be int.
-    dist_ip_addrs : list of str
+    dist_ip_addrs: list of str
         IP addresses of remote machines.
-    delay_get_config : bool
+    training_history_callback: callable
+        Callback function func called every time a job finishes, if at least
+        training_history_callback_delta_secs seconds passed since the last
+        recent call. The call has the form:
+            func(self.training_history, self._start_time)
+        Here, self._start_time is time stamp for when experiment started.
+        Use this callback to serialize self.training_history after regular
+        intervals.
+    training_history_callback_delta_secs: float
+        See training_history_callback.
+    delay_get_config: bool
         If True, the call to searcher.get_config is delayed until a worker
         resource for evaluation is available. Otherwise, get_config is called
         just after a job has been started.
@@ -100,6 +110,8 @@ class FIFOScheduler(TaskScheduler):
                  time_out=None, max_reward=None, reward_attr='accuracy',
                  time_attr='epoch',
                  visualizer='none', dist_ip_addrs=None,
+                 training_history_callback=None,
+                 training_history_callback_delta_secs=60,
                  delay_get_config=True):
         super().__init__(dist_ip_addrs)
         if resource is None:
@@ -173,7 +185,15 @@ class FIFOScheduler(TaskScheduler):
                 msg = f'checkpoint path {checkpoint} is not available for resume.'
                 logger.exception(msg)
                 raise FileExistsError(msg)
+        # Needed for training_history callback mechanism, which is used to
+        # serialize training_history after each
+        # training_history_call_delta_secs seconds
         self._start_time = None
+        self._training_history_callback_last_block = None
+        self._training_history_callback_last_len = None
+        self.training_history_callback = training_history_callback
+        self.training_history_callback_delta_secs = \
+            training_history_callback_delta_secs
         self._delay_get_config = delay_get_config
 
     def run(self, **kwargs):
@@ -185,6 +205,9 @@ class FIFOScheduler(TaskScheduler):
         self._start_time = start_time
         num_trials = kwargs.get('num_trials', self.num_trials)
         time_out = kwargs.get('time_out', self.time_out)
+        # For training_history callback mechanism:
+        self._training_history_callback_last_block = -1
+        self._training_history_callback_last_len = len(self.training_history)
 
         logger.info('Starting Experiments')
         logger.info(f'Num of Finished Tasks is {self.num_finished_tasks}')
@@ -297,8 +320,10 @@ class FIFOScheduler(TaskScheduler):
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
-        # Checkpoint thread
-        if self._checkpoint is not None:
+        # Checkpoint thread. This is also used for training_history
+        # callback
+        if self._checkpoint is not None or \
+                self.training_history_callback is not None:
             self._add_checkpointing_to_job(job)
         with self.LOCK:
             self.scheduled_tasks.append(task_dict)
@@ -310,8 +335,29 @@ class FIFOScheduler(TaskScheduler):
         def _save_checkpoint_callback(fut):
             self._cleaning_tasks()
             self.save()
+            # training_history callback
+            with self.log_lock:
+                if self._trigger_training_history_callback():
+                    logger.debug("Execute training_history callback")
+                    self.training_history_callback(
+                        self.training_history, self._start_time)
 
         job.add_done_callback(_save_checkpoint_callback)
+
+    def _trigger_training_history_callback(self):
+        if self.training_history_callback is None:
+            return False
+        assert self._training_history_callback_last_block is not None
+        current_block = int(np.floor(
+            self._elapsed_time() / self.training_history_callback_delta_secs))
+        current_len = len(self.training_history)
+        ret_val = (current_block >
+                   self._training_history_callback_last_block) and \
+            current_len > self._training_history_callback_last_len
+        if ret_val:
+            self._training_history_callback_last_block = current_block
+            self._training_history_callback_last_len = current_len
+        return ret_val
 
     def _run_reporter(self, task, task_job, reporter, searcher):
         last_result = None
