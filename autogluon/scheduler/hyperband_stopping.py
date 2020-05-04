@@ -50,8 +50,6 @@ class HyperbandStopping_Manager(object):
             See HyperbandScheduler.
 
     """
-    LOCK = mp.Lock()
-
     def __init__(
             self, time_attr, reward_attr, max_t, grace_period,
             reduction_factor, brackets):
@@ -64,6 +62,7 @@ class HyperbandStopping_Manager(object):
         self._task_info = dict()
         self._num_stopped = 0
         self._brackets = []
+        self.obj_lock = mp.Lock()
         for s in range(brackets):
             bracket = StoppingBracket(
                 grace_period, max_t, reduction_factor, s)
@@ -85,7 +84,7 @@ class HyperbandStopping_Manager(object):
         """
         assert 'bracket' in kwargs
         bracket_id = kwargs['bracket']
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             bracket = self._brackets[bracket_id]
             self._task_info[str(task.task_id)] = bracket_id
             levels = [x[0] for x in bracket._rungs]
@@ -114,7 +113,7 @@ class HyperbandStopping_Manager(object):
         :param result: Current reported results from task
         :return: See above
         """
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             action = False
             update_searcher = True
             next_milestone = None
@@ -135,14 +134,14 @@ class HyperbandStopping_Manager(object):
             'bracket_id': bracket_id}
 
     def on_task_complete(self, task, result):
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             bracket, _ = self._get_bracket(task.task_id)
             bracket.on_result(
                 task, result[self._time_attr], result[self._reward_attr])
         self.on_task_remove(task)
 
     def on_task_remove(self, task):
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             del self._task_info[str(task.task_id)]
 
     def _sample_bracket(self):
@@ -152,7 +151,7 @@ class HyperbandStopping_Manager(object):
             rf=self._reduction_factor)
 
     def on_task_schedule(self):
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             # Sample bracket for task to be scheduled
             bracket_id = self._sample_bracket()
             # 'milestone' is first milestone the new config will get to
@@ -162,7 +161,7 @@ class HyperbandStopping_Manager(object):
         return None, extra_kwargs
 
     def snapshot_rungs(self, bracket_id):
-        with HyperbandStopping_Manager.LOCK:
+        with self.obj_lock:
             return self._brackets[bracket_id].snapshot_rungs()
 
     def resource_to_index(self, resource):

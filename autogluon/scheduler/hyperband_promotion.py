@@ -54,8 +54,6 @@ class HyperbandPromotion_Manager(object):
             See HyperbandScheduler.
 
     """
-    LOCK = mp.Lock()
-
     def __init__(
             self, time_attr, reward_attr, max_t, grace_period,
             reduction_factor, brackets, keep_size_ratios):
@@ -67,6 +65,7 @@ class HyperbandPromotion_Manager(object):
         # Maps str(task_id) -> bracket_id
         self._task_info = dict()
         self._brackets = []
+        self.obj_lock = mp.Lock()
         for s in range(brackets):
             bracket = PromotionBracket(
                 grace_period, max_t, reduction_factor, s, keep_size_ratios)
@@ -77,7 +76,7 @@ class HyperbandPromotion_Manager(object):
     def on_task_add(self, task, **kwargs):
         assert 'bracket' in kwargs
         bracket_id = kwargs['bracket']
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             bracket = self._brackets[bracket_id]
             bracket.on_task_add(task, **kwargs)
             self._task_info[str(task.task_id)] = bracket_id
@@ -102,7 +101,7 @@ class HyperbandPromotion_Manager(object):
         was promoted. This happens if the evaluation function does not support
         pause&resume and has to be started from scratch.
         """
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             action = False
             update_searcher = True
             next_milestone = None
@@ -122,14 +121,14 @@ class HyperbandPromotion_Manager(object):
             'ignore_data': ignore_data}
 
     def on_task_complete(self, task, result):
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             bracket, _ = self._get_bracket(task.task_id)
             bracket.on_result(
                 task, result[self._time_attr], result[self._reward_attr])
         self.on_task_remove(task)
 
     def on_task_remove(self, task):
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             task_id = task.task_id
             bracket, _ = self._get_bracket(task_id)
             bracket.on_task_remove(task)
@@ -142,10 +141,10 @@ class HyperbandPromotion_Manager(object):
             rf=self._reduction_factor)
 
     def on_task_schedule(self):
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             # Sample bracket for task to be scheduled
             bracket_id = self._sample_bracket()
-            extra_kwargs = {'brackets': bracket_id}
+            extra_kwargs = {'bracket': bracket_id}
             bracket = self._brackets[bracket_id]
             # Check whether config can be promoted in that bracket
             config, config_key, milestone, next_milestone = \
@@ -164,7 +163,7 @@ class HyperbandPromotion_Manager(object):
             resource, self._reduction_factor, self._min_t, self._max_t)
 
     def snapshot_rungs(self, bracket_id):
-        with HyperbandPromotion_Manager.LOCK:
+        with self.obj_lock:
             return self._brackets[bracket_id].snapshot_rungs()
 
     def __repr__(self):

@@ -228,7 +228,7 @@ class FIFOScheduler(TaskScheduler):
         if checkpoint is None:
             checkpoint = self._checkpoint
         if checkpoint is not None:
-            with self.LOCK:
+            with self.log_lock:
                 mkdir(os.path.dirname(checkpoint))
                 save(self.state_dict(), checkpoint)
 
@@ -325,7 +325,7 @@ class FIFOScheduler(TaskScheduler):
         if self._checkpoint is not None or \
                 self.training_history_callback is not None:
             self._add_checkpointing_to_job(job)
-        with self.LOCK:
+        with self.obj_lock:
             self.scheduled_tasks.append(task_dict)
 
     def _clean_task_internal(self, task_dict):

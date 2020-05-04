@@ -31,6 +31,7 @@ class TaskScheduler(object):
         cls.RESOURCE_MANAGER.add_remote(cls.REMOTE_MANAGER.get_remotes())
         self.scheduled_tasks = []
         self.finished_tasks = []
+        self.obj_lock = mp.Lock()  # Lock at object level
 
     def add_remote(self, ip_addrs):
         """Add remote nodes to the scheduler computation resource.
@@ -80,7 +81,7 @@ class TaskScheduler(object):
         if not task.resources.is_ready:
             cls.RESOURCE_MANAGER._request(task.resources)
         job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
-        with self.LOCK:
+        with self.obj_lock:
             new_dict = self._dict_from_task(task)
             new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
@@ -151,7 +152,7 @@ class TaskScheduler(object):
         pass
 
     def _cleaning_tasks(self):
-        with self.LOCK:
+        with self.obj_lock:
             new_scheduled_tasks = []
             for task_dict in self.scheduled_tasks:
                 if task_dict['Job'].done():
