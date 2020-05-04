@@ -228,9 +228,9 @@ class FIFOScheduler(TaskScheduler):
         if checkpoint is None:
             checkpoint = self._checkpoint
         if checkpoint is not None:
-            with self.LOCK:
-                mkdir(os.path.dirname(checkpoint))
-                save(self.state_dict(), checkpoint)
+            #with self.LOCK:
+            mkdir(os.path.dirname(checkpoint))
+            save(self.state_dict(), checkpoint)
 
     def _create_new_task(self, config, resources=None):
         if resources is None:
