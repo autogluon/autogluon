@@ -1,8 +1,9 @@
 import logging
 import numpy as np
-import multiprocessing as mp
 import heapq
 import copy
+
+from .hyperband_stopping import map_resource_to_index, _sample_bracket
 
 logger = logging.getLogger(__name__)
 
@@ -24,43 +25,44 @@ class HyperbandPromotion_Manager(object):
     evaluation function receives info about the promotion, so pause &
     resume can be implemented there.
 
-    Args:
-        time_attr (str): A training result attr to use for comparing time.
-            Note that you can pass in something non-temporal such as
-            `training_epoch` as a measure of progress, the only requirement
-            is that the attribute should increase monotonically.
-        reward_attr (str): The training result objective value attribute. As
-            with `time_attr`, this may refer to any objective value. Stopping
-            procedures will use this attribute.
-        max_t (float): max time units per task. Trials will be stopped after
-            max_t time units (determined by time_attr) have passed.
-        grace_period (float): Only stop tasks at least this old in time.
-            The units are the same as the attribute named by `time_attr`.
-        reduction_factor (float): Used to set halving rate and amount. This
-            is simply a unit-less scalar.
-        brackets (int): Number of brackets. Each bracket has a different
-            grace period, all share max_t and reduction_factor.
-            If brackets == 1, we just run successive halving, for
-            brackets > 1, we run Hyperband.
-        keep_size_ratios (bool): If True,
-            promotions are done only if the (current estimate of the) size ratio
-            between rung and next rung are 1 / reduction_factor or better. This
-            avoids higher rungs to get more populated than they would be in
-            synchronous Hyperband. A drawback is that promotions to higher rungs
-            take longer.
-    """
-    LOCK = mp.Lock()
+    Note: If the evaluation function does not implement pause & resume, it
+    needs to start training from scratch, in which case metrics are reported
+    for every epoch, also those < task.args['resume_from']. At least for some
+    modes of fitting the searcher model to data, this would lead to duplicate
+    target values for the same extended config (x, r), which we want to avoid.
+    The solution is to maintain task.args['resume_from'] in the data for the
+    terminator (see PromotionBracket._running). Given this, we can report
+    in on_task_report that the current metric data should not be used for the
+    searcher model (ignore_data = True), namely as long as the evaluation has
+    not yet gone beyond level task.args['resume_from'].
 
+    Args:
+        time_attr: str
+            See HyperbandScheduler.
+        reward_attr: str
+            See HyperbandScheduler.
+        max_t: int
+            See HyperbandScheduler.
+        grace_period: int
+            See HyperbandScheduler.
+        reduction_factor: int
+            See HyperbandScheduler.
+        brackets: int
+            See HyperbandScheduler.
+        keep_size_ratios: bool
+            See HyperbandScheduler.
+
+    """
     def __init__(
             self, time_attr, reward_attr, max_t, grace_period,
             reduction_factor, brackets, keep_size_ratios):
-        # attr
         self._reward_attr = reward_attr
         self._time_attr = time_attr
-        # hyperband params
-        self._task_info = {}  # task_id -> bracket_id
         self._reduction_factor = reduction_factor
         self._max_t = max_t
+        self._min_t = grace_period
+        # Maps str(task_id) -> bracket_id
+        self._task_info = dict()
         self._brackets = []
         for s in range(brackets):
             bracket = PromotionBracket(
@@ -72,77 +74,89 @@ class HyperbandPromotion_Manager(object):
     def on_task_add(self, task, **kwargs):
         assert 'bracket' in kwargs
         bracket_id = kwargs['bracket']
-        with HyperbandPromotion_Manager.LOCK:
-            bracket = self._brackets[bracket_id]
-            bracket.on_task_add(task, **kwargs)
-            self._task_info[task.task_id] = bracket_id
-            levels = [x[0] for x in bracket._rungs]
-            if levels[0] < self._max_t:
-                levels.insert(0, self._max_t)
-            return levels
+        bracket = self._brackets[bracket_id]
+        bracket.on_task_add(task, **kwargs)
+        self._task_info[str(task.task_id)] = bracket_id
+        levels = [x[0] for x in bracket._rungs]
+        if levels[0] < self._max_t:
+            levels.insert(0, self._max_t)
+        return levels
 
     def _get_bracket(self, task_id):
-        return self._brackets[self._task_info[task_id]]
+        bracket_id = self._task_info[str(task_id)]
+        return self._brackets[bracket_id], bracket_id
 
     def on_task_report(self, task, result):
-        with HyperbandPromotion_Manager.LOCK:
-            action = False
-            update_searcher = True
-            next_milestone = None
-            bracket_id = self._task_info[task.task_id]
-            bracket = self._brackets[bracket_id]
-            rung_counts = bracket.get_rung_counts()
-            if result[self._time_attr] < self._max_t:
-                action, update_searcher, next_milestone = bracket.on_result(
-                    task, result[self._time_attr], result[self._reward_attr])
-            return action, update_searcher, next_milestone, bracket_id, rung_counts
+        """
+        See docstring of HyperbandStopping_Manager. Additional entries:
+        - rung_counts: Occupancy counts per rung level
+        - ignore_data: If True, the metric value should not be added to the
+          dataset of the searcher
+
+        ignore_data = True iff the task is running a config which has been
+        promoted, and the resource level is <= the rung from where the config
+        was promoted. This happens if the evaluation function does not support
+        pause&resume and has to be started from scratch.
+        """
+        action = False
+        update_searcher = True
+        next_milestone = None
+        ignore_data = False
+        bracket, bracket_id = self._get_bracket(task.task_id)
+        rung_counts = bracket.get_rung_counts()
+        if result[self._time_attr] < self._max_t:
+            action, update_searcher, next_milestone, ignore_data = \
+                bracket.on_result(task, result[self._time_attr],
+                                  result[self._reward_attr])
+        return {
+            'task_continues': action,
+            'update_searcher': update_searcher,
+            'next_milestone': next_milestone,
+            'bracket_id': bracket_id,
+            'rung_counts': rung_counts,
+            'ignore_data': ignore_data}
 
     def on_task_complete(self, task, result):
-        with HyperbandPromotion_Manager.LOCK:
-            bracket = self._get_bracket(task.task_id)
-            bracket.on_result(
-                task, result[self._time_attr], result[self._reward_attr])
-            bracket.on_task_remove(task)
-            del self._task_info[task.task_id]
+        bracket, _ = self._get_bracket(task.task_id)
+        bracket.on_result(
+            task, result[self._time_attr], result[self._reward_attr])
+        self.on_task_remove(task)
 
     def on_task_remove(self, task):
-        with HyperbandPromotion_Manager.LOCK:
-            self._get_bracket(task.task_id).on_task_remove(task)
-            del self._task_info[task.task_id]
+        task_id = task.task_id
+        bracket, _ = self._get_bracket(task_id)
+        bracket.on_task_remove(task)
+        del self._task_info[str(task_id)]
 
     def _sample_bracket(self):
-        # Brackets are sampled in proportion to the number of configs started
-        # in synchronous Hyperband in each bracket
-        num_brackets = len(self._brackets)
-        if num_brackets > 1:
-            smax_plus1 = len(self._brackets[0]._rungs)
-            rf = self._reduction_factor
-            probs = np.array([
-                (smax_plus1 / (smax_plus1 - s)) * (rf ** (smax_plus1 - s - 1))
-                for s in range(num_brackets)])
-            normalized = probs / probs.sum()
-            return np.random.choice(num_brackets, p=normalized)
-        else:
-            return 0
+        return _sample_bracket(
+            num_brackets=len(self._brackets),
+            max_num_rungs=len(self._brackets[0]._rungs),
+            rf=self._reduction_factor)
 
     def on_task_schedule(self):
-        with HyperbandPromotion_Manager.LOCK:
-            # Sample bracket for task to be scheduled
-            bracket_id = self._sample_bracket()
-            extra_kwargs = dict()
-            extra_kwargs['bracket'] = bracket_id
-            bracket = self._brackets[bracket_id]
-            # Check whether config can be promoted in that bracket
-            config, config_key, milestone, next_milestone = \
-                bracket.on_task_schedule()
-            if config is not None:
-                extra_kwargs['milestone'] = next_milestone
-                extra_kwargs['config_key'] = config_key
-                extra_kwargs['resume_from'] = milestone
-            else:
-                # First milestone the new config will get to
-                extra_kwargs['milestone'] = bracket.get_first_milestone()
-            return config, extra_kwargs
+        # Sample bracket for task to be scheduled
+        bracket_id = self._sample_bracket()
+        extra_kwargs = {'bracket': bracket_id}
+        bracket = self._brackets[bracket_id]
+        # Check whether config can be promoted in that bracket
+        config, config_key, milestone, next_milestone = \
+            bracket.on_task_schedule()
+        if config is not None:
+            extra_kwargs['milestone'] = next_milestone
+            extra_kwargs['config_key'] = config_key
+            extra_kwargs['resume_from'] = milestone
+        else:
+            # First milestone the new config will get to
+            extra_kwargs['milestone'] = bracket.get_first_milestone()
+        return config, extra_kwargs
+
+    def resource_to_index(self, resource):
+        return map_resource_to_index(
+            resource, self._reduction_factor, self._min_t, self._max_t)
+
+    def snapshot_rungs(self, bracket_id):
+        return self._brackets[bracket_id].snapshot_rungs()
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(' + \
@@ -157,7 +171,7 @@ class HyperbandPromotion_Manager(object):
 
 class PromotionBracket(object):
     """
-    Different to _Bracket in hyperband_stopping, reward data at rungs is
+    Different to StoppingBracket in hyperband_stopping, reward data at rungs is
     associated with configs, not with tasks. To avoid having to use config
     as key, we maintain unique integers as config keys.
 
@@ -166,7 +180,8 @@ class PromotionBracket(object):
     if it directly passes the promotion test).
 
     """
-    def __init__(self, min_t, max_t, reduction_factor, s, keep_size_ratios):
+    def __init__(
+            self, min_t, max_t, reduction_factor, s, keep_size_ratios):
         self.rf = reduction_factor
         self.max_t = max_t
         self.keep_size_ratios = keep_size_ratios
@@ -175,20 +190,24 @@ class PromotionBracket(object):
         # config_key to (reward_value, was_promoted)
         self._rungs = [(min_t * self.rf ** (k + s), dict())
                        for k in reversed(range(MAX_RUNGS))]
-        # Note: config_key are positions into _config
+        # Note: config_key are positions into _config, cast to str
         self._config = list()
-        # _running maps task_id to tuples (config_key, milestone), which means
-        # task task_id runs evaluation of config_key until time_attr reaches
-        # milestone
+        # _running maps str(task_id) to tuples
+        #   (config_key, milestone, resume_from),
+        # which means task task_id runs evaluation of config_key until
+        # time_attr reaches milestone. The resume_from field can be None. If
+        # not, the task is running a config which has been promoted from
+        # rung level resume_from. This info is required for on_result to
+        # properly report ignore_data.
         self._running = dict()
         # _count_tasks[m] counts the number of tasks started with target
         # milestone m. Here, m includes max_t. Used to implement the
         # keep_size_ratios rule
         self._count_tasks = dict()
         for milestone, _ in self._rungs:
-            self._count_tasks[milestone] = 0
+            self._count_tasks[str(milestone)] = 0
         if self._rungs and max_t > self._rungs[0][0]:
-            self._count_tasks[max_t] = 0
+            self._count_tasks[str(max_t)] = 0
 
     def _find_promotable_config(self, recorded, config_key=None):
         """
@@ -223,8 +242,8 @@ class PromotionBracket(object):
     def _do_skip_promotion(self, milestone, next_milestone):
         skip_promotion = False
         if self.keep_size_ratios:
-            count_this = self._count_tasks[milestone]
-            count_next = self._count_tasks[next_milestone]
+            count_this = self._count_tasks[str(milestone)]
+            count_next = self._count_tasks[str(next_milestone)]
             # We skip the promotion if the ideal size ratio is currently
             # violated. This is a little more permissive than we could be.
             # Since a promotion increases count_next, we could also use
@@ -266,32 +285,36 @@ class PromotionBracket(object):
             reward = recorded[config_key][0]
             assert not recorded[config_key][1]
             recorded[config_key] = (reward, True)
-            return self._config[config_key], config_key, milestone, next_milestone
+            return self._config[int(config_key)], config_key, milestone, \
+                   next_milestone
 
     def on_task_add(self, task, **kwargs):
         """
-        Called when new task is started. Depending on kwargs['new_config'], this
-        could start an evaluation (True) or promote an existing config to the
-        next milestone (False). In the latter case, kwargs contains additional
-        information about the promotion.
+        Called when new task is started. Depending on kwargs['new_config'],
+        this could start an evaluation (True) or promote an existing config
+        to the next milestone (False). In the latter case, kwargs contains
+        additional information about the promotion.
         """
         new_config = kwargs.get('new_config', True)
         if new_config:
             # New config
-            config_key = len(self._config)
+            config_key = str(len(self._config))
             self._config.append(copy.copy(task.args['config']))
             # First milestone:
             milestone = self._rungs[-1][0]
+            resume_from = None
         else:
             # Existing config is promoted
-            # Note that self._rungs has already been updated in on_task_schedule
+            # Note that self._rungs has already been updated in
+            # on_task_schedule
             assert 'milestone' in kwargs
             assert 'config_key' in kwargs
             config_key = kwargs['config_key']
-            assert self._config[config_key] == task.args['config']
+            assert self._config[int(config_key)] == task.args['config']
             milestone = kwargs['milestone']
-        self._running[task.task_id] = (config_key, milestone)
-        self._count_tasks[milestone] += 1
+            resume_from = kwargs.get('resume_from')
+        self._running[str(task.task_id)] = (config_key, milestone, resume_from)
+        self._count_tasks[str(milestone)] += 1
 
     def on_result(self, task, cur_iter, cur_rew):
         """
@@ -304,58 +327,64 @@ class PromotionBracket(object):
         :param task: Only need task.task_id
         :param cur_iter: Current time_attr value of task
         :param cur_rew: Current reward_attr value of task
-        :return: action, milestone_reached, next_milestone
+        :return: action, milestone_reached, next_milestone, ignore_data
+
         """
+        assert cur_rew is not None, \
+            "Reward attribute must be a numerical value, not None"
+        task_key = str(task.task_id)
         action = True
         milestone_reached = False
         next_milestone = None
-        milestone = self._running[task.task_id][1]
+        milestone = self._running[task_key][1]
         if cur_iter >= milestone:
             assert cur_iter == milestone, \
                 "cur_iter = {} > {} = milestone. Make sure to report time attributes covering all milestones".format(
                     cur_iter, milestone)
             action = False
             milestone_reached = True
-            config_key = self._running[task.task_id][0]
-            assert self._config[config_key] == task.args['config']
-            if cur_rew is None:
-                logger.warning(
-                    "Reward attribute is None! Consider reporting using "
-                    "a different field.")
-            else:
-                try:
-                    rung_pos = next(i for i, v in enumerate(self._rungs)
-                                    if v[0] == milestone)
-                    # Register reward at rung level (as not promoted)
-                    recorded = self._rungs[rung_pos][1]
-                    recorded[config_key] = (cur_rew, False)
-                    next_milestone = self._rungs[rung_pos - 1][0] \
-                        if rung_pos > 0 else self.max_t
-                    # Check whether config can be promoted immediately. If so,
-                    # we do not have to stop the task
-                    if milestone < self.max_t:
-                        skip_promotion = self._do_skip_promotion(
-                            milestone, next_milestone)
-                        if (not skip_promotion) and (self._find_promotable_config(
-                                recorded, config_key=config_key) is not None):
-                            action = True
-                            recorded[config_key] = (cur_rew, True)
-                            self._running[task.task_id] = (config_key, next_milestone)
-                            self._count_tasks[next_milestone] += 1
-                except StopIteration:
-                    # milestone not a rung level. This can happen, in particular
-                    # if milestone == self.max_t
-                    pass
-        return action, milestone_reached, next_milestone
+            config_key = self._running[task_key][0]
+            assert self._config[int(config_key)] == task.args['config']
+            try:
+                rung_pos = next(i for i, v in enumerate(self._rungs)
+                                if v[0] == milestone)
+                # Register reward at rung level (as not promoted)
+                recorded = self._rungs[rung_pos][1]
+                recorded[config_key] = (cur_rew, False)
+                next_milestone = self._rungs[rung_pos - 1][0] \
+                    if rung_pos > 0 else self.max_t
+                # Check whether config can be promoted immediately. If so,
+                # we do not have to stop the task
+                if milestone < self.max_t:
+                    skip_promotion = self._do_skip_promotion(
+                        milestone, next_milestone)
+                    if (not skip_promotion) and (self._find_promotable_config(
+                            recorded, config_key=config_key) is not None):
+                        action = True
+                        recorded[config_key] = (cur_rew, True)
+                        self._running[task_key] = (
+                            config_key, next_milestone, None)
+                        self._count_tasks[str(next_milestone)] += 1
+            except StopIteration:
+                # milestone not a rung level. This can happen, in particular
+                # if milestone == self.max_t
+                pass
+        resume_from = self._running[task_key][2]
+        ignore_data = (resume_from is not None) and (cur_iter <= resume_from)
+
+        return action, milestone_reached, next_milestone, ignore_data
 
     def get_rung_counts(self):
         return self._count_tasks
 
     def on_task_remove(self, task):
-        del self._running[task.task_id]
+        del self._running[str(task.task_id)]
 
     def get_first_milestone(self):
         return self._rungs[-1][0]
+
+    def snapshot_rungs(self):
+        return [(x[0], copy.copy(x[1])) for x in self._rungs]
 
     def _num_promotable_config(self, recorded):
         num_recorded = len(recorded)

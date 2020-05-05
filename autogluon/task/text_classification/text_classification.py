@@ -1,13 +1,9 @@
 import logging
-import matplotlib.pyplot as plt
 
 import mxnet as mx
-from mxnet import gluon, nd
 import gluonnlp as nlp
 
 from ...core import *
-from ...searcher import *
-from ...scheduler import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ...utils import update_params
@@ -198,8 +194,8 @@ class TextClassification(BaseTask):
                 'searcher': 'random',
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs//4})
-        results = BaseTask.run_fit(train_text_classification, search_strategy,
-                                   scheduler_options)
+        results = BaseTask.run_fit(
+            train_text_classification, search_strategy, scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])
         get_model_params = results.pop('get_model_args')
         get_model_params['ctx'] = mx.cpu(0)

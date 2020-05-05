@@ -21,8 +21,9 @@ class GridSearcher(BaseSearcher):
     Number of configurations for grid search is 9
     {'x.choice': 2, 'y.choice': 2}
     """
-    def __init__(self, configspace):
-        super().__init__(configspace)
+    def __init__(self, configspace, **kwargs):
+        super().__init__(
+            configspace, reward_attribute=kwargs.get('reward_attribute'))
         param_grid = {}
         hp_ordering = configspace.get_hyperparameter_names()
         for hp in hp_ordering:

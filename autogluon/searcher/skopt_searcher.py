@@ -4,7 +4,7 @@ import logging
 from ..utils import warning_filter
 with warning_filter():
     from skopt import Optimizer
-    from skopt.space import *
+    from skopt.space import Integer, Real, Categorical
 
 from .searcher import BaseSearcher
 
@@ -38,6 +38,18 @@ class SKoptSearcher(BaseSearcher):
     
     Examples
     --------
+    By default, the searcher is created along with the scheduler. For example:
+    >>> import autogluon as ag
+    >>> @ag.args(
+    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True))
+    >>> def train_fn(args, reporter):
+    >>>     reporter(accuracy = args.lr ** 2)
+    >>> search_options = {'base_estimator': 'RF', 'acq_func': 'EI'}
+    >>> scheduler = ag.scheduler.FIFOScheduler(
+    >>>     train_fn, searcher='skopt', search_options=search_options,
+    >>>     num_trials=10, reward_attr='accuracy')
+    This would result in a SKoptSearcher with cs = train_fn.cs. You can also
+    create a SKoptSearcher by hand:
     >>> import autogluon as ag
     >>> @ag.args(
     >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
@@ -47,10 +59,11 @@ class SKoptSearcher(BaseSearcher):
     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
     >>> searcher.get_config()
     {'lr': 0.0031622777, 'wd': 0.0055}
-    >>> searcher = SKoptSearcher(train_fn.cs, base_estimator='RF', acq_func='EI') # # BayesOpt searcher using RF surrogate model and Expected Improvement acquisition
+    >>> searcher = SKoptSearcher(
+    >>>     train_fn.cs, reward_attribute='accuracy', base_estimator='RF',
+    >>>     acq_func='EI')
     >>> next_config = searcher.get_config()
-    >>> next_reward = 10.0 # made-up value.
-    >>> searcher.update(next_config, next_reward)
+    >>> searcher.update(next_config, accuracy=10.0)  # made-up value
     
     .. note::
         
@@ -64,9 +77,10 @@ class SKoptSearcher(BaseSearcher):
         then get_config simply reverts to random search via random_config().
     """
     errors_tohandle = (ValueError, TypeError, RuntimeError)
-    
+
     def __init__(self, configspace, **kwargs):
-        BaseSearcher.__init__(self, configspace)
+        super().__init__(
+            configspace, reward_attribute=kwargs.get('reward_attribute'))
         self.hp_ordering = configspace.get_hyperparameter_names() # fix order of hyperparams in configspace.
         skopt_hpspace = []
         for hp in self.hp_ordering:
@@ -86,8 +100,25 @@ class SKoptSearcher(BaseSearcher):
             else:
                 raise ValueError("unknown hyperparameter type: %s" % hp)
             skopt_hpspace.append(hp_dimension)
-        self.bayes_optimizer = Optimizer(dimensions=skopt_hpspace, **kwargs)
-    
+        skopt_keys = {
+            'base_estimator', 'n_random_starts', 'n_initial_points',
+            'acq_func', 'acq_optimizer', 'random_state',  'model_queue_size',
+            'acq_func_kwargs', 'acq_optimizer_kwargs'}
+        skopt_kwargs = self._filter_skopt_kwargs(kwargs, skopt_keys)
+        self.bayes_optimizer = Optimizer(
+            dimensions=skopt_hpspace, **skopt_kwargs)
+
+    @staticmethod
+    def _filter_skopt_kwargs(kwargs, keys):
+        return {k: v for k, v in kwargs.items() if k in keys}
+
+    def configure_scheduler(self, scheduler):
+        from ..scheduler.fifo import FIFOScheduler
+
+        assert isinstance(scheduler, FIFOScheduler), \
+            "This searcher requires FIFOScheduler scheduler"
+        super().configure_scheduler(scheduler)
+
     def get_config(self, **kwargs):
         """Function to sample a new configuration
         This function is called to query a new configuration that has not yet been tried.
@@ -155,10 +186,11 @@ class SKoptSearcher(BaseSearcher):
         self._results[pickle.dumps(new_config)] = self._reward_while_pending()
         return new_config
 
-    def update(self, config, reward, **kwargs):
+    def update(self, config, **kwargs):
         """Update the searcher with the newest metric report.
         """
-        super().update(config, reward, **kwargs)
+        super().update(config, **kwargs)
+        reward = kwargs[self._reward_attribute]
         try:
             self.bayes_optimizer.tell(self.config2skopt(config),
                                       -reward)  # provide negative reward since skopt performs minimization

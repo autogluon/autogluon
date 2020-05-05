@@ -40,7 +40,7 @@ class Task(object):
 
     @classmethod
     def set_id(cls, taskid):
-        logger.info('Seting TASK ID: {}'.format(taskid))
+        logger.info('Setting TASK ID: {}'.format(taskid))
         cls.TASK_ID.value = taskid
 
     def __repr__(self):

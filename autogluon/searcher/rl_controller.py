@@ -32,8 +32,10 @@ class RLSearcher(BaseSearcher):
     >>> searcher = RLSearcher(train_fn.kwspaces)
     >>> searcher.get_config()
     """
-    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm', **kwargs):
-        self._results = OrderedDict()
+    def __init__(self, kwspaces, ctx=mx.cpu(), controller_type='lstm',
+                 **kwargs):
+        super().__init__(
+            configspace=None, reward_attribute=kwargs.get('reward_attribute'))
         self._best_state_path = None
         if controller_type == 'lstm':
             self.controller = LSTMController(kwspaces, ctx=ctx, **kwargs)
@@ -75,7 +77,7 @@ class RLSearcher(BaseSearcher):
 
 
 class BaseController(mx.gluon.Block):
-    def __init__(self, prefetch=4, num_workers=4, timeout=20):
+    def __init__(self, prefetch=4, num_workers=4, timeout=20, **kwargs):
         super().__init__()
         #manager = multiprocessing.Manager()
         self._data_buffer = {}#manager.dict()

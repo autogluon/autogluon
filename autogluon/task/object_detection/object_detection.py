@@ -264,8 +264,8 @@ class ObjectDetection(BaseTask):
                 'searcher': 'random',
                 'max_t': epochs,
                 'grace_period': grace_period if grace_period else epochs // 4})
-        results = BaseTask.run_fit(train_object_detection, search_strategy,
-                                   scheduler_options)
+        results = BaseTask.run_fit(
+            train_object_detection, search_strategy, scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
         logger.info('The best config: {}'.format(results['best_config']))
