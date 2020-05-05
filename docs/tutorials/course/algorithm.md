@@ -56,21 +56,24 @@ scheduler.get_training_curves(plot=True, use_legend=False)
 
 ### Hyperband Scheduler
 
-The Hyperband Scheduler terminates training trials that don't appear promising during the early stages to free up compute resources for more promising hyperparameter configurations.
+AutoGluon implements different variants of Hyperband scheduling, as selected by `type`. In the `stopping` variant (the default), the scheduler terminates training trials that don't appear promising during the early stages to free up compute resources for more promising hyperparameter configurations.
 
 ```{.python .input}
 scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                             resource={'num_cpus': 2, 'num_gpus': 0},
-                                            num_trials=20,
+                                            num_trials=100,
                                             reward_attr='accuracy',
                                             time_attr='epoch',
-                                            grace_period=1)
+                                            max_t=10,
+                                            grace_period=1,
+                                            reduction_factor=3,
+                                            type='stopping')
 scheduler.run()
 scheduler.join_jobs()
 
 ```
 
-Visualize the results:
+In this example, trials are stopped early after 1, 3, or 9 epochs. Only a small fraction of most promising jobs run for the full number of 10 epochs. Since the majority of trials are stopped early, we can afford a larger `num_trials`. Visualize the results:
 
 ```{.python .input}
 scheduler.get_training_curves(plot=True, use_legend=False)

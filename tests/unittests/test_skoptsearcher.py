@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def test_skoptsearcher():
     logger.debug('Start testing SKoptSearcher')
     random.seed(1)
+    reward_attribute = 'accuracy'
     # Create configuration space:
     cs = CS.ConfigurationSpace()
     a = CSH.UniformFloatHyperparameter('a', lower=1e-4, upper=1e-1, log=True) # log-scale float
@@ -32,32 +33,39 @@ def test_skoptsearcher():
     optimal_reward = toy_reward(optimal_config) # should ~= 7025.58
     # Compare skopt searchers VS random sampling searcher:
     num_configs_totry = 15
-    skopt_searcher = SKoptSearcher(cs) # skopt searcher with all default arguments
-    skopt_config_list = [None]*num_configs_totry 
+    skopt_searcher = SKoptSearcher(
+        cs, reward_attribute=reward_attribute)
+    skopt_config_list = [None]*num_configs_totry
     skopt_reward_list = [0.0]*num_configs_totry # stores rewards scaled between 0-1
     # Also try skopt searcher which uses various kwargs (random forest surrgoate model, expected improvement acquisition):
-    skrf_searcher = SKoptSearcher(cs, base_estimator='RF', acq_func='EI')
+    skrf_searcher = SKoptSearcher(
+        cs, reward_attribute=reward_attribute, base_estimator='RF',
+        acq_func='EI')
     skrf_config_list = [None]*num_configs_totry 
     skrf_reward_list = [0.0]*num_configs_totry # stores rewards scaled between 0-1
     # Benchmark against random searcher:
-    rs_searcher = RandomSearcher(cs)
+    rs_searcher = RandomSearcher(cs, reward_attribute=reward_attribute)
     random_config_list = [None]*num_configs_totry
     random_reward_list = [0.0]*num_configs_totry
     # Run search:
+    reported_result = {reward_attribute: 0.0}
     for i in range(num_configs_totry):
         skopt_config = skopt_searcher.get_config()
         skopt_reward = toy_reward(skopt_config) / optimal_reward
-        skopt_searcher.update(skopt_config, skopt_reward)
+        reported_result[reward_attribute] = skopt_reward
+        skopt_searcher.update(skopt_config, **reported_result)
         skopt_config_list[i] = skopt_config
         skopt_reward_list[i] = skopt_reward
         skrf_config = skrf_searcher.get_config()
         skrf_reward = toy_reward(skrf_config) / optimal_reward
-        skrf_searcher.update(skrf_config, skrf_reward)
+        reported_result[reward_attribute] = skrf_reward
+        skrf_searcher.update(skrf_config, **reported_result)
         skrf_config_list[i] = skrf_config
         skrf_reward_list[i] = skrf_reward
         rs_config = rs_searcher.get_config()
         rs_reward = toy_reward(rs_config) / optimal_reward
-        rs_searcher.update(rs_config, rs_reward)
+        reported_result[reward_attribute] = rs_reward
+        rs_searcher.update(rs_config, **reported_result)
         random_config_list[i] = rs_config
         random_reward_list[i] = rs_reward
         # print("Round %d: skopt best reward=%f" % (i,max(skopt_reward_list)))

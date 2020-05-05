@@ -80,9 +80,9 @@ class TaskScheduler(object):
         if not task.resources.is_ready:
             cls.RESOURCE_MANAGER._request(task.resources)
         job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
+        new_dict = self._dict_from_task(task)
+        new_dict['Job'] = job
         with self.LOCK:
-            new_dict = self._dict_from_task(task)
-            new_dict['Job'] = job
             self.scheduled_tasks.append(new_dict)
 
     def run_job(self, task):

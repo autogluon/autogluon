@@ -424,7 +424,7 @@ class TabularPrediction(BaseTask):
             'search_options': search_options,
         }
         if isinstance(search_strategy, str):
-            scheduler = schedulers[search_strategy.lower()]
+            scheduler_cls = schedulers[search_strategy.lower()]
             # This is a fix for now. But we need to separate between scheduler
             # (mainly FIFO and Hyperband) and searcher. Currently, most searchers
             # only work with FIFO, and Hyperband works only with random searcher,
@@ -435,9 +435,9 @@ class TabularPrediction(BaseTask):
         else:
             # TODO: Check that search_strategy is a subclass of TaskScheduler
             assert callable(search_strategy)
-            scheduler = search_strategy
+            scheduler_cls = search_strategy
             scheduler_options['searcher'] = 'random'
-        scheduler_options = (scheduler, scheduler_options)  # wrap into tuple
+        scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, random_seed=random_seed)

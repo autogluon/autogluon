@@ -35,12 +35,22 @@ autogluon.searcher
    ...                                        time_attr='epoch')
    >>> scheduler.run()
 
+   When working with `FIFOScheduler` or `HyperbandScheduler`, it is recommended to specify the searcher by the `searcher` argument (string identifier) and `search_options`, instead of creating the searcher object by hand:
+
+   >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
+   ...                                        searcher = 'skopt',
+   ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
+   ...                                        num_trials=10,
+   ...                                        reward_attr='accuracy',
+   ...                                        time_attr='epoch')
+
    Visualize the results:
 
    >>> scheduler.get_training_curves(plot=True)
 
    .. image:: https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon.searcher.1.png
       :width: 400
+
 
 Searchers
 ~~~~~~~~~

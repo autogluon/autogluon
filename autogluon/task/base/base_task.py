@@ -36,14 +36,14 @@ class BaseTask(object):
         start_time = time.time()
         # create scheduler and schedule tasks
         if isinstance(search_strategy, str):
-            scheduler = schedulers[search_strategy.lower()]
+            scheduler_cls = schedulers[search_strategy.lower()]
         else:
             assert callable(search_strategy)
-            scheduler = search_strategy
+            scheduler_cls = search_strategy
             scheduler_options['searcher'] = 'random'
         plot_results = scheduler_options.pop('plot_results') \
             if 'plot_results' in scheduler_options else False
-        scheduler = scheduler(train_fn, **scheduler_options)
+        scheduler = scheduler_cls(train_fn, **scheduler_options)
         print('scheduler:', scheduler)
         scheduler.run()
         scheduler.join_jobs()

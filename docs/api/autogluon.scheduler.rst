@@ -23,10 +23,12 @@ autogluon.scheduler
 
    >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
    ...                                             resource={'num_cpus': 2, 'num_gpus': 0},
-   ...                                             num_trials=10,
+   ...                                             num_trials=100,
    ...                                             reward_attr='accuracy',
    ...                                             time_attr='epoch',
-   ...                                             grace_period=1)
+   ...                                             max_t=10,
+   ...                                             grace_period=1,
+   ...                                             reduction_factor=3)
    >>> scheduler.run()
    >>> scheduler.join_jobs()
 
