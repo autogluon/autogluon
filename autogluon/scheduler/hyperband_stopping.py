@@ -1,6 +1,5 @@
 import logging
 import numpy as np
-import multiprocessing as mp
 import copy
 
 logger = logging.getLogger(__name__)
@@ -50,8 +49,6 @@ class HyperbandStopping_Manager(object):
             See HyperbandScheduler.
 
     """
-    LOCK = mp.Lock()
-
     def __init__(
             self, time_attr, reward_attr, max_t, grace_period,
             reduction_factor, brackets):
@@ -85,10 +82,9 @@ class HyperbandStopping_Manager(object):
         """
         assert 'bracket' in kwargs
         bracket_id = kwargs['bracket']
-        with HyperbandStopping_Manager.LOCK:
-            bracket = self._brackets[bracket_id]
-            self._task_info[str(task.task_id)] = bracket_id
-            levels = [x[0] for x in bracket._rungs]
+        bracket = self._brackets[bracket_id]
+        self._task_info[str(task.task_id)] = bracket_id
+        levels = [x[0] for x in bracket._rungs]
         if levels[0] < self._max_t:
             levels.insert(0, self._max_t)
         return levels
@@ -114,20 +110,19 @@ class HyperbandStopping_Manager(object):
         :param result: Current reported results from task
         :return: See above
         """
-        with HyperbandStopping_Manager.LOCK:
-            action = False
-            update_searcher = True
-            next_milestone = None
-            bracket, bracket_id = self._get_bracket(task.task_id)
-            if result[self._time_attr] < self._max_t:
-                action, update_searcher, next_milestone = bracket.on_result(
-                    task, result[self._time_attr], result[self._reward_attr])
-                # Special case: If config just reached the last milestone in
-                # the bracket and survived, next_milestone is equal to max_t
-                if action and update_searcher and (next_milestone is None):
-                    next_milestone = self._max_t
-            if action == False:
-                self._num_stopped += 1
+        action = False
+        update_searcher = True
+        next_milestone = None
+        bracket, bracket_id = self._get_bracket(task.task_id)
+        if result[self._time_attr] < self._max_t:
+            action, update_searcher, next_milestone = bracket.on_result(
+                task, result[self._time_attr], result[self._reward_attr])
+            # Special case: If config just reached the last milestone in
+            # the bracket and survived, next_milestone is equal to max_t
+            if action and update_searcher and (next_milestone is None):
+                next_milestone = self._max_t
+        if action == False:
+            self._num_stopped += 1
         return {
             'task_continues': action,
             'update_searcher': update_searcher,
@@ -135,15 +130,13 @@ class HyperbandStopping_Manager(object):
             'bracket_id': bracket_id}
 
     def on_task_complete(self, task, result):
-        with HyperbandStopping_Manager.LOCK:
-            bracket, _ = self._get_bracket(task.task_id)
-            bracket.on_result(
-                task, result[self._time_attr], result[self._reward_attr])
+        bracket, _ = self._get_bracket(task.task_id)
+        bracket.on_result(
+            task, result[self._time_attr], result[self._reward_attr])
         self.on_task_remove(task)
 
     def on_task_remove(self, task):
-        with HyperbandStopping_Manager.LOCK:
-            del self._task_info[str(task.task_id)]
+        del self._task_info[str(task.task_id)]
 
     def _sample_bracket(self):
         return _sample_bracket(
@@ -152,18 +145,16 @@ class HyperbandStopping_Manager(object):
             rf=self._reduction_factor)
 
     def on_task_schedule(self):
-        with HyperbandStopping_Manager.LOCK:
-            # Sample bracket for task to be scheduled
-            bracket_id = self._sample_bracket()
-            # 'milestone' is first milestone the new config will get to
-            extra_kwargs = {
-                'bracket': bracket_id,
-                'milestone': self._brackets[bracket_id].get_first_milestone()}
+        # Sample bracket for task to be scheduled
+        bracket_id = self._sample_bracket()
+        # 'milestone' is first milestone the new config will get to
+        extra_kwargs = {
+            'bracket': bracket_id,
+            'milestone': self._brackets[bracket_id].get_first_milestone()}
         return None, extra_kwargs
 
     def snapshot_rungs(self, bracket_id):
-        with HyperbandStopping_Manager.LOCK:
-            return self._brackets[bracket_id].snapshot_rungs()
+        return self._brackets[bracket_id].snapshot_rungs()
 
     def resource_to_index(self, resource):
         return map_resource_to_index(

@@ -169,7 +169,7 @@ class FIFOScheduler(TaskScheduler):
                 verbose=False
             )
 
-        self.log_lock = mp.Lock()
+        self._fifo_lock = mp.Lock()
         # training_history maintains the complete history of the experiment,
         # in terms of all results obtained from the reporter. Keys are
         # str(task.task_id)
@@ -228,7 +228,6 @@ class FIFOScheduler(TaskScheduler):
         if checkpoint is None:
             checkpoint = self._checkpoint
         if checkpoint is not None:
-            #with self.LOCK:
             mkdir(os.path.dirname(checkpoint))
             save(self.state_dict(), checkpoint)
 
@@ -314,9 +313,8 @@ class FIFOScheduler(TaskScheduler):
         # reporter thread
         rp = threading.Thread(
             target=self._run_reporter,
-            args=(task, job, reporter, self.searcher),
-            daemon=False
-        )
+            args=(task, job, reporter),
+            daemon=False)
         rp.start()
         task_dict = self._dict_from_task(task)
         task_dict.update({'Task': task, 'Job': job, 'ReporterThread': rp})
@@ -336,7 +334,7 @@ class FIFOScheduler(TaskScheduler):
             self._cleaning_tasks()
             self.save()
             # training_history callback
-            with self.log_lock:
+            with self._fifo_lock:
                 if self._trigger_training_history_callback():
                     logger.debug("Execute training_history callback")
                     self.training_history_callback(
@@ -359,7 +357,7 @@ class FIFOScheduler(TaskScheduler):
             self._training_history_callback_last_len = current_len
         return ret_val
 
-    def _run_reporter(self, task, task_job, reporter, searcher):
+    def _run_reporter(self, task, task_job, reporter):
         last_result = None
         while not task_job.done():
             reported_result = reporter.fetch()
@@ -369,7 +367,7 @@ class FIFOScheduler(TaskScheduler):
             if 'traceback' in reported_result:
                 # Evaluation has failed
                 logger.exception(reported_result['traceback'])
-                searcher.evaluation_failed(
+                self.searcher.evaluation_failed(
                     config=task.args['config'], **reported_result)
                 reporter.move_on()
                 break
@@ -377,12 +375,12 @@ class FIFOScheduler(TaskScheduler):
                 reporter.move_on()
                 break
             # Extra information from searcher (optional)
-            dataset_size = searcher.dataset_size()
+            dataset_size = self.searcher.dataset_size()
             if dataset_size > 0:
                 reported_result['searcher_data_size'] = dataset_size
-            for k, v in searcher.cumulative_profile_record().items():
+            for k, v in self.searcher.cumulative_profile_record().items():
                 reported_result['searcher_profile_' + k] = v
-            for k, v in searcher.model_parameters().items():
+            for k, v in self.searcher.model_parameters().items():
                 reported_result['searcher_params_' + k] = v
             self._add_training_result(
                 task.task_id, reported_result, config=task.args['config'])
@@ -390,7 +388,7 @@ class FIFOScheduler(TaskScheduler):
             last_result = reported_result
         # Pass all of last_result to searcher
         if last_result is not None:
-            searcher.update(config=task.args['config'], **last_result)
+            self.searcher.update(config=task.args['config'], **last_result)
 
     def _promote_config(self):
         """
@@ -440,7 +438,7 @@ class FIFOScheduler(TaskScheduler):
                 ),
                 global_step=reported_result[self._reward_attr]
             )
-        with self.log_lock:
+        with self._fifo_lock:
             # Note: We store all of reported_result in training_history[task_id],
             # not just the reward value.
             task_key = str(task_id)
@@ -475,7 +473,7 @@ class FIFOScheduler(TaskScheduler):
         plt.ylabel(self._reward_attr)
         plt.xlabel(self._time_attr)
         plt.title("Performance vs Training-Time in each HPO Trial")
-        with self.log_lock:
+        with self._fifo_lock:
             for task_id, task_res in self.training_history.items():
                 rewards = [x[self._reward_attr] for x in task_res]
                 x = list(range(len(task_res)))
@@ -509,7 +507,7 @@ class FIFOScheduler(TaskScheduler):
         >>> ag.save(scheduler.state_dict(), 'checkpoint.ag')
         """
         destination = super().state_dict(destination)
-        with self.log_lock:
+        with self._fifo_lock:
             # The result of searcher.get_state can always be pickled
             destination['searcher'] = pickle.dumps(self.searcher.get_state())
             destination['training_history'] = json.dumps(self.training_history)
@@ -532,7 +530,7 @@ class FIFOScheduler(TaskScheduler):
         >>> scheduler.load_state_dict(ag.load('checkpoint.ag'))
         """
         super().load_state_dict(state_dict)
-        with self.log_lock:
+        with self._fifo_lock:
             self.searcher = self.searcher.clone_from_state(
                 pickle.loads(state_dict['searcher']))
             self.training_history = json.loads(state_dict['training_history'])
