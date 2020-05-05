@@ -137,7 +137,7 @@ class HyperbandPromotion_Manager(object):
     def on_task_schedule(self):
         # Sample bracket for task to be scheduled
         bracket_id = self._sample_bracket()
-        extra_kwargs = {'brackets': bracket_id}
+        extra_kwargs = {'bracket': bracket_id}
         bracket = self._brackets[bracket_id]
         # Check whether config can be promoted in that bracket
         config, config_key, milestone, next_milestone = \
