@@ -1306,7 +1306,7 @@ class AbstractTrainer:
                 for model in models_to_remove:
                     model = self.load_model(model)
                     logger.log(30, f'\tDirectory {model.path} would have been deleted.')
-            logger.log(30, f'To perform the deletion, set dry_run=True')
+            logger.log(30, f'To perform the deletion, set dry_run=False')
             return
 
         self.model_graph.remove_nodes_from(models_to_remove)
