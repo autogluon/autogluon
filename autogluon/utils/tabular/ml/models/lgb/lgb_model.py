@@ -150,15 +150,11 @@ class LGBModel(AbstractModel):
         X = super().preprocess(X=X)
 
         if is_train:
-            requires_internal_map = False
             for column in X.columns:
                 new_column = re.sub(r'[",:{}[\]]', '', column)
                 if new_column != column:
-                    requires_internal_map = True
-                if requires_internal_map:
+                    self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
                     break
-            if requires_internal_map:
-                self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
 
         if self._internal_feature_map:
             new_columns = [self._internal_feature_map[column] for column in list(X.columns)]
@@ -299,8 +295,11 @@ class LGBModel(AbstractModel):
             raise ValueError(f"unknown problem_type for LGBModel: {self.problem_type}")
         return train_loss_name
 
-    def get_model_feature_importance(self):
+    def get_model_feature_importance(self, use_original_feature_names=False):
         feature_names = self.model.feature_name()
         importances = self.model.feature_importance()
         importance_dict = {feature_name: importance for (feature_name, importance) in zip(feature_names, importances)}
+        if use_original_feature_names and (self._internal_feature_map is not None):
+            inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
+            importance_dict = {inverse_internal_feature_map[i]: importance for i, importance in importance_dict.items()}
         return importance_dict
