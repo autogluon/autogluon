@@ -250,9 +250,9 @@ class AbstractModel:
             X = self.preprocess(X)
 
         if not features_to_use:
-            features = X.columns.values
+            features = list(X.columns.values)
         else:
-            features = features_to_use
+            features = list(features_to_use)
 
         feature_importance_quick_dict = self.get_model_feature_importance()
         # TODO: Also consider banning features with close to 0 importance
