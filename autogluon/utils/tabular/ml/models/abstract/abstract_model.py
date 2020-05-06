@@ -514,6 +514,7 @@ class AbstractModel:
         from pathlib import Path
         import shutil
         model_path = Path(self.path)
+        # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
     def get_info(self):

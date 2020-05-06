@@ -688,10 +688,12 @@ class TabularPredictor(BasePredictor):
         y = load_y() if return_y else None
         return X, y
 
-    def reduce_memory_size(self, remove_data=True, remove_fit_stack=True, requires_save=True, reduce_children=False):
+    def save_space(self, remove_data=True, remove_fit_stack=True, requires_save=True, reduce_children=False):
         """
-        Reduces the memory and disk size of `predictor`.
-        Note that most methods of reducing `predictor` size involve removing advanced functionality.
+        Reduces the memory and disk size of predictor by deleting auxiliary model files that aren't needed for prediction on new data.
+        This function has NO impact on inference accuracy.
+        It is recommended to invoke this method if the only goal is to use the trained model for prediction.
+        However, certain advanced functionality may no longer be available after `save_space()` has been called.
 
         Parameters
         ----------
@@ -713,8 +715,8 @@ class TabularPredictor(BasePredictor):
             Typically this only includes flag variables that don't have significant impact on memory or disk usage, but should technically be updated due to the removal of more important information.
                 An example is the `is_data_saved` boolean variable in `trainer`, which should be updated to `False` if `remove_data=True` was set.
         reduce_children : bool, default = False
-            Whether to apply the reduction rules to bagged ensemble children models.
-            This should generally be kept as `False` since the most important memory reduction techniques are automatically applied to these models during the original `fit()` call.
+            Whether to apply the reduction rules to bagged ensemble children models. These are the models trained for each fold of the bagged ensemble.
+            This should generally be kept as `False` since the most important memory and disk reduction techniques are automatically applied to these models during the original `fit()` call.
 
         """
         self._trainer.reduce_memory_size(remove_data=remove_data, remove_fit_stack=remove_fit_stack, remove_fit=True, remove_info=False, requires_save=requires_save, reduce_children=reduce_children)
@@ -725,6 +727,8 @@ class TabularPredictor(BasePredictor):
         This can be helpful to minimize memory usage and disk usage, particularly for model deployment.
         This will remove all references to the models in `predictor`.
             For example, removed models will not appear in `predictor.leaderboard()`.
+        WARNING: If `delete_from_disk=True`, this will DELETE ALL FILES in the deleted model directories, regardless if they were created by AutoGluon or not.
+            DO NOT STORE FILES INSIDE OF THE MODEL DIRECTORY THAT ARE UNRELATED TO AUTOGLUON.
 
         Parameters
         ----------
@@ -733,12 +737,14 @@ class TabularPredictor(BasePredictor):
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
+            To see the list of possible model names, use: `predictor.model_names` or `predictor.leaderboard()`.
         models_to_delete : str or list, default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
             `models_to_keep` must be None if `models_to_delete` is set.
         allow_delete_cascade : bool, default = False
             If `False`, if unspecified dependent models of models in `models_to_delete` exist an exception will be raised instead of deletion occurring.
+                An example of a dependent model is m1 if m2 is a stacker model and takes predictions from m1 as inputs. In this case, m1 would be a dependent model of m2.
             If `True`, all dependent models of models in `models_to_delete` will be deleted.
             Has no effect if `models_to_delete=None`.
         delete_from_disk : bool, default = True
