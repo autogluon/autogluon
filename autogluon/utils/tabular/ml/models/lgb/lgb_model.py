@@ -2,6 +2,7 @@ import gc
 import logging
 import os
 import random
+import re
 import time
 import warnings
 
@@ -34,6 +35,7 @@ class LGBModel(AbstractModel):
 
         self.eval_metric_name = self.stopping_metric.name
         self.is_higher_better = True
+        self._internal_feature_map = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -144,6 +146,28 @@ class LGBModel(AbstractModel):
             else:  # Should this ever happen?
                 return y_pred_proba[:, 1]
 
+    def preprocess(self, X, is_train=False):
+        X = super().preprocess(X=X)
+
+        if is_train:
+            requires_internal_map = False
+            for column in X.columns:
+                new_column = re.sub(r'[",:{}[\]]', '', column)
+                if new_column != column:
+                    requires_internal_map = True
+                if requires_internal_map:
+                    break
+            if requires_internal_map:
+                self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
+
+        if self._internal_feature_map:
+            new_columns = [self._internal_feature_map[column] for column in list(X.columns)]
+            X_new = X.copy(deep=False)
+            X_new.columns = new_columns
+            return X_new
+        else:
+            return X
+
     def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
@@ -151,7 +175,7 @@ class LGBModel(AbstractModel):
         W_train = None  # TODO: Add weight support
         W_test = None  # TODO: Add weight support
         if X_train is not None:
-            X_train = self.preprocess(X_train)
+            X_train = self.preprocess(X_train, is_train=True)
         if X_test is not None:
             X_test = self.preprocess(X_test)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
@@ -255,6 +279,14 @@ class LGBModel(AbstractModel):
         scheduler.join_jobs()
 
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
+
+    # TODO: Consider adding _internal_feature_map functionality to abstract_model
+    def compute_feature_importance(self, **kwargs):
+        permutation_importance = super().compute_feature_importance(**kwargs)
+        if self._internal_feature_map is not None:
+            inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
+            permutation_importance = {inverse_internal_feature_map[i]: importance for i, importance in permutation_importance.items()}
+        return permutation_importance
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:
