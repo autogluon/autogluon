@@ -179,10 +179,7 @@ class AbstractTrainer:
         save_pkl.save(path=path, object=y, verbose=verbose)
 
     def get_model_names_all(self):
-        model_names = []
-        for stack_name in self.models_level.keys():
-            model_names += self.get_model_names(stack_name)
-        return model_names
+        return list(self.model_graph.nodes)
 
     def get_model_names(self, stack_name):
         model_names = []
@@ -737,17 +734,21 @@ class AbstractTrainer:
         for model_name in model_pred_order:
             if record_pred_time:
                 time_start = time.time()
-            model = self.load_model(model_name=model_name)
+
             if fit:
-                if isinstance(model, BaggedEnsembleModel):
-                    model_pred_proba_dict[model_name] = model.oof_pred_proba
+                model_type = self.model_types[model_name]
+                if issubclass(model_type, BaggedEnsembleModel):
+                    model_path = self.model_paths[model_name]
+                    model_pred_proba_dict[model_name] = model_type.load_oof(path=model_path)
                 else:
                     raise AssertionError(f'Model {model.name} must be a BaggedEnsembleModel to return oof_pred_proba')
-            elif isinstance(model, StackerEnsembleModel):
-                X_input = model.preprocess(X=X, preprocess=True, infer=False, model_pred_proba_dict=model_pred_proba_dict)
-                model_pred_proba_dict[model_name] = model.predict_proba(X_input, preprocess=False)
             else:
-                model_pred_proba_dict[model_name] = model.predict_proba(X)
+                model = self.load_model(model_name=model_name)
+                if isinstance(model, StackerEnsembleModel):
+                    X_input = model.preprocess(X=X, preprocess=True, infer=False, model_pred_proba_dict=model_pred_proba_dict)
+                    model_pred_proba_dict[model_name] = model.predict_proba(X_input, preprocess=False)
+                else:
+                    model_pred_proba_dict[model_name] = model.predict_proba(X)
 
             if record_pred_time:
                 time_end = time.time()
@@ -956,7 +957,10 @@ class AbstractTrainer:
             raise AssertionError('No fit models exist with a validation score to choose the best model.')
         return max(perfs, key=lambda i: i[1])[0]
 
-    def save_model(self, model):
+    def save_model(self, model, reduce_memory=True):
+        # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
+        if reduce_memory:
+            model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if self.low_memory:
             model.save()
         else:
@@ -1241,6 +1245,93 @@ class AbstractTrainer:
             else:
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict
+
+    def reduce_memory_size(self, remove_data=True, remove_fit_stack=False, remove_fit=True, remove_info=False, requires_save=True, reduce_children=False, **kwargs):
+        if remove_data and self.is_data_saved:
+            data_files = [
+                self.path_data + 'X_train.pkl',
+                self.path_data + 'X_val.pkl',
+                self.path_data + 'y_train.pkl',
+                self.path_data + 'y_val.pkl',
+            ]
+            for data_file in data_files:
+                try:
+                    os.remove(data_file)
+                except FileNotFoundError:
+                    pass
+            if requires_save:
+                self.is_data_saved = False
+
+        models = self.get_model_names_all()
+        for model in models:
+            model = self.load_model(model)
+            model.reduce_memory_size(remove_fit_stack=remove_fit_stack, remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, reduce_children=reduce_children, **kwargs)
+            if requires_save:
+                self.save_model(model, reduce_memory=False)
+        if requires_save:
+            self.save()
+
+    # TODO: Also enable deletion of models which didn't succeed in training (files may still be persisted)
+    #  This includes the original HPO fold for stacking
+    # Deletes specified models from trainer and from disk (if delete_from_disk=True).
+    def delete_models(self, models_to_keep=None, models_to_delete=None, allow_delete_cascade=False, delete_from_disk=True, dry_run=True):
+        if models_to_keep is not None and models_to_delete is not None:
+            raise ValueError('Exactly one of [models_to_keep, models_to_delete] must be set.')
+        if models_to_keep is not None:
+            if not isinstance(models_to_keep, list):
+                models_to_keep = [models_to_keep]
+            minimum_model_set = set()
+            for model in models_to_keep:
+                minimum_model_set.update(self.get_minimum_model_set(model))
+            minimum_model_set = list(minimum_model_set)
+            models_to_remove = [model for model in self.get_model_names_all() if model not in minimum_model_set]
+        elif models_to_delete is not None:
+            if not isinstance(models_to_delete, list):
+                models_to_delete = [models_to_delete]
+            minimum_model_set = set(models_to_delete)
+            minimum_model_set_orig = copy.deepcopy(minimum_model_set)
+            for model in models_to_delete:
+                minimum_model_set.update(nx.algorithms.dag.descendants(self.model_graph, model))
+            if not allow_delete_cascade:
+                if minimum_model_set != minimum_model_set_orig:
+                    raise AssertionError('models_to_delete contains models which cause a delete cascade due to other models being dependent on them. Set allow_delete_cascade=True to enable the deletion.')
+            minimum_model_set = list(minimum_model_set)
+            models_to_remove = [model for model in self.get_model_names_all() if model in minimum_model_set]
+        else:
+            raise ValueError('Exactly one of [models_to_keep, models_to_delete] must be set.')
+
+        if dry_run:
+            logger.log(30, f'Dry run enabled, AutoGluon would have deleted the following models: {models_to_remove}')
+            if delete_from_disk:
+                for model in models_to_remove:
+                    model = self.load_model(model)
+                    logger.log(30, f'\tDirectory {model.path} would have been deleted.')
+            logger.log(30, f'To perform the deletion, set dry_run=False')
+            return
+
+        self.model_graph.remove_nodes_from(models_to_remove)
+        for model in models_to_remove:
+            if model in self.models:
+                self.models.pop(model)
+
+        models_kept = self.get_model_names_all()
+        # TODO: Refactor this part, link models_level to model_graph
+        for key in self.models_level:
+            for level in self.models_level[key]:
+                self.models_level[key][level] = [model for model in self.models_level[key][level] if model in models_kept]
+
+        if self.model_best is not None and self.model_best not in models_kept:
+            try:
+                self.model_best = self.get_model_best()
+            except AssertionError:
+                self.model_best = None
+
+        # TODO: Delete from all the other model dicts
+        self.save()
+        if delete_from_disk:
+            for model in models_to_remove:
+                model = self.load_model(model)
+                model.delete_from_disk()
 
     @classmethod
     def load(cls, path, reset_paths=False):

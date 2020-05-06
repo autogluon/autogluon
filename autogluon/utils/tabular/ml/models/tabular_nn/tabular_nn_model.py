@@ -364,6 +364,10 @@ class TabularNeuralNetModel(AbstractModel):
 
         if test_dataset is not None:
             self.model.load_parameters(net_filename)  # Revert back to best model
+            try:
+                os.remove(net_filename)
+            except FileNotFoundError:
+                pass
         if test_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
         else: # evaluate one final time:
@@ -818,6 +822,11 @@ class TabularNeuralNetModel(AbstractModel):
         info = super().get_info()
         info['hyperparameters_post_fit'] = self.params_post_fit
         return info
+
+    def reduce_memory_size(self, remove_fit=True, requires_save=True, **kwargs):
+        super().reduce_memory_size(remove_fit=remove_fit, requires_save=requires_save, **kwargs)
+        if remove_fit and requires_save:
+            self.optimizer = None
 
 
 """ General TODOs:
