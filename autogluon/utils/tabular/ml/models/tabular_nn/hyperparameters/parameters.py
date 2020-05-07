@@ -6,7 +6,7 @@ from ....constants import BINARY, MULTICLASS, REGRESSION
 def get_fixed_params():
     """ Parameters that currently cannot be searched during HPO """
     fixed_params = {
-        'num_epochs': 300,  # maximum number of epochs for training NN
+        'num_epochs': 500,  # maximum number of epochs for training NN
         'epochs_wo_improve': 20,  # we terminate training if validation performance hasn't improved in the last 'epochs_wo_improve' # of epochs
         # TODO: Epochs could take a very long time, we may want smarter logic than simply # of epochs without improvement (slope, difference in score, etc.)
         'seed_value': None,  # random seed for reproducibility (set = None to ignore)

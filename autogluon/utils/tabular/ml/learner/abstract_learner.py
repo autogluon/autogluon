@@ -79,7 +79,7 @@ class AbstractLearner:
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, hyperparameters={}, verbosity=2):
+            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
@@ -251,8 +251,9 @@ class AbstractLearner:
 
         scores = {}
         all_trained_models = trainer.get_model_names_all()
+        all_trained_models_can_infer = trainer.get_model_names_all(can_infer=True)
         all_trained_models_original = all_trained_models.copy()
-        model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models, fit=False, record_pred_time=True)
+        model_pred_proba_dict, pred_time_test_marginal = trainer.get_model_pred_proba_dict(X=X, models=all_trained_models_can_infer, fit=False, record_pred_time=True)
 
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
@@ -267,8 +268,7 @@ class AbstractLearner:
             pred_time_test_marginal['oracle_ensemble'] = oracle_pred_time
             all_trained_models.append('oracle_ensemble')
 
-        for i, model_name in enumerate(all_trained_models):
-            pred_proba = model_pred_proba_dict[model_name]
+        for model_name, pred_proba in model_pred_proba_dict.items():
             if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                 pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
             if trainer.objective_func_expects_y_pred:
@@ -279,7 +279,7 @@ class AbstractLearner:
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
-        for model in all_trained_models:
+        for model in model_pred_proba_dict.keys():
             if model in all_trained_models_original:
                 base_model_set = trainer.get_minimum_model_set(model)
                 if len(base_model_set) == 1:
@@ -292,14 +292,22 @@ class AbstractLearner:
             else:
                 pred_time_test[model] = None
 
+        scored_models = list(scores.keys())
+        for model in all_trained_models:
+            if model not in scored_models:
+                scores[model] = None
+                pred_time_test[model] = None
+                pred_time_test_marginal[model] = None
+
         logger.debug('Model scores:')
         logger.debug(str(scores))
+        model_names_final = list(scores.keys())
         df = pd.DataFrame(
             data={
-                'model': list(scores.keys()),
+                'model': model_names_final,
                 'score_test': list(scores.values()),
-                'pred_time_test': [pred_time_test[model] for model in scores.keys()],
-                'pred_time_test_marginal': [pred_time_test_marginal[model] for model in scores.keys()],
+                'pred_time_test': [pred_time_test[model] for model in model_names_final],
+                'pred_time_test_marginal': [pred_time_test_marginal[model] for model in model_names_final],
             }
         )
 
@@ -320,6 +328,7 @@ class AbstractLearner:
             'pred_time_val_marginal',
             'fit_time_marginal',
             'stack_level',
+            'can_infer',
         ]
         df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
         df_columns_new = explicit_order + df_columns_other
