@@ -327,6 +327,7 @@ class TabularPrediction(BaseTask):
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
                     This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
                 If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
+                    `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
             save_space : bool, default = False
                 If True, reduces the memory and disk size of predictor by deleting auxiliary model files that aren't needed for prediction on new data.
                     This is equivalent to calling `predictor.save_space()` directly after `fit()`.
@@ -527,9 +528,18 @@ class TabularPrediction(BaseTask):
 
         predictor = TabularPredictor(learner=learner)
 
-        if refit_full is not False:
-            if refit_full is True:
+        keep_only_best = kwargs.get('keep_only_best', False)
+        if refit_full is True:
+            if keep_only_best is True:
+                if set_best_to_refit_full is True:
+                    refit_full = 'best'
+                else:
+                    logger.warning(f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
+                    refit_full = False
+            else:
                 refit_full = 'all'
+
+        if refit_full is not False:
             predictor.refit_full(model=refit_full)
             if set_best_to_refit_full:
                 trainer = predictor._trainer
@@ -542,7 +552,6 @@ class TabularPrediction(BaseTask):
                 else:
                     logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. AutoGluon will default to using {trainer_model_best} for predictions.')
 
-        keep_only_best = kwargs.get('keep_only_best', False)
         if keep_only_best:
             predictor.delete_models(models_to_keep='best', dry_run=False)
 
