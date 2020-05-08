@@ -82,40 +82,41 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        presets : list or str or dict, default = 'medium_quality_fastest_train'
-            List of preset parameter configurations.
-            It is recommended to specify presets and avoid specifying most other parameters prior to becoming familiar with AutoGluon.
-            As an example, to get the best model quality, set `presets='best_quality'`.
+        presets : list or str or dict, default = 'medium_quality_faster_train'
+            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
+            It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
+            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
             To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
-            User specified parameters will override changes made by presets.
-            If specifying a list of presets, later presets will override earlier presets if they alter the same parameter.
-            Users can specify custom presets by passing in a dictionary of parameter values.
+            Any user-specified arguments in `fit()` will override the values used by presets.
+            If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
+            For precise definitions of the provided presets, see file: `autogluon/tasks/tabular_prediction/presets_configs.py`.
+            Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
 
-            Available Presets: ['best_quality', 'best_quality_with_high_quality_refit', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_fastest_train', 'optimize_for_deployment', 'ignore_text']
+            Available Presets: ['best_quality', 'best_quality_with_high_quality_refit', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
+            It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-
-                # Best quality with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
-                # Recommended for applications that benefit from the best possible model quality.
+                # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+                # Recommended for applications that benefit from the best possible model accuracy.
                 best_quality={'auto_stack': True},
 
-                # Identical to best_quality but additionally trains refit_full models that have slightly lower quality but are over 10x faster during inference and require 10x less disk space.
+                # Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
                 best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True},
 
-                # High quality with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+                # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
                 # Recommended for applications that require reasonable inference speed and/or model size.
                 high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False},
 
-                # Good quality with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
+                # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
                 # Recommended for applications that require fast inference speed.
                 good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'},
 
-                # Medium quality with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
-                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better quality and faster inference time.
-                medium_quality_fastest_train={'auto_stack': False},
+                # Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
+                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
+                medium_quality_faster_train={'auto_stack': False},
 
                 # Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
-                # Often can reduce disk usage by ~2-4x with no negatives to model quality or inference speed.
+                # Often can reduce disk usage by ~2-4x with no negatives to model accuracy or inference speed.
                 # This will disable numerous advanced functionality, but has no impact on inference.
                 # Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                 # This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
@@ -125,8 +126,6 @@ class TabularPrediction(BaseTask):
                 # Disables automated feature generation when text features are detected.
                 # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
                 ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}},
-
-            Presets are located in `autogluon/tasks/tabular_prediction/presets_configs.py
 
         output_directory : str, default = None
             Path to directory where models and intermediate outputs should be saved.
@@ -173,10 +172,10 @@ class TabularPrediction(BaseTask):
             If `refit_full=False`, refitting will not occur.
             Valid str values:
                 `all`: refits all models.
-                `best`: refits only the best model (and its ancestors).
-                `{model_name}`: refits only the specified model (and its ancestors).
+                `best`: refits only the best model (and its ancestors if it is a stacker model).
+                `{model_name}`: refits only the specified model (and its ancestors if it is a stacker model).
             For bagged models:
-                Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+                Reduces a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
                 This process will typically result in a slight accuracy reduction and a large inference speedup.
                 The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
                     The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
@@ -197,7 +196,7 @@ class TabularPrediction(BaseTask):
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
-                Valid `str` options: ['default', 'light', 'very_light']
+                Valid `str` options: ['default', 'light', 'very_light', 'toy']
                     'default': Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
                     'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
                     'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
@@ -317,14 +316,15 @@ class TabularPrediction(BaseTask):
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full` is set.
             save_bagged_folds : bool, default = True
-                If True, bagged models will save their fold models. This enables bagged models to be capable of inference after `fit()`.
+                If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
                     This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
-                    Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will take virtually no disk space during training.
-                    In a typical training run, this will reduce peak disk usage by >10x.
+                    Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
+                    In many training runs, this will reduce peak disk usage by >10x.
                 This parameter has no effect if bagging is disabled.
             keep_only_best : bool, default = False
                 If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
+                    If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
                     This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
                 If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
                     `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
@@ -550,7 +550,7 @@ class TabularPrediction(BaseTask):
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                     trainer.save()
                 else:
-                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. AutoGluon will default to using {trainer_model_best} for predictions.')
+                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
         if keep_only_best:
             predictor.delete_models(models_to_keep='best', dry_run=False)

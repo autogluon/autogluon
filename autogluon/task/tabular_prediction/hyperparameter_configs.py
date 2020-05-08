@@ -29,7 +29,7 @@ hyperparameter_config_dict = dict(
         'GBM': {},
         'CAT': {},
     },
-    # Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
+    # Results in extremely quick to train models. Only use this when prototyping, as the model accuracy will be severely reduced.
     toy={
         'NN': {'num_epochs': 10},
         'GBM': {'num_boost_round': 10},
