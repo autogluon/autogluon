@@ -59,11 +59,11 @@ class TabularPrediction(BaseTask):
 
     @staticmethod
     @unpack(set_presets)
-    def fit(train_data, label, tuning_data=None, presets=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
-            auto_stack=False, hyperparameter_tune=False, feature_prune=False, refit_full=False,
+    def fit(train_data, label, tuning_data=None, time_limits=None, output_directory=None, presets=None,
+            problem_type=None, eval_metric=None, stopping_metric=None,
+            auto_stack=False, hyperparameter_tune=False, feature_prune=False,
             holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters=None, cache_data=True,
-            time_limits=None, num_trials=None, search_strategy='random', search_options=None,
+            hyperparameters=None, num_trials=None, search_strategy='random', search_options=None,
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
             verbosity=2, **kwargs):
         """
@@ -82,6 +82,14 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
+        time_limits : int
+            Approximately how long `fit()` should run for (wallclock time in seconds).
+            If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
+        output_directory : str, default = None
+            Path to directory where models and intermediate outputs should be saved.
+            If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
+            Note: To call `fit()` twice and save all results of each fit, you must specify different `output_directory` locations.
+            Otherwise files from first `fit()` will be overwritten by second `fit()`.
         presets : list or str or dict, default = 'medium_quality_faster_train'
             List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
             It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
@@ -127,11 +135,6 @@ class TabularPrediction(BaseTask):
                 # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
                 ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}},
 
-        output_directory : str, default = None
-            Path to directory where models and intermediate outputs should be saved.
-            If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
-            Note: To call `fit()` twice and save all results of each fit, you must specify different `output_directory` locations.
-            Otherwise files from first `fit()` will be overwritten by second `fit()`.
         problem_type : str, default = None
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
@@ -165,34 +168,6 @@ class TabularPrediction(BaseTask):
             Use `auto_stack` to maximize predictive accuracy; use `hyperparameter_tune` if you prefer to deploy just a single model rather than an ensemble.
         feature_prune : bool, default = False
             Whether or not to perform feature selection.
-        refit_full : bool or str, default = False
-            Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
-            This is equivalent to calling `predictor.refit_full(model=refit_full)` after training.
-            If `refit_full=True`, it will be treated as `refit_full='all'`.
-            If `refit_full=False`, refitting will not occur.
-            Valid str values:
-                `all`: refits all models.
-                `best`: refits only the best model (and its ancestors if it is a stacker model).
-                `{model_name}`: refits only the specified model (and its ancestors if it is a stacker model).
-            For bagged models:
-                Reduces a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
-                This process will typically result in a slight accuracy reduction and a large inference speedup.
-                The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
-                    The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
-                The runtime is generally 10% or less of the original fit runtime.
-                    The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
-            For non-bagged models:
-                Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
-                Will typically result in a slight accuracy increase and no change to inference time.
-                The runtime will be approximately equal to the original fit runtime.
-            This process does not alter the original models, but instead adds additional models.
-            If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
-            Models produced by this process will not have validation scores, as they use all of the data for training.
-                Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
-                If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
-                    Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
-            The time taken by this process is not enforced by `time_limits`.
-            `cache_data` must be set to `True` to enable this functionality.
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
@@ -265,12 +240,6 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
-        cache_data : bool, default = True
-            When enabled, the training and validation data are saved to disk for future reuse.
-            Enables advanced functionality in the resulting Predictor object such as feature importance calculation on the original data.
-        time_limits : int
-            Approximately how long `fit()` should run for (wallclock time in seconds).
-            If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
         num_trials : int
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
@@ -334,6 +303,37 @@ class TabularPrediction(BaseTask):
                 This has NO impact on inference accuracy.
                 It is recommended if the only goal is to use the trained model for prediction.
                 Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
+            cache_data : bool, default = True
+                When enabled, the training and validation data are saved to disk for future reuse.
+                Enables advanced functionality in the resulting Predictor object such as feature importance calculation on the original data.
+            refit_full : bool or str, default = False
+                Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+                This is equivalent to calling `predictor.refit_full(model=refit_full)` after training.
+                If `refit_full=True`, it will be treated as `refit_full='all'`.
+                If `refit_full=False`, refitting will not occur.
+                Valid str values:
+                    `all`: refits all models.
+                    `best`: refits only the best model (and its ancestors if it is a stacker model).
+                    `{model_name}`: refits only the specified model (and its ancestors if it is a stacker model).
+                For bagged models:
+                    Reduces a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+                    This process will typically result in a slight accuracy reduction and a large inference speedup.
+                    The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+                        The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+                    The runtime is generally 10% or less of the original fit runtime.
+                        The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
+                For non-bagged models:
+                    Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
+                    Will typically result in a slight accuracy increase and no change to inference time.
+                    The runtime will be approximately equal to the original fit runtime.
+                This process does not alter the original models, but instead adds additional models.
+                If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
+                Models produced by this process will not have validation scores, as they use all of the data for training.
+                    Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+                    If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
+                        Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
+                The time taken by this process is not enforced by `time_limits`.
+                `cache_data` must be set to `True` to enable this functionality.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
                 Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
@@ -382,6 +382,8 @@ class TabularPrediction(BaseTask):
             'save_bagged_folds',
             'keep_only_best',
             'save_space',
+            'cache_data',
+            'refit_full',
             'random_seed',
             'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
         }
@@ -404,6 +406,8 @@ class TabularPrediction(BaseTask):
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
+        cache_data = kwargs.get('cache_data', True)
+        refit_full = kwargs.get('refit_full', False)
         # TODO: Remove on 0.1.0 release
         if 'enable_fit_continuation' in kwargs.keys():
             logger.log(30, 'Warning: `enable_fit_continuation` is a deprecated parameter. It has been renamed to `cache_data`. Starting from AutoGluon 0.1.0, specifying `enable_fit_continuation` as a parameter will cause an exception.')
