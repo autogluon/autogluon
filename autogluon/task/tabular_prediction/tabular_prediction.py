@@ -104,36 +104,36 @@ class TabularPrediction(BaseTask):
             It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
 
             In-depth Preset Info:
-                # Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
-                # Recommended for applications that benefit from the best possible model accuracy.
-                best_quality={'auto_stack': True},
+                best_quality={'auto_stack': True}
+                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+                    Recommended for applications that benefit from the best possible model accuracy.
 
-                # Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
-                best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True},
+                best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
+                    Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
 
-                # High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
-                # Recommended for applications that require reasonable inference speed and/or model size.
-                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False},
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False}
+                    High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+                    Recommended for applications that require reasonable inference speed and/or model size.
 
-                # Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
-                # Recommended for applications that require fast inference speed.
-                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'},
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'}
+                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
+                    Recommended for applications that require fast inference speed.
 
-                # Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
-                # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
-                medium_quality_faster_train={'auto_stack': False},
+                medium_quality_faster_train={'auto_stack': False}
+                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
+                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
 
-                # Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
-                # Often can reduce disk usage by ~2-4x with no negatives to model accuracy or inference speed.
-                # This will disable numerous advanced functionality, but has no impact on inference.
-                # Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
-                # This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
-                # Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
-                optimize_for_deployment={'keep_only_best': True, 'save_space': True},
+                optimize_for_deployment={'keep_only_best': True, 'save_space': True}
+                    Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
+                    Often can reduce disk usage by ~2-4x with no negatives to model accuracy or inference speed.
+                    This will disable numerous advanced functionality, but has no impact on inference.
+                    Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
+                    This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
+                    Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
 
-                # Disables automated feature generation when text features are detected.
-                # This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
-                ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}},
+                ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}}
+                    Disables automated feature generation when text features are detected.
+                    This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
 
         problem_type : str, default = None
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
@@ -258,7 +258,7 @@ class TabularPrediction(BaseTask):
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         visualizer : str
             How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
-        verbosity: int, default = 2
+        verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
