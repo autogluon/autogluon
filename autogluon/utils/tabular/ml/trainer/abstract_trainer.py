@@ -38,7 +38,7 @@ class AbstractTrainer:
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
-                 stack_ensemble_levels=0, time_limit=None, save_data=False, random_seed=0, verbosity=2):
+                 stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
         if feature_types_metadata is None:
@@ -85,6 +85,7 @@ class AbstractTrainer:
             self.stack_ensemble_levels = 0
             self.stack_mode = False
             self.n_repeats = 1
+        self.save_bagged_folds = save_bagged_folds
 
         self.hyperparameters = {}  # TODO: This is currently required for fetching stacking layer models. Consider incorporating more elegantly
 
@@ -178,8 +179,13 @@ class AbstractTrainer:
         path = self.path_data + 'y_val.pkl'
         save_pkl.save(path=path, object=y, verbose=verbose)
 
-    def get_model_names_all(self):
-        return list(self.model_graph.nodes)
+    def get_model_names_all(self, can_infer=None):
+        model_names_all = list(self.model_graph.nodes)
+        # TODO: can_infer is technically more complicated, if an ancestor can't infer then the model can't infer.
+        if can_infer is not None:
+            node_attributes = nx.get_node_attributes(self.model_graph, 'can_infer')
+            model_names_all = [model for model in model_names_all if node_attributes[model] == can_infer]
+        return model_names_all
 
     def get_model_names(self, stack_name):
         model_names = []
@@ -319,7 +325,7 @@ class AbstractTrainer:
         self.model_fit_times[model.name] = model.fit_time
         self.model_pred_times[model.name] = model.predict_time
         if model.is_valid():
-            self.model_graph.add_node(model.name, fit_time=model.fit_time, predict_time=model.predict_time, val_score=model.val_score)
+            self.model_graph.add_node(model.name, fit_time=model.fit_time, predict_time=model.predict_time, val_score=model.val_score, can_infer=model.can_infer())
             if isinstance(model, StackerEnsembleModel):
                 for stack_column_prefix in model.stack_column_prefix_lst:
                     base_model_name = model.stack_column_prefix_to_model_map[stack_column_prefix]
@@ -530,7 +536,7 @@ class AbstractTrainer:
             aux_models = self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, time_limit=time_limit_aux)
         return core_models + aux_models
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', kfolds=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, stacker_type=StackerEnsembleModel):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', kfolds=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, save_bagged_folds=None, stacker_type=StackerEnsembleModel):
         use_orig_features = True
         if models is None:
             models = self.get_models(self.hyperparameters, level=level)
@@ -538,6 +544,8 @@ class AbstractTrainer:
             kfolds = self.kfolds
         if n_repeats is None:
             n_repeats = self.n_repeats
+        if save_bagged_folds is None:
+            save_bagged_folds = self.save_bagged_folds
 
         if self.bagged_mode:
             if level == 0:
@@ -552,7 +560,7 @@ class AbstractTrainer:
             models = [
                 stacker_type(path=self.path, name=model.name + '_STACKER_l' + str(level), model_base=model, base_model_names=base_model_names,
                                      base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types, use_orig_features=use_orig_features,
-                                     num_classes=self.num_classes, random_state=level+self.random_seed)
+                                     num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed)
                 for model in models]
         X_train_init = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
         if X_test is not None:
@@ -565,7 +573,9 @@ class AbstractTrainer:
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
 
-    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix=''):
+    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix='', save_bagged_folds=None):
+        if save_bagged_folds is None:
+            save_bagged_folds = self.save_bagged_folds
         if base_model_names is None:
             base_model_names = self.models_level['core'][level - 1]
         if len(base_model_names) == 0:
@@ -573,7 +583,7 @@ class AbstractTrainer:
             return []
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        objective_func=self.objective_func, num_classes=self.num_classes, random_state=level+self.random_seed)
+                                                        objective_func=self.objective_func, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if weighted_ensemble_model.name in self.get_model_names_all():
@@ -865,7 +875,7 @@ class AbstractTrainer:
                         y_input = y_val
 
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX)
+                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -875,7 +885,7 @@ class AbstractTrainer:
                         self.model_pred_times[model_weighted_ensemble] = None
                         self.save_model(model_loaded)
                 else:
-                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, stacker_type=stacker_type)
+                    models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
                 if len(models_trained) == 1:
                     model_full_dict[model_name] = models_trained[0]
                 models_trained_full += models_trained
@@ -922,7 +932,7 @@ class AbstractTrainer:
             model_loaded.save()  # TODO: Avoid this!
 
             # TODO: Consider moving into internal function in model to update graph with node + links?
-            self.model_graph.add_node(model_loaded.name, fit_time=model_loaded.fit_time, predict_time=model_loaded.predict_time, val_score=model_loaded.val_score)
+            self.model_graph.add_node(model_loaded.name, fit_time=model_loaded.fit_time, predict_time=model_loaded.predict_time, val_score=model_loaded.val_score, can_infer=model_loaded.can_infer())
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model_name = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
@@ -948,13 +958,19 @@ class AbstractTrainer:
         return max(perfs, key=lambda i: i[1])[0]
 
     # TODO: Take best performance model with lowest inference
-    def get_model_best(self):
-        models = self.get_model_names_all()
+    def get_model_best(self, can_infer=None, allow_full=True):
+        models = self.get_model_names_all(can_infer=can_infer)
         if not models:
-            raise AssertionError('Trainer has no fit models.')
+            raise AssertionError('Trainer has no fit models that can infer.')
         perfs = [(m, self.model_performance[m]) for m in models if self.model_performance[m] is not None]
         if not perfs:
-            raise AssertionError('No fit models exist with a validation score to choose the best model.')
+            model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
+            models = [m for m in models if m in model_full_dict_inverse]
+            perfs = [(m, self.model_performance[model_full_dict_inverse[m]]) for m in models if self.model_performance[model_full_dict_inverse[m]] is not None]
+            if not perfs:
+                raise AssertionError('No fit models that can infer exist with a validation score to choose the best model.')
+            elif not allow_full:
+                raise AssertionError('No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model.')
         return max(perfs, key=lambda i: i[1])[0]
 
     def save_model(self, model, reduce_memory=True):
@@ -1157,6 +1173,7 @@ class AbstractTrainer:
         stack_level = []
         fit_time = []
         pred_time_val = []
+        can_infer = []
         for model_name in model_names:
             score_val.append(self.model_performance.get(model_name))
             fit_time_marginal.append(self.model_fit_times.get(model_name))
@@ -1164,6 +1181,7 @@ class AbstractTrainer:
             pred_time_val_marginal.append(self.model_pred_times.get(model_name))
             pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
+            can_infer.append(self.model_graph.nodes[model_name]['can_infer'])
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
@@ -1172,6 +1190,7 @@ class AbstractTrainer:
             'pred_time_val_marginal': pred_time_val_marginal,
             'fit_time_marginal': fit_time_marginal,
             'stack_level': stack_level,
+            'can_infer': can_infer,
         })
         df_sorted = df.sort_values(by=['score_val', 'pred_time_val', 'model'], ascending=[False, True, False]).reset_index(drop=True)
         return df_sorted
@@ -1261,7 +1280,14 @@ class AbstractTrainer:
                     pass
             if requires_save:
                 self.is_data_saved = False
-
+            try:
+                os.rmdir(self.path_data)
+            except OSError:
+                pass
+            try:
+                os.rmdir(self.path_utils)
+            except OSError:
+                pass
         models = self.get_model_names_all()
         for model in models:
             model = self.load_model(model)
