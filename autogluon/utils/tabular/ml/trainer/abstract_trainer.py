@@ -1066,7 +1066,7 @@ class AbstractTrainer:
         if raw:
             feature_importance = self._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, silent=silent)
         else:
-            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
+            feature_importance = model.compute_feature_importance(X=X, y=y, features_to_use=features, preprocess=False, subsample_size=subsample_size, is_oof=is_oof, silent=silent)
         return feature_importance
 
     # TODO: Can get feature importances of all children of model at no extra cost, requires scoring the values after predict_proba on each model
