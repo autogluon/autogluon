@@ -5,7 +5,9 @@ import math
 import numpy as np
 
 from .dataset import TabularDataset
+from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
+from .presets_configs import set_presets, unpack
 from ..base import BaseTask
 from ..base.base_task import schedulers
 from ...utils import verbosity2loglevel
@@ -56,11 +58,12 @@ class TabularPrediction(BaseTask):
         return TabularPredictor(learner=learner)
 
     @staticmethod
-    def fit(train_data, label, tuning_data=None, output_directory=None, problem_type=None, eval_metric=None, stopping_metric=None,
-            auto_stack=False, hyperparameter_tune=False, feature_prune=False, refit_full=False,
+    @unpack(set_presets)
+    def fit(train_data, label, tuning_data=None, time_limits=None, output_directory=None, presets=None,
+            problem_type=None, eval_metric=None, stopping_metric=None,
+            auto_stack=False, hyperparameter_tune=False, feature_prune=False,
             holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters=None, cache_data=True,
-            time_limits=None, num_trials=None, search_strategy='random', search_options=None,
+            hyperparameters=None, num_trials=None, search_strategy='random', search_options=None,
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
             verbosity=2, **kwargs):
         """
@@ -79,11 +82,59 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        output_directory : str
+        time_limits : int
+            Approximately how long `fit()` should run for (wallclock time in seconds).
+            If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
+        output_directory : str, default = None
             Path to directory where models and intermediate outputs should be saved.
-            If unspecified, a time-stamped folder called "autogluon-fit-[TIMESTAMP]" will be created in the working directory to store all models.
+            If unspecified, a time-stamped folder called "AutogluonModels/ag-[TIMESTAMP]" will be created in the working directory to store all models.
             Note: To call `fit()` twice and save all results of each fit, you must specify different `output_directory` locations.
             Otherwise files from first `fit()` will be overwritten by second `fit()`.
+        presets : list or str or dict, default = 'medium_quality_faster_train'
+            List of preset configurations for various arguments in `fit()`. Can significantly impact predictive accuracy, memory-footprint, and inference latency of trained models, and various other properties of the returned `predictor`.
+            It is recommended to specify presets and avoid specifying most other `fit()` arguments or model hyperparameters prior to becoming familiar with AutoGluon.
+            As an example, to get the most accurate overall predictor (regardless of its efficiency), set `presets='best_quality'`.
+            To get good quality with minimal disk usage, set `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`
+            Any user-specified arguments in `fit()` will override the values used by presets.
+            If specifying a list of presets, later presets will override earlier presets if they alter the same argument.
+            For precise definitions of the provided presets, see file: `autogluon/tasks/tabular_prediction/presets_configs.py`.
+            Users can specify custom presets by passing in a dictionary of argument values as an element to the list.
+
+            Available Presets: ['best_quality', 'best_quality_with_high_quality_refit', 'high_quality_fast_inference_only_refit', 'good_quality_faster_inference_only_refit', 'medium_quality_faster_train', 'optimize_for_deployment', 'ignore_text']
+            It is recommended to only use one `quality` based preset in a given call to `fit()` as they alter many of the same arguments and are not compatible with each-other.
+
+            In-depth Preset Info:
+                best_quality={'auto_stack': True}
+                    Best predictive accuracy with little consideration to inference time or disk usage. Achieve even better results by specifying a large time_limits value.
+                    Recommended for applications that benefit from the best possible model accuracy.
+
+                best_quality_with_high_quality_refit={'auto_stack': True, 'refit_full': True}
+                    Identical to best_quality but additionally trains refit_full models that have slightly lower predictive accuracy but are over 10x faster during inference and require 10x less disk space.
+
+                high_quality_fast_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False}
+                    High predictive accuracy with fast inference. ~10x-200x faster inference and ~10x-200x lower disk usage than `best_quality`.
+                    Recommended for applications that require reasonable inference speed and/or model size.
+
+                good_quality_faster_inference_only_refit={'auto_stack': True, 'refit_full': True, 'set_best_to_refit_full': True, 'save_bagged_folds': False, 'hyperparameters': 'light'}
+                    Good predictive accuracy with very fast inference. ~4x faster inference and ~4x lower disk usage than `high_quality_fast_inference_only_refit`.
+                    Recommended for applications that require fast inference speed.
+
+                medium_quality_faster_train={'auto_stack': False}
+                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality_faster_inference_only_refit`.
+                    This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality_faster_inference_only_refit` results in significantly better predictive accuracy and faster inference time.
+
+                optimize_for_deployment={'keep_only_best': True, 'save_space': True}
+                    Optimizes result immediately for deployment by deleting unused models and removing training artifacts.
+                    Often can reduce disk usage by ~2-4x with no negatives to model accuracy or inference speed.
+                    This will disable numerous advanced functionality, but has no impact on inference.
+                    Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
+                    This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
+                    Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
+
+                ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}}
+                    Disables automated feature generation when text features are detected.
+                    This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
+
         problem_type : str, default = None
             Type of prediction problem, i.e. is this a binary/multiclass classification or regression problem (options: 'binary', 'multiclass', 'regression').
             If `problem_type = None`, the prediction problem type is inferred based on the label-values in provided dataset.
@@ -117,29 +168,15 @@ class TabularPrediction(BaseTask):
             Use `auto_stack` to maximize predictive accuracy; use `hyperparameter_tune` if you prefer to deploy just a single model rather than an ensemble.
         feature_prune : bool, default = False
             Whether or not to perform feature selection.
-        refit_full : bool, default = False
-            Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
-            This is equivalent to calling `predictor.refit_full()` after training.
-            For bagged models:
-                Optimizes a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
-                This process will typically result in a slight accuracy reduction and a large inference speedup.
-                The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
-                    The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
-                The runtime is generally 10% or less of the original fit runtime.
-                    The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
-            For non-bagged models:
-                Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
-                Will typically result in a slight accuracy increase and no change to inference time.
-                The runtime will be approximately equal to the original fit runtime.
-            This process does not alter the original models, but instead adds additional models.
-            If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
-            Models produced by this process will not have validation scores, as they use all of the data for training.
-                Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
-                If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
-                    Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
-            The time taken by this process is not enforced by `time_limits`.
-            `cache_data` must be set to `True` to enable this functionality.
-        hyperparameters : dict
+        hyperparameters : str or dict, default = 'default'
+            Determines the hyperparameters used by the models.
+            If `str` is passed, will use a preset hyperparameter configuration.
+                Valid `str` options: ['default', 'light', 'very_light', 'toy']
+                    'default': Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
+                    'light': Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
+                    'very_light': Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
+                    'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
+                Reference `autogluon/task/tabular_prediction/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
                 If certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
@@ -154,11 +191,11 @@ class TabularPrediction(BaseTask):
 
             Default:
                 `hyperparameters = {
-                   'NN': {'num_epochs': 500},
-                   'GBM': {'num_boost_round': 10000},
-                   'CAT': {'iterations': 10000},
-                   'RF': {'n_estimators': 300},
-                   'XT': {'n_estimators': 300},
+                   'NN': {},
+                   'GBM': {},
+                   'CAT': {},
+                   'RF': {},
+                   'XT': {},
                    'KNN': {},
                    'custom': ['GBM'],
                 }`
@@ -203,12 +240,6 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
-        cache_data : bool, default = True
-            When enabled, the training and validation data are saved to disk for future reuse.
-            Enables advanced functionality in the resulting Predictor object such as feature importance calculation on the original data.
-        time_limits : int
-            Approximately how long `fit()` should run for (wallclock time in seconds).
-            If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` is specified.
         num_trials : int
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
@@ -227,7 +258,7 @@ class TabularPrediction(BaseTask):
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         visualizer : str
             How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
-        verbosity: int, default = 2
+        verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
@@ -252,7 +283,57 @@ class TabularPrediction(BaseTask):
             set_best_to_refit_full : bool, default = False
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
-                Only valid if `refit_full=True`.
+                Only valid if `refit_full` is set.
+            save_bagged_folds : bool, default = True
+                If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
+                If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
+                    This should only be set to False when planning to call `predictor.refit_full()` or when `refit_full` is set and `set_best_to_refit_full=True`.
+                    Particularly useful if disk usage is a concern. By not saving the fold models, bagged models will use only very small amounts of disk space during training.
+                    In many training runs, this will reduce peak disk usage by >10x.
+                This parameter has no effect if bagging is disabled.
+            keep_only_best : bool, default = False
+                If True, only the best model and its ancestor models are saved in the outputted `predictor`. All other models are deleted.
+                    If you only care about deploying the most accurate predictor with the smallest file-size and no longer need any of the other trained models or functionality beyond prediction on new data, then set: `keep_only_best=True`, `save_space=True`.
+                    This is equivalent to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` directly after `fit()`.
+                If used with `refit_full` and `set_best_to_refit_full`, the best model will be the refit_full model, and the original bagged best model will be deleted.
+                    `refit_full` will be automatically set to 'best' in this case to avoid training models which will be later deleted.
+            save_space : bool, default = False
+                If True, reduces the memory and disk size of predictor by deleting auxiliary model files that aren't needed for prediction on new data.
+                    This is equivalent to calling `predictor.save_space()` directly after `fit()`.
+                This has NO impact on inference accuracy.
+                It is recommended if the only goal is to use the trained model for prediction.
+                Certain advanced functionality may no longer be available if `save_space=True`. Refer to `predictor.save_space()` documentation for more details.
+            cache_data : bool, default = True
+                When enabled, the training and validation data are saved to disk for future reuse.
+                Enables advanced functionality in the resulting Predictor object such as feature importance calculation on the original data.
+            refit_full : bool or str, default = False
+                Whether to retrain all models on all of the data (training + validation) after the normal training procedure.
+                This is equivalent to calling `predictor.refit_full(model=refit_full)` after training.
+                If `refit_full=True`, it will be treated as `refit_full='all'`.
+                If `refit_full=False`, refitting will not occur.
+                Valid str values:
+                    `all`: refits all models.
+                    `best`: refits only the best model (and its ancestors if it is a stacker model).
+                    `{model_name}`: refits only the specified model (and its ancestors if it is a stacker model).
+                For bagged models:
+                    Reduces a model's inference time by collapsing bagged ensembles into a single model fit on all of the training data.
+                    This process will typically result in a slight accuracy reduction and a large inference speedup.
+                    The inference speedup will generally be between 10-200x faster than the original bagged ensemble model.
+                        The inference speedup factor is equivalent to (k * n), where k is the number of folds (`num_bagging_folds`) and n is the number of finished repeats (`num_bagging_sets`) in the bagged ensemble.
+                    The runtime is generally 10% or less of the original fit runtime.
+                        The runtime can be roughly estimated as 1 / (k * n) of the original fit runtime, with k and n defined above.
+                For non-bagged models:
+                    Optimizes a model's accuracy by retraining on 100% of the data without using a validation set.
+                    Will typically result in a slight accuracy increase and no change to inference time.
+                    The runtime will be approximately equal to the original fit runtime.
+                This process does not alter the original models, but instead adds additional models.
+                If stacker models are refit by this process, they will use the refit_full versions of the ancestor models during inference.
+                Models produced by this process will not have validation scores, as they use all of the data for training.
+                    Therefore, it is up to the user to determine if the models are of sufficient quality by including test data in `predictor.leaderboard(dataset=test_data)`.
+                    If the user does not have additional test data, they should reference the original model's score for an estimate of the performance of the refit_full model.
+                        Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
+                The time taken by this process is not enforced by `time_limits`.
+                `cache_data` must be set to `True` to enable this functionality.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
                 Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
@@ -298,6 +379,11 @@ class TabularPrediction(BaseTask):
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
+            'save_bagged_folds',
+            'keep_only_best',
+            'save_space',
+            'cache_data',
+            'refit_full',
             'random_seed',
             'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
         }
@@ -320,6 +406,8 @@ class TabularPrediction(BaseTask):
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
 
+        cache_data = kwargs.get('cache_data', True)
+        refit_full = kwargs.get('refit_full', False)
         # TODO: Remove on 0.1.0 release
         if 'enable_fit_continuation' in kwargs.keys():
             logger.log(30, 'Warning: `enable_fit_continuation` is a deprecated parameter. It has been renamed to `cache_data`. Starting from AutoGluon 0.1.0, specifying `enable_fit_continuation` as a parameter will cause an exception.')
@@ -334,6 +422,8 @@ class TabularPrediction(BaseTask):
         if set_best_to_refit_full and not refit_full:
             raise ValueError('`set_best_to_refit_full=True` is only available when `refit_full=True`. Set `refit_full=True` to utilize `set_best_to_refit_full`.')
 
+        save_bagged_folds = kwargs.get('save_bagged_folds', True)
+
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
 
@@ -344,15 +434,9 @@ class TabularPrediction(BaseTask):
             search_options = dict()
 
         if hyperparameters is None:
-            hyperparameters = {
-               'NN': {'num_epochs': 500},
-               'GBM': {'num_boost_round': 10000},
-               'CAT': {'iterations': 10000},
-               'RF': {'n_estimators': 300},
-               'XT': {'n_estimators': 300},
-               'KNN': {},
-               'custom': ['GBM'],
-            }
+            hyperparameters = 'default'
+        if isinstance(hyperparameters, str):
+            hyperparameters = get_hyperparameter_config(hyperparameters)
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
@@ -444,18 +528,39 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, verbosity=verbosity)
+                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
-        if refit_full:
-            learner.refit_ensemble_full()
+        predictor = TabularPredictor(learner=learner)
+
+        keep_only_best = kwargs.get('keep_only_best', False)
+        if refit_full is True:
+            if keep_only_best is True:
+                if set_best_to_refit_full is True:
+                    refit_full = 'best'
+                else:
+                    logger.warning(f'refit_full was set to {refit_full}, but keep_only_best=True and set_best_to_refit_full=False. Disabling refit_full to avoid training models which would be automatically deleted.')
+                    refit_full = False
+            else:
+                refit_full = 'all'
+
+        if refit_full is not False:
+            predictor.refit_full(model=refit_full)
             if set_best_to_refit_full:
-                trainer = learner.load_trainer()
-                if trainer.model_best in trainer.model_full_dict.keys():
-                    trainer.model_best = trainer.model_full_dict[trainer.model_best]
+                trainer = predictor._trainer
+                trainer_model_best = trainer.get_model_best()
+                if trainer_model_best in trainer.model_full_dict.keys():
+                    trainer.model_best = trainer.model_full_dict[trainer_model_best]
                     # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.
                     # This has the side-effect of having the possibility of model_best being overwritten by a worse model than the original model_best.
                     trainer.save()
                 else:
-                    logger.warning(f'Best model ({trainer.model_best}) is not present in refit_full dictionary. AutoGluon will default to using {trainer.model_best} for predictions.')
+                    logger.warning(f'Best model ({trainer_model_best}) is not present in refit_full dictionary. Training may have failed on the refit model. AutoGluon will default to using {trainer_model_best} for predictions.')
 
-        return TabularPredictor(learner=learner)
+        if keep_only_best:
+            predictor.delete_models(models_to_keep='best', dry_run=False)
+
+        save_space = kwargs.get('save_space', False)
+        if save_space:
+            predictor.save_space()
+
+        return predictor

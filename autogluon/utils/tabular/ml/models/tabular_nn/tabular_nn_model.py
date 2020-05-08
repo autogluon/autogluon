@@ -714,35 +714,32 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory = None, return_name=False, verbose=None):
+    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
-            return_name (bool): return the file-names corresponding to this save as tuple (model_obj_file, net_params_file)
+            return_filename (bool): return the file-name corresponding to this save
         """
-        if verbose is None:
-            verbose = self.verbosity >= 3
         if directory is not None:
             path = directory + file_prefix
         else:
             path = self.path + file_prefix
 
         params_filepath = path + self.params_file_name
-        modelobj_filepath = path + self.model_file_name
         # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
         os.makedirs(os.path.dirname(path), exist_ok=True)
         if self.model is not None:
             self.model.save_parameters(params_filepath)
+            self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
         temp_sw = self.summary_writer
-        self._architecture_desc = self.model.architecture_desc
         self.model = None
         self.summary_writer = None
-        save_pkl.save(path=modelobj_filepath, object=self, verbose=verbose)
+        modelobj_filepath = super().save(file_prefix=file_prefix, directory=directory, return_filename=True, verbose=verbose)
         self.model = temp_model
         self.summary_writer = temp_sw
         self._architecture_desc = None
-        if return_name:
-            return (modelobj_filepath, params_filepath)
+        if return_filename:
+            return modelobj_filepath
 
     @classmethod
     def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
@@ -753,11 +750,12 @@ class TabularNeuralNetModel(AbstractModel):
         obj: TabularNeuralNetModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
         if reset_paths:
             obj.set_contexts(path)
-        obj.model = EmbedNet(architecture_desc=obj._architecture_desc, ctx=obj.ctx)  # recreate network from architecture description
-        obj._architecture_desc = None
-        # TODO: maybe need to initialize/hybridize??
-        obj.model.load_parameters(path + cls.params_file_name, ctx=obj.ctx)
-        obj.summary_writer = None
+        if obj._architecture_desc is not None:
+            obj.model = EmbedNet(architecture_desc=obj._architecture_desc, ctx=obj.ctx)  # recreate network from architecture description
+            obj._architecture_desc = None
+            # TODO: maybe need to initialize/hybridize??
+            obj.model.load_parameters(path + cls.params_file_name, ctx=obj.ctx)
+            obj.summary_writer = None
         return obj
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):

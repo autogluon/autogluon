@@ -28,9 +28,10 @@ class DefaultLearner(AbstractLearner):
                          problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, is_trainer_present=is_trainer_present, random_seed=random_seed)
         self.trainer_type = trainer_type
 
+    # TODO: Add trainer_kwargs to simplify parameter count and extensibility
     def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters={'NN': {'num_epochs': 300}, 'GBM': {'num_boost_round': 10000}}, time_limit=None, save_data=False, verbosity=2):
+            hyperparameters=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -46,6 +47,8 @@ class DefaultLearner(AbstractLearner):
                     Ignored unless kfolds is also set >= 2
                 hyperparameters (dict): keys = hyperparameters + search-spaces for each type of model we should train.
         """
+        if hyperparameters is None:
+            hyperparameters = {'NN': {}, 'GBM': {}}
         # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
         if time_limit:
             self.time_limit = time_limit
@@ -84,6 +87,7 @@ class DefaultLearner(AbstractLearner):
             scheduler_options=scheduler_options,
             time_limit=time_limit_trainer,
             save_data=save_data,
+            save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
             verbosity=verbosity
         )

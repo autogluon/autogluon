@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
-        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, random_state=random_state, debug=debug)
+    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, save_bagged_folds=True, random_state=0, debug=0):
+        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, save_bagged_folds=save_bagged_folds, random_state=random_state, debug=debug)
         if base_model_names is None:
             base_model_names = []
         if base_models_dict is None:
@@ -202,6 +202,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stacker._oof_pred_model_repeats = oof_pred_model_repeats
             child.name = child.name + '_fold_0'
             child.set_contexts(stacker.path + child.name + os.path.sep)
+            if not self.save_bagged_folds:
+                child.model = None
             if stacker.low_memory:
                 stacker.save_child(child, verbose=False)
                 stacker.models.append(child.name)

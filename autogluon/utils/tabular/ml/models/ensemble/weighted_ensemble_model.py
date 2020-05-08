@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 # TODO: Optimize predict speed when fit on kfold, can simply sum weights
 class WeightedEnsembleModel(StackerEnsembleModel):
-    def __init__(self, path: str, name: str, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
+    def __init__(self, path: str, name: str, base_model_names, base_model_paths_dict, base_model_types_dict, base_model_types_inner_dict=None, base_model_performances_dict=None, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, save_bagged_folds=True, random_state=0, debug=0):
         model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
-        super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, base_model_types_inner_dict=base_model_types_inner_dict, base_model_performances_dict=base_model_performances_dict, use_orig_features=False, num_classes=num_classes, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, random_state=random_state, debug=debug)
+        super().__init__(path=path, name=name, model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, base_model_types_inner_dict=base_model_types_inner_dict, base_model_performances_dict=base_model_performances_dict, use_orig_features=False, num_classes=num_classes, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, save_bagged_folds=save_bagged_folds, random_state=random_state, debug=debug)
         self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric)
         self._child_type = type(self.model_base)
         self.low_memory = False

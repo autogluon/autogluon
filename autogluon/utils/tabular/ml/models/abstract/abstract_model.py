@@ -107,9 +107,13 @@ class AbstractModel:
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
 
-    # Checks if model is ready to make predictions for final result
+    # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
     def is_valid(self):
         return self.is_fit()
+
+    # Checks if model is capable of inference on new data
+    def can_infer(self):
+        return self.is_valid()
 
     # Checks if a model has been fit
     def is_fit(self):

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
     _oof_filename = 'oof.pkl'
-    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, objective_func=None, stopping_metric=None, random_state=0, debug=0):
+    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, objective_func=None, stopping_metric=None, save_bagged_folds=True, random_state=0, debug=0):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -35,6 +35,7 @@ class BaggedEnsembleModel(AbstractModel):
         self._random_state = random_state
         self.low_memory = True
         self.bagged_mode = None
+        self.save_bagged_folds = save_bagged_folds
 
         try:
             feature_types_metadata = self.model_base.feature_types_metadata
@@ -50,6 +51,9 @@ class BaggedEnsembleModel(AbstractModel):
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
+
+    def can_infer(self):
+        return self.is_fit() and self.save_bagged_folds
 
     def is_stratified(self):
         if self.problem_type == REGRESSION or self.problem_type == SOFTCLASS:
@@ -132,6 +136,8 @@ class BaggedEnsembleModel(AbstractModel):
             self._k_per_n_repeat = [1]
             self.bagged_mode = False
             model_base.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
+            if not self.save_bagged_folds:
+                model_base.model = None
             if self.low_memory:
                 self.save_child(model_base, verbose=False)
                 self.models = [model_base.name]
@@ -200,6 +206,8 @@ class BaggedEnsembleModel(AbstractModel):
                 fold_model.predict_time = time_predict_end_fold - time_train_end_fold
                 fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)
                 fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
+                if not self.save_bagged_folds:
+                    fold_model.model = None
                 if self.low_memory:
                     self.save_child(fold_model, verbose=False)
                     models.append(fold_model.name)
@@ -444,6 +452,16 @@ class BaggedEnsembleModel(AbstractModel):
             if requires_save:
                 self._oof_pred_proba = None
                 self._oof_pred_model_repeats = None
+            try:
+                os.remove(self.path + 'utils' + os.path.sep + 'model_template.pkl')
+            except FileNotFoundError:
+                pass
+            if requires_save:
+                self.model_base = None
+            try:
+                os.rmdir(self.path + 'utils')
+            except OSError:
+                pass
         if reduce_children:
             for model in self.models:
                 model = self.load_child(model)
