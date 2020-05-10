@@ -2,7 +2,7 @@ import warnings
 
 import pandas as pd
 
-from ...utils import warning_filter
+from autogluon_core.utils import warning_filter
 
 with warning_filter():
     from ...utils.tabular.utils.loaders import load_pd

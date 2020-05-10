@@ -20,7 +20,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer  # PowerTransformer
 
 from autogluon_core.core import Space
-from ......utils import try_import_mxboard
+from autogluon_core.utils.try_import import try_import_mxboard
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS

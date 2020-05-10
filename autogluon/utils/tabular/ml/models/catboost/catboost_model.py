@@ -13,7 +13,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
-from .....try_import import try_import_catboost
+from autogluon_core.utils.try_import import try_import_catboost
 
 logger = logging.getLogger(__name__)
 

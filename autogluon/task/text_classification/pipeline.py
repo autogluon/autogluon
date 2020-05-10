@@ -11,8 +11,8 @@ from gluonnlp.data import BERTTokenizer
 from .network import get_network#BERTClassifier, RoBERTaClassifier, LMClassifier
 from .transforms import BERTDatasetTransform
 from autogluon_core.core import *
-from ...utils import tqdm
-from ...utils.mxutils import collect_params
+from autogluon_core.utils import tqdm
+from autogluon_core.utils.mxutils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
 

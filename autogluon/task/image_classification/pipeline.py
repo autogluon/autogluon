@@ -8,9 +8,9 @@ from .metrics import get_metric_instance
 from .processing_params import Sample_params, Getmodel_kwargs
 from .utils import *
 from autogluon_core.core import *
-from ...utils import tqdm
+from autogluon_core.utils import tqdm
 from ...utils.learning_rate import LR_params
-from ...utils.mxutils import collect_params
+from autogluon_core.utils.mxutils import collect_params
 
 __all__ = ['train_image_classification']
 

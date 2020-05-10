@@ -4,7 +4,7 @@ import pickle
 from collections import OrderedDict
 import numpy as np
 
-from autogluon.utils import DeprecationHelper
+from ..utils import DeprecationHelper
 
 __all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 

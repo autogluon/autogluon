@@ -7,7 +7,7 @@ from multiprocessing.pool import ThreadPool
 
 from ..core.space import *
 from .searcher import BaseSearcher
-from autogluon.utils import keydefaultdict, update_params
+from ..utils import keydefaultdict, update_params
 from collections import OrderedDict
 
 __all__ = ['RLSearcher', 'LSTMController']

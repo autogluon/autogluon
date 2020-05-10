@@ -6,7 +6,7 @@ import gluonnlp as nlp
 from autogluon_core.core import *
 from autogluon_core.scheduler import get_cpu_count, get_gpu_count
 from ..base import BaseTask
-from ...utils import update_params
+from autogluon_core.utils import update_params
 
 from .network import get_network
 from .dataset import get_dataset

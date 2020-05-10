@@ -6,7 +6,7 @@ import warnings, os
 import numpy as np
 from collections import OrderedDict
 
-from .miscs import warning_filter
+from autogluon_core.utils.miscs import warning_filter
 
 __all__ = ['plot_performance_vs_trials', 'plot_summary_of_models', 'plot_tabular_models', 'mousover_plot']
 

@@ -14,7 +14,7 @@ from autogluon_core.core import *
 from autogluon_core.core.loss import *
 from autogluon_core.core.optimizer import *
 from autogluon_core.scheduler import get_cpu_count, get_gpu_count
-from ...utils import update_params
+from autogluon_core.utils import update_params
 
 __all__ = ['ImageClassification']
 

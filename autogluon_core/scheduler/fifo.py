@@ -18,7 +18,7 @@ from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher.searcher_factory import searcher_factory
-from autogluon.utils import save, load, mkdir, try_import_mxboard
+from ..utils import save, load, mkdir, try_import_mxboard
 
 __all__ = ['FIFOScheduler']
 

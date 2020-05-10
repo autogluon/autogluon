@@ -10,7 +10,7 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from autogluon.utils import (save, load, mkdir, try_import_mxboard, tqdm)
+from ..utils import save, load, mkdir, try_import_mxboard, tqdm
 from ..core import Task
 from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher

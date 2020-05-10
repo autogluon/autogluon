@@ -10,7 +10,7 @@ from .remote import RemoteManager
 from .resource import DistributedResourceManager
 from ..core import Task
 from .reporter import *
-from autogluon.utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
 logger = logging.getLogger(__name__)
 

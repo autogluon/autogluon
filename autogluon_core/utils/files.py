@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import requests
 import errno
-import shutil
 import hashlib
 import zipfile
 import logging

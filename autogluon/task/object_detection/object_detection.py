@@ -11,7 +11,7 @@ from ..base import BaseTask
 from autogluon_core.core.decorator import sample_config
 from autogluon_core.core import Categorical
 from autogluon_core.scheduler import get_cpu_count, get_gpu_count
-from ...utils import update_params
+from autogluon_core.utils import update_params
 
 __all__ = ['ObjectDetection']
 
