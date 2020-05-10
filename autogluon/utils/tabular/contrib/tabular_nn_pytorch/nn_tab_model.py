@@ -200,7 +200,8 @@ class NNFastAiTabularModel(AbstractModel):
             base_size = max(len(data.classes) * 2, 100)
             layers = [base_size * 2, base_size]
 
-        early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, min_delta=0.01, patience=5)
+        early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
+                                    min_delta=self.params['nn.tabular.early.stopping.min_delta'], patience=self.params['nn.tabular.early.stopping.patience'])
         self.model = tabular_learner(
             data, layers=layers, ps=[self.params['nn.tabular.dropout']], emb_drop=self.params['nn.tabular.dropout'], metrics=nn_metric,
             callback_fns=[early_stopping_fn]
@@ -262,7 +263,9 @@ class NNFastAiTabularModel(AbstractModel):
     def predict(self, X):
         return super().predict(X)
 
-    def predict_proba(self, X, preprocess=False):
+    def predict_proba(self, X, preprocess=True):
+        if preprocess:
+            X = self.preprocess(X)
         self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
