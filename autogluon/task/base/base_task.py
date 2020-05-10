@@ -5,7 +5,7 @@ from abc import abstractmethod
 
 import mxnet as mx
 
-from ...scheduler import *
+from autogluon_core.scheduler import *
 from ...utils import in_ipynb
 
 __all__ = ['BaseDataset', 'BaseTask']

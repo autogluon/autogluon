@@ -6,7 +6,6 @@ from collections import OrderedDict, defaultdict
 import cloudpickle as pkl
 import matplotlib.pyplot as plt
 import mxnet as mx
-import numpy as np
 from PIL import Image
 from mxnet.gluon.data.vision import transforms
 
@@ -14,7 +13,7 @@ from .metrics import get_metric_instance
 from .nets import get_network
 from .utils import *
 from ..base.base_predictor import BasePredictor
-from ...core import AutoGluonObject
+from autogluon_core.core import AutoGluonObject
 from ...utils import save, load, tqdm, collect_params, update_params
 
 __all__ = ['Classifier']

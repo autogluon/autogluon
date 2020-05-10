@@ -16,8 +16,8 @@ from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_
 from .... import metrics
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
-from ......core import Space, Categorical, List, NestedSpace
-from ......scheduler.fifo import FIFOScheduler
+from autogluon_core.core import Space, Categorical, List, NestedSpace
+from autogluon_core.scheduler import FIFOScheduler
 from ......task.base import BasePredictor
 
 logger = logging.getLogger(__name__)

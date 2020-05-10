@@ -7,7 +7,7 @@ from mxnet import gluon, nd
 from .metrics import get_metric_instance
 from .processing_params import Sample_params, Getmodel_kwargs
 from .utils import *
-from ...core import *
+from autogluon_core.core import *
 from ...utils import tqdm
 from ...utils.learning_rate import LR_params
 from ...utils.mxutils import collect_params

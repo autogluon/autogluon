@@ -7,9 +7,9 @@ from .utils.try_import import *
 
 try_import_mxnet()
 
-from . import scheduler, searcher, utils
-from .scheduler import get_cpu_count, get_gpu_count
+from autogluon_core import scheduler, searcher
+from autogluon_core.scheduler import get_cpu_count, get_gpu_count
+from autogluon_core.core import *
 
 from .utils import *
-from .core import *
 from .task import *

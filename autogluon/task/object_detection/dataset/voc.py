@@ -2,19 +2,13 @@
 from __future__ import absolute_import
 from __future__ import division
 import os
-import warnings
-import numpy as np
 import glob
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
     import xml.etree.ElementTree as ET
-import mxnet as mx
-from gluoncv.data.base import VisionDataset
 
-from ....core import *
-from .base import DatasetBase
-import autogluon as ag
+from autogluon_core.core import *
 
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric

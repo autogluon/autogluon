@@ -8,9 +8,9 @@ from .detector import Detector
 from .pipeline import train_object_detection
 from .utils import get_network
 from ..base import BaseTask
-from ...core.decorator import sample_config
-from ...core.space import Categorical
-from ...scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon_core.core.decorator import sample_config
+from autogluon_core.core import Categorical
+from autogluon_core.scheduler import get_cpu_count, get_gpu_count
 from ...utils import update_params
 
 __all__ = ['ObjectDetection']

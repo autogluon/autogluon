@@ -12,7 +12,7 @@ from mxnet import gluon
 
 from .utils import rcnn_split_and_load, get_network
 from ..base.base_predictor import BasePredictor
-from ...core import AutoGluonObject
+from autogluon_core.core import AutoGluonObject
 from ...utils import save, load, collect_params, update_params
 
 __all__ = ['Detector']

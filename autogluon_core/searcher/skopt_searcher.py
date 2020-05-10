@@ -1,7 +1,7 @@
 import pickle
 import logging
 
-from ..utils import warning_filter
+from autogluon.utils import warning_filter
 with warning_filter():
     from skopt import Optimizer
     from skopt.space import Integer, Real, Categorical

@@ -1,7 +1,7 @@
 import logging
 import multiprocessing as mp
 from .resource import *
-from ...utils import Queue
+from autogluon.utils import Queue
 
 __all__ = ['ResourceManager']
 

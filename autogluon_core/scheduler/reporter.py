@@ -5,7 +5,7 @@ import json
 import logging
 import threading
 import multiprocessing as mp
-from ..utils import save, load, AutoGluonEarlyStop
+from autogluon.utils import save, load, AutoGluonEarlyStop
 import distributed
 from distributed import Queue, Variable
 from distributed.comm.core import CommClosedError

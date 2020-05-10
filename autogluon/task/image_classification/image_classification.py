@@ -10,10 +10,10 @@ from .pipeline import train_image_classification
 from .utils import *
 from ..base import BaseTask
 from ..base.base_task import schedulers
-from ...core import *
-from ...core.loss import *
-from ...core.optimizer import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon_core.core import *
+from autogluon_core.core.loss import *
+from autogluon_core.core.optimizer import *
+from autogluon_core.scheduler import get_cpu_count, get_gpu_count
 from ...utils import update_params
 
 __all__ = ['ImageClassification']

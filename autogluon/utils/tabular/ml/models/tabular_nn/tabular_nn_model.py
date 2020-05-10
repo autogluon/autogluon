@@ -19,12 +19,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer  # PowerTransformer
 
-from ......core import Space
+from autogluon_core.core import Space
 from ......utils import try_import_mxboard
-from ......task.base import BasePredictor
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....metrics import log_loss
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder

@@ -4,8 +4,8 @@ import logging
 
 from ....utils.loaders import load_pkl
 from ....utils.exceptions import TimeLimitExceeded
-from ......core import args
-from ......scheduler.reporter import LocalStatusReporter
+from autogluon_core.core import args
+from autogluon_core.scheduler.reporter import LocalStatusReporter
 
 logger = logging.getLogger(__name__)
 

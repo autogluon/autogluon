@@ -2,7 +2,7 @@ import json
 import collections
 import mxnet as mx
 from mxnet import gluon
-from ...core.space import Categorical, Space, _strip_config_space
+from autogluon_core.core.space import Categorical, Space, _strip_config_space
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -155,7 +155,6 @@ def enas_net(**kwvars):
                 return self._avg_latency
 
             def evaluate_latency(self, x):
-                import time
                 # evaluate submodule latency
                 for k, op in self._modules.items():
                     if hasattr(op, 'evaluate_latency'):
@@ -276,7 +275,6 @@ class ENAS_Sequential(gluon.HybridBlock):
         return self._avg_latency
 
     def evaluate_latency(self, x):
-        import time
         # evaluate submodule latency
         for k, op in self._modules.items():
             if hasattr(op, 'evaluate_latency'):

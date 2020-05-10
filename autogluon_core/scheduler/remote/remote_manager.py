@@ -4,7 +4,7 @@ import logging
 import multiprocessing as mp
 
 from .remote import Remote
-from ...utils import warning_filter
+from autogluon.utils import warning_filter
 
 __all__ = ['RemoteManager']
 

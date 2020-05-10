@@ -13,7 +13,7 @@ from mxnet.gluon.data import RecordFileDataset
 from mxnet.gluon.data.vision import ImageFolderDataset as MXImageFolderDataset
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms
 
-from ...core import *
+from autogluon_core.core import *
 from ...utils import get_data_rec
 from ...utils.pil_transforms import *
 

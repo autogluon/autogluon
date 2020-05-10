@@ -6,7 +6,7 @@ import mxnet as mx
 
 import autogluon as ag
 from autogluon import ObjectDetection as task
-from autogluon.scheduler.resource import get_gpu_count
+from autogluon import get_gpu_count
 
 # meta info for each dataset. { name: (url, index_file_name_trainval, index_file_name_test), ...}
 dataset_dict = {

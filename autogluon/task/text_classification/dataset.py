@@ -1,15 +1,12 @@
-import multiprocessing as mp
 import warnings
-from typing import AnyStr
 import pandas as pd
 
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
-import gluonnlp as nlp
 
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
-from ...core import *
+from autogluon_core.core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',

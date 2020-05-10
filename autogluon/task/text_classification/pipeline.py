@@ -1,21 +1,16 @@
-import os
-import io
 import time
 import logging
 import multiprocessing
 import random
-import warnings
 import numpy as np
 
 import mxnet as mx
-from mxnet import gluon, init, autograd, nd
-from mxnet.gluon import nn
+from mxnet import gluon, autograd
 import gluonnlp as nlp
 from gluonnlp.data import BERTTokenizer
 from .network import get_network#BERTClassifier, RoBERTaClassifier, LMClassifier
-from .dataset import *
 from .transforms import BERTDatasetTransform
-from ...core import *
+from autogluon_core.core import *
 from ...utils import tqdm
 from ...utils.mxutils import collect_params
 

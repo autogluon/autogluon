@@ -3,8 +3,8 @@ import logging
 import mxnet as mx
 import gluonnlp as nlp
 
-from ...core import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon_core.core import *
+from autogluon_core.scheduler import get_cpu_count, get_gpu_count
 from ..base import BaseTask
 from ...utils import update_params
 

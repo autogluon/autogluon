@@ -4,7 +4,7 @@ import pickle
 from collections import OrderedDict
 import numpy as np
 
-from ..utils import DeprecationHelper
+from autogluon.utils import DeprecationHelper
 
 __all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
 
@@ -49,7 +49,7 @@ class BaseSearcher(object):
                 Scheduler the searcher is used with.
 
         """
-        from autogluon.scheduler.fifo import FIFOScheduler
+        from autogluon_core.scheduler import FIFOScheduler
 
         if isinstance(scheduler, FIFOScheduler):
             self._reward_attribute = scheduler._reward_attr
