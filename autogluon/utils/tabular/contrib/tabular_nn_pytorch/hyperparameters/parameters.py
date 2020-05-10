@@ -19,6 +19,7 @@ def get_param_multiclass_baseline():
         'nn.tabular.lr': 1e-2,
         'nn.tabular.epochs': 30,
         'nn.tabular.metric': 'accuracy',
+        'nn.tabular.early.stopping.patience': 5,
     }
     return params
 
@@ -35,5 +36,6 @@ def get_param_regression_baseline():
         'nn.tabular.lr': 1e-2,
         'nn.tabular.epochs': 30,
         'nn.tabular.metric': 'root_mean_squared_error',
+        'nn.tabular.early.stopping.patience': 5,
     }
     return params
