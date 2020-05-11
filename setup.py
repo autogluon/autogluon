@@ -4,17 +4,21 @@ import shutil
 import subprocess
 
 from setuptools import setup, find_packages
-import setuptools.command.develop
-import setuptools.command.install
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.7'
+version = '0.0.8'
+"""
+To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
+a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
+You need to increase the version number after stable release, so that the nightly pypi can work properly.
+"""
 try:
-    from datetime import date
-    today = date.today()
-    day = today.strftime("b%d%m%Y")
-    version += day
+    if not os.getenv('RELEASE'):
+        from datetime import date
+        today = date.today()
+        day = today.strftime("b%Y%m%d")
+        version += day
 except Exception:
     pass
 
@@ -25,17 +29,6 @@ def create_version_file():
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
-
-# run test scrip after installation
-class install(setuptools.command.install.install):
-    def run(self):
-        create_version_file()
-        setuptools.command.install.install.run(self)
-
-class develop(setuptools.command.develop.develop):
-    def run(self):
-        create_version_file()
-        setuptools.command.develop.develop.run(self)
 
 long_description = open('README.md').read()
 
@@ -72,33 +65,31 @@ test_requirements = [
     'pytest',
 ]
 
-setup(
-    # Metadata
-    name='autogluon',
-    version=version,
-    author='AutoGluon Community',
-    url='https://github.com/awslabs/autogluon',
-    description='AutoML Toolkit with MXNet Gluon',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    license='Apache',
+if __name__ == '__main__':
+    create_version_file()
+    setup(
+        # Metadata
+        name='autogluon',
+        version=version,
+        author='AutoGluon Community',
+        url='https://github.com/awslabs/autogluon',
+        description='AutoML Toolkit with MXNet Gluon',
+        long_description=long_description,
+        long_description_content_type='text/markdown',
+        license='Apache',
 
-    # Package info
-    packages=find_packages(exclude=('docs', 'tests', 'scripts')),
-    zip_safe=True,
-    include_package_data=True,
-    install_requires=requirements + test_requirements,
-    python_requires=MIN_PYTHON_VERSION,
-    package_data={'autogluon': [
-        'LICENSE',
-    ]},
-    cmdclass={
-        'install': install,
-        'develop': develop,
-    },
-    entry_points={
-        'console_scripts': [
-            'agremote = autogluon.scheduler.remote.cli:main',
-        ]
-    },
-)
+        # Package info
+        packages=find_packages(exclude=('docs', 'tests', 'scripts')),
+        zip_safe=True,
+        include_package_data=True,
+        install_requires=requirements + test_requirements,
+        python_requires=MIN_PYTHON_VERSION,
+        package_data={'autogluon': [
+            'LICENSE',
+        ]},
+        entry_points={
+            'console_scripts': [
+                'agremote = autogluon.scheduler.remote.cli:main',
+            ]
+        },
+    )
