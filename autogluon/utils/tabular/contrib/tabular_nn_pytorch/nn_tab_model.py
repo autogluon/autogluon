@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import shutil
 import tempfile
 from functools import partial
@@ -10,6 +11,7 @@ from fastai.basic_data import DatasetType
 from fastai.basic_train import load_learner
 from fastai.callbacks import SaveModelCallback, EarlyStoppingCallback
 from fastai.data_block import FloatList
+from fastai.layers import LabelSmoothingCrossEntropy
 from fastai.metrics import mean_absolute_error, accuracy, root_mean_squared_error, AUROC, mean_squared_error, r2_score, FBeta, Precision, Recall
 from fastai.tabular import tabular_learner, TabularList, FillMissing, Categorify, Normalize
 from fastai.utils.mod_display import progress_disabled_ctx
@@ -19,7 +21,7 @@ from sklearn.pipeline import Pipeline
 
 from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_param_baseline
 from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.searchspaces import get_default_searchspace
-from autogluon.utils.tabular.ml.constants import REGRESSION, BINARY
+from autogluon.utils.tabular.ml.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
 from autogluon.utils.tabular.ml.models.tabular_nn.categorical_encoders import OrdinalMergeRaresHandleUnknownEncoder
 from autogluon.utils.tabular.utils.loaders import load_pkl
@@ -27,6 +29,7 @@ from autogluon.utils.tabular.utils.savers import save_pkl
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
+# Reproduced with raw torch: https://github.com/pytorch/pytorch/issues/31867
 # https://forums.fast.ai/t/runtimeerror-received-0-items-of-ancdata/48935
 # https://github.com/pytorch/pytorch/issues/973
 # https://pytorch.org/docs/master/multiprocessing.html#file-system-file-system
@@ -35,6 +38,8 @@ from autogluon.utils.tabular.utils.savers import save_pkl
 # torch.multiprocessing.set_sharing_strategy('file_system')
 
 LABEL = '__label__'
+
+logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -146,7 +151,7 @@ class NNFastAiTabularModel(AbstractModel):
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             Y_train_norm = pd.Series(self.y_scaler.fit_transform(Y_train.values.reshape(-1, 1)).reshape(-1))
             Y_test_norm = pd.Series(self.y_scaler.transform(Y_test.values.reshape(-1, 1)).reshape(-1)) if Y_test is not None else None
-            print(f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
+            logger.log(15, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
         else:
             Y_train_norm = Y_train
             Y_test_norm = Y_test
@@ -157,13 +162,13 @@ class NNFastAiTabularModel(AbstractModel):
             cat_cols_to_drop = []
         cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
         cat_cols_to_use = [col for col in self.cat_names if col in cat_cols_to_keep]
-        print(f'Using {len(cat_cols_to_use)}/{len(self.cat_names)} categorical features')
+        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_names)} categorical features')
         self.cat_names = cat_cols_to_use
         self.cat_names = [feature for feature in self.cat_names if feature in list(X_train.columns)]
         self.cont_names = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present(
             'datetime')  # + self.__get_feature_type_if_present('vectorizers')  # Disabling vectorizers until more performance testing is done
         self.cont_names = [feature for feature in self.cont_names if feature in list(X_train.columns)]
-        print(f'Using {len(self.cont_names)} cont features')
+        logger.log(15, f'Using {len(self.cont_names)} cont features')
         X_train = self.preprocess(X_train, fit=True)
         if X_test is not None:
             X_test = self.preprocess(X_test)
@@ -184,7 +189,7 @@ class NNFastAiTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
-        print(f'Fitting Neural Networ with parameters {self.params}...')
+        logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
         data = self.preprocess_train(X_train, Y_train, X_test, Y_test)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
@@ -194,7 +199,7 @@ class NNFastAiTabularModel(AbstractModel):
         ] else 'auto'
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
-        if self.problem_type == REGRESSION or self.problem_type == BINARY:
+        if self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         else:
             base_size = max(len(data.classes) * 2, 100)
@@ -202,11 +207,16 @@ class NNFastAiTabularModel(AbstractModel):
 
         early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
                                     min_delta=self.params['nn.tabular.early.stopping.min_delta'], patience=self.params['nn.tabular.early.stopping.patience'])
+
+        loss_func = None
+        if self.problem_type in [BINARY, MULTICLASS] and 'nn.tabular.smoothing' in self.params:
+            loss_func = LabelSmoothingCrossEntropy(self.params['nn.tabular.smoothing'])
+
         self.model = tabular_learner(
             data, layers=layers, ps=[self.params['nn.tabular.dropout']], emb_drop=self.params['nn.tabular.dropout'], metrics=nn_metric,
-            callback_fns=[early_stopping_fn]
+            loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
-        print(self.model.model)
+        logger.log(15, self.model.model)
 
         with make_temp_directory() as temp_dir:
             save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name)
@@ -223,7 +233,7 @@ class NNFastAiTabularModel(AbstractModel):
                 else:
                     self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
 
-                print(f'Model validation metrics: {self.eval_result}')
+                logger.log(15, f'Model validation metrics: {self.eval_result}')
                 model.path = original_path
 
     def __get_objective_func_name(self):
@@ -260,8 +270,8 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    def predict(self, X):
-        return super().predict(X)
+    def predict(self, X, preprocess=True):
+        return super().predict(X, preprocess)
 
     def predict_proba(self, X, preprocess=True):
         if preprocess:
