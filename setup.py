@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.9'
+version = '0.0.10'
 """
 To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
 a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
