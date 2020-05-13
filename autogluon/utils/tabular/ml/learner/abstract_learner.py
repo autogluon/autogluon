@@ -83,16 +83,9 @@ class AbstractLearner:
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True, sample=None):
-        ##########
-        # Enable below for local testing # TODO: do we want to keep sample option?
-        if sample is not None:
-            X_test = X_test.head(sample)
-        ##########
-        trainer = self.load_trainer()
-
+    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
         X_test = self.transform_features(X_test)
-        y_pred_proba = trainer.predict_proba(X_test, model=model)
+        y_pred_proba = self.load_trainer().predict_proba(X_test, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):
@@ -107,7 +100,7 @@ class AbstractLearner:
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, model=None, as_pandas=False, sample=None, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X_test: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
@@ -126,7 +119,7 @@ class AbstractLearner:
             X_test_cache_miss = X_test
 
         if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False, sample=sample)
+            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False)
             problem_type = self.trainer_problem_type or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
