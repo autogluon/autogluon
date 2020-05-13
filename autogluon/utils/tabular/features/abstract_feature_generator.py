@@ -26,6 +26,7 @@ class AbstractFeatureGenerator:
         self.features_to_remove_post = []
         self.features_to_keep_raw = []
         self.features_object = []
+        self.features_init_types = dict()
         self.feature_types = defaultdict(list)
         self.feature_type_family = defaultdict(list)
         self.feature_type_family_generated = defaultdict(list)
@@ -108,6 +109,7 @@ class AbstractFeatureGenerator:
         self.get_feature_types(X)
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         self.features_init_to_keep = copy.deepcopy(list(X.columns))
+        self.features_init_types = X.dtypes.to_dict()
         X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
         for column in X_features:
@@ -151,9 +153,9 @@ class AbstractFeatureGenerator:
     @calculate_time
     def transform(self, X: DataFrame):
         if not self.fit:
-            raise Exception('FeatureGenerator has not yet been fit!')
+            raise AssertionError('FeatureGenerator has not yet been fit.')
         if self.features is None:
-            raise Exception('FeatureGenerator.features is None, have you called fit() yet?')
+            raise AssertionError('FeatureGenerator.features is None, have you called fit() yet?')
         X_index = copy.deepcopy(X.index)
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         X_columns = X.columns.tolist()
@@ -162,16 +164,10 @@ class AbstractFeatureGenerator:
         for col in self.features_init_to_keep:
             if col not in X_columns:
                 missing_cols.append(col)
-                if col in self.features_object:  # was a dtype==object column in training dataset
-                    X[col] = [None] * len(X)
-                else:  # was a dtype==numerical column in training dataset
-                    X[col] = [np.nan] * len(X)
-        # TODO: I don't think we hould allow missing columns. This is dangerous, we should throw an exception instead.
         if len(missing_cols) > 0:
-            warnings.warn("The columns listed below from the training data are no longer in the given dataset. "
-                          "(AutoGluon will proceed assuming their values are missing, but you should remove these columns "
-                          "from training dataset and train a new model):  %s" % missing_cols)
+            raise ValueError(f'Required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
+        X = X.astype(self.features_init_types)
         X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
         for column in self.features_binned:
