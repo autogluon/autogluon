@@ -283,7 +283,7 @@ soft_log_loss = make_scorer('soft_log_loss', softclass_metrics.soft_log_loss,
 
 REGRESSION_METRICS = {
     scorer.name: scorer
-    for scorer in [r2, mean_squared_error, mean_absolute_error, median_absolute_error]
+    for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error, median_absolute_error]
 }
 
 CLASSIFICATION_METRICS = {
@@ -370,7 +370,7 @@ def get_metric(metric, problem_type, metric_type):
             return soft_log_loss
         else:
             raise ValueError(
-                f"{metric} is unknown metric, see utils/tabular/metrics/ for available options "
+                f"{metric} is an unknown metric, see utils/tabular/metrics/ for available options "
                 f"or how to define your own {metric_type} function"
             )
     else:
