@@ -8,7 +8,7 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
-from ..base import BaseTask
+from ..base import BaseTask, compile_scheduler_options
 from ..base.base_task import schedulers
 from ...utils import verbosity2loglevel
 from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
@@ -65,7 +65,8 @@ class TabularPrediction(BaseTask):
             holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
             hyperparameters=None, num_trials=None, search_strategy='random', search_options=None,
             nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
-            verbosity=2, **kwargs):
+            verbosity=2, epochs=None, grace_period=None, reduction_factor=None, brackets=None,
+            type=None, searcher_data=None, **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
 
@@ -264,6 +265,18 @@ class TabularPrediction(BaseTask):
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        epochs : int
+            Maximum number of epochs (max_t of HyperbandScheduler)
+        grace_period : int
+            See HyperbandScheduler
+        reduction_factor : int
+            See HyperbandScheduler
+        brackets : int
+            See HyperbandScheduler
+        type : str
+            See HyperbandScheduler
+        searcher_data : str
+            See HyperbandScheduler
 
         Kwargs can include additional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
@@ -497,31 +510,16 @@ class TabularPrediction(BaseTask):
         stopping_metric = get_metric(stopping_metric, problem_type, 'stopping_metric')
 
         # All models use the same scheduler:
-        scheduler_options = {
-            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
-            'num_trials': num_trials,
-            'time_out': time_limits_hpo,
-            'visualizer': visualizer,
-            'time_attr': 'epoch',  # For tree ensembles, each new tree (ie. boosting round) is considered one epoch
-            'reward_attr': 'validation_performance',
-            'dist_ip_addrs': dist_ip_addrs,
-            'searcher': search_strategy,
-            'search_options': search_options,
-        }
-        if isinstance(search_strategy, str):
-            scheduler_cls = schedulers[search_strategy.lower()]
-            # This is a fix for now. But we need to separate between scheduler
-            # (mainly FIFO and Hyperband) and searcher. Currently, most searchers
-            # only work with FIFO, and Hyperband works only with random searcher,
-            # but this will be different in the future.
-            if search_strategy == 'hyperband':
-                # Currently, HyperbandScheduler only supports random searcher
-                scheduler_options['searcher'] = 'random'
-        else:
-            # TODO: Check that search_strategy is a subclass of TaskScheduler
-            assert callable(search_strategy)
-            scheduler_cls = search_strategy
-            scheduler_options['searcher'] = 'random'
+        scheduler_options = compile_scheduler_options(
+            search_strategy, nthreads_per_trial, ngpus_per_trial,
+            checkpoint=None, num_trials=num_trials, time_out=time_limits,
+            resume=False, visualizer=visualizer, time_attr='epoch',
+            reward_attr='validation_performance',
+            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs, grace_period=grace_period,
+            reduction_factor=reduction_factor, brackets=brackets, type=type,
+            searcher_data=searcher_data)
+        scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,

@@ -5,7 +5,7 @@ import gluonnlp as nlp
 
 from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ..base import BaseTask
+from ..base import BaseTask, compile_scheduler_options
 from ...utils import update_params
 
 from .network import get_network
@@ -49,14 +49,18 @@ class TextClassification(BaseTask):
             ngpus_per_trial=1,
             hybridize=True,
             search_strategy='random',
-            search_options={},
+            search_options=None,
             time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
             num_trials=2,
-            dist_ip_addrs=[],
+            dist_ip_addrs=None,
             grace_period=None,
+            reduction_factor=None,
+            brackets=None,
+            type=None,
+            searcher_data=None,
             auto_search=True,
             verbose=False,
             **kwargs):
@@ -124,7 +128,15 @@ class TextClassification(BaseTask):
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         grace_period : int
-            The grace period in early stopping when using Hyperband to tune hyperparameters. If None, this is set automatically.
+            See HyperbandScheduler
+        reduction_factor : int
+            See HyperbandScheduler
+        brackets : int
+            See HyperbandScheduler
+        type : str
+            See HyperbandScheduler
+        searcher_data : str
+            See HyperbandScheduler
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
         
@@ -176,24 +188,14 @@ class TextClassification(BaseTask):
             final_fit=False,
             **kwargs)
 
-        scheduler_options = {
-            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
-            'checkpoint': checkpoint,
-            'num_trials': num_trials,
-            'time_out': time_limits,
-            'resume': resume,
-            'visualizer': visualizer,
-            'time_attr': 'epoch',
-            'reward_attr': 'accuracy',
-            'dist_ip_addrs': dist_ip_addrs,
-            'searcher': search_strategy,
-            'search_options': search_options,
-        }
-        if search_strategy == 'hyperband':
-            scheduler_options.update({
-                'searcher': 'random',
-                'max_t': epochs,
-                'grace_period': grace_period if grace_period else epochs//4})
+        scheduler_options = compile_scheduler_options(
+            search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
+            num_trials, time_out=time_limits, resume=resume,
+            visualizer=visualizer, time_attr='epoch', reward_attr='accuracy',
+            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs, grace_period=grace_period,
+            reduction_factor=reduction_factor, brackets=brackets, type=type,
+            searcher_data=searcher_data)
         results = BaseTask.run_fit(
             train_text_classification, search_strategy, scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])

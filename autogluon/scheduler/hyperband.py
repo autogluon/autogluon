@@ -3,11 +3,14 @@ import logging
 import threading
 import numpy as np
 import multiprocessing as mp
+import os
 
 from .fifo import FIFOScheduler
 from .hyperband_stopping import HyperbandStopping_Manager
 from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
+from ..utils import load
+
 
 __all__ = ['HyperbandScheduler',
            'HyperbandStopping_Manager',
@@ -186,9 +189,11 @@ class HyperbandScheduler(FIFOScheduler):
         _search_options['resource_attribute'] = time_attr
         _search_options['min_epochs'] = grace_period
         _search_options['max_epochs'] = max_t
+        # Pass resume=False here. Resume needs members of this object to be
+        # created
         super().__init__(
             train_fn=train_fn, args=args, resource=resource, searcher=searcher,
-            search_options=_search_options, checkpoint=checkpoint, resume=resume,
+            search_options=_search_options, checkpoint=checkpoint, resume=False,
             num_trials=num_trials, time_out=time_out, max_reward=max_reward,
             reward_attr=reward_attr, time_attr=time_attr,
             visualizer=visualizer, dist_ip_addrs=dist_ip_addrs,
@@ -236,6 +241,16 @@ class HyperbandScheduler(FIFOScheduler):
         # This lock protects both _running_tasks and terminator, the latter
         # does not define its own lock
         self._hyperband_lock = mp.Lock()
+        if resume:
+            assert checkpoint is not None, \
+                "Need checkpoint to be set if resume = True"
+            if os.path.isfile(checkpoint):
+                self.load_state_dict(load(checkpoint))
+            else:
+                msg = f'checkpoint path {checkpoint} is not available for resume.'
+                logger.exception(msg)
+                raise FileExistsError(msg)
+
 
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
@@ -330,12 +345,9 @@ class HyperbandScheduler(FIFOScheduler):
     def _run_reporter(self, task, task_job, reporter):
         last_result = None
         last_updated = None
+        task_key = str(task.task_id)
         while not task_job.done():
             reported_result = reporter.fetch()
-            # Time since start of experiment
-            elapsed_time = self._elapsed_time()
-            reported_result['time_since_start'] = elapsed_time
-            task_key = str(task.task_id)
             if 'traceback' in reported_result:
                 # Evaluation has failed
                 logger.exception(reported_result['traceback'])
@@ -353,6 +365,13 @@ class HyperbandScheduler(FIFOScheduler):
                     # Cleanup
                     del self._running_tasks[task_key]
                 break
+            if len(reported_result) == 0:
+                # An empty dict should just be skipped
+                logger.warning("Skipping empty dict received from reporter")
+                continue
+            # Time since start of experiment
+            elapsed_time = self._elapsed_time()
+            reported_result['time_since_start'] = elapsed_time
 
             # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
@@ -431,14 +450,6 @@ class HyperbandScheduler(FIFOScheduler):
                 # variant. It means that the *task* terminates, while the
                 # evaluation of the config is just paused
                 last_result['terminated'] = True
-                resource = int(reported_result[self._time_attr])
-                if self.type == 'stopping' or resource >= self.max_t:
-                    act_str = 'terminating'
-                else:
-                    act_str = 'pausing'
-                logger.debug(
-                    'Stopping task ({} evaluation, resource = {}):\n{}'.format(
-                        act_str, resource, task))
                 with self._hyperband_lock:
                     self.terminator.on_task_remove(task)
                     # Cleanup

@@ -8,8 +8,7 @@ from .dataset import get_dataset
 from .nets import *
 from .pipeline import train_image_classification
 from .utils import *
-from ..base import BaseTask
-from ..base.base_task import schedulers
+from ..base import BaseTask, compile_scheduler_options, create_scheduler
 from ...core import *
 from ...core.loss import *
 from ...core.optimizer import *
@@ -83,14 +82,18 @@ class ImageClassification(BaseTask):
             search_strategy='random',
             plot_results=False,
             verbose=False,
-            search_options={},
+            search_options=None,
             time_limits=None,
             resume=False,
             output_directory='checkpoint/',
             visualizer='none',
             num_trials=2,
-            dist_ip_addrs=[],
+            dist_ip_addrs=None,
             grace_period=None,
+            reduction_factor=None,
+            brackets=None,
+            type=None,
+            searcher_data=None,
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -163,14 +166,22 @@ class ImageClassification(BaseTask):
             If a model checkpoint file exists, model training will resume from there when specified.
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+        grace_period : int
+            See HyperbandScheduler
+        reduction_factor : int
+            See HyperbandScheduler
+        brackets : int
+            See HyperbandScheduler
+        type : str
+            See HyperbandScheduler
+        searcher_data : str
+            See HyperbandScheduler
         verbose : bool
             Whether or not to print out intermediate information during training.
         plot_results : bool
             Whether or not to generate plots summarizing training process.
         visualizer : str
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
-        grace_period : int
-            The grace period in early stopping when using Hyperband to tune hyperparameters. If None, this is set automatically.
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
 
@@ -268,30 +279,18 @@ class ImageClassification(BaseTask):
             lr_config=lr_config
         )
 
-        scheduler_options = {
-            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
-            'checkpoint': checkpoint,
-            'num_trials': num_trials,
-            'time_out': time_limits,
-            'resume': resume,
-            'visualizer': visualizer,
-            'time_attr': 'epoch',
-            'reward_attr': 'classification_reward',
-            'dist_ip_addrs': dist_ip_addrs,
-            'searcher': search_strategy,
-            'search_options': search_options,
-            'plot_results': plot_results
-        }
-        if search_strategy == 'hyperband':
-            scheduler_options.update(
-                {
-                    'searcher': 'random',
-                    'max_t': epochs,
-                    'grace_period': grace_period if grace_period else epochs // 4
-                }
-            )
-
-        results = BaseTask.run_fit(train_image_classification, search_strategy, scheduler_options)
+        scheduler_options = compile_scheduler_options(
+            search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
+            num_trials, time_out=time_limits, resume=resume,
+            visualizer=visualizer, time_attr='epoch',
+            reward_attr='classification_reward',
+            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs, grace_period=grace_period,
+            reduction_factor=reduction_factor, brackets=brackets, type=type,
+            searcher_data=searcher_data)
+        results = BaseTask.run_fit(
+            train_image_classification, search_strategy, scheduler_options,
+            plot_results=plot_results)
         args = sample_config(train_image_classification.args, results['best_config'])
 
         kwargs = {'num_classes': results['num_classes'], 'ctx': mx.cpu(0)}
@@ -301,14 +300,8 @@ class ImageClassification(BaseTask):
 
         if ensemble > 1:
             models = [model]
-            if isinstance(search_strategy, str):
-                scheduler_cls = schedulers[search_strategy.lower()]
-            else:
-                assert callable(search_strategy)
-                scheduler_cls = search_strategy
-                scheduler_options['searcher'] = 'random'
-            scheduler = scheduler_cls(
-                train_image_classification, **scheduler_options)
+            scheduler = create_scheduler(
+                train_image_classification, search_strategy, scheduler_options)
             for i in range(1, ensemble):
                 resultsi = scheduler.run_with_config(results['best_config'])
                 kwargs = {
