@@ -321,7 +321,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
         model_compressed.params = compressed_params
         model_compressed.name = model_compressed.name + REFIT_FULL_SUFFIX
-        model_compressed.set_contexts(self.path + model_compressed.name + os.path.sep)
+        model_compressed.set_contexts(self.path_root + model_compressed.name + os.path.sep)
         return model_compressed
 
     def _get_compressed_params(self):
