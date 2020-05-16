@@ -21,8 +21,7 @@ schedulers = {
     'random': FIFOScheduler,
     'skopt': FIFOScheduler,
     'hyperband': HyperbandScheduler,
-    'rl': RLScheduler,
-}
+    'rl': RLScheduler}
 
 
 def create_scheduler(train_fn, search_strategy, scheduler_options):
@@ -94,7 +93,7 @@ searcher_for_hyperband_strategy = {
 def compile_scheduler_options(
         search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
         num_trials, time_out, resume, visualizer, time_attr, reward_attr,
-        search_options, dist_ip_addrs, epochs, **kwargs):
+        search_options, dist_ip_addrs, **kwargs):
     assert isinstance(search_strategy, str)
     if visualizer is None:
         visualizer = 'none'
@@ -104,26 +103,28 @@ def compile_scheduler_options(
         reward_attr = 'accuracy'
     if search_options is None:
         search_options = dict()
-    if epochs is None:
-        epochs = 20
     scheduler_options = {
         'resource': {
             'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
-        'checkpoint': checkpoint,
-        'num_trials': num_trials,
-        'time_out': time_out,
-        'resume': resume,
-        'visualizer': visualizer,
-        'time_attr': time_attr,
-        'reward_attr': reward_attr,
-        'dist_ip_addrs': dist_ip_addrs,
         'searcher': search_strategy,
         'search_options': search_options,
+        'checkpoint': checkpoint,
+        'resume': resume,
+        'num_trials': num_trials,
+        'time_out': time_out,
+        'reward_attr': reward_attr,
+        'time_attr': time_attr,
+        'visualizer': visualizer,
+        'dist_ip_addrs': dist_ip_addrs,
         'delay_get_config': kwargs.get('delay_get_config', True)}
     searcher = searcher_for_hyperband_strategy.get(search_strategy)
     if searcher is not None:
-        # Note: We can have grace_period=None in kwargs, or grace_period
+        # Additional arguments for HyperbandScheduler
+        # Note: We can have epochs=None in kwargs, or epochs
         # missing in kwargs
+        epochs = kwargs.get('epochs')
+        if epochs is None:
+            epochs = 20
         grace_period = kwargs.get('grace_period')
         if grace_period is None:
             grace_period = 1

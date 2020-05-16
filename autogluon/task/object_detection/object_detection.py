@@ -7,7 +7,7 @@ from .dataset import get_dataset
 from .detector import Detector
 from .pipeline import train_object_detection
 from .utils import get_network
-from ..base import BaseTask, compile_scheduler_options, create_scheduler
+from ..base import BaseTask, compile_scheduler_options
 from ...core.decorator import sample_config
 from ...core.space import Categorical
 from ...scheduler.resource import get_cpu_count, get_gpu_count
@@ -47,6 +47,7 @@ class ObjectDetection(BaseTask):
             time_limits=None,
             verbose=False,
             transfer='coco',
+            resume_model='',
             checkpoint='checkpoint/exp1.ag',
             resume=False,
             visualizer='none',
@@ -105,7 +106,7 @@ class ObjectDetection(BaseTask):
             The final returned model may be fit to all of the data (after hyperparameters have been selected).
         batch_size : int
             How many images to group in each mini-batch during gradient computations in training.
-        epochs: int
+        epochs : int
             How many epochs to train the neural networks for at most.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.
@@ -127,10 +128,13 @@ class ObjectDetection(BaseTask):
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         verbose : bool
             Whether or not to print out intermediate information during training.
-        checkpoint: str
-            The path to local directory where trained models will be saved.
+        resume_model : str
+            Path to checkpoint file of existing model, from which model training should resume.
+        checkpoint : str or None
+            State of hyperparameter search is stored to this local file
         resume : bool
-            If a model checkpoint file exists, model training will resume from there when specified.
+            If True, the hyperparameter search is started from state loaded
+            from checkpoint
         visualizer : str
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list
@@ -254,13 +258,13 @@ class ObjectDetection(BaseTask):
             mixup=mixup,
             no_mixup_epochs=no_mixup_epochs,
             label_smooth=label_smooth,
-            resume=resume,
+            resume=resume_model,
             syncbn=syncbn,
             reuse_pred_weights=reuse_pred_weights)
 
         scheduler_options = compile_scheduler_options(
             search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
-            num_trials,time_out=time_limits, resume=resume,
+            num_trials, time_out=time_limits, resume=resume,
             visualizer=visualizer, time_attr='epoch', reward_attr='map_reward',
             search_options=search_options, dist_ip_addrs=dist_ip_addrs,
             epochs=epochs, grace_period=grace_period,

@@ -119,10 +119,11 @@ class TextClassification(BaseTask):
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         verbose : bool
             Whether or not to print out intermediate information during training.
-        checkpoint: str
-            The path to local directory where trained models will be saved.
-        resume : str
-            Path to checkpoint file of existing model, from which model training should resume.
+        checkpoint : str or None
+            State of hyperparameter search is stored to this local file
+        resume : bool
+            If True, the hyperparameter search is started from state loaded
+            from checkpoint
         visualizer : str
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list

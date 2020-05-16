@@ -156,14 +156,16 @@ class ImageClassification(BaseTask):
         ngpus_per_trial : int
             How many GPUs to use in each trial (ie. single training run of a model).
         output_directory : str
-            Dir to save search results.
+            Checkpoints of the search state are written to
+            os.path.join(output_directory, 'exp1.ag')
         search_strategy : str
             Which hyperparameter search algorithm to use.
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         resume : bool
-            If a model checkpoint file exists, model training will resume from there when specified.
+            If True, the hyperparameter search is started from state loaded from
+            os.path.join(output_directory, 'exp1.ag')
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         grace_period : int
