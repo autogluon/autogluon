@@ -379,7 +379,7 @@ class AbstractModel:
         template = self.convert_to_template()
         template.params.update(params_trained)
         template.name = template.name + REFIT_FULL_SUFFIX
-        template.path = template.create_contexts(self.path + template.name + os.path.sep)
+        template.set_contexts(self.path_root + template.name + os.path.sep)
         return template
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
