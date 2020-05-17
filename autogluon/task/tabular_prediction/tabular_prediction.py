@@ -453,6 +453,12 @@ class TabularPrediction(BaseTask):
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
 
+        if dist_ip_addrs is None:
+            dist_ip_addrs = []
+
+        if search_options is None:
+            search_options = dict()
+
         if hyperparameters is None:
             hyperparameters = 'default'
         if isinstance(hyperparameters, str):
@@ -519,7 +525,7 @@ class TabularPrediction(BaseTask):
         scheduler_options = compile_scheduler_options(
             scheduler_options, search_strategy, search_options,
             nthreads_per_trial, ngpus_per_trial, checkpoint=None,
-            num_trials=num_trials, time_out=time_limits, resume=False,
+            num_trials=num_trials, time_out=time_limits_hpo, resume=False,
             visualizer=visualizer, time_attr='epoch',
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs, epochs=epochs)
