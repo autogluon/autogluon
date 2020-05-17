@@ -3,7 +3,7 @@
 from autogluon import TabularPrediction as task
 
 # Training time:
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame
+train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame
 train_data = train_data.head(500) # subsample for faster demo
 print(train_data.head())
 label_column = 'class' # specifies which column do we want to predict
@@ -13,7 +13,7 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
 results = predictor.fit_summary() # display summary of models trained during fit()
 
 # Inference time:
-test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame
+test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame
 y_test = test_data[label_column]
 test_data = test_data.drop(labels=[label_column],axis=1) # delete labels from test data since we wouldn't have them in practice
 print(test_data.head())

@@ -82,7 +82,7 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
 
 
 def run_tabular_benchmark_toy(fit_args):
-    dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/toyClassification.zip',
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyClassification.zip',
                           'name': 'toyClassification',
                           'problem_type': MULTICLASS,
                           'label_column': 'y',
@@ -122,25 +122,25 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
 
     # Information about each dataset in benchmark is stored in dict.
     # performance_val = expected performance on this dataset (lower = better),should update based on previously run benchmarks
-    binary_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
+    binary_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
                       'name': 'AdultIncomeBinaryClassification',
                       'problem_type': BINARY,
                       'label_column': 'class',
                       'performance_val': 0.129} # Mixed types of features.
 
-    multi_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
+    multi_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/CoverTypeMulticlassClassification.zip',
                       'name': 'CoverTypeMulticlassClassification',
                       'problem_type': MULTICLASS,
                       'label_column': 'Cover_Type',
                       'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
-    regression_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
+    regression_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
                        'name': 'AmesHousingPriceRegression',
                       'problem_type': REGRESSION,
                       'label_column': 'SalePrice',
                       'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
 
-    toyregres_dataset = {'url': 'https://autogluon.s3-us-west-2.amazonaws.com/datasets/toyRegression.zip', 
+    toyregres_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
                          'name': 'toyRegression',
                          'problem_type': REGRESSION, 
                         'label_column': 'y', 

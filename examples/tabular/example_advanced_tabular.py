@@ -7,7 +7,7 @@ import autogluon as ag
 from autogluon import TabularPrediction as task
 
 # Training time:
-train_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame
+train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame
 train_data = train_data.head(100) # subsample for faster demo
 print(train_data.head())
 label_column = 'class' # specifies which column do we want to predict
@@ -23,7 +23,7 @@ predictor = task.fit(train_data=train_data, label=label_column, output_directory
 results = predictor.fit_summary() # display detailed summary of fit() process
 
 # Inference time:
-test_data = task.Dataset(file_path='https://autogluon.s3-us-west-2.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame
+test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame
 print(test_data.head())
 
 perf = predictor.evaluate(test_data) # shorthand way to evaluate our predictor if test-labels available
