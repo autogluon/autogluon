@@ -124,6 +124,10 @@ Here is an example of using an early stopping scheduler :class:`autogluon.schedu
 
 ```{.python .input}
 search_strategy = 'hyperband'
+scheduler_options = {
+    'grace_period': 1,
+    'reduction_factor': 3,
+    'brackets': 1}
 
 classifier = task.fit(dataset,
                       net=net,
@@ -134,7 +138,7 @@ classifier = task.fit(dataset,
                       verbose=False,
                       plot_results=True,
                       ngpus_per_trial=1,
-                      grace_period=1)
+                      scheduler_options=scheduler_options)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
