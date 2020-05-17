@@ -542,7 +542,10 @@ class AbstractLearner:
 
         unique_values = y.unique()
         unique_count = len(unique_values)
-        logger.log(20, f'Here are the first 10 unique label values in your data:  {unique_values[:10]}')
+        if unique_count > 10:
+            logger.log(20, f'Here are the first 10 unique label values in your data:  {list(unique_values[:10])}')
+        else:
+            logger.log(20, f'Here are the {unique_count} unique label values in your data:  {list(unique_values)}')
 
         MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
         if num_rows > 1000:
@@ -585,7 +588,7 @@ class AbstractLearner:
             raise NotImplementedError('label dtype', unique_values.dtype, 'not supported!')
         logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
         logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
-                       f"(You may specify problem_type as one of: [{BINARY, MULTICLASS, REGRESSION}])\n")
+                       f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})\n")
         return problem_type
 
     def save(self):

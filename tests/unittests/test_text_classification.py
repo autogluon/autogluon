@@ -19,7 +19,7 @@ def test_fit():
     print('finished')
 
 def test_custom_dataset_fit():
-    os.system('wget https://autogluon-hackathon.s3-us-west-2.amazonaws.com/demodata.zip')
+    os.system('wget https://autogluon-hackathon.s3.amazonaws.com/demodata.zip')
     os.system('unzip -o demodata.zip')
     dataset = task.Dataset(filepath='./demodata/train.csv', usecols=['text', 'target'])
     predictor = task.fit(dataset,

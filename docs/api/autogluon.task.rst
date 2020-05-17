@@ -13,7 +13,7 @@ autogluon.task
    
    Load a toy image dataset:
    
-   >>> filename = ag.download('http://autogluon-hackathon.s3-website-us-west-2.amazonaws.com/data.zip')
+   >>> filename = ag.download('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
    
