@@ -89,11 +89,7 @@ class ImageClassification(BaseTask):
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=None,
-            grace_period=None,
-            reduction_factor=None,
-            brackets=None,
-            type=None,
-            searcher_data=None,
+            scheduler_options=None,
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -168,16 +164,8 @@ class ImageClassification(BaseTask):
             os.path.join(output_directory, 'exp1.ag')
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        grace_period : int
-            See HyperbandScheduler
-        reduction_factor : int
-            See HyperbandScheduler
-        brackets : int
-            See HyperbandScheduler
-        type : str
-            See HyperbandScheduler
-        searcher_data : str
-            See HyperbandScheduler
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler
         verbose : bool
             Whether or not to print out intermediate information during training.
         plot_results : bool
@@ -282,14 +270,11 @@ class ImageClassification(BaseTask):
         )
 
         scheduler_options = compile_scheduler_options(
-            search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
-            num_trials, time_out=time_limits, resume=resume,
-            visualizer=visualizer, time_attr='epoch',
-            reward_attr='classification_reward',
-            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
-            epochs=epochs, grace_period=grace_period,
-            reduction_factor=reduction_factor, brackets=brackets, type=type,
-            searcher_data=searcher_data)
+            scheduler_options, search_strategy, search_options,
+            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
+            time_out=time_limits, resume=resume, visualizer=visualizer,
+            time_attr='epoch', reward_attr='classification_reward',
+            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
         results = BaseTask.run_fit(
             train_image_classification, search_strategy, scheduler_options,
             plot_results=plot_results)

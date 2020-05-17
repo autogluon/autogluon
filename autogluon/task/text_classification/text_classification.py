@@ -56,11 +56,7 @@ class TextClassification(BaseTask):
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=None,
-            grace_period=None,
-            reduction_factor=None,
-            brackets=None,
-            type=None,
-            searcher_data=None,
+            scheduler_options=None,
             auto_search=True,
             verbose=False,
             **kwargs):
@@ -128,16 +124,8 @@ class TextClassification(BaseTask):
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        grace_period : int
-            See HyperbandScheduler
-        reduction_factor : int
-            See HyperbandScheduler
-        brackets : int
-            See HyperbandScheduler
-        type : str
-            See HyperbandScheduler
-        searcher_data : str
-            See HyperbandScheduler
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
         
@@ -190,13 +178,11 @@ class TextClassification(BaseTask):
             **kwargs)
 
         scheduler_options = compile_scheduler_options(
-            search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
-            num_trials, time_out=time_limits, resume=resume,
-            visualizer=visualizer, time_attr='epoch', reward_attr='accuracy',
-            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
-            epochs=epochs, grace_period=grace_period,
-            reduction_factor=reduction_factor, brackets=brackets, type=type,
-            searcher_data=searcher_data)
+            scheduler_options, search_strategy, search_options,
+            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
+            time_out=time_limits, resume=resume, visualizer=visualizer,
+            time_attr='epoch', reward_attr='accuracy',
+            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
         results = BaseTask.run_fit(
             train_text_classification, search_strategy, scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])

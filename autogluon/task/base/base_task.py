@@ -91,19 +91,47 @@ searcher_for_hyperband_strategy = {
 
 
 def compile_scheduler_options(
-        search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
-        num_trials, time_out, resume, visualizer, time_attr, reward_attr,
-        search_options, dist_ip_addrs, **kwargs):
+        scheduler_options, search_strategy, search_options, nthreads_per_trial,
+        ngpus_per_trial, checkpoint, num_trials, time_out, resume, visualizer,
+        time_attr, reward_attr, dist_ip_addrs, epochs):
+    """
+    Updates a copy of scheduler_options (scheduler-specific options, can be
+    empty) with general options. The result can be passed to __init__ of the
+    scheduler.
+
+    :param scheduler_options:
+    :param search_strategy:
+    :param search_options:
+    :param nthreads_per_trial:
+    :param ngpus_per_trial:
+    :param checkpoint:
+    :param num_trials:
+    :param time_out:
+    :param resume:
+    :param visualizer:
+    :param time_attr:
+    :param reward_attr:
+    :param dist_ip_addrs:
+    :param kwargs:
+    :param epochs:
+    :return:
+
+    """
+    if scheduler_options is None:
+        scheduler_options = dict()
+    else:
+        assert isinstance(scheduler_options, dict)
     assert isinstance(search_strategy, str)
+    if search_options is None:
+        search_options = dict()
     if visualizer is None:
         visualizer = 'none'
     if time_attr is None:
         time_attr = 'epoch'
     if reward_attr is None:
         reward_attr = 'accuracy'
-    if search_options is None:
-        search_options = dict()
-    scheduler_options = {
+    scheduler_options = copy.copy(scheduler_options)
+    scheduler_options.update({
         'resource': {
             'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
         'searcher': search_strategy,
@@ -115,37 +143,12 @@ def compile_scheduler_options(
         'reward_attr': reward_attr,
         'time_attr': time_attr,
         'visualizer': visualizer,
-        'dist_ip_addrs': dist_ip_addrs,
-        'delay_get_config': kwargs.get('delay_get_config', True)}
+        'dist_ip_addrs': dist_ip_addrs})
     searcher = searcher_for_hyperband_strategy.get(search_strategy)
     if searcher is not None:
-        # Additional arguments for HyperbandScheduler
-        # Note: We can have epochs=None in kwargs, or epochs
-        # missing in kwargs
-        epochs = kwargs.get('epochs')
         if epochs is None:
             epochs = 20
-        grace_period = kwargs.get('grace_period')
-        if grace_period is None:
-            grace_period = 1
-        reduction_factor = kwargs.get('reduction_factor')
-        if reduction_factor is None:
-            reduction_factor = 3
-        brackets = kwargs.get('brackets')
-        if brackets is None:
-            brackets = 1
-        type = kwargs.get('type')
-        if type is None:
-            type = 'stopping'
-        searcher_data = kwargs.get('searcher_data')
-        if searcher_data is None:
-            searcher_data = 'rungs'
         scheduler_options.update({
             'searcher': searcher,
-            'max_t': epochs,
-            'grace_period': grace_period,
-            'reduction_factor': reduction_factor,
-            'brackets': brackets,
-            'type': type,
-            'searcher_data': searcher_data})
+            'max_t': epochs})
     return scheduler_options

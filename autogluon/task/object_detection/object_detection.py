@@ -52,11 +52,7 @@ class ObjectDetection(BaseTask):
             resume=False,
             visualizer='none',
             dist_ip_addrs=None,
-            grace_period=None,
-            reduction_factor=None,
-            brackets=None,
-            type=None,
-            searcher_data=None,
+            scheduler_options=None,
             auto_search=True,
             seed=223,
             data_shape=416,
@@ -139,16 +135,8 @@ class ObjectDetection(BaseTask):
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        grace_period : int
-            See HyperbandScheduler
-        reduction_factor : int
-            See HyperbandScheduler
-        brackets : int
-            See HyperbandScheduler
-        type : str
-            See HyperbandScheduler
-        searcher_data : str
-            See HyperbandScheduler
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
         seed : int
@@ -263,13 +251,11 @@ class ObjectDetection(BaseTask):
             reuse_pred_weights=reuse_pred_weights)
 
         scheduler_options = compile_scheduler_options(
-            search_strategy, nthreads_per_trial, ngpus_per_trial, checkpoint,
-            num_trials, time_out=time_limits, resume=resume,
-            visualizer=visualizer, time_attr='epoch', reward_attr='map_reward',
-            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
-            epochs=epochs, grace_period=grace_period,
-            reduction_factor=reduction_factor, brackets=brackets, type=type,
-            searcher_data=searcher_data)
+            scheduler_options, search_strategy, search_options,
+            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
+            time_out=time_limits, resume=resume, visualizer=visualizer,
+            time_attr='epoch', reward_attr='map_reward',
+            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
         results = BaseTask.run_fit(
             train_object_detection, search_strategy, scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")

@@ -59,14 +59,34 @@ class TabularPrediction(BaseTask):
 
     @staticmethod
     @unpack(set_presets)
-    def fit(train_data, label, tuning_data=None, time_limits=None, output_directory=None, presets=None,
-            problem_type=None, eval_metric=None, stopping_metric=None,
-            auto_stack=False, hyperparameter_tune=False, feature_prune=False,
-            holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters=None, num_trials=None, search_strategy='random', search_options=None,
-            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
-            verbosity=2, epochs=None, grace_period=None, reduction_factor=None, brackets=None,
-            type=None, searcher_data=None, **kwargs):
+    def fit(train_data,
+            label,
+            tuning_data=None,
+            time_limits=None,
+            output_directory=None,
+            presets=None,
+            problem_type=None,
+            eval_metric=None,
+            stopping_metric=None,
+            auto_stack=False,
+            hyperparameter_tune=False,
+            feature_prune=False,
+            holdout_frac=None,
+            num_bagging_folds=0,
+            num_bagging_sets=None,
+            stack_ensemble_levels=0,
+            hyperparameters=None,
+            num_trials=None,
+            search_strategy='random',
+            search_options=None,
+            nthreads_per_trial=None,
+            ngpus_per_trial=None,
+            dist_ip_addrs=None,
+            visualizer='none',
+            verbosity=2,
+            epochs=None,
+            scheduler_options=None,
+            **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
 
@@ -267,16 +287,8 @@ class TabularPrediction(BaseTask):
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
         epochs : int
             Maximum number of epochs (max_t of HyperbandScheduler)
-        grace_period : int
-            See HyperbandScheduler
-        reduction_factor : int
-            See HyperbandScheduler
-        brackets : int
-            See HyperbandScheduler
-        type : str
-            See HyperbandScheduler
-        searcher_data : str
-            See HyperbandScheduler
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler
 
         Kwargs can include additional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
@@ -441,12 +453,6 @@ class TabularPrediction(BaseTask):
         if hyperparameter_tune:
             logger.log(30, 'Warning: `hyperparameter_tune=True` is currently experimental and may cause the process to hang. Setting `auto_stack=True` instead is recommended to achieve maximum quality models.')
 
-        if dist_ip_addrs is None:
-            dist_ip_addrs = []
-
-        if search_options is None:
-            search_options = dict()
-
         if hyperparameters is None:
             hyperparameters = 'default'
         if isinstance(hyperparameters, str):
@@ -511,14 +517,12 @@ class TabularPrediction(BaseTask):
 
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
-            search_strategy, nthreads_per_trial, ngpus_per_trial,
-            checkpoint=None, num_trials=num_trials, time_out=time_limits,
-            resume=False, visualizer=visualizer, time_attr='epoch',
+            scheduler_options, search_strategy, search_options,
+            nthreads_per_trial, ngpus_per_trial, checkpoint=None,
+            num_trials=num_trials, time_out=time_limits, resume=False,
+            visualizer=visualizer, time_attr='epoch',
             reward_attr='validation_performance',
-            search_options=search_options, dist_ip_addrs=dist_ip_addrs,
-            epochs=epochs, grace_period=grace_period,
-            reduction_factor=reduction_factor, brackets=brackets, type=type,
-            searcher_data=searcher_data)
+            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
