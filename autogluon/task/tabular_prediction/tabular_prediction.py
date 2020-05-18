@@ -84,7 +84,6 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=None,
             visualizer='none',
             verbosity=2,
-            epochs=None,
             scheduler_options=None,
             **kwargs):
         """
@@ -285,10 +284,10 @@ class TabularPrediction(BaseTask):
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-        epochs : int
-            Maximum number of epochs (max_t of HyperbandScheduler)
         scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning. This
+            is ignored if hyperparameter_tune=False.
 
         Kwargs can include additional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
@@ -528,7 +527,7 @@ class TabularPrediction(BaseTask):
             num_trials=num_trials, time_out=time_limits_hpo, resume=False,
             visualizer=visualizer, time_attr='epoch',
             reward_attr='validation_performance',
-            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
+            dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,

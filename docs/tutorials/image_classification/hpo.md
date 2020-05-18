@@ -118,22 +118,27 @@ print('Top-1 test acc: %.3f' % test_acc)
 
 ### Hyperband Early Stopping
 
-AutoGluon currently supports scheduling trials in serial order and with early stopping
-(e.g., if the performance of the model early within training already looks bad, the trial may be terminated early to free up resources).
-Here is an example of using an early stopping scheduler :class:`autogluon.scheduler.HyperbandScheduler`:
+AutoGluon currently supports scheduling trials in serial order and with early
+stopping (e.g., if the performance of the model early within training already
+looks bad, the trial may be terminated early to free up resources).
+Here is an example of using an early stopping scheduler
+:class:`autogluon.scheduler.HyperbandScheduler`. `scheduler_options` is used
+to configure the scheduler. In this example, we run Hyperband with a single
+bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
+`grace_period * reduction_factor`):
 
 ```{.python .input}
 search_strategy = 'hyperband'
 scheduler_options = {
     'grace_period': 1,
-    'reduction_factor': 3,
+    'reduction_factor': 2,
     'brackets': 1}
 
 classifier = task.fit(dataset,
                       net=net,
                       optimizer=optimizer,
                       search_strategy=search_strategy,
-                      epochs=epochs,
+                      epochs=4,
                       num_trials=2,
                       verbose=False,
                       plot_results=True,

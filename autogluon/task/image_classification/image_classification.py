@@ -165,7 +165,8 @@ class ImageClassification(BaseTask):
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
         scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning.
         verbose : bool
             Whether or not to print out intermediate information during training.
         plot_results : bool
