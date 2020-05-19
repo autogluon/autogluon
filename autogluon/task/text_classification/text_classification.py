@@ -2,6 +2,7 @@ import logging
 
 import mxnet as mx
 import gluonnlp as nlp
+import copy
 
 from ...core import *
 from ...scheduler.resource import get_cpu_count, get_gpu_count
@@ -48,6 +49,7 @@ class TextClassification(BaseTask):
             nthreads_per_trial=4,
             ngpus_per_trial=1,
             hybridize=True,
+            scheduler_options=None,
             search_strategy='random',
             search_options=None,
             time_limits=None,
@@ -56,7 +58,6 @@ class TextClassification(BaseTask):
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=None,
-            scheduler_options=None,
             auto_search=True,
             verbose=False,
             **kwargs):
@@ -105,6 +106,9 @@ class TextClassification(BaseTask):
             How many GPUs to use in each trial (ie. single training run of a model). 
         hybridize : bool
             Whether or not the MXNet neural network should be hybridized (for increased efficiency).
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -124,9 +128,6 @@ class TextClassification(BaseTask):
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning.
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
         
@@ -178,13 +179,32 @@ class TextClassification(BaseTask):
             final_fit=False,
             **kwargs)
 
+        # Backward compatibility:
+        grace_period = kwargs.get('grace_period')
+        if grace_period is not None:
+            if scheduler_options is None:
+                scheduler_options = {'grace_period': grace_period}
+            else:
+                assert 'grace_period' not in scheduler_options, \
+                    "grace_period appears both in scheduler_options and as direct argument"
+                scheduler_options = copy.copy(scheduler_options)
+                scheduler_options['grace_period'] = grace_period
         scheduler_options = compile_scheduler_options(
-            scheduler_options, search_strategy, search_options,
-            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
-            time_out=time_limits, resume=resume, visualizer=visualizer,
-            time_attr='epoch', reward_attr='accuracy',
-            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
-        results = BaseTask.run_fit(
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=nthreads_per_trial,
+            ngpus_per_trial=ngpus_per_trial,
+            checkpoint=checkpoint,
+            num_trials=num_trials,
+            time_out=time_limits,
+            resume=resume,
+            visualizer=visualizer,
+            time_attr='epoch',
+            reward_attr='accuracy',
+            dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs)
+        results = super().run_fit(
             train_text_classification, search_strategy, scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])
         get_model_params = results.pop('get_model_args')

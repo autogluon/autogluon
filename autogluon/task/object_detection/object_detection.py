@@ -2,6 +2,7 @@ import logging
 
 import mxnet as mx
 from mxnet import gluon
+import copy
 
 from .dataset import get_dataset
 from .detector import Detector
@@ -42,17 +43,16 @@ class ObjectDetection(BaseTask):
             num_workers=32,
             ngpus_per_trial=1,
             hybridize=True,
+            scheduler_options=None,
             search_strategy='random',
             search_options=None,
             time_limits=None,
             verbose=False,
             transfer='coco',
-            resume_model='',
+            resume='',
             checkpoint='checkpoint/exp1.ag',
-            resume=False,
             visualizer='none',
             dist_ip_addrs=None,
-            scheduler_options=None,
             auto_search=True,
             seed=223,
             data_shape=416,
@@ -79,7 +79,7 @@ class ObjectDetection(BaseTask):
             label_smooth=False,
             syncbn=False,
             reuse_pred_weights=True,
-            ):
+            **kwargs):
 
         """
         Fit object detection models.
@@ -114,6 +114,9 @@ class ObjectDetection(BaseTask):
             How many GPUs to use in each trial (ie. single training run of a model). 
         hybridize : bool
             Whether or not the MXNet neural network should be hybridized (for increased efficiency).
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use. 
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -124,20 +127,17 @@ class ObjectDetection(BaseTask):
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         verbose : bool
             Whether or not to print out intermediate information during training.
-        resume_model : str
-            Path to checkpoint file of existing model, from which model training should resume.
+        resume : str
+            Path to checkpoint file of existing model, from which model training
+            should resume.
+            If not empty, we also start the hyperparameter search from the state
+            loaded from checkpoint.
         checkpoint : str or None
             State of hyperparameter search is stored to this local file
-        resume : bool
-            If True, the hyperparameter search is started from state loaded
-            from checkpoint
         visualizer : str
             Describes method to visualize training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none']. 
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning.
         auto_search : bool
             If True, enables automatic suggestion of network types and hyper-parameter ranges adaptively based on provided dataset.
         seed : int
@@ -247,17 +247,36 @@ class ObjectDetection(BaseTask):
             mixup=mixup,
             no_mixup_epochs=no_mixup_epochs,
             label_smooth=label_smooth,
-            resume=resume_model,
+            resume=resume,
             syncbn=syncbn,
             reuse_pred_weights=reuse_pred_weights)
 
+        # Backward compatibility:
+        grace_period = kwargs.get('grace_period')
+        if grace_period is not None:
+            if scheduler_options is None:
+                scheduler_options = {'grace_period': grace_period}
+            else:
+                assert 'grace_period' not in scheduler_options, \
+                    "grace_period appears both in scheduler_options and as direct argument"
+                scheduler_options = copy.copy(scheduler_options)
+                scheduler_options['grace_period'] = grace_period
         scheduler_options = compile_scheduler_options(
-            scheduler_options, search_strategy, search_options,
-            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
-            time_out=time_limits, resume=resume, visualizer=visualizer,
-            time_attr='epoch', reward_attr='map_reward',
-            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
-        results = BaseTask.run_fit(
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=nthreads_per_trial,
+            ngpus_per_trial=ngpus_per_trial,
+            checkpoint=checkpoint,
+            num_trials=num_trials,
+            time_out=time_limits,
+            resume=(len(resume) > 0),
+            visualizer=visualizer,
+            time_attr='epoch',
+            reward_attr='map_reward',
+            dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs)
+        results = super().run_fit(
             train_object_detection, search_strategy, scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])

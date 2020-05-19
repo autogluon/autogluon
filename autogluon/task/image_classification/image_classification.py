@@ -1,6 +1,6 @@
 import logging
 import os
-
+import copy
 import mxnet as mx
 
 from .classifier import Classifier
@@ -79,17 +79,17 @@ class ImageClassification(BaseTask):
             nthreads_per_trial=60,
             ngpus_per_trial=1,
             hybridize=True,
+            scheduler_options=None,
             search_strategy='random',
+            search_options=None,
             plot_results=False,
             verbose=False,
-            search_options=None,
             time_limits=None,
             resume=False,
             output_directory='checkpoint/',
             visualizer='none',
             num_trials=2,
             dist_ip_addrs=None,
-            scheduler_options=None,
             auto_search=True,
             lr_config=Dict(
                 lr_mode='cosine',
@@ -112,8 +112,8 @@ class ImageClassification(BaseTask):
                 temperature=20.0,
                 hard_weight=0.5,
                 batch_norm=False,
-                use_gn=False)
-            ):
+                use_gn=False),
+            **kwargs):
         # TODO: ensemble and hybridize are not in docstring
         """
         Fit image classification models to a given dataset.
@@ -154,6 +154,9 @@ class ImageClassification(BaseTask):
         output_directory : str
             Checkpoints of the search state are written to
             os.path.join(output_directory, 'exp1.ag')
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use.
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
@@ -164,9 +167,6 @@ class ImageClassification(BaseTask):
             os.path.join(output_directory, 'exp1.ag')
         dist_ip_addrs : list
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning.
         verbose : bool
             Whether or not to print out intermediate information during training.
         plot_results : bool
@@ -270,13 +270,32 @@ class ImageClassification(BaseTask):
             lr_config=lr_config
         )
 
+        # Backward compatibility:
+        grace_period = kwargs.get('grace_period')
+        if grace_period is not None:
+            if scheduler_options is None:
+                scheduler_options = {'grace_period': grace_period}
+            else:
+                assert 'grace_period' not in scheduler_options, \
+                    "grace_period appears both in scheduler_options and as direct argument"
+                scheduler_options = copy.copy(scheduler_options)
+                scheduler_options['grace_period'] = grace_period
         scheduler_options = compile_scheduler_options(
-            scheduler_options, search_strategy, search_options,
-            nthreads_per_trial, ngpus_per_trial, checkpoint, num_trials,
-            time_out=time_limits, resume=resume, visualizer=visualizer,
-            time_attr='epoch', reward_attr='classification_reward',
-            dist_ip_addrs=dist_ip_addrs, epochs=epochs)
-        results = BaseTask.run_fit(
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=nthreads_per_trial,
+            ngpus_per_trial=ngpus_per_trial,
+            checkpoint=checkpoint,
+            num_trials=num_trials,
+            time_out=time_limits,
+            resume=resume,
+            visualizer=visualizer,
+            time_attr='epoch',
+            reward_attr='classification_reward',
+            dist_ip_addrs=dist_ip_addrs,
+            epochs=epochs)
+        results = super().run_fit(
             train_image_classification, search_strategy, scheduler_options,
             plot_results=plot_results)
         args = sample_config(train_image_classification.args, results['best_config'])

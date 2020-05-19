@@ -77,6 +77,7 @@ class TabularPrediction(BaseTask):
             stack_ensemble_levels=0,
             hyperparameters=None,
             num_trials=None,
+            scheduler_options=None,
             search_strategy='random',
             search_options=None,
             nthreads_per_trial=None,
@@ -84,7 +85,6 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=None,
             visualizer='none',
             verbosity=2,
-            scheduler_options=None,
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -264,6 +264,10 @@ class TabularPrediction(BaseTask):
         num_trials : int
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning. This
+            is ignored if hyperparameter_tune=False.
         search_strategy : str
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband)
@@ -284,10 +288,6 @@ class TabularPrediction(BaseTask):
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-        scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning. This
-            is ignored if hyperparameter_tune=False.
 
         Kwargs can include additional arguments for advanced users:
             feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
@@ -522,10 +522,17 @@ class TabularPrediction(BaseTask):
 
         # All models use the same scheduler:
         scheduler_options = compile_scheduler_options(
-            scheduler_options, search_strategy, search_options,
-            nthreads_per_trial, ngpus_per_trial, checkpoint=None,
-            num_trials=num_trials, time_out=time_limits_hpo, resume=False,
-            visualizer=visualizer, time_attr='epoch',
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=nthreads_per_trial,
+            ngpus_per_trial=ngpus_per_trial,
+            checkpoint=None,
+            num_trials=num_trials,
+            time_out=time_limits_hpo,
+            resume=False,
+            visualizer=visualizer,
+            time_attr='epoch',
             reward_attr='validation_performance',
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
