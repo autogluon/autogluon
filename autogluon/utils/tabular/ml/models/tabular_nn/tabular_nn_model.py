@@ -352,7 +352,8 @@ class TabularNeuralNetModel(AbstractModel):
             if reporter is not None:
                 # TODO: Ensure reporter/scheduler properly handle None/nan values after refactor
                 if test_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
-                    reporter(epoch=e, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
+                    # epoch must be number of epochs done (starting at 1)
+                    reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
             if e - best_val_epoch > epochs_wo_improve:
                 break
             if time_limit:

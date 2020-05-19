@@ -36,7 +36,7 @@ def model_trial(args, reporter: LocalStatusReporter):
             logger.exception(e, exc_info=True)
         reporter.terminate()
     else:
-        reporter(epoch=0, validation_performance=model.val_score)
+        reporter(epoch=1, validation_performance=model.val_score)
 
 
 def prepare_inputs(args):
