@@ -298,7 +298,7 @@ class ImageClassification(BaseTask):
             reward_attr='classification_reward',
             dist_ip_addrs=dist_ip_addrs,
             epochs=epochs)
-        results = super().run_fit(
+        results = BaseTask.run_fit(
             train_image_classification, search_strategy, scheduler_options,
             plot_results=plot_results)
         args = sample_config(train_image_classification.args, results['best_config'])

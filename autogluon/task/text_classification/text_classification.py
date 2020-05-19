@@ -207,7 +207,7 @@ class TextClassification(BaseTask):
             reward_attr='accuracy',
             dist_ip_addrs=dist_ip_addrs,
             epochs=epochs)
-        results = super().run_fit(
+        results = BaseTask.run_fit(
             train_text_classification, search_strategy, scheduler_options)
         args = sample_config(train_text_classification.args, results['best_config'])
         get_model_params = results.pop('get_model_args')

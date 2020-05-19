@@ -279,7 +279,7 @@ class ObjectDetection(BaseTask):
             reward_attr='map_reward',
             dist_ip_addrs=dist_ip_addrs,
             epochs=epochs)
-        results = super().run_fit(
+        results = BaseTask.run_fit(
             train_object_detection, search_strategy, scheduler_options)
         logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> finish model fitting")
         args = sample_config(train_object_detection.args, results['best_config'])
