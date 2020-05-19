@@ -1037,7 +1037,7 @@ class AbstractTrainer:
     # TODO: Enable raw=True for bagged models when X=None
     #  This is non-trivial to implement for multi-layer stacking ensembles on the OOF data.
     # TODO: Consider limiting X to 10k rows here instead of inside the model call
-    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, subsample_size=10000, silent=False):
+    def get_feature_importance(self, model=None, X=None, y=None, features=None, raw=True, subsample_size=1000, silent=False):
         if model is None:
             model = self.model_best
         model: AbstractModel = self.load_model(model)
@@ -1048,7 +1048,7 @@ class AbstractTrainer:
             if isinstance(model, WeightedEnsembleModel):
                 if self.bagged_mode:
                     if raw:
-                        raise AssertionError('Raw feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute raw feature importances.')
+                        raise AssertionError('`feature_stage=\'transformed\'` feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute feature importances.')
                     X = None
                     is_oof = True
                 else:
@@ -1059,7 +1059,7 @@ class AbstractTrainer:
                     is_oof = False
             elif isinstance(model, BaggedEnsembleModel):
                 if raw:
-                    raise AssertionError('Raw feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute raw feature importances.')
+                    raise AssertionError('`feature_stage=\'transformed\'` feature importance on the original training data is not yet supported when bagging is enabled, please specify new test data to compute feature importances.')
                 X = self.load_X_train()
                 X = self.get_inputs_to_model(model=model, X=X, fit=True)
                 is_oof = True
@@ -1094,8 +1094,10 @@ class AbstractTrainer:
     #  This is different from raw, where the predictions of the folds are averaged and then feature importance is computed.
     #  Consider aligning these methods so they produce the same result.
     # The output of this function is identical to non-raw when model is level 0 and non-bagged
-    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, subsample_size=10000, silent=False):
+    def _get_feature_importance_raw(self, model, X, y, features_to_use=None, subsample_size=1000, transform_func=None, silent=False):
         time_start = time.time()
+        if model is None:
+            model = self.model_best
         model: AbstractModel = self.load_model(model)
         if features_to_use is None:
             features_to_use = list(X.columns)
@@ -1109,7 +1111,11 @@ class AbstractTrainer:
             y = y.loc[X.index]
 
         time_start_score = time.time()
-        score_baseline = self.score(X=X, y=y, model=model)
+        if transform_func is None:
+            score_baseline = self.score(X=X, y=y, model=model)
+        else:
+            X_transformed = transform_func(X)
+            score_baseline = self.score(X=X_transformed, y=y, model=model)
         time_score = time.time() - time_start_score
 
         if not silent:
@@ -1127,7 +1133,11 @@ class AbstractTrainer:
             if last_processed is not None:  # resetting original values
                 X_to_check[last_processed] = X[last_processed].values
             X_to_check[feature] = X_shuffled[feature].values
-            score_feature = self.score(X=X_to_check, y=y, model=model)
+            if transform_func is None:
+                score_feature = self.score(X=X_to_check, y=y, model=model)
+            else:
+                X_to_check_transformed = transform_func(X_to_check)
+                score_feature = self.score(X=X_to_check_transformed, y=y, model=model)
             score_diff = score_baseline - score_feature
             permutation_importance_dict[feature] = score_diff
             last_processed = feature
