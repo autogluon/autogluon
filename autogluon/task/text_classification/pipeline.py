@@ -348,7 +348,8 @@ def train_text_classification(args, reporter=None):
             metric_history.append((epoch_id, metric_nm, metric_val))
 
         if reporter is not None:
-            reporter(epoch=epoch_id, accuracy=metric_val[0])
+            # Note: epoch reported back must start with 1, not with 0
+            reporter(epoch=epoch_id+1, accuracy=metric_val[0])
 
     if args.final_fit:
         get_model_params.pop('ctx')

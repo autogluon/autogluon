@@ -44,7 +44,7 @@ def train_fn(args, reporter):
     assert g.obj.name in ['auto', 'gluon']
     assert hasattr(h, 'name') or h == 'test'
     assert i in ['mxnet', 'pytorch']
-    reporter(epoch=0, accuracy=0)
+    reporter(epoch=1, accuracy=0)
 
 
 def test_search_space():

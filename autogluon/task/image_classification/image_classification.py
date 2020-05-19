@@ -278,6 +278,9 @@ class ImageClassification(BaseTask):
             else:
                 assert 'grace_period' not in scheduler_options, \
                     "grace_period appears both in scheduler_options and as direct argument"
+                logger.warning(
+                    "grace_period is deprecated, use "
+                    "scheduler_options={'grace_period': ...} instead")
                 scheduler_options = copy.copy(scheduler_options)
                 scheduler_options['grace_period'] = grace_period
         scheduler_options = compile_scheduler_options(

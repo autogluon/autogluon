@@ -288,7 +288,8 @@ def train(net, train_data, val_data, eval_metric, ctx, args, reporter, final_fit
             pre_current_map = current_map
         else:
             current_map = pre_current_map
-        reporter(epoch=epoch, map_reward=current_map)
+        # Note: epoch reported back must start with 1, not 0
+        reporter(epoch=epoch+1, map_reward=current_map)
 
 
 @args()
