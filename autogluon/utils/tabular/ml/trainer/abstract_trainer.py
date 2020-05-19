@@ -27,8 +27,6 @@ logger = logging.getLogger(__name__)
 #  If kfold = 5, scores are 0.9, 0.85, 0.8, 0.75, and 0.7, the score is not 0.8! It is much lower because probs are combined together and AUC is recalculated
 #  Do we want this to happen? Should we calculate score by 5 separate scores and then averaging instead?
 
-# TODO: Add post-fit cleanup function which loads all models and saves them after removing unnecessary variables such as oof_pred_probas to optimize load times and space usage
-#  Trainer will not be able to be fit further after this operation is done, but it will be able to predict.
 # TODO: Dynamic model loading for ensemble models during prediction, only load more models if prediction is uncertain. This dynamically reduces inference time.
 # TODO: Try midstack Semi-Supervised. Just take final models and re-train them, use bagged preds for SS rows. This would be very cheap and easy to try.
 class AbstractTrainer:
@@ -97,12 +95,10 @@ class AbstractTrainer:
 
         self.model_best = None
 
-        self.model_performance = {}
+        self.model_performance = {}  # TODO: Remove in future, use networkx.
         self.model_paths = {}
         self.model_types = {}  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
         self.model_types_inner = {}  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
-        self.model_fit_times = {}
-        self.model_pred_times = {}
         self.models = {}
         self.model_graph = nx.DiGraph()
         self.model_full_dict = {}  # Dict of normal Model -> FULL Model
@@ -322,8 +318,6 @@ class AbstractTrainer:
         if model.predict_time is not None:
             logger.log(20, '\t' + str(round(model.predict_time, 2)) + 's' + '\t = Validation runtime')
         # TODO: Add to HPO
-        self.model_fit_times[model.name] = model.fit_time
-        self.model_pred_times[model.name] = model.predict_time
         if model.is_valid():
             self.model_graph.add_node(model.name, fit_time=model.fit_time, predict_time=model.predict_time, val_score=model.val_score, can_infer=model.can_infer())
             if isinstance(model, StackerEnsembleModel):
@@ -882,7 +876,6 @@ class AbstractTrainer:
                         model_loaded.val_score = None
                         model_loaded.predict_time = None
                         self.model_performance[model_weighted_ensemble] = None
-                        self.model_pred_times[model_weighted_ensemble] = None
                         self.save_model(model_loaded)
                 else:
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
@@ -1158,6 +1151,10 @@ class AbstractTrainer:
             attribute_full += self.model_graph.nodes[base_model][attribute]
         return attribute_full
 
+    # Returns dictionary of model name -> attribute value for the provided attribute
+    def get_model_attributes_dict(self, attribute):
+        return nx.get_node_attributes(self.model_graph, attribute)
+
     # Gets the minimum set of models that the provided model depends on, including itself
     # Returns a list of model names
     def get_minimum_model_set(self, model):
@@ -1174,11 +1171,14 @@ class AbstractTrainer:
         fit_time = []
         pred_time_val = []
         can_infer = []
+        score_val_dict = self.get_model_attributes_dict('val_score')
+        fit_time_marginal_dict = self.get_model_attributes_dict('fit_time')
+        predict_time_marginal_dict = self.get_model_attributes_dict('predict_time')
         for model_name in model_names:
-            score_val.append(self.model_performance.get(model_name))
-            fit_time_marginal.append(self.model_fit_times.get(model_name))
+            score_val.append(score_val_dict[model_name])
+            fit_time_marginal.append(fit_time_marginal_dict[model_name])
             fit_time.append(self.get_model_attribute_full(model=model_name, attribute='fit_time'))
-            pred_time_val_marginal.append(self.model_pred_times.get(model_name))
+            pred_time_val_marginal.append(predict_time_marginal_dict[model_name])
             pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
             can_infer.append(self.model_graph.nodes[model_name]['can_infer'])
