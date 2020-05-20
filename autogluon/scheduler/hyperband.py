@@ -26,6 +26,11 @@ class HyperbandScheduler(FIFOScheduler):
     using multiple brackets, task allocation to bracket is done randomly 
     based on a softmax probability.
 
+    Note: This scheduler requires both reward and resource (time) to be
+    returned by the reporter. Here, resource (time) values must be positive
+    int. If time_attr == 'epoch', this should be the number of epochs done,
+    starting from 1 (not the epoch number, starting from 0).
+
     Parameters
     ----------
     train_fn : callable
@@ -56,7 +61,7 @@ class HyperbandScheduler(FIFOScheduler):
         from reporter
     time_attr: str
         Name of resource (or time) attribute in data obtained from reporter.
-        Note: The type of resource must be int.
+        Note: Resource values must be positive int.
     max_t: int
         Maximum resource (see time_attr) to be used for a job. Together with
         grace_period and reduction_factor, this is used to determine rung
