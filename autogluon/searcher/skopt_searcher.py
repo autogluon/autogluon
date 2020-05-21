@@ -39,23 +39,26 @@ class SKoptSearcher(BaseSearcher):
     Examples
     --------
     By default, the searcher is created along with the scheduler. For example:
+
     >>> import autogluon as ag
     >>> @ag.args(
-    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True))
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
     >>> def train_fn(args, reporter):
-    >>>     reporter(accuracy = args.lr ** 2)
+    ...     reporter(accuracy = args.lr ** 2)
     >>> search_options = {'base_estimator': 'RF', 'acq_func': 'EI'}
     >>> scheduler = ag.scheduler.FIFOScheduler(
-    >>>     train_fn, searcher='skopt', search_options=search_options,
-    >>>     num_trials=10, reward_attr='accuracy')
+    ...     train_fn, searcher='skopt', search_options=search_options,
+    ...     num_trials=10, reward_attr='accuracy')
+
     This would result in a SKoptSearcher with cs = train_fn.cs. You can also
     create a SKoptSearcher by hand:
+
     >>> import autogluon as ag
     >>> @ag.args(
-    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    >>>     wd=ag.space.Real(1e-3, 1e-2))
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
     >>> def train_fn(args, reporter):
-    >>>     pass
+    ...     pass
     >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
     >>> searcher.get_config()
     {'lr': 0.0031622777, 'wd': 0.0055}

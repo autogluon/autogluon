@@ -34,7 +34,7 @@ Decorators for customizing AutoGluon to apply hyperparameter-tuning on arbitrary
    ...     h, i = args.h, args.i
    ...     assert hasattr(h, 'name') or h == 'test'
    ...     assert i in ['mxnet', 'pytorch']
-   ...     reporter(epoch=e, accuracy=0)
+   ...     reporter(epoch=1, accuracy=0)
 
    Create a scheduler and run training trials to search for the best values of the hyperparameters:
 

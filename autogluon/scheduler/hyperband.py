@@ -3,15 +3,16 @@ import logging
 import threading
 import numpy as np
 import multiprocessing as mp
+import os
 
 from .fifo import FIFOScheduler
 from .hyperband_stopping import HyperbandStopping_Manager
 from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
+from ..utils import load
 
-__all__ = ['HyperbandScheduler',
-           'HyperbandStopping_Manager',
-           'HyperbandPromotion_Manager']
+
+__all__ = ['HyperbandScheduler']
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,11 @@ class HyperbandScheduler(FIFOScheduler):
     See 'type' for the different variants. One implementation detail is when
     using multiple brackets, task allocation to bracket is done randomly 
     based on a softmax probability.
+
+    Note: This scheduler requires both reward and resource (time) to be
+    returned by the reporter. Here, resource (time) values must be positive
+    int. If time_attr == 'epoch', this should be the number of epochs done,
+    starting from 1 (not the epoch number, starting from 0).
 
     Parameters
     ----------
@@ -34,31 +40,31 @@ class HyperbandScheduler(FIFOScheduler):
     searcher : str or BaseSearcher
         Searcher (get_config decisions). If str, this is passed to
         searcher_factory along with search_options.
-    search_options: dict
+    search_options : dict
         If searcher is str, these arguments are passed to searcher_factory.
-    checkpoint: str
+    checkpoint : str
         If filename given here, a checkpoint of scheduler (and searcher) state
         is written to file every time a job finishes.
         Note: May not be fully supported by all searchers.
-    resume: bool
+    resume : bool
         If True, scheduler state is loaded from checkpoint, and experiment
         starts from there.
         Note: May not be fully supported by all searchers.
-    num_trials: int
+    num_trials : int
         Maximum number of jobs run in experiment.
-    time_out: float
+    time_out : float
         If given, jobs are started only until this time_out (wall clock time)
-    reward_attr: str
+    reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter
-    time_attr: str
+    time_attr : str
         Name of resource (or time) attribute in data obtained from reporter.
-        Note: The type of resource must be int.
-    max_t: int
+        Note: The type of resource must be positive int.
+    max_t : int
         Maximum resource (see time_attr) to be used for a job. Together with
         grace_period and reduction_factor, this is used to determine rung
         levels in Hyperband brackets.
-    grace_period: int
+    grace_period : int
         Minimum resource (see time_attr) to be used for a job.
     reduction_factor : int (>= 2)
         Parameter to determine rung levels in successive halving (Hyperband).
@@ -66,7 +72,7 @@ class HyperbandScheduler(FIFOScheduler):
         Number of brackets to be used in Hyperband. Each bracket has a different
         grace period, all share max_t and reduction_factor.
         If brackets == 1, we just run successive halving.
-    training_history_callback:
+    training_history_callback : callable
         Callback function func called every time a job finishes, if at least
         training_history_callback_delta_secs seconds passed since the last
         recent call. The call has the form:
@@ -74,9 +80,9 @@ class HyperbandScheduler(FIFOScheduler):
         Here, self._start_time is time stamp for when experiment started.
         Use this callback to serialize self.training_history after regular
         intervals.
-    training_history_callback_delta_secs: float
+    training_history_callback_delta_secs : float
         See training_history_callback.
-    delay_get_config: bool
+    delay_get_config : bool
         If True, the call to searcher.get_config is delayed until a worker
         resource for evaluation is available. Otherwise, get_config is called
         just after a job has been started.
@@ -114,7 +120,7 @@ class HyperbandScheduler(FIFOScheduler):
         the acquisition function (for model-based variant), which operates
         at level max_t. On the other hand, it decreases the variance of the
         latent process there.
-    searcher_data: str
+    searcher_data : str
         Relevant only if a model-based searcher is used, and if train_fn is such
         that we receive results (from the reporter) at each successive resource
         level, not just at the rung levels.
@@ -147,7 +153,7 @@ class HyperbandScheduler(FIFOScheduler):
     ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
     ...     for e in range(10):
     ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-    ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
     >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
     ...                                             resource={'num_cpus': 2, 'num_gpus': 0},
     ...                                             num_trials=20,
@@ -175,8 +181,8 @@ class HyperbandScheduler(FIFOScheduler):
                  dist_ip_addrs=None,
                  keep_size_ratios=False,
                  maxt_pending=False,
-                 searcher_data = 'rungs',
-                 do_snapshots = False):
+                 searcher_data='rungs',
+                 do_snapshots=False):
         # Adjoin information about scheduler to search_options
         if search_options is None:
             _search_options = dict()
@@ -186,9 +192,11 @@ class HyperbandScheduler(FIFOScheduler):
         _search_options['resource_attribute'] = time_attr
         _search_options['min_epochs'] = grace_period
         _search_options['max_epochs'] = max_t
+        # Pass resume=False here. Resume needs members of this object to be
+        # created
         super().__init__(
             train_fn=train_fn, args=args, resource=resource, searcher=searcher,
-            search_options=_search_options, checkpoint=checkpoint, resume=resume,
+            search_options=_search_options, checkpoint=checkpoint, resume=False,
             num_trials=num_trials, time_out=time_out, max_reward=max_reward,
             reward_attr=reward_attr, time_attr=time_attr,
             visualizer=visualizer, dist_ip_addrs=dist_ip_addrs,
@@ -236,6 +244,16 @@ class HyperbandScheduler(FIFOScheduler):
         # This lock protects both _running_tasks and terminator, the latter
         # does not define its own lock
         self._hyperband_lock = mp.Lock()
+        if resume:
+            assert checkpoint is not None, \
+                "Need checkpoint to be set if resume = True"
+            if os.path.isfile(checkpoint):
+                self.load_state_dict(load(checkpoint))
+            else:
+                msg = f'checkpoint path {checkpoint} is not available for resume.'
+                logger.exception(msg)
+                raise FileExistsError(msg)
+
 
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
@@ -330,12 +348,9 @@ class HyperbandScheduler(FIFOScheduler):
     def _run_reporter(self, task, task_job, reporter):
         last_result = None
         last_updated = None
+        task_key = str(task.task_id)
         while not task_job.done():
             reported_result = reporter.fetch()
-            # Time since start of experiment
-            elapsed_time = self._elapsed_time()
-            reported_result['time_since_start'] = elapsed_time
-            task_key = str(task.task_id)
             if 'traceback' in reported_result:
                 # Evaluation has failed
                 logger.exception(reported_result['traceback'])
@@ -353,6 +368,13 @@ class HyperbandScheduler(FIFOScheduler):
                     # Cleanup
                     del self._running_tasks[task_key]
                 break
+            if len(reported_result) == 0:
+                # An empty dict should just be skipped
+                logger.warning("Skipping empty dict received from reporter")
+                continue
+            # Time since start of experiment
+            elapsed_time = self._elapsed_time()
+            reported_result['time_since_start'] = elapsed_time
 
             # Call before _add_training_results, since we may be able to report
             # extra information from the bracket
@@ -431,14 +453,6 @@ class HyperbandScheduler(FIFOScheduler):
                 # variant. It means that the *task* terminates, while the
                 # evaluation of the config is just paused
                 last_result['terminated'] = True
-                resource = int(reported_result[self._time_attr])
-                if self.type == 'stopping' or resource >= self.max_t:
-                    act_str = 'terminating'
-                else:
-                    act_str = 'pausing'
-                logger.debug(
-                    'Stopping task ({} evaluation, resource = {}):\n{}'.format(
-                        act_str, resource, task))
                 with self._hyperband_lock:
                     self.terminator.on_task_remove(task)
                     # Cleanup

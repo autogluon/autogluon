@@ -107,6 +107,7 @@ def train_image_classification(args, reporter):
         reporter(epoch=epoch, classification_reward=reward)
         return reward
 
+    # Note: epoch must start with 1, not 0
     tbar = tqdm(range(1, args.epochs + 1))
     for epoch in tbar:
         metric = train(epoch, args.epochs, metric)

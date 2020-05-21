@@ -17,9 +17,10 @@ autogluon.searcher
    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
    ...     for e in range(10):
    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-   ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+   ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
-   Create a searcher and sample one configuration
+   Note that `epoch` returned by `reporter` must be the number of epochs done,
+   and start with 1. Create a searcher and sample one configuration:
 
    >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
    >>> searcher.get_config()

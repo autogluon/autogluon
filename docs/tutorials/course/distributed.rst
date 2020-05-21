@@ -27,7 +27,7 @@ A Toy Example
     >>>     print('task_id: {}, lr: {}'.format(args.task_id, args.lr))
     >>>     for e in range(10):
     >>>         top1_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-    >>>         reporter(epoch=e, accuracy=top1_accuracy)
+    >>>         reporter(epoch=e+1, accuracy=top1_accuracy)
     >>>     # wait for 1 sec
     >>>     time.sleep(1.0)
 

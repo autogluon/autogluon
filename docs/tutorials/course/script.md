@@ -92,7 +92,7 @@ def train_loop(args, reporter):
 
         if reporter is not None:
             # reporter enables communications with autogluon
-            reporter(epoch=epoch, accuracy=val_acc)
+            reporter(epoch=epoch+1, accuracy=val_acc)
         else:
             print('[Epoch %d] Train-acc: %.3f | Val-acc: %.3f' %
                   (epoch, train_acc, val_acc))

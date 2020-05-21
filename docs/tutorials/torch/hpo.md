@@ -91,7 +91,8 @@ def train_mnist(args, reporter):
                 correct += predicted.eq(targets).sum().item()
 
         acc = 100.*correct/total
-        reporter(epoch=epoch, accuracy=acc)
+        # 'epoch' reports the number of epochs done
+        reporter(epoch=epoch+1, accuracy=acc)
 
     for epoch in tqdm(range(0, epochs)):
         train(epoch)

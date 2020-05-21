@@ -166,8 +166,11 @@ def early_stopping_custom(stopping_rounds, first_metric_only=False, metrics_to_u
                         validation_perf = score
                     else:
                         validation_perf = -score
-                    reporter(epoch=env.iteration, validation_performance=validation_perf, train_loss=best_trainloss[i],
-                             best_iter_sofar=best_iter[i] + 1, best_valperf_sofar=best_score[i])
+                    reporter(epoch=env.iteration + 1,
+                             validation_performance=validation_perf,
+                             train_loss=best_trainloss[i],
+                             best_iter_sofar=best_iter[i] + 1,
+                             best_valperf_sofar=best_score[i])
             if env.iteration - best_iter[i] >= stopping_rounds:
                 if verbose:
                     logger.log(15, 'Early stopping, best iteration is:\n[%d]\t%s' % (

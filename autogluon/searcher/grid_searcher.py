@@ -12,8 +12,8 @@ class GridSearcher(BaseSearcher):
     --------
     >>> import autogluon as ag
     >>> @ag.args(
-    >>>     x=ag.space.Categorical(0, 1, 2),
-    >>>     y=ag.space.Categorical('a', 'b', 'c'))
+    ...     x=ag.space.Categorical(0, 1, 2),
+    ...     y=ag.space.Categorical('a', 'b', 'c'))
     >>> def train_fn(args, reporter):
     ...     pass
     >>> searcher = ag.searcher.GridSearcher(train_fn.cs)

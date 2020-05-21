@@ -8,7 +8,7 @@ from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from .predictor import TabularPredictor
 from .presets_configs import set_presets, unpack
-from ..base import BaseTask
+from ..base import BaseTask, compile_scheduler_options
 from ..base.base_task import schedulers
 from ...utils import verbosity2loglevel
 from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
@@ -59,13 +59,33 @@ class TabularPrediction(BaseTask):
 
     @staticmethod
     @unpack(set_presets)
-    def fit(train_data, label, tuning_data=None, time_limits=None, output_directory=None, presets=None,
-            problem_type=None, eval_metric=None, stopping_metric=None,
-            auto_stack=False, hyperparameter_tune=False, feature_prune=False,
-            holdout_frac=None, num_bagging_folds=0, num_bagging_sets=None, stack_ensemble_levels=0,
-            hyperparameters=None, num_trials=None, search_strategy='random', search_options=None,
-            nthreads_per_trial=None, ngpus_per_trial=None, dist_ip_addrs=None, visualizer='none',
-            verbosity=2, **kwargs):
+    def fit(train_data,
+            label,
+            tuning_data=None,
+            time_limits=None,
+            output_directory=None,
+            presets=None,
+            problem_type=None,
+            eval_metric=None,
+            stopping_metric=None,
+            auto_stack=False,
+            hyperparameter_tune=False,
+            feature_prune=False,
+            holdout_frac=None,
+            num_bagging_folds=0,
+            num_bagging_sets=None,
+            stack_ensemble_levels=0,
+            hyperparameters=None,
+            num_trials=None,
+            scheduler_options=None,
+            search_strategy='random',
+            search_options=None,
+            nthreads_per_trial=None,
+            ngpus_per_trial=None,
+            dist_ip_addrs=None,
+            visualizer='none',
+            verbosity=2,
+            **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
 
@@ -244,6 +264,10 @@ class TabularPrediction(BaseTask):
         num_trials : int
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
+        scheduler_options : dict
+            Extra arguments passed to __init__ of scheduler, to configure the
+            orchestration of training jobs during hyperparameter-tuning. This
+            is ignored if hyperparameter_tune=False.
         search_strategy : str
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband)
@@ -497,31 +521,21 @@ class TabularPrediction(BaseTask):
         stopping_metric = get_metric(stopping_metric, problem_type, 'stopping_metric')
 
         # All models use the same scheduler:
-        scheduler_options = {
-            'resource': {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial},
-            'num_trials': num_trials,
-            'time_out': time_limits_hpo,
-            'visualizer': visualizer,
-            'time_attr': 'epoch',  # For tree ensembles, each new tree (ie. boosting round) is considered one epoch
-            'reward_attr': 'validation_performance',
-            'dist_ip_addrs': dist_ip_addrs,
-            'searcher': search_strategy,
-            'search_options': search_options,
-        }
-        if isinstance(search_strategy, str):
-            scheduler_cls = schedulers[search_strategy.lower()]
-            # This is a fix for now. But we need to separate between scheduler
-            # (mainly FIFO and Hyperband) and searcher. Currently, most searchers
-            # only work with FIFO, and Hyperband works only with random searcher,
-            # but this will be different in the future.
-            if search_strategy == 'hyperband':
-                # Currently, HyperbandScheduler only supports random searcher
-                scheduler_options['searcher'] = 'random'
-        else:
-            # TODO: Check that search_strategy is a subclass of TaskScheduler
-            assert callable(search_strategy)
-            scheduler_cls = search_strategy
-            scheduler_options['searcher'] = 'random'
+        scheduler_options = compile_scheduler_options(
+            scheduler_options=scheduler_options,
+            search_strategy=search_strategy,
+            search_options=search_options,
+            nthreads_per_trial=nthreads_per_trial,
+            ngpus_per_trial=ngpus_per_trial,
+            checkpoint=None,
+            num_trials=num_trials,
+            time_out=time_limits_hpo,
+            resume=False,
+            visualizer=visualizer,
+            time_attr='epoch',
+            reward_attr='validation_performance',
+            dist_ip_addrs=dist_ip_addrs)
+        scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,

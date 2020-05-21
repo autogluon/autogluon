@@ -132,7 +132,7 @@ def train_cifar(args, reporter):
             train_loss /= batch_size * num_batch
             name, acc = train_metric.get()
             name, val_acc = test(ctx, val_data)
-            reporter(epoch=epoch, accuracy=val_acc)
+            reporter(epoch=epoch+1, accuracy=val_acc)
 
     train(args.epochs, context)
 

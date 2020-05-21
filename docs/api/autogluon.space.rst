@@ -19,7 +19,7 @@ Search space of possible hyperparameter values to consider.
    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
    ...     for e in range(10):
    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-   ...         reporter(epoch=e, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+   ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
    Create a scheduler to manage training jobs and begin hyperparameter tuning with the provided search space:
 
