@@ -107,4 +107,4 @@ predictor_age = task.fit(train_data=train_data, output_directory="agModels-predi
 performance = predictor_age.evaluate(test_data)
 ```
 
-Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default).
+Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = mean_absolute_error`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flips their sign and print them as negative values during training (as it internally assumes higher values are better).
