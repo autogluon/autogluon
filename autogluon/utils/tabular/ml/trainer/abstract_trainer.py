@@ -11,7 +11,7 @@ from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SO
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, combine_pred_and_true, shuffle_df_rows
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -128,8 +128,6 @@ class AbstractTrainer:
         self.num_cols_train = None
 
         self.is_data_saved = False
-        self.normalize_predprobs = False # whether or not probabilistic predictions may need to be renormalized (eg. distillation with BINARY -> REGRESSION)
-        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
 
     # path_root is the directory containing learner.pkl
     @property
@@ -637,23 +635,6 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        EPS = 1e-10 # predicted probabilities can be at most this confident if we normalize predicted probabilities
-        # TODO: ensure each model always outputs appropriately normalized predictions so this final safety check then becomes unnecessary
-        if not self.normalize_predprobs:
-            return model.predict_proba(X=X, preprocess=False)
-        elif self.problem_type == MULTICLASS:
-           y_predproba = model.predict_proba(X=X, preprocess=False)
-           most_negative_rowvals = np.clip(np.min(y_predproba, axis=1), a_min=None, a_max=0)
-           y_predproba = y_predproba - most_negative_rowvals[:,None] # ensure nonnegative rows
-           y_predproba = np.clip(y_predproba, a_min = EPS, a_max = None) # ensure no zeros
-           return y_predproba / y_predproba.sum(axis=1, keepdims=1) # renormalize
-        elif self.problem_type == BINARY:
-            y_predproba = model.predict_proba(X=X, preprocess=False)
-            min_y = np.min(y_predproba)
-            max_y = np.max(y_predproba)
-            if min_y < EPS or max_y > 1-EPS: # remap predicted probs to line that goes through: (min_y, EPS), (max_y, 1-EPS)
-                y_predproba =  EPS + ((1-2*EPS)/(max_y-min_y)) * (y_predproba - min_y)
-            return y_predproba
         return model.predict_proba(X=X, preprocess=False)
 
     # Note: model_pred_proba_dict is mutated in this function to minimize memory usage

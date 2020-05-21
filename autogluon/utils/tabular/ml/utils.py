@@ -9,7 +9,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
 
-from .constants import BINARY, REGRESSION, SOFTCLASS
+from .constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
 
 logger = logging.getLogger(__name__)
 
@@ -145,20 +145,6 @@ def get_leaderboard_pareto_frontier(leaderboard: DataFrame, score_col='score_val
     return leaderboard_pareto_frontier
 
 
-def combine_pred_and_true(y_predprob, y_true, upweight_factor=0.25):
-    """ Used in distillation, combines true (integer) classes with 2D array of predicted probabilities.
-        Returns new 2D array of predicted probabilities where true classes are upweighted by upweight_factor (and then probabilities are renormalized)
-    """
-    if len(y_predprob) != len(y_true):
-        raise ValueError("y_predprob and y_true cannot have different lengths for distillation. Perhaps some classes' data was deleted during label cleaning.")
-
-    y_trueprob = np.zeros((y_true.size, y_true.max() + 1))
-    y_trueprob[np.arange(y_true.size), y_true] = upweight_factor
-    y_predprob = y_predprob + y_trueprob
-    y_predprob = y_predprob / y_predprob.sum(axis=1, keepdims=1)  # renormalize
-    return y_predprob
-
-
 def shuffle_df_rows(X: DataFrame, seed=0, reset_index=True):
     """Returns DataFrame with rows shuffled based on seed value."""
     row_count = X.shape[0]
@@ -168,3 +154,52 @@ def shuffle_df_rows(X: DataFrame, seed=0, reset_index=True):
     if reset_index:
         X_shuffled.reset_index(inplace=True, drop=True)
     return X_shuffled
+
+
+def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
+    """ Remaps the predicted probabilities to ensure there are no zeros (needed for certain metrics like log-loss)
+        and that no predicted probability exceeds [0,1] (eg. in distillation when classification is treated as regression).
+        Args:
+            y_predprob: 1D (for binary classification) or 2D (for multiclass) numpy array of predicted probabilities
+            problem_type: We only consider normalization if the problem_type is one of: [BINARY, MULTICLASS, SOFTCLASS]
+            eps: controls around how far from 0 remapped predicted probabilities should be (larger `eps` means predicted probabilities will lie further from 0).
+    """
+    if (problem_type == REGRESSION) and (len(y_predprob.shape) > 1) and (y_predprob.shape[1] > 1):
+        problem_type = SOFTCLASS  # this was MULTICLASS problem converted to REGRESSION (as done in distillation)
+
+    if problem_type in [BINARY, REGRESSION]:
+        if len(y_predprob.shape) > 1 and min(y_predprob.shape) > 1:
+            raise ValueError(f"cannot call normalize_pred_probas with problem_type={problem_type} and y_predprob.shape=={y_predprob.shape}")
+        return normalize_binary_probas(y_predprob, eps)
+    elif problem_type in [MULTICLASS, SOFTCLASS]:  # clip all probs below at eps and then renormalize
+        if len(y_predprob.shape) == 1:
+            return normalize_binary_probas(y_predprob, eps)
+        else:
+            return normalize_multi_probas(y_predprob, eps)
+    else:
+        raise ValueError(f"Invalid problem_type")
+    return y_predprob
+
+
+def normalize_binary_probas(y_predprob, eps):
+    (pmin,pmax) = (eps, 1-eps)  # predicted probs outside this range will be remapped into (0,1)
+    which_toobig = y_predprob > pmax
+    if np.sum(which_toobig) > 0:  # remap overly large probs
+        y_predprob = np.logical_not(which_toobig)*y_predprob + which_toobig*(1-(eps*np.exp(-(y_predprob-pmax))))
+    which_toosmall = y_predprob < pmin
+    if np.sum(which_toosmall) > 0:  # remap overly small probs
+        y_predprob = np.logical_not(which_toosmall)*y_predprob + which_toosmall*eps*np.exp(-(pmin-y_predprob))
+    return y_predprob
+
+
+def normalize_multi_probas(y_predprob, eps):
+    min_predprob = np.min(y_predprob)
+    if min_predprob < 0:  # ensure nonnegative rows
+        most_negative_rowvals = np.clip(np.min(y_predprob, axis=1), a_min=None, a_max=0)
+        y_predprob = y_predprob - most_negative_rowvals[:,None]
+    if min_predprob < eps:
+        y_predprob = np.clip(y_predprob, a_min=eps, a_max=None)  # ensure no entries < eps
+        y_predprob = y_predprob / y_predprob.sum(axis=1, keepdims=1)  # renormalize
+    return y_predprob
+
+

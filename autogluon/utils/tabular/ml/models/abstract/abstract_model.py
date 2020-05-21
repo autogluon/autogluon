@@ -10,9 +10,9 @@ import pandas as pd
 import psutil
 
 from .model_trial import model_trial
-from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas
 from .... import metrics
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
@@ -77,6 +77,12 @@ class AbstractModel:
             self.stopping_metric = self.objective_func
         else:
             self.stopping_metric = stopping_metric
+
+        self.normalize_predprobs = False  # do probabilistic predictions need to be renormalized
+        if self.objective_func.name in OBJECTIVES_TO_NORMALIZE:
+            self.normalize_predprobs = True
+            logger.debug(self.name+" predicted probabilities will be transformed to never =0 since eval_metric="+self.objective_func.name)
+
 
         if isinstance(self.objective_func, metrics._ProbaScorer):
             self.metric_needs_y_pred = False
