@@ -502,26 +502,30 @@ class TabularPredictor(BasePredictor):
         Parameters
         ----------
         dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
-            This dataset must also contain the label-column with the same column-name as specified during fit().
+            This dataset must also contain the label-column with the same column-name as specified during `fit()`.
             If specified, then the dataset is used to calculate the feature importance scores.
             If str is passed, `dataset` will be loaded using the str value as the file path.
-            If not specified, the original dataset used during fit() will be used if `cache_data=True`. Otherwise, an exception will be raised.
-            Do not pass the training data through this argument, as the feature importance scores calculated will be inaccurate.
+            If not specified, the original dataset used during `fit()` will be used if `cache_data=True`. Otherwise, an exception will be raised.
+            Do not pass the training data through this argument, as the feature importance scores calculated will be biased due to overfitting.
+                More accurate feature importances will be obtained from new data that was held-out during `fit()`.
         model : str, default = None
             Model to get feature importances for, if None the best model is chosen.
             Valid models are listed in this `predictor` by calling `predictor.model_names`
         features : list, default = None
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
             If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
+            Valid feature names change depending on the `feature_stage`.
+                To get the list of feature names for `feature_stage='transformed'`, call `list(predictor.transform_features().columns)`.
+                To get the list of feature names for `feature_stage=`transformed_model`, call `list(predictor.transform_features(model={model_name}).columns)`.
         feature_stage : str, default = 'original'
-            The stage of features to compute importances on.
+            What stage of feature-processing should importances be computed for.
             Options:
                 'original':
                     Compute importances of the original features.
                     Warning: `dataset` must be specified with this option, otherwise an exception will be raised.
                 'transformed':
                     Compute importances of the post-internal-transformation features (after automated feature engineering). These features may be missing some original features, or add new features entirely.
-                    An example of new features would be ngram features generated from a text feature.
+                    An example of new features would be ngram features generated from a text column.
                     Warning: For bagged models, feature importance calculation is not yet supported with this option when `dataset=None`. Doing so will raise an exception.
                 'transformed_model':
                     Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
