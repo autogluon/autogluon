@@ -88,7 +88,7 @@ class TabularPredictor(BasePredictor):
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
         self.model_names = self._trainer.get_model_names_all()  # TODO: Consider making this a function instead of a variable: This should never be de-synced with the output of self._trainer.get_model_names_all()
-        self.model_performance = self._trainer.model_performance
+        self.model_performance = self._trainer.model_performance  # TODO: Remove this in future, do not use this.
         self.class_labels = self._learner.class_labels
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
@@ -280,11 +280,11 @@ class TabularPredictor(BasePredictor):
         # all fit() information that is returned:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self.model_performance,  # dict with key = model-name, value = validation performance
+            'model_performance': self._trainer.get_model_attributes_dict('val_score'),  # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
             'model_paths': self._trainer.model_paths,  # dict with key = model-name, value = path to model file
-            'model_fit_times': self._trainer.model_fit_times,
-            'model_pred_times': self._trainer.model_pred_times,
+            'model_fit_times': self._trainer.get_model_attributes_dict('fit_time'),
+            'model_pred_times': self._trainer.get_model_attributes_dict('predict_time'),
             'num_bagging_folds': self._trainer.kfolds,
             'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
             'feature_prune': self._trainer.feature_prune,
@@ -297,7 +297,7 @@ class TabularPredictor(BasePredictor):
             results['hpo_results'] = self._trainer.hpo_results
         # get dict mapping model name to final hyperparameter values for each model:
         model_hyperparams = {}
-        for model_name in results['model_performance']:
+        for model_name in self._trainer.get_model_names_all():
             model_obj = self._trainer.load_model(model_name)
             model_hyperparams[model_name] = model_obj.params
         results['model_hyperparams'] = model_hyperparams
