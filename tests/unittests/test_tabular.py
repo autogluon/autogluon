@@ -63,6 +63,59 @@ def test_tabular():
     run_tabular_benchmark_toy(fit_args=fit_args)
 
 
+def test_advanced_functionality():
+    fast_benchmark = True
+    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification.zip',
+                      'name': 'AdultIncomeBinaryClassification',
+                      'problem_type': BINARY}
+    label = 'class'
+    directory_prefix = './datasets/'
+    train_file = 'train_data.csv'
+    test_file = 'test_data.csv'
+    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
+    if fast_benchmark:  # subsample for fast_benchmark
+        subsample_size = 100
+        train_data = train_data.head(subsample_size)
+        test_data = test_data.head(subsample_size)
+    print(f"Evaluating Advanced Functionality on Benchmark Dataset {dataset['name']}")
+    directory = directory_prefix + 'advanced/' + dataset['name'] + "/"
+    savedir = directory + 'AutogluonOutput/'
+    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
+    predictor = task.fit(train_data=train_data, label=label, output_directory=savedir)
+    leaderboard = predictor.leaderboard(dataset=test_data)
+    assert(set(predictor.model_names) == set(leaderboard['model']))
+    num_models = len(predictor.model_names)
+    feature_importances = predictor.feature_importance(dataset=test_data)
+    original_features = set(train_data.columns)
+    original_features.remove(label)
+    assert(set(feature_importances.keys()) == original_features)
+    predictor.transform_features()
+    predictor.transform_features(dataset=test_data)
+    predictor.info()
+    assert(predictor.get_model_full_dict() == dict())
+    predictor.refit_full()
+    assert(len(predictor.get_model_full_dict()) == num_models)
+    assert(len(predictor.model_names) == num_models * 2)
+    for model in predictor.model_names:
+        predictor.predict(dataset=test_data, model=model)
+    predictor.refit_full()  # Confirm that refit_models aren't further refit.
+    assert(len(predictor.get_model_full_dict()) == num_models)
+    assert(len(predictor.model_names) == num_models * 2)
+    predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
+    assert(len(predictor.model_names) == num_models * 2)
+    predictor.predict(dataset=test_data)
+    predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
+    assert(len(predictor.model_names) == 0)
+    assert(len(predictor.leaderboard()) == 0)
+    try:
+        predictor.predict(dataset=test_data)
+    except:
+        pass
+    else:
+        raise AssertionError('predictor.predict should raise exception after all models are deleted')
+    print('Tabular Advanced Functionality Test Succeeded.')
+
+
 def load_data(directory_prefix, train_file, test_file, name, url=None):
     if not os.path.exists(directory_prefix):
         os.mkdir(directory_prefix)
