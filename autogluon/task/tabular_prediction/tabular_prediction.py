@@ -128,6 +128,7 @@ class TabularPrediction(BaseTask):
                     Often can reduce disk usage by ~2-4x with no negatives to model accuracy or inference speed.
                     This will disable numerous advanced functionality, but has no impact on inference.
                     This will make certain functionality less informative, such as `predictor.leaderboard()` and `predictor.fit_summary()`.
+                        Because unused models will be deleted under this preset, methods like `predictor.leaderboard()` and `predictor.fit_summary()` will no longer show the full set of models that were trained during `fit()`.
                     Recommended for applications where the inner details of AutoGluon's training is not important and there is no intention of manually choosing between the final models.
                     This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
