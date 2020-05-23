@@ -219,15 +219,10 @@ class AbstractLearner:
         trainer = self.load_trainer()
         if self.problem_type == MULTICLASS:
             y = y.fillna(-1)
-            if trainer.objective_func_expects_y_pred:
-                return trainer.score(X=X, y=y, model=model)
-            else:
-                # Log loss
-                if -1 in y.unique():
-                    raise ValueError(f'Multiclass scoring with eval_metric={self.objective_func.name} does not support unknown classes.')
-                return trainer.score(X=X, y=y, model=model)
-        else:
-            return trainer.score(X=X, y=y, model=model)
+            if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
+                # log_loss / pac_score
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
+        return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, compute_oracle=False, silent=False):
@@ -239,8 +234,8 @@ class AbstractLearner:
         if self.problem_type == MULTICLASS:
             y = y.fillna(-1)
             if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
-                # Log loss
-                raise ValueError(f'Multiclass scoring with eval_metric={self.objective_func.name} does not support unknown classes.')
+                # log_loss / pac_score
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
 
         scores = {}
         all_trained_models = trainer.get_model_names_all()
@@ -374,6 +369,7 @@ class AbstractLearner:
         assert isinstance(y_true, (np.ndarray, pd.Series))
         assert isinstance(y_pred, (np.ndarray, pd.Series))
 
+        # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
         y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
         trainer = self.load_trainer()
         if trainer.objective_func_expects_y_pred:
@@ -383,7 +379,15 @@ class AbstractLearner:
                 y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
             performance = self.objective_func(y_true_cleaned, y_pred_cleaned)
         else:
-            performance = self.objective_func(y_true, y_pred)
+            if self.problem_type == MULTICLASS:
+                y_true_cleaned = self.label_cleaner.transform(y_true)
+                y_true_cleaned = y_true_cleaned.fillna(-1)
+                if (not trainer.objective_func_expects_y_pred) and (-1 in y_true_cleaned.unique()):
+                    # log_loss / pac_score
+                    raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
+                performance = self.objective_func(y_true_cleaned, y_pred)
+            else:
+                performance = self.objective_func(y_true, y_pred)
 
         metric = self.objective_func.name
 

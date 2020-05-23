@@ -130,7 +130,7 @@ class DefaultLearner(AbstractLearner):
         else:
             self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
-        if (self.objective_func is not None) and (self.objective_func.name == 'log_loss') and (self.problem_type == MULTICLASS):
+        if (self.objective_func is not None) and (self.objective_func.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             X = self.augment_rare_classes(X)
 
         # Gets labels prior to removal of infrequent classes

@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import pandas as pd
 try:
     from sklearn.metrics._classification import _check_targets, type_of_target
 except:
@@ -190,6 +191,11 @@ def pac_score(solution, prediction):
 
     y_type = type_of_target(solution)
 
+    if isinstance(solution, pd.Series):
+        solution = solution.values
+    if isinstance(prediction, pd.Series):
+        prediction = prediction.values
+
     if y_type == 'binary':
         if len(solution.shape) == 1:
             solution = solution.reshape((-1, 1))
@@ -201,7 +207,7 @@ def pac_score(solution, prediction):
                                  f'for {prediction.shape[1]} classes is not a binary '
                                  f'classification problem')
             # Prediction will be copied into a new binary array - no copy
-            prediction = prediction[:, 1].reshape((-1, 1))
+            prediction = prediction.reshape((-1, 1))
         else:
             raise ValueError(f'Invalid prediction shape {prediction.shape}')
 
@@ -216,7 +222,7 @@ def pac_score(solution, prediction):
             raise ValueError('Solution.shape %s' % solution.shape)
 
         # Need to create a multiclass solution and a multiclass predictions
-        max_class = int(np.max((np.max(solution), np.max(prediction))))
+        max_class = prediction.shape[1] - 1
         solution_binary = np.zeros((len(solution), max_class + 1))
         for i in range(len(solution)):
             solution_binary[i, int(solution[i])] = 1
