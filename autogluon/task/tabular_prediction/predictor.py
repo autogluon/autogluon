@@ -489,7 +489,7 @@ class TabularPredictor(BasePredictor):
         return labels_transformed
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
-    def feature_importance(self, model=None, dataset=None, features=None, raw=True, subsample_size=10000, silent=False):
+    def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False, **kwargs):
         """
         Calculates feature importance scores for the given model.
         A feature's importance score represents the performance drop that results when the model makes predictions on a perturbed copy of the dataset where this feature's values have been randomly shuffled across rows.
@@ -501,23 +501,36 @@ class TabularPredictor(BasePredictor):
 
         Parameters
         ----------
+        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
+            This dataset must also contain the label-column with the same column-name as specified during `fit()`.
+            If specified, then the dataset is used to calculate the feature importance scores.
+            If str is passed, `dataset` will be loaded using the str value as the file path.
+            If not specified, the original dataset used during `fit()` will be used if `cache_data=True`. Otherwise, an exception will be raised.
+            Do not pass the training data through this argument, as the feature importance scores calculated will be biased due to overfitting.
+                More accurate feature importances will be obtained from new data that was held-out during `fit()`.
         model : str, default = None
             Model to get feature importances for, if None the best model is chosen.
             Valid models are listed in this `predictor` by calling `predictor.model_names`
-        dataset : str or :class:`TabularDataset` or `pandas.DataFrame` (optional)
-            This dataset must also contain the label-column with the same column-name as specified during fit().
-            If specified, then the dataset is used to calculate the feature importance scores.
-            If str is passed, `dataset` will be loaded using the str value as the file path.
-            If not specified, the original dataset used during fit() will be used if `cache_data=True`. Otherwise, an exception will be raised.
-            Do not pass the training data through this argument, as the feature importance scores calculated will be inaccurate.
         features : list, default = None
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
             If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
-        raw : bool, default = True
-            Whether to compute feature importance on raw features in the original data (after automated feature engineering) or on the features used by the particular model.
-            For example, a stacker model uses both the original features and the predictions of the lower-level models.
-            Note that for bagged models, feature importance calculation is not yet supported when both `raw=True` and `dataset=None`. Doing so will raise an exception.
-        subsample_size : int, default = 10000
+            Valid feature names change depending on the `feature_stage`.
+                To get the list of feature names for `feature_stage='transformed'`, call `list(predictor.transform_features().columns)`.
+                To get the list of feature names for `feature_stage=`transformed_model`, call `list(predictor.transform_features(model={model_name}).columns)`.
+        feature_stage : str, default = 'original'
+            What stage of feature-processing should importances be computed for.
+            Options:
+                'original':
+                    Compute importances of the original features.
+                    Warning: `dataset` must be specified with this option, otherwise an exception will be raised.
+                'transformed':
+                    Compute importances of the post-internal-transformation features (after automated feature engineering). These features may be missing some original features, or add new features entirely.
+                    An example of new features would be ngram features generated from a text column.
+                    Warning: For bagged models, feature importance calculation is not yet supported with this option when `dataset=None`. Doing so will raise an exception.
+                'transformed_model':
+                    Compute importances of the post-model-transformation features. These features are the internal features used by the requested model. They may differ greatly from the original features.
+                    If the model is a stack ensemble, this will include stack ensemble features such as the prediction probability features of the stack ensemble's base (ancestor) models.
+        subsample_size : int, default = 1000
             The number of rows to sample from `dataset` when computing feature importance.
             If `subsample_size=None` or `dataset` contains fewer than `subsample_size` rows, all rows will be used during computation.
             Larger values increase the accuracy of the feature importance scores.
@@ -530,11 +543,26 @@ class TabularPredictor(BasePredictor):
         Pandas `pandas.Series` of feature importance scores.
 
         """
+        allowed_kwarg_names = {'raw'}
+        for kwarg_name in kwargs.keys():
+            if kwarg_name not in allowed_kwarg_names:
+                raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
+        if 'raw' in kwargs.keys():
+            logger.log(30, 'Warning: `raw` is a deprecated parameter. Use `feature_stage` instead. Starting from AutoGluon 0.1.0, specifying `raw` as a parameter will cause an exception.')
+            logger.log(30, 'Overriding `feature_stage` value with `raw` value.')
+            raw = kwargs['raw']
+            if raw is True:
+                feature_stage = 'transformed'
+            elif raw is False:
+                feature_stage = 'transformed_model'
+            else:
+                raise ValueError(f'`raw` must be one of [True, False], but was {raw}.')
+
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
         if (dataset is None) and (not self._trainer.is_data_saved):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
-        return self._learner.get_feature_importance(model=model, X=dataset, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
+        return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
 
     def refit_full(self, model='all'):
         """

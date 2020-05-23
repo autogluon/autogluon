@@ -500,17 +500,34 @@ class AbstractLearner:
     # Negative values mean the feature is likely harmful.
     # model: model (str) to get feature importances for, if None will choose best model.
     # features: list of feature names that feature importances are calculated for and returned, specify None to get all feature importances.
-    # raw: Whether to compute feature importance on raw original features or on the features used by the particular model.
-    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, raw=True, subsample_size=10000, silent=False) -> Series:
+    # feature_stage: Whether to compute feature importance on raw original features ('original'), transformed features ('transformed') or on the features used by the particular model ('transformed_model').
+    def get_feature_importance(self, model=None, X=None, y=None, features: list = None, feature_stage='original', subsample_size=1000, silent=False) -> Series:
+        valid_feature_stages = ['original', 'transformed', 'transformed_model']
+        if feature_stage not in valid_feature_stages:
+            raise ValueError(f'feature_stage must be one of: {valid_feature_stages}, but was {feature_stage}.')
+        trainer = self.load_trainer()
         if X is not None:
             if y is None:
                 X, y = self.extract_label(X)
-            X = self.transform_features(X)
             y = self.label_cleaner.transform(y)
+            X, y = self._remove_nan_label_rows(X, y)
+
+            if feature_stage == 'original':
+                return trainer._get_feature_importance_raw(model=model, X=X, y=y, features_to_use=features, subsample_size=subsample_size, transform_func=self.transform_features, silent=silent)
+            X = self.transform_features(X)
         else:
+            if feature_stage == 'original':
+                raise AssertionError('Feature importance `dataset` cannot be None if `feature_stage==\'original\'`. A test dataset must be specified.')
             y = None
-        trainer = self.load_trainer()
+        raw = feature_stage == 'transformed'
         return trainer.get_feature_importance(X=X, y=y, model=model, features=features, raw=raw, subsample_size=subsample_size, silent=silent)
+
+    @staticmethod
+    def _remove_nan_label_rows(X, y):
+        if y.isnull().any():
+            y = y.dropna()
+            X = X.loc[y.index]
+        return X, y
 
     # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
     # TODO: Add feature inference / feature engineering info to get_info output
