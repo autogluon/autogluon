@@ -199,7 +199,9 @@ class NNFastAiTabularModel(AbstractModel):
         ] else 'auto'
 
         # TODO: calculate max emb concat layer size and use 1st layer as that value and 2nd in between number of classes and the value
-        if self.problem_type in [REGRESSION, BINARY]:
+        if self.params.get('layers', None) is not None:
+            layers = self.params['layers']
+        elif self.problem_type in [REGRESSION, BINARY]:
             layers = [200, 100]
         else:
             base_size = max(len(data.classes) * 2, 100)
@@ -213,7 +215,7 @@ class NNFastAiTabularModel(AbstractModel):
             loss_func = LabelSmoothingCrossEntropy(self.params['smoothing'])
 
         self.model = tabular_learner(
-            data, layers=layers, ps=[self.params['dropout']], emb_drop=self.params['dropout'], metrics=nn_metric,
+            data, layers=layers, ps=self.params['ps'], emb_drop=self.params['emb_drop'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
         logger.log(15, self.model.model)
