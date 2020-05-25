@@ -214,8 +214,12 @@ class NNFastAiTabularModel(AbstractModel):
         if self.problem_type in [BINARY, MULTICLASS] and self.params.get('smoothing', 0.0) > 0.0:
             loss_func = LabelSmoothingCrossEntropy(self.params['smoothing'])
 
+        ps = self.params['ps']
+        if type(ps) != list:
+            ps = [ps]
+
         self.model = tabular_learner(
-            data, layers=layers, ps=self.params['ps'], emb_drop=self.params['emb_drop'], metrics=nn_metric,
+            data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
         logger.log(15, self.model.model)
