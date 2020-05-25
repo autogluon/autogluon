@@ -94,7 +94,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
         )
     if (nn_fastai_options is not None) & __is_fastai_available():
-        from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
+        from ....contrib.tabular_nn_pytorch.tabular_nn_fastai import NNFastAiTabularModel
         models.append(
             NNFastAiTabularModel(path=path, name='FastaiNNClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
@@ -167,7 +167,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
         )
     if (nn_fastai_options is not None) & __is_fastai_available():
-        from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
+        from ....contrib.tabular_nn_pytorch.tabular_nn_fastai import NNFastAiTabularModel
         models.append(
             NNFastAiTabularModel(path=path, name='FastaiNNRegressor', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
