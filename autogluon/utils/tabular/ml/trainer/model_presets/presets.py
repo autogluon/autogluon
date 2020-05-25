@@ -96,7 +96,7 @@ def get_preset_models_classification(path, problem_type, objective_func, stoppin
     if (nn_fastai_options is not None) & __is_fastai_available():
         from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
         models.append(
-            NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
+            NNFastAiTabularModel(path=path, name='FastaiNNClassifier', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
         )
     if lr_options is not None:
@@ -169,7 +169,7 @@ def get_preset_models_regression(path, problem_type, objective_func, stopping_me
     if (nn_fastai_options is not None) & __is_fastai_available():
         from ....contrib.tabular_nn_pytorch.nn_tab_model import NNFastAiTabularModel
         models.append(
-            NNFastAiTabularModel(path=path, name='FastAiNeuralNetClassifier', problem_type=problem_type,
+            NNFastAiTabularModel(path=path, name='FastaiNNRegressor', problem_type=problem_type,
                                   objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_fastai_options.copy()),
         )
     if (not hyperparameter_tune) and (custom_options is not None):
@@ -217,12 +217,13 @@ def _add_models(models, options, name_prefix, model_fn):
 def __is_fastai_available():
     try:
         with warning_filter():
-            import fastai
-            import torch
+            import fastai  # tested with 1.0.61
+            import torch  # tested with torch==1.4.0, torchvision==0.5.0
         fastai_imported = True
     except ImportError:
         fastai_imported = False
 
     if not fastai_imported:
-        warnings.warn('fastAI models cannot be created because fastai/torch are not installed.')
+        # Detailed installation instructions are available here: https://github.com/fastai/fastai/blob/master/README.md#installation
+        warnings.warn('fastAI models cannot be created because fastai/torch are not installed. Please use `pip install fastai`')
     return fastai_imported

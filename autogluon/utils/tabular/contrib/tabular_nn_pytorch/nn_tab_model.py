@@ -177,7 +177,7 @@ class NNFastAiTabularModel(AbstractModel):
         data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
-                .databunch(bs=self.params['nn.tabular.bs'] if len(X_train) > self.params['nn.tabular.bs'] else 32))
+                .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
     def _generate_datasets(self, X_train, Y_train, X_test, Y_test):
@@ -206,14 +206,14 @@ class NNFastAiTabularModel(AbstractModel):
             layers = [base_size * 2, base_size]
 
         early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-                                    min_delta=self.params['nn.tabular.early.stopping.min_delta'], patience=self.params['nn.tabular.early.stopping.patience'])
+                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'])
 
         loss_func = None
-        if self.problem_type in [BINARY, MULTICLASS] and 'nn.tabular.smoothing' in self.params:
-            loss_func = LabelSmoothingCrossEntropy(self.params['nn.tabular.smoothing'])
+        if self.problem_type in [BINARY, MULTICLASS] and self.params.get('smoothing', 0.0) > 0.0:
+            loss_func = LabelSmoothingCrossEntropy(self.params['smoothing'])
 
         self.model = tabular_learner(
-            data, layers=layers, ps=[self.params['nn.tabular.dropout']], emb_drop=self.params['nn.tabular.dropout'], metrics=nn_metric,
+            data, layers=layers, ps=[self.params['dropout']], emb_drop=self.params['dropout'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
         logger.log(15, self.model.model)
@@ -223,7 +223,7 @@ class NNFastAiTabularModel(AbstractModel):
             with progress_disabled_ctx(self.model) as model:
                 original_path = model.path
                 model.path = Path(temp_dir)
-                model.fit_one_cycle(self.params['nn.tabular.epochs'], self.params['nn.tabular.lr'], callbacks=save_callback)
+                model.fit_one_cycle(self.params['epochs'], self.params['lr'], callbacks=save_callback)
 
                 # Load the best one and export it
                 model.load(self.name)
@@ -241,8 +241,8 @@ class NNFastAiTabularModel(AbstractModel):
         if objective_func_name in self.metrics_map.keys():
             nn_metric = self.metrics_map[objective_func_name]
         elif objective_func_name is None:
-            objective_func_name = self.params['nn.tabular.metric']
-            nn_metric = self.metrics_map[self.params['nn.tabular.metric']]
+            objective_func_name = self.params['metric']
+            nn_metric = self.metrics_map[self.params['metric']]
         else:
             nn_metric = None
         return nn_metric, objective_func_name

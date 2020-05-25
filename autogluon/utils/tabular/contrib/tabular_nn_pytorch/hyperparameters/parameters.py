@@ -14,13 +14,22 @@ def get_param_baseline(problem_type, num_classes=None):
 
 def get_param_multiclass_baseline():
     params = {
-        'nn.tabular.dropout': 0.1,
-        'nn.tabular.bs': 256,
-        'nn.tabular.lr': 1e-2,
-        'nn.tabular.epochs': 30,
-        'nn.tabular.metric': 'accuracy',
-        'nn.tabular.early.stopping.min_delta': 0.001,
-        'nn.tabular.early.stopping.patience': 7,
+        'dropout': 0.1,  # linear layers dropout
+        'bs': 256,  # batch size
+
+        # maximum learning rate for one cycle policy https://docs.fast.ai/train.html#fit_one_cycle
+        # One-cycle policy paper: https://arxiv.org/abs/1803.09820
+        'lr': 1e-2,
+        'epochs': 30,  # number of epochs
+        'metric': 'accuracy',
+
+        # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+        'early.stopping.min_delta': 0.001,
+        'early.stopping.patience': 7,
+
+        # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
+        # otherwise use default loss function for this type of problem
+        'smoothing': 0.0,
     }
     return params
 
@@ -32,12 +41,21 @@ def get_param_binary_baseline():
 
 def get_param_regression_baseline():
     params = {
-        'nn.tabular.dropout': 0.1,
-        'nn.tabular.bs': 256,
-        'nn.tabular.lr': 1e-2,
-        'nn.tabular.epochs': 30,
-        'nn.tabular.metric': 'root_mean_squared_error',
-        'nn.tabular.early.stopping.min_delta': 0.001,
-        'nn.tabular.early.stopping.patience': 7,
+        'dropout': 0.1,  # linear layers dropout
+        'bs': 256,  # batch size
+
+        # maximum learning rate for one cycle policy https://docs.fast.ai/train.html#fit_one_cycle
+        # One-cycle policy paper: https://arxiv.org/abs/1803.09820
+        'lr': 1e-2,
+        'epochs': 30,  # number of epochs
+        'metric': 'root_mean_squared_error',
+
+        # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+        'early.stopping.min_delta': 0.001,
+        'early.stopping.patience': 7,
+
+        # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
+        # otherwise use default loss function for this type of problem
+        'smoothing': 0.0,
     }
     return params
