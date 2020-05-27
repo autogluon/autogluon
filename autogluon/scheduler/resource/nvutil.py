@@ -22,7 +22,7 @@ _cudaLib_refcount = 0 # Incremented on each cudaInit and decremented on cudaShut
 def cudaInit():
     if not _LoadNvmlLibrary():
         return False
-    
+
     #
     # Initialize the library
     #
@@ -32,7 +32,7 @@ def cudaInit():
         _cudaCheckReturn(ret)
     except NVMLError:
         return False
-   
+
     # Atomically update refcount
     global _cudaLib_refcount
     libLoadLock.acquire()
@@ -53,7 +53,7 @@ def _LoadNvmlLibrary():
     Load the library if it isn't loaded already
     '''
     global cudaLib
-    
+
     ret = True
     if (cudaLib == None):
         # lock to ensure only one caller loads the library
@@ -94,7 +94,7 @@ def _cudaGetFunctionPointer(name):
 
     if name in _cudaGetFunctionPointer_cache:
         return _cudaGetFunctionPointer_cache[name]
-    
+
     libLoadLock.acquire()
     try:
         # ensure library was loaded
@@ -150,7 +150,7 @@ def cudaShutdown():
     fn = _cudaGetFunctionPointer("nvmlShutdown")
     ret = fn()
     _cudaCheckReturn(ret)
-    
+
     # Atomically update refcount
     global _cudaLib_refcount
     libLoadLock.acquire()
@@ -158,3 +158,110 @@ def cudaShutdown():
         _cudaLib_refcount -= 1
     libLoadLock.release()
     return None
+
+
+class _PrintableStructure(Structure):
+    """
+    Abstract class that produces nicer __str__ output than ctypes.Structure.
+    e.g. instead of:
+      >>> print str(obj)
+      <class_name object at 0x7fdf82fef9e0>
+    this class will print
+      class_name(field_name: formatted_value, field_name: formatted_value)
+    _fmt_ dictionary of <str _field_ name> -> <str format>
+    e.g. class that has _field_ 'hex_value', c_uint could be formatted with
+      _fmt_ = {"hex_value" : "%08X"}
+    to produce nicer output.
+    Default fomratting string for all fields can be set with key "<default>" like:
+      _fmt_ = {"<default>" : "%d MHz"} # e.g all values are numbers in MHz.
+    If not set it's assumed to be just "%s"
+    Exact format of returned str from this class is subject to change in the future.
+    """
+    _fmt_ = {}
+    def __str__(self):
+        result = []
+        for x in self._fields_:
+            key = x[0]
+            value = getattr(self, key)
+            fmt = "%s"
+            if key in self._fmt_:
+                fmt = self._fmt_[key]
+            elif "<default>" in self._fmt_:
+                fmt = self._fmt_["<default>"]
+            result.append(("%s: " + fmt) % (key, value))
+        return self.__class__.__name__ + "(" + string.join(result, ", ") + ")"
+
+
+class c_nvmlUtilization_t(_PrintableStructure):
+    _fields_ = [
+        ('gpu', c_uint),
+        ('memory', c_uint),
+    ]
+    _fmt_ = {'<default>': "%d %%"}
+
+
+class c_nvmlMemory_t(_PrintableStructure):
+    _fields_ = [
+        ('total', c_ulonglong),
+        ('free', c_ulonglong),
+        ('used', c_ulonglong),
+    ]
+    _fmt_ = {'<default>': "%d B"}
+
+def cudaDeviceGetHandleByIndex(index):
+    c_index = c_uint(index)
+    device = c_nvmlDevice_t()
+    fn = _nvmlGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")
+    ret = fn(c_index, byref(device))
+    _nvmlCheckReturn(ret)
+    return device
+
+class NviSMI:
+    def __init__(self, gpu_id=0):
+        self.handle = cudaDeviceGetHandleByIndex(index)
+
+    def get_utilization_rates():
+        c_util = c_nvmlUtilization_t()
+        fn = _nvmlGetFunctionPointer("nvmlDeviceGetUtilizationRates")
+        ret = fn(self.handle, byref(c_util))
+        _nvmlCheckReturn(ret)
+        return c_util
+
+    def get_memory_info():
+        c_memory = c_nvmlMemory_t()
+        fn = _nvmlGetFunctionPointer("nvmlDeviceGetMemoryInfo")
+        ret = fn(self.handle, byref(c_memory))
+        _nvmlCheckReturn(ret)
+        return c_memory
+
+
+def cudaDeviceGetUtilizationRates(gpu_id=None):
+    """Short summary.
+
+    Parameters
+    ----------
+    gpu_id : int, list of int, or `None`
+        GPU id or list of GPU id. If default to `None`, it assumes all GPU is queried.
+
+    Returns
+    -------
+    dict or list of dict
+
+
+    """
+    gpu_id = gpu_id if gpu_id is not None else
+    handle = nvmlDeviceGetHandleByIndex(0)
+    c_util = c_nvmlUtilization_t()
+    fn = _nvmlGetFunctionPointer("nvmlDeviceGetUtilizationRates")
+    ret = fn(handle, byref(c_util))
+    _nvmlCheckReturn(ret)
+    return c_util
+
+def cudaDeviceGetMemoryInfo(gpu_id=None):
+
+    handle = handle = nvmlDeviceGetHandleByIndex(0)
+    c_memory = c_nvmlMemory_t()
+    fn = _nvmlGetFunctionPointer("nvmlDeviceGetMemoryInfo")
+    ret = fn(handle, byref(c_memory))
+    _nvmlCheckReturn(ret)
+    return c_memory
