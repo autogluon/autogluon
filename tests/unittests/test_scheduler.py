@@ -49,3 +49,16 @@ def test_rl_scheduler():
     scheduler.run()
     scheduler.join_jobs()
 
+def test_nvismi_util():
+    from autogluon.scheduler.resource.nvutil import NviSMI
+    from autogluon.scheduler.resource import get_gpu_count
+    num_gpu = get_gpu_count()
+    if not num_gpu > 0:
+        return
+    import mxnet as mx
+    gpu_arrays = [mx.nd.zeros((1, 2, 3), ctx=mx.gpu(i)) for i in range(num_gpu)]
+    monitor = [NviSMI(i) for i in range(num_gpu)]
+    for i in range(num_gpu):
+        assert monitor[i].get_memory_info().used > 0
+        u = monitor[i].get_utilization_rates().gpu
+        assert u >= 0 and u <= 100

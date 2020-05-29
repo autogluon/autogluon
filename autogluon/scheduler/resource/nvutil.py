@@ -3,10 +3,9 @@ from ctypes.util import find_library
 import sys
 import os
 import threading
-import string
 
-__all__ = ['cudaInit', 'cudaDeviceGetCount', 'cudaSystemGetNVMLVersion'
-           'cudaShutdown']
+__all__ = ['cudaInit', 'cudaDeviceGetCount', 'cudaSystemGetNVMLVersion',
+           'cudaShutdown', 'NviSMI']
 
 NVML_SUCCESS                                = 0
 NVML_ERROR_UNINITIALIZED                    = 1
@@ -189,7 +188,7 @@ class _PrintableStructure(Structure):
             elif "<default>" in self._fmt_:
                 fmt = self._fmt_["<default>"]
             result.append(("%s: " + fmt) % (key, value))
-        return self.__class__.__name__ + "(" + string.join(result, ", ") + ")"
+        return self.__class__.__name__ + "(" + ", ".join(result) + ")"
 
 
 class c_nvmlUtilization_t(_PrintableStructure):
@@ -208,60 +207,88 @@ class c_nvmlMemory_t(_PrintableStructure):
     ]
     _fmt_ = {'<default>': "%d B"}
 
+
+class struct_c_nvmlDevice_t(Structure):
+    pass # opaque handle
+c_nvmlDevice_t = POINTER(struct_c_nvmlDevice_t)
+
 def cudaDeviceGetHandleByIndex(index):
     c_index = c_uint(index)
     device = c_nvmlDevice_t()
-    fn = _nvmlGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")
+    fn = _cudaGetFunctionPointer("nvmlDeviceGetHandleByIndex_v2")
     ret = fn(c_index, byref(device))
-    _nvmlCheckReturn(ret)
+    _cudaCheckReturn(ret)
     return device
 
 class NviSMI:
-    def __init__(self, gpu_id=0):
-        self.handle = cudaDeviceGetHandleByIndex(index)
+    """A NviSMI helper class that provides minimal functionality like `nvidia-smi`.
 
-    def get_utilization_rates():
-        c_util = c_nvmlUtilization_t()
-        fn = _nvmlGetFunctionPointer("nvmlDeviceGetUtilizationRates")
-        ret = fn(self.handle, byref(c_util))
-        _nvmlCheckReturn(ret)
-        return c_util
+    For example, one can use instance to monitor the utilization and memory for a
+    particular GPU.
 
-    def get_memory_info():
-        c_memory = c_nvmlMemory_t()
-        fn = _nvmlGetFunctionPointer("nvmlDeviceGetMemoryInfo")
-        ret = fn(self.handle, byref(c_memory))
-        _nvmlCheckReturn(ret)
-        return c_memory
-
-
-def cudaDeviceGetUtilizationRates(gpu_id=None):
-    """Short summary.
+    >>> gpu0 = NviSMI(0)
+    >>> rate = gpu0.get_utilization_rates()
+    >>> print('gpu:', rate.gpu)
+    >>> print('mem:', rate.memory)
+    >>> # or detailed memory info
+    >>> print(gpu0.get_memory_info())
 
     Parameters
     ----------
-    gpu_id : int, list of int, or `None`
-        GPU id or list of GPU id. If default to `None`, it assumes all GPU is queried.
-
-    Returns
-    -------
-    dict or list of dict
-
+    gpu_id : int
+        The integer GPU id, typical value is from 0-16.
 
     """
-    gpu_id = gpu_id if gpu_id is not None else
-    handle = nvmlDeviceGetHandleByIndex(0)
-    c_util = c_nvmlUtilization_t()
-    fn = _nvmlGetFunctionPointer("nvmlDeviceGetUtilizationRates")
-    ret = fn(handle, byref(c_util))
-    _nvmlCheckReturn(ret)
-    return c_util
+    def __init__(self, gpu_id=0):
+        self.handle = None
+        if not cudaInit():
+            return
+        self.handle = cudaDeviceGetHandleByIndex(gpu_id)
 
-def cudaDeviceGetMemoryInfo(gpu_id=None):
+    def get_utilization_rates(self):
+        """Get the GPU utilization and memory rate(integer value, 0-100).
 
-    handle = handle = nvmlDeviceGetHandleByIndex(0)
-    c_memory = c_nvmlMemory_t()
-    fn = _nvmlGetFunctionPointer("nvmlDeviceGetMemoryInfo")
-    ret = fn(handle, byref(c_memory))
-    _nvmlCheckReturn(ret)
-    return c_memory
+        Fields:
+        -------
+            ('gpu', c_uint)
+            ('memory', c_uint)
+
+        Returns
+        -------
+        c_nvmlUtilization_t
+            ('gpu', c_uint)
+            ('memory', c_uint)
+
+        """
+        if not self.handle:
+            return c_nvmlUtilization_t(0, 0)
+        c_util = c_nvmlUtilization_t()
+        fn = _cudaGetFunctionPointer("nvmlDeviceGetUtilizationRates")
+        ret = fn(self.handle, byref(c_util))
+        _cudaCheckReturn(ret)
+        return c_util
+
+    def get_memory_info(self):
+        """Get the detailed memory information.
+
+        Fields:
+        -------
+            ('total', c_ulonglong),
+            ('free', c_ulonglong),
+            ('used', c_ulonglong),
+
+        Returns
+        -------
+        c_nvmlMemory_t
+            ('total', c_ulonglong),
+            ('free', c_ulonglong),
+            ('used', c_ulonglong),
+
+        """
+        if not self.handle:
+            return c_nvmlMemory_t(0, 0, 0)
+        c_memory = c_nvmlMemory_t()
+        fn = _cudaGetFunctionPointer("nvmlDeviceGetMemoryInfo")
+        ret = fn(self.handle, byref(c_memory))
+        _cudaCheckReturn(ret)
+        return c_memory

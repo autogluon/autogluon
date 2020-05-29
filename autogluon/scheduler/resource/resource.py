@@ -2,7 +2,7 @@ import logging
 from multiprocessing import cpu_count
 
 __all__ = ['Resources', 'DistributedResource',
-           'get_cpu_count', 'get_gpu_count', 
+           'get_cpu_count', 'get_gpu_count',
            'get_remote_cpu_count', 'get_remote_gpu_count']
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class DistributedResource(Resources):
         super(DistributedResource, self)._ready(cids, gids)
         self.node = remote
         self.is_ready = True
- 
+
     def _release(self):
         super(DistributedResource, self)._release()
         self.node = None
