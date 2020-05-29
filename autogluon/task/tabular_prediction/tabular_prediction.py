@@ -204,24 +204,43 @@ class TabularPrediction(BaseTask):
                 Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
                 If certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
                 For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
-            Values = dict of hyperparameter settings for each model type.
-                Each hyperparameter can either be single fixed value or a search space containing many possible values.
+            Values = dict of hyperparameter settings for each model type, or list of dicts.
+                Each hyperparameter can either be a single fixed value or a search space containing many possible values.
                 Unspecified hyperparameters will be set to default values (or default search spaces if `hyperparameter_tune = True`).
                 Caution: Any provided search spaces will be overridden by fixed defaults if `hyperparameter_tune = False`.
+                To train multiple models of a given type, set the value to a list of hyperparameter dictionaries.
+                    For example, `hyperparameters = {'RF': [rf_params1, rf_params2, rf_params3]}` will result in 3 random forest models being trained with separate hyperparameters.
+            Advanced functionality: Custom stack levels
+                By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
+                To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
+                    Example: `hyperparameters = {0: {'RF': rf_params1}, 1: {'CAT': [cat_params1, cat_params2], 'NN': {}}}
+                    This will result in a stack ensemble that has one custom random forest in level 0 followed by two CatBoost models with custom hyperparameters and a default neural network in level 1, for a total of 4 models.
+                If a level is not specified in `hyperparameters`, it will default to using the highest specified level to train models. This can also be explicitly controlled by adding a 'default' key.
 
             Note: `hyperparameters` can also take a special key 'custom', which maps to a list of model names (currently supported options = 'GBM').
             If `hyperparameter_tune = False`, then these additional models will also be trained using custom pre-specified hyperparameter settings that are known to work well.
 
             Default:
-                `hyperparameters = {
-                   'NN': {},
-                   'GBM': {},
-                   'CAT': {},
-                   'RF': {},
-                   'XT': {},
-                   'KNN': {},
-                   'custom': ['GBM'],
-                }`
+                hyperparameters = {
+                    'NN': {},
+                    'GBM': {},
+                    'CAT': {},
+                    'RF': [
+                        {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                    ],
+                    'XT': [
+                        {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                    ],
+                    'KNN': [
+                        {'weights': 'uniform', '_ag_args': {'name_suffix': 'Unif'}},
+                        {'weights': 'distance', '_ag_args': {'name_suffix': 'Dist'}},
+                    ],
+                    'custom': ['GBM']
+                }
 
             Details regarding the hyperparameters you can specify for each model are provided in the following files:
                 NN: `autogluon/utils/tabular/ml/models/tabular_nn/hyperparameters/parameters.py`
@@ -243,6 +262,20 @@ class TabularPrediction(BaseTask):
                     Note: a list of hyper-parameters dicts can be passed; each set will create different version of the model.
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
+                Advanced functionality: Custom AutoGluon model parameters
+                    These parameters are optional and can be specified in any model's hyperparameters.
+                        Example: `hyperparameters = {'RF': {..., '_ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                    _ag_args: Dictionary of customization options related to AutoGluon.
+                        Valid keys:
+                            name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
+                            name_main: (str) The main name of the model. In 'RandomForestClassifier', this is 'RandomForest'.
+                            name_prefix: (str) Add a custom prefix to the model name. Unused by default.
+                            name_type_suffix: (str) Override the type suffix of the model name. In 'RandomForestClassifier', this is 'Classifier'. This comes before 'name_suffix'.
+                            name_suffix: (str) Add a custom suffix to the model name. Unused by default.
+                            priority: (int) Determines the order in which the model is trained. Larger values result in the model being trained earlier. Default values range from 100 (RF) to 0 (custom), dictated by model type.
+                            problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
+                            disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
+                        Reference the default hyperparameters for example usage of these options.
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
@@ -561,10 +594,10 @@ class TabularPrediction(BaseTask):
                 refit_full = 'all'
 
         if refit_full is not False:
+            trainer = predictor._trainer
+            trainer_model_best = trainer.get_model_best()
             predictor.refit_full(model=refit_full)
             if set_best_to_refit_full:
-                trainer = predictor._trainer
-                trainer_model_best = trainer.get_model_best()
                 if trainer_model_best in trainer.model_full_dict.keys():
                     trainer.model_best = trainer.model_full_dict[trainer_model_best]
                     # Note: model_best will be overwritten if additional training is done with new models, since model_best will have validation score of None and any new model will have a better validation score.

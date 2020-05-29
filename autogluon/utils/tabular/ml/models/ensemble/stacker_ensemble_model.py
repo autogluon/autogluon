@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 #  To solve this, this model must know full context of stacker, and only get preds once for each required model
 #  This is already done in trainer, but could be moved internally.
 class StackerEnsembleModel(BaggedEnsembleModel):
-    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, save_bagged_folds=True, random_state=0, debug=0):
-        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, save_bagged_folds=save_bagged_folds, random_state=random_state, debug=debug)
+    def __init__(self, path: str, name: str, model_base: AbstractModel, base_model_names=None, base_models_dict=None, base_model_paths_dict=None, base_model_types_dict=None, base_model_types_inner_dict=None, base_model_performances_dict=None, use_orig_features=True, num_classes=None, hyperparameters=None, objective_func=None, stopping_metric=None, save_bagged_folds=True, random_state=0, debug=0, **kwargs):
+        super().__init__(path=path, name=name, model_base=model_base, hyperparameters=hyperparameters, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, save_bagged_folds=save_bagged_folds, random_state=random_state, debug=debug, **kwargs)
         if base_model_names is None:
             base_model_names = []
         if base_models_dict is None:
@@ -32,7 +32,6 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         self.base_model_paths_dict = base_model_paths_dict
         self.base_model_types_dict = base_model_types_dict
         self.use_orig_features = use_orig_features
-        self.num_classes = num_classes
 
         if (base_model_performances_dict is not None) and (base_model_types_inner_dict is not None):
             if self.params['max_models_per_type'] > 0:

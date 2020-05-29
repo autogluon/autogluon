@@ -28,10 +28,8 @@ logger = logging.getLogger(__name__)
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None,
-                 num_classes=None, hyperparameters=None, features=None, debug=0):
-        self.num_classes = num_classes
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features, debug=debug)
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, num_classes=None, hyperparameters=None, features=None, debug=0, **kwargs):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=hyperparameters, features=features, debug=debug, **kwargs)
 
         self.eval_metric_name = self.stopping_metric.name
         self.is_higher_better = True
@@ -93,6 +91,7 @@ class LGBModel(AbstractModel):
             reporter = kwargs.get('reporter', None)
             train_loss_name = self._get_train_loss_name() if reporter is not None else None
             callbacks += [
+                # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', self.eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
                                       ignore_dart_warning=True, verbose=False, manual_stop_file=False, reporter=reporter, train_loss_name=train_loss_name),
             ]

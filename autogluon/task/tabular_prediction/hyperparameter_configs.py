@@ -9,9 +9,20 @@ hyperparameter_config_dict = dict(
         'NN': {},
         'GBM': {},
         'CAT': {},
-        'RF': {},
-        'XT': {},
-        'KNN': {},
+        'RF': [
+            {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
+        'XT': [
+            {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
+        'KNN': [
+            {'weights': 'uniform', '_ag_args': {'name_suffix': 'Unif'}},
+            {'weights': 'distance', '_ag_args': {'name_suffix': 'Dist'}},
+        ],
         'custom': ['GBM'],
     },
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
@@ -19,8 +30,16 @@ hyperparameter_config_dict = dict(
         'NN': {},
         'GBM': {},
         'CAT': {},
-        'RF': {'max_depth': 15},
-        'XT': {'max_depth': 15},
+        'RF': [
+            {'criterion': 'gini', 'max_depth': 15, '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', 'max_depth': 15, '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', 'max_depth': 15, '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
+        'XT': [
+            {'criterion': 'gini', 'max_depth': 15, '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'entropy', 'max_depth': 15, '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+            {'criterion': 'mse', 'max_depth': 15, '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+        ],
         'custom': ['GBM'],
     },
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.

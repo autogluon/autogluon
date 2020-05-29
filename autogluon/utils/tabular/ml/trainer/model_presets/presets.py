@@ -1,33 +1,148 @@
+import copy
 import logging
-import mxnet as mx
+from collections import defaultdict
+
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ...constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from ...models.abstract.abstract_model import AbstractModel
 from ...models.lgb.lgb_model import LGBModel
-from ...models.lgb.hyperparameters.parameters import get_param_baseline_custom
 from ...models.lr.lr_model import LinearModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
 from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
-from .presets_rf import rf_classifiers, xt_classifiers, rf_regressors, xt_regressors
-from ....metrics import soft_log_loss, mean_squared_error
+from ...models.xt.xt_model import XTModel
+from ....metrics import soft_log_loss
 
 logger = logging.getLogger(__name__)
 
+# Higher values indicate higher priority, priority dictates the order models are trained for a given level.
+DEFAULT_MODEL_PRIORITY = dict(
+    RF=100,
+    XT=90,
+    KNN=80,
+    GBM=70,
+    CAT=60,
+    NN=50,
+    LR=40,
+    custom=0,
+)
 
-def get_preset_models(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                      hyperparameters={'NN': {}, 'GBM': {}}, hyperparameter_tune=False, name_suffix=''):
-    if problem_type in [BINARY, MULTICLASS]:
-        return get_preset_models_classification(path=path, problem_type=problem_type,
-                                                objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes,
-                                                hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
-    elif problem_type == REGRESSION:
-        return get_preset_models_regression(path=path, problem_type=problem_type,
-                                            objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters,
-                                            hyperparameter_tune=hyperparameter_tune, name_suffix=name_suffix)
-    else:
+MODEL_TYPES = dict(
+    RF=RFModel,
+    XT=XTModel,
+    KNN=KNNModel,
+    GBM=LGBModel,
+    CAT=CatboostModel,
+    NN=TabularNeuralNetModel,
+    LR=LinearModel,
+)
+
+DEFAULT_MODEL_NAMES = {
+    RFModel: 'RandomForest',
+    XTModel: 'ExtraTrees',
+    KNNModel: 'KNeighbors',
+    LGBModel: 'LightGBM',
+    CatboostModel: 'Catboost',
+    TabularNeuralNetModel: 'NeuralNet',
+    LinearModel: 'LinearModel',
+}
+
+
+def _dd_classifier():
+    return 'Classifier'
+
+
+def _dd_regressor():
+    return 'Regressor'
+
+
+DEFAULT_MODEL_TYPE_SUFFIX = dict(
+    classifier=defaultdict(_dd_classifier),
+    regressor=defaultdict(_dd_regressor),
+)
+DEFAULT_MODEL_TYPE_SUFFIX['classifier'].update({LinearModel: ''})
+DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
+
+
+# DONE: Add levels, including 'default'
+# DONE: Add lists
+# DONE: Add custom which can append to lists
+# DONE: Add special optional AG args for things like name prefix, name suffix, name, etc.
+# TODO: Move creation of stack ensemble internally into this function? Requires passing base models in as well.
+# DONE: Add special optional AG args for training order
+# TODO: Add special optional AG args for base models
+# TODO: Consider making hyperparameters arg in fit() accept lists, concatenate hyperparameter sets together.
+# TODO: Consider adding special optional AG args for #cores,#gpus,num_early_stopping_iterations,etc.
+# TODO: Consider adding special optional AG args for max train time, max memory size, etc.
+# TODO: Consider adding special optional AG args for use_original_features,features_to_use,etc.
+# TODO: Consider adding optional AG args to dynamically disable models such as valid_num_classes_range, valid_row_count_range, valid_feature_count_range, etc.
+# TODO: Args such as max_repeats, num_folds
+# TODO: Add banned_model_types arg
+# TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
+# TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
+def get_preset_models(path, problem_type, objective_func, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, name_suffix=''):
+    if problem_type not in [BINARY, MULTICLASS, REGRESSION]:
         raise NotImplementedError
+
+    if level in hyperparameters.keys():
+        level_key = level
+    else:
+        level_key = 'default'
+    hp_level = hyperparameters[level_key]
+    priority_dict = defaultdict(list)
+    for model_type in hp_level:
+        for model in hp_level[model_type]:
+            model = copy.deepcopy(model)
+            try:
+                model_priority = model[AG_ARGS]['priority']
+            except:
+                model_priority = DEFAULT_MODEL_PRIORITY[model_type]
+            if AG_ARGS not in model:
+                model[AG_ARGS] = dict()
+            if 'model_type' not in model[AG_ARGS]:
+                model[AG_ARGS]['model_type'] = model_type
+            # Check if model is valid
+            if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
+                continue  # Not valid
+            priority_dict[model_priority].append(model)
+    model_priority_list = [model for priority in sorted(priority_dict.keys(), reverse=True) for model in priority_dict[priority]]
+    model_names_set = set()
+    models = []
+    for model in model_priority_list:
+        model_type = model[AG_ARGS]['model_type']
+        if not isinstance(model_type, AbstractModel):
+            model_type = MODEL_TYPES[model_type]
+        name_orig = model[AG_ARGS].get('name', None)
+        if name_orig is None:
+            name_main = model[AG_ARGS].get('name_main', DEFAULT_MODEL_NAMES[model_type])
+            name_prefix = model[AG_ARGS].get('name_prefix', '')
+            name_type_suffix = model[AG_ARGS].get('name_type_suffix', None)
+            if name_type_suffix is None:
+                suffix_key = 'classifier' if problem_type in PROBLEM_TYPES_CLASSIFICATION else 'regressor'
+                name_type_suffix = DEFAULT_MODEL_TYPE_SUFFIX[suffix_key][model_type]
+            name_suff = model[AG_ARGS].get('name_suffix', '')
+            name_orig = name_prefix + name_main + name_type_suffix + name_suff
+        name = name_orig
+        num_increment = 2
+        while name in model_names_set:  # Ensure name is unique
+            name = f'{name_orig}_{num_increment}'
+            num_increment += 1
+        model_names_set.add(name)
+        model_params = copy.deepcopy(model)
+        model_params.pop(AG_ARGS)
+        if extra_ag_args_fit is not None:
+            if AG_ARGS_FIT not in model_params:
+                model_params[AG_ARGS_FIT] = {}
+            model_params[AG_ARGS_FIT].update(extra_ag_args_fit.copy())  # TODO: Consider case of overwriting user specified extra args.
+        model_init = model_type(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
+        models.append(model_init)
+
+    for model in models:
+        model.rename(model.name + name_suffix)
+
+    return models
 
 
 def get_preset_stacker_model(path, problem_type, objective_func, num_classes=None,
@@ -43,134 +158,6 @@ def get_preset_stacker_model(path, problem_type, objective_func, num_classes=Non
     return model
 
 
-def get_preset_models_classification(path, problem_type, objective_func, stopping_metric=None, num_classes=None,
-                                     hyperparameters={'NN': {}, 'GBM': {}, 'custom': {}}, hyperparameter_tune=False, name_suffix=''):
-    # TODO: define models based on additional keys in hyperparameters
-
-    models = []
-    lr_options = hyperparameters.get('LR', None)
-    gbm_options = hyperparameters.get('GBM', None)
-    nn_options = hyperparameters.get('NN', None)
-    cat_options = hyperparameters.get('CAT', None)
-    rf_options = hyperparameters.get('RF', None)
-    xt_options = hyperparameters.get('XT', None)
-    knn_options = hyperparameters.get('KNN', None)
-    custom_options = hyperparameters.get('custom', None)
-    if rf_options is not None:
-        models += rf_classifiers(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes)
-    if xt_options is not None:
-        models += xt_classifiers(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes)
-    if knn_options is not None:
-        # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = knn_options.copy()
-        knn_unif_params['weights'] = 'uniform'
-        models.append(
-            KNNModel(path=path, name='KNeighborsClassifierUnif', problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_unif_params),
-        )
-        knn_dist_params = knn_options.copy()
-        knn_dist_params['weights'] = 'distance'
-        models.append(
-            KNNModel(path=path, name='KNeighborsClassifierDist', problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_dist_params),
-        )
-    if gbm_options is not None:
-        models.append(
-            LGBModel(path=path, name='LightGBMClassifier', problem_type=problem_type,
-                     objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=gbm_options.copy())
-        )
-    if cat_options is not None:
-        models.append(
-            CatboostModel(path=path, name='CatboostClassifier', problem_type=problem_type,
-                          objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=cat_options.copy()),
-        )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetClassifier', problem_type=problem_type,
-                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy()),
-        )
-    if lr_options is not None:
-        _add_models(
-            models, lr_options, 'LinearModel',
-            lambda name_prefix, lr_option: LinearModel(path=path, name=name_prefix, problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
-        )
-    if (not hyperparameter_tune) and (custom_options is not None):
-        # Consider additional models with custom pre-specified hyperparameter settings:
-        if 'GBM' in custom_options:
-            models += [LGBModel(path=path, name='LightGBMClassifierCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric,
-                         num_classes=num_classes, hyperparameters=get_param_baseline_custom(problem_type, num_classes=num_classes))
-                ]
-        # SKLearnModel(path=path, name='DummyClassifier', model=DummyClassifier(), problem_type=problem_type, objective_func=objective_func),
-        # SKLearnModel(path=path, name='GaussianNB', model=GaussianNB(), problem_type=problem_type, objective_func=objective_func),
-        # SKLearnModel(path=path, name='DecisionTreeClassifier', model=DecisionTreeClassifier(), problem_type=problem_type, objective_func=objective_func),
-        # SKLearnModel(path=path, name='LogisticRegression', model=LogisticRegression(n_jobs=-1), problem_type=problem_type, objective_func=objective_func)
-
-    for model in models:
-        model.rename(model.name + name_suffix)
-
-    # TODO: Update name_suffix to only apply here so its not repeated code! Add .rename function to model
-    return models
-
-
-def get_preset_models_regression(path, problem_type, objective_func, stopping_metric=None, hyperparameters={'NN':{},'GBM':{},'custom':{}}, hyperparameter_tune=False, name_suffix=''):
-    models = []
-    lr_options = hyperparameters.get('LR', None)
-    gbm_options = hyperparameters.get('GBM', None)
-    nn_options = hyperparameters.get('NN', None)
-    cat_options = hyperparameters.get('CAT', None)
-    rf_options = hyperparameters.get('RF', None)
-    xt_options = hyperparameters.get('XT', None)
-    knn_options = hyperparameters.get('KNN', None)
-    custom_options = hyperparameters.get('custom', None)
-    if rf_options is not None:
-        models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=problem_type, objective_func=objective_func)
-    if xt_options is not None:
-        models += xt_regressors(hyperparameters=xt_options, path=path, problem_type=problem_type, objective_func=objective_func)
-    if knn_options is not None:
-        # TODO: Combine uniform and distance into one model when doing HPO
-        knn_unif_params = knn_options.copy()
-        knn_unif_params['weights'] = 'uniform'
-        models.append(
-            KNNModel(path=path, name='KNeighborsRegressorUnif', problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_unif_params),
-        )
-        knn_dist_params = knn_options.copy()
-        knn_dist_params['weights'] = 'distance'
-        models.append(
-            KNNModel(path=path, name='KNeighborsRegressorDist', problem_type=problem_type,
-                     objective_func=objective_func, hyperparameters=knn_dist_params),
-        )
-    if gbm_options is not None:
-        models.append(
-            LGBModel(path=path, name='LightGBMRegressor', problem_type=problem_type,
-                     objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=gbm_options.copy())
-        )
-    if cat_options is not None:
-        models.append(
-            CatboostModel(path=path, name='CatboostRegressor', problem_type=problem_type,
-                          objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=cat_options.copy()),
-        )
-    if nn_options is not None:
-        models.append(
-            TabularNeuralNetModel(path=path, name='NeuralNetRegressor', problem_type=problem_type,
-                                  objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=nn_options.copy())
-        )
-    if (not hyperparameter_tune) and (custom_options is not None):
-        if 'GBM' in custom_options:
-            models += [LGBModel(path=path, name='LightGBMRegressorCustom', problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=get_param_baseline_custom(problem_type))]
-        # SKLearnModel(path=path, name='DummyRegressor', model=DummyRegressor(), problem_type=problem_type, objective_func=objective_func),
-    if lr_options is not None:
-        _add_models(
-            models, lr_options, 'LinearModel',
-            lambda name_prefix, lr_option: LinearModel(path=path, name=name_prefix, problem_type=problem_type, objective_func=objective_func, hyperparameters=lr_option.copy())
-        )
-
-    for model in models:
-        model.rename(model.name + name_suffix)
-
-    return models
-
-
 def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
     # print("Neural Net is currently the only model supported for multi-class distillation.")
     models = []
@@ -180,19 +167,13 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
         TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
                               objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
     )
-    rf_options = {}
-    models += rf_regressors(hyperparameters=rf_options, path=path, problem_type=REGRESSION, objective_func=soft_log_loss)
+    rf_options = dict(criterion='mse')
+    models.append(
+        RFModel(path=path, name='RandomForestRegressorMSE', problem_type=REGRESSION,
+                objective_func=soft_log_loss, hyperparameters=rf_options),
+    )
+
     for model in models:
         model.rename(model.name + name_suffix)
 
     return models
-
-
-def _add_models(models, options, name_prefix, model_fn):
-    if isinstance(options, list):
-        for i, option in enumerate(options):
-            name = f'{name_prefix}_{i}' if len(options) > 1 else name_prefix
-            models.append(model_fn(name, option))
-    else:
-        models.append(model_fn(name_prefix, options))
-

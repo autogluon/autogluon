@@ -10,7 +10,7 @@ import pandas as pd
 import psutil
 
 from .model_trial import model_trial
-from ...constants import BINARY, REGRESSION, REFIT_FULL_SUFFIX
+from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX
 from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int
 from .... import metrics
@@ -57,7 +57,7 @@ class AbstractModel:
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs
@@ -68,6 +68,7 @@ class AbstractModel:
         self.path_root = path
         self.path_suffix = self.name + os.path.sep  # TODO: Make into function to avoid having to reassign on load?
         self.path = self.create_contexts(self.path_root + self.path_suffix)  # TODO: Make this path a function for consistency.
+        self.num_classes = num_classes
         self.model = model
         self.problem_type = problem_type
         self.objective_func = objective_func  # Note: we require higher values = better performance
@@ -100,10 +101,18 @@ class AbstractModel:
         self.val_score = None  # Score with eval_metric (Validation data)
 
         self.params = {}
+        self.params_aux = {}
+
+        self._set_default_auxiliary_params()
+        if hyperparameters is not None:
+            hyperparameters = hyperparameters.copy()
+            if AG_ARGS_FIT in hyperparameters:
+                ag_args_fit = hyperparameters.pop(AG_ARGS_FIT)
+                self.params_aux.update(ag_args_fit)
         self._set_default_params()
         self.nondefault_params = []
         if hyperparameters is not None:
-            self.params.update(hyperparameters.copy())
+            self.params.update(hyperparameters)
             self.nondefault_params = list(hyperparameters.keys())[:]  # These are hyperparameters that user has specified.
         self.params_trained = dict()
 
@@ -122,9 +131,28 @@ class AbstractModel:
     def _set_default_params(self):
         pass
 
-    def _set_default_param_value(self, param_name, param_value):
-        if param_name not in self.params:
-            self.params[param_name] = param_value
+    def _set_default_auxiliary_params(self):
+        # TODO: Consider adding to get_info() output
+        default_auxiliary_params = dict(
+            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors.
+            # TODO: Add more params
+            # max_memory_usage=None,
+            # max_disk_usage=None,
+            # max_time_limit_ratio=1.0,
+            # max_time_limit=None,
+            # num_cpu=None,
+            # num_gpu=None,
+            # ignore_hpo=False,
+            # max_early_stopping_rounds=None,
+        )
+        for key, value in default_auxiliary_params.items():
+            self._set_default_param_value(key, value, params=self.params_aux)
+
+    def _set_default_param_value(self, param_name, param_value, params=None):
+        if params is None:
+            params = self.params
+        if param_name not in params:
+            params[param_name] = param_value
 
     def _get_default_searchspace(self) -> dict:
         return NotImplementedError
