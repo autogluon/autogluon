@@ -21,14 +21,29 @@ class TaskScheduler(object):
     """Base Distributed Task Scheduler
     """
     LOCK = mp.Lock()
-    RESOURCE_MANAGER = DistributedResourceManager()
-    REMOTE_MANAGER = RemoteManager()
+    _resource_manager = None
+    _remote_manager = None
+
+    @classmethod
+    @property
+    def resource_manager(cls):
+        if cls._resource_manager is None:
+            cls._resource_manager = DistributedResourceManager()
+        return cls._resource_manager
+
+    @classmethod
+    @property
+    def remote_manager(cls):
+        if cls._remote_manager is None:
+            cls._remote_manager = RemoteManager()
+        return cls._remote_manager
+
     def __init__(self, dist_ip_addrs=None):
         if dist_ip_addrs is None:
             dist_ip_addrs=[]
         cls = TaskScheduler
-        remotes = cls.REMOTE_MANAGER.add_remote_nodes(dist_ip_addrs)
-        cls.RESOURCE_MANAGER.add_remote(cls.REMOTE_MANAGER.get_remotes())
+        remotes = cls.remote_manager.add_remote_nodes(dist_ip_addrs)
+        cls.resource_manager.add_remote(cls.remote_manager.get_remotes())
         self.scheduled_tasks = []
         self.finished_tasks = []
 
@@ -37,14 +52,14 @@ class TaskScheduler(object):
         """
         ip_addrs = [ip_addrs] if isinstance(ip_addrs, str) else ip_addrs
         with self.LOCK:
-            remotes = TaskScheduler.REMOTE_MANAGER.add_remote_nodes(ip_addrs)
-            TaskScheduler.RESOURCE_MANAGER.add_remote(remotes)
+            remotes = TaskScheduler.remote_manager.add_remote_nodes(ip_addrs)
+            TaskScheduler.resource_manager.add_remote(remotes)
 
     @classmethod
     def upload_files(cls, files, **kwargs):
-        """Upload files to remote machines, so that they are accessible by import or load. 
+        """Upload files to remote machines, so that they are accessible by import or load.
         """
-        cls.REMOTE_MANAGER.upload_files(files, **kwargs)
+        cls.remote_manager.upload_files(files, **kwargs)
 
     def _dict_from_task(self, task):
         if isinstance(task, Task):
@@ -78,8 +93,8 @@ class TaskScheduler(object):
         # adding the task
         cls = TaskScheduler
         if not task.resources.is_ready:
-            cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
+            cls.resource_manager._request(task.resources)
+        job = cls._start_distributed_job(task, cls.resource_manager)
         new_dict = self._dict_from_task(task)
         new_dict['Job'] = job
         with self.LOCK:
@@ -89,12 +104,12 @@ class TaskScheduler(object):
         """Run a training task to the scheduler (Sync).
         """
         cls = TaskScheduler
-        cls.RESOURCE_MANAGER._request(task.resources)
-        job = cls._start_distributed_job(task, cls.RESOURCE_MANAGER)
+        cls.resource_manager._request(task.resources)
+        job = cls._start_distributed_job(task, cls.resource_manager)
         return job.result()
 
     @staticmethod
-    def _start_distributed_job(task, resource_manager):
+    def _start_distributed_job(task, remote_manager):
         """Async Execute the job in remote and release the resources
         """
         logger.debug('\nScheduling {}'.format(task))
@@ -102,7 +117,7 @@ class TaskScheduler(object):
                                          task.fn, task.args, task.resources.gpu_ids)
         def _release_resource_callback(fut):
             logger.debug('Start Releasing Resource')
-            resource_manager._release(task.resources)
+            remote_manager._release(task.resources)
         job.add_done_callback(_release_resource_callback)
         return job
 
@@ -113,9 +128,9 @@ class TaskScheduler(object):
         if '_default_config' in args['args']:
             args['args'].pop('_default_config')
 
-        if 'reporter' in args:	
-            local_reporter = LocalStatusReporter()	
-            dist_reporter = args['reporter']	
+        if 'reporter' in args:
+            local_reporter = LocalStatusReporter()
+            dist_reporter = args['reporter']
             args['reporter'] = local_reporter
 
         manager = mp.Manager()
@@ -185,7 +200,7 @@ class TaskScheduler(object):
         warn("scheduler.shutdown() is now deprecated in favor of autogluon.done().",
              AutoGluonWarning)
         self.join_jobs()
-        self.REMOTE_MANAGER.shutdown()
+        self.remote_manager.shutdown()
 
     def state_dict(self, destination=None):
         """Returns a dictionary containing a whole state of the Scheduler
@@ -218,5 +233,5 @@ class TaskScheduler(object):
 
     def __repr__(self):
         reprstr = self.__class__.__name__ + '(\n' + \
-            str(self.RESOURCE_MANAGER) +')\n'
+            str(self.resource_manager) +')\n'
         return reprstr

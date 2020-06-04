@@ -22,6 +22,7 @@ from distributed.proctitle import (
     enable_proctitle_on_current,
 )
 
+dask.config.set({'distributed.logging.distributed': "critical"})
 logger = logging.getLogger("distributed.scheduler")
 
 
