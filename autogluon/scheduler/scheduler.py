@@ -17,9 +17,13 @@ logger = logging.getLogger(__name__)
 __all__ = ['TaskScheduler']
 
 
-class _ClassProperty(property):
-    def __get__(self, cls, owner):
-        return self.fget.__get__(None, owner)()
+class ClassProperty(object):
+
+    def __init__(self, fget):
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls):
+        return self.fget(owner_cls)
 
 
 class TaskScheduler(object):
@@ -29,15 +33,13 @@ class TaskScheduler(object):
     _resource_manager = None
     _remote_manager = None
 
-    @classmethod
-    @_ClassProperty
+    @ClassProperty
     def resource_manager(cls):
         if cls._resource_manager is None:
             cls._resource_manager = DistributedResourceManager()
         return cls._resource_manager
 
-    @classmethod
-    @_ClassProperty
+    @ClassProperty
     def remote_manager(cls):
         if cls._remote_manager is None:
             cls._remote_manager = RemoteManager()
