@@ -7,7 +7,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from collections import defaultdict
 
-from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
+from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
@@ -16,6 +16,7 @@ from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
 from ..trainer.model_presets.presets import get_preset_stacker_model
+from ..trainer.model_presets.presets_custom import get_preset_custom
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 
@@ -530,10 +531,10 @@ class AbstractTrainer:
             aux_models = self.stack_new_level_aux(X=X_test, y=y_test, fit=False, level=level+1, time_limit=time_limit_aux)
         return core_models + aux_models
 
-    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', kfolds=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, save_bagged_folds=None, stacker_type=StackerEnsembleModel):
+    def stack_new_level_core(self, X, y, X_test=None, y_test=None, models=None, level=1, stack_name='core', kfolds=None, n_repeats=None, hyperparameter_tune=False, feature_prune=False, time_limit=None, save_bagged_folds=None, stacker_type=StackerEnsembleModel, extra_ag_args_fit=None):
         use_orig_features = True
         if models is None:
-            models = self.get_models(self.hyperparameters, level=level)
+            models = self.get_models(self.hyperparameters, level=level, extra_ag_args_fit=extra_ag_args_fit)
         if kfolds is None:
             kfolds = self.kfolds
         if n_repeats is None:
@@ -567,7 +568,7 @@ class AbstractTrainer:
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
 
-    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix='', save_bagged_folds=None):
+    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix='', save_bagged_folds=None, check_if_best=True, child_hyperparameters=None):
         if save_bagged_folds is None:
             save_bagged_folds = self.save_bagged_folds
         if base_model_names is None:
@@ -575,12 +576,18 @@ class AbstractTrainer:
         if len(base_model_names) == 0:
             logger.log(20, 'No base models to train on, skipping weighted ensemble...')
             return []
+
+        # TODO: Remove extra_params, currently a hack
+        if child_hyperparameters is not None:
+            extra_params = {'_tmp_greedy_hyperparameters': child_hyperparameters}
+        else:
+            extra_params = {}
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        objective_func=self.objective_func, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed)
+                                                        objective_func=self.objective_func, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed, **extra_params)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
-        if weighted_ensemble_model.name in self.get_model_names_all():
+        if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
             else:
@@ -857,6 +864,8 @@ class AbstractTrainer:
                 model = self.load_model(model)
                 model_name = model.name
                 model_full = model.convert_to_refitfull_template()
+                # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
+                model_full.params_aux['max_memory_usage_ratio'] = model_full.params_aux['max_memory_usage_ratio'] * 1.15
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
@@ -868,8 +877,12 @@ class AbstractTrainer:
                         X_train_stack_preds = self.get_inputs_to_stacker(X_val, level_start=0, level_end=level, fit=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
                         y_input = y_val
 
+                    # TODO: Remove child_hyperparameters, make this cleaner
+                    #  This fixes the following: Use the original weighted ensemble's iterations: Currently Dionis spends over 1hr training the refit weighted ensemble because it isn't time limited and goes to 100 iterations.
+                    child_hyperparameters = copy.deepcopy(model_full.params)
+                    child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_full.params_aux)
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True)
+                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)
@@ -1398,3 +1411,43 @@ class AbstractTrainer:
         save_pkl.save(path=self.path + self.trainer_info_name, object=info)
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
+
+    def _process_hyperparameters(self, hyperparameters):
+        hyperparameters = copy.deepcopy(hyperparameters)
+
+        has_levels = False
+        top_level_keys = hyperparameters.keys()
+        for key in top_level_keys:
+            if isinstance(key, int) or key == 'default':
+                has_levels = True
+        if not has_levels:
+            hyperparameters = {'default': hyperparameters}
+        top_level_keys = hyperparameters.keys()
+        for key in top_level_keys:
+            for subkey in hyperparameters[key].keys():
+                if not isinstance(hyperparameters[key][subkey], list):
+                    hyperparameters[key][subkey] = [hyperparameters[key][subkey]]
+                models_expanded = []
+                for i, model in enumerate(hyperparameters[key][subkey]):
+                    if isinstance(model, str):
+                        candidate_models = get_preset_custom(name=model, problem_type=self.problem_type, num_classes=self.num_classes)
+                    else:
+                        candidate_models = [model]
+                    valid_models = []
+                    for candidate in candidate_models:
+                        is_valid = True
+                        if AG_ARGS in candidate:
+                            model_valid_problem_types = candidate[AG_ARGS].get('problem_types', None)
+                            if model_valid_problem_types is not None:
+                                if self.problem_type not in model_valid_problem_types:
+                                    is_valid = False
+                        if is_valid:
+                            valid_models.append(candidate)
+                    models_expanded += valid_models
+
+                hyperparameters[key][subkey] = models_expanded
+        if 'default' not in hyperparameters.keys():
+            level_keys = [key for key in hyperparameters.keys() if isinstance(key, int)]
+            max_level_key = max(level_keys)
+            hyperparameters['default'] = copy.deepcopy(hyperparameters[max_level_key])
+        return hyperparameters

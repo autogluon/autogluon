@@ -177,9 +177,11 @@ class DefaultLearner(AbstractLearner):
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
         if new_threshold != threshold:
-            logger.warning(f'Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes.')
+            if new_threshold < threshold:
+                logger.warning(f'Warning: Updated label_count_threshold from {threshold} to {new_threshold} to avoid cutting too many classes.')
         if new_holdout_frac != holdout_frac:
-            logger.warning(f'Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes.')
+            if new_holdout_frac > holdout_frac:
+                logger.warning(f'Warning: Updated holdout_frac from {holdout_frac} to {new_holdout_frac} to avoid cutting too many classes.')
         if new_num_bagging_folds != num_bagging_folds:
             logger.warning(f'Warning: Updated num_bagging_folds from {num_bagging_folds} to {new_num_bagging_folds} to avoid cutting too many classes.')
         return new_threshold, new_holdout_frac, new_num_bagging_folds

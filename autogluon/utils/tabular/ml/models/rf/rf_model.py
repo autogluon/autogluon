@@ -1,4 +1,5 @@
 import logging
+import math
 import pickle
 import sys
 import time
@@ -15,21 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 class RFModel(SKLearnModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0):
-        self.num_classes = num_classes
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
-        if self.params['model_type'] == 'rf':
-            if self.problem_type == REGRESSION:
-                self._model_type = RandomForestRegressor
-            else:
-                self._model_type = RandomForestClassifier
-        elif self.params['model_type'] == 'xt':
-            if self.problem_type == REGRESSION:
-                self._model_type = ExtraTreesRegressor
-            else:
-                self._model_type = ExtraTreesClassifier
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0, **kwargs):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug, **kwargs)
+        self._model_type = self._get_model_type()
+
+    def _get_model_type(self):
+        if self.problem_type == REGRESSION:
+            return RandomForestRegressor
         else:
-            raise ValueError(f'model_type arg must be one of [\'rf\', \'xt\'], but value {self.params["model_type"]} was given.')
+            return RandomForestClassifier
 
     # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
@@ -38,7 +33,6 @@ class RFModel(SKLearnModel):
 
     def _set_default_params(self):
         default_params = {
-            'model_type': 'rf',
             'n_estimators': 300,
             'n_jobs': -1,
         }
@@ -57,11 +51,15 @@ class RFModel(SKLearnModel):
 
     def fit(self, X_train, Y_train, time_limit=None, **kwargs):
         time_start = time.time()
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
-        hyperparams.pop('model_type')
         n_estimators_final = hyperparams['n_estimators']
-        n_estimators_test = 8
-        # minimum_n_estimators = min(50, n_estimators_final)  # TODO: Add in for early stopping RF models based on memory/time constraints
+
+        n_estimators_minimum = min(40, n_estimators_final)
+        if n_estimators_minimum < 40:
+            n_estimators_test = max(1, math.floor(n_estimators_minimum/5))
+        else:
+            n_estimators_test = 8
 
         X_train = self.preprocess(X_train)
         n_estimator_increments = [n_estimators_final]
@@ -77,9 +75,9 @@ class RFModel(SKLearnModel):
         bytes_per_estimator = num_trees_per_estimator * len(X_train) / 60000 * 1e6  # Underestimates by 3x on ExtraTrees
         available_mem = psutil.virtual_memory().available
         expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
-        # expected_min_memory_usage = bytes_per_estimator * minimum_n_estimators / available_mem
-        if expected_memory_usage > 0.8:  # if estimated size is greater than 80% memory
-            logger.warning(f'\tWarning: Model is expected to require {expected_memory_usage * 100} percent of available memory (Estimated before training)...')
+        expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
+        if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
+            logger.warning(f'\tWarning: Model is expected to require {expected_min_memory_usage * 100} percent of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
 
         if n_estimators_final > n_estimators_test * 2:
@@ -87,7 +85,7 @@ class RFModel(SKLearnModel):
                 n_estimator_increments = [n_estimators_test, n_estimators_final]
                 hyperparams['warm_start'] = True
             else:
-                if expected_memory_usage > 0.05:  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
+                if expected_memory_usage > (0.05 * max_memory_usage_ratio):  # Somewhat arbitrary, consider finding a better value, should it scale by cores?
                     # Causes ~10% training slowdown, so try to avoid if memory is not an issue
                     n_estimator_increments = [n_estimators_test, n_estimators_final]
                     hyperparams['warm_start'] = True
@@ -102,18 +100,35 @@ class RFModel(SKLearnModel):
             self.model = self.model.fit(X_train, Y_train)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
-                time_expected = time_train_start - time_start + (time_elapsed * n_estimators_final / n_estimators)
-                if (time_limit is not None) and (time_expected > time_limit):
-                    logger.warning(f'\tWarning: Model is expected to require {round(time_expected, 2)}s to train, which exceeds the maximum time limit of {round(time_limit, 2)}s, skipping model...')
-                    raise TimeLimitExceeded
+
                 model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
                 expected_final_model_size_bytes = model_size_bytes * (n_estimators_final / self.model.n_estimators)
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
-                if model_memory_ratio > 0.20:
-                    logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
-                if model_memory_ratio > 0.30:
-                    raise NotEnoughMemoryError  # don't train full model to avoid OOM error
+
+                ideal_memory_ratio = 0.25 * max_memory_usage_ratio
+                n_estimators_ideal = min(n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
+
+                if n_estimators_final > n_estimators_ideal:
+                    if n_estimators_ideal < n_estimators_minimum:
+                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio*100, 1)}% of available memory...')
+                        raise NotEnoughMemoryError  # don't train full model to avoid OOM error
+                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 1)}% -> {round(ideal_memory_ratio*100, 1)}% of available memory...')
+
+                if time_limit is not None:
+                    time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators)
+                    n_estimators_time = math.floor((time_limit - time_train_start + time_start) * n_estimators / time_elapsed)
+                    if n_estimators_time < n_estimators_ideal:
+                        if n_estimators_time < n_estimators_minimum:
+                            logger.warning(f'\tWarning: Model is expected to require {round(time_expected, 1)}s to train, which exceeds the maximum time limit of {round(time_limit, 1)}s, skipping model...')
+                            raise TimeLimitExceeded
+                        logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_ideal} -> {n_estimators_time} due to low time. Expected time usage reduced from {round(time_expected, 1)}s -> {round(time_limit, 1)}s...')
+                        n_estimators_ideal = n_estimators_time
+
+                for j in range(len(n_estimator_increments)):
+                    if n_estimator_increments[j] > n_estimators_ideal:
+                        n_estimator_increments[j] = n_estimators_ideal
+
         self.params_trained['n_estimators'] = self.model.n_estimators
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):

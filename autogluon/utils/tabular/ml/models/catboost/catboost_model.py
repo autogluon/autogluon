@@ -22,9 +22,8 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, num_classes=None, hyperparameters=None, features=None, debug=0):
-        self.num_classes = num_classes
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features, debug=debug)
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, num_classes=None, hyperparameters=None, features=None, debug=0, **kwargs):
+        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=hyperparameters, features=features, debug=debug, **kwargs)
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor
         self.model_type = CatBoostClassifier if problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
@@ -73,15 +72,16 @@ class CatboostModel(AbstractModel):
             num_classes = 1
 
         # TODO: Add ignore_memory_limits param to disable NotEnoughMemoryError Exceptions
+        max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         approx_mem_size_req = num_rows_train * num_cols_train * num_classes / 2  # TODO: Extremely crude approximation, can be vastly improved
         if approx_mem_size_req > 1e9:  # > 1 GB
             available_mem = psutil.virtual_memory().available
             ratio = approx_mem_size_req / available_mem
-            if ratio > 1:
-                logger.warning('Warning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+            if ratio > (1 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
                 raise NotEnoughMemoryError
-            elif ratio > 0.2:
-                logger.warning('Warning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+            elif ratio > (0.2 * max_memory_usage_ratio):
+                logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
         start_time = time.time()
         X_train = self.preprocess(X_train)
@@ -97,11 +97,11 @@ class CatboostModel(AbstractModel):
             else:
                 modifier = 10000/num_rows_train
             early_stopping_rounds = max(round(modifier*150), 10)
-            num_sample_iter_max = max(round(modifier*100), 2)
+            num_sample_iter_max = max(round(modifier*50), 2)
         else:
             eval_set = None
             early_stopping_rounds = None
-            num_sample_iter_max = 100
+            num_sample_iter_max = 50
 
         invalid_params = ['num_threads', 'num_gpus']
         for invalid in invalid_params:
@@ -117,8 +117,7 @@ class CatboostModel(AbstractModel):
                     pass
                 else:
                     train_dir = self.path + 'catboost_info'
-        logger.log(15, 'Catboost model hyperparameters:')
-        logger.log(15, self.params)
+        logger.log(15, f'\tCatboost model hyperparameters: {self.params}')
 
         # TODO: Add more control over these params (specifically early_stopping_rounds)
         verbosity = kwargs.get('verbosity', 2)
@@ -136,11 +135,22 @@ class CatboostModel(AbstractModel):
         init_model_best_iteration = None
         init_model_best_score = None
 
+        params = self.params.copy()
+        num_features = len(self.features)
+        if self.problem_type == MULTICLASS and 'rsm' not in params and 'colsample_bylevel' not in params and num_features > 1000:
+            if time_limit:
+                # Reduce sample iterations to avoid taking unreasonable amounts of time
+                num_sample_iter_max = max(round(num_sample_iter_max/2), 2)
+            # Subsample columns to speed up training
+            params['colsample_bylevel'] = max(min(1.0, 1000 / num_features), 0.05)
+            logger.log(30, f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
+            logger.log(30, f'\tTo disable this functionality, explicitly specify \'colsample_bylevel\' in the model hyperparameters.')
+
         if time_limit:
             time_left_start = time_limit - (time.time() - start_time)
             if time_left_start <= time_limit * 0.4:  # if 60% of time was spent preprocessing, likely not enough time to train model
                 raise TimeLimitExceeded
-            params_init = self.params.copy()
+            params_init = params.copy()
             num_sample_iter = min(num_sample_iter_max, params_init['iterations'])
             params_init['iterations'] = num_sample_iter
             if train_dir is not None:
@@ -165,23 +175,23 @@ class CatboostModel(AbstractModel):
             estimated_iters_in_time = round(time_left_end / time_taken_per_iter)
             init_model = self.model
 
-            params_final = self.params.copy()
+            params_final = params.copy()
 
             # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
             available_mem = psutil.virtual_memory().available
             model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
 
-            max_memory_proportion = 0.3
+            max_memory_proportion = 0.3 * max_memory_usage_ratio
             mem_usage_per_iter = model_size_bytes / num_sample_iter
             max_memory_iters = math.floor(available_mem * max_memory_proportion / mem_usage_per_iter)
 
-            params_final['iterations'] = min(self.params['iterations'] - num_sample_iter, estimated_iters_in_time)
+            params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
             if params_final['iterations'] > max_memory_iters - num_sample_iter:
                 if max_memory_iters - num_sample_iter <= 500:
-                    logger.warning('Warning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
+                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
                 params_final['iterations'] = max_memory_iters - num_sample_iter
         else:
-            params_final = self.params.copy()
+            params_final = params.copy()
 
         if train_dir is not None:
             params_final['train_dir'] = train_dir
