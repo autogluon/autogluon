@@ -109,7 +109,7 @@ class TaskScheduler(object):
         return job.result()
 
     @staticmethod
-    def _start_distributed_job(task, remote_manager):
+    def _start_distributed_job(task, resource_manager):
         """Async Execute the job in remote and release the resources
         """
         logger.debug('\nScheduling {}'.format(task))
@@ -117,7 +117,7 @@ class TaskScheduler(object):
                                          task.fn, task.args, task.resources.gpu_ids)
         def _release_resource_callback(fut):
             logger.debug('Start Releasing Resource')
-            remote_manager._release(task.resources)
+            resource_manager._release(task.resources)
         job.add_done_callback(_release_resource_callback)
         return job
 
