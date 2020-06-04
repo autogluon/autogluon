@@ -78,10 +78,10 @@ class CatboostModel(AbstractModel):
             available_mem = psutil.virtual_memory().available
             ratio = approx_mem_size_req / available_mem
             if ratio > (1 * max_memory_usage_ratio):
-                logger.warning('Warning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                logger.warning('\tWarning: Not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
                 raise NotEnoughMemoryError
             elif ratio > (0.2 * max_memory_usage_ratio):
-                logger.warning('Warning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
+                logger.warning('\tWarning: Potentially not enough memory to safely train CatBoost model, roughly requires: %s GB, but only %s GB is available...' % (round(approx_mem_size_req / 1e9, 3), round(available_mem / 1e9, 3)))
 
         start_time = time.time()
         X_train = self.preprocess(X_train)
@@ -117,8 +117,7 @@ class CatboostModel(AbstractModel):
                     pass
                 else:
                     train_dir = self.path + 'catboost_info'
-        logger.log(15, 'Catboost model hyperparameters:')
-        logger.log(15, self.params)
+        logger.log(15, f'\tCatboost model hyperparameters: {self.params}')
 
         # TODO: Add more control over these params (specifically early_stopping_rounds)
         verbosity = kwargs.get('verbosity', 2)
@@ -189,7 +188,7 @@ class CatboostModel(AbstractModel):
             params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
             if params_final['iterations'] > max_memory_iters - num_sample_iter:
                 if max_memory_iters - num_sample_iter <= 500:
-                    logger.warning('Warning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
+                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
                 params_final['iterations'] = max_memory_iters - num_sample_iter
         else:
             params_final = params.copy()
