@@ -11,6 +11,9 @@ logger.setLevel(logging.ERROR)
 logger = logging.getLogger("distributed.logging.distributed")
 logger.setLevel(logging.ERROR)
 
+logger = logging.getLogger("distributed.worker")
+logger.setLevel(logging.ERROR)
+
 from .utils.try_import import *
 try_import_mxnet()
 
