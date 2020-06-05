@@ -386,7 +386,7 @@ if SCHEDULER == 'fifo':
     myscheduler = FIFOScheduler(
         run_mlp_openml,
         resource=resources,
-        searcher=searcher,
+        searcher=SEARCHER,
         search_options={'run_id': run_id},
         num_trials=100000, # if this is a very large number, just run until timeout 
         time_out=120,
@@ -401,7 +401,7 @@ else:
     myscheduler = HyperbandScheduler(
         run_mlp_openml,
         resource=resources,
-        searcher=searcher,
+        searcher=SEARCHER,
         search_options={'run_id': run_id, 'min_reward': _map_reward.reverse(1.0)},
         num_trials=100000,
         time_out=120,
