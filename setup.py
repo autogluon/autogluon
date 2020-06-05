@@ -59,6 +59,7 @@ requirements = [
     'psutil>=5.0.0',
     'scikit-learn>=0.20.0,<0.23',
     'networkx>=2.3,<3.0',
+    'openml'
 ]
 
 test_requirements = [
