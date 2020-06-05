@@ -47,10 +47,6 @@ def searcher_factory(name, **kwargs):
         Minimum value of resource attribute, equal to grace_period
     max_epochs : int [only for HyperbandScheduler]
         Maximum value of resource attribute, equal to max_t
-
-    Further kwargs are dependent on the searcher. Some supported by more than
-    one searcher type:
-
     debug_log : bool (default: False)
         Supported by 'random', 'bayesopt'. If True, both searcher and
         scheduler output an informative log, from which the configs chosen

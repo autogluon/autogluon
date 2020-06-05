@@ -1,4 +1,4 @@
-# Getting started
+# Getting started with Advanced HPO Algorithms
 
 ## Loading libraries
 
