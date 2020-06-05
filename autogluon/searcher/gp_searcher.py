@@ -23,18 +23,6 @@ class GPFIFOSearcher(BaseSearcher):
     optimization, based on a Gaussian process surrogate model. It is created
     along with the scheduler, using `searcher='bayesopt'`:
 
-    >>> import autogluon as ag
-    >>> @ag.args(
-    ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
-    >>> def train_fn(args, reporter):
-    ...     reporter(accuracy = args.lr ** 2)
-    >>> searcher_options = {
-    ...     'map_reward': 'minus_x',
-    ...     'opt_skip_period': 2}
-    >>> scheduler = ag.scheduler.FIFOScheduler(
-    ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
-    ...     num_trials=10, reward_attr='accuracy')
-
     All arguments to the searcher are passed in `searcher_options`. They are
     documented as parameters below, even though they are not arguments of
     `__init__` here.
@@ -60,8 +48,10 @@ class GPFIFOSearcher(BaseSearcher):
     optimization is then run starting from the top scoring config, where EI
     is minimized.
 
-    Parameters (searcher_options)
-    -----------------------------
+    The following parameters must be given in `searcher_options`:
+
+    Parameters
+    ----------
     debug_log : bool (default: False)
         If True, both searcher and scheduler output an informative log, from
         which the configs chosen and decisions being made can be traced.
@@ -113,6 +103,20 @@ class GPFIFOSearcher(BaseSearcher):
         because criterion is only used internally. Also note that criterion
         data is always normalized to mean 0, variance 1 before fitted with a
         GP.
+
+    Examples
+    --------
+    >>> import autogluon as ag
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
+    >>> def train_fn(args, reporter):
+    ...     reporter(accuracy = args.lr ** 2)
+    >>> searcher_options = {
+    ...     'map_reward': 'minus_x',
+    ...     'opt_skip_period': 2}
+    >>> scheduler = ag.scheduler.FIFOScheduler(
+    ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
+    ...     num_trials=10, reward_attr='accuracy')
     """
     def __init__(self, reward_attribute: str, gp_searcher: _GPFIFOSearcher):
         super().__init__(gp_searcher.hp_ranges.config_space, reward_attribute)
@@ -190,26 +194,6 @@ class GPMultiFidelitySearcher(BaseSearcher):
     resource levels are modelled jointly. It is created along with the
     scheduler, using `searcher='bayesopt'`:
 
-    >>> import numpy as np
-    >>> import autogluon as ag
-    >>>
-    >>> @ag.args(
-    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    ...     wd=ag.space.Real(1e-3, 1e-2))
-    >>> def train_fn(args, reporter):
-    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-    ...     for e in range(9):
-    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr,
-    ...         wd=args.wd)
-    >>> searcher_options = {
-    ...     'gp_resource_kernel': 'matern52-res-warp',
-    ...     'opt_skip_num_max_resource': True}
-    >>> scheduler = ag.scheduler.HyperbandScheduler(
-    ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
-    ...     num_trials=10, reward_attr='accuracy', time_attr='epoch',
-    ...     max_t=10, grace_period=1, reduction_factor=3)
-
     All arguments to the searcher are passed in `searcher_options`. They are
     documented as parameters below, even though they are not arguments of
     `__init__` here.
@@ -237,8 +221,11 @@ class GPMultiFidelitySearcher(BaseSearcher):
     `resource_acq` == 'first', r is the first milestone which config x would
     reach when started.
 
-    Parameters (searcher_options; in addition to GPFIFOSearcher)
-    ------------------------------------------------------------
+    The following parameters (in addition to these of `GPFIFOSearcher`) must be
+    given in `searcher_options`:
+
+    Parameters
+    ----------
     gp_resource_kernel : str
         Surrogate model over criterion function f(x, r), x the config, r the
         resource. Note that x is encoded to be a vector with entries in [0, 1],
@@ -261,6 +248,28 @@ class GPMultiFidelitySearcher(BaseSearcher):
         Parameter for hyperparameter fitting, skip predicate. If True, and
         number of observations above `opt_skip_init_length`, fitting is done
         only when there is a new datapoint at r = max_t, and skipped otherwise.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import autogluon as ag
+    >>>
+    >>> @ag.args(
+    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
+    ...     wd=ag.space.Real(1e-3, 1e-2))
+    >>> def train_fn(args, reporter):
+    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
+    ...     for e in range(9):
+    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
+    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr,
+    ...         wd=args.wd)
+    >>> searcher_options = {
+    ...     'gp_resource_kernel': 'matern52-res-warp',
+    ...     'opt_skip_num_max_resource': True}
+    >>> scheduler = ag.scheduler.HyperbandScheduler(
+    ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
+    ...     num_trials=10, reward_attr='accuracy', time_attr='epoch',
+    ...     max_t=10, grace_period=1, reduction_factor=3)
 
     See Also
     --------
