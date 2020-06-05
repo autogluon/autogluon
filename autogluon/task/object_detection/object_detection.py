@@ -118,10 +118,15 @@ class ObjectDetection(BaseTask):
             Extra arguments passed to __init__ of scheduler, to configure the
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
-            Which hyperparameter search algorithm to use. 
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Which hyperparameter search algorithm to use.
+            Options include: 'random' (random search), 'bayesopt' (Gaussian process
+            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
+            (grid search), 'hyperband' (Hyperband random), 'bayesopt_hyperband'
+            (asynchronous BOHB: Bayesian optimization with Hyperband scheduling),
+            'rl' (reinforcement learner).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
+            Auxiliary keyword arguments to pass to the searcher that performs
+            hyperparameter optimization.
         time_limits : int
             Approximately how long should `fit()` should run for (wallclock time in seconds).
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
@@ -259,11 +264,11 @@ class ObjectDetection(BaseTask):
             else:
                 assert 'grace_period' not in scheduler_options, \
                     "grace_period appears both in scheduler_options and as direct argument"
-                logger.warning(
-                    "grace_period is deprecated, use "
-                    "scheduler_options={'grace_period': ...} instead")
                 scheduler_options = copy.copy(scheduler_options)
                 scheduler_options['grace_period'] = grace_period
+            logger.warning(
+                "grace_period is deprecated, use "
+                "scheduler_options={'grace_period': ...} instead")
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,

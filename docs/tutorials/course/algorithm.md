@@ -1,7 +1,7 @@
 # Search Algorithms
 :label:`course_alg`
 
-## AutoGluon System Implementatin Logic
+## AutoGluon System Implementation Logic
 
 ![](https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/doc/api/autogluon_system.png)
 

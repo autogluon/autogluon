@@ -29,7 +29,8 @@ autogluon.scheduler
    ...                                             time_attr='epoch',
    ...                                             max_t=10,
    ...                                             grace_period=1,
-   ...                                             reduction_factor=3)
+   ...                                             reduction_factor=3,
+   ...                                             type='stopping')
    >>> scheduler.run()
    >>> scheduler.join_jobs()
 

@@ -159,9 +159,14 @@ class ImageClassification(BaseTask):
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use.
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Options include: 'random' (random search), 'bayesopt' (Gaussian process
+            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
+            (grid search), 'hyperband' (Hyperband random), 'bayesopt_hyperband'
+            (asynchronous BOHB: Bayesian optimization with Hyperband scheduling),
+            'rl' (reinforcement learner).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
+            Auxiliary keyword arguments to pass to the searcher that performs
+            hyperparameter optimization.
         resume : bool
             If True, the hyperparameter search is started from state loaded from
             os.path.join(output_directory, 'exp1.ag')
@@ -278,11 +283,11 @@ class ImageClassification(BaseTask):
             else:
                 assert 'grace_period' not in scheduler_options, \
                     "grace_period appears both in scheduler_options and as direct argument"
-                logger.warning(
-                    "grace_period is deprecated, use "
-                    "scheduler_options={'grace_period': ...} instead")
                 scheduler_options = copy.copy(scheduler_options)
                 scheduler_options['grace_period'] = grace_period
+            logger.warning(
+                "grace_period is deprecated, use "
+                "scheduler_options={'grace_period': ...} instead")
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,

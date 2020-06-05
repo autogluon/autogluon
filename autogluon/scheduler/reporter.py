@@ -12,8 +12,11 @@ from distributed.comm.core import CommClosedError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['DistStatusReporter', 'FakeReporter', 'DistSemaphore',
-           'Communicator', 'LocalStatusReporter']
+__all__ = ['DistStatusReporter',
+           'FakeReporter',
+           'DistSemaphore',
+           'Communicator',
+           'LocalStatusReporter']
 
 
 class FakeReporter(object):
@@ -26,10 +29,11 @@ class FakeReporter(object):
 class DistStatusReporter(object):
     """Report status through the training scheduler.
 
-    Example:
-        >>> @autogluon_method
-        >>> def train_func(config, reporter):
-        >>>     reporter(accuracy=0.1)
+    Example
+    -------
+    >>> @autogluon_method
+    >>> def train_func(config, reporter):
+    ...     reporter(accuracy=0.1)
     """
 
     def __init__(self, remote=None):
@@ -46,8 +50,9 @@ class DistStatusReporter(object):
         Args:
             kwargs: Latest training result status.
 
-        Example:
-            >>> reporter(accuracy=1, training_iters=4)
+        Example
+        _______
+        >>> reporter(accuracy=1, training_iters=4)
         """
         report_time = time.time()
         if 'time_this_iter' not in kwargs:
@@ -95,10 +100,11 @@ class DistStatusReporter(object):
 
 class LocalStatusReporter(object):
     """Local status reporter (automatically created by communicator)
-    Example:
-        >>> def train_func(config, reporter):
-        >>>     assert isinstance(reporter, StatusReporter)
-        >>>     reporter(timesteps_this_iter=1)
+    Example
+    -------
+    >>> def train_func(config, reporter):
+    ...     assert isinstance(reporter, StatusReporter)
+    ...     reporter(timesteps_this_iter=1)
     """
 
     def __init__(self, dict_path=None):#, result_queue, continue_semaphore):
@@ -113,10 +119,12 @@ class LocalStatusReporter(object):
     def __call__(self, **kwargs):
         """Report updated training status.
         Pass in `done=True` when the training job is completed.
+
         Args:
             kwargs: Latest training result status.
-        Example:
-            >>> reporter(accuracy=1, training_iters=4)
+        Example
+        -------
+        >>> reporter(accuracy=1, training_iters=4)
         """
         report_time = time.time()
         if 'time_this_iter' not in kwargs:
