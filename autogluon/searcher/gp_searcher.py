@@ -1,10 +1,10 @@
 import ConfigSpace as CS
 import multiprocessing as mp
 
-from autogluon.searcher.bayesopt.autogluon.gp_multifidelity_searcher import \
-    GPMultiFidelitySearcher as _GPMultiFidelitySearcher
-from autogluon.searcher.bayesopt.autogluon.gp_fifo_searcher import \
-    GPFIFOSearcher as _GPFIFOSearcher
+from autogluon.searcher.default_arguments import check_and_merge_defaults
+from autogluon.searcher.bayesopt.autogluon.searcher_factory import \
+    gp_fifo_searcher_factory, gp_multifidelity_searcher_factory, \
+    gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults
 from .searcher import BaseSearcher
 
 __all__ = ['GPFIFOSearcher',
@@ -22,10 +22,6 @@ class GPFIFOSearcher(BaseSearcher):
     This searcher must be used with FIFOScheduler. It provides Bayesian
     optimization, based on a Gaussian process surrogate model. It is created
     along with the scheduler, using `searcher='bayesopt'`:
-
-    All arguments to the searcher are passed in `searcher_options`. They are
-    documented as parameters below, even though they are not arguments of
-    `__init__` here.
 
     Pending configurations (for which evaluation tasks are currently running)
     are dealt with by fantasizing (i.e., target values are drawn from the
@@ -48,10 +44,13 @@ class GPFIFOSearcher(BaseSearcher):
     optimization is then run starting from the top scoring config, where EI
     is minimized.
 
-    The following parameters must be given in `searcher_options`:
-
     Parameters
     ----------
+    configspace : ConfigSpace.ConfigurationSpace
+        Config space of train_fn, equal to train_fn.cs
+    reward_attribute : str
+        Name of reward attribute reported by train_fn, equal to reward_attr of
+        scheduler
     debug_log : bool (default: False)
         If True, both searcher and scheduler output an informative log, from
         which the configs chosen and decisions being made can be traced.
@@ -118,9 +117,17 @@ class GPFIFOSearcher(BaseSearcher):
     ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
     ...     num_trials=10, reward_attr='accuracy')
     """
-    def __init__(self, reward_attribute: str, gp_searcher: _GPFIFOSearcher):
-        super().__init__(gp_searcher.hp_ranges.config_space, reward_attribute)
-        self.gp_searcher = gp_searcher
+    def __init__(self, **kwargs):
+        _gp_searcher = kwargs.get('_gp_searcher')
+        if _gp_searcher is None:
+            _kwargs = check_and_merge_defaults(
+                kwargs, *gp_fifo_searcher_defaults(),
+                dict_name='search_options')
+            _gp_searcher = gp_fifo_searcher_factory(**_kwargs)
+        super().__init__(
+            _gp_searcher.hp_ranges.config_space,
+            reward_attribute=kwargs.get('reward_attribute'))
+        self.gp_searcher = _gp_searcher
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
@@ -133,48 +140,50 @@ class GPFIFOSearcher(BaseSearcher):
         super().configure_scheduler(scheduler)
 
     def get_config(self, **kwargs):
-        with  self._gp_lock:
+        with self._gp_lock:
             config_cs = self.gp_searcher.get_config()
         return config_cs.get_dictionary()
 
     def update(self, config, **kwargs):
         super().update(config, **kwargs)
-        with  self._gp_lock:
+        with self._gp_lock:
             config_cs = self._to_config_cs(config)
             self.gp_searcher.update(
                 config_cs, reward=kwargs[self._reward_attribute])
 
     def register_pending(self, config, milestone=None):
-        with  self._gp_lock:
+        with self._gp_lock:
             config_cs = self._to_config_cs(config)
             self.gp_searcher.register_pending(config_cs)
 
     def evaluation_failed(self, config, **kwargs):
-        with  self._gp_lock:
+        with self._gp_lock:
             config_cs = self._to_config_cs(config)
             self.gp_searcher.evaluation_failed(config_cs)
 
     def dataset_size(self):
-        with  self._gp_lock:
+        with self._gp_lock:
             return self.gp_searcher.dataset_size()
 
     def cumulative_profile_record(self):
-        with  self._gp_lock:
+        with self._gp_lock:
             return self.gp_searcher.cumulative_profile_record()
 
     def model_parameters(self):
-        with  self._gp_lock:
+        with self._gp_lock:
             return self.gp_searcher.get_params()
 
     def get_state(self):
-        with  self._gp_lock:
+        with self._gp_lock:
             return self.gp_searcher.get_state()
 
     def clone_from_state(self, state):
-        with  self._gp_lock:
+        with self._gp_lock:
             _gp_searcher = self.gp_searcher.clone_from_state(state)
+        # Use copy constructor
         return GPFIFOSearcher(
-            self._reward_attribute, gp_searcher=_gp_searcher)
+            reward_attribute=self._reward_attribute,
+            _gp_searcher=_gp_searcher)
 
     @property
     def debug_log(self):
@@ -193,10 +202,6 @@ class GPMultiFidelitySearcher(BaseSearcher):
     model, with Hyperband scheduling. In particular, observations across
     resource levels are modelled jointly. It is created along with the
     scheduler, using `searcher='bayesopt'`:
-
-    All arguments to the searcher are passed in `searcher_options`. They are
-    documented as parameters below, even though they are not arguments of
-    `__init__` here.
 
     Most of GPFIFOSearcher comments apply here as well.
     In multi-fidelity HPO, we optimize a function f(x, r), x the configuration,
@@ -221,11 +226,46 @@ class GPMultiFidelitySearcher(BaseSearcher):
     `resource_acq` == 'first', r is the first milestone which config x would
     reach when started.
 
-    The following parameters (in addition to these of `GPFIFOSearcher`) must be
-    given in `searcher_options`:
-
     Parameters
     ----------
+    configspace : ConfigSpace.ConfigurationSpace
+        Config space of train_fn, equal to train_fn.cs
+    reward_attribute : str
+        Name of reward attribute reported by train_fn, equal to reward_attr of
+        scheduler
+    resource_attribute : str
+        Name of resource (or time) attribute reported by train_fn, equal to
+        time_attr of scheduler
+    debug_log : bool (default: False)
+        If True, both searcher and scheduler output an informative log, from
+        which the configs chosen and decisions being made can be traced.
+    first_is_default : bool (default: True)
+        If True, the first config to be evaluated is the default one of the
+        config space. Otherwise, this first config is drawn at random.
+    random_seed : int
+        Seed for pseudo-random number generator used.
+    num_init_random : int
+        See `GPFIFOSearcher`
+    num_init_candidates : int
+        See `GPFIFOSearcher`
+    num_fantasy_samples : int
+        See `GPFIFOSearcher`
+    initial_scoring : str
+        See `GPFIFOSearcher`
+    opt_nstarts : int
+        See `GPFIFOSearcher`
+    opt_maxiter : int
+        See `GPFIFOSearcher`
+    opt_warmstart : bool
+        See `GPFIFOSearcher`
+    opt_verbose : bool
+        See `GPFIFOSearcher`
+    opt_skip_init_length : int
+        See `GPFIFOSearcher`
+    opt_skip_period : int
+        See `GPFIFOSearcher`
+    map_reward : str or MapReward (default: '1_minus_x')
+        See `GPFIFOSearcher`
     gp_resource_kernel : str
         Surrogate model over criterion function f(x, r), x the config, r the
         resource. Note that x is encoded to be a vector with entries in [0, 1],
@@ -275,11 +315,18 @@ class GPMultiFidelitySearcher(BaseSearcher):
     --------
     GPFIFOSearcher
     """
-    def __init__(self, reward_attribute: str, resource_attribute: str,
-                 gp_searcher: _GPMultiFidelitySearcher):
-        super().__init__(gp_searcher.hp_ranges.config_space, reward_attribute)
-        self.gp_searcher = gp_searcher
-        self._resource_attribute = resource_attribute
+    def __init__(self, **kwargs):
+        _gp_searcher = kwargs.get('_gp_searcher')
+        if _gp_searcher is None:
+            _kwargs = check_and_merge_defaults(
+                kwargs, *gp_multifidelity_searcher_defaults(),
+                dict_name='search_options')
+            _gp_searcher = gp_multifidelity_searcher_factory(**_kwargs)
+        super().__init__(
+            _gp_searcher.hp_ranges.config_space,
+            reward_attribute=kwargs.get('reward_attribute'))
+        self.gp_searcher = _gp_searcher
+        self._resource_attribute = kwargs.get('resource_attribute')
         # This lock protects gp_searcher. We are not using self.LOCK, this
         # can lead to deadlocks when superclass methods are called
         self._gp_lock = mp.Lock()
@@ -349,9 +396,11 @@ class GPMultiFidelitySearcher(BaseSearcher):
     def clone_from_state(self, state):
         with self._gp_lock:
             _gp_searcher = self.gp_searcher.clone_from_state(state)
+        # Use copy constructor
         return GPMultiFidelitySearcher(
-            self._reward_attribute, self._resource_attribute,
-            gp_searcher=_gp_searcher)
+            reward_attribute=self._reward_attribute,
+            resource_attribute=self._resource_attribute,
+            _gp_searcher=_gp_searcher)
 
     @property
     def debug_log(self):

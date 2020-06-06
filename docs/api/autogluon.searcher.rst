@@ -23,7 +23,7 @@ autogluon.searcher
    and start with 1. Recall that a searcher is used by a scheduler in order to suggest configurations
    to evaluate. Create a searcher and sample one configuration:
 
-   >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+   >>> searcher = ag.searcher.GPFIFOSearcher(train_fn.cs)
    >>> searcher.get_config()
    {'lr': 0.0031622777, 'wd': 0.0055}
 

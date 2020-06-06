@@ -2,10 +2,6 @@ from .searcher import RandomSearcher
 from .skopt_searcher import SKoptSearcher
 from .grid_searcher import GridSearcher
 from .gp_searcher import GPFIFOSearcher, GPMultiFidelitySearcher
-from .default_arguments import check_and_merge_defaults
-from autogluon.searcher.bayesopt.autogluon.searcher_factory import \
-    gp_fifo_searcher_factory, gp_multifidelity_searcher_factory, \
-    gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults
 
 __all__ = ['searcher_factory']
 
@@ -79,22 +75,9 @@ def searcher_factory(name, **kwargs):
             name, kwargs.get('scheduler'),
             {'fifo', 'hyperband_stopping', 'hyperband_promotion'})
         if scheduler == 'fifo':
-            _kwargs = check_and_merge_defaults(
-                kwargs, *gp_fifo_searcher_defaults(),
-                dict_name='search_options')
-            gp_searcher = gp_fifo_searcher_factory(**_kwargs)
-            return GPFIFOSearcher(
-                reward_attribute=_kwargs['reward_attribute'],
-                gp_searcher=gp_searcher)
+            return GPFIFOSearcher(**kwargs)
         else:
-            _kwargs = check_and_merge_defaults(
-                kwargs, *gp_multifidelity_searcher_defaults(),
-                dict_name='search_options')
-            gp_searcher = gp_multifidelity_searcher_factory(**_kwargs)
-            return GPMultiFidelitySearcher(
-                reward_attribute=_kwargs['reward_attribute'],
-                resource_attribute=_kwargs['resource_attribute'],
-                gp_searcher=gp_searcher)
+            return GPMultiFidelitySearcher(**kwargs)
     else:
         raise AssertionError("name = '{}' not supported".format(name))
 
