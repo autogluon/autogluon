@@ -19,7 +19,7 @@ def _to_config_cs(config_space: CS.ConfigurationSpace, config: dict) \
 class GPFIFOSearcher(BaseSearcher):
     """Gaussian process Bayesian optimization for FIFO scheduler
 
-    This searcher must be used with FIFOScheduler. It provides Bayesian
+    This searcher must be used with `FIFOScheduler`. It provides Bayesian
     optimization, based on a Gaussian process surrogate model. It is created
     along with the scheduler, using `searcher='bayesopt'`:
 
@@ -32,9 +32,9 @@ class GPFIFOSearcher(BaseSearcher):
     function. The acquisition function is expected improvement (EI). All
     hyperparameters of the surrogate model are estimated by empirical Bayes
     (maximizing the marginal likelihood). In general, this hyperparameter
-    fitting is the most expensive part of a get_config call.
+    fitting is the most expensive part of a `get_config` call.
 
-    The following happens in get_config. For the first `num_init_random` calls,
+    The following happens in `get_config`. For the first `num_init_random` calls,
     a config is drawn at random (the very first call results in the default
     config of the space). Afterwards, Bayesian optimization is used, unless
     there are no finished evaluations yet.
@@ -47,10 +47,10 @@ class GPFIFOSearcher(BaseSearcher):
     Parameters
     ----------
     configspace : ConfigSpace.ConfigurationSpace
-        Config space of train_fn, equal to train_fn.cs
+        Config space of `train_fn`, equal to `train_fn.cs`
     reward_attribute : str
-        Name of reward attribute reported by train_fn, equal to reward_attr of
-        scheduler
+        Name of reward attribute reported by `train_fn`, equal to `reward_attr`
+        of `scheduler
     debug_log : bool (default: False)
         If True, both searcher and scheduler output an informative log, from
         which the configs chosen and decisions being made can be traced.
@@ -60,21 +60,20 @@ class GPFIFOSearcher(BaseSearcher):
     random_seed : int
         Seed for pseudo-random number generator used.
     num_init_random : int
-        Number of initial get_config calls for which randomly sampled configs
+        Number of initial `get_config` calls for which randomly sampled configs
         are returned. Afterwards, Bayesian optimization is used
     num_init_candidates : int
         Number of initial candidates sampled at random in order to seed the
-        search for get_config
+        search for `get_config`
     num_fantasy_samples : int
         Number of samples drawn for fantasizing (latent target values for
         pending candidates)
     initial_scoring : str
         Scoring function to rank initial candidates (local optimization of EI
-        is started from top scorer).
-        'thompson_indep': Independent Thompson sampling. This is a randomized
-            score, which can increase exploration
-        'acq_func': Score is the same (EI) acquisition function which is
-            afterwards (locally) optimized
+        is started from top scorer). Values are 'thompson_indep' (independent
+        Thompson sampling; randomized score, which can increase exploration),
+        'acq_func' (score is the same (EI) acquisition function which is afterwards
+        locally optimized).
     opt_nstarts : int
         Parameter for hyperparameter fitting. Number of random restarts
     opt_maxiter : int
@@ -93,11 +92,10 @@ class GPFIFOSearcher(BaseSearcher):
         of observations above `opt_skip_init_length`, fitting is done only
         K-th call, and skipped otherwise
     map_reward : str or MapReward (default: '1_minus_x')
-        AutoGluon is maximizing reward, while internally, Bayesian
-        optimization is minimizing the criterion. States how reward is
-        mapped to criterion. This must a strictly decreasing function:
-        '1_minus_x': criterion = 1 - reward
-        'minus_x': criterion = -reward
+        AutoGluon is maximizing reward, while internally, Bayesian optimization
+        is minimizing the criterion. States how reward is mapped to criterion.
+        This must a strictly decreasing function. Values are '1_minus_x'
+        (criterion = 1 - reward), 'minus_x' (criterion = -reward).
         From a technical standpoint, it does not matter what is chosen here,
         because criterion is only used internally. Also note that criterion
         data is always normalized to mean 0, variance 1 before fitted with a
@@ -197,16 +195,16 @@ class GPFIFOSearcher(BaseSearcher):
 class GPMultiFidelitySearcher(BaseSearcher):
     """Gaussian process Bayesian optimization for Hyperband scheduler
 
-    This searcher must be used with HyperbandScheduler. It provides a novel
+    This searcher must be used with `HyperbandScheduler`. It provides a novel
     combination of Bayesian optimization, based on a Gaussian process surrogate
     model, with Hyperband scheduling. In particular, observations across
     resource levels are modelled jointly. It is created along with the
     scheduler, using `searcher='bayesopt'`:
 
-    Most of GPFIFOSearcher comments apply here as well.
+    Most of `GPFIFOSearcher` comments apply here as well.
     In multi-fidelity HPO, we optimize a function f(x, r), x the configuration,
     r the resource (or time) attribute. The latter must be a positive integer.
-    In most applications, time_attr == 'epoch', and the resource is the number
+    In most applications, `time_attr` == 'epoch', and the resource is the number
     of epochs already trained.
 
     We model the function f(x, r) jointly over all resource levels r at which
@@ -219,7 +217,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
         Model-based Asynchronous Hyperparameter Optimization
         https://arxiv.org/abs/2003.10865
 
-    The acquisition function (EI) which is optimized in get_config, is obtained
+    The acquisition function (EI) which is optimized in `get_config`, is obtained
     by fixing the resource level r to a value which is determined depending on
     the current state. If `resource_acq` == 'bohb', r is the largest value
     <= max_t, where we have seen >= dimension(x) metric values. If
@@ -229,13 +227,13 @@ class GPMultiFidelitySearcher(BaseSearcher):
     Parameters
     ----------
     configspace : ConfigSpace.ConfigurationSpace
-        Config space of train_fn, equal to train_fn.cs
+        Config space of `train_fn`, equal to `train_fn.cs`
     reward_attribute : str
-        Name of reward attribute reported by train_fn, equal to reward_attr of
-        scheduler
+        Name of reward attribute reported by `train_fn`, equal to `reward_attr`
+        of scheduler
     resource_attribute : str
-        Name of resource (or time) attribute reported by train_fn, equal to
-        time_attr of scheduler
+        Name of resource (or time) attribute reported by `train_fn`, equal to
+        `time_attr` of scheduler
     debug_log : bool (default: False)
         If True, both searcher and scheduler output an informative log, from
         which the configs chosen and decisions being made can be traced.
@@ -272,15 +270,15 @@ class GPMultiFidelitySearcher(BaseSearcher):
         and r is linearly mapped to [0, 1], while the criterion data is
         normalized to mean 0, variance 1. The reference above provides details
         on the models supported here. For the exponential decay kernel, the
-        base kernel over x is Matern 5/2 ARD:
-        'matern52': Matern 5/2 ARD kernel over [x, r]
-        'matern52-res-warp': Matern 5/2 ARD kernel over [x, r], with additional
-            warping on r (2 parameters)
-        'exp-decay-sum': Exponential decay kernel, with delta=0. This is the
-            additive kernel from Freeze-Thaw Bayesian Optimization
-        'exp-decay-delta1': Exponential decay kernel, with delta=1
-        'exp-decay-combined': Exponential decay kernel, with delta in [0, 1]
-            a hyperparameter
+        base kernel over x is Matern 5/2 ARD.
+        Values are 'matern52' (Matern 5/2 ARD kernel over [x, r]),
+        'matern52-res-warp' (Matern 5/2 ARD kernel over [x, r], with additional
+        warping on r),
+        'exp-decay-sum' (exponential decay kernel, with delta=0. This is the
+        additive kernel from Freeze-Thaw Bayesian Optimization),
+        'exp-decay-delta1' (exponential decay kernel, with delta=1),
+        'exp-decay-combined' (exponential decay kernel, with delta in [0, 1]
+        a hyperparameter).
     resource_acq : str
         Determines how the EI acquisition function is used (see above).
         Values: 'bohb', 'first'
