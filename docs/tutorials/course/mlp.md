@@ -247,10 +247,10 @@ Note that the method known as (asynchronous) Hyperband is using random search.
 Combining Hyperband scheduling with the `bayesopt` searcher uses a novel
 method called asynchronous BOHB.
 
-Pick the combination you're interested in (doing the full experiment takes around 120 seconds, see the
-`time_out` parameter), running everything with multiple runs can take a fair bit
-of time. In real life, you will want to choose a larger `time_out` in order to
-obtain good performance.
+Pick the combination you're interested in (doing the full experiment takes around
+120 seconds, see the `time_out` parameter), running everything with multiple runs
+can take a fair bit of time. In real life, you will want to choose a larger
+`time_out` in order to obtain good performance.
 
 ```{.python .input  n=37}
 SCHEDULER = "hbs"
@@ -299,7 +299,6 @@ if SCHEDULER == 'fifo':
         resource=resources,
         searcher=SEARCHER,
         search_options={'run_id': run_id},
-        num_trials=100000, # if this is a very large number, just run until timeout 
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME)
@@ -314,7 +313,6 @@ else:
         resource=resources,
         searcher=SEARCHER,
         search_options={'run_id': run_id, 'min_reward': _map_reward.reverse(1.0)},
-        num_trials=100000,
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,

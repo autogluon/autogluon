@@ -86,8 +86,13 @@ def _create_common_objects(**kwargs):
     else:
         assert isinstance(_map_reward, MapReward), \
             "map_reward must either be string or of MapReward type"
-    max_metric_value = _map_reward(kwargs['min_reward']) if is_hyperband \
-        else None
+    if is_hyperband:
+        # Note: 'min_reward' is needed only to support the exp-decay
+        # surrogate model. If not given, it is assumed to be 0.
+        min_reward = kwargs.get('min_reward', 0)
+        max_metric_value = _map_reward(min_reward)
+    else:
+        max_metric_value = None
     opt_warmstart = kwargs.get('opt_warmstart', False)
 
     # Underlying GP regression model
@@ -293,7 +298,7 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         'debug_log': False}
     if is_hyperband:
         default_options['opt_skip_num_max_resource'] = False
-        default_options['gp_resource_kernel'] = 'exp-decay-combined'  # Really?
+        default_options['gp_resource_kernel'] = 'matern52'
         default_options['resource_acq'] = 'bohb'
         default_options['num_init_random'] = 10
 

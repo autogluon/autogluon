@@ -154,14 +154,25 @@ def ag_train_mnist(args, reporter):
 
 ### Create the Scheduler and Launch the Experiment
 
-```{.python .input}
-myscheduler = ag.scheduler.FIFOScheduler(ag_train_mnist,
-                                         resource={'num_cpus': 4, 'num_gpus': 1},
-                                         num_trials=2,
-                                         time_attr='epoch',
-                                         reward_attr="accuracy")
-print(myscheduler)
+For hyperparameter tuning, AutoGluon provides a number of different schedulers:
 
+- `FIFOScheduler`: Each training jobs runs for the full number of epochs
+- `HyperbandScheduler`: Uses successive halving and Hyperband scheduling in
+   order to stop unpromising jobs early, so that the available budget is allocated
+   more efficiently
+
+Each scheduler is internally configured by a searcher, which determines the choice
+of hyperparameter configurations to be run. The default searcher is `random`:
+configurations are drawn uniformly at random from the search space.
+
+```{.python .input}
+myscheduler = ag.scheduler.FIFOScheduler(
+    ag_train_mnist,
+    resource={'num_cpus': 4, 'num_gpus': 1},
+    num_trials=2,
+    time_attr='epoch',
+    reward_attr='accuracy')
+print(myscheduler)
 ```
 
 ```{.python .input}
@@ -176,3 +187,69 @@ myscheduler.get_training_curves(plot=True,use_legend=False)
 print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_best_config(),
                                                                myscheduler.get_best_reward()))
 ```
+
+### Search by Bayesian Optimization
+
+While simple to implement, random search is usually not an efficient way to
+propose configurations for evaluation. AutoGluon provides a number of model-based
+searchers:
+
+- Gaussian process based Bayesian optimization (`bayesopt`)
+- SkOpt Bayesian optimization (`skopt`; only with FIFO scheduler)
+
+Here, `skopt` maps to [scikit.optimize](https://scikit-optimize.github.io/stable/),
+whereas `bayesopt` is an own implementation. While `skopt` is currently somewhat
+more versatile (choice of acquisition function, surrogate model), `bayesopt`
+is directly optimized to asynchronous parallel scheduling. Importantly, `bayesopt`
+runs both with FIFO and Hyperband scheduler (while `skopt` is restricted to the
+FIFO scheduler). More details about `bayesopt` are given in:
+
+    Tiao, Klein, Archambeau, Seeger (2020)
+    Model-based Asynchronous Hyperparameter Optimization
+    https://arxiv.org/abs/2003.10865
+
+When running the following examples, comparing the different schedulers and
+searchers, you need to increase `num_trials` (or use `time_out` instead, which
+specifies the search budget in terms of wall-clock time) in order to see
+differences in performance.
+
+```{.python .input}
+myscheduler = ag.scheduler.FIFOScheduler(
+    ag_train_mnist,
+    resource={'num_cpus': 4, 'num_gpus': 1},
+    searcher=`bayesopt`,
+    num_trials=2,
+    time_attr='epoch',
+    reward_attr='accuracy')
+print(myscheduler)
+```
+
+```{.python .input}
+myscheduler.run()
+myscheduler.join_jobs()
+```
+
+### Search by Asynchronous BOHB
+
+When training neural networks, it is often more efficient to use early stopping,
+and in particular Hyperband scheduling can save a lot of wall-clock time. Let us
+use Hyperband scheduling together with Bayesian optimization:
+
+```{.python .input}
+myscheduler = ag.scheduler.HyperbandScheduler(
+    ag_train_mnist,
+    resource={'num_cpus': 4, 'num_gpus': 1},
+    searcher=`bayesopt`,
+    num_trials=2,
+    time_attr='epoch',
+    reward_attr='accuracy',
+    max_t=5,
+    grace_period=1,
+    reduction_factor=3,
+    brackets=1)
+print(myscheduler)
+```
+
+```{.python .input}
+myscheduler.run()
+myscheduler.join_jobs()
