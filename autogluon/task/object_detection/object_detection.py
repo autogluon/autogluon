@@ -38,7 +38,8 @@ class ObjectDetection(BaseTask):
             split_ratio=0.8,
             batch_size=16,
             epochs=50,
-            num_trials=2,
+            num_trials=None,
+            time_limits=None,
             nthreads_per_trial=12,
             num_workers=32,
             ngpus_per_trial=1,
@@ -46,7 +47,6 @@ class ObjectDetection(BaseTask):
             scheduler_options=None,
             search_strategy='random',
             search_options=None,
-            time_limits=None,
             verbose=False,
             transfer='coco',
             resume='',
@@ -106,6 +106,9 @@ class ObjectDetection(BaseTask):
             How many epochs to train the neural networks for at most.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.
+        time_limits : int
+            Approximately how long should `fit()` should run for (wallclock time in seconds).
+            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion).
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
         num_workers : int
@@ -122,9 +125,6 @@ class ObjectDetection(BaseTask):
             Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
-        time_limits : int
-            Approximately how long should `fit()` should run for (wallclock time in seconds).
-            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
         verbose : bool
             Whether or not to print out intermediate information during training.
         resume : str
@@ -208,6 +208,11 @@ class ObjectDetection(BaseTask):
             logger.warning(
                 "The number of requested GPUs is greater than the number of available GPUs.")
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+
+        # If only time_limits is given, the scheduler starts trials until the
+        # time limit is reached
+        if num_trials is None and time_limits is None:
+            num_trials = 2
 
         train_object_detection.register_args(
             meta_arch=meta_arch,
