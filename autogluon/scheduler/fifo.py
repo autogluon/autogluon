@@ -142,7 +142,6 @@ class FIFOScheduler(TaskScheduler):
         if num_trials is None:
             assert time_out is not None, \
                 "Need stopping criterion: Either num_trials or time_out"
-            num_trials = 100000  # time_out is what matters
         self.num_trials = num_trials
         self.time_out = time_out
         self.max_reward = max_reward
@@ -211,11 +210,15 @@ class FIFOScheduler(TaskScheduler):
 
         logger.info('Starting Experiments')
         logger.info(f'Num of Finished Tasks is {self.num_finished_tasks}')
-        logger.info(f'Num of Pending Tasks is {num_trials - self.num_finished_tasks}')
+        if num_trials is not None:
+            logger.info(f'Num of Pending Tasks is {num_trials - self.num_finished_tasks}')
+            tbar = tqdm(range(self.num_finished_tasks, num_trials))
+        else:
+            # In this case, only stopping by time_out is used. We do not display
+            # a progress bar then
+            tbar = range(self.num_finished_tasks, 100000)
         if time_out is not None:
             logger.info(f'Time out (secs) is {time_out}')
-        # TODO: This bar is misleading if num_trials not set
-        tbar = tqdm(range(self.num_finished_tasks, num_trials))
         for _ in tbar:
             if (time_out and time.time() - start_time >= time_out) or \
                     (self.max_reward and self.get_best_reward() >= self.max_reward):

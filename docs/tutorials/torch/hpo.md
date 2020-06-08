@@ -217,7 +217,7 @@ differences in performance.
 myscheduler = ag.scheduler.FIFOScheduler(
     ag_train_mnist,
     resource={'num_cpus': 4, 'num_gpus': 1},
-    searcher=`bayesopt`,
+    searcher='bayesopt',
     num_trials=2,
     time_attr='epoch',
     reward_attr='accuracy')
@@ -239,7 +239,7 @@ use Hyperband scheduling together with Bayesian optimization:
 myscheduler = ag.scheduler.HyperbandScheduler(
     ag_train_mnist,
     resource={'num_cpus': 4, 'num_gpus': 1},
-    searcher=`bayesopt`,
+    searcher='bayesopt',
     num_trials=2,
     time_attr='epoch',
     reward_attr='accuracy',
