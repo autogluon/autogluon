@@ -14,7 +14,7 @@ state-of-the-art built-in methods.
 
    .. card::
       :title: Efficient NAS on Target Hardware
-      :link: enas_mnist.html
+      :link: enas_proxylessnas.html
 
       Efficient neural architecture search for low latency model
       on target hardware.
