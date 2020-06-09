@@ -190,28 +190,7 @@ print('The Best Configuration and Accuracy are: {}, {}'.format(myscheduler.get_b
 
 ### Search by Bayesian Optimization
 
-While simple to implement, random search is usually not an efficient way to
-propose configurations for evaluation. AutoGluon provides a number of model-based
-searchers:
-
-- Gaussian process based Bayesian optimization (`bayesopt`)
-- SkOpt Bayesian optimization (`skopt`; only with FIFO scheduler)
-
-Here, `skopt` maps to [scikit.optimize](https://scikit-optimize.github.io/stable/),
-whereas `bayesopt` is an own implementation. While `skopt` is currently somewhat
-more versatile (choice of acquisition function, surrogate model), `bayesopt`
-is directly optimized to asynchronous parallel scheduling. Importantly, `bayesopt`
-runs both with FIFO and Hyperband scheduler (while `skopt` is restricted to the
-FIFO scheduler). More details about `bayesopt` are given in:
-
-    Tiao, Klein, Archambeau, Seeger (2020)
-    Model-based Asynchronous Hyperparameter Optimization
-    https://arxiv.org/abs/2003.10865
-
-When running the following examples, comparing the different schedulers and
-searchers, you need to increase `num_trials` (or use `time_out` instead, which
-specifies the search budget in terms of wall-clock time) in order to see
-differences in performance.
+Maybe this text does not work?
 
 ```{.python .input}
 myscheduler = ag.scheduler.FIFOScheduler(
