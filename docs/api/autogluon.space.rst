@@ -14,10 +14,11 @@ Search space of possible hyperparameter values to consider.
    >>> import autogluon as ag
    >>> @ag.args(
    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
-   >>>     wd=ag.space.Real(1e-3, 1e-2))
+   ...     wd=ag.space.Real(1e-3, 1e-2),
+   ...     epochs=10)
    >>> def train_fn(args, reporter):
    ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-   ...     for e in range(10):
+   ...     for e in range(args.epochs):
    ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 

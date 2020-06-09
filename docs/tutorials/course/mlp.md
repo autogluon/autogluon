@@ -230,6 +230,27 @@ def run_mlp_openml(args, reporter, **kwargs):
             elapsed_time=elapsed_time)
 ```
 
+**Note**: The annotation `epochs=9` specifies the maximum number of epochs for
+training. It becomes available as `args.epochs`. Importantly, it is also
+processed by `HyperbandScheduler` below in order to set its `max_t` attribute.
+
+**Recommendation**: Whenever writing training code to be passed as `train_fn` to
+a scheduler, if this training code reports a resource (or time) attribute, the
+corresponding maximum resource value should be included in `train_fn.args`:
+
+- If the resource attribute (`time_attr` of scheduler) in `train_fn` is `epoch`,
+  make sure to include `epochs=XYZ` in the annotation. This allows the scheduler
+  to read `max_t` from `train_fn.args.epochs`. This case corresponds to our
+  example here.
+- If the resource attribute is something else than `epoch`, you can also include
+  the annotation `max_t=XYZ`, which allows the scheduler to read `max_t` from
+  `train_fn.args.max_t`.
+
+Annotating the training function by the correct value for `max_t` simplifies
+scheduler creation (since `max_t` does not have to be passed), and avoids
+inconsistencies between `train_fn` and the scheduler.
+
+
 ### Running the Hyperparameter Optimization
 
 You can use the following schedulers:
@@ -317,7 +338,6 @@ else:
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,
         type=sch_type,
-        max_t=9,
         grace_period=1,
         reduction_factor=3,
         brackets=1)

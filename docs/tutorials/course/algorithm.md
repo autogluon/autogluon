@@ -26,9 +26,10 @@ import autogluon as ag
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    wd=ag.space.Real(1e-3, 1e-2))
+    wd=ag.space.Real(1e-3, 1e-2),
+    epochs=10)
 def train_fn(args, reporter):
-    for e in range(10):
+    for e in range(args.epochs):
         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 ```
@@ -64,7 +65,6 @@ scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                             num_trials=100,
                                             reward_attr='accuracy',
                                             time_attr='epoch',
-                                            max_t=10,
                                             grace_period=1,
                                             reduction_factor=3,
                                             type='stopping')
@@ -73,11 +73,19 @@ scheduler.join_jobs()
 
 ```
 
-In this example, trials are stopped early after 1, 3, or 9 epochs. Only a small fraction of most promising jobs run for the full number of 10 epochs. Since the majority of trials are stopped early, we can afford a larger `num_trials`. Visualize the results:
+In this example, trials are stopped early after 1, 3, or 9 epochs. Only a small
+fraction of most promising jobs run for the full number of 10 epochs. Since the
+majority of trials are stopped early, we can afford a larger `num_trials`.
+Visualize the results:
 
 ```{.python .input}
 scheduler.get_training_curves(plot=True, use_legend=False)
 ```
+
+Note that `HyperbandScheduler` needs to know the maximum number of epochs. This
+can be passed as `max_t` argument. If it is missing (as above), it is inferred
+from `train_fn.args.epochs` (which is set by `epochs=10` in the example above)
+or from `train_fn.args.max_t` otherwise.
 
 ## Random Search vs. Reinforcement Learning
 
