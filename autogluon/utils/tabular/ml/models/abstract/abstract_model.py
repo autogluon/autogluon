@@ -78,11 +78,11 @@ class AbstractModel:
         else:
             self.stopping_metric = stopping_metric
 
-        self.normalize_predprobs = False  # do probabilistic predictions need to be renormalized
         if self.objective_func.name in OBJECTIVES_TO_NORMALIZE:
-            self.normalize_predprobs = True
+            self.normalize_pred_probas = True
             logger.debug(self.name+" predicted probabilities will be transformed to never =0 since eval_metric="+self.objective_func.name)
-
+        else:
+            self.normalize_pred_probas = False
 
         if isinstance(self.objective_func, metrics._ProbaScorer):
             self.metric_needs_y_pred = False
@@ -213,7 +213,15 @@ class AbstractModel:
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
-    def predict_proba(self, X, preprocess=True):
+    def predict_proba(self, X, preprocess=True, normalize=None):
+        if normalize is None:
+            normalize = self.normalize_pred_probas
+        y_pred_proba = self._predict_proba(X=X, preprocess=preprocess)
+        if normalize:
+            y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
+        return y_pred_proba
+
+    def _predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
 
@@ -221,7 +229,6 @@ class AbstractModel:
             return self.model.predict(X)
 
         y_pred_proba = self.model.predict_proba(X)
-
         if self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba

@@ -27,7 +27,6 @@ from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....metrics import log_loss, roc_auc
-from ...utils import normalize_pred_probas
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .tabular_nn_dataset import TabularNNDataset
 from .embednet import EmbedNet
@@ -384,7 +383,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.params_trained['num_epochs'] = best_val_epoch
         return
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         """ To align predict wiht abstract_model API.
             Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
@@ -392,16 +391,13 @@ class TabularNeuralNetModel(AbstractModel):
             but cannot use preprocess in this case (needs to be already processed).
         """
         if isinstance(X, TabularNNDataset):
-            y_pred_proba = self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
+            return self._predict_tabular_data(new_data=X, process=False, predict_proba=True)
         elif isinstance(X, pd.DataFrame):
             if preprocess:
                 X = self.preprocess(X)
-            y_pred_proba = self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
+            return self._predict_tabular_data(new_data=X, process=True, predict_proba=True)
         else:
             raise ValueError("X must be of type pd.DataFrame or TabularNNDataset, not type: %s" % type(X))
-        if self.normalize_predprobs:
-            y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
-        return y_pred_proba
 
     def _predict_tabular_data(self, new_data, process=True, predict_proba=True):  # TODO ensure API lines up with tabular.Model class.
         """ Specific TabularNN method to produce predictions on new (unprocessed) data.

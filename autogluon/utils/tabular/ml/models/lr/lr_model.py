@@ -140,7 +140,7 @@ class LinearModel(AbstractModel):
 
         self.model = model.fit(X_train, Y_train)
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
         return super().predict_proba(X, preprocess=False)
 

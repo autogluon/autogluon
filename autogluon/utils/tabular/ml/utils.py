@@ -182,6 +182,7 @@ def normalize_pred_probas(y_predprob, problem_type, eps=1e-7):
 
 
 def normalize_binary_probas(y_predprob, eps):
+    """ Remaps the predicted probabilities to open interval (0,1) while maintaining rank order """
     (pmin,pmax) = (eps, 1-eps)  # predicted probs outside this range will be remapped into (0,1)
     which_toobig = y_predprob > pmax
     if np.sum(which_toobig) > 0:  # remap overly large probs
@@ -193,6 +194,7 @@ def normalize_binary_probas(y_predprob, eps):
 
 
 def normalize_multi_probas(y_predprob, eps):
+    """ Remaps the predicted probabilities to lie in (0,1) where eps controls how far from 0 smallest class-probability lies """
     min_predprob = np.min(y_predprob)
     if min_predprob < 0:  # ensure nonnegative rows
         most_negative_rowvals = np.clip(np.min(y_predprob, axis=1), a_min=None, a_max=0)

@@ -18,7 +18,6 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION
-from ...utils import normalize_pred_probas
 from ....utils.savers import save_pkl
 from .....try_import import try_import_lightgbm
 from ......core import Int, Space
@@ -123,19 +122,29 @@ class LGBModel(AbstractModel):
         self.model = lgb.train(**train_params)
         self.params_trained['num_boost_round'] = self.model.best_iteration
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
+        if self.problem_type == REGRESSION:
+            return self.model.predict(X)
 
         y_pred_proba = self.model.predict(X)
-        if (self.problem_type == BINARY) and (len(y_pred_proba.shape) > 1) and (y_pred_proba.shape[1] > 1):
-            y_pred_proba = y_pred_proba[:, 1]
-        elif (self.problem_type != MULTICLASS) and (len(y_pred_proba.shape) > 1) and (y_pred_proba.shape[1] <= 2):
-            # Should this ever happen?
-            y_pred_proba = y_pred_proba[:, 1]
-        if self.normalize_predprobs:
-            y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
-        return y_pred_proba
+        if self.problem_type == BINARY:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 1:
+                return y_pred_proba[:, 1]
+            else:
+                return y_pred_proba
+        elif self.problem_type == MULTICLASS:
+            return y_pred_proba
+        else:
+            if len(y_pred_proba.shape) == 1:
+                return y_pred_proba
+            elif y_pred_proba.shape[1] > 2:  # Should this ever happen?
+                return y_pred_proba
+            else:  # Should this ever happen?
+                return y_pred_proba[:, 1]
 
     def preprocess(self, X, is_train=False):
         X = super().preprocess(X=X)
