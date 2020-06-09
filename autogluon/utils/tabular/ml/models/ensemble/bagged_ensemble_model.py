@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add metadata object with info like score on each model, train time on each model, etc.
 class BaggedEnsembleModel(AbstractModel):
     _oof_filename = 'oof.pkl'
-    def __init__(self, path: str, name: str, model_base: AbstractModel, hyperparameters=None, objective_func=None, stopping_metric=None, num_classes=None, save_bagged_folds=True, random_state=0, debug=0, **kwargs):
+    def __init__(self, model_base: AbstractModel, save_bagged_folds=True, random_state=0, **kwargs):
         self.model_base = model_base
         self._child_type = type(self.model_base)
         self.models = []
@@ -42,12 +42,10 @@ class BaggedEnsembleModel(AbstractModel):
         except:
             feature_types_metadata = None
 
-        if objective_func is None:
-            objective_func = self.model_base.objective_func
-        if stopping_metric is None:
-            stopping_metric = self.model_base.stopping_metric
+        objective_func = kwargs.pop('objective_func', self.model_base.objective_func)
+        stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
 
-        super().__init__(path=path, name=name, problem_type=self.model_base.problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, feature_types_metadata=feature_types_metadata, hyperparameters=hyperparameters, debug=debug, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, objective_func=objective_func, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, **kwargs)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)

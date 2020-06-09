@@ -66,8 +66,8 @@ class TabularNeuralNetModel(AbstractModel):
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, stopping_metric=None, hyperparameters=None, features=None, **kwargs):
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, hyperparameters=hyperparameters, features=features, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         """
         TabularNeuralNetModel object.
 
