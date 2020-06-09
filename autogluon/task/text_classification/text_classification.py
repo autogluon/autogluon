@@ -52,11 +52,11 @@ class TextClassification(BaseTask):
             scheduler_options=None,
             search_strategy='random',
             search_options=None,
+            num_trials=None,
             time_limits=None,
             resume=False,
             checkpoint='checkpoint/exp1.ag',
             visualizer='none',
-            num_trials=2,
             dist_ip_addrs=None,
             auto_search=True,
             verbose=False,
@@ -100,6 +100,9 @@ class TextClassification(BaseTask):
             Whether to utilize early stopping during training to avoid overfitting.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.
+        time_limits : int
+            Approximately how long should `fit()` should run for (wallclock time in seconds).
+            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion).
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : int
@@ -110,13 +113,13 @@ class TextClassification(BaseTask):
             Extra arguments passed to __init__ of scheduler, to configure the
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
-            Which hyperparameter search algorithm to use. 
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Which hyperparameter search algorithm to use.
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian
+            optimization), 'grid' (grid search), 'hyperband' (Hyperband random),
+            'rl' (reinforcement learner).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization. 
-        time_limits : int
-            Approximately how long should `fit()` should run for (wallclock time in seconds).
-            `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion). 
+            Auxiliary keyword arguments to pass to the searcher that performs
+            hyperparameter optimization.
         verbose : bool
             Whether or not to print out intermediate information during training.
         checkpoint : str or None
@@ -141,6 +144,8 @@ class TextClassification(BaseTask):
         >>> dataset = task.Dataset(name='ToySST')
         >>> predictor = task.fit(dataset)
         """
+        assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
+            "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
 
         logger.warning('`TextClassification` is in preview mode.'
                        'Please feel free to request new features in issues '
@@ -154,6 +159,11 @@ class TextClassification(BaseTask):
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+
+        # If only time_limits is given, the scheduler starts trials until the
+        # time limit is reached
+        if num_trials is None and time_limits is None:
+            num_trials = 2
 
         train_text_classification.register_args(
             dataset=dataset,
@@ -187,11 +197,11 @@ class TextClassification(BaseTask):
             else:
                 assert 'grace_period' not in scheduler_options, \
                     "grace_period appears both in scheduler_options and as direct argument"
-                logger.warning(
-                    "grace_period is deprecated, use "
-                    "scheduler_options={'grace_period': ...} instead")
                 scheduler_options = copy.copy(scheduler_options)
                 scheduler_options['grace_period'] = grace_period
+            logger.warning(
+                "grace_period is deprecated, use "
+                "scheduler_options={'grace_period': ...} instead")
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,

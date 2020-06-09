@@ -84,11 +84,11 @@ class ImageClassification(BaseTask):
             search_options=None,
             plot_results=False,
             verbose=False,
+            num_trials=None,
             time_limits=None,
             resume=False,
             output_directory='checkpoint/',
             visualizer='none',
-            num_trials=2,
             dist_ip_addrs=None,
             auto_search=True,
             lr_config=Dict(
@@ -141,12 +141,12 @@ class ImageClassification(BaseTask):
             Loss function used during training of the neural network weights.
         num_trials : int
             Maximal number of hyperparameter configurations to try out.
-        split_ratio : float, default = 0.8
-            Fraction of dataset to use for training (rest of data is held-out for tuning hyperparameters).
-            The final returned model may be fit to all of the data (after hyperparameters have been selected).
         time_limits : int
             Approximately how long `fit()` should run for (wallclock time in seconds).
             `fit()` will stop training new models after this amount of time has elapsed (but models which have already started training will continue to completion).
+        split_ratio : float, default = 0.8
+            Fraction of dataset to use for training (rest of data is held-out for tuning hyperparameters).
+            The final returned model may be fit to all of the data (after hyperparameters have been selected).
         nthreads_per_trial : int
             How many CPUs to use in each trial (ie. single training run of a model).
         ngpus_per_trial : int
@@ -159,9 +159,12 @@ class ImageClassification(BaseTask):
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use.
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband), 'rl' (reinforcement learner)
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian
+            optimization), 'grid' (grid search), 'hyperband' (Hyperband random),
+            'rl' (reinforcement learner).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
+            Auxiliary keyword arguments to pass to the searcher that performs
+            hyperparameter optimization.
         resume : bool
             If True, the hyperparameter search is started from state loaded from
             os.path.join(output_directory, 'exp1.ag')
@@ -240,6 +243,8 @@ class ImageClassification(BaseTask):
         use-gn', default= False.
             whether to use group norm.
         """
+        assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
+            "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
         checkpoint = os.path.join(output_directory, 'exp1.ag')
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
@@ -248,6 +253,11 @@ class ImageClassification(BaseTask):
 
         nthreads_per_trial = get_cpu_count() if nthreads_per_trial > get_cpu_count() else nthreads_per_trial
         ngpus_per_trial = get_gpu_count() if ngpus_per_trial > get_gpu_count() else ngpus_per_trial
+
+        # If only time_limits is given, the scheduler starts trials until the
+        # time limit is reached
+        if num_trials is None and time_limits is None:
+            num_trials = 2
 
         final_fit_epochs = final_fit_epochs if final_fit_epochs else epochs
         train_image_classification.register_args(
@@ -278,11 +288,11 @@ class ImageClassification(BaseTask):
             else:
                 assert 'grace_period' not in scheduler_options, \
                     "grace_period appears both in scheduler_options and as direct argument"
-                logger.warning(
-                    "grace_period is deprecated, use "
-                    "scheduler_options={'grace_period': ...} instead")
                 scheduler_options = copy.copy(scheduler_options)
                 scheduler_options['grace_period'] = grace_period
+            logger.warning(
+                "grace_period is deprecated, use "
+                "scheduler_options={'grace_period': ...} instead")
         scheduler_options = compile_scheduler_options(
             scheduler_options=scheduler_options,
             search_strategy=search_strategy,

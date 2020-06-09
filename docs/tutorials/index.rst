@@ -83,6 +83,14 @@ Tuning Custom Models
 
       Easily distribute AutoGluon tuning 
       across multiple machines.
+   
+   .. card::
+      :title: Tune a Multi-Layer Perceptron
+      :link: course/mlp.html
+
+      Complete example of how to use AutoGluon
+      and its state-of-the-art schedulers and 
+      model-based searchers to tune a MLP.
 
 
 Neural Architecture Search

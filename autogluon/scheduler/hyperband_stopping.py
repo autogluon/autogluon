@@ -35,17 +35,17 @@ class HyperbandStopping_Manager(object):
     median rule.
 
     Args:
-        time_attr: str
+        time_attr : str
             See HyperbandScheduler.
-        reward_attr: str
+        reward_attr : str
             See HyperbandScheduler.
-        max_t: int
+        max_t : int
             See HyperbandScheduler.
-        grace_period: int
+        grace_period : int
             See HyperbandScheduler.
-        reduction_factor: int
+        reduction_factor : int
             See HyperbandScheduler.
-        brackets: int
+        brackets : int
             See HyperbandScheduler.
 
     """
@@ -200,7 +200,6 @@ class StoppingBracket(object):
         :param cur_iter: Current time_attr value of task
         :param cur_rew: Current reward_attr value of task
         :return: action, milestone_reached, next_milestone
-
         """
         assert cur_rew is not None, \
             "Reward attribute must be a numerical value, not None"

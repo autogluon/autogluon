@@ -20,26 +20,33 @@ autogluon.searcher
    ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
 
    Note that `epoch` returned by `reporter` must be the number of epochs done,
-   and start with 1. Create a searcher and sample one configuration:
+   and start with 1. Recall that a searcher is used by a scheduler in order to suggest configurations
+   to evaluate. Create a searcher and sample one configuration:
 
-   >>> searcher = ag.searcher.SKoptSearcher(train_fn.cs)
+   >>> searcher = ag.searcher.GPFIFOSearcher(train_fn.cs)
    >>> searcher.get_config()
    {'lr': 0.0031622777, 'wd': 0.0055}
 
    Create a scheduler and run this toy experiment:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
-   ...                                        searcher = searcher,
+   ...                                        searcher=searcher,
    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
    ...                                        num_trials=10,
    ...                                        reward_attr='accuracy',
    ...                                        time_attr='epoch')
    >>> scheduler.run()
 
-   When working with `FIFOScheduler` or `HyperbandScheduler`, it is recommended to specify the searcher by the `searcher` argument (string identifier) and `search_options`, instead of creating the searcher object by hand:
+   Note that `reward_attr` and `time_attr` must correspond to the keys used in the
+   `reporter` callback in `train_fn`.
+
+   When working with `FIFOScheduler` or `HyperbandScheduler`, it is strongly
+   recommended to have the scheduler create its searcher (by specifying
+   `searcher` (string identifier) and `search_options`), instead of creating
+   the searcher object by hand:
 
    >>> scheduler = ag.scheduler.FIFOScheduler(train_fn,
-   ...                                        searcher = 'skopt',
+   ...                                        searcher='bayesopt',
    ...                                        resource={'num_cpus': 2, 'num_gpus': 0},
    ...                                        num_trials=10,
    ...                                        reward_attr='accuracy',
@@ -63,6 +70,8 @@ Searchers
 
    RandomSearcher
    SKoptSearcher
+   GPFIFOSearcher
+   GPMultiFidelitySearcher
    GridSearcher
    RLSearcher
 
@@ -90,6 +99,32 @@ Searchers
     .. rubric:: Methods
 
     .. autoautosummary:: SKoptSearcher
+        :methods:
+
+
+:hidden:`GPFIFOSearcher`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: GPFIFOSearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: GPFIFOSearcher
+        :methods:
+
+
+:hidden:`GPMultiFidelitySearcher`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: GPMultiFidelitySearcher
+   :members:
+   :inherited-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: GPMultiFidelitySearcher
         :methods:
 
 

@@ -37,21 +37,20 @@ class HyperbandPromotion_Manager(object):
     not yet gone beyond level task.args['resume_from'].
 
     Args:
-        time_attr: str
+        time_attr : str
             See HyperbandScheduler.
-        reward_attr: str
+        reward_attr : str
             See HyperbandScheduler.
-        max_t: int
+        max_t : int
             See HyperbandScheduler.
-        grace_period: int
+        grace_period : int
             See HyperbandScheduler.
-        reduction_factor: int
+        reduction_factor : int
             See HyperbandScheduler.
-        brackets: int
+        brackets : int
             See HyperbandScheduler.
-        keep_size_ratios: bool
+        keep_size_ratios : bool
             See HyperbandScheduler.
-
     """
     def __init__(
             self, time_attr, reward_attr, max_t, grace_period,
@@ -178,7 +177,6 @@ class PromotionBracket(object):
     The stopping rule is simple: Per task_id, we record the config key and
     the milestone the task should be stopped at (it may still continue there,
     if it directly passes the promotion test).
-
     """
     def __init__(
             self, min_t, max_t, reduction_factor, s, keep_size_ratios):
@@ -328,7 +326,6 @@ class PromotionBracket(object):
         :param cur_iter: Current time_attr value of task
         :param cur_rew: Current reward_attr value of task
         :return: action, milestone_reached, next_milestone, ignore_data
-
         """
         assert cur_rew is not None, \
             "Reward attribute must be a numerical value, not None"
@@ -395,8 +392,8 @@ class PromotionBracket(object):
             # 1 / self.rf fraction
             num_top = int(num_recorded / self.rf)
             top_list = heapq.nlargest(
-                num_top, recorded.items(), key=lambda x: x[1][0])
-            num_promotable = sum([(not v[1]) for v in top_list.values()])
+                num_top, recorded.values(), key=lambda x: x[0])
+            num_promotable = sum((not x) for _, x in top_list)
         return num_promotable, num_top
 
     def __repr__(self):

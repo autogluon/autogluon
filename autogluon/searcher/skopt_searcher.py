@@ -9,6 +9,7 @@ with warning_filter():
 from .searcher import BaseSearcher
 
 __all__ = ['SKoptSearcher']
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,8 +64,8 @@ class SKoptSearcher(BaseSearcher):
     >>> searcher.get_config()
     {'lr': 0.0031622777, 'wd': 0.0055}
     >>> searcher = SKoptSearcher(
-    >>>     train_fn.cs, reward_attribute='accuracy', base_estimator='RF',
-    >>>     acq_func='EI')
+    ...     train_fn.cs, reward_attribute='accuracy', base_estimator='RF',
+    ...     acq_func='EI')
     >>> next_config = searcher.get_config()
     >>> searcher.update(next_config, accuracy=10.0)  # made-up value
     

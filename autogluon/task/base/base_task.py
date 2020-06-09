@@ -21,7 +21,9 @@ schedulers = {
     'random': FIFOScheduler,
     'skopt': FIFOScheduler,
     'hyperband': HyperbandScheduler,
-    'rl': RLScheduler}
+    'rl': RLScheduler,
+    'bayesopt': FIFOScheduler,
+    'bayesopt_hyperband': HyperbandScheduler}
 
 
 def create_scheduler(train_fn, search_strategy, scheduler_options):
@@ -87,7 +89,8 @@ class BaseTask(object):
 # These search_strategies use HyperbandScheduler, along with certain
 # searchers.
 searcher_for_hyperband_strategy = {
-    'hyperband': 'random'}
+    'hyperband': 'random',
+    'bayesopt_hyperband': 'bayesopt'}
 
 
 def compile_scheduler_options(

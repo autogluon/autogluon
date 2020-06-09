@@ -36,6 +36,12 @@ Tutorials for customizing AutoGluon using advanced APIs.
       :link: distributed.html
 
       Easily distribute the hyperparameter search arcross multiple machines to improve efficiency.
+   
+   .. card::
+      :title: Tune a Multi-Layer Perceptron
+      :link: mlp.html
+
+      Complete example of how to use AutoGluon and its state-of-the-art schedulers and model-based searchers to tune a MLP.
 
 .. toctree::
    :maxdepth: 1
@@ -46,3 +52,4 @@ Tutorials for customizing AutoGluon using advanced APIs.
    object
    script
    distributed
+   mlp

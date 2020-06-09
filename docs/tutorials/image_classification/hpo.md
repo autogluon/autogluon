@@ -76,11 +76,13 @@ print(optimizer)
 
 ## Search Algorithms
 
-In AutoGluon, :meth:`autogluon.searcher` supports different search search_strategys for both hyperparameter optimization and architecture search.
+In AutoGluon, `autogluon.searcher` supports different search search strategies for both hyperparameter optimization and architecture search.
 Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space. 
 This process of finding good hyperparameters from a given search space is commonly referred to as *hyperparameter optimization* (HPO) or *hyperparameter tuning*. 
-:meth:`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
-We currently support random search, Hyperband, and Bayesian Optimization. Although these are simple techniques, they can be surprisingly powerful when parallelized, which can be easily enabled in AutoGluon.
+`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
+We currently support FIFO (standard) and Hyperband scheduling, along with search
+by random sampling or Bayesian optimization. These basic techniques are rendered
+surprisingly powerful by AutoGluon's support of asynchronous parallel execution.
 
 ### Bayesian Optimization
 
@@ -102,7 +104,8 @@ classifier = task.fit(dataset,
                       search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=1,
+                      num_trials=2)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
@@ -115,6 +118,9 @@ test_dataset = task.Dataset('data/test', train=False)
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
+
+Note that `num_trials=2` above is only used to speed up the tutorial. In normal
+practice, it is common to only use `time_limits` and drop `num_trials`.
 
 ### Hyperband Early Stopping
 

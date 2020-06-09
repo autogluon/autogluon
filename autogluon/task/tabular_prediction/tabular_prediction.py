@@ -304,10 +304,15 @@ class TabularPrediction(BaseTask):
             orchestration of training jobs during hyperparameter-tuning. This
             is ignored if hyperparameter_tune=False.
         search_strategy : str
-            Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune = True`).
-            Options include: 'random' (random search), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search), 'hyperband' (Hyperband)
+            Which hyperparameter search algorithm to use (only matters if
+            `hyperparameter_tune = True`).
+            Options include: 'random' (random search), 'bayesopt' (Gaussian process
+            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
+            (grid search), 'hyperband' (Hyperband random), rl' (reinforcement
+            learner).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
+            Auxiliary keyword arguments to pass to the searcher that performs
+            hyperparameter optimization.
         nthreads_per_trial : int
             How many CPUs to use in each training run of an individual model.
             This is automatically determined by AutoGluon when left as None (based on available compute).
@@ -426,6 +431,8 @@ class TabularPrediction(BaseTask):
         >>> time_limits = 360  # set as long as you are willing to wait (in sec)
         >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
         """
+        assert search_strategy != 'bayesopt_hyperband', \
+            "search_strategy == 'bayesopt_hyperband' not yet supported"
         if verbosity < 0:
             verbosity = 0
         elif verbosity > 4:

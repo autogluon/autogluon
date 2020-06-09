@@ -50,6 +50,9 @@ detector = task.fit(dataset_train,
                     time_limits=time_limits)
 ```
 
+Note that `num_trials=2` above is only used to speed up the tutorial. In normal
+practice, it is common to only use `time_limits` and drop `num_trials`.
+
 After fitting, AutoGluon automatically returns the best model among all models in the searching space. From the output, we know the best model is the one trained with the second learning rate. To see how well the returned model performed on test dataset, call detector.evaluate().
 
 ```{.python .input}

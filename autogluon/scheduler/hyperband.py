@@ -11,7 +11,6 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
 from ..utils import load
 
-
 __all__ = ['HyperbandScheduler']
 
 logger = logging.getLogger(__name__)
@@ -51,9 +50,11 @@ class HyperbandScheduler(FIFOScheduler):
         starts from there.
         Note: May not be fully supported by all searchers.
     num_trials : int
-        Maximum number of jobs run in experiment.
+        Maximum number of jobs run in experiment. One of `num_trials`,
+        `time_out` must be given.
     time_out : float
-        If given, jobs are started only until this time_out (wall clock time)
+        If given, jobs are started only until this time_out (wall clock time).
+        One of `num_trials`, `time_out` must be given.
     reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter
@@ -128,7 +129,7 @@ class HyperbandScheduler(FIFOScheduler):
         each epoch, but not all epoch values are also rung levels.
         searcher_data determines which of these results are passed to the
         searcher. As a rule, the more data the searcher receives, the better its
-        fit, but also the more expensive it becomes. Choices:
+        fit, but also the more expensive get_config may become. Choices:
         - 'rungs' (default): Only results at rung levels. Cheapest
         - 'all': All results. Most expensive
         - 'rungs_and_last': Results at rung levels, plus the most recent result.
@@ -145,7 +146,6 @@ class HyperbandScheduler(FIFOScheduler):
     --------
     >>> import numpy as np
     >>> import autogluon as ag
-    >>> 
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
     ...     wd=ag.space.Real(1e-3, 1e-2))
@@ -253,7 +253,6 @@ class HyperbandScheduler(FIFOScheduler):
                 msg = f'checkpoint path {checkpoint} is not available for resume.'
                 logger.exception(msg)
                 raise FileExistsError(msg)
-
 
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
@@ -370,7 +369,8 @@ class HyperbandScheduler(FIFOScheduler):
                 break
             if len(reported_result) == 0:
                 # An empty dict should just be skipped
-                logger.warning("Skipping empty dict received from reporter")
+                if self.searcher.debug_log is not None:
+                    logger.info("Skipping empty dict received from reporter")
                 continue
             # Time since start of experiment
             elapsed_time = self._elapsed_time()
@@ -447,12 +447,35 @@ class HyperbandScheduler(FIFOScheduler):
 
             last_result = reported_result
             if task_continues:
+                debug_log = self.searcher.debug_log
+                if update_searcher and debug_log is not None:
+                    # Debug log output
+                    config_id = debug_log.config_id(task.args['config'])
+                    milestone = int(reported_result[self._time_attr])
+                    next_milestone = task_info['next_milestone']
+                    msg = "config_id {}: Reaches {}, continues".format(
+                        config_id, milestone)
+                    if next_milestone is not None:
+                        msg += " to {}".format(next_milestone)
+                    logger.info(msg)
                 reporter.move_on()
             else:
                 # Note: The 'terminated' signal is sent even in the promotion
                 # variant. It means that the *task* terminates, while the
                 # evaluation of the config is just paused
                 last_result['terminated'] = True
+                debug_log = self.searcher.debug_log
+                if debug_log is not None:
+                    # Debug log output
+                    config_id = debug_log.config_id(task.args['config'])
+                    resource = int(reported_result[self._time_attr])
+                    if self.type == 'stopping' or resource >= self.max_t:
+                        act_str = 'Terminating'
+                    else:
+                        act_str = 'Pausing'
+                    msg = "config_id {}: {} evaluation at {}".format(
+                        config_id, act_str, resource)
+                    logger.info(msg)
                 with self._hyperband_lock:
                     self.terminator.on_task_remove(task)
                     # Cleanup
@@ -529,6 +552,14 @@ class HyperbandScheduler(FIFOScheduler):
                     'rungs': self.terminator.snapshot_rungs(bracket_id),
                     'max_resource': self.max_t,
                     'reduction_factor': self.reduction_factor}
+            debug_log = self.searcher.debug_log
+            if (debug_log is not None) and (config is not None):
+                # Debug log output
+                config_id = debug_log.config_id(config)
+                msg = "config_id {}: Promotion from {} to {}".format(
+                    config_id, extra_kwargs['resume_from'],
+                    extra_kwargs['milestone'])
+                logger.info(msg)
             return config, extra_kwargs
 
     def map_resource_to_index(self):

@@ -5,8 +5,11 @@ from collections import OrderedDict
 import numpy as np
 
 from ..utils import DeprecationHelper
+from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
 
-__all__ = ['BaseSearcher', 'RandomSearcher', 'RandomSampling']
+__all__ = ['BaseSearcher',
+           'RandomSearcher',
+           'RandomSampling']
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,6 @@ class BaseSearcher(object):
             config_pkl = pickle.dumps(config)
             old_reward = self._results.get(config_pkl, reward)
             self._results[config_pkl] = max(reward, old_reward)
-        #logger.info(f'Finished Task with config: {config} and reward: {reward}')
 
     def register_pending(self, config, milestone=None):
         """
@@ -224,6 +226,16 @@ class BaseSearcher(object):
         """
         return state
 
+    @property
+    def debug_log(self):
+        """
+        Some BaseSearcher subclasses support writing a debug log, using
+        DebugLogPrinter. See RandomSearcher for an example.
+
+        :return: DebugLogPrinter; or None (not supported)
+        """
+        return None
+
     def __repr__(self):
         config, reward = self.get_best_config_reward()
         reprstr = (
@@ -282,6 +294,39 @@ class RandomSearcher(BaseSearcher):
         # checkpoint and resume
         self.random_state = np.random.RandomState(
             kwargs.get('random_seed', 31415927))
+        # Debug log printing (optional)
+        self._debug_log = kwargs.get('debug_log')
+        if self._debug_log is not None:
+            if isinstance(self._debug_log, bool):
+                if self._debug_log:
+                    self._debug_log = DebugLogPrinter()
+                else:
+                    self._debug_log = None
+            else:
+                assert isinstance(self._debug_log, DebugLogPrinter)
+
+    def configure_scheduler(self, scheduler):
+        """
+        Some searchers need to obtain information from the scheduler they are
+        used with, in order to configure themselves.
+        This method has to be called before the searcher can be used.
+
+        The implementation here sets _reward_attribute for schedulers which
+        specify it.
+
+        Args:
+            scheduler: TaskScheduler
+                Scheduler the searcher is used with.
+
+        """
+        from autogluon.scheduler.hyperband import HyperbandScheduler
+
+        super().configure_scheduler(scheduler)
+        self._resource_attribute = None
+        # If the scheduler is Hyperband, we want to know the resource
+        # attribute, this is used for debug_log
+        if isinstance(scheduler, HyperbandScheduler):
+            self._resource_attribute = scheduler._time_attr
 
     def get_config(self, **kwargs):
         """Sample a new configuration at random
@@ -289,9 +334,10 @@ class RandomSearcher(BaseSearcher):
         Returns
         -------
         A new configuration that is valid.
-
         """
         self.configspace.random = self.random_state
+        if self._debug_log is not None:
+            self._debug_log.start_get_config('random')
         if self._first_is_default and (not self._results):
             # Try default config first
             new_config = self.configspace.get_default_configuration().get_dictionary()
@@ -305,21 +351,47 @@ class RandomSearcher(BaseSearcher):
                 new_config = self.configspace.sample_configuration().get_dictionary()
                 num_tries += 1
             self._results[pickle.dumps(new_config)] = self._reward_while_pending()
+        if self._debug_log is not None:
+            self._debug_log.set_final_config(new_config)
+            # All get_config debug log info is only written here
+            self._debug_log.write_block()
         return new_config
 
+    def update(self, config, **kwargs):
+        super().update(config, **kwargs)
+        if self._debug_log is not None:
+            config_id = self._debug_log.config_id(config)
+            reward = kwargs[self._reward_attribute]
+            if self._resource_attribute is not None:
+                # For HyperbandScheduler, also add the resource attribute
+                resource = int(kwargs[self._resource_attribute])
+                config_id = config_id + ':{}'.format(resource)
+            msg = "Update for config_id {}: reward = {}".format(
+                config_id, reward)
+            logger.info(msg)
+
     def get_state(self):
-        return {
+        state = {
             'random_state': self.random_state,
-            'results': self._results
-        }
+            'results': self._results}
+        if self._debug_log is not None:
+            state['debug_log'] = self._debug_log.get_mutable_state()
+        return state
 
     def clone_from_state(self, state):
         new_searcher = RandomSearcher(
             self.configspace, reward_attribute=self._reward_attribute,
-            first_is_default=self._first_is_default)
+            first_is_default=self._first_is_default,
+            debug_log=self._debug_log)
         new_searcher.random_state = state['random_state']
         new_searcher._results = state['results']
+        if self._debug_log and 'debug_log' in state:
+            new_searcher._debug_log.set_mutable_state(state['debug_log'])
         return new_searcher
+
+    @property
+    def debug_log(self):
+        return self._debug_log
 
 
 RandomSampling = DeprecationHelper(RandomSearcher, 'RandomSampling')

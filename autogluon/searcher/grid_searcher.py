@@ -1,7 +1,7 @@
-__all__ = ['GridSearcher']
-
 from .searcher import BaseSearcher
 from sklearn.model_selection import ParameterGrid
+
+__all__ = ['GridSearcher']
 
 
 class GridSearcher(BaseSearcher):
