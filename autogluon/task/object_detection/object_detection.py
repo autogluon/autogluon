@@ -122,10 +122,8 @@ class ObjectDetection(BaseTask):
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use.
-            Options include: 'random' (random search), 'bayesopt' (Gaussian process
-            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
-            (grid search), 'hyperband' (Hyperband random), 'bayesopt_hyperband'
-            (asynchronous BOHB: Bayesian optimization with Hyperband scheduling),
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian
+            optimization), 'grid' (grid search), 'hyperband' (Hyperband random),
             'rl' (reinforcement learner).
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs
@@ -203,6 +201,8 @@ class ObjectDetection(BaseTask):
         >>> detector = task.fit(dataset = 'voc', net = 'mobilenet1.0',
         >>>                     time_limits = 600, ngpus_per_trial = 1, num_trials = 1)
         """
+        assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
+            "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps
             # based on the dataset statistics

@@ -33,10 +33,15 @@ Now, we want to obtain a neural network classifier using AutoGluon. In the defau
 
 While we primarily stick with default configurations in this Beginner tutorial, the Advanced tutorial covers various options that you can specify for greater control over the training process. With just a single call to AutoGluon's `fit` function, AutoGluon will train many models with different hyperparameter configurations and return the best model.
 
-However, neural network training can be quite time-costly. To ensure quick runtimes, we tell AutoGluon to obey strict limits: `num_training_epochs` specifies how much computational effort can be devoted to training any single network, while `time_limits` in seconds specifies how much time `fit` has to return a model. For demo purposes, we specify only small values for `time_limits`, `num_training_epochs`:
+However, neural network training can be quite time-costly. To ensure quick runtimes,
+we tell AutoGluon to obey strict limits: `epochs` specifies how much
+computational effort can be devoted to training any single network, while `time_limits`
+in seconds specifies how much time `fit` has to return a model (more
+precisely, training runs are started as long as `time_limits` is not reached).
+For demo purposes, we specify only small values for `time_limits`, `epochs`:
 
 ```{.python .input}
-predictor = task.fit(dataset, epochs=1)
+predictor = task.fit(dataset, epochs=1, time_limits=30)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  

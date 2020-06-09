@@ -12,3 +12,4 @@ dependencies:
   - torch
   - torchvision
   - bokeh
+  - openml

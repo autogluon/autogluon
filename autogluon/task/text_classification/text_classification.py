@@ -114,10 +114,8 @@ class TextClassification(BaseTask):
             orchestration of training jobs during hyperparameter-tuning.
         search_strategy : str
             Which hyperparameter search algorithm to use.
-            Options include: 'random' (random search), 'bayesopt' (Gaussian process
-            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
-            (grid search), 'hyperband' (Hyperband random), 'bayesopt_hyperband'
-            (asynchronous BOHB: Bayesian optimization with Hyperband scheduling),
+            Options include: 'random' (random search), 'skopt' (SKopt Bayesian
+            optimization), 'grid' (grid search), 'hyperband' (Hyperband random),
             'rl' (reinforcement learner).
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs
@@ -146,6 +144,8 @@ class TextClassification(BaseTask):
         >>> dataset = task.Dataset(name='ToySST')
         >>> predictor = task.fit(dataset)
         """
+        assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
+            "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
 
         logger.warning('`TextClassification` is in preview mode.'
                        'Please feel free to request new features in issues '

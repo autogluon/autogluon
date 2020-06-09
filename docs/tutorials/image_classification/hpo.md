@@ -104,7 +104,8 @@ classifier = task.fit(dataset,
                       search_options={'base_estimator': 'RF', 'acq_func': 'EI'},
                       time_limits=time_limits,
                       epochs=epochs,
-                      ngpus_per_trial=1)
+                      ngpus_per_trial=1,
+                      num_trials=2)
 
 print('Top-1 val acc: %.3f' % classifier.results[classifier.results['reward_attr']])
 ```
@@ -117,6 +118,9 @@ test_dataset = task.Dataset('data/test', train=False)
 test_acc = classifier.evaluate(test_dataset)
 print('Top-1 test acc: %.3f' % test_acc)
 ```
+
+Note that `num_trials=2` above is only used to speed up the tutorial. In normal
+practice, it is common to only use `time_limits` and drop `num_trials`.
 
 ### Hyperband Early Stopping
 

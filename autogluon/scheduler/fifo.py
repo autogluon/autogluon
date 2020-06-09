@@ -50,9 +50,11 @@ class FIFOScheduler(TaskScheduler):
         starts from there.
         Note: May not be fully supported by all searchers.
     num_trials : int
-        Maximum number of jobs run in experiment.
+        Maximum number of jobs run in experiment. One of `num_trials`,
+        `time_out` must be given.
     time_out : float
-        If given, jobs are started only until this time_out (wall clock time)
+        If given, jobs are started only until this time_out (wall clock time).
+        One of `num_trials`, `time_out` must be given.
     reward_attr : str
         Name of reward (i.e., metric to maximize) attribute in data obtained
         from reporter

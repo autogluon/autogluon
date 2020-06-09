@@ -308,9 +308,8 @@ class TabularPrediction(BaseTask):
             `hyperparameter_tune = True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process
             Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
-            (grid search), 'hyperband' (Hyperband random), 'bayesopt_hyperband'
-            (asynchronous BOHB: Bayesian optimization with Hyperband scheduling),
-            'rl' (reinforcement learner).
+            (grid search), 'hyperband' (Hyperband random), rl' (reinforcement
+            learner).
         search_options : dict
             Auxiliary keyword arguments to pass to the searcher that performs
             hyperparameter optimization.
@@ -432,6 +431,8 @@ class TabularPrediction(BaseTask):
         >>> time_limits = 360  # set as long as you are willing to wait (in sec)
         >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
         """
+        assert search_strategy != 'bayesopt_hyperband', \
+            "search_strategy == 'bayesopt_hyperband' not yet supported"
         if verbosity < 0:
             verbosity = 0
         elif verbosity > 4:
