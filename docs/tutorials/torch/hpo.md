@@ -228,8 +228,9 @@ myscheduler.join_jobs()
 ### Search by Asynchronous BOHB
 
 When training neural networks, it is often more efficient to use early stopping,
-and in particular Hyperband scheduling can save a lot of wall-clock time. Let us
-use Hyperband scheduling together with Bayesian optimization:
+and in particular Hyperband scheduling can save a lot of wall-clock time. AutoGluon
+provides a combination of Hyperband scheduling with asynchronous Bayesian
+optimization (more details can be found [here](https://arxiv.org/abs/2003.10865)):
 
 ```{.python .input}
 myscheduler = ag.scheduler.HyperbandScheduler(
@@ -239,7 +240,6 @@ myscheduler = ag.scheduler.HyperbandScheduler(
     num_trials=2,
     time_attr='epoch',
     reward_attr='accuracy',
-    max_t=5,
     grace_period=1,
     reduction_factor=3,
     brackets=1)
