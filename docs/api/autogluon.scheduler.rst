@@ -36,8 +36,9 @@ autogluon.scheduler
    >>> scheduler.join_jobs()
 
    Note that `HyperbandScheduler` obtains the maximum number of epochs from
-   `train_fn.args.epochs` (specified by `epochs=10` in the example above). The
-   value can also be passed as `max_t` to `HyperbandScheduler`.
+   `train_fn.args.epochs` (specified by `epochs=10` in the example above in the
+   ag.args decorator). The value can also be passed as `max_t`
+   to `HyperbandScheduler`.
 
    Visualize the results:
 

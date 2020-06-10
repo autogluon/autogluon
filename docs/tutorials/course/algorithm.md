@@ -74,7 +74,7 @@ scheduler.join_jobs()
 ```
 
 In this example, trials are stopped early after 1, 3, or 9 epochs. Only a small
-fraction of most promising jobs run for the full number of 10 epochs. Since the
+fraction of the most promising jobs run for the full number of 10 epochs. Since the
 majority of trials are stopped early, we can afford a larger `num_trials`.
 Visualize the results:
 

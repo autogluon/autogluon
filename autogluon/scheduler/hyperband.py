@@ -195,13 +195,13 @@ class HyperbandScheduler(FIFOScheduler):
         # the one inferred from train_fn.args. If neither is given, we raise an
         # exception
         inferred_max_t = self._infer_max_t(train_fn.args)
-        assert (max_t is not None) or (inferred_max_t is not None), \
-            "Either max_t must be specified, or it has to be specified via train_fn (as train_fn.args.epochs or train_fn.args.max_t)"
         if max_t is not None:
             if inferred_max_t is not None and max_t != inferred_max_t:
                 logger.warning(
                     "max_t = {} is different from the value {} inferred from train_fn.args (train_fn.args.epochs, train_fn.args.max_t)".format(max_t, inferred_max_t))
         else:
+            assert inferred_max_t is not None, \
+                "Either max_t must be specified, or it has to be specified via train_fn (as train_fn.args.epochs or train_fn.args.max_t)"
             logger.info("max_t = {}, as inferred from train_fn.args".format(
                 inferred_max_t))
             max_t = inferred_max_t
@@ -278,10 +278,12 @@ class HyperbandScheduler(FIFOScheduler):
 
     @staticmethod
     def _infer_max_t(args):
-        max_t = getattr(args, 'epochs', None)
-        if max_t is None:
-            max_t = getattr(args, 'max_t', None)
-        return max_t
+        if hasattr(args, 'epochs'):
+            return args.epochs
+        elif hasattr(args, 'max_t'):
+            return args.max_t
+        else:
+            return None
 
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
