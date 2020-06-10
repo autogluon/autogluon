@@ -24,9 +24,6 @@ from mxnet.gluon import nn
 
 # AutoGluon and HPO tools
 import autogluon as ag
-from autogluon.searcher.bayesopt.autogluon.gp_fifo_searcher import map_reward
-from autogluon.scheduler.fifo import FIFOScheduler
-from autogluon.scheduler.hyperband import HyperbandScheduler
 ```
 
 Check the version of MxNet, you should be fine with version >= 1.5
@@ -305,21 +302,14 @@ def process_training_history(task_dicts, start_timestamp,
     return result
 
 resources = dict(num_cpus=NUM_CPUS, num_gpus=0)
-
-# default for classification problems: map error to accuracy.
-_map_reward = map_reward(const=1.0)
-max_metric_value = 1.0
 ```
 
 ```{.python .input  n=39}
-run_id = 1
-
 if SCHEDULER == 'fifo': 
-    myscheduler = FIFOScheduler(
+    myscheduler = ag.scheduler.FIFOScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
-        search_options={'run_id': run_id},
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME)
@@ -327,13 +317,14 @@ if SCHEDULER == 'fifo':
 else:
     # This setup uses rung levels at 1, 3, 9 epochs. We just use a single
     # bracket, so this is in fact successive halving (Hyperband would use
-    # more than 1 bracket)
+    # more than 1 bracket).
+    # Also note that since we do not use the max_t argument of
+    # HyperbandScheduler, this value is obtained from train_fn.args.epochs.
     sch_type = 'stopping' if SCHEDULER == 'hbs' else 'promotion'
-    myscheduler = HyperbandScheduler(
+    myscheduler = ag.scheduler.HyperbandScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
-        search_options={'run_id': run_id, 'min_reward': _map_reward.reverse(1.0)},
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,
