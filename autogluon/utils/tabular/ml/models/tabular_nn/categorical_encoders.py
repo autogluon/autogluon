@@ -640,8 +640,7 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                 X_tr[:, i] = self.categories_[i][self.drop_idx_[i]]
                 j += n_categories
                 continue
-            sub = X[:, j:j + n_categories]
-            # for sparse X argmax returns 2D matrix, ensure 1D array
+            sub = X[:, j:j + n_categories]  # for sparse X argmax returns 2D matrix, ensure 1D array
             labels = np.asarray(sub.argmax(axis=1)).flatten()
             X_tr[:, i] = cats[labels]
             if self.handle_unknown == 'ignore':
