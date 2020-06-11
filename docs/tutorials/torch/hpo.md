@@ -151,7 +151,6 @@ def ag_train_mnist(args, reporter):
 ```
 
 
-
 ### Create the Scheduler and Launch the Experiment
 
 For hyperparameter tuning, AutoGluon provides a number of different schedulers:
@@ -250,3 +249,6 @@ print(myscheduler)
 myscheduler.run()
 myscheduler.join_jobs()
 ```
+
+**Tip**: If you like to learn more about HPO algorithms in AutoGluon, please
+have a look at :ref:`sec_custom_advancedhpo`.
