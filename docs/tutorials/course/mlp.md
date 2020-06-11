@@ -1,4 +1,5 @@
 # Getting started with Advanced HPO Algorithms
+:label:`sec_custom_advancedhpo`
 
 ## Loading libraries
 
@@ -24,9 +25,6 @@ from mxnet.gluon import nn
 
 # AutoGluon and HPO tools
 import autogluon as ag
-from autogluon.searcher.bayesopt.autogluon.gp_fifo_searcher import map_reward
-from autogluon.scheduler.fifo import FIFOScheduler
-from autogluon.scheduler.hyperband import HyperbandScheduler
 ```
 
 Check the version of MxNet, you should be fine with version >= 1.5
@@ -230,6 +228,27 @@ def run_mlp_openml(args, reporter, **kwargs):
             elapsed_time=elapsed_time)
 ```
 
+**Note**: The annotation `epochs=9` specifies the maximum number of epochs for
+training. It becomes available as `args.epochs`. Importantly, it is also
+processed by `HyperbandScheduler` below in order to set its `max_t` attribute.
+
+**Recommendation**: Whenever writing training code to be passed as `train_fn` to
+a scheduler, if this training code reports a resource (or time) attribute, the
+corresponding maximum resource value should be included in `train_fn.args`:
+
+- If the resource attribute (`time_attr` of scheduler) in `train_fn` is `epoch`,
+  make sure to include `epochs=XYZ` in the annotation. This allows the scheduler
+  to read `max_t` from `train_fn.args.epochs`. This case corresponds to our
+  example here.
+- If the resource attribute is something else than `epoch`, you can also include
+  the annotation `max_t=XYZ`, which allows the scheduler to read `max_t` from
+  `train_fn.args.max_t`.
+
+Annotating the training function by the correct value for `max_t` simplifies
+scheduler creation (since `max_t` does not have to be passed), and avoids
+inconsistencies between `train_fn` and the scheduler.
+
+
 ### Running the Hyperparameter Optimization
 
 You can use the following schedulers:
@@ -284,21 +303,14 @@ def process_training_history(task_dicts, start_timestamp,
     return result
 
 resources = dict(num_cpus=NUM_CPUS, num_gpus=0)
-
-# default for classification problems: map error to accuracy.
-_map_reward = map_reward(const=1.0)
-max_metric_value = 1.0
 ```
 
 ```{.python .input  n=39}
-run_id = 1
-
 if SCHEDULER == 'fifo': 
-    myscheduler = FIFOScheduler(
+    myscheduler = ag.scheduler.FIFOScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
-        search_options={'run_id': run_id},
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME)
@@ -306,18 +318,18 @@ if SCHEDULER == 'fifo':
 else:
     # This setup uses rung levels at 1, 3, 9 epochs. We just use a single
     # bracket, so this is in fact successive halving (Hyperband would use
-    # more than 1 bracket)
+    # more than 1 bracket).
+    # Also note that since we do not use the max_t argument of
+    # HyperbandScheduler, this value is obtained from train_fn.args.epochs.
     sch_type = 'stopping' if SCHEDULER == 'hbs' else 'promotion'
-    myscheduler = HyperbandScheduler(
+    myscheduler = ag.scheduler.HyperbandScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
-        search_options={'run_id': run_id, 'min_reward': _map_reward.reverse(1.0)},
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,
         type=sch_type,
-        max_t=9,
         grace_period=1,
         reduction_factor=3,
         brackets=1)
@@ -361,3 +373,102 @@ plt.yticks(fontsize=12)
 plt.xlabel("Runtime [s]", fontsize=14)
 plt.ylabel("Objective", fontsize=14)
 ```
+
+## Diving Deeper
+
+Now, you are ready to try HPO on your own machine learning models (if you use
+PyTorch, have a look at :ref:`sec_customstorch`). While AutoGluon comes with
+well-chosen defaults, it can pay off to tune it to your specific needs. Here are
+some tips which may come useful.
+
+### Logging the Search Progress
+
+First, it is a good idea in general to switch on `debug_log`, which outputs
+useful information about the search progress:
+
+```{.python .input  n=50}
+myscheduler = ag.scheduler.FIFOScheduler(
+    run_mlp_openml,
+    resource=resources,
+    searcher=SEARCHER,
+    search_options={'debug_log': True},
+    time_out=120,
+    time_attr=RESOURCE_ATTR_NAME,
+    reward_attr=REWARD_ATTR_NAME)
+```
+
+The outputs show which configurations are chosen, stopped, or promoted. For
+BO and BOHB, a range of information is displayed for every `get_config`
+decision. This log output is very useful in order to figure out what is going
+on during the search.
+
+### Configuring `HyperbandScheduler`
+
+The most important knobs to turn with `HyperbandScheduler` are `max_t`, `grace_period`,
+`reduction_factor`, `brackets`, and `type`. The first three determine the rung
+levels at which stopping or promotion decisions are being made.
+
+- The maximum resource level `max_t` (usually, resource equates to epochs, so
+   `max_t` is the maximum number of training epochs) is typically hardcoded in
+   `train_fn` passed to the scheduler (this is `run_mlp_openml` in the example
+   above). As already noted above, the value is best fixed in the `ag.args`
+   decorator as `epochs=XYZ`, it can then be accessed as `args.epochs` in the
+   `train_fn` code. If this is done, you do not have to pass `max_t` when creating
+   the scheduler.
+- `grace_period` and `reduction_factor` determine the rung levels, which are
+   `grace_period`, `grace_period * reduction_factor`,
+   `grace_period * (reduction_factor ** 2)`, etc. All rung levels must be less or
+   equal than `max_t`. It is recommended to make `max_t` equal to the largest rung
+   level. For example, if `grace_period = 1`, `reduction_factor = 3`, it is in
+   general recommended to use `max_t = 9`, `max_t = 27`, or `max_t = 81`. Choosing
+   a `max_t` value "off the grid" works against the successive halving principle
+   that the total resources spent in a rung should be roughly equal between rungs. If in the
+   example above, you set `max_t = 10`, about a third of configurations reaching
+   9 epochs are allowed to proceed, but only for one more epoch.
+- With `reduction_factor`, you tune the extent to which successive halving
+   filtering is applied. The larger this integer, the fewer configurations make
+   it to higher number of epochs. Values 2, 3, 4 are commonly used.
+- Finally, `grace_period` should be set to the smallest resource (number of epochs)
+   for which you expect any meaningful differentiation between configurations.
+   While `grace_period = 1` should always be explored, it may be too low for any
+   meaningful stopping decisions to be made at the first rung.
+- `brackets` sets the maximum number of brackets in Hyperband (make sure to study
+   the Hyperband paper or follow-ups for details). For `brackets = 1`, you are
+   running successive halving (single bracket). Higher brackets have larger effective
+   `grace_period` values (so runs are not stopped until later), yet are also chosen
+   with less probability. We recommend to always consider successive halving
+   (`brackets = 1`) in a comparison.
+- Finally, with `type` (values `stopping`, `promotion`) you are choosing different
+   ways of extending successive halving scheduling to the asynchronous
+   case. The method for the default `stopping` is simpler and seems to perform well,
+   but `promotion` is more careful promoting configurations to higher resource
+   levels, which can work better in some cases.
+
+### Asynchronous BOHB
+
+Finally, here are some ideas for tuning asynchronous BOHB, apart from tuning its
+`HyperbandScheduling` component. You need to pass these options in `search_options`.
+
+- We support a range of different surrogate models over the criterion functions
+   across resource levels. All of them are jointly dependent Gaussian process
+   models, meaning that data collected at all resource levels are modelled
+   together. The surrogate model is selected by `gp_resource_kernel`, values are
+   `matern52`, `matern52-res-warp`, `exp-decay-sum`, `exp-decay-combined`,
+   `exp-decay-delta1`. These are variants of either a joint Matern 5/2 kernel
+   over configuration and resource, or the exponential decay model. Details about
+   the latter can be found [here](https://arxiv.org/abs/2003.10865).
+- Fitting a Gaussian process surrogate model to data encurs a cost which scales
+   cubically with the number of datapoints. When applied to expensive deep learning
+   workloads, even multi-fidelity asynchronous BOHB is rarely running up more than
+   100 observations or so (across all rung levels and brackets), and the GP
+   computations are subdominant. However, if you apply it to cheaper `train_fn`
+   and find yourself beyond 2000 total evaluations, the cost of GP fitting can
+   become painful. In such a situation, you can explore the options `opt_skip_period`
+   and `opt_skip_num_max_resource`. The basic idea is as follows. By far the most
+   expensive part of a `get_config` call (picking the next configuration) is the
+   refitting of the GP model to past data (this entails re-optimizing hyperparameters
+   of the surrogate model itself). The options allow you to skip this expensive
+   step for most `get_config` calls, after some initial period. Check the docstrings
+   for details about these options. If you find yourself in such a situation and
+   gain experience with these skipping features, make sure to contact the AutoGluon
+   developers -- we would love to learn about your use case.

@@ -65,6 +65,9 @@ class HyperbandScheduler(FIFOScheduler):
         Maximum resource (see time_attr) to be used for a job. Together with
         grace_period and reduction_factor, this is used to determine rung
         levels in Hyperband brackets.
+        Note: If this is not given, we try to infer its value from `train_fn.args`,
+        checking `train_fn.args.epochs` or `train_fn.args.max_t`. If `max_t` is
+        given as argument here, it takes precedence.
     grace_period : int
         Minimum resource (see time_attr) to be used for a job.
     reduction_factor : int (>= 2)
@@ -148,18 +151,20 @@ class HyperbandScheduler(FIFOScheduler):
     >>> import autogluon as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
-    ...     wd=ag.space.Real(1e-3, 1e-2))
+    ...     wd=ag.space.Real(1e-3, 1e-2),
+    ...     epochs=10)
     >>> def train_fn(args, reporter):
     ...     print('lr: {}, wd: {}'.format(args.lr, args.wd))
-    ...     for e in range(10):
+    ...     for e in range(args.epochs):
     ...         dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
     ...         reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
-    >>> scheduler = ag.scheduler.HyperbandScheduler(train_fn,
-    ...                                             resource={'num_cpus': 2, 'num_gpus': 0},
-    ...                                             num_trials=20,
-    ...                                             reward_attr='accuracy',
-    ...                                             time_attr='epoch',
-    ...                                             grace_period=1)
+    >>> scheduler = ag.scheduler.HyperbandScheduler(
+    ...     train_fn,
+    ...     resource={'num_cpus': 2, 'num_gpus': 0},
+    ...     num_trials=20,
+    ...     reward_attr='accuracy',
+    ...     time_attr='epoch',
+    ...     grace_period=1)
     >>> scheduler.run()
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
@@ -171,7 +176,7 @@ class HyperbandScheduler(FIFOScheduler):
                  time_out=None, max_reward=None,
                  reward_attr="accuracy",
                  time_attr="epoch",
-                 max_t=50, grace_period=1,
+                 max_t=None, grace_period=1,
                  reduction_factor=3, brackets=1,
                  visualizer='none',
                  training_history_callback=None,
@@ -183,6 +188,23 @@ class HyperbandScheduler(FIFOScheduler):
                  maxt_pending=False,
                  searcher_data='rungs',
                  do_snapshots=False):
+        # Setting max_t:
+        # A well-written train_fn reveals its max_t value. We check fields in
+        # train_fn.args: epochs, max_t.
+        # In any case, the max_t argument takes precedence. If it is None, we use
+        # the one inferred from train_fn.args. If neither is given, we raise an
+        # exception
+        inferred_max_t = self._infer_max_t(train_fn.args)
+        if max_t is not None:
+            if inferred_max_t is not None and max_t != inferred_max_t:
+                logger.warning(
+                    "max_t = {} is different from the value {} inferred from train_fn.args (train_fn.args.epochs, train_fn.args.max_t)".format(max_t, inferred_max_t))
+        else:
+            assert inferred_max_t is not None, \
+                "Either max_t must be specified, or it has to be specified via train_fn (as train_fn.args.epochs or train_fn.args.max_t)"
+            logger.info("max_t = {}, as inferred from train_fn.args".format(
+                inferred_max_t))
+            max_t = inferred_max_t
         # Adjoin information about scheduler to search_options
         if search_options is None:
             _search_options = dict()
@@ -253,6 +275,15 @@ class HyperbandScheduler(FIFOScheduler):
                 msg = f'checkpoint path {checkpoint} is not available for resume.'
                 logger.exception(msg)
                 raise FileExistsError(msg)
+
+    @staticmethod
+    def _infer_max_t(args):
+        if hasattr(args, 'epochs'):
+            return args.epochs
+        elif hasattr(args, 'max_t'):
+            return args.max_t
+        else:
+            return None
 
     def add_job(self, task, **kwargs):
         """Adding a training task to the scheduler.
