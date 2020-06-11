@@ -1,10 +1,11 @@
 from typing import AnyStr
 
-import gluonnlp as nlp
 import mxnet as mx
 from mxnet import gluon
 from mxnet.gluon import Block, HybridBlock, nn
-import gluonnlp as nlp
+from ...utils.try_import import try_import_gluonnlp
+nlp = try_import_gluonnlp()
+nlp.utils.check_version('0.8.1')
 
 from .dataset import *
 

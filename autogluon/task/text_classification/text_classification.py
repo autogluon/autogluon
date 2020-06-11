@@ -1,7 +1,10 @@
 import logging
 
 import mxnet as mx
-import gluonnlp as nlp
+from ...utils.try_import import try_import_gluonnlp
+nlp = try_import_gluonnlp()
+nlp.utils.check_version('0.8.1')
+
 import copy
 
 from ...core import *

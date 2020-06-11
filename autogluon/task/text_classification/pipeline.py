@@ -10,9 +10,13 @@ import numpy as np
 import mxnet as mx
 from mxnet import gluon, init, autograd, nd
 from mxnet.gluon import nn
-import gluonnlp as nlp
+from ...utils.try_import import try_import_gluonnlp
+
+nlp = try_import_gluonnlp()
+nlp.utils.check_version('0.8.1')
+
 from gluonnlp.data import BERTTokenizer
-from .network import get_network#BERTClassifier, RoBERTaClassifier, LMClassifier
+from .network import get_network
 from .dataset import *
 from .transforms import BERTDatasetTransform
 from ...core import *

@@ -6,7 +6,10 @@ import numpy as np
 from collections import OrderedDict
 import mxnet as mx
 import matplotlib.pyplot as plt
-import gluonnlp as nlp
+from ...utils.try_import import try_import_gluonnlp
+
+nlp = try_import_gluonnlp()
+nlp.utils.check_version('0.8.1')
 
 from ...utils import *
 from .network import *
