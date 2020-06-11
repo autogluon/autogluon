@@ -10,7 +10,6 @@ from scipy import sparse
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
-from sklearn.utils.fixes import _argmax
 from sklearn.utils.validation import check_is_fitted
 
 
@@ -641,9 +640,8 @@ class OneHotMergeRaresHandleUnknownEncoder(_BaseEncoder):
                 X_tr[:, i] = self.categories_[i][self.drop_idx_[i]]
                 j += n_categories
                 continue
-            sub = X[:, j:j + n_categories]
-            # for sparse X argmax returns 2D matrix, ensure 1D array
-            labels = np.asarray(_argmax(sub, axis=1)).flatten()
+            sub = X[:, j:j + n_categories]  # for sparse X argmax returns 2D matrix, ensure 1D array
+            labels = np.asarray(sub.argmax(axis=1)).flatten()
             X_tr[:, i] = cats[labels]
             if self.handle_unknown == 'ignore':
                 unknown = np.asarray(sub.sum(axis=1) == 0).flatten()
