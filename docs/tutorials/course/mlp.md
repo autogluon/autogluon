@@ -416,14 +416,14 @@ levels at which stopping or promotion decisions are being made.
    `train_fn` code. If this is done, you do not have to pass `max_t` when creating
    the scheduler.
 - `grace_period` and `reduction_factor` determine the rung levels, which are
-   `grace_period, grace_period * reduction_factor,
-   grace_period * (reduction_factor ** 2)`, etc. All rung levels must be less or
-   equal to `max_t`. It is recommended to make `max_t` equal to the largest rung
+   `grace_period`, `grace_period * reduction_factor`,
+   `grace_period * (reduction_factor ** 2)`, etc. All rung levels must be less or
+   equal than `max_t`. It is recommended to make `max_t` equal to the largest rung
    level. For example, if `grace_period = 1`, `reduction_factor = 3`, it is in
    general recommended to use `max_t = 9`, `max_t = 27`, or `max_t = 81`. Choosing
    a `max_t` value "off the grid" works against the successive halving principle
    that the total resources spent in a rung should be roughly equal between rungs. If in the
-   example above, you set `max_t=10`, about a third of configurations reaching
+   example above, you set `max_t = 10`, about a third of configurations reaching
    9 epochs are allowed to proceed, but only for one more epoch.
 - With `reduction_factor`, you tune the extent to which successive halving
    filtering is applied. The larger this integer, the fewer configurations make
@@ -438,8 +438,8 @@ levels at which stopping or promotion decisions are being made.
    `grace_period` values (so runs are not stopped until later), yet are also chosen
    with less probability. We recommend to always consider successive halving
    (`brackets = 1`) in a comparison.
-- Finally, with `type` (values `stopping`, `promotion`) you are choosing entirely
-   different ways of extending successive halving scheduling to the asynchronous
+- Finally, with `type` (values `stopping`, `promotion`) you are choosing different
+   ways of extending successive halving scheduling to the asynchronous
    case. The method for the default `stopping` is simpler and seems to perform well,
    but `promotion` is more careful promoting configurations to higher resource
    levels, which can work better in some cases.
@@ -447,7 +447,7 @@ levels at which stopping or promotion decisions are being made.
 ### Asynchronous BOHB
 
 Finally, here are some ideas for tuning asynchronous BOHB, apart from tuning its
-HyperbandScheduling component. You need to pass these options in `search_options`.
+`HyperbandScheduling` component. You need to pass these options in `search_options`.
 
 - We support a range of different surrogate models over the criterion functions
    across resource levels. All of them are jointly dependent Gaussian process
