@@ -13,7 +13,6 @@ from mxnet.gluon import nn
 from ...utils.try_import import try_import_gluonnlp
 
 nlp = try_import_gluonnlp()
-nlp.utils.check_version('0.8.1')
 
 from gluonnlp.data import BERTTokenizer
 from .network import get_network

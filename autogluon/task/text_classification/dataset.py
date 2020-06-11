@@ -8,7 +8,6 @@ from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMet
 from ...utils.try_import import try_import_gluonnlp
 
 nlp = try_import_gluonnlp()
-nlp.utils.check_version('0.8.1')
 
 from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
 from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI

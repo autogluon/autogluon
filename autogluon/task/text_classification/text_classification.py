@@ -3,7 +3,6 @@ import logging
 import mxnet as mx
 from ...utils.try_import import try_import_gluonnlp
 nlp = try_import_gluonnlp()
-nlp.utils.check_version('0.8.1')
 
 import copy
 
