@@ -55,9 +55,9 @@ def try_import_gluonnlp():
         # TODO After 1.0 is supported,
         #  we will remove the checking here and use gluonnlp.utils.check_version instead.
         from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
-        parsed_version = parse_version(gluonnlp.__version__)
-        assert parsed_version >= parse_version('0.8.1') and\
-               parsed_version <= parsed_version('0.8.3'), \
+        gluonnlp_version = parse_version(gluonnlp.__version__)
+        assert gluonnlp_version >= parse_version('0.8.1') and\
+               gluonnlp_version <= parse_version('0.8.3'), \
             'Currently, we only support 0.8.1<=gluonnlp<=0.8.3'
     except ImportError:
         raise ImportError(
