@@ -105,7 +105,7 @@ Neural Architecture Search
 
    .. card::
       :title: Efficient NAS on Target Hardware
-      :link: nas/enas_mnist.html
+      :link: nas/enas_proxylessnas.html
 
       Efficient Neural Architecture Search for low latency model
       on target hardware.
