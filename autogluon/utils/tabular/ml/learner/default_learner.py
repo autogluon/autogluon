@@ -145,6 +145,9 @@ class DefaultLearner(AbstractLearner):
         else:
             self.trainer_problem_type = self.problem_type
 
+        if self.label_cleaner.num_classes is not None:
+            logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
+
         X, y = self.extract_label(X)
         y = self.label_cleaner.transform(y)
 
