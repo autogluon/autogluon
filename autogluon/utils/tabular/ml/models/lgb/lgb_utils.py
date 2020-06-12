@@ -4,7 +4,31 @@ import numpy as np
 from pandas import DataFrame, Series
 
 from autogluon import try_import_lightgbm
-from ...constants import MULTICLASS
+from ...constants import BINARY, MULTICLASS, REGRESSION
+
+
+# Mapping to specialized LightGBM metrics that are much faster than the standard metric computation
+_ag_to_lgbm_metric_dict = {
+    BINARY: dict(
+        accuracy='binary_error',
+        log_loss='binary_logloss',
+        roc_auc='auc',
+    ),
+    MULTICLASS: dict(
+        accuracy='multi_error',
+        log_loss='multi_logloss',
+    ),
+    REGRESSION: dict(
+        mean_absolute_error='l1',
+        mean_squared_error='l2',
+        root_mean_squared_error='rmse',
+    ),
+}
+
+
+def convert_ag_metric_to_lgbm(ag_metric_name, problem_type):
+    return _ag_to_lgbm_metric_dict.get(problem_type, dict()).get(ag_metric_name, None)
+
 
 
 def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
