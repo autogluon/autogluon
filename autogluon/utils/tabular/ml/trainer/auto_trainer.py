@@ -18,7 +18,7 @@ class AutoTrainer(AbstractTrainer):
         if hyperparameters is None:
             hyperparameters = {}
         self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters)
-        models = self.get_models(self.hyperparameters, hyperparameter_tune=hyperparameter_tune, level=0)
+        models = self.get_models(hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, level=0)
         if self.bagged_mode:
             if (y_test is not None) and (X_test is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_test preds while still bagging? Doubt a user would want this.
