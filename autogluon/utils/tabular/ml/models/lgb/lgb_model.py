@@ -95,6 +95,11 @@ class LGBModel(AbstractModel):
         if dataset_val is not None:
             reporter = kwargs.get('reporter', None)
             train_loss_name = self._get_train_loss_name() if reporter is not None else None
+            if train_loss_name is not None:
+                if 'metric' not in params or params['metric'] == '':
+                    params['metric'] = train_loss_name
+                elif train_loss_name not in params['metric']:
+                    params['metric'] = f'{params["metric"]},{train_loss_name}'
             callbacks += [
                 # Note: Don't use self.params_aux['max_memory_usage_ratio'] here as LightGBM handles memory per iteration optimally.  # TODO: Consider using when ratio < 1.
                 early_stopping_custom(early_stopping_rounds, metrics_to_use=[('valid_set', eval_metric_name)], max_diff=None, start_time=start_time, time_limit=time_limit,
@@ -116,7 +121,10 @@ class LGBModel(AbstractModel):
         if not isinstance(eval_metric, str):
             train_params['feval'] = eval_metric
         else:
-            train_params['params']['metric'] = eval_metric
+            if 'metric' not in train_params['params'] or train_params['params']['metric'] == '':
+                train_params['params']['metric'] = eval_metric
+            elif eval_metric not in train_params['params']['metric']:
+                train_params['params']['metric'] = f'{train_params["params"]["metric"]},{eval_metric}'
         if seed_val is not None:
             train_params['params']['seed'] = seed_val
             random.seed(seed_val)
