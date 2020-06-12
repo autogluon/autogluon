@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class RFModel(SKLearnModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0, **kwargs):
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, num_classes=num_classes, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._model_type = self._get_model_type()
 
     def _get_model_type(self):

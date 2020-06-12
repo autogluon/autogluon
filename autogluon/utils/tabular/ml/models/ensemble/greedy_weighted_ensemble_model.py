@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class GreedyWeightedEnsembleModel(AbstractModel):
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes, base_model_names, model_base=EnsembleSelection, stopping_metric=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0, **kwargs):
-        super().__init__(path, name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug, **kwargs)
+    def __init__(self, base_model_names, model_base=EnsembleSelection, **kwargs):
+        super().__init__(**kwargs)
         self.model_base = model_base
         self.base_model_names = base_model_names
         self.weights_ = None
