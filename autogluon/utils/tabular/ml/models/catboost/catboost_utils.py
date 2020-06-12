@@ -86,6 +86,7 @@ metric_classes_dict = {
 }
 
 
+# TODO: Refactor as a dictionary mapping as done in LGBM
 def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba, problem_type):
     if (metric.name == 'log_loss') and (problem_type == MULTICLASS) and needs_pred_proba:
         return 'MultiClass'
@@ -93,6 +94,8 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'Accuracy'
     if (metric.name == 'log_loss') and (problem_type == BINARY) and needs_pred_proba:
         return 'Logloss'
+    if (metric.name == 'roc_auc') and (problem_type == BINARY) and needs_pred_proba:
+        return 'AUC'
     if (metric.name == 'f1') and (problem_type == BINARY) and not needs_pred_proba:
         return 'F1'
     if (metric.name == 'balanced_accuracy') and (problem_type == BINARY) and not needs_pred_proba:
@@ -101,5 +104,15 @@ def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba,
         return 'Recall'
     if (metric.name == 'precision') and (problem_type == BINARY) and not needs_pred_proba:
         return 'Precision'
+    if (metric.name == 'mean_absolute_error') and (problem_type == REGRESSION):
+        return 'MAE'
+    if (metric.name == 'mean_squared_error') and (problem_type == REGRESSION):
+        return 'RMSE'
+    if (metric.name == 'root_mean_squared_error') and (problem_type == REGRESSION):
+        return 'RMSE'
+    if (metric.name == 'median_absolute_error') and (problem_type == REGRESSION):
+        return 'MedianAbsoluteError'
+    if (metric.name == 'r2') and (problem_type == REGRESSION):
+        return 'R2'
     metric_class = metric_classes_dict[problem_type]
     return metric_class(metric=metric, is_higher_better=is_higher_better, needs_pred_proba=needs_pred_proba)
