@@ -71,10 +71,6 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
         if self.enable_nlp_features and self.features_nlp:
             # Combine Text Fields
-            txt = ['. '.join(row) for row in X[self.features_nlp].values]
-
-            X['__nlp__'] = txt  # Could potentially find faster methods if this ends up being slow
-
             features_nlp_current = ['__nlp__']
 
             if not self.fit:
@@ -82,8 +78,10 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 logger.log(15, 'Fitting vectorizer for nlp features: ' + str(self.features_nlp))
                 for nlp_feature in features_nlp_current:
                     # TODO: Preprocess text?
-                    # print('fitting vectorizer for', nlp_feature, '...')
-                    text_list = list(X[nlp_feature].drop_duplicates().values)
+                    if nlp_feature == '__nlp__':
+                        text_list = list(set(['. '.join(row) for row in X[self.features_nlp].values]))
+                    else:
+                        text_list = list(X[nlp_feature].drop_duplicates().values)
                     vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
                     try:
                         vectorizer_fit, _ = self.train_vectorizer(text_list, vectorizer_raw)
@@ -146,33 +144,37 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         for i, nlp_feature in enumerate(features_nlp_current):
             vectorizer_fit = self.vectorizers[i]
 
-            transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
+            if nlp_feature == '__nlp__':
+                text_data = ['. '.join(row) for row in X[self.features_nlp].values]
+            else:
+                text_data = X[nlp_feature].values
+            transform_matrix = vectorizer_fit.transform(text_data)
 
-            predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
-            mem_avail = psutil.virtual_memory().available
-            mem_rss = psutil.Process().memory_info().rss
-            # TODO: 0.25 causes OOM error with 72 GB ram on nyc-wendykan-lending-club-loan-data, fails on NN or Catboost, distributed.worker spams logs with memory warnings
-            # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
-            max_memory_percentage = 0.15  # TODO: Finetune this, or find a better metric
-            predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
-            predicted_percentage = predicted_rss / mem_avail
             if not self.fit:
+                predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
+                mem_avail = psutil.virtual_memory().available
+                mem_rss = psutil.Process().memory_info().rss
+                # TODO: 0.25 causes OOM error with 72 GB ram on nyc-wendykan-lending-club-loan-data, fails on NN or Catboost, distributed.worker spams logs with memory warnings
+                # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
+                max_memory_percentage = 0.15  # TODO: Finetune this, or find a better metric
+                predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
+                predicted_percentage = predicted_rss / mem_avail
                 if downsample_ratio is None:
                     if predicted_percentage > max_memory_percentage:
                         downsample_ratio = max_memory_percentage / predicted_percentage
-                        logger.log(15, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+                        logger.warning('Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
 
                 if downsample_ratio is not None:
                     if (downsample_ratio >= 1) or (downsample_ratio <= 0):
                         raise ValueError(f'downsample_ratio must be >0 and <1, but downsample_ratio is {downsample_ratio}')
                     vocab_size = len(vectorizer_fit.vocabulary_)
                     downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
-                    logger.debug(f'Reducing Vectorizer vocab size from {vocab_size} to {downsampled_vocab_size} to avoid OOM error')
+                    logger.log(20, f'Reducing Vectorizer vocab size from {vocab_size} to {downsampled_vocab_size} to avoid OOM error')
                     ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
                     downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
                     # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
                     #  If we have this functionality, simply update transform_matrix each time OOM occurs instead of re-calling .transform
-                    transform_matrix = vectorizer_fit.transform(X[nlp_feature].values)
+                    transform_matrix = vectorizer_fit.transform(text_data)
 
             nlp_features_names = vectorizer_fit.get_feature_names()
 

@@ -1,11 +1,13 @@
 import copy
 import logging
+import math
 import re
 import warnings
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import psutil
 from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
@@ -15,7 +17,6 @@ from ..utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add optimization to make Vectorizer smaller in size by deleting key dictionary
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractFeatureGenerator:
@@ -43,6 +44,13 @@ class AbstractFeatureGenerator:
         self.features = []
         self.banned_features = []
         self.fit = False
+
+        self.minimize_categorical_memory_usage_flag = True
+
+        self.pre_memory_usage = None
+        self.pre_memory_usage_per_row = None
+        self.post_memory_usage = None
+        self.post_memory_usage_per_row = None
 
     @property
     def feature_types_metadata(self):
@@ -98,10 +106,18 @@ class AbstractFeatureGenerator:
     def preprocess(self, X: DataFrame):
         return X
 
+    # TODO: Save this to disk and remove from memory if large categoricals!
     @calculate_time
     def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
         self.fit = False
         X_len = len(X)
+        self.pre_memory_usage = self.get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
+        self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
+        available_mem = psutil.virtual_memory().available
+        pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
+        if pre_memory_usage_percent > 0.05:
+            logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+
         if banned_features:
             self.banned_features = banned_features
             self.features_to_remove += self.banned_features
@@ -119,7 +135,7 @@ class AbstractFeatureGenerator:
             elif column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
                 self.features_to_remove_post.append(column)
 
-        self.features_binned = set(self.features_binned) - set(self.features_to_remove_post)
+        self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
         self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
@@ -131,7 +147,24 @@ class AbstractFeatureGenerator:
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
             X_features = self.fix_categoricals_for_sklearn(X_features=X_features)
         for column in self.features_categorical_final:
-            self.features_categorical_final_mapping[column] = X_features[column].cat.categories  # dict(enumerate(X_features[column].cat.categories))
+            self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
+
+        if self.minimize_categorical_memory_usage_flag:
+            X_features = self.minimize_categorical_memory_usage(X_features=X_features)
+        if self.features_vectorizers:
+            X_features = self.minimize_ngram_memory_usage(X_features=X_features)
+        if self.features_binned:
+            X_features = self.minimize_binned_memory_usage(X_features=X_features)
+
+        self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
+        self.post_memory_usage_per_row = self.post_memory_usage / X_len
+
+        available_mem = psutil.virtual_memory().available
+        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
+
+        if post_memory_usage_percent > 0.15:
+            logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+
         X_features.index = X_index
         self.features = list(X_features.columns)
         self.feature_type_family_generated['int'] += self.features_binned
@@ -175,6 +208,12 @@ class AbstractFeatureGenerator:
         X_features = X_features[self.features]
         for column in self.features_categorical_final:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
+        if self.minimize_categorical_memory_usage_flag:
+            X_features = self.minimize_categorical_memory_usage(X_features=X_features)
+        if self.features_vectorizers:
+            X_features = self.minimize_ngram_memory_usage(X_features=X_features)
+        if self.features_binned:
+            X_features = self.minimize_binned_memory_usage(X_features=X_features)
         X_features.index = X_index
         return X_features
 
@@ -243,6 +282,17 @@ class AbstractFeatureGenerator:
 
             bin_mapping[column] = interval_index
         return bin_mapping
+
+    # TODO: Move this outside of here
+    # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
+    @staticmethod
+    def get_approximate_df_mem_usage(df, sample_ratio=0.2):
+        if sample_ratio >= 1:
+            return df.memory_usage(deep=True)
+        else:
+            num_rows = len(df)
+            num_rows_sample = math.ceil(sample_ratio * num_rows)
+            return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
 
     # TODO: Clean code
     # bins is a sorted int/float series, ascending=True
@@ -373,6 +423,23 @@ class AbstractFeatureGenerator:
         X = X.drop(feature, axis=1)
 
         return X
+
+    def minimize_ngram_memory_usage(self, X_features):
+        X_features[self.features_vectorizers] = np.clip(X_features[self.features_vectorizers], 0, 255).astype('uint8')
+        return X_features
+
+    def minimize_binned_memory_usage(self, X_features):
+        X_features[self.features_binned] = np.clip(X_features[self.features_binned], 0, 255).astype('uint8')
+        return X_features
+
+    # TODO: Compress further, uint16, etc.
+    # Warning: Performs in-place updates
+    def minimize_categorical_memory_usage(self, X_features):
+        cat_columns = X_features.select_dtypes('category').columns
+        for column in cat_columns:
+            new_categories = range(len(X_features[column].cat.categories.values))
+            X_features[column].cat.rename_categories(new_categories, inplace=True)
+        return X_features
 
     def fix_categoricals_for_sklearn(self, X_features):
         for column in self.features_categorical_final:

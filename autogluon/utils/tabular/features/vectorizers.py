@@ -1,10 +1,11 @@
 from collections import Counter
 
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
 
 def vectorizer_auto_ml_default():
-    return CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=30000)
+    return CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
 
 
 def get_ngram_freq(vectorizer, transform_matrix):
