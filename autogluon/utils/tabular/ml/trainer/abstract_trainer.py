@@ -771,7 +771,7 @@ class AbstractTrainer:
             return model_pred_proba_dict
 
     # TODO: Remove get_inputs_to_stacker eventually, move logic internally into this function instead
-    def get_inputs_to_stacker_v2(self, X, base_models, model_pred_proba_dict=None, fit=False):
+    def get_inputs_to_stacker_v2(self, X, base_models, model_pred_proba_dict=None, fit=False, use_orig_features=True):
         if not fit:
             model_pred_proba_dict = self.get_model_pred_proba_dict(X=X, models=base_models, model_pred_proba_dict=model_pred_proba_dict)
             model_pred_proba_list = [model_pred_proba_dict[model] for model in base_models]
@@ -780,6 +780,8 @@ class AbstractTrainer:
             model_pred_proba_list = None
 
         X_stacker_input = self.get_inputs_to_stacker(X=X, level_start=0, level_end=1, model_levels={0: base_models}, y_pred_probas=model_pred_proba_list, fit=fit)
+        if not use_orig_features:
+            X_stacker_input = X_stacker_input.drop(columns=X.columns)
         return X_stacker_input
 
     # TODO: Legacy code, still used during training because it is technically slightly faster and more memory efficient than get_model_pred_proba_dict()
@@ -797,8 +799,10 @@ class AbstractTrainer:
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
             X = dummy_stacker.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=True)
         elif y_pred_probas is not None:
+            if y_pred_probas == []:
+                return X
             dummy_stacker = self._get_dummy_stacker(level=level_end, model_levels=model_levels, use_orig_features=True)
-            X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas)
+            X_stacker = dummy_stacker.pred_probas_to_df(pred_proba=y_pred_probas, index=X.index)
             if dummy_stacker.use_orig_features:
                 if level_start >= 1:
                     dummy_stacker_start = self._get_dummy_stacker(level=level_start, model_levels=model_levels, use_orig_features=True)

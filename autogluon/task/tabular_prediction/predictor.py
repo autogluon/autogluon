@@ -366,7 +366,7 @@ class TabularPredictor(BasePredictor):
             print("*** End of fit() summary ***")
         return results
 
-    def transform_features(self, dataset=None, model=None, base_models=None):
+    def transform_features(self, dataset=None, model=None, base_models=None, return_original_features=True):
         """
         Transforms dataset features through the AutoGluon feature generator.
         This is useful to gain an understanding of how AutoGluon interprets the dataset features.
@@ -412,6 +412,10 @@ class TabularPredictor(BasePredictor):
             Valid models are listed in this `predictor` by calling `predictor.model_names`.
             If a stacker model S exists with `base_models=M`, then setting `base_models=M` is equivalent to setting `model=S`.
             `model=None` is a requirement when specifying `base_models`.
+        return_original_features : bool, default = True
+            Whether to return the original features.
+            If False, only returns the additional output columns from specifying `model` or `base_models`.
+                This is useful to set to False if the intent is to use the output as input to further stacker models without the original features.
 
         Returns
         -------
@@ -431,17 +435,7 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        # TODO: Make this index fix inside of learner/trainer once the defect is identified. For now, this resolves the issue.
-        if dataset is not None:
-            original_indices = copy.deepcopy(dataset.index)
-            dataset = dataset.reset_index(drop=True)
-        else:
-            original_indices = None
-
-        dataset_transformed = self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models)
-        if original_indices is not None:
-            dataset_transformed.index = original_indices
-        return dataset_transformed
+        return self._learner.get_inputs_to_stacker(dataset=dataset, model=model, base_models=base_models, use_orig_features=return_original_features)
 
     # TODO: Add support for DataFrame input and support for DataFrame output
     #  Add support for retaining DataFrame/Series indices in output

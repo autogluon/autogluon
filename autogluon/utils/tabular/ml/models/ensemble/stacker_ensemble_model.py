@@ -91,8 +91,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                         base_model = self.load_base_model(base_model_name)
                         y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
-                X_stacker = self.pred_probas_to_df(X_stacker)
-                X_stacker.index = X.index
+                X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
                 if self.use_orig_features:
                     X = pd.concat([X_stacker, X], axis=1)
                 else:
@@ -103,12 +102,14 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             X = super().preprocess(X, model=model)
         return X
 
-    def pred_probas_to_df(self, pred_proba: list) -> pd.DataFrame:
+    def pred_probas_to_df(self, pred_proba: list, index=None) -> pd.DataFrame:
         if self.problem_type == MULTICLASS:
             pred_proba = np.concatenate(pred_proba, axis=1)
             pred_proba = pd.DataFrame(pred_proba, columns=self.stack_columns)
         else:
             pred_proba = pd.DataFrame(data=np.asarray(pred_proba).T, columns=self.stack_columns)
+        if index is not None:
+            pred_proba.set_index(index, inplace=True)
         return pred_proba
 
     def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, compute_base_preds=True, time_limit=None, **kwargs):
