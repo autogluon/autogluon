@@ -437,7 +437,7 @@ class AbstractFeatureGenerator:
     def minimize_categorical_memory_usage(self, X_features):
         cat_columns = X_features.select_dtypes('category').columns
         for column in cat_columns:
-            new_categories = range(len(X_features[column].cat.categories.values))
+            new_categories = list(range(len(X_features[column].cat.categories.values)))
             X_features[column].cat.rename_categories(new_categories, inplace=True)
         return X_features
 
