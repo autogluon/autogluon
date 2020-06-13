@@ -19,7 +19,6 @@ def get_default_searchspace(problem_type, num_classes=None):
 def get_searchspace_multiclass_baseline(num_classes):
     params = {
         'objective': 'multiclass',
-        'metric': 'multi_error,multi_logloss',
         'num_classes': num_classes,
         'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.75, upper=1.0, default=1.0),
@@ -39,7 +38,6 @@ def get_searchspace_multiclass_baseline(num_classes):
 def get_searchspace_binary_baseline():
     params = {
         'objective': 'binary',
-        'metric': 'binary_logloss,binary_error',
         'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.75, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=30, default=20),
@@ -56,7 +54,6 @@ def get_searchspace_binary_baseline():
 def get_searchspace_regression_baseline():
     params = {
         'objective': 'regression',
-        'metric': 'l2',
         'learning_rate': Real(lower=5e-3, upper=0.2, default=0.1, log=True),
         'feature_fraction': Real(lower=0.75, upper=1.0, default=1.0),
         'min_data_in_leaf': Int(lower=2, upper=30, default=20),
