@@ -14,3 +14,5 @@ REFIT_FULL_SUFFIX = "_FULL"  # suffix appended to model name for refit_single_fu
 # AG_ARGS variables are key names in model hyperparameters to dictionaries of custom AutoGluon arguments.
 AG_ARGS = '_ag_args'  # Contains arguments to control model name, model priority, and the valid configurations which it can be used in.
 AG_ARGS_FIT = '_ag_args_fit'  # Contains arguments that impact model training, such as early stopping rounds, #cores, #gpus, max time limit, max memory usage  # TODO
+
+OBJECTIVES_TO_NORMALIZE = ['log_loss', 'pac_score', 'soft_log_loss']  # do not like predicted probabilities =0

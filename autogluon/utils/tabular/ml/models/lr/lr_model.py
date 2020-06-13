@@ -138,9 +138,9 @@ class LinearModel(AbstractModel):
 
         self.model = model.fit(X_train, Y_train)
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
-        return super().predict_proba(X, preprocess=False)
+        return super()._predict_proba(X, preprocess=False)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)

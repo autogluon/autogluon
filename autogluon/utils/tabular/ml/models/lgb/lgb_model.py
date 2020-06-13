@@ -22,6 +22,7 @@ from ....utils.savers import save_pkl
 from .....try_import import try_import_lightgbm
 from ......core import Int, Space
 
+
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class LGBModel(AbstractModel):
         self.model = lgb.train(**train_params)
         self.params_trained['num_boost_round'] = self.model.best_iteration
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
         if self.problem_type == REGRESSION:

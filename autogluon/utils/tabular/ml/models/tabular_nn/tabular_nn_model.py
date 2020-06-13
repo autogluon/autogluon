@@ -26,7 +26,7 @@ from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from ....metrics import log_loss
+from ....metrics import log_loss, roc_auc
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
 from .tabular_nn_dataset import TabularNNDataset
 from .embednet import EmbedNet
@@ -80,7 +80,6 @@ class TabularNeuralNetModel(AbstractModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.eval_metric_name = self.stopping_metric.name
         self.feature_types_metadata = None
         self.types_of_features = None
         self.feature_arraycol_map = None
@@ -96,6 +95,10 @@ class TabularNeuralNetModel(AbstractModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
+        if self.stopping_metric is not None and self.objective_func == roc_auc and self.stopping_metric == log_loss:
+            self.stopping_metric = roc_auc  # NN is overconfident so early stopping with logloss can halt training too quick
+
+        self.eval_metric_name = self.stopping_metric.name
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
@@ -380,7 +383,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.params_trained['num_epochs'] = best_val_epoch
         return
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         """ To align predict wiht abstract_model API.
             Preprocess here only refers to feature processing stesp done by all AbstractModel objects,
             not tabularNN-specific preprocessing steps.
@@ -426,25 +429,11 @@ class TabularNeuralNetModel(AbstractModel):
             preds[i:(i+batch_size)] = preds_batch
             i = i+batch_size
         if self.problem_type == REGRESSION or not predict_proba:
-            return preds.asnumpy().flatten() # return 1D numpy array
+            return preds.asnumpy().flatten()  # return 1D numpy array
         elif self.problem_type == BINARY and predict_proba:
-            preds = preds[:,1].asnumpy() # for binary problems, only return P(Y==+1)
-            if self.stopping_metric == log_loss or self.objective_func == log_loss:
-                # Ensure nonzero predicted probabilities under log-loss:
-                min_pred = 0.0
-                max_pred = 1.0
-                preds =  EPS + ((1 - 2*EPS)/(max_pred - min_pred)) * (preds - min_pred)
-            return preds
-        elif (predict_proba and (self.problem_type == MULTICLASS or self.problem_type == SOFTCLASS) and
-              (self.stopping_metric == log_loss or self.objective_func == log_loss)):
-            # Ensure nonzero predicted probabilities under log-loss:
-            preds = preds.asnumpy()
-            most_negative_rowvals = np.clip(np.min(preds, axis=1), a_min=None, a_max=0)
-            preds = preds - most_negative_rowvals[:,None] # ensure nonnegative rows
-            preds = np.clip(preds, a_min = EPS, a_max = None) # ensure no zeros
-            return preds / preds.sum(axis=1, keepdims=1) # renormalize
+            return preds[:,1].asnumpy()  # for binary problems, only return P(Y==+1)
 
-        return preds.asnumpy() # return 2D numpy array
+        return preds.asnumpy()  # return 2D numpy array
 
     def generate_datasets(self, X_train, y_train, params, X_test=None, y_test=None):
         impute_strategy = params['proc.impute_strategy']
