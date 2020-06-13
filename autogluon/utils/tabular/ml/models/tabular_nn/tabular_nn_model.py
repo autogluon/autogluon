@@ -17,7 +17,7 @@ from gluoncv.utils import LRSequential, LRScheduler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, QuantileTransformer  # PowerTransformer
+from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
 from ......core import Space
 from ......utils import try_import_mxboard
@@ -491,7 +491,6 @@ class TabularNeuralNetModel(AbstractModel):
         if (self.processor is None or self.types_of_features is None
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
-        df = self.ensure_onehot_object(df)
         df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
         return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 batch_size=batch_size, num_dataloading_workers=num_dataloading_workers,
@@ -520,7 +519,6 @@ class TabularNeuralNetModel(AbstractModel):
         logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
         logger.log(15, json.dumps(self.types_of_features, indent=4))
         logger.log(15, "\n")
-        df = self.ensure_onehot_object(df)
         self.processor = self._create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels)
         df = self.processor.fit_transform(df) # 2D numpy array
         self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels) # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
@@ -570,15 +568,9 @@ class TabularNeuralNetModel(AbstractModel):
             raise ValueError("Unknown optimizer specified: %s" % params['optimizer'])
         return optimizer
 
-    def ensure_onehot_object(self, df):
-        """ Converts all numerical one-hot columns to object-dtype.
-            Note: self.types_of_features must already exist!
-        """
-        new_df = df.copy() # To avoid SettingWithCopyWarning
-        for feature in self.types_of_features['onehot']:
-            if df[feature].dtype != 'object':
-                new_df.loc[:,feature] = df.loc[:,feature].astype(str)
-        return new_df
+    @staticmethod
+    def convert_df_dtype_to_str(df):
+        return df.astype(str)
 
     def __get_feature_type_if_present(self, feature_type):
         """ Returns crude categorization of feature types """
@@ -703,6 +695,8 @@ class TabularNeuralNetModel(AbstractModel):
             transformers.append( ('skewed', power_transformer, skewed_features) )
         if len(onehot_features) > 0:
             onehot_transformer = Pipeline(steps=[
+                # TODO: Consider avoiding converting to string for improved memory efficiency
+                ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
                 ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))]) # test-time unknown values will be encoded as all zeros vector
             transformers.append( ('onehot', onehot_transformer, onehot_features) )
