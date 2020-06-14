@@ -300,7 +300,6 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         default_options['opt_skip_num_max_resource'] = False
         default_options['gp_resource_kernel'] = 'matern52'
         default_options['resource_acq'] = 'bohb'
-        default_options['num_init_random'] = 10
 
     constraints = {
         'random_seed': Integer(),
