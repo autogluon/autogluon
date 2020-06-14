@@ -192,9 +192,9 @@ def test_bayesopt_fifo():
     myscheduler.run()
     myscheduler.join_jobs()
     # Not really needed...
-    results_df = process_training_history(
-        myscheduler.training_history.copy(),
-        start_timestamp=myscheduler._start_time)
+    #results_df = process_training_history(
+    #    myscheduler.training_history.copy(),
+    #    start_timestamp=myscheduler._start_time)
 
 
 def test_bayesopt_hyperband(sch_type='stopping'):
@@ -226,9 +226,9 @@ def test_bayesopt_hyperband(sch_type='stopping'):
     myscheduler.run()
     myscheduler.join_jobs()
     # Not really needed...
-    results_df = process_training_history(
-        myscheduler.training_history.copy(),
-        start_timestamp=myscheduler._start_time)
+    #results_df = process_training_history(
+    #    myscheduler.training_history.copy(),
+    #    start_timestamp=myscheduler._start_time)
 
 
 if __name__ == "__main__":

@@ -306,11 +306,15 @@ resources = dict(num_cpus=NUM_CPUS, num_gpus=0)
 ```
 
 ```{.python .input  n=39}
+search_options = {
+    'num_init_random': 2,
+    'debug_log': True}
 if SCHEDULER == 'fifo': 
     myscheduler = ag.scheduler.FIFOScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
+        search_options=search_options,
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME)
@@ -326,6 +330,7 @@ else:
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
+        search_options=search_options,
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,
@@ -384,18 +389,8 @@ some tips which may come useful.
 ### Logging the Search Progress
 
 First, it is a good idea in general to switch on `debug_log`, which outputs
-useful information about the search progress:
-
-```{.python .input  n=50}
-myscheduler = ag.scheduler.FIFOScheduler(
-    run_mlp_openml,
-    resource=resources,
-    searcher=SEARCHER,
-    search_options={'debug_log': True},
-    time_out=120,
-    time_attr=RESOURCE_ATTR_NAME,
-    reward_attr=REWARD_ATTR_NAME)
-```
+useful information about the search progress. This is already done in the
+example above.
 
 The outputs show which configurations are chosen, stopped, or promoted. For
 BO and BOHB, a range of information is displayed for every `get_config`
