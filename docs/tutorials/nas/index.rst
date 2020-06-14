@@ -24,5 +24,5 @@ state-of-the-art built-in methods.
    :hidden:
 
    rl_searcher
-   enas_mnist
+   enas_proxylessnas
 
