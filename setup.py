@@ -57,7 +57,7 @@ requirements = [
     'lightgbm>=2.3.0,<3.0',
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0',
-    'scikit-learn>=0.20.0,<0.23',
+    'scikit-learn>=0.22.0,<0.23',
     'networkx>=2.3,<3.0'
 ]
 
