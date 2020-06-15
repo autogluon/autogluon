@@ -1,5 +1,4 @@
 import os
-import openml
 import numpy as np
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
@@ -21,6 +20,7 @@ def load_and_split_openml_data(
         CI system (downloading from OpenML fails too often)
     :return: X_train, X_valid, y_train, y_valid, n_classes
     """
+    import openml
     if not download_from_openml:
         # We download the data from the AutoGluon S3 bucket, avoiding a
         # download from OpenML, which fails too often
