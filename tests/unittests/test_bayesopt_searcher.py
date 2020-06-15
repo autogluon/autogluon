@@ -1,42 +1,19 @@
 import time
 import multiprocessing # to count the number of CPUs available
-
-import openml
-import numpy as np
 import pandas as pd
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
 import mxnet as mx
 from mxnet import gluon, autograd
 from mxnet.gluon import nn
 import autogluon as ag
 
+from autogluon.searcher.bayesopt.autogluon.openml_download import \
+    load_and_split_openml_data
+
+
 OPENML_TASK_ID = 6                # describes the problem we will tackle
 RATIO_TRAIN_VALID = 0.33          # split of the training data used for validation
 RESOURCE_ATTR_NAME = 'epoch'      # how do we measure resources   (will become clearer further)
 REWARD_ATTR_NAME = 'objective'    # how do we measure performance (will become clearer further)
-
-# TODO: Load data from AutoGluon S3 bucket, avoid openml dependency!
-def load_data():
-    openml.config.set_cache_directory("./")
-    task = openml.tasks.get_task(OPENML_TASK_ID)
-    n_classes = len(task.class_labels)
-    train_indices, test_indices = task.get_train_test_split_indices()
-    X, y = task.get_X_and_y()
-    # Basic missing values imputation
-    imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
-    X = imputer.fit_transform(X)
-    X_train = X[train_indices]
-    y_train = y[train_indices]
-    # Train/validation split and standardization of inputs
-    X_train, X_valid, y_train, y_valid = train_test_split(
-        X_train, y_train, random_state=1, test_size=RATIO_TRAIN_VALID)
-    mean = np.mean(X_train, axis=0)
-    std = np.std(X_train, axis=0)
-    X_train = (X_train - mean) / (std + 1e-10)
-    X_valid = (X_valid - mean) / (std + 1e-10)
-
-    return X_train, X_valid, y_train, y_valid, n_classes
 
 
 def create_train_fn(X_train, X_valid, y_train, y_valid, n_classes, epochs=9):
@@ -172,7 +149,8 @@ def test_bayesopt_fifo():
     num_cpus = multiprocessing.cpu_count()
     resources = dict(num_cpus=num_cpus, num_gpus=0)
     # Load data and create evaluation function
-    X_train, X_valid, y_train, y_valid, n_classes = load_data()
+    X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
+        OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
     run_mlp_openml = create_train_fn(
         X_train, X_valid, y_train, y_valid, n_classes)
     # Create scheduler and searcher:
@@ -202,7 +180,8 @@ def test_bayesopt_hyperband(sch_type='stopping'):
     num_cpus = multiprocessing.cpu_count()
     resources = dict(num_cpus=num_cpus, num_gpus=0)
     # Load data and create evaluation function
-    X_train, X_valid, y_train, y_valid, n_classes = load_data()
+    X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
+        OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
     run_mlp_openml = create_train_fn(
         X_train, X_valid, y_train, y_valid, n_classes)
     # Create scheduler and searcher:
