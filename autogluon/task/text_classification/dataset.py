@@ -6,11 +6,6 @@ import pandas as pd
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
 from ...utils.try_import import try_import_gluonnlp
-
-nlp = try_import_gluonnlp()
-
-from gluonnlp.data import GlueCoLA, GlueSST2, GlueSTSB, GlueMRPC
-from gluonnlp.data import GlueQQP, GlueRTE, GlueMNLI, GlueQNLI, GlueWNLI
 from ...core import *
 from ...utils.dataset import get_split_samplers, SampledDataset
 
@@ -124,7 +119,8 @@ class ToySSTTask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        dataset = GlueSST2(segment=segment)
+        nlp = try_import_gluonnlp()
+        dataset = nlp.data.GlueSST2(segment=segment)
         sampler, _ = get_split_samplers(dataset, split_ratio=0.01)
         return SampledDataset(dataset, sampler)
 
@@ -324,7 +320,8 @@ class MRPCTask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueMRPC(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueMRPC(segment=segment)
 
 class QQPTask(AbstractGlueTask):
     """The Quora Question Pairs task on GLUE benchmark."""
@@ -344,7 +341,8 @@ class QQPTask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueQQP(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueQQP(segment=segment)
 
 
 class RTETask(AbstractGlueTask):
@@ -363,7 +361,8 @@ class RTETask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueRTE(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueRTE(segment=segment)
 
 class QNLITask(AbstractGlueTask):
     """The SQuAD NLI task on GLUE benchmark."""
@@ -381,7 +380,8 @@ class QNLITask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueQNLI(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueQNLI(segment=segment)
 
 class STSBTask(AbstractGlueTask):
     """The Sentence Textual Similarity Benchmark task on GLUE benchmark."""
@@ -399,7 +399,8 @@ class STSBTask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueSTSB(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueSTSB(segment=segment)
 
 class CoLATask(AbstractGlueTask):
     """The Warstdadt acceptability task on GLUE benchmark."""
@@ -417,7 +418,8 @@ class CoLATask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueCoLA(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueCoLA(segment=segment)
 
 class SSTTask(AbstractGlueTask):
     """The Stanford Sentiment Treebank task on GLUE benchmark."""
@@ -435,7 +437,8 @@ class SSTTask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'train', 'dev', 'test'.
         """
-        return GlueSST2(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueSST2(segment=segment)
 
 class WNLITask(AbstractGlueTask):
     """The Winograd NLI task on GLUE benchmark."""
@@ -453,7 +456,8 @@ class WNLITask(AbstractGlueTask):
         segment : str, default 'train'
             Dataset segments. Options are 'dev', 'test', 'train'
         """
-        return GlueWNLI(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueWNLI(segment=segment)
 
 class MNLITask(AbstractGlueTask):
     """The Multi-Genre Natural Language Inference task on GLUE benchmark."""
@@ -472,7 +476,8 @@ class MNLITask(AbstractGlueTask):
             Dataset segments. Options are 'dev_matched', 'dev_mismatched', 'test_matched',
             'test_mismatched', 'train'
         """
-        return GlueMNLI(segment=segment)
+        nlp = try_import_gluonnlp()
+        return nlp.data.GlueMNLI(segment=segment)
 
     def dataset_dev(self):
         """Get the dev segment of the dataset for the task.

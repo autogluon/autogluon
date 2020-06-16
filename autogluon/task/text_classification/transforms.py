@@ -17,7 +17,8 @@
 __all__ = ['BERTDatasetTransform']
 
 import numpy as np
-from gluonnlp.data import BERTSentenceTransform
+from ...utils.try_import import try_import_gluonnlp
+
 
 class BERTDatasetTransform:
     """Dataset transformation for BERT-style sentence classification or regression.
@@ -62,7 +63,8 @@ class BERTDatasetTransform:
             if label_alias:
                 for key in label_alias:
                     self._label_map[key] = self._label_map[label_alias[key]]
-        self._bert_xform = BERTSentenceTransform(
+        nlp = try_import_gluonnlp()
+        self._bert_xform = nlp.data.BERTSentenceTransform(
             tokenizer, max_seq_length, pad=pad, pair=pair)
 
     def __call__(self, line):
