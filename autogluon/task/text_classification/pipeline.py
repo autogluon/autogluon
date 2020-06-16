@@ -106,6 +106,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function
+    nlp = try_import_gluonnlp()
     logger = logging.getLogger(__name__)
     if args.verbose:
         logger.setLevel(logging.INFO)
