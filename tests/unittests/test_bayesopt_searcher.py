@@ -144,73 +144,64 @@ def process_training_history(task_dicts, start_timestamp,
     return result
 
 
+def run_bayesopt_test(sch_type):
+    # Each job uses all available CPUs:
+    num_cpus = multiprocessing.cpu_count()
+    resources = dict(num_cpus=num_cpus, num_gpus=0)
+    # Load data and create evaluation function
+    X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
+        OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
+    run_mlp_openml = create_train_fn(
+        X_train, X_valid, y_train, y_valid, n_classes)
+    # Create scheduler and searcher:
+    # First two get_config are random, the next three should use BO
+    search_options = {
+        'num_init_random': 2,
+        'debug_log': True}
+    if sch_type == 'fifo':
+        myscheduler = ag.scheduler.FIFOScheduler(
+            run_mlp_openml,
+            resource=resources,
+            searcher='bayesopt',
+            search_options=search_options,
+            num_trials=5,
+            time_attr=RESOURCE_ATTR_NAME,
+            reward_attr=REWARD_ATTR_NAME)
+    else:
+        myscheduler = ag.scheduler.HyperbandScheduler(
+            run_mlp_openml,
+            resource=resources,
+            searcher='bayesopt',
+            search_options=search_options,
+            num_trials=8,
+            time_attr=RESOURCE_ATTR_NAME,
+            reward_attr=REWARD_ATTR_NAME,
+            type=sch_type,
+            grace_period=1,
+            reduction_factor=3,
+            brackets=1)
+    # Run HPO experiment
+    myscheduler.run()
+    myscheduler.join_jobs()
+    # Not really needed...
+    #results_df = process_training_history(
+    #    myscheduler.training_history.copy(),
+    #    start_timestamp=myscheduler._start_time)
+
+
 def test_bayesopt_fifo():
-    # Each job uses all available CPUs:
-    num_cpus = multiprocessing.cpu_count()
-    resources = dict(num_cpus=num_cpus, num_gpus=0)
-    # Load data and create evaluation function
-    X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
-        OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
-    run_mlp_openml = create_train_fn(
-        X_train, X_valid, y_train, y_valid, n_classes)
-    # Create scheduler and searcher:
-    # First two get_config are random, the next three should use BO
-    search_options = {
-        'num_init_random': 2,
-        'debug_log': True}
-    myscheduler = ag.scheduler.FIFOScheduler(
-        run_mlp_openml,
-        resource=resources,
-        searcher='bayesopt',
-        search_options=search_options,
-        num_trials=5,
-        time_attr=RESOURCE_ATTR_NAME,
-        reward_attr=REWARD_ATTR_NAME)
-    # Run HPO experiment
-    myscheduler.run()
-    myscheduler.join_jobs()
-    # Not really needed...
-    #results_df = process_training_history(
-    #    myscheduler.training_history.copy(),
-    #    start_timestamp=myscheduler._start_time)
+    run_bayesopt_test('fifo')
 
 
-def test_bayesopt_hyperband(sch_type='stopping'):
-    # Each job uses all available CPUs:
-    num_cpus = multiprocessing.cpu_count()
-    resources = dict(num_cpus=num_cpus, num_gpus=0)
-    # Load data and create evaluation function
-    X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
-        OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
-    run_mlp_openml = create_train_fn(
-        X_train, X_valid, y_train, y_valid, n_classes)
-    # Create scheduler and searcher:
-    # First two get_config are random, the next three should use BO
-    search_options = {
-        'num_init_random': 2,
-        'debug_log': True}
-    myscheduler = ag.scheduler.HyperbandScheduler(
-        run_mlp_openml,
-        resource=resources,
-        searcher='bayesopt',
-        search_options=search_options,
-        num_trials=8,
-        time_attr=RESOURCE_ATTR_NAME,
-        reward_attr=REWARD_ATTR_NAME,
-        type=sch_type,
-        grace_period=1,
-        reduction_factor=3,
-        brackets=1)
-    # Run HPO experiment
-    myscheduler.run()
-    myscheduler.join_jobs()
-    # Not really needed...
-    #results_df = process_training_history(
-    #    myscheduler.training_history.copy(),
-    #    start_timestamp=myscheduler._start_time)
+def test_bayesopt_hyperband_stopping():
+    run_bayesopt_test('stopping')
+
+
+def test_bayesopt_hyperband_promotion():
+    run_bayesopt_test('promotion')
 
 
 if __name__ == "__main__":
     test_bayesopt_fifo()
-    test_bayesopt_hyperband('stopping')
-    test_bayesopt_hyperband('promotion')
+    test_bayesopt_hyperband_stopping()
+    test_bayesopt_hyperband_promotion()
