@@ -63,5 +63,5 @@ def try_import_gluonnlp():
         raise ImportError(
             "Unable to import dependency gluonnlp. The NLP model won't be available "
             "without installing gluonnlp. "
-            "A quick tip is to install via `pip install gluonnlp`. ")
+            "A quick tip is to install via `pip install gluonnlp==0.8.1`. ")
     return gluonnlp
