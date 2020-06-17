@@ -9,7 +9,7 @@ We adopt the task of Text Classification as a running example to illustrate basi
 The AutoGluon Text functionality depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 
 Thus, in order to use AutoGluon-Text, you will need to install GluonNLP:
 
-```{.bash .input}
+```bash
 pip install gluonnlp==0.8.1
 ``` 
 
