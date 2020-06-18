@@ -1,11 +1,8 @@
 from typing import AnyStr
 
-import gluonnlp as nlp
 import mxnet as mx
 from mxnet import gluon
 from mxnet.gluon import Block, HybridBlock, nn
-import gluonnlp as nlp
-
 from .dataset import *
 
 
@@ -74,7 +71,7 @@ class RoBERTaClassifier(HybridBlock):
     classification.
     Parameters
     ----------
-    bert: RoBERTaModel
+    roberta: RoBERTaModel
         The RoBERTa model.
     num_classes : int, default is 2
         The number of target classes.
