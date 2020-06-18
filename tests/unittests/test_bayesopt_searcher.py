@@ -151,6 +151,13 @@ def run_bayesopt_test(sch_type):
     # Load data and create evaluation function
     X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
         OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
+    # Limit sizes for this test:
+    n_train = min(X_train.shape[0], 100)
+    X_train = X_train[:n_train]
+    y_train = y_train[:n_train]
+    n_valid = min(X_valid.shape[0], 100)
+    X_valid = X_valid[:n_valid]
+    y_valid = y_valid[:n_valid]
     run_mlp_openml = create_train_fn(
         X_train, X_valid, y_train, y_valid, n_classes)
     # Create scheduler and searcher:
@@ -173,7 +180,7 @@ def run_bayesopt_test(sch_type):
             resource=resources,
             searcher='bayesopt',
             search_options=search_options,
-            num_trials=8,
+            num_trials=5,
             time_attr=RESOURCE_ATTR_NAME,
             reward_attr=REWARD_ATTR_NAME,
             type=sch_type,
@@ -187,6 +194,8 @@ def run_bayesopt_test(sch_type):
     #results_df = process_training_history(
     #    myscheduler.training_history.copy(),
     #    start_timestamp=myscheduler._start_time)
+    # Force synchronization
+    mx.nd.waitall()
 
 
 def test_bayesopt_fifo():
