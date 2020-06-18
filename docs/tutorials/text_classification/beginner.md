@@ -1,11 +1,19 @@
 # Text Classification - Quick Start
 :label:`sec_textquick`
 
-Note: `TextClassification` is in preview mode and is not feature complete. While the tutorial described below is functional, using `TextClassification` on custom datasets is not yet supported. For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.
+Note: `TextClassification` is in preview mode and is not feature complete. While the tutorial described below is functional, using `TextClassification` on custom datasets is not yet supported.
+For an alternative, text data can be passed to `TabularPrediction` in tabular format which has text feature support.
 
 We adopt the task of Text Classification as a running example to illustrate basic usage of AutoGluon’s NLP capability.
 
-In this tutorial, we are using sentiment analysis as a text classification example. We will load sentences and the corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. Different from traditional machine learning where we need to manually define the neural network, and specify the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
+The AutoGluon Text functionality depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 
+Thus, in order to use AutoGluon-Text, you will need to install GluonNLP via `pip install gluonnlp==0.8.1`
+
+In this tutorial, we are using sentiment analysis as a text classification example. We will load sentences and the 
+corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. 
+Different from traditional machine learning where we need to manually define the neural network, and specify 
+the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, 
+AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
 
 We begin by specifying `TextClassification` as our task of interest:
 

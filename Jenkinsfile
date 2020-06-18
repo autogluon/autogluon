@@ -17,6 +17,7 @@ stage("Unit Test") {
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         export MXNET_ENGINE_TYPE=NaiveEngine
+        pip install --force-reinstall --upgrade gluonnlp==0.8.1
         pip install --upgrade --force-reinstall -e .
         pip install pytest
         python3 -m pytest --junitxml=results.xml --runslow tests
@@ -43,6 +44,7 @@ stage("Build Docs") {
         export AG_DOCS=1
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
+        pip install --force-reinstall --upgrade gluonnlp==0.8.1
         pip install --upgrade --force-reinstall -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then

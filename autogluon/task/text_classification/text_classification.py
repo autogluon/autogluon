@@ -1,7 +1,8 @@
 import logging
 
 import mxnet as mx
-import gluonnlp as nlp
+from ...utils.try_import import try_import_gluonnlp
+
 import copy
 
 from ...core import *
@@ -222,6 +223,7 @@ class TextClassification(BaseTask):
         args = sample_config(train_text_classification.args, results['best_config'])
         get_model_params = results.pop('get_model_args')
         get_model_params['ctx'] = mx.cpu(0)
+        nlp = try_import_gluonnlp()
         bert, _ = nlp.model.get_model(**get_model_params)
         model = get_network(bert, results.pop('class_labels'), 'roberta' in args.net)
         update_params(model, results.pop('model_params'))

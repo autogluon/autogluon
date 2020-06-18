@@ -1,4 +1,5 @@
-# Step 1: run the dataset downloading scripts
+# Step 1: Install GluonNLP + Run the dataset downloading scripts
+# pip install gluonnlp==0.8.1
 # sh download_dataset.sh
 
 # Step 2: run the following example script
