@@ -142,9 +142,10 @@ class CatboostModel(AbstractModel):
                 # Reduce sample iterations to avoid taking unreasonable amounts of time
                 num_sample_iter_max = max(round(num_sample_iter_max/2), 2)
             # Subsample columns to speed up training
-            params['colsample_bylevel'] = max(min(1.0, 1000 / num_features), 0.05)
-            logger.log(30, f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
-            logger.log(30, f'\tTo disable this functionality, explicitly specify \'colsample_bylevel\' in the model hyperparameters.')
+            if params.get('task_type', None) != 'GPU':  # RSM does not work on GPU
+                params['colsample_bylevel'] = max(min(1.0, 1000 / num_features), 0.05)
+                logger.log(30, f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
+                logger.log(30, f'\tTo disable this functionality, explicitly specify \'colsample_bylevel\' in the model hyperparameters.')
 
         if time_limit:
             time_left_start = time_limit - (time.time() - start_time)
