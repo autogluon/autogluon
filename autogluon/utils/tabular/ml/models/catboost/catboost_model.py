@@ -137,6 +137,15 @@ class CatboostModel(AbstractModel):
 
         params = self.params.copy()
         num_features = len(self.features)
+
+        if params.get('task_type', None) == 'GPU':
+            if 'colsample_bylevel' in params:
+                params.pop('colsample_bylevel')
+                logger.log(30, f'\t\'colsample_bylevel\' is not supported on GPU, using default value (Default = 1).')
+            if 'rsm' in params:
+                params.pop('rsm')
+                logger.log(30, f'\t\'rsm\' is not supported on GPU, using default value (Default = 1).')
+
         if self.problem_type == MULTICLASS and 'rsm' not in params and 'colsample_bylevel' not in params and num_features > 1000:
             if time_limit:
                 # Reduce sample iterations to avoid taking unreasonable amounts of time
