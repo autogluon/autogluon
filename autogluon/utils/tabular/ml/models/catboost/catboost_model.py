@@ -146,6 +146,9 @@ class CatboostModel(AbstractModel):
                 params['colsample_bylevel'] = max(min(1.0, 1000 / num_features), 0.05)
                 logger.log(30, f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
                 logger.log(30, f'\tTo disable this functionality, explicitly specify \'colsample_bylevel\' in the model hyperparameters.')
+            else:
+                params['colsample_bylevel'] = 1.0
+                logger.log(30, f'\t\'colsample_bylevel\' is not supported on GPU, using default value (Default = 1).')
 
         if time_limit:
             time_left_start = time_limit - (time.time() - start_time)
