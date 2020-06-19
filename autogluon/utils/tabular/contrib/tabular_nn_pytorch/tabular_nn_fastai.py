@@ -311,6 +311,7 @@ class NNFastAiTabularModel(AbstractModel):
         return get_default_searchspace(problem_type)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
+        # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
         # TODO that hyperparameter-tuning is not yet implemented
         self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
         hpo_model_performances = {self.name: self.score(X_test, Y_test)}
