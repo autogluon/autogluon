@@ -105,6 +105,7 @@ class Classifier(BasePredictor):
             Whether to plot the image being classified.
         set_prob_thresh: float
             Results with probability below threshold are set to 0 by default.
+
         Examples
         --------
         >>> from autogluon import ImageClassification as task
