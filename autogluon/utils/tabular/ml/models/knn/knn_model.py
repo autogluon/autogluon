@@ -42,7 +42,7 @@ class KNNModel(SKLearnModel):
         spaces = {}
         return spaces
 
-    def fit(self, X_train, Y_train, **kwargs):
+    def _fit(self, X_train, Y_train, **kwargs):
         X_train = self.preprocess(X_train)
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         model_size_bytes = sys.getsizeof(pickle.dumps(X_train, protocol=4))

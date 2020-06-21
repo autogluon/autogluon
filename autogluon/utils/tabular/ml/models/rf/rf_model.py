@@ -49,7 +49,7 @@ class RFModel(SKLearnModel):
         }
         return spaces
 
-    def fit(self, X_train, Y_train, time_limit=None, **kwargs):
+    def _fit(self, X_train, Y_train, time_limit=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()

@@ -102,7 +102,7 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        time_limits : int
+        time_limits : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
         output_directory : str, default = None
@@ -276,6 +276,12 @@ class TabularPrediction(BaseTask):
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
                         Reference the default hyperparameters for example usage of these options.
+                    _ag_args_fit: Dictionary of model fit customization options related to AutoGluon. These parameters affect stacker fold models, but not stacker models themselves.
+                        Valid keys:
+                            max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
+                            max_time_limit_ratio: (float, default=1.0) The ratio of given time_limit to use during model `fit()`. If `time_limit=10` and `max_time_limit_ratio=0.3`, time_limit would be changed to 3.
+                            max_time_limit: (float, default=None) Max time_limit value during model `fit()`. If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+                            min_time_limit: (float, default=0) Min time_limit value during model `fit()`. If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
@@ -337,8 +343,12 @@ class TabularPrediction(BaseTask):
             feature_generator_kwargs : dict, default={}
                 Keyword arguments to pass into the `FeatureGenerator` constructor.
             trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheritng from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
+            ag_args_fit : dict, default={}
+                Keyword arguments to pass to all models. See the `_ag_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `_ag_args_fit` parameter for all models in `hyperparameters`.
+                If a key in `_ag_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
@@ -443,6 +453,7 @@ class TabularPrediction(BaseTask):
             'feature_generator_type',
             'feature_generator_kwargs',
             'trainer_type',
+            'ag_args_fit',
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
@@ -512,6 +523,7 @@ class TabularPrediction(BaseTask):
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
+        ag_args_fit = kwargs.get('ag_args_fit', {})
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
@@ -585,7 +597,7 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 

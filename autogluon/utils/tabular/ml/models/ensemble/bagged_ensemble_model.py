@@ -84,7 +84,7 @@ class BaggedEnsembleModel(AbstractModel):
         model = self.load_child(model)
         return model.preprocess(X)
 
-    def fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
+    def _fit(self, X, y, k_fold=5, k_fold_start=0, k_fold_end=None, n_repeats=1, n_repeat_start=0, time_limit=None, **kwargs):
         if k_fold < 1:
             k_fold = 1
         if k_fold_end is None:

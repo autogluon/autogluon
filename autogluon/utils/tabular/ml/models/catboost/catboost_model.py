@@ -49,7 +49,7 @@ class CatboostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor

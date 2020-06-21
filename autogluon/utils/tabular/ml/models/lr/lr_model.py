@@ -114,7 +114,7 @@ class LinearModel(AbstractModel):
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
         hyperparams = self.params.copy()
 
         if self.problem_type == BINARY:

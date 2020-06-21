@@ -144,12 +144,14 @@ class AbstractModel:
             # TODO: Add more params
             # max_memory_usage=None,
             # max_disk_usage=None,
-            # max_time_limit_ratio=1.0,
-            # max_time_limit=None,
+            max_time_limit_ratio=1.0,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
+            max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
+            min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
             # num_cpu=None,
             # num_gpu=None,
             # ignore_hpo=False,
             # max_early_stopping_rounds=None,
+            # use_orig_features=True,  # TODO: Only for stackers
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -203,7 +205,30 @@ class AbstractModel:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
         return X
 
-    def fit(self, X_train, Y_train, **kwargs):
+    def _preprocess_fit_args(self, **kwargs):
+        time_limit = kwargs.get('time_limit', None)
+        max_time_limit_ratio = self.params_aux.get('max_time_limit_ratio', 1)
+        if time_limit is not None:
+            time_limit *= max_time_limit_ratio
+        max_time_limit = self.params_aux.get('max_time_limit', None)
+        if max_time_limit is not None:
+            if time_limit is None:
+                time_limit = max_time_limit
+            else:
+                time_limit = min(time_limit, max_time_limit)
+        min_time_limit = self.params_aux.get('min_time_limit', 0)
+        if min_time_limit is None:
+            time_limit = min_time_limit
+        elif time_limit is not None:
+            time_limit = max(time_limit, min_time_limit)
+        kwargs['time_limit'] = time_limit
+        return kwargs
+
+    def fit(self, **kwargs):
+        kwargs = self._preprocess_fit_args(**kwargs)
+        self._fit(**kwargs)
+
+    def _fit(self, X_train, Y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus
         X_train = self.preprocess(X_train)
         self.model = self.model.fit(X_train, Y_train)
