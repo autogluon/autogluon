@@ -19,8 +19,7 @@ from mxnet.gluon import nn
 
 # AutoGluon and HPO tools
 import autogluon as ag
-from autogluon.searcher.bayesopt.autogluon.openml_download import \
-    load_and_split_openml_data
+from autogluon.utils import load_and_split_openml_data
 ```
 
 Check the version of MxNet, you should be fine with version >= 1.5
