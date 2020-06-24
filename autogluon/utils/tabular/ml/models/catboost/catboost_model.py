@@ -22,16 +22,6 @@ logger = logging.getLogger(__name__)
 #  Question: Do we turn these into binary classification and then convert to multiclass output in Learner? This would make the most sense.
 # TODO: Consider having Catboost variant that converts all categoricals to numerical as done in RFModel, was showing improved results in some problems.
 class CatboostModel(AbstractModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        try_import_catboost()
-        from catboost import CatBoostClassifier, CatBoostRegressor
-        self.model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
-        if isinstance(self.params['eval_metric'], str):
-            self.metric_name = self.params['eval_metric']
-        else:
-            self.metric_name = type(self.params['eval_metric']).__name__
-
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
         for param, val in default_params.items():
@@ -60,7 +50,13 @@ class CatboostModel(AbstractModel):
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
     def fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
-        from catboost import Pool
+        try_import_catboost()
+        from catboost import CatBoostClassifier, CatBoostRegressor, Pool
+        model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
+        if isinstance(self.params['eval_metric'], str):
+            metric_name = self.params['eval_metric']
+        else:
+            metric_name = type(self.params['eval_metric']).__name__
         num_rows_train = len(X_train)
         num_cols_train = len(X_train.columns)
         if self.problem_type == MULTICLASS:
@@ -168,7 +164,7 @@ class CatboostModel(AbstractModel):
             params_init['iterations'] = num_sample_iter
             if train_dir is not None:
                 params_init['train_dir'] = train_dir
-            self.model = self.model_type(
+            self.model = model_type(
                 **params_init,
             )
             self.model.fit(
@@ -181,7 +177,7 @@ class CatboostModel(AbstractModel):
 
             init_model_tree_count = self.model.tree_count_
             init_model_best_iteration = self.model.get_best_iteration()
-            init_model_best_score = self.model.get_best_score()['validation'][self.metric_name]
+            init_model_best_score = self.model.get_best_score()['validation'][metric_name]
 
             time_left_end = time_limit - (time.time() - start_time)
             time_taken_per_iter = (time_left_start - time_left_end) / num_sample_iter
@@ -209,7 +205,7 @@ class CatboostModel(AbstractModel):
         if train_dir is not None:
             params_final['train_dir'] = train_dir
         if params_final['iterations'] > 0:
-            self.model = self.model_type(
+            self.model = model_type(
                 **params_final,
             )
 
@@ -224,7 +220,7 @@ class CatboostModel(AbstractModel):
             )
 
             if init_model is not None:
-                final_model_best_score = self.model.get_best_score()['validation'][self.metric_name]
+                final_model_best_score = self.model.get_best_score()['validation'][metric_name]
                 if self.stopping_metric._optimum > final_model_best_score:
                     if final_model_best_score > init_model_best_score:
                         best_iteration = init_model_tree_count + self.model.get_best_iteration()
