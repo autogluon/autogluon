@@ -34,6 +34,7 @@ class TabularPrediction(BaseTask):
     def load(output_directory, verbosity=2):
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
+        It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
         Parameters
         ----------
