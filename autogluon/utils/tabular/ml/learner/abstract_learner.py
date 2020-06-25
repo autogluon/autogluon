@@ -63,6 +63,12 @@ class AbstractLearner:
         self.time_fit_training = None
         self.time_limit = None
 
+        try:
+            from .....version import __version__
+            self.version = __version__
+        except:
+            self.version = None
+
     @property
     def class_labels(self):
         return self.label_cleaner.ordered_class_labels
@@ -546,6 +552,7 @@ class AbstractLearner:
             'time_fit_total': self.time_fit_total,
             'time_limit': self.time_limit,
             'random_seed': self.random_seed,
+            'version': self.version,
         }
 
         learner_info.update(trainer_info)
