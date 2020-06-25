@@ -1397,7 +1397,9 @@ class AbstractTrainer:
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
 
-    def _process_hyperparameters(self, hyperparameters):
+    def _process_hyperparameters(self, hyperparameters, ag_args_fit=None):
+        if ag_args_fit is None:
+            ag_args_fit = {}
         hyperparameters = copy.deepcopy(hyperparameters)
 
         has_levels = False
@@ -1421,11 +1423,21 @@ class AbstractTrainer:
                     valid_models = []
                     for candidate in candidate_models:
                         is_valid = True
+                        if '_ag_args' in candidate:  # Legacy keyword from autogluon<=0.0.11
+                            if AG_ARGS not in candidate:
+                                candidate[AG_ARGS] = candidate['_ag_args']
+                                candidate.pop('_ag_args')
                         if AG_ARGS in candidate:
                             model_valid_problem_types = candidate[AG_ARGS].get('problem_types', None)
                             if model_valid_problem_types is not None:
                                 if self.problem_type not in model_valid_problem_types:
                                     is_valid = False
+                        if ag_args_fit:
+                            model_ag_fit_args = candidate.get(AG_ARGS_FIT, {})
+                            for ag_fit_key in ag_args_fit:
+                                if ag_fit_key not in model_ag_fit_args:
+                                    model_ag_fit_args[ag_fit_key] = ag_args_fit[ag_fit_key]
+                            candidate[AG_ARGS_FIT] = model_ag_fit_args
                         if is_valid:
                             valid_models.append(candidate)
                     models_expanded += valid_models

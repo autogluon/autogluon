@@ -102,7 +102,7 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
-        time_limits : int
+        time_limits : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
         output_directory : str, default = None
@@ -226,18 +226,18 @@ class TabularPrediction(BaseTask):
                     'GBM': {},
                     'CAT': {},
                     'RF': [
-                        {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'XT': [
-                        {'criterion': 'gini', '_ag_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'entropy', '_ag_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
-                        {'criterion': 'mse', '_ag_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
+                        {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'entropy', 'AG_args': {'name_suffix': 'Entr', 'problem_types': ['binary', 'multiclass']}},
+                        {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE', 'problem_types': ['regression']}},
                     ],
                     'KNN': [
-                        {'weights': 'uniform', '_ag_args': {'name_suffix': 'Unif'}},
-                        {'weights': 'distance', '_ag_args': {'name_suffix': 'Dist'}},
+                        {'weights': 'uniform', 'AG_args': {'name_suffix': 'Unif'}},
+                        {'weights': 'distance', 'AG_args': {'name_suffix': 'Dist'}},
                     ],
                     'custom': ['GBM']
                 }
@@ -251,21 +251,17 @@ class TabularPrediction(BaseTask):
                      See also the CatBoost docs: https://catboost.ai/docs/concepts/parameter-tuning.html
                 RF: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'criterion' parameter will be overridden. Both 'gini' and 'entropy' are used automatically, training two models.
                 XT: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.ExtraTreesClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'criterion' parameter will be overridden. Both 'gini' and 'entropy' are used automatically, training two models.
                 KNN: See sklearn documentation: https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsClassifier.html
                     Note: Hyperparameter tuning is disabled for this model.
-                    Note: 'weights' parameter will be overridden. Both 'distance' and 'uniform' are used automatically, training two models.
                 LR: `autogluon/utils/tabular/ml/models/lr/hyperparameters/parameters.py`
-                    Note: a list of hyper-parameters dicts can be passed; each set will create different version of the model.
                     Note: Hyperparameter tuning is disabled for this model.
                     Note: 'penalty' parameter can be used for regression to specify regularization method: 'L1' and 'L2' values are supported.
                 Advanced functionality: Custom AutoGluon model arguments
                     These arguments are optional and can be specified in any model's hyperparameters.
-                        Example: `hyperparameters = {'RF': {..., '_ag_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
-                    _ag_args: Dictionary of customization options related to AutoGluon.
+                        Example: `hyperparameters = {'RF': {..., 'AG_args': {'name_suffix': 'CustomModelSuffix', 'disable_in_hpo': True}}`
+                    AG_args: Dictionary of customization options related to meta properties of the model such as its name, the order it is trained, and the problem types it is valid for.
                         Valid keys:
                             name: (str) The name of the model. This overrides AutoGluon's naming logic and all other name arguments if present.
                             name_main: (str) The main name of the model. In 'RandomForestClassifier', this is 'RandomForest'.
@@ -276,6 +272,15 @@ class TabularPrediction(BaseTask):
                             problem_types: (list) List of valid problem types for the model. `problem_types=['binary']` will result in the model only being trained if `problem_type` is 'binary'.
                             disable_in_hpo: (bool) If True, the model will only be trained if `hyperparameter_tune=False`.
                         Reference the default hyperparameters for example usage of these options.
+                    AG_args_fit: Dictionary of model fit customization options related to how and with what constraints the model is trained. These parameters affect stacker fold models, but not stacker models themselves.
+                        Clarification: `time_limit` is the internal time in seconds given to a particular model to train, which is dictated in part by the `time_limits` argument given during `fit()` but is not the same.
+                        Valid keys:
+                            max_memory_usage_ratio: (float, default=1.0) The ratio of memory usage relative to the default to allow before early stopping or killing the model. Values greater than 1.0 will be increasingly prone to out-of-memory errors.
+                            max_time_limit_ratio: (float, default=1.0) The ratio of the provided time_limit to use during model `fit()`. If `time_limit=10` and `max_time_limit_ratio=0.3`, time_limit would be changed to 3. Does not alter max_time_limit or min_time_limit values.
+                            max_time_limit: (float, default=None) Maximum amount of time to allow this model to train for (in sec). If the provided time_limit is greater than this value, it will be replaced by max_time_limit.
+                            min_time_limit: (float, default=0) Allow this model to train for at least this long (in sec), regardless of the time limit it would otherwise be granted.
+                                If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
+                                If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
 
         holdout_frac : float
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
@@ -337,8 +342,12 @@ class TabularPrediction(BaseTask):
             feature_generator_kwargs : dict, default={}
                 Keyword arguments to pass into the `FeatureGenerator` constructor.
             trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheritng from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
+            AG_args_fit : dict, default={}
+                Keyword arguments to pass to all models. See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
+                Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
+                If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
@@ -443,6 +452,7 @@ class TabularPrediction(BaseTask):
             'feature_generator_type',
             'feature_generator_kwargs',
             'trainer_type',
+            'AG_args_fit',
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
@@ -512,6 +522,7 @@ class TabularPrediction(BaseTask):
         feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
+        ag_args_fit = kwargs.get('AG_args_fit', {})
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
@@ -585,7 +596,7 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 
