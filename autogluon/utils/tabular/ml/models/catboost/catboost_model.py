@@ -197,7 +197,7 @@ class CatboostModel(AbstractModel):
             params_final['iterations'] = min(params['iterations'] - num_sample_iter, estimated_iters_in_time)
             if params_final['iterations'] > max_memory_iters - num_sample_iter:
                 if max_memory_iters - num_sample_iter <= 500:
-                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters - num_sample_iter, params_final['iterations']))
+                    logger.warning('\tWarning: CatBoost will be early stopped due to lack of memory, increase memory to enable full quality models, max training iterations changed to %s from %s' % (max_memory_iters, params_final['iterations'] + num_sample_iter))
                 params_final['iterations'] = max_memory_iters - num_sample_iter
         else:
             params_final = params.copy()
