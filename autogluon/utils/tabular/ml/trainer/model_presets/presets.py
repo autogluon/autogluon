@@ -75,7 +75,7 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add special optional AG args for base models
 # TODO: Consider making hyperparameters arg in fit() accept lists, concatenate hyperparameter sets together.
 # TODO: Consider adding special optional AG args for #cores,#gpus,num_early_stopping_iterations,etc.
-# TODO: Consider adding special optional AG args for max train time, max memory size, etc.
+# DONE: Consider adding special optional AG args for max train time, max memory size, etc.
 # TODO: Consider adding special optional AG args for use_original_features,features_to_use,etc.
 # TODO: Consider adding optional AG args to dynamically disable models such as valid_num_classes_range, valid_row_count_range, valid_feature_count_range, etc.
 # TODO: Args such as max_repeats, num_folds
@@ -95,14 +95,11 @@ def get_preset_models(path, problem_type, objective_func, hyperparameters, stopp
     for model_type in hp_level:
         for model in hp_level[model_type]:
             model = copy.deepcopy(model)
-            try:
-                model_priority = model[AG_ARGS]['priority']
-            except:
-                model_priority = DEFAULT_MODEL_PRIORITY[model_type]
             if AG_ARGS not in model:
                 model[AG_ARGS] = dict()
             if 'model_type' not in model[AG_ARGS]:
                 model[AG_ARGS]['model_type'] = model_type
+            model_priority = model[AG_ARGS].get('priority', DEFAULT_MODEL_PRIORITY[model_type])
             # Check if model is valid
             if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
                 continue  # Not valid

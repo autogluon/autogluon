@@ -14,6 +14,7 @@ from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJ
 from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas
 from .... import metrics
+from ....utils.exceptions import TimeLimitExceeded
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
 from ......core import Space, Categorical, List, NestedSpace
@@ -226,7 +227,11 @@ class AbstractModel:
 
     def fit(self, **kwargs):
         kwargs = self._preprocess_fit_args(**kwargs)
-        self._fit(**kwargs)
+        if 'time_limit' not in kwargs or kwargs['time_limit'] is None or kwargs['time_limit'] > 0:
+            self._fit(**kwargs)
+        else:
+            logger.warning(f'\tWarning: Model has no time left to train, skipping model... (Time Left = {round(kwargs["time_limit"], 1)}s)')
+            raise TimeLimitExceeded
 
     def _fit(self, X_train, Y_train, **kwargs):
         # kwargs may contain: num_cpus, num_gpus

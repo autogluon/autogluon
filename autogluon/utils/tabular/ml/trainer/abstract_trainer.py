@@ -1423,6 +1423,10 @@ class AbstractTrainer:
                     valid_models = []
                     for candidate in candidate_models:
                         is_valid = True
+                        if '_ag_args' in candidate:  # Legacy keyword from autogluon<=0.0.11
+                            if AG_ARGS not in candidate:
+                                candidate[AG_ARGS] = candidate['_ag_args']
+                                candidate.pop('_ag_args')
                         if AG_ARGS in candidate:
                             model_valid_problem_types = candidate[AG_ARGS].get('problem_types', None)
                             if model_valid_problem_types is not None:
