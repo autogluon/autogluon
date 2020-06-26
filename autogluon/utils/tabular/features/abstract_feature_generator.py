@@ -51,6 +51,7 @@ class AbstractFeatureGenerator:
         self.pre_memory_usage_per_row = None
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
+        self.is_dummy = False
 
     @property
     def feature_types_metadata(self):
@@ -155,6 +156,7 @@ class AbstractFeatureGenerator:
             X_features = self.minimize_ngram_memory_usage(X_features=X_features)
         if self.features_binned:
             X_features = self.minimize_binned_memory_usage(X_features=X_features)
+        self.feature_type_family_generated['int'] += self.features_binned
 
         self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
@@ -166,8 +168,13 @@ class AbstractFeatureGenerator:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
         X_features.index = X_index
+        if len(list(X_features.columns)) == 0:
+            self.is_dummy = True
+            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            X_features['__dummy__'] = 0
+            self.feature_type_family_generated['int'] = ['__dummy__']
+
         self.features = list(X_features.columns)
-        self.feature_type_family_generated['int'] += self.features_binned
         self.fit = True
 
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
@@ -205,6 +212,10 @@ class AbstractFeatureGenerator:
         X_features = self.generate_features(X)
         for column in self.features_binned:
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+        if self.is_dummy:
+            X_features.index = X_index
+            X_features['__dummy__'] = 0
+            return X_features
         X_features = X_features[self.features]
         for column in self.features_categorical_final:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)

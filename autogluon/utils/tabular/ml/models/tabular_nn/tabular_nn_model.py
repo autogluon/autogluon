@@ -577,8 +577,8 @@ class TabularNeuralNetModel(AbstractModel):
         if not use_ngram_features:
             vectorizers_featnames = self.__get_feature_type_if_present('vectorizers')
             nlp_featnames = self.__get_feature_type_if_present('nlp')
-            self.feature_types_metadata['int'] = [feature for feature in self.feature_types_metadata['int'] if feature not in vectorizers_featnames]
-            self.feature_types_metadata['object'] = [feature for feature in self.feature_types_metadata['object'] if feature not in nlp_featnames]
+            self.feature_types_metadata['int'] = [feature for feature in self.__get_feature_type_if_present('int') if feature not in vectorizers_featnames]
+            self.feature_types_metadata['object'] = [feature for feature in self.__get_feature_type_if_present('object') if feature not in nlp_featnames]
 
         categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
         continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')
