@@ -34,6 +34,7 @@ class TabularPrediction(BaseTask):
     def load(output_directory, verbosity=2):
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
+        It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
         Parameters
         ----------
@@ -49,13 +50,7 @@ class TabularPrediction(BaseTask):
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object that can be used to make predictions.
         """
-        logger.setLevel(verbosity2loglevel(verbosity)) # Reset logging after load (since we may be in new Python session)
-        if output_directory is None:
-            raise ValueError("output_directory cannot be None in load()")
-
-        output_directory = setup_outputdir(output_directory) # replace ~ with absolute path if it exists
-        learner = Learner.load(output_directory)
-        return TabularPredictor(learner=learner)
+        return TabularPredictor.load(output_directory=output_directory, verbosity=verbosity)
 
     @staticmethod
     @unpack(set_presets)

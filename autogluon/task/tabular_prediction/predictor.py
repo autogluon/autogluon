@@ -628,6 +628,7 @@ class TabularPredictor(BasePredictor):
     def load(cls, output_directory, verbosity=2):
         """
         Load a predictor object previously produced by `fit()` from file and returns this object.
+        It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
         Is functionally equivalent to :meth:`autogluon.task.tabular_prediction.TabularPrediction.load`.
 
         Parameters
@@ -650,6 +651,26 @@ class TabularPredictor(BasePredictor):
 
         output_directory = setup_outputdir(output_directory)  # replace ~ with absolute path if it exists
         learner = Learner.load(output_directory)
+        try:
+            from ...version import __version__
+            version_inference = __version__
+        except:
+            version_inference = None
+        try:
+            version_fit = learner.version
+        except:
+            version_fit = None
+        if version_fit is None:
+            version_fit = 'Unknown (Likely <=0.0.11)'
+        if version_inference != version_fit:
+            logger.warning('')
+            logger.warning('############################## WARNING ##############################')
+            logger.warning('WARNING: AutoGluon version differs from the version used during the original model fit! This may lead to instability and it is highly recommended the model be loaded with the exact AutoGluon version it was fit with.')
+            logger.warning(f'\tFit Version:     {version_fit}')
+            logger.warning(f'\tCurrent Version: {version_inference}')
+            logger.warning('############################## WARNING ##############################')
+            logger.warning('')
+
         return cls(learner=learner)
 
     def save(self):

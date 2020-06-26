@@ -57,6 +57,7 @@ class DefaultLearner(AbstractLearner):
             self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
         logger.log(20, f'AutoGluon will save models to {self.path}')
+        logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len(X.columns)}')
         if X_test is not None:
