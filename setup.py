@@ -62,6 +62,7 @@ requirements = [
 
 test_requirements = [
     'pytest',
+    'openml'
 ]
 
 if __name__ == '__main__':

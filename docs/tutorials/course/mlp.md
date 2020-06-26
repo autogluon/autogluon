@@ -5,18 +5,12 @@
 
 ```{.python .input  n=1}
 # Basic utils for folder manipulations etc
-import os
-import shutil
 import time
-import re
 import multiprocessing # to count the number of CPUs available
 
 # External tools to load and process data
-import openml
 import numpy as np
 import pandas as pd
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
 
 # MXNet (NeuralNets)
 import mxnet as mx
@@ -25,6 +19,7 @@ from mxnet.gluon import nn
 
 # AutoGluon and HPO tools
 import autogluon as ag
+from autogluon.utils import load_and_split_openml_data
 ```
 
 Check the version of MxNet, you should be fine with version >= 1.5
@@ -58,56 +53,21 @@ NUM_CPUS = multiprocessing.cpu_count()
 
 ### Preparing the data
 
-Set the openml directory to the current directory (next to the notebook) and download the task if the file is not already present.
+We will use a multi-way classification task from OpenML. Data preparation
+includes:
+
+- Missing values are imputed, using the 'mean' strategy of
+  `sklearn.impute.SimpleImputer`
+- Split training set into training and validation
+- Standardize inputs to mean 0, variance 1
 
 ```{.python .input  n=5}
-openml.config.set_cache_directory("./")
-task = openml.tasks.get_task(OPENML_TASK_ID)
-```
-
-It's a multiclass classification task with 26 classes:
-
-```{.python .input  n=6}
-n_classes = len(task.class_labels)
+X_train, X_valid, y_train, y_valid, n_classes = load_and_split_openml_data(
+    OPENML_TASK_ID, RATIO_TRAIN_VALID, download_from_openml=False)
 n_classes
 ```
 
-OpenML provides a standard train/test split that we can use.
-
-```{.python .input  n=7}
-train_indices, test_indices = task.get_train_test_split_indices()
-
-X, y = task.get_X_and_y()
-
-X.shape
-```
-
-Impute any missing value with a basic strategy and recover the training data
-
-```{.python .input  n=8}
-imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
-X = imputer.fit_transform(X)
-
-X_train = X[train_indices]
-y_train = y[train_indices]
-```
-
-Resplit the training data into training+validation using the specific fraction indicated earlier
-
-```{.python .input  n=9}
-X_train, X_valid, y_train, y_valid = \
-    train_test_split(X_train, y_train, random_state=1, test_size=RATIO_TRAIN_VALID)
-```
-
-Standardize the data
-
-```{.python .input  n=10}
-mean = np.mean(X_train, axis=0)
-std = np.std(X_train, axis=0)
-
-X_train = (X_train - mean) / (std + 1e-10)
-X_valid = (X_valid - mean) / (std + 1e-10)
-```
+The problem has 26 classes.
 
 ### Declaring a model specifying a hyperparameter space with AutoGluon
 
@@ -306,11 +266,15 @@ resources = dict(num_cpus=NUM_CPUS, num_gpus=0)
 ```
 
 ```{.python .input  n=39}
+search_options = {
+    'num_init_random': 2,
+    'debug_log': True}
 if SCHEDULER == 'fifo': 
     myscheduler = ag.scheduler.FIFOScheduler(
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
+        search_options=search_options,
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME)
@@ -326,6 +290,7 @@ else:
         run_mlp_openml,
         resource=resources,
         searcher=SEARCHER,
+        search_options=search_options,
         time_out=120,
         time_attr=RESOURCE_ATTR_NAME,
         reward_attr=REWARD_ATTR_NAME,
@@ -384,18 +349,8 @@ some tips which may come useful.
 ### Logging the Search Progress
 
 First, it is a good idea in general to switch on `debug_log`, which outputs
-useful information about the search progress:
-
-```{.python .input  n=50}
-myscheduler = ag.scheduler.FIFOScheduler(
-    run_mlp_openml,
-    resource=resources,
-    searcher=SEARCHER,
-    search_options={'debug_log': True},
-    time_out=120,
-    time_attr=RESOURCE_ATTR_NAME,
-    reward_attr=REWARD_ATTR_NAME)
-```
+useful information about the search progress. This is already done in the
+example above.
 
 The outputs show which configurations are chosen, stopped, or promoted. For
 BO and BOHB, a range of information is displayed for every `get_config`
