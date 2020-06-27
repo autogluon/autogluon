@@ -35,7 +35,6 @@ from autogluon.searcher.bayesopt.gpmxnet.debug_gp_regression import \
 
 __all__ = ['gp_fifo_searcher_factory',
            'gp_multifidelity_searcher_factory',
-           'from_argparse',
            'gp_fifo_searcher_defaults',
            'gp_multifidelity_searcher_defaults']
 
@@ -217,64 +216,6 @@ def gp_multifidelity_searcher_factory(**kwargs) -> GPMultiFidelitySearcher:
         first_is_default=kwargs['first_is_default'],
         debug_log=debug_log)
     return gp_searcher
-
-
-def from_argparse(args) -> (dict, dict):
-    """
-    Given result from ArgumentParser.parse_args() from run_benchmarks script,
-    create both search_options (kwargs in XYZ_searcher_factory above) and
-    scheduler_options.
-
-    :param args: See above
-    :return: search_options, scheduler_options
-
-    """
-    # Options for searcher
-    search_options = dict()
-    search_options['random_seed'] = args.run_id  # TODO: Change this
-    search_options['opt_skip_num_max_resource'] = args.opt_skip_num_max_resource
-    search_options['opt_skip_init_length'] = args.opt_skip_init_length
-    search_options['opt_skip_period'] = args.opt_skip_period
-    search_options['profiler'] = args.profiler
-    search_options['gp_resource_kernel'] = args.gp_searcher_resource_kernel
-    search_options['opt_maxiter'] = args.opt_maxiter
-    search_options['opt_nstarts'] = args.opt_nstarts
-    search_options['opt_warmstart'] = args.opt_warmstart
-    search_options['opt_verbose'] = args.opt_verbose
-    search_options['opt_debug_writer'] = args.opt_debug_writer
-    if args.opt_debug_writer:
-        pref = 'debug_gpr_{}'.format(args.run_id)
-        search_options['opt_debug_writer_fmask'] = pref + '_{}'
-    search_options['num_fantasy_samples'] = args.gp_searcher_num_fantasy_samples
-    search_options['num_init_random'] = args.gp_searcher_num_init_random
-    search_options['num_init_candidates'] = args.gp_searcher_num_init_candidates
-    search_options['resource_acq'] = args.gp_searcher_resource_acq
-    search_options['first_is_default'] = not args.first_is_not_default
-    search_options['debug_log'] = args.debug_log
-    search_options['initial_scoring'] = args.gp_searcher_initial_scoring
-
-    # Options for scheduler
-    scheduler_options = dict()
-    scheduler_options['num_trials'] = args.num_trials
-    scheduler_options['time_out'] = args.scheduler_timeout
-    scheduler_options['checkpoint'] = args.checkpoint
-    scheduler_options['resume'] = args.resume
-    scheduler_options['scheduler'] = args.scheduler
-    if args.scheduler == 'hyperband_stopping':
-        scheduler_options['type'] = 'stopping'
-    elif args.scheduler == 'hyperband_promotion':
-        scheduler_options['type'] = 'promotion'
-    scheduler_options['reduction_factor'] = args.reduction_factor
-    scheduler_options['max_t'] = args.epochs
-    scheduler_options['grace_period'] = args.grace_period
-    scheduler_options['brackets'] = args.brackets
-    scheduler_options['maxt_pending'] = args.maxt_pending
-    scheduler_options['keep_size_ratios'] = args.scheduler_keep_size_ratios
-    scheduler_options['searcher_data'] = args.gp_searcher_data
-    scheduler_options['store_results_period'] = args.store_results_period
-    scheduler_options['delay_get_config'] = not args.no_delay_get_config
-
-    return search_options, scheduler_options
 
 
 def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
