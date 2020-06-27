@@ -23,7 +23,7 @@ from autogluon.searcher.bayesopt.models.gpmxnet_transformers import \
     GPMXNetModelArgs
 from autogluon.searcher.bayesopt.models.nphead_acqfunc import \
     EIAcquisitionFunction
-from autogluon.searcher.default_arguments import Integer, Categorical, Boolean
+from autogluon.utils.default_arguments import Integer, Categorical, Boolean
 from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
 from autogluon.searcher.bayesopt.datatypes.hp_ranges import HyperparameterRanges  # DEBUG!
@@ -300,6 +300,7 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         default_options['opt_skip_num_max_resource'] = False
         default_options['gp_resource_kernel'] = 'matern52'
         default_options['resource_acq'] = 'bohb'
+        default_options['num_init_random'] = 10
 
     constraints = {
         'random_seed': Integer(),

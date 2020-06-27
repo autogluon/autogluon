@@ -10,10 +10,37 @@ from .hyperband_stopping import HyperbandStopping_Manager
 from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
 from ..utils import load
+from ..utils.default_arguments import check_and_merge_defaults, \
+    Integer, Boolean, Categorical
 
 __all__ = ['HyperbandScheduler']
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_OPTIONS = {
+    'resume': False,
+    'grace_period': 1,
+    'reduction_factor': 3,
+    'brackets': 1,
+    'type': 'stopping',
+    'keep_size_ratios': False,
+    'maxt_pending': False,
+    'searcher_data': 'rungs',
+    'do_snapshots': False}
+
+_CONSTRAINTS = {
+    'resume': Boolean(),
+    'max_t': Integer(1, None),
+    'grace_period': Integer(1, None),
+    'reduction_factor': Integer(2, None),
+    'brackets': Integer(1, None),
+    'type': Categorical(('stopping', 'promotion')),
+    'keep_size_ratios': Boolean(),
+    'maxt_pending': Boolean(),
+    'searcher_data': Categorical(
+        ('rungs', 'all', 'rungs_and_last')),
+    'do_snapshots': Boolean()}
 
 
 class HyperbandScheduler(FIFOScheduler):
@@ -169,25 +196,8 @@ class HyperbandScheduler(FIFOScheduler):
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
     """
-    def __init__(self, train_fn, args=None, resource=None,
-                 searcher=None, search_options=None,
-                 checkpoint=None,
-                 resume=False, num_trials=None,
-                 time_out=None, max_reward=None,
-                 reward_attr="accuracy",
-                 time_attr="epoch",
-                 max_t=None, grace_period=1,
-                 reduction_factor=3, brackets=1,
-                 visualizer='none',
-                 training_history_callback=None,
-                 training_history_callback_delta_secs=60,
-                 delay_get_config=True,
-                 type='stopping',
-                 dist_ip_addrs=None,
-                 keep_size_ratios=False,
-                 maxt_pending=False,
-                 searcher_data='rungs',
-                 do_snapshots=False):
+
+    def __init__(self, train_fn, **kwargs):
         # Setting max_t:
         # A well-written train_fn reveals its max_t value. We check fields in
         # train_fn.args: epochs, max_t.
@@ -195,6 +205,7 @@ class HyperbandScheduler(FIFOScheduler):
         # the one inferred from train_fn.args. If neither is given, we raise an
         # exception
         inferred_max_t = self._infer_max_t(train_fn.args)
+        max_t = kwargs.get('max_t')
         if max_t is not None:
             if inferred_max_t is not None and max_t != inferred_max_t:
                 logger.warning(
@@ -205,50 +216,54 @@ class HyperbandScheduler(FIFOScheduler):
             logger.info("max_t = {}, as inferred from train_fn.args".format(
                 inferred_max_t))
             max_t = inferred_max_t
+        # Check values and impute default values (only for arguments new to
+        # this class)
+        kwargs = check_and_merge_defaults(
+            kwargs, set(), _DEFAULT_OPTIONS, _CONSTRAINTS,
+            dict_name='scheduler_options')
+        resume = kwargs['resume']
+        type = kwargs['type']
+        grace_period = kwargs['grace_period']
+        reduction_factor = kwargs['reduction_factor']
+        brackets = kwargs['brackets']
+        do_snapshots = kwargs['do_snapshots']
+
         # Adjoin information about scheduler to search_options
+        search_options = kwargs.get('search_options')
         if search_options is None:
             _search_options = dict()
         else:
             _search_options = search_options.copy()
         _search_options['scheduler'] = 'hyperband_{}'.format(type)
-        _search_options['resource_attribute'] = time_attr
         _search_options['min_epochs'] = grace_period
         _search_options['max_epochs'] = max_t
+        kwargs['search_options'] = _search_options
         # Pass resume=False here. Resume needs members of this object to be
         # created
-        super().__init__(
-            train_fn=train_fn, args=args, resource=resource, searcher=searcher,
-            search_options=_search_options, checkpoint=checkpoint, resume=False,
-            num_trials=num_trials, time_out=time_out, max_reward=max_reward,
-            reward_attr=reward_attr, time_attr=time_attr,
-            visualizer=visualizer, dist_ip_addrs=dist_ip_addrs,
-            training_history_callback=training_history_callback,
-            training_history_callback_delta_secs=training_history_callback_delta_secs,
-            delay_get_config=delay_get_config)
+        kwargs['resume'] = False
+        super().__init__(train_fn=train_fn, **kwargs)
+
         self.max_t = max_t
         self.reduction_factor = reduction_factor
         self.type = type
-        self.maxt_pending = maxt_pending
+        self.maxt_pending = kwargs['maxt_pending']
         if type == 'stopping':
             self.terminator = HyperbandStopping_Manager(
-                time_attr, reward_attr, max_t, grace_period, reduction_factor,
-                brackets)
+                self._time_attr, self._reward_attr, max_t, grace_period,
+                reduction_factor, brackets)
         elif type == 'promotion':
             assert not do_snapshots, \
                 "Snapshots are supported only for type = 'stopping'"
             self.terminator = HyperbandPromotion_Manager(
-                time_attr, reward_attr, max_t, grace_period, reduction_factor,
-                brackets, keep_size_ratios=keep_size_ratios)
+                self._time_attr, self._reward_attr, max_t, grace_period,
+                reduction_factor, brackets,
+                keep_size_ratios=kwargs['keep_size_ratios'])
         else:
             raise AssertionError(
                 "type '{}' not supported, must be 'stopping' or 'promotion'".format(
                     type))
         self.do_snapshots = do_snapshots
-        sd_values = {'rungs', 'all', 'rungs_and_last'}
-        assert searcher_data in sd_values, \
-            "searcher_data = '{}', must be in {}".format(
-                searcher_data, sd_values)
-        self.searcher_data = searcher_data
+        self.searcher_data = kwargs['searcher_data']
         # Maintains a snapshot of currently running tasks, needed by several
         # features (for example, searcher_data == 'rungs_and_last', or for
         # providing a snapshot to the searcher).
@@ -267,6 +282,7 @@ class HyperbandScheduler(FIFOScheduler):
         # does not define its own lock
         self._hyperband_lock = mp.Lock()
         if resume:
+            checkpoint = kwargs.get('checkpoint')
             assert checkpoint is not None, \
                 "Need checkpoint to be set if resume = True"
             if os.path.isfile(checkpoint):

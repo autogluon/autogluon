@@ -50,4 +50,3 @@ def test_rl_scheduler():
                                          checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
-
