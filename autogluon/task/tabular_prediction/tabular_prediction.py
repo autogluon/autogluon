@@ -343,6 +343,11 @@ class TabularPrediction(BaseTask):
                 Keyword arguments to pass to all models. See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
                 If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
+            excluded_model_types : list, default = []
+                Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
+                Reference `hyperparameters` documentation for the list of model types.
+                Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
+                    Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
@@ -448,6 +453,7 @@ class TabularPrediction(BaseTask):
             'feature_generator_kwargs',
             'trainer_type',
             'AG_args_fit',
+            'excluded_model_types',
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
@@ -518,6 +524,7 @@ class TabularPrediction(BaseTask):
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
+        excluded_model_types = kwargs.get('excluded_model_types', [])
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
@@ -591,7 +598,7 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 
