@@ -1456,6 +1456,4 @@ class AbstractTrainer:
             level_keys = [key for key in hyperparameters_valid.keys() if isinstance(key, int)]
             max_level_key = max(level_keys)
             hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
-        logger.log(15, 'Hyperparameters:')
-        logger.log(15, json.dumps(hyperparameters_valid, indent=2))
         return hyperparameters_valid
