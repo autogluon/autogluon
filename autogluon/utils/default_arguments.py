@@ -100,3 +100,23 @@ def check_and_merge_defaults(
                 check.assert_valid(prefix + "Key '{}'".format(key), value)
 
     return result_options
+
+
+def filter_by_key(options: dict, remove_keys: Set[str]) -> dict:
+    """
+    Filter options by removing entries whose keys are in remove_keys.
+    Used to filter kwargs passed to a constructor, before passing it to
+    the superclass constructor.
+
+    :param options:
+    :param remove_keys:
+    :return: Filtered options
+    """
+    return {
+        k: v for k, v in options.items() if k not in remove_keys}
+
+
+def assert_no_invalid_options(options: dict, all_keys: Set[str], name: str):
+    for k in options:
+        assert k in all_keys, \
+            "{}: Invalid argument '{}'".format(name, k)

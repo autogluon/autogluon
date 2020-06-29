@@ -11,12 +11,17 @@ from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
 from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
-    Integer, Boolean, Categorical
+    Integer, Boolean, Categorical, filter_by_key
 
 __all__ = ['HyperbandScheduler']
 
 logger = logging.getLogger(__name__)
 
+
+_ARGUMENT_KEYS = {
+    'max_t', 'grace_period', 'reduction_factor', 'brackets', 'type',
+    'keep_size_ratios', 'maxt_pending', 'searcher_data', 'do_snapshots'
+}
 
 _DEFAULT_OPTIONS = {
     'resume': False,
@@ -241,7 +246,8 @@ class HyperbandScheduler(FIFOScheduler):
         # Pass resume=False here. Resume needs members of this object to be
         # created
         kwargs['resume'] = False
-        super().__init__(train_fn=train_fn, **kwargs)
+        super().__init__(
+            train_fn=train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
 
         self.max_t = max_t
         self.reduction_factor = reduction_factor

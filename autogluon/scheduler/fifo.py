@@ -20,12 +20,18 @@ from ..searcher import BaseSearcher
 from ..searcher.searcher_factory import searcher_factory
 from ..utils import save, load, mkdir, try_import_mxboard
 from ..utils.default_arguments import check_and_merge_defaults, \
-    Float, Integer, String, Boolean
+    Float, Integer, String, Boolean, assert_no_invalid_options
 
 __all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
 
+
+_ARGUMENT_KEYS = {
+    'args', 'resource', 'searcher', 'search_options', 'checkpoint', 'resume',
+    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr',
+    'dist_ip_addrs', 'visualizer', 'training_history_callback',
+    'training_history_callback_delta_secs', 'delay_get_config'}
 
 _DEFAULT_OPTIONS = {
     'resource': {'num_cpus': 1, 'num_gpus': 0},
@@ -133,6 +139,8 @@ class FIFOScheduler(TaskScheduler):
     def __init__(self, train_fn, **kwargs):
         super().__init__(kwargs.get('dist_ip_addrs'))
         # Check values and impute default values
+        assert_no_invalid_options(
+            kwargs, _ARGUMENT_KEYS, name='FIFOScheduler')
         kwargs = check_and_merge_defaults(
             kwargs, set(), _DEFAULT_OPTIONS, _CONSTRAINTS,
             dict_name='scheduler_options')
@@ -175,7 +183,7 @@ class FIFOScheduler(TaskScheduler):
             'search_strategy': searcher,
             'stop_criterion': {
                 'time_limits': time_out,
-                'max_reward': kwargs.get('max_reward')},
+                'max_reward': self.max_reward},
             'resources_per_trial': self.resource}
 
         checkpoint = kwargs.get('checkpoint')

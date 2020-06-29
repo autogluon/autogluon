@@ -17,12 +17,16 @@ from ..searcher import RLSearcher
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
 from ..utils.default_arguments import check_and_merge_defaults, \
-    Integer, Boolean, Float, String
+    Integer, Boolean, Float, String, filter_by_key
 
 __all__ = ['RLScheduler']
 
 logger = logging.getLogger(__name__)
 
+
+_ARGUMENT_KEYS = {
+    'controller_lr', 'ema_baseline_decay', 'controller_resource',
+    'controller_batch_size', 'sync'}
 
 _DEFAULT_OPTIONS = {
     'resume': False,
@@ -115,7 +119,8 @@ class RLScheduler(FIFOScheduler):
         # Pass resume=False here. Resume needs members of this object to be
         # created
         kwargs['resume'] = False
-        super().__init__(train_fn, **kwargs)
+        super().__init__(
+            train_fn=train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
         # reserve controller computation resource on master node
         master_node = self.remote_manager.get_master_node()
         controller_resource = kwargs['controller_resource']
