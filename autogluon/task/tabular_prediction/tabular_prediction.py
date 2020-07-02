@@ -196,8 +196,8 @@ class TabularPrediction(BaseTask):
                     'toy': Results in extremely small models. Only use this when prototyping, as the model quality will be severely reduced.
                 Reference `autogluon/task/tabular_prediction/hyperparameter_configs.py` for information on the hyperparameters associated with each preset.
             Keys are strings that indicate which model types to train.
-                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors)
-                If certain key is missing from hyperparameters, then `fit()` will not train any models of that type.
+                Options include: 'NN' (neural network), 'GBM' (lightGBM boosted trees), 'CAT' (CatBoost boosted trees), 'RF' (random forest), 'XT' (extremely randomized trees), 'KNN' (k-nearest neighbors), 'LR' (linear regression)
+                If certain key is missing from hyperparameters, then `fit()` will not train any models of that type. Omitting a model key from hyperparameters is equivalent to including this model key in `excluded_model_types`.
                 For example, set `hyperparameters = { 'NN':{...} }` if say you only want to train neural networks and no other types of models.
             Values = dict of hyperparameter settings for each model type, or list of dicts.
                 Each hyperparameter can either be a single fixed value or a search space containing many possible values.
@@ -300,19 +300,13 @@ class TabularPrediction(BaseTask):
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
         scheduler_options : dict
-            Extra arguments passed to __init__ of scheduler, to configure the
-            orchestration of training jobs during hyperparameter-tuning. This
-            is ignored if hyperparameter_tune=False.
+            Extra arguments passed to __init__ of scheduler, to configure the orchestration of training jobs during hyperparameter-tuning.
+            Ignored if `hyperparameter_tune=False`.
         search_strategy : str
-            Which hyperparameter search algorithm to use (only matters if
-            `hyperparameter_tune = True`).
-            Options include: 'random' (random search), 'bayesopt' (Gaussian process
-            Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid'
-            (grid search), 'hyperband' (Hyperband random), rl' (reinforcement
-            learner).
+            Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
+            Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
         search_options : dict
-            Auxiliary keyword arguments to pass to the searcher that performs
-            hyperparameter optimization.
+            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
         nthreads_per_trial : int
             How many CPUs to use in each training run of an individual model.
             This is automatically determined by AutoGluon when left as None (based on available compute).
@@ -330,29 +324,21 @@ class TabularPrediction(BaseTask):
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
 
         Kwargs can include additional arguments for advanced users:
-            feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
-                A `FeatureGenerator` class specifying which feature engineering protocol to follow
-                (see autogluon.utils.tabular.features.abstract_feature_generator.AbstractFeatureGenerator).
-                Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
-            feature_generator_kwargs : dict, default={}
-                Keyword arguments to pass into the `FeatureGenerator` constructor.
-            trainer_type : `Trainer` class, default=`AutoTrainer`
-                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
-                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
             AG_args_fit : dict, default={}
                 Keyword arguments to pass to all models. See the `AG_args_fit` argument from "Advanced functionality: Custom AutoGluon model arguments" in the `hyperparameters` argument documentation for valid values.
                 Identical to specifying `AG_args_fit` parameter for all models in `hyperparameters`.
                 If a key in `AG_args_fit` is already specified for a model in `hyperparameters`, it will not be altered through this argument.
-            label_count_threshold : int, default = 10
-                For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
-                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
+            excluded_model_types : list, default = []
+                Banned subset of model types to avoid training during `fit()`, even if present in `hyperparameters`.
+                Valid values: ['RF', 'XT', 'KNN', 'GBM', 'CAT', 'NN', 'LR', 'custom']. Reference `hyperparameters` documentation for what models correspond to each value.
+                Useful when a particular model type such as 'KNN' or 'custom' is not desired but altering the `hyperparameters` dictionary is difficult or time-consuming.
+                    Example: To exclude both 'KNN' and 'custom' models, specify `excluded_model_types=['KNN', 'custom']`.
             id_columns : list, default = []
                 Banned subset of column names that model may not use as predictive features (e.g. contains label, user-ID, etc).
                 These columns are ignored during `fit()`, but DataFrame of just these columns with appended predictions may be produced, for example to submit in a ML competition.
-            set_best_to_refit_full : bool, default = False
-                If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
-                This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
-                Only valid if `refit_full` is set.
+            label_count_threshold : int, default = 10
+                For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
+                AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
             save_bagged_folds : bool, default = True
                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
@@ -403,6 +389,19 @@ class TabularPrediction(BaseTask):
                         Warning: Be aware that utilizing refit_full models without separately verifying on test data means that the model is untested, and has no guarantee of being consistent with the original model.
                 The time taken by this process is not enforced by `time_limits`.
                 `cache_data` must be set to `True` to enable this functionality.
+            set_best_to_refit_full : bool, default = False
+                If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
+                This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
+                Only valid if `refit_full` is set.
+            feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
+                A `FeatureGenerator` class specifying which feature engineering protocol to follow
+                (see autogluon.utils.tabular.features.abstract_feature_generator.AbstractFeatureGenerator).
+                Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
+            feature_generator_kwargs : dict, default={}
+                Keyword arguments to pass into the `FeatureGenerator` constructor.
+            trainer_type : `Trainer` class, default=`AutoTrainer`
+                A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
+                Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
             random_seed : int, default = 0
                 Seed to use when generating data split indices such as kfold splits and train/validation splits.
                 Caution: This seed only enables reproducible data splits (and the ability to randomize splits in each run by changing seed values).
@@ -448,6 +447,7 @@ class TabularPrediction(BaseTask):
             'feature_generator_kwargs',
             'trainer_type',
             'AG_args_fit',
+            'excluded_model_types',
             'label_count_threshold',
             'id_columns',
             'set_best_to_refit_full',
@@ -518,6 +518,7 @@ class TabularPrediction(BaseTask):
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
+        excluded_model_types = kwargs.get('excluded_model_types', [])
         random_seed = kwargs.get('random_seed', 0)
         nthreads_per_trial, ngpus_per_trial = setup_compute(nthreads_per_trial, ngpus_per_trial)
         num_train_rows = len(train_data)
@@ -591,7 +592,7 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 

@@ -14,10 +14,10 @@ class AutoTrainer(AbstractTrainer):
         return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric,
                                  num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level, extra_ag_args_fit=extra_ag_args_fit)
 
-    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None):
+    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, **kwargs):
         if hyperparameters is None:
             hyperparameters = {}
-        self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=ag_args_fit)
+        self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
         models = self.get_models(hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, level=0)
         if self.bagged_mode:
             if (y_test is not None) and (X_test is not None):

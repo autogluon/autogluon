@@ -1,4 +1,4 @@
-import copy, time, traceback, logging
+import copy, time, traceback, logging, json
 import os
 from typing import List
 import networkx as nx
@@ -225,7 +225,7 @@ class AbstractTrainer:
 
         return path, model_paths
 
-    def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None):
+    def train(self, X_train, y_train, X_test=None, y_test=None, **kwargs):
         raise NotImplementedError
 
     def train_single(self, X_train, y_train, X_test, y_test, model, kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
@@ -1397,10 +1397,15 @@ class AbstractTrainer:
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
 
-    def _process_hyperparameters(self, hyperparameters, ag_args_fit=None):
+    def _process_hyperparameters(self, hyperparameters, ag_args_fit=None, excluded_model_types=None):
         if ag_args_fit is None:
             ag_args_fit = {}
+        if excluded_model_types is None:
+            excluded_model_types = []
+        if excluded_model_types:
+            logger.log(20, f'Excluded Model Types: {excluded_model_types}')
         hyperparameters = copy.deepcopy(hyperparameters)
+        hyperparameters_valid = dict()
 
         has_levels = False
         top_level_keys = hyperparameters.keys()
@@ -1411,7 +1416,11 @@ class AbstractTrainer:
             hyperparameters = {'default': hyperparameters}
         top_level_keys = hyperparameters.keys()
         for key in top_level_keys:
+            hyperparameters_valid[key] = {}
             for subkey in hyperparameters[key].keys():
+                if subkey in excluded_model_types:
+                    logger.log(20, f"\tFound '{subkey}' model in hyperparameters, but '{subkey}' is present in `excluded_model_types` and will be removed.")
+                    continue  # Don't include excluded models
                 if not isinstance(hyperparameters[key][subkey], list):
                     hyperparameters[key][subkey] = [hyperparameters[key][subkey]]
                 models_expanded = []
@@ -1442,9 +1451,9 @@ class AbstractTrainer:
                             valid_models.append(candidate)
                     models_expanded += valid_models
 
-                hyperparameters[key][subkey] = models_expanded
-        if 'default' not in hyperparameters.keys():
-            level_keys = [key for key in hyperparameters.keys() if isinstance(key, int)]
+                hyperparameters_valid[key][subkey] = models_expanded
+        if 'default' not in hyperparameters_valid.keys():
+            level_keys = [key for key in hyperparameters_valid.keys() if isinstance(key, int)]
             max_level_key = max(level_keys)
-            hyperparameters['default'] = copy.deepcopy(hyperparameters[max_level_key])
-        return hyperparameters
+            hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
+        return hyperparameters_valid
