@@ -62,11 +62,10 @@ def rl_simulation(args, reporter):
 ### Random Search Baseline
 
 ```{.python .input}
-random_scheduler = ag.scheduler.FIFOScheduler(rl_simulation, rl_simulation.args,
+random_scheduler = ag.scheduler.FIFOScheduler(rl_simulation,
                                               resource={'num_cpus': 1, 'num_gpus': 0},
                                               num_trials=300,
-                                              reward_attr="accuracy",
-                                              resume=False)
+                                              reward_attr='accuracy')
 random_scheduler.run()
 random_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(random_scheduler.get_best_config(), random_scheduler.get_best_reward()))
@@ -78,12 +77,10 @@ print('Best config: {}, best reward: {}'.format(random_scheduler.get_best_config
 rl_scheduler = ag.scheduler.RLScheduler(rl_simulation,
                                         resource={'num_cpus': 1, 'num_gpus': 0},
                                         num_trials=300,
-                                        reward_attr="accuracy",
+                                        reward_attr='accuracy',
                                         controller_batch_size=4,
                                         controller_lr=5e-3,
-                                        checkpoint='./rl_exp/checkerpoint.ag',
-                                        resume=False,
-                                        sync=True)
+                                        checkpoint='./rl_exp/checkerpoint.ag')
 rl_scheduler.run()
 rl_scheduler.join_jobs()
 print('Best config: {}, best reward: {}'.format(rl_scheduler.get_best_config(), rl_scheduler.get_best_reward()))

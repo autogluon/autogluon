@@ -16,10 +16,36 @@ from ..core.decorator import _autogluon_method
 from ..searcher import RLSearcher
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
+from ..utils.default_arguments import check_and_merge_defaults, \
+    Integer, Boolean, Float, String, filter_by_key
 
 __all__ = ['RLScheduler']
 
 logger = logging.getLogger(__name__)
+
+
+_ARGUMENT_KEYS = {
+    'controller_lr', 'ema_baseline_decay', 'controller_resource',
+    'controller_batch_size', 'sync'}
+
+_DEFAULT_OPTIONS = {
+    'resume': False,
+    'reward_attr': 'accuracy',
+    'checkpoint': './exp/checkpoint.ag',
+    'controller_lr': 1e-3,
+    'ema_baseline_decay': 0.95,
+    'controller_resource': {'num_cpus': 0, 'num_gpus': 0},
+    'controller_batch_size': 1,
+    'sync': True}
+
+_CONSTRAINTS = {
+    'resume': Boolean(),
+    'reward_attr': String(),
+    'checkpoint': String(),
+    'controller_lr': Float(0.0, None),
+    'ema_baseline_decay': Float(0.0, 1.0),
+    'controller_batch_size': Integer(1, None),
+    'sync': Boolean()}
 
 
 class RLScheduler(FIFOScheduler):
@@ -71,49 +97,60 @@ class RLScheduler(FIFOScheduler):
     >>> scheduler.join_jobs()
     >>> scheduler.get_training_curves(plot=True)
     """
-    def __init__(self, train_fn, args=None, resource=None, searcher=None, checkpoint='./exp/checkpoint.ag',
-                 resume=False, num_trials=None, time_attr='epoch', reward_attr='accuracy',
-                 visualizer='none', controller_lr=1e-3, ema_baseline_decay=0.95,
-                 controller_resource={'num_cpus': 0, 'num_gpus': 0},
-                 controller_batch_size=1,
-                 dist_ip_addrs=[], sync=True, **kwargs):
+    def __init__(self, train_fn, **kwargs):
         assert isinstance(train_fn, _autogluon_method), 'Please use @ag.args ' + \
                 'to decorate your training script.'
-        self.ema_baseline_decay = ema_baseline_decay
-        self.sync = sync
-        # create RL searcher/controller
+        # Check values and impute default values (only for arguments new to
+        # this class)
+        kwargs = check_and_merge_defaults(
+            kwargs, set(), _DEFAULT_OPTIONS, _CONSTRAINTS,
+            dict_name='scheduler_options')
+        resume = kwargs['resume']
+
+        self.ema_baseline_decay = kwargs['ema_baseline_decay']
+        self.sync = kwargs['sync']
+        # create RL searcher if not passed
+        searcher = kwargs.get('searcher')
         if not isinstance(searcher, RLSearcher):
-            searcher = RLSearcher(
-                train_fn.kwspaces, reward_attribute=reward_attr)
-        super(RLScheduler,self).__init__(
-                train_fn, train_fn.args, resource, searcher,
-                checkpoint=checkpoint, resume=False, num_trials=num_trials,
-                time_attr=time_attr, reward_attr=reward_attr,
-                visualizer=visualizer, dist_ip_addrs=dist_ip_addrs, **kwargs)
+            if searcher is not None:
+                logger.warning("Argument 'searcher' must be of type RLSearcher. Ignoring 'searcher' and creating searcher here.")
+            kwargs['searcher'] = RLSearcher(
+                train_fn.kwspaces, reward_attribute=kwargs['reward_attr'])
+        # Pass resume=False here. Resume needs members of this object to be
+        # created
+        kwargs['resume'] = False
+        super().__init__(
+            train_fn=train_fn, **filter_by_key(kwargs, _ARGUMENT_KEYS))
         # reserve controller computation resource on master node
         master_node = self.remote_manager.get_master_node()
+        controller_resource = kwargs['controller_resource']
         self.controller_resource = DistributedResource(**controller_resource)
         assert self.resource_manager.reserve_resource(
-                master_node, self.controller_resource), 'Not Enough Resource on Master Node' + \
-                    ' for Training Controller'
-        self.controller_ctx = [mx.gpu(i) for i in self.controller_resource.gpu_ids] if \
-                controller_resource['num_gpus'] > 0 else [mx.cpu()]
+            master_node, self.controller_resource),\
+            "Not Enough Resource on Master Node for Training Controller"
+        if controller_resource['num_gpus'] > 0:
+            self.controller_ctx = [
+                mx.gpu(i) for i in self.controller_resource.gpu_ids]
+        else:
+            self.controller_ctx = [mx.cpu()]
         # controller setup
-        self.controller = searcher.controller
+        self.controller = self.searcher.controller
         self.controller.collect_params().reset_ctx(self.controller_ctx)
+        controller_batch_size = kwargs['controller_batch_size']
+        learning_rate = kwargs['controller_lr'] * controller_batch_size
         self.controller_optimizer = mx.gluon.Trainer(
-                self.controller.collect_params(), 'adam',
-                optimizer_params={'learning_rate': controller_lr*controller_batch_size})
+            self.controller.collect_params(), 'adam',
+            optimizer_params={'learning_rate': learning_rate})
         self.controller_batch_size = controller_batch_size
         self.baseline = None
         self.lock = mp.Lock()
         # async buffers
-        if not sync:
+        if not self.sync:
             self.mp_count = mp.Value('i', 0)
             self.mp_seed = mp.Value('i', 0)
             self.mp_fail = mp.Value('i', 0)
-
         if resume:
+            checkpoint = kwargs.get('checkpoint')
             if os.path.isfile(checkpoint):
                 self.load_state_dict(load(checkpoint))
             else:

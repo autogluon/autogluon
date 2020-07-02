@@ -1,7 +1,7 @@
 import ConfigSpace as CS
 import multiprocessing as mp
 
-from autogluon.searcher.default_arguments import check_and_merge_defaults
+from autogluon.utils.default_arguments import check_and_merge_defaults
 from autogluon.searcher.bayesopt.autogluon.searcher_factory import \
     gp_fifo_searcher_factory, gp_multifidelity_searcher_factory, \
     gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults

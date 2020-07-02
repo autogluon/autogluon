@@ -19,10 +19,41 @@ from ..core.decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher.searcher_factory import searcher_factory
 from ..utils import save, load, mkdir, try_import_mxboard
+from ..utils.default_arguments import check_and_merge_defaults, \
+    Float, Integer, String, Boolean, assert_no_invalid_options
 
 __all__ = ['FIFOScheduler']
 
 logger = logging.getLogger(__name__)
+
+
+_ARGUMENT_KEYS = {
+    'args', 'resource', 'searcher', 'search_options', 'checkpoint', 'resume',
+    'num_trials', 'time_out', 'max_reward', 'reward_attr', 'time_attr',
+    'dist_ip_addrs', 'visualizer', 'training_history_callback',
+    'training_history_callback_delta_secs', 'delay_get_config'}
+
+_DEFAULT_OPTIONS = {
+    'resource': {'num_cpus': 1, 'num_gpus': 0},
+    'searcher': 'random',
+    'resume': False,
+    'reward_attr': 'accuracy',
+    'time_attr': 'epoch',
+    'visualizer': 'none',
+    'training_history_callback_delta_secs': 60,
+    'delay_get_config': True}
+
+_CONSTRAINTS = {
+    'checkpoint': String(),
+    'resume': Boolean(),
+    'num_trials': Integer(1, None),
+    'time_out': Float(0.0, None),
+    'max_reward': Float(),
+    'reward_attr': String(),
+    'time_attr': String(),
+    'visualizer': String(),
+    'training_history_callback_delta_secs': Integer(1, None),
+    'delay_get_config': Boolean()}
 
 
 class FIFOScheduler(TaskScheduler):
@@ -105,29 +136,25 @@ class FIFOScheduler(TaskScheduler):
     >>> scheduler.get_training_curves(plot=True)
     """
 
-    def __init__(self, train_fn, args=None, resource=None,
-                 searcher=None, search_options=None,
-                 checkpoint=None,
-                 resume=False, num_trials=None,
-                 time_out=None, max_reward=None, reward_attr='accuracy',
-                 time_attr='epoch',
-                 visualizer='none', dist_ip_addrs=None,
-                 training_history_callback=None,
-                 training_history_callback_delta_secs=60,
-                 delay_get_config=True):
-        super().__init__(dist_ip_addrs)
-        if resource is None:
-            resource = {'num_cpus': 1, 'num_gpus': 0}
-        self.resource = resource
+    def __init__(self, train_fn, **kwargs):
+        super().__init__(kwargs.get('dist_ip_addrs'))
+        # Check values and impute default values
+        assert_no_invalid_options(
+            kwargs, _ARGUMENT_KEYS, name='FIFOScheduler')
+        kwargs = check_and_merge_defaults(
+            kwargs, set(), _DEFAULT_OPTIONS, _CONSTRAINTS,
+            dict_name='scheduler_options')
 
-        if searcher is None:
-            searcher = 'random'  # RandomSearcher
+        self.resource = kwargs['resource']
+        searcher = kwargs['searcher']
+        search_options = kwargs.get('search_options')
         if isinstance(searcher, str):
             if search_options is None:
                 search_options = dict()
             _search_options = search_options.copy()
             _search_options['configspace'] = train_fn.cs
-            _search_options['reward_attribute'] = reward_attr
+            _search_options['reward_attribute'] = kwargs['reward_attr']
+            _search_options['resource_attribute'] = kwargs['time_attr']
             # Adjoin scheduler info to search_options, if not already done by
             # subclass
             if 'scheduler' not in _search_options:
@@ -140,28 +167,32 @@ class FIFOScheduler(TaskScheduler):
 
         assert isinstance(train_fn, _autogluon_method)
         self.train_fn = train_fn
+        args = kwargs.get('args')
         self.args = args if args else train_fn.args
+        num_trials = kwargs.get('num_trials')
+        time_out = kwargs.get('time_out')
         if num_trials is None:
             assert time_out is not None, \
                 "Need stopping criterion: Either num_trials or time_out"
         self.num_trials = num_trials
         self.time_out = time_out
-        self.max_reward = max_reward
+        self.max_reward = kwargs.get('max_reward')
         # meta data
         self.metadata = {
             'search_space': train_fn.kwspaces,
             'search_strategy': searcher,
             'stop_criterion': {
-                'time_limits': time_out, 'max_reward': max_reward},
-            'resources_per_trial': resource}
+                'time_limits': time_out,
+                'max_reward': self.max_reward},
+            'resources_per_trial': self.resource}
 
+        checkpoint = kwargs.get('checkpoint')
         self._checkpoint = checkpoint
-        self._reward_attr = reward_attr
-        self._time_attr = time_attr
-        self.visualizer = visualizer.lower()
+        self._reward_attr = kwargs['reward_attr']
+        self._time_attr = kwargs['time_attr']
+        self.visualizer = kwargs['visualizer'].lower()
         if self.visualizer == 'tensorboard' or self.visualizer == 'mxboard':
-            assert checkpoint is not None, \
-                "Need checkpoint to be set"
+            assert checkpoint is not None, "Need checkpoint to be set"
             try_import_mxboard()
             from mxboard import SummaryWriter
             self.mxboard = SummaryWriter(
@@ -182,12 +213,12 @@ class FIFOScheduler(TaskScheduler):
         self._start_time = None
         self._training_history_callback_last_block = None
         self._training_history_callback_last_len = None
-        self.training_history_callback = training_history_callback
+        self.training_history_callback = kwargs.get('training_history_callback')
         self.training_history_callback_delta_secs = \
-            training_history_callback_delta_secs
-        self._delay_get_config = delay_get_config
+            kwargs['training_history_callback_delta_secs']
+        self._delay_get_config = kwargs['delay_get_config']
         # Resume experiment from checkpoint?
-        if resume:
+        if kwargs['resume']:
             assert checkpoint is not None, \
                 "Need checkpoint to be set if resume = True"
             if os.path.isfile(checkpoint):
