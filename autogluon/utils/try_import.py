@@ -1,4 +1,4 @@
-__all__ = ['try_import_catboost', 'try_import_catboostdev', 'try_import_lightgbm', 'try_import_mxboard', 'try_import_mxnet',
+__all__ = ['try_import_catboost', 'try_import_lightgbm', 'try_import_mxboard', 'try_import_mxnet',
            'try_import_cv2', 'try_import_gluonnlp']
 
 def try_import_catboost():
