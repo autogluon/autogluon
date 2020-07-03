@@ -1,7 +1,5 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for regression. """
 
-# To distill with CatBoost, first run: pip install catboost-dev
-
 import shutil, os
 from autogluon import TabularPrediction as task
 from autogluon.utils.tabular.ml.constants import REGRESSION

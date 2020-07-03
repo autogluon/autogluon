@@ -1,7 +1,5 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for binary classification. """
 
-# To distill with CatBoost, first run: pip install catboost-dev
-
 import shutil
 from autogluon import TabularPrediction as task
 
