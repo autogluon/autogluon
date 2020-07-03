@@ -27,15 +27,10 @@ class CatboostModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         self._set_default_param_value('random_seed', 0)  # Remove randomness for reproducibility
-        self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
-        if self.problem_type == SOFTCLASS:
-            SoftLogLossObjective = make_softclass_objective()
-            SoftclassCustomMetric = make_softclass_metric()
-            self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
-            self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
-            self._set_default_param_value('early_stopping_rounds', 50)  # Speeds up training with custom (non-C++) losses
+        if self.problem_type != SOFTCLASS:  # TODO: remove this after catboost 0.24
+            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=self.num_classes)
@@ -61,6 +56,13 @@ class CatboostModel(AbstractModel):
         if self.problem_type == SOFTCLASS:
             try_import_catboostdev()  # Need to first import catboost then catboost_dev not vice-versa.
             from catboost_dev import CatBoostClassifier, CatBoostRegressor, Pool
+            SoftLogLossObjective = make_softclass_objective()
+            SoftclassCustomMetric = make_softclass_metric()
+            self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
+            self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
+            self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
+            self._set_default_param_value('early_stopping_rounds', 50)  # Speeds up training with custom (non-C++) losses
+
         model_type = CatBoostClassifier if self.problem_type in PROBLEM_TYPES_CLASSIFICATION else CatBoostRegressor
         if isinstance(self.params['eval_metric'], str):
             metric_name = self.params['eval_metric']
