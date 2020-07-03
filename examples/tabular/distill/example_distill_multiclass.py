@@ -40,18 +40,16 @@ predictor = task.fit(train_data=train_data, label=label_column, problem_type='mu
                      cache_data=True, auto_stack=False, time_limits = time_limits)
 
 # Distill ensemble-predictor into single model:
-
 time_limits = 60  # None
-augment_args = {'num_augmented_samples': 30}
 verbosity = 2
 
 aug_data = task.Dataset(file_path=train_file_path)
 aug_data = aug_data.head(subsample_size)  # subsample for faster demo
 
-predictor.distill(time_limits=time_limits, augment_args=augment_args)  # default distillation (time_limits & augmented_args are also optional)
+predictor.distill(time_limits=time_limits, augment_args={'num_augmented_samples':100})  # default distillation (time_limits & augmented_args are also optional)
 
 # Other variants demonstrating different usage options:
-predictor.distill(time_limits=time_limits, teacher_preds='soft', augment_method='spunge', augment_args=augment_args, verbosity=verbosity, models_name_suffix='spunge')
+predictor.distill(time_limits=time_limits, teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':1}, verbosity=verbosity, models_name_suffix='spunge')
 
 predictor.distill(time_limits=time_limits, hyperparameters={'GBM':{},'NN':{}}, teacher_preds='soft', augment_method='munge', augment_args={'size_factor':1,'max_size':100}, verbosity=verbosity, models_name_suffix='munge')
 
@@ -66,4 +64,3 @@ ldr = predictor.leaderboard(test_data)
 
 y_pred = predictor.predict_proba(test_data, 'LightGBMClassifier_DSTL')
 print(y_pred[:5])
-
