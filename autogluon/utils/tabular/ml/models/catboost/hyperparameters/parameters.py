@@ -1,4 +1,4 @@
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from ....constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 DEFAULT_ITERATIONS = 10000
 
@@ -6,7 +6,7 @@ DEFAULT_ITERATIONS = 10000
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
         return get_param_binary_baseline()
-    elif problem_type == MULTICLASS:
+    elif problem_type in [MULTICLASS, SOFTCLASS]:
         return get_param_multiclass_baseline(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression_baseline()

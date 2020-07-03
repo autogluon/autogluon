@@ -17,7 +17,7 @@ from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....utils.savers import save_pkl
 from .....try_import import try_import_lightgbm
 from ......core import Int, Space
@@ -126,6 +126,8 @@ class LGBModel(AbstractModel):
                 train_params['params']['metric'] = eval_metric
             elif eval_metric not in train_params['params']['metric']:
                 train_params['params']['metric'] = f'{train_params["params"]["metric"]},{eval_metric}'
+        if self.problem_type == SOFTCLASS:
+            train_params['fobj'] = lgb_utils.softclass_lgbobj
         if seed_val is not None:
             train_params['params']['seed'] = seed_val
             random.seed(seed_val)
@@ -153,7 +155,11 @@ class LGBModel(AbstractModel):
                 return y_pred_proba
         elif self.problem_type == MULTICLASS:
             return y_pred_proba
-        else:
+        elif self.problem_type == SOFTCLASS:  # apply softmax
+            y_pred_proba = np.exp(y_pred_proba)
+            y_pred_proba = np.multiply(y_pred_proba, 1/np.sum(y_pred_proba, axis=1)[:, np.newaxis])
+            return y_pred_proba
+        else:  # Should this ever happen?
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 2:  # Should this ever happen?
@@ -191,6 +197,17 @@ class LGBModel(AbstractModel):
         if X_val is not None:
             X_val = self.preprocess(X_val)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
+
+        if self.problem_type == SOFTCLASS:
+            Y_train_og = None
+            Y_test_og = None
+            if (not dataset_train) and (X_train is not None) and (Y_train is not None):
+                Y_train_og = np.array(Y_train)
+                Y_train = pd.Series([0]*len(X_train))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+            if (not dataset_val) and (X_test is not None) and (Y_test is not None):
+                Y_test_og = np.array(Y_test)
+                Y_test = pd.Series([0]*len(X_test))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+
         if not dataset_train:
             # X_train, W_train = self.convert_to_weight(X=X_train)
             dataset_train = construct_dataset(x=X_train, y=y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=W_train)
@@ -199,6 +216,11 @@ class LGBModel(AbstractModel):
             # X_val, W_val = self.convert_to_weight(X=X_val)
             dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
+        if self.problem_type == SOFTCLASS:
+            if Y_train_og is not None:
+                dataset_train.softlabels = Y_train_og
+            if Y_test_og is not None:
+                dataset_val.softlabels = Y_test_og
         return dataset_train, dataset_val
 
     def debug_features_to_use(self, X_val_in):

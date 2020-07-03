@@ -274,3 +274,53 @@ def infer_eval_metric(problem_type: str) -> Scorer:
         return accuracy
     else:
         return root_mean_squared_error
+
+
+def default_holdout_frac(num_train_rows, hyperparameter_tune=False):
+    """ Returns default holdout_frac used in fit().
+        Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples.
+    """
+    if num_train_rows < 5000:
+        holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
+    else:
+        holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
+
+    if hyperparameter_tune:
+        holdout_frac = min(0.2, holdout_frac * 2)  # We want to allocate more validation data for HPO to avoid overfitting
+
+    return holdout_frac
+
+
+def augment_rare_classes(X, label, threshold):
+    """ Use this method when using certain eval_metrics like log_loss, for which no classes may be filtered out.
+        This method will augment dataset with additional examples of rare classes.
+    """
+    class_counts = X[label].value_counts()
+    class_counts_invalid = class_counts[class_counts < threshold]
+    if len(class_counts_invalid) == 0:
+        logger.debug("augment_rare_classes did not need to duplicate any data from rare classes")
+        return X
+
+    aug_df = None
+    for clss, n_clss in class_counts_invalid.iteritems():
+        n_toadd = threshold - n_clss
+        clss_df = X.loc[X[label] == clss]
+        if aug_df is None:
+            aug_df = clss_df[:0].copy()
+        duplicate_times = int(np.floor(n_toadd / n_clss))
+        remainder = n_toadd % n_clss
+        new_df = clss_df.copy()
+        new_df = new_df[:remainder]
+        while duplicate_times > 0:
+            logger.debug(f"Duplicating data from rare class: {clss}")
+            duplicate_times -= 1
+            new_df = new_df.append(clss_df.copy())
+        aug_df = aug_df.append(new_df.copy())
+
+    X = X.append(aug_df)
+    class_counts = X[label].value_counts()
+    class_counts_invalid = class_counts[class_counts < threshold]
+    if len(class_counts_invalid) > 0:
+        raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
+    logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
+    return X

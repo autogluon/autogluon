@@ -15,7 +15,7 @@ from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGen
 from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
-from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits
+from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
 
 __all__ = ['TabularPrediction']
 
@@ -565,14 +565,7 @@ class TabularPrediction(BaseTask):
             logger.log(30, 'Warning: Specified num_trials == 1 or time_limits is too small for hyperparameter_tune, setting to False.')
 
         if holdout_frac is None:
-            # Between row count 5,000 and 25,000 keep 0.1 holdout_frac, as we want to grow validation set to a stable 2500 examples
-            if num_train_rows < 5000:
-                holdout_frac = max(0.1, min(0.2, 500.0 / num_train_rows))
-            else:
-                holdout_frac = max(0.01, min(0.1, 2500.0 / num_train_rows))
-
-            if hyperparameter_tune:
-                holdout_frac = min(0.2, holdout_frac * 2)  # We want to allocate more validation data for HPO to avoid overfitting
+            holdout_frac = default_holdout_frac(num_train_rows, hyperparameter_tune)
 
         # Add visualizer to NN hyperparameters:
         if (visualizer is not None) and (visualizer != 'none') and ('NN' in hyperparameters):
