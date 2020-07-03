@@ -7,7 +7,7 @@ import time
 import psutil
 import numpy as np
 
-from .catboost_utils import construct_custom_catboost_metric, SoftclassObjective, SoftclassCustomMetric
+from .catboost_utils import construct_custom_catboost_metric, make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
@@ -31,6 +31,8 @@ class CatboostModel(AbstractModel):
         # Set 'allow_writing_files' to True in order to keep log files created by catboost during training (these will be saved in the directory where AutoGluon stores this model)
         self._set_default_param_value('allow_writing_files', False)  # Disables creation of catboost logging files during training by default
         if self.problem_type == SOFTCLASS:
+            SoftLogLossObjective = make_softclass_objective()
+            SoftclassCustomMetric = make_softclass_metric()
             self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
             self._set_default_param_value('early_stopping_rounds', 50)  # Speeds up training with custom (non-C++) losses

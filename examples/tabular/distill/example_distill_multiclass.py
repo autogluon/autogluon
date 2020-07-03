@@ -1,6 +1,6 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for multiclass classification. """
 
-# To distill with CatBoost, first run: pip install catboost-dev
+# To distill CatBoost models in multiclass classification, need to first run:  pip install catboost-dev
 
 import shutil, os
 import numpy as np
