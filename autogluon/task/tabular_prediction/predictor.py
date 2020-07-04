@@ -30,8 +30,11 @@ class TabularPredictor(BasePredictor):
             What metric is used to evaluate predictive performance.
         label_column : str
             Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-        feature_types : dict
+        feature_types : :class:`autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata`
             Inferred data type of each predictive variable (i.e. column of training data table used to predict `label_column`).
+            Contains both raw dtype and special dtype information. Special dtypes are AutoGluon specific feature types.
+                `feature_types.feature_types_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
+                `feature_types.feature_types_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
         model_names : list
             List of model names trained during `fit()`.
         model_performance : dict
