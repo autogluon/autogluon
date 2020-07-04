@@ -2,7 +2,6 @@ import copy
 import logging
 import math
 import re
-import warnings
 from collections import defaultdict
 
 import numpy as np
@@ -11,6 +10,8 @@ import psutil
 from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
+from .feature_types_metadata import FeatureTypesMetadata
+from .utils import get_type_family, get_type_groups_df, get_type_family_groups_df
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
 
@@ -25,23 +26,16 @@ class AbstractFeatureGenerator:
         self.features_init_to_keep = []
         self.features_to_remove = []
         self.features_to_remove_post = []
-        self.features_to_keep_raw = []
-        self.features_object = []
-        self.features_init_types = dict()
-        self.feature_types = defaultdict(list)
-        self.feature_type_family = defaultdict(list)
-        self.feature_type_family_generated = defaultdict(list)
-        self.features_bool = []
-        self.features_nlp = []
-        self.features_nlp_ratio = []
-        self.features_datetime = []
-        self.features_categorical = []
+        self.features_init_types = dict()  # Initial feature types prior to transformation
+        self.feature_type_family_init_raw = defaultdict(list)  # Feature types of original features, without inferring.
+        self.feature_type_family = defaultdict(list)  # Feature types of original features, after inferring.
+        self.feature_type_family_generated = defaultdict(list)  # Feature types (special) of generated features.
+        self.feature_transformations = defaultdict(list)  # Dictionary of transformation pipelines (keys) and the list of original features transformed through them (values)
         self.features_categorical_final = []
         self.features_categorical_final_mapping = defaultdict()
-        self.features_binned = []
+        self.features_binned = []  # Features to be binned
         self.features_binned_mapping = defaultdict()
-        self.features_vectorizers = []
-        self.features = []
+        self.features = []  # Final list of features after transformation
         self.banned_features = []
         self.fit = False
 
@@ -53,47 +47,18 @@ class AbstractFeatureGenerator:
         self.post_memory_usage_per_row = None
         self.is_dummy = False
 
-    @property
-    def feature_types_metadata(self):
-        feature_types_metadata = copy.deepcopy(
-            {
-                'nlp': self.features_nlp,
-                'vectorizers': self.features_vectorizers,
-                **self.feature_type_family
-            }
-        )
-        for key, val in self.feature_type_family_generated.items():
-            if key in feature_types_metadata:
-                feature_types_metadata[key] += val
-            else:
-                feature_types_metadata[key] = val
-        return feature_types_metadata
+        self.feature_types_metadata: FeatureTypesMetadata = None
 
-    @property
-    def feature_types_metadata_generated(self):
-        feature_types_metadata_generated = copy.deepcopy(
-            {**self.feature_type_family_generated}
-        )
-        if 'int' in feature_types_metadata_generated:  # TODO: Clean this, feature_vectorizers should already be handled
-            feature_types_metadata_generated['int'] += self.features_vectorizers
-        elif len(self.features_vectorizers) > 0:
-            feature_types_metadata_generated['int'] = self.features_vectorizers
-        return feature_types_metadata_generated
+    def get_feature_types_metadata_full(self):
+        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.feature_types_special)
 
-    @property
-    def feature_types_metadata_full(self):
-        feature_types_metadata_full = copy.deepcopy(
-            {**self.feature_type_family}
-        )
-        for key, val in self.feature_type_family_generated.items():
-            if key in feature_types_metadata_full:
-                feature_types_metadata_full[key] += val
-            else:
-                feature_types_metadata_full[key] = val
-        if 'int' in feature_types_metadata_full:  # TODO: Clean this, feature_vectorizers should already be handled
-            feature_types_metadata_full['int'] += self.features_vectorizers
-        elif len(self.features_vectorizers) > 0:
-            feature_types_metadata_full['int'] = self.features_vectorizers
+        for key_raw in self.feature_types_metadata.feature_types_raw:
+            values = self.feature_types_metadata.feature_types_raw[key_raw]
+            for key_special in self.feature_types_metadata.feature_types_special:
+                values = [value for value in values if value not in self.feature_types_metadata.feature_types_special[key_special]]
+            if values:
+                feature_types_metadata_full[key_raw] += values
+
         return feature_types_metadata_full
 
     @staticmethod
@@ -127,13 +92,15 @@ class AbstractFeatureGenerator:
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         self.features_init_to_keep = copy.deepcopy(list(X.columns))
         self.features_init_types = X.dtypes.to_dict()
+        self.feature_type_family_init_raw = get_type_groups_df(X)
+
         X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
         for column in X_features:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
                 self.features_to_remove_post.append(column)
-            elif column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
+            elif 'object' in self.feature_type_family and column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
                 self.features_to_remove_post.append(column)
 
         self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
@@ -150,13 +117,10 @@ class AbstractFeatureGenerator:
         for column in self.features_categorical_final:
             self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
 
-        if self.minimize_categorical_memory_usage_flag:
-            X_features = self.minimize_categorical_memory_usage(X_features=X_features)
-        if self.features_vectorizers:
-            X_features = self.minimize_ngram_memory_usage(X_features=X_features)
-        if self.features_binned:
-            X_features = self.minimize_binned_memory_usage(X_features=X_features)
-        self.feature_type_family_generated['int'] += self.features_binned
+        X_features = self.minimize_memory_usage(X_features=X_features)
+
+        for feature_type in self.feature_type_family_generated:
+            self.feature_type_family_generated[feature_type] = list(set(self.feature_type_family_generated[feature_type]) - set(self.features_to_remove_post))
 
         self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
@@ -174,19 +138,27 @@ class AbstractFeatureGenerator:
             X_features['__dummy__'] = 0
             self.feature_type_family_generated['int'] = ['__dummy__']
 
+        feature_types_raw = get_type_family_groups_df(X_features)
+        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=self.feature_type_family_generated)
+
         self.features = list(X_features.columns)
         self.fit = True
-
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
-        logger.log(20, 'Original Features:')
+        logger.log(20, 'Original Features (raw dtypes):')
+        for key, val in self.feature_type_family_init_raw.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Original Features (inferred dtypes):')
         for key, val in self.feature_type_family.items():
-            logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Generated Features:')
-        for key, val in self.feature_types_metadata_generated.items():
-            logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'All Features:')
-        for key, val in self.feature_types_metadata_full.items():
-            logger.log(20, '\t%s features: %s' % (key, len(val)))
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Generated Features (special dtypes):')
+        for key, val in self.feature_types_metadata.feature_types_special.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Final Features (raw dtypes):')
+        for key, val in self.feature_types_metadata.feature_types_raw.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Final Features:')
+        for key, val in self.get_feature_types_metadata_full().items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
 
         return X_features
 
@@ -219,13 +191,9 @@ class AbstractFeatureGenerator:
         X_features = X_features[self.features]
         for column in self.features_categorical_final:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
-        if self.minimize_categorical_memory_usage_flag:
-            X_features = self.minimize_categorical_memory_usage(X_features=X_features)
-        if self.features_vectorizers:
-            X_features = self.minimize_ngram_memory_usage(X_features=X_features)
-        if self.features_binned:
-            X_features = self.minimize_binned_memory_usage(X_features=X_features)
+        X_features = self.minimize_memory_usage(X_features=X_features)
         X_features.index = X_index
+
         return X_features
 
     @staticmethod
@@ -356,27 +324,17 @@ class AbstractFeatureGenerator:
             if self.check_if_datetime_feature(col_val):
                 type_family = 'datetime'  # TODO: Verify
                 dtype = 'datetime'
-                self.features_datetime.append(column)
                 logger.debug(f'date: {column}')
                 logger.debug(unique_counts.head(5))
             elif self.check_if_nlp_feature(col_val):
-                self.features_nlp.append(column)
-                self.features_nlp_ratio.append(column)
+                type_family = 'nlp_text'
                 logger.debug(f'nlp: {column}')
                 logger.debug(unique_counts.head(5))
-            # print(is_nlp, '\t', column)
 
             if mark_for_removal:
                 self.features_to_remove.append(column)
             else:
                 self.feature_type_family[type_family].append(column)
-                if type_family == 'object':
-                    self.features_categorical.append(column)
-                elif type_family != 'datetime':
-                    self.features_to_keep_raw.append(column)
-                self.feature_types[dtype].append(column)
-
-        pass
 
     def generate_features(self, X: DataFrame):
         raise NotImplementedError()
@@ -435,12 +393,21 @@ class AbstractFeatureGenerator:
 
         return X
 
+    def minimize_memory_usage(self, X_features):
+        if self.minimize_categorical_memory_usage_flag:
+            X_features = self.minimize_categorical_memory_usage(X_features=X_features)
+        X_features = self.minimize_ngram_memory_usage(X_features=X_features)
+        X_features = self.minimize_binned_memory_usage(X_features=X_features)
+        return X_features
+
     def minimize_ngram_memory_usage(self, X_features):
-        X_features[self.features_vectorizers] = np.clip(X_features[self.features_vectorizers], 0, 255).astype('uint8')
+        if 'nlp_ngram' in self.feature_type_family_generated and self.feature_type_family_generated['nlp_ngram']:
+            X_features[self.feature_type_family_generated['nlp_ngram']] = np.clip(X_features[self.feature_type_family_generated['nlp_ngram']], 0, 255).astype('uint8')
         return X_features
 
     def minimize_binned_memory_usage(self, X_features):
-        X_features[self.features_binned] = np.clip(X_features[self.features_binned], 0, 255).astype('uint8')
+        if self.features_binned:
+            X_features[self.features_binned] = np.clip(X_features[self.features_binned], 0, 255).astype('uint8')
         return X_features
 
     # TODO: Compress further, uint16, etc.
@@ -468,24 +435,8 @@ class AbstractFeatureGenerator:
 
     # TODO: add option for user to specify dtypes on load
     @staticmethod
-    def get_type_family(type):
-        try:
-            if 'datetime' in type.name:
-                return 'datetime'
-            elif np.issubdtype(type, np.integer):
-                return 'int'
-            elif np.issubdtype(type, np.floating):
-                return 'float'
-        except Exception as err:
-            logger.exception('Warning: dtype %s is not recognized as a valid dtype by numpy! AutoGluon may incorrectly handle this feature...')
-            logger.exception(err)
-
-        if type.name in ['bool', 'bool_']:
-            return 'bool'
-        elif type.name in ['str', 'string', 'object']:
-            return 'object'
-        else:
-            return type.name
+    def get_type_family(dtype):
+        return get_type_family(dtype=dtype)
 
     @staticmethod
     def word_count(string):

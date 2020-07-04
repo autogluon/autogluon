@@ -14,7 +14,8 @@ from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJ
 from ...tuning.feature_pruner import FeaturePruner
 from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas
 from .... import metrics
-from ....utils.exceptions import TimeLimitExceeded
+from ....features.feature_types_metadata import FeatureTypesMetadata
+from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
 from ......core import Space, Categorical, List, NestedSpace
@@ -58,7 +59,7 @@ class AbstractModel:
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata=None, debug=0, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs
@@ -153,6 +154,8 @@ class AbstractModel:
             # ignore_hpo=False,
             # max_early_stopping_rounds=None,
             # use_orig_features=True,  # TODO: Only for stackers
+            ignored_feature_types_special=None,  # List, drops any features in `self.feature_types_metadata.feature_types_special[type]` for type in `ignored_feature_types_special`. | Currently undocumented in task.
+            ignored_feature_types_raw=None,  # List, drops any features in `self.feature_types_metadata.feature_types_raw[type]` for type in `ignored_feature_types_raw`. | Currently undocumented in task.
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -164,7 +167,7 @@ class AbstractModel:
             params[param_name] = param_value
 
     def _get_default_searchspace(self) -> dict:
-        return NotImplementedError
+        raise NotImplementedError
 
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from
@@ -204,6 +207,19 @@ class AbstractModel:
                 return X[self.features]
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
+            ignored_feature_types_raw = self.params_aux.get('ignored_feature_types_raw', None)
+            if ignored_feature_types_raw:
+                for ignored_feature_type in ignored_feature_types_raw:
+                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_raw[ignored_feature_type]]
+            ignored_feature_types_special = self.params_aux.get('ignored_feature_types_special', None)
+            if ignored_feature_types_special:
+                for ignored_feature_type in ignored_feature_types_special:
+                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_special[ignored_feature_type]]
+            if not self.features:
+                raise NoValidFeatures
+            if ignored_feature_types_raw or ignored_feature_types_special:
+                if list(X.columns) != self.features:
+                    X = X[self.features]
         return X
 
     def _preprocess_fit_args(self, **kwargs):

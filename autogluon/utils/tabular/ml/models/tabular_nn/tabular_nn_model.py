@@ -9,6 +9,7 @@
 """
 import random, json, time, os, logging, warnings
 from collections import OrderedDict
+
 import numpy as np
 import pandas as pd
 import mxnet as mx
@@ -21,10 +22,8 @@ from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionT
 
 from ......core import Space
 from ......utils import try_import_mxboard
-from ......task.base import BasePredictor
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from ....utils.savers import save_pkl
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....metrics import log_loss, roc_auc
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
@@ -33,8 +32,6 @@ from .embednet import EmbedNet
 from .tabular_nn_trial import tabular_nn_trial
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
-
-# __all__ = ['TabularNeuralNetModel', 'EPS']
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -80,7 +77,6 @@ class TabularNeuralNetModel(AbstractModel):
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
-        self.feature_types_metadata = None
         self.types_of_features = None
         self.feature_arraycol_map = None
         self.feature_type_map = None
@@ -105,6 +101,14 @@ class TabularNeuralNetModel(AbstractModel):
         default_params = get_default_param(self.problem_type)
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _set_default_auxiliary_params(self):
+        default_auxiliary_params = dict(
+            ignored_feature_types_special=['nlp_ngram', 'nlp_category'],
+        )
+        for key, value in default_auxiliary_params.items():
+            self._set_default_param_value(key, value, params=self.params_aux)
+        super()._set_default_auxiliary_params()
 
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
@@ -561,10 +565,6 @@ class TabularNeuralNetModel(AbstractModel):
     def convert_df_dtype_to_str(df):
         return df.astype(str)
 
-    def __get_feature_type_if_present(self, feature_type):
-        """ Returns crude categorization of feature types """
-        return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
-
     def _get_types_of_features(self, df, skew_threshold, embed_min_categories, use_ngram_features):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
@@ -573,15 +573,10 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
 
-        # TODO: Consider setting use_ngram_features=True by default once performance is improved
-        if not use_ngram_features:
-            vectorizers_featnames = self.__get_feature_type_if_present('vectorizers')
-            nlp_featnames = self.__get_feature_type_if_present('nlp')
-            self.feature_types_metadata['int'] = [feature for feature in self.__get_feature_type_if_present('int') if feature not in vectorizers_featnames]
-            self.feature_types_metadata['object'] = [feature for feature in self.__get_feature_type_if_present('object') if feature not in nlp_featnames]
+        feature_types = self.feature_types_metadata.feature_types_raw
 
-        categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
-        continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present('datetime')
+        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
+        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
@@ -606,7 +601,7 @@ class TabularNeuralNetModel(AbstractModel):
                 else:
                     types_of_features['continuous'].append(feature)
             elif feature in categorical_featnames:
-                if num_unique_vals >= embed_min_categories: # sufficiently many cateories to warrant learned embedding dedicated to this feature
+                if num_unique_vals >= embed_min_categories: # sufficiently many categories to warrant learned embedding dedicated to this feature
                     types_of_features['embed'].append(feature)
                 else:
                     types_of_features['onehot'].append(feature)

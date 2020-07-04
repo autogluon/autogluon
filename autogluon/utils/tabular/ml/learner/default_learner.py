@@ -22,10 +22,8 @@ logger = logging.getLogger(__name__)
 # TODO: Add cv / OOF generator option, so that AutoGluon can be used as a base model in an ensemble stacker
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False, random_seed=0, trainer_type=AutoTrainer):
-        super().__init__(path_context=path_context, label=label, id_columns=id_columns, feature_generator=feature_generator, label_count_threshold=label_count_threshold,
-                         problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, is_trainer_present=is_trainer_present, random_seed=random_seed)
+    def __init__(self, trainer_type=AutoTrainer, **kwargs):
+        super().__init__(**kwargs)
         self.trainer_type = trainer_type
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility

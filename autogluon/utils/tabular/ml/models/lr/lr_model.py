@@ -38,10 +38,12 @@ class LinearModel(AbstractModel):
         """
         if self.types_of_features is not None:
             logger.warning("Attempting to _get_types_of_features for LRModel, but previously already did this.")
-        categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
-        continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present(
-            'datetime')
-        language_featnames = self.feature_types_metadata['nlp']
+
+        feature_types = self.feature_types_metadata.feature_types_raw
+
+        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
+        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
@@ -52,21 +54,17 @@ class LinearModel(AbstractModel):
         return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
-        features_seclector = {
+        features_selector = {
             INCLUDE: self._select_features_handle_text_include,
             ONLY: self._select_features_handle_text_only,
             IGNORE: self._select_features_handle_text_ignore,
         }.get(self.handle_text, self._select_features_handle_text_ignore)
-        return features_seclector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
-
-    def __get_feature_type_if_present(self, feature_type):
-        """ Returns crude categorization of feature types """
-        return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
+        return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000, model_specific_preprocessing=False):
         if model_specific_preprocessing:  # This is hack to work-around pre-processing caching in bagging/stacker models
-            X = X.copy()
+            X = X.copy()  # TODO: Might not be necessary
             if is_train:
                 feature_types = self._get_types_of_features(X)
                 self.preprocess_train(X, feature_types, vect_max_features)
@@ -109,8 +107,8 @@ class LinearModel(AbstractModel):
         for param, val in get_param_baseline().items():
             self._set_default_param_value(param, val)
 
-    def _get_default_searchspace(self, problem_type):
-        return get_default_searchspace(problem_type)
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type)
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
