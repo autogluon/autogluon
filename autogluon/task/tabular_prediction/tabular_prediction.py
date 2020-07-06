@@ -399,6 +399,13 @@ class TabularPrediction(BaseTask):
                 Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
             feature_generator_kwargs : dict, default={}
                 Keyword arguments to pass into the `FeatureGenerator` constructor.
+                Valid `AutoMLFeatureGenerator` kwargs:
+                    enable_nlp_vectorizer_features : bool, default = True
+                        If True, the vectorizer argument value is used to generate 'nlp_ngram' features from text features if present.
+                    enable_nlp_ratio_features : bool, default = True
+                        If True, generate 'nlp_special' features from text features if present.
+                    vectorizer : `sklearn.feature_extraction.text.CountVectorizer`, default = `CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)`
+                        Determines the count vectorizer used during feature generation if text features are detected.
             trainer_type : `Trainer` class, default=`AutoTrainer`
                 A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
