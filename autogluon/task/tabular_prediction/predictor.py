@@ -779,7 +779,7 @@ class TabularPredictor(BasePredictor):
         Loads the internal data representation used during model training.
         Individual AutoGluon models like the neural network may apply additional feature transformations that are not reflected in this method.
         This method only applies universal transforms employed by all AutoGluon models.
-        This will raise an exception if `cache_data=False` was set in `task.fit()`.
+        This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
         Warning, the internal representation may:
             Have different features compared to the original data.
             Have different row counts compared to the original data.
@@ -903,11 +903,14 @@ class TabularPredictor(BasePredictor):
         return self._trainer.get_model_names_all()
 
     def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limits=None, hyperparameters=None, holdout_frac=None,
-                teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}, models_name_suffix=None, verbosity=2):
+                teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}, models_name_suffix=None, verbosity=None):
         """
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
         After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
+        This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
+
+        NOTE: Until catboost v0.24 is released, `distill()` with CatBoost students in multiclass classification requires you to first install catboost-dev: `pip install catboost-dev`
 
         Parameters
         ----------
@@ -922,7 +925,7 @@ class TabularPredictor(BasePredictor):
             An optional extra dataset of unlabeled rows that can be used for augmenting the dataset used to fit student models during distillation (ignored if None).
         time_limits : int, default = None
             Approximately how long (in seconds) the distillation process should run for.
-            float
+            If None, no time-constraint will be enforced allowing the distilled models to fully train.
         hyperparameters : dict or str, default = None
             Specifies which models to use as students and what hyperparameter-values to use for them.
             Same as `hyperparameters` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
@@ -954,27 +957,32 @@ class TabularPredictor(BasePredictor):
         models_name_suffix : str, default = None
             Optional suffix that can be appended at the end of all distilled student models' names.
             Note: all distilled models will contain '_DSTL' substring in their name by default.
-        verbosity : int, default = 2
+        verbosity : int, default = None
             Controls amount of printed output during distillation (4 = highest, 0 = lowest).
             Same as `verbosity` argument of :meth:`autogluon.task.tabular_prediction.TabularPrediction.fit`.
+            If None, the same `verbosity` used in previous fit is employed again.
+
+        Returns
+        -------
+        List of names (str) corresponding to the distilled models.
 
         Examples
         --------
         >>> from autogluon import TabularPrediction as task
         >>> train_data = task.Dataset('train.csv')
         >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
-        >>> predictor.distill()
+        >>> distilled_model_names = predictor.distill()
         >>> test_data = task.Dataset('test.csv')
         >>> ldr = predictor.leaderboard(test_data)
-        >>> example_model_todeploy = ldr['model'][1]
-        >>> predictor.predict(test_data, model=example_model_todeploy)
+        >>> model_todeploy = distilled_model_names[0]
+        >>> predictor.predict(test_data, model=model_todeploy)
 
         """
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
-        self._learner.distill(X=train_data, X_test=tuning_data, time_limits=time_limits, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
-                verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
-                augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+        return self._learner.distill(X=train_data, X_test=tuning_data, time_limits=time_limits, hyperparameters=hyperparameters, holdout_frac=holdout_frac,
+                                     verbosity=verbosity, models_name_suffix=models_name_suffix, teacher_preds=teacher_preds,
+                                     augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
 
     @staticmethod
     def _summarize(key, msg, results):

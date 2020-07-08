@@ -7,7 +7,7 @@ import time
 import psutil
 import numpy as np
 
-from .catboost_utils import construct_custom_catboost_metric, make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
+from .catboost_utils import construct_custom_catboost_metric # make_softclass_metric, make_softclass_objective  # TODO: replace with SoftclassObjective, SoftclassCustomMetric once lazy import no longer needed.
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
@@ -56,8 +56,7 @@ class CatboostModel(AbstractModel):
         if self.problem_type == SOFTCLASS:
             try_import_catboostdev()  # Need to first import catboost then catboost_dev not vice-versa.
             from catboost_dev import CatBoostClassifier, CatBoostRegressor, Pool
-            SoftLogLossObjective = make_softclass_objective()
-            SoftclassCustomMetric = make_softclass_metric()
+            from .catboost_softclass_utils import SoftclassCustomMetric, SoftclassObjective
             self._set_default_param_value('eval_metric', construct_custom_catboost_metric(self.stopping_metric, True, not self.stopping_metric_needs_y_pred, self.problem_type))
             self.params['loss_function'] = SoftclassObjective.SoftLogLossObjective()
             self.params['eval_metric'] = SoftclassCustomMetric.SoftLogLossMetric()
@@ -75,7 +74,7 @@ class CatboostModel(AbstractModel):
                 num_classes = self.num_classes
             else:
                 num_classes = 10  # Guess if not given, can do better by looking at y_train
-        elif self.problem_type == SOFTCLASS:
+        elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
             num_classes = Y_train.shape[1]
             self.num_classes = num_classes
         else:
@@ -202,7 +201,10 @@ class CatboostModel(AbstractModel):
 
             # TODO: This only handles memory with time_limits specified, but not with time_limits=None, handle when time_limits=None
             available_mem = psutil.virtual_memory().available
-            model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
+            if self.problem_type == SOFTCLASS:  # TODO: remove this once catboost-dev is no longer necessary and SOFTCLASS objectives can be pickled.
+                model_size_bytes = 1  # skip memory check
+            else:
+                model_size_bytes = sys.getsizeof(pickle.dumps(self.model))
 
             max_memory_proportion = 0.3 * max_memory_usage_ratio
             mem_usage_per_iter = model_size_bytes / num_sample_iter

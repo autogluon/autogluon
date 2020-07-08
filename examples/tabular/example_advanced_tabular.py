@@ -1,6 +1,6 @@
-""" Example script for predicting columns of tables, demonstrating more advanced usage of fit(). 
-    Note that all settings demonstrated here are just chosen for demonstration purposes (to minimize runtime),
-    and do not represent wise choices to use in practice.
+""" Example script for predicting columns of tables, demonstrating more advanced usage of fit().
+    Note that all settings demonstrated here are just chosen for demonstration purposes (to minimize runtime), and do not represent wise choices to use in practice.
+    To maximize predictive accuracy, we recommend you do NOT specify `hyperparameters` or `hyperparameter_tune`, and instead only specify the following fit() arguments: eval_metric=YOUR_METRIC, presets='best_quality'
 """
 
 import autogluon as ag
@@ -13,11 +13,11 @@ print(train_data.head())
 label_column = 'class' # specifies which column do we want to predict
 savedir = 'ag_hpo_models/' # where to save trained models
 
-hyperparams = {'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0,0.5)}, 
+hyperparams = {'NN': {'num_epochs': 10, 'activation': 'relu', 'dropout_prob': ag.Real(0.0,0.5)},
                'GBM': {'num_boost_round': 1000, 'learning_rate': ag.Real(0.01,0.1,log=True)} }
 
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, 
-                     hyperparameter_tune=True, hyperparameters=hyperparams, 
+predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir,
+                     hyperparameter_tune=True, hyperparameters=hyperparams,
                      num_trials=5, time_limits=1*60, num_bagging_folds=0, stack_ensemble_levels=0) # since tuning_data = None, automatically determines train/validation split
 
 results = predictor.fit_summary() # display detailed summary of fit() process

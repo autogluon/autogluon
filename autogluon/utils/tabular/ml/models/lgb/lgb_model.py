@@ -159,7 +159,7 @@ class LGBModel(AbstractModel):
             y_pred_proba = np.exp(y_pred_proba)
             y_pred_proba = np.multiply(y_pred_proba, 1/np.sum(y_pred_proba, axis=1)[:, np.newaxis])
             return y_pred_proba
-        else:  # Should this ever happen?
+        else:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba
             elif y_pred_proba.shape[1] > 2:  # Should this ever happen?

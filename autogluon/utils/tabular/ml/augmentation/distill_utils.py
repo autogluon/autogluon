@@ -9,26 +9,22 @@ from ...metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
 
-def format_distillation_labels(y_train, y_test, problem_type, num_classes=None, eps_labelsmooth=0.01):
-    """ Transforms train/test label objects to the correct type for distillation.
+
+def format_distillation_labels(y, problem_type, num_classes=None, eps_labelsmooth=0.01):
+    """ Transforms train/test label objects (y) to the correct type for distillation (smoothed regression targets for binary, one-hot labels for multiclass).
         eps_labelsmooth : truncates labels to [EPS, 1-EPS], eg. when converting binary problems -> regression
     """
     if problem_type == MULTICLASS:
-        y_train_int = y_train.to_numpy()
-        y_train = np.zeros((y_train_int.size, num_classes))
-        y_train[np.arange(y_train_int.size),y_train_int] = 1
-        y_train = pd.DataFrame(y_train)
-        y_test_int = y_test.to_numpy()
-        y_test = np.zeros((y_test_int.size, num_classes))
-        y_test[np.arange(y_test_int.size),y_test_int] = 1
-        y_test = pd.DataFrame(y_test)
+        y_int = y.to_numpy()
+        y = np.zeros((y_int.size, num_classes))
+        y[np.arange(y_int.size),y_int] = 1
+        y = pd.DataFrame(y)
     elif problem_type == BINARY:
         min_pred = 0.0
         max_pred = 1.0
-        y_train = eps_labelsmooth + ((1-2*eps_labelsmooth)/(max_pred-min_pred)) * (y_train - min_pred)
-        y_test = eps_labelsmooth + ((1-2*eps_labelsmooth)/(max_pred-min_pred)) * (y_test - min_pred)
+        y = eps_labelsmooth + ((1-2*eps_labelsmooth)/(max_pred-min_pred)) * (y - min_pred)
+    return y
 
-    return (y_train, y_test)
 
 def augment_data(X_train, feature_types_metadata, augmentation_data=None, augment_method='spunge', augment_args={}):
     """ augment_method options: ['spunge', 'munge']
@@ -48,17 +44,20 @@ def augment_data(X_train, feature_types_metadata, augmentation_data=None, augmen
         else:
             raise ValueError(f"unknown augment_method: {augment_method}")
 
-    return postprocess_augmented(X_aug, X_train)
+    # return postprocess_augmented(X_aug, X_train)  # TODO: dropping duplicates is much more efficient, but may skew distribution for entirely-categorical data with few categories.
+    logger.log(15, f"Augmented training dataset with {len(X_aug)} extra datapoints")
+    return X_aug.reset_index(drop=True)
+
 
 def postprocess_augmented(X_aug, X):
+    """ Drops rows from augmented data that are duplicated (including duplicates that appeared in original data X). """
     X_aug = pd.concat([X, X_aug])
-    # X_aug.drop_duplicates(keep='first', inplace=True)  # remove duplicate points including those in original training data already.
-    # TODO: dropping duplicates is much more efficient, but may skew distribution for entirely-categorical data with few categories.
+    X_aug.drop_duplicates(keep='first', inplace=True)
     X_aug = X_aug.tail(len(X_aug)-len(X))
     logger.log(15, f"Augmented training dataset with {len(X_aug)} extra datapoints")
     return X_aug.reset_index(drop=True, inplace=False)
 
-# To grid-search {frac_perturb,continuous_feature_noise}: call spunge_augment() many times and track validation score in Trainer.
+
 def spunge_augment(X, feature_types_metadata, num_augmented_samples = 10000, frac_perturb = 0.1,
                    continuous_feature_noise = 0.1, **kwargs):
     """ Generates synthetic datapoints for learning to mimic teacher model in distillation
@@ -103,10 +102,8 @@ def spunge_augment(X, feature_types_metadata, num_augmented_samples = 10000, fra
     return X_aug
 
 
-# Example: z = munge_augment(train_data[:100], trainer.feature_types_metadata, num_augmented_samples=25, s= 0.1, perturb_prob=0.9)
-# To grid-search {p,s}: call munge_augment() many times and track validation score in Trainer.
 def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, perturb_prob = 0.5, s = 1.0, **kwargs):
-    """ Use MUNGE to generate synthetic datapoints for learning to mimic teacher model in distillation.
+    """ Uses MUNGE algorithm to generate synthetic datapoints for learning to mimic teacher model in distillation: https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf
         Args:
             num_augmented_samples: number of additional augmented data points to return
             perturb_prob: probability of perturbing each feature during augmentation. Set near 0 to ensure augmented sample distribution remains closer to real data.
@@ -147,12 +144,7 @@ def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, pert
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)
-    """
-    column_list = X.columns.tolist()
-    numer_colinds = [j for j in range(len(column_list)) if column_list[j] in continuous_featnames]
-    categ_colinds = [j for j in range(len(column_list)) if column_list[j] not in continuous_featnames]
-    numer_std_devs = [np.std(X.iloc[:,j]) for j in numer_colinds]  # list whose jth element = std dev of the jth numerical feature
-    """
+
     for i in range(num_augmented_samples):
         og_ind = i % len(X)
         augdata_i = X.iloc[og_ind].copy()
@@ -167,6 +159,7 @@ def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, pert
         X_aug.iloc[i] = augdata_i
 
     return X_aug
+
 
 def nearest_neighbor(numer_i, categ_i, numer_candidates, categ_candidates):
     """ Returns tuple (index, dist) of nearest neighbor point in the list of candidates (pd.DataFrame) to query point i (pd.Series).

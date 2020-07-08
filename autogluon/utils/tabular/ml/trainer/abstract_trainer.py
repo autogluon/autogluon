@@ -312,7 +312,7 @@ class AbstractTrainer:
             self.model_types_inner[model.name] = model._child_type
         else:
             self.model_types_inner[model.name] = type(model)
-        if model.val_score is not None and stack_name != self.distill_stackname:
+        if model.val_score is not None and stack_name != self.distill_stackname:  # TODO: may want to avoid hard-coding logic into specific stack names
             logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
         if model.fit_time is not None:
             logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
@@ -1468,7 +1468,7 @@ class AbstractTrainer:
         return hyperparameters_valid
 
     def distill(self, X=None, y=None, X_test=None, y_test=None,
-                time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=3,
+                time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
                 models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ Various distillation algorithms.
@@ -1492,12 +1492,17 @@ class AbstractTrainer:
                 }
                 augment_args (dict): args passed into the augmentation function corresponding to augment_method.
         """
+        if verbosity is None:
+            verbosity = self.verbosity
+
         hyperparameter_tune = False  # TODO: add as argument with scheduler options.
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
         logger.log(20, f"Distilling with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
         if X is None:
+            if y is not None:
+                raise ValueError("X cannot be None when y specified.")
             X = self.load_X_train()
             if not self.bagged_mode:
                 try:
@@ -1533,7 +1538,8 @@ class AbstractTrainer:
             logger.log(20, "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.")
 
         if teacher_preds in ['onehot','soft']:
-            y_train, y_test = format_distillation_labels(y_train, y_test, self.problem_type, self.num_classes)
+            y_train = format_distillation_labels(y_train, self.problem_type, self.num_classes)
+            y_test = format_distillation_labels(y_test, self.problem_type, self.num_classes)
 
         if augment_method is None and augmentation_data is None:
             if teacher_preds == 'hard':
@@ -1609,7 +1615,7 @@ class AbstractTrainer:
 
         self.time_train_start = time.time()
         self.time_limit = time_limits
-
+        distilled_model_names = []
         for model in models_distill:
             time_left = None
             if time_limits is not None:
@@ -1624,9 +1630,11 @@ class AbstractTrainer:
                 self.model_performance[model_name] = model_score
                 model_obj = self.load_model(model_name)
                 model_obj.val_score = model_score
+                model_obj.save()  # TODO: consider omitting for sake of efficiency
                 self.model_graph.nodes[model_name]['val_score'] = model_score
+                distilled_model_names.append(model_name)
                 logger.log(20, '\t' + str(round(model_obj.val_score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
         # reset trainer to old state before distill() was called:
-        self.bagged_mode = og_bagged_mode
+        self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
         self.verbosity = og_verbosity
-        self.save()
+        return distilled_model_names

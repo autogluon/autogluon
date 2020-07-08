@@ -138,11 +138,11 @@ def get_param_regression_baseline_custom():
 
 def get_param_softclass_baseline(num_classes):
     params = get_param_multiclass_baseline(num_classes)
-    _ = params.pop('metric', None)
+    params.pop('metric', None)
     return params.copy()
 
 
 def get_param_softclass_baseline_custom(num_classes):
     params = get_param_multiclass_baseline_custom(num_classes)
-    _ = params.pop('metric', None)
+    params.pop('metric', None)
     return params.copy()
