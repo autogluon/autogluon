@@ -114,7 +114,6 @@ def munge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented
     nn_dummy = TabularNeuralNetModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, objective_func=mean_squared_error,
                                      hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},
                                      features = list(X.columns), feature_types_metadata=feature_types_metadata)
-    nn_dummy.feature_types_metadata = feature_types_metadata
     processed_data = nn_dummy.process_train_data(df=nn_dummy.preprocess(X), labels=pd.Series([1]*len(X)), batch_size=nn_dummy.params['batch_size'],
                         num_dataloading_workers=0, impute_strategy=nn_dummy.params['proc.impute_strategy'],
                         max_category_levels=nn_dummy.params['proc.max_category_levels'], skew_threshold=nn_dummy.params['proc.skew_threshold'],
