@@ -17,6 +17,8 @@ from ....ml.models.abstract.abstract_model import AbstractModel
 logger = logging.getLogger(__name__)
 
 
+# TODO: Can Bagged LinearModels be combined during inference to 1 model by averaging their weights?
+#  What about just always using refit_full model? Should we even bag at all? Do we care that its slightly overfit?
 class LinearModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -38,10 +40,12 @@ class LinearModel(AbstractModel):
         """
         if self.types_of_features is not None:
             logger.warning("Attempting to _get_types_of_features for LRModel, but previously already did this.")
-        categorical_featnames = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
-        continuous_featnames = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present(
-            'datetime')
-        language_featnames = self.feature_types_metadata['nlp']
+
+        feature_types = self.feature_types_metadata.feature_types_raw
+
+        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
+        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
@@ -52,26 +56,22 @@ class LinearModel(AbstractModel):
         return self._select_features(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     def _select_features(self, df, types_of_features, categorical_featnames, language_featnames, continuous_featnames):
-        features_seclector = {
+        features_selector = {
             INCLUDE: self._select_features_handle_text_include,
             ONLY: self._select_features_handle_text_only,
             IGNORE: self._select_features_handle_text_ignore,
         }.get(self.handle_text, self._select_features_handle_text_ignore)
-        return features_seclector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
-
-    def __get_feature_type_if_present(self, feature_type):
-        """ Returns crude categorization of feature types """
-        return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
+        return features_selector(df, types_of_features, categorical_featnames, language_featnames, continuous_featnames)
 
     # TODO: handle collinear features - they will impact results quality
     def preprocess(self, X: DataFrame, is_train=False, vect_max_features=1000, model_specific_preprocessing=False):
+        X = super().preprocess(X=X)
         if model_specific_preprocessing:  # This is hack to work-around pre-processing caching in bagging/stacker models
-            X = X.copy()
             if is_train:
                 feature_types = self._get_types_of_features(X)
-                self.preprocess_train(X, feature_types, vect_max_features)
-            X = self.pipeline.transform(X)
-
+                X = self.preprocess_train(X, feature_types, vect_max_features)
+            else:
+                X = self.pipeline.transform(X)
         return X
 
     def preprocess_train(self, X, feature_types, vect_max_features):
@@ -79,8 +79,7 @@ class LinearModel(AbstractModel):
         if len(feature_types['language']) > 0:
             pipeline = Pipeline(steps=[
                 ("preparator", NlpDataPreprocessor(nlp_cols=feature_types['language'])),
-                ("vectorizer",
-                 TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self.tokenize))
+                ("vectorizer", TfidfVectorizer(ngram_range=self.params['proc.ngram_range'], sublinear_tf=True, max_features=vect_max_features, tokenizer=self.tokenize)),
             ])
             transformer_list.append(('vect', pipeline))
         if len(feature_types['onehot']) > 0:
@@ -103,14 +102,14 @@ class LinearModel(AbstractModel):
             ])
             transformer_list.append(('skew', pipeline))
         self.pipeline = FeatureUnion(transformer_list=transformer_list)
-        self.pipeline.fit(X)
+        return self.pipeline.fit_transform(X)
 
     def _set_default_params(self):
         for param, val in get_param_baseline().items():
             self._set_default_param_value(param, val)
 
-    def _get_default_searchspace(self, problem_type):
-        return get_default_searchspace(problem_type)
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type)
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
@@ -131,6 +130,7 @@ class LinearModel(AbstractModel):
             params['alpha'] = 1 / (params['C'] if params['C'] != 0 else 1e-8)
             params.pop('C', None)
 
+        # TODO: copy_X=True currently set during regression problem type, could potentially set to False to avoid unnecessary data copy.
         model = self.model_class(**params)
 
         logger.log(15, f'Training Model with the following hyperparameter settings:')
@@ -191,8 +191,6 @@ class LinearModel(AbstractModel):
             feature_data = df[feature]
             num_unique_vals = len(feature_data.unique())
             if feature in continuous_featnames:
-                if '__nlp__' in feature:
-                    continue
                 if np.abs(feature_data.skew()) > self.params['proc.skew_threshold']:
                     types_of_features['skewed'].append(feature)
                 else:

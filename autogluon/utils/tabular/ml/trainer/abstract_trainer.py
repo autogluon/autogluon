@@ -10,7 +10,7 @@ from collections import defaultdict
 from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, REFIT_FULL_NAME, REFIT_FULL_SUFFIX
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
-from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError
+from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
 from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
@@ -40,8 +40,6 @@ class AbstractTrainer:
                  stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
-        if feature_types_metadata is None:
-            feature_types_metadata = {}
         self.feature_types_metadata = feature_types_metadata
         self.save_data = save_data
         self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
@@ -234,7 +232,7 @@ class AbstractTrainer:
         if n_repeats is None:
             n_repeats = self.n_repeats
         if model.feature_types_metadata is None:
-            model.feature_types_metadata = self.feature_types_metadata  # TODO: move this into model creation process?
+            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'verbosity': self.verbosity,
@@ -282,11 +280,14 @@ class AbstractTrainer:
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
         except TimeLimitExceeded:
-            logger.log(20, '\tTime limit exceeded... Skipping %s.' % model.name)
+            logger.log(20, f'\tTime limit exceeded... Skipping {model.name}.')
             # logger.log(20, '\tTime wasted: ' + str(time.time() - fit_start_time))
             del model
         except NotEnoughMemoryError:
-            logger.warning('\tNot enough memory to train %s... Skipping this model.' % model.name)
+            logger.warning(f'\tNot enough memory to train {model.name}... Skipping this model.')
+            del model
+        except NoValidFeatures:
+            logger.warning(f'\tNo valid features to train {model.name}... Skipping this model.')
             del model
         except Exception as err:
             if self.verbosity >= 1:
@@ -331,7 +332,7 @@ class AbstractTrainer:
     def train_single_full(self, X_train, y_train, X_test, y_test, model: AbstractModel, feature_prune=False,
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
-            model.feature_types_metadata = self.feature_types_metadata  # TODO: Don't set feature_types_metadata here
+            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: Don't set feature_types_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))

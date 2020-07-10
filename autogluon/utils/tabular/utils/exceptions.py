@@ -6,3 +6,7 @@ class TimeLimitExceeded(Exception):
 
 class NotEnoughMemoryError(Exception):
     pass
+
+
+class NoValidFeatures(Exception):
+    pass

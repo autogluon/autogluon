@@ -148,7 +148,7 @@ class TabularPrediction(BaseTask):
                     This preset pairs well with the other presets such as `good_quality_faster_inference_only_refit` to make a very compact final model.
                     Identical to calling `predictor.delete_models(models_to_keep='best', dry_run=False)` and `predictor.save_space()` directly after `fit()`.
 
-                ignore_text={'feature_generator_kwargs': {'enable_nlp_vectorizer_features': False, 'enable_nlp_ratio_features': False}}
+                ignore_text={'feature_generator_kwargs': {'enable_text_ngram_features': False, 'enable_text_special_features': False}}
                     Disables automated feature generation when text features are detected.
                     This is useful to determine how beneficial text features are to the end result, as well as to ensure features are not mistaken for text when they are not.
 
@@ -393,12 +393,21 @@ class TabularPrediction(BaseTask):
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full` is set.
-            feature_generator_type : `FeatureGenerator` class, default=`AutoMLFeatureGenerator`
+            feature_generator_type : :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AbstractFeatureGenerator` class, default = :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AutoMLFeatureGenerator`
                 A `FeatureGenerator` class specifying which feature engineering protocol to follow
-                (see autogluon.utils.tabular.features.abstract_feature_generator.AbstractFeatureGenerator).
                 Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
             feature_generator_kwargs : dict, default={}
                 Keyword arguments to pass into the `FeatureGenerator` constructor.
+                Valid :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AutoMLFeatureGenerator` kwargs:
+                    enable_text_ngram_features : bool, default = True
+                        If True, the vectorizer argument value is used to generate 'text_ngram' features from text features if present.
+                        Try setting this to False if you encounter memory issues running AutoGluon on text data and cannot access a machine with more memory.
+                    enable_text_special_features : bool, default = True
+                        If True, generate 'text_special' features from text features if present.
+                        Examples of 'text_special' features include the number of whitespaces and the average word length in a text feature.
+                    vectorizer : `sklearn.feature_extraction.text.CountVectorizer`, default = `CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)`
+                        Determines the count vectorizer used during feature generation if text features are detected.
+                        If your data contain text fields and you encounter memory issues running AutoGluon (and cannot access a machine with more memory), then consider reducing max_features or setting n_gram_range=(1, 2).
             trainer_type : `Trainer` class, default=`AutoTrainer`
                 A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
