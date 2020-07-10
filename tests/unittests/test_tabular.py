@@ -83,8 +83,8 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = task.fit(train_data=train_data, label=label, output_directory=savedir)
     leaderboard = predictor.leaderboard(dataset=test_data)
-    assert(set(predictor.model_names) == set(leaderboard['model']))
-    num_models = len(predictor.model_names)
+    assert(set(predictor.get_model_names()) == set(leaderboard['model']))
+    num_models = len(predictor.get_model_names())
     feature_importances = predictor.feature_importance(dataset=test_data)
     original_features = set(train_data.columns)
     original_features.remove(label)
@@ -95,17 +95,17 @@ def test_advanced_functionality():
     assert(predictor.get_model_full_dict() == dict())
     predictor.refit_full()
     assert(len(predictor.get_model_full_dict()) == num_models)
-    assert(len(predictor.model_names) == num_models * 2)
-    for model in predictor.model_names:
+    assert(len(predictor.get_model_names()) == num_models * 2)
+    for model in predictor.get_model_names():
         predictor.predict(dataset=test_data, model=model)
     predictor.refit_full()  # Confirm that refit_models aren't further refit.
     assert(len(predictor.get_model_full_dict()) == num_models)
-    assert(len(predictor.model_names) == num_models * 2)
+    assert(len(predictor.get_model_names()) == num_models * 2)
     predictor.delete_models(models_to_keep=[])  # Test that dry-run doesn't delete models
-    assert(len(predictor.model_names) == num_models * 2)
+    assert(len(predictor.get_model_names()) == num_models * 2)
     predictor.predict(dataset=test_data)
     predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
-    assert(len(predictor.model_names) == 0)
+    assert(len(predictor.get_model_names()) == 0)
     assert(len(predictor.leaderboard()) == 0)
     try:
         predictor.predict(dataset=test_data)

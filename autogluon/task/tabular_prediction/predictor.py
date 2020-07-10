@@ -37,10 +37,6 @@ class TabularPredictor(BasePredictor):
                 `feature_types.get_feature_types_raw_flattened()`: Dictionary of feature name -> raw dtype mappings.
                 `feature_types.feature_types_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
                 `feature_types.feature_types_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
-        model_names : list
-            List of model names trained during `fit()`.
-        model_performance : dict
-            Maps names of trained models to their predictive performance values attained on the validation dataset during `fit()`.
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
             For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
@@ -92,11 +88,19 @@ class TabularPredictor(BasePredictor):
         self.eval_metric = self._learner.objective_func
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
-        self.model_names = self._trainer.get_model_names_all()  # TODO: Consider making this a function instead of a variable: This should never be de-synced with the output of self._trainer.get_model_names_all()
-        self.model_performance = self._trainer.model_performance  # TODO: Remove this in future, do not use this.
         self.class_labels = self._learner.class_labels
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
+
+    @property
+    def model_names(self):
+        logger.warning('WARNING: `predictor.model_names` is a deprecated `predictor` variable. Use `predictor.get_model_names()` instead. Use of `predictor.model_names` will result in an exception starting in autogluon==0.1')
+        return self.get_model_names()
+
+    @property
+    def model_performance(self):
+        logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
+        return self._trainer.model_performance
 
     def predict(self, dataset, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
@@ -109,7 +113,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get predictions from. Defaults to None, which uses the highest scoring model on the validation set.
-                Valid models are listed in this `predictor` by calling `predictor.model_names`
+                Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
             use_pred_cache : bool (optional)
@@ -138,7 +142,7 @@ class TabularPredictor(BasePredictor):
                 If str is passed, `dataset` will be loaded using the str value as the file path.
             model : str (optional)
                 The name of the model to get prediction probabilities from. Defaults to None, which uses the highest scoring model on the validation set.
-                Valid models are listed in this `predictor` by calling `predictor.model_names`
+                Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas object (True) or numpy array (False).
                 Pandas object is a DataFrame if this is a multiclass problem or `as_multiclass=True`, otherwise it is a Series.
@@ -408,13 +412,13 @@ class TabularPredictor(BasePredictor):
             The output data will be equivalent to the input data that would be sent into `model.predict_proba(data)`.
                 Note: This only applies to cases where `dataset` is not the training data.
             If `None`, then only return generically preprocessed features prior to any model fitting.
-            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
             Specifying a `refit_full` model will cause an exception if `dataset=None`.
             `base_models=None` is a requirement when specifying `model`.
         base_models : list, default = None
             List of model names to use as base_models for a hypothetical stacker model when generating input features.
             If `None`, then only return generically preprocessed features prior to any model fitting.
-            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
             If a stacker model S exists with `base_models=M`, then setting `base_models=M` is equivalent to setting `model=S`.
             `model=None` is a requirement when specifying `base_models`.
         return_original_features : bool, default = True
@@ -509,7 +513,7 @@ class TabularPredictor(BasePredictor):
                 More accurate feature importances will be obtained from new data that was held-out during `fit()`.
         model : str, default = None
             Model to get feature importances for, if None the best model is chosen.
-            Valid models are listed in this `predictor` by calling `predictor.model_names`
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
         features : list, default = None
             List of str feature names that feature importances are calculated for and returned, specify None to get all feature importances.
             If you only want to compute feature importances for some of the features, you can pass their names in as a list of str.
@@ -592,14 +596,13 @@ class TabularPredictor(BasePredictor):
                 If 'all' then all models are refitted.
                 If 'best' then the model with the highest validation score is refit.
             All ancestor models will also be refit in the case that the selected model is a weighted or stacker ensemble.
-            Valid models are listed in this `predictor` by calling `predictor.model_names`.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
 
         Returns
         -------
         Dictionary of original model names -> refit_full model names.
         """
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
-        self.model_names = self._trainer.get_model_names_all()
         return refit_full_dict
 
     def get_model_full_dict(self):
@@ -628,6 +631,78 @@ class TabularPredictor(BasePredictor):
         Dictionary of `predictor` metadata.
         """
         return self._learner.get_info(include_model_info=True)
+
+    # TODO: Handle cases where name is same as a previously fit model, currently overwrites old model.
+    # TODO: Add dataset argument
+    # TODO: Add option to disable OOF generation of newly fitted models
+    # TODO: Move code logic to learner/trainer
+    # TODO: Add task.fit arg to perform this automatically at end of training
+    # TODO: Consider adding cutoff arguments such as top-k models
+    def fit_weighted_ensemble(self, base_models: list = None, name_suffix='_custom', expand_pareto_frontier=False, time_limits=None):
+        """
+        Fits new weighted ensemble models to combine predictions of previously-trained models.
+        `cache_data` must have been set to `True` during the original training to enable this functionality.
+
+        Parameters
+        ----------
+        base_models : list, default = None
+            List of model names the weighted ensemble can consider as candidates.
+            If None, all previously trained models are considered except for weighted ensemble models.
+            As an example, to train a weighted ensemble that can only have weights assigned to the models 'model_a' and 'model_b', set `base_models=['model_a', 'model_b']`
+        name_suffix : str, default = '_custom'
+            Name suffix to add to the name of the newly fitted ensemble model.
+            Warning: If the name of a trained model from this function is identical to an existing model, it will overwrite the existing model.
+            Ensure that `name_suffix` is unique each time `fit_weighted_ensemble` is called to avoid this.
+        expand_pareto_frontier : bool, default = False
+            If True, will train N-1 weighted ensemble models instead of 1, where `N=len(base_models)`.
+            The final model trained when True is equivalent to the model trained when False.
+            These weighted ensemble models will attempt to expand the pareto frontier.
+            This will create many different weighted ensembles which have different accuracy/memory/inference-speed trade-offs.
+            This is particularly useful when inference speed is an important consideration.
+        time_limits : int, default = None
+            Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limits` value is applied to each model.
+            If None, the ensemble models train without time restriction.
+
+        Returns
+        -------
+        List of newly trained weighted ensemble model names.
+        If an exception is encountered while training an ensemble model, that model's name will be absent from the list.
+        """
+        trainer = self._learner.load_trainer()
+
+        if trainer.bagged_mode:
+            X = trainer.load_X_train()
+            y = trainer.load_y_train()
+            fit = True
+        else:
+            X = trainer.load_X_val()
+            y = trainer.load_y_val()
+            fit = False
+
+        stack_name = 'aux1'
+        if base_models is None:
+            base_models = trainer.get_model_names(stack_name='core')
+
+        X_train_stack_preds = trainer.get_inputs_to_stacker_v2(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+
+        models = []
+
+        if expand_pareto_frontier:
+            leaderboard = self.leaderboard(silent=True)
+            leaderboard = leaderboard[leaderboard['model'].isin(base_models)]
+            leaderboard = leaderboard.sort_values(by='pred_time_val')
+            models_to_check = leaderboard['model'].tolist()
+            for i in range(1, len(models_to_check) - 1):
+                models_to_check_now = models_to_check[:i+1]
+                max_base_model_level = max([trainer.get_model_level(base_model) for base_model in models_to_check_now])
+                weighted_ensemble_level = max_base_model_level + 1
+                models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=models_to_check_now, name_suffix=name_suffix + '_pareto' + str(i), time_limit=time_limits)
+
+        max_base_model_level = max([trainer.get_model_level(base_model) for base_model in base_models])
+        weighted_ensemble_level = max_base_model_level + 1
+        models += trainer.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=weighted_ensemble_level, stack_name=stack_name, base_model_names=base_models, name_suffix=name_suffix, time_limit=time_limits)
+
+        return models
 
     @classmethod
     def load(cls, output_directory, verbosity=2):
@@ -785,7 +860,7 @@ class TabularPredictor(BasePredictor):
             All models that are not specified and are also not required as a dependency of any model in `models_to_keep` will be deleted.
             Specify `models_to_keep='best'` to keep only the best model and its model dependencies.
             `models_to_delete` must be None if `models_to_keep` is set.
-            To see the list of possible model names, use: `predictor.model_names` or `predictor.leaderboard()`.
+            To see the list of possible model names, use: `predictor.get_model_names()` or `predictor.leaderboard()`.
         models_to_delete : str or list, default = None
             Name of model or models to delete.
             All models that are not specified but depend on a model in `models_to_delete` will also be deleted.
@@ -809,7 +884,10 @@ class TabularPredictor(BasePredictor):
             if models_to_keep is None:
                 models_to_keep = self._trainer.get_model_best()
         self._trainer.delete_models(models_to_keep=models_to_keep, models_to_delete=models_to_delete, allow_delete_cascade=allow_delete_cascade, delete_from_disk=delete_from_disk, dry_run=dry_run)
-        self.model_names = self._trainer.get_model_names_all()
+
+    def get_model_names(self):
+        """Returns the list of model names trained in this `predictor` object."""
+        return self._trainer.get_model_names_all()
 
     @staticmethod
     def _summarize(key, msg, results):
