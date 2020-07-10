@@ -5,6 +5,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
+from ...features.feature_types_metadata import FeatureTypesMetadata
 from ...metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -26,9 +27,11 @@ def format_distillation_labels(y, problem_type, num_classes=None, eps_labelsmoot
     return y
 
 
-def augment_data(X_train, feature_types_metadata, augmentation_data=None, augment_method='spunge', augment_args={}):
+def augment_data(X_train, feature_types_metadata: FeatureTypesMetadata, augmentation_data=None, augment_method='spunge', augment_args=None):
     """ augment_method options: ['spunge', 'munge']
     """
+    if augment_args is None:
+        augment_args = {}
     if augmentation_data is not None:
         X_aug = augmentation_data
     else:
@@ -58,8 +61,7 @@ def postprocess_augmented(X_aug, X):
     return X_aug.reset_index(drop=True, inplace=False)
 
 
-def spunge_augment(X, feature_types_metadata, num_augmented_samples = 10000, frac_perturb = 0.1,
-                   continuous_feature_noise = 0.1, **kwargs):
+def spunge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented_samples=10000, frac_perturb=0.1, continuous_feature_noise=0.1, **kwargs):
     """ Generates synthetic datapoints for learning to mimic teacher model in distillation
         via simplified version of MUNGE strategy (that does not require near-neighbor search).
 
@@ -74,11 +76,11 @@ def spunge_augment(X, feature_types_metadata, num_augmented_samples = 10000, fra
     num_feature_perturb = max(1, int(frac_perturb*len(X.columns)))
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
-    continuous_types = ['float','int', 'datetime']
+    continuous_types = ['float', 'int']
     continuous_featnames = [] # these features will have shuffled values with added noise
     for contype in continuous_types:
-        if contype in feature_types_metadata:
-            continuous_featnames += feature_types_metadata[contype]
+        if contype in feature_types_metadata.feature_types_raw:
+            continuous_featnames += feature_types_metadata.feature_types_raw[contype]
 
     for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
         og_ind = i % len(X)
@@ -102,15 +104,16 @@ def spunge_augment(X, feature_types_metadata, num_augmented_samples = 10000, fra
     return X_aug
 
 
-def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, perturb_prob = 0.5, s = 1.0, **kwargs):
+def munge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs):
     """ Uses MUNGE algorithm to generate synthetic datapoints for learning to mimic teacher model in distillation: https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf
         Args:
             num_augmented_samples: number of additional augmented data points to return
             perturb_prob: probability of perturbing each feature during augmentation. Set near 0 to ensure augmented sample distribution remains closer to real data.
             s: We noise numeric features by their std-dev divided by this factor (inverse of continuous_feature_noise). Set large to ensure augmented sample distribution remains closer to real data.
     """
-    nn_dummy = TabularNeuralNetModel( path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, objective_func=mean_squared_error,
-                    hyperparameters={'num_dataloading_workers':0,'proc.embed_min_categories':np.inf}, features = list(X.columns))
+    nn_dummy = TabularNeuralNetModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, objective_func=mean_squared_error,
+                                     hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},
+                                     features = list(X.columns), feature_types_metadata=feature_types_metadata)
     nn_dummy.feature_types_metadata = feature_types_metadata
     processed_data = nn_dummy.process_train_data(df=nn_dummy.preprocess(X), labels=pd.Series([1]*len(X)), batch_size=nn_dummy.params['batch_size'],
                         num_dataloading_workers=0, impute_strategy=nn_dummy.params['proc.impute_strategy'],
@@ -136,11 +139,11 @@ def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, pert
     X = X.copy()
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
-    continuous_types = ['float','int', 'datetime']
+    continuous_types = ['float', 'int']
     continuous_featnames = [] # these features will have shuffled values with added noise
     for contype in continuous_types:
-        if contype in feature_types_metadata:
-            continuous_featnames += feature_types_metadata[contype]
+        if contype in feature_types_metadata.feature_types_raw:
+            continuous_featnames += feature_types_metadata.feature_types_raw[contype]
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)
@@ -159,12 +162,3 @@ def munge_augment(X, feature_types_metadata, num_augmented_samples = 10000, pert
         X_aug.iloc[i] = augdata_i
 
     return X_aug
-
-
-def nearest_neighbor(numer_i, categ_i, numer_candidates, categ_candidates):
-    """ Returns tuple (index, dist) of nearest neighbor point in the list of candidates (pd.DataFrame) to query point i (pd.Series).
-        Uses Euclidean distance for numerical features, Hamming for categorical features.
-    """
-    from sklearn.metrics.pairwise import paired_euclidean_distances
-    dists = paired_euclidean_distances(numer_i.to_numpy(), numer_candidates.to_numpy())
-    return (index, distance)
