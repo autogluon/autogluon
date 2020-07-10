@@ -637,35 +637,36 @@ class TabularPredictor(BasePredictor):
     # TODO: Add option to disable OOF generation of newly fitted models
     # TODO: Move code logic to learner/trainer
     # TODO: Add task.fit arg to perform this automatically at end of training
+    # TODO: Consider adding cutoff arguments such as top-k models
     def fit_weighted_ensemble(self, base_models: list = None, name_suffix='_custom', expand_pareto_frontier=False, time_limits=None):
         """
-        [EXPERIMENTAL] Fits new weighted ensemble models.
-        Warning: This functionality is currently in preview mode.
-            The API may change entirely in future versions without warning.
+        Fits new weighted ensemble models to combine predictions of previously-trained models.
+        `cache_data` must have been set to `True` during the original training to enable this functionality.
 
         Parameters
         ----------
         base_models : list, default = None
-            List of model names the weighted ensemble can use.
-            If None, all previously trained models are used except for weighted ensemble models.
+            List of model names the weighted ensemble can consider as candidates.
+            If None, all previously trained models are considered except for weighted ensemble models.
             As an example, to train a weighted ensemble that can only have weights assigned to the models 'model_a' and 'model_b', set `base_models=['model_a', 'model_b']`
         name_suffix : str, default = '_custom'
-            Name suffix to add to the name of the newly fitted model.
+            Name suffix to add to the name of the newly fitted ensemble model.
             Warning: If the name of a trained model from this function is identical to an existing model, it will overwrite the existing model.
             Ensure that `name_suffix` is unique each time `fit_weighted_ensemble` is called to avoid this.
         expand_pareto_frontier : bool, default = False
             If True, will train N-1 weighted ensemble models instead of 1, where `N=len(base_models)`.
             The final model trained when True is equivalent to the model trained when False.
             These weighted ensemble models will attempt to expand the pareto frontier.
-            This is useful when inference speed is an important consideration.
+            This will create many different weighted ensembles which have different accuracy/memory/inference-speed trade-offs.
+            This is particularly useful when inference speed is an important consideration.
         time_limits : int, default = None
-            Time in seconds each model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limits` value is applied to each model.
-            If None, the models train without time restriction.
+            Time in seconds each weighted ensemble model is allowed to train for. If `expand_pareto_frontier=True`, the `time_limits` value is applied to each model.
+            If None, the ensemble models train without time restriction.
 
         Returns
         -------
         List of newly trained weighted ensemble model names.
-        If an exception is encountered while training a model, that model's name will be absent from the list.
+        If an exception is encountered while training an ensemble model, that model's name will be absent from the list.
         """
         trainer = self._learner.load_trainer()
 
