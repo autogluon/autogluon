@@ -10,8 +10,8 @@ class FeatureTypesMetadata:
 
     feature_types_raw is the dictionary computed as output to :function:`autogluon.utils.tabular.features.utils.get_type_family_groups_df`
     feature_types_special is an optional dictionary to communicate special properties of features to downstream models that have special handling functionality for those feature types.
-        As an example, feature_types_special might contain a key 'nlp_ngram' indicating that the list of values are all features which were generated from a nlp vectorizer and represent ngrams.
-        A downstream model such as a K-Nearest-Neighbor model could then check if 'nlp_ngram' is present in feature_types_special and drop those features if present, to speed up training and inference time.
+        As an example, feature_types_special might contain a key 'text_ngram' indicating that the list of values are all features which were generated from a nlp vectorizer and represent ngrams.
+        A downstream model such as a K-Nearest-Neighbor model could then check if 'text_ngram' is present in feature_types_special and drop those features if present, to speed up training and inference time.
     """
     def __init__(self, feature_types_raw: defaultdict, feature_types_special: defaultdict = None):
         # These dictionaries must have only 1 instance of a feature among all of its value lists.
@@ -44,6 +44,9 @@ class FeatureTypesMetadata:
 
     def get_feature_type_special(self, feature):
         return self._get_feature_type(feature=feature, feature_types_dict=self.feature_types_special)
+
+    def get_feature_types_raw_flattened(self):
+        return {feature: type_family for type_family, features in self.feature_types_raw.items() for feature in features}
 
     @staticmethod
     def _get_feature_type(feature, feature_types_dict):

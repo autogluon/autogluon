@@ -100,6 +100,7 @@ class AbstractFeatureGenerator:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
                 self.features_to_remove_post.append(column)
+            # TODO: Consider making 0.99 a parameter to FeatureGenerator
             elif 'object' in self.feature_type_family and column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
                 self.features_to_remove_post.append(column)
 
@@ -327,7 +328,7 @@ class AbstractFeatureGenerator:
                 logger.debug(f'date: {column}')
                 logger.debug(unique_counts.head(5))
             elif self.check_if_nlp_feature(col_val):
-                type_family = 'nlp_text'
+                type_family = 'text'
                 logger.debug(f'nlp: {column}')
                 logger.debug(unique_counts.head(5))
 
@@ -401,8 +402,8 @@ class AbstractFeatureGenerator:
         return X_features
 
     def minimize_ngram_memory_usage(self, X_features):
-        if 'nlp_ngram' in self.feature_type_family_generated and self.feature_type_family_generated['nlp_ngram']:
-            X_features[self.feature_type_family_generated['nlp_ngram']] = np.clip(X_features[self.feature_type_family_generated['nlp_ngram']], 0, 255).astype('uint8')
+        if 'text_ngram' in self.feature_type_family_generated and self.feature_type_family_generated['text_ngram']:
+            X_features[self.feature_type_family_generated['text_ngram']] = np.clip(X_features[self.feature_type_family_generated['text_ngram']], 0, 255).astype('uint8')
         return X_features
 
     def minimize_binned_memory_usage(self, X_features):
