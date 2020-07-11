@@ -60,13 +60,13 @@ class AbstractModel:
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                objective_func (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
+                eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
                 feature_types_metadata (autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime.
         """
@@ -78,26 +78,26 @@ class AbstractModel:
         self.model = model
         self.problem_type = problem_type
         # TODO: RENAME OBJECTIVE FUNC
-        if objective_func is not None:
-            self.objective_func = metrics.get_metric(objective_func, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance  # TODO: Make it possible to pass str here as in TabularPrediction.fit()
+        if eval_metric is not None:
+            self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance  # TODO: Make it possible to pass str here as in TabularPrediction.fit()
         else:
-            self.objective_func = infer_eval_metric(problem_type=self.problem_type)
-            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.objective_func.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
+            self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
+            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.eval_metric.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
 
         if stopping_metric is None:
-            self.stopping_metric = self.objective_func
+            self.stopping_metric = self.eval_metric
         else:
             self.stopping_metric = stopping_metric
 
-        if self.objective_func.name in OBJECTIVES_TO_NORMALIZE:
+        if self.eval_metric.name in OBJECTIVES_TO_NORMALIZE:
             self.normalize_pred_probas = True
-            logger.debug(self.name+" predicted probabilities will be transformed to never =0 since eval_metric="+self.objective_func.name)
+            logger.debug(self.name +" predicted probabilities will be transformed to never =0 since eval_metric=" + self.eval_metric.name)
         else:
             self.normalize_pred_probas = False
 
-        if isinstance(self.objective_func, metrics._ProbaScorer):
+        if isinstance(self.eval_metric, metrics._ProbaScorer):
             self.metric_needs_y_pred = False
-        elif isinstance(self.objective_func, metrics._ThresholdScorer):
+        elif isinstance(self.eval_metric, metrics._ThresholdScorer):
             self.metric_needs_y_pred = False
         else:
             self.metric_needs_y_pred = True
@@ -307,7 +307,7 @@ class AbstractModel:
 
     def score(self, X, y, eval_metric=None, metric_needs_y_pred=None, preprocess=True):
         if eval_metric is None:
-            eval_metric = self.objective_func
+            eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
@@ -319,7 +319,7 @@ class AbstractModel:
 
     def score_with_y_pred_proba(self, y, y_pred_proba, eval_metric=None, metric_needs_y_pred=None):
         if eval_metric is None:
-            eval_metric = self.objective_func
+            eval_metric = self.eval_metric
         if metric_needs_y_pred is None:
             metric_needs_y_pred = self.metric_needs_y_pred
         if metric_needs_y_pred:
@@ -445,7 +445,7 @@ class AbstractModel:
                 # calculating importance score for given feature
                 row_index_end = row_index + row_count
                 Y_pred_cur = Y_pred[row_index:row_index_end]
-                score = self.objective_func(y, Y_pred_cur)
+                score = self.eval_metric(y, Y_pred_cur)
                 permutation_importance_dict[feature] = model_score_base - score
 
                 if not final_iteration:
@@ -631,7 +631,7 @@ class AbstractModel:
             name=self.name,
             model_type=type(self).__name__,
             problem_type=self.problem_type,
-            eval_metric=self.objective_func.name,
+            eval_metric=self.eval_metric.name,
             stopping_metric=self.stopping_metric.name,
             fit_time=self.fit_time,
             predict_time=self.predict_time,

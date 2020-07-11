@@ -85,7 +85,7 @@ class TabularPredictor(BasePredictor):
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
         self.problem_type = self._learner.problem_type
-        self.eval_metric = self._learner.objective_func
+        self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
         self.class_labels = self._learner.class_labels
@@ -182,7 +182,7 @@ class TabularPredictor(BasePredictor):
         """
         dataset = self.__get_dataset(dataset)
         perf = self._learner.score(dataset)
-        sign = self._learner.objective_func._sign
+        sign = self._learner.eval_metric._sign
         perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
             print("Predictive performance on given dataset: %s = %s" % (self.eval_metric, perf))

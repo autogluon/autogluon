@@ -75,7 +75,7 @@ class DefaultLearner(AbstractLearner):
         trainer = self.trainer_type(
             path=self.model_context,
             problem_type=self.trainer_problem_type,
-            objective_func=self.objective_func,
+            eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
@@ -92,8 +92,8 @@ class DefaultLearner(AbstractLearner):
         )
 
         self.trainer_path = trainer.path
-        if self.objective_func is None:
-            self.objective_func = trainer.objective_func
+        if self.eval_metric is None:
+            self.eval_metric = trainer.eval_metric
         if self.stopping_metric is None:
             self.stopping_metric = trainer.stopping_metric
 
@@ -129,7 +129,7 @@ class DefaultLearner(AbstractLearner):
         else:
             self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
-        if (self.objective_func is not None) and (self.objective_func.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
+        if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             X = self.augment_rare_classes(X)
 
         # Gets labels prior to removal of infrequent classes

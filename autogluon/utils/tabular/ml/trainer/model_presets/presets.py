@@ -85,7 +85,7 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, objective_func, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, name_suffix=''):
+def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, name_suffix=''):
     if problem_type not in [BINARY, MULTICLASS, REGRESSION]:
         raise NotImplementedError
 
@@ -140,7 +140,7 @@ def get_preset_models(path, problem_type, objective_func, hyperparameters, stopp
             if AG_ARGS_FIT not in model_params:
                 model_params[AG_ARGS_FIT] = {}
             model_params[AG_ARGS_FIT].update(extra_ag_args_fit.copy())  # TODO: Consider case of overwriting user specified extra args.
-        model_init = model_type(path=path, name=name, problem_type=problem_type, objective_func=objective_func, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
+        model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
         models.append(model_init)
 
     for model in models:
@@ -149,16 +149,16 @@ def get_preset_models(path, problem_type, objective_func, hyperparameters, stopp
     return models
 
 
-def get_preset_stacker_model(path, problem_type, objective_func, num_classes=None,
+def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
                              hyperparameters={'NN': {}, 'GBM': {}}, hyperparameter_tune=False):
     # TODO: Expand options to RF and NN
     if problem_type == REGRESSION:
         model = RFModel(path=path, name='LinearRegression', model=LinearRegression(),
-                        problem_type=problem_type, objective_func=objective_func)
+                        problem_type=problem_type, eval_metric=eval_metric)
     else:
         model = RFModel(path=path, name='LogisticRegression', model=LogisticRegression(
             solver='liblinear', multi_class='auto', max_iter=500,  # n_jobs=-1  # TODO: HP set to hide warnings, but we should find optimal HP for this
-        ), problem_type=problem_type, objective_func=objective_func)
+        ), problem_type=problem_type, eval_metric=eval_metric)
     return model
 
 
@@ -169,12 +169,12 @@ def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=Fa
     nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*2 + [512], 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
     models.append(
         TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
-                              objective_func=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
+                              eval_metric=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
     )
     rf_options = dict(criterion='mse')
     models.append(
         RFModel(path=path, name='RandomForestRegressorMSE', problem_type=REGRESSION,
-                objective_func=soft_log_loss, hyperparameters=rf_options),
+                eval_metric=soft_log_loss, hyperparameters=rf_options),
     )
 
     for model in models:

@@ -595,7 +595,7 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=dist_ip_addrs)
         scheduler_cls = schedulers[search_strategy.lower()]
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
-        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, objective_func=eval_metric, stopping_metric=stopping_metric,
+        learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, random_seed=random_seed)
         learner.fit(X=train_data, X_test=tuning_data, scheduler_options=scheduler_options,

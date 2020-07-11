@@ -50,7 +50,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.feature_type_map (OrderedDict): maps feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         processor (sklearn.ColumnTransformer): scikit-learn preprocessor object.
 
-        Note: This model always assumes higher values of self.objective_func indicate better performance.
+        Note: This model always assumes higher values of self.eval_metric indicate better performance.
 
     """
 
@@ -58,7 +58,7 @@ class TabularNeuralNetModel(AbstractModel):
     # model_internals_file_name = 'model-internals.pkl' # store model internals here
     unique_category_str = '!missing!' # string used to represent missing values and unknown categories for categorical features. Should not appear in the dataset
     # TODO: remove: metric_map = {REGRESSION: 'Rsquared', BINARY: 'accuracy', MULTICLASS: 'accuracy'}  # string used to represent different evaluation metrics. metric_map[self.problem_type] produces str corresponding to metric used here.
-    # TODO: should be using self.objective_func as the metric of interest. Should have method: get_metric_name(self.objective_func)
+    # TODO: should be using self.eval_metric as the metric of interest. Should have method: get_metric_name(self.eval_metric)
     rescale_losses = {gluon.loss.L1Loss:'std', gluon.loss.HuberLoss:'std', gluon.loss.L2Loss:'var'} # dict of loss names where we should rescale loss, value indicates how to rescale. Call self.loss_func.name
     params_file_name = 'net.params' # Stores parameters of final network
     temp_file_name = 'temp_net.params' # Stores temporary network parameters (eg. during the course of training)
@@ -73,7 +73,7 @@ class TabularNeuralNetModel(AbstractModel):
         path (str): file-path to directory where to save files associated with this model
         name (str): name used to refer to this model
         problem_type (str): what type of prediction problem is this model used for
-        objective_func (func): function used to evaluate performance (Note: we assume higher = better)
+        eval_metric (func): function used to evaluate performance (Note: we assume higher = better)
         hyperparameters (dict): various hyperparameters for neural network and the NN-specific data processing
         features (list): List of predictive features to use, other features are ignored by the model.
         """
@@ -91,7 +91,7 @@ class TabularNeuralNetModel(AbstractModel):
         self._architecture_desc = None
         self.optimizer = None
         self.verbosity = None
-        if self.stopping_metric is not None and self.objective_func == roc_auc and self.stopping_metric == log_loss:
+        if self.stopping_metric is not None and self.eval_metric == roc_auc and self.stopping_metric == log_loss:
             self.stopping_metric = roc_auc  # NN is overconfident so early stopping with logloss can halt training too quick
 
         self.eval_metric_name = self.stopping_metric.name

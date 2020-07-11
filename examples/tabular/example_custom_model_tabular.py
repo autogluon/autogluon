@@ -68,7 +68,7 @@ y_pred_orig = label_cleaner.inverse_transform(y_pred)
 print(y_pred_orig)
 
 score = naive_bayes_model.score(X_test, y_test_clean)
-print(f'test score ({naive_bayes_model.objective_func.name}) = {score}')
+print(f'test score ({naive_bayes_model.eval_metric.name}) = {score}')
 
 ########################################
 # Training custom model using task.fit #

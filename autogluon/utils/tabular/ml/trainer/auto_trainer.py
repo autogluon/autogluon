@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
     def get_models(self, hyperparameters, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, **kwargs):
-        return get_preset_models(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, stopping_metric=self.stopping_metric,
+        return get_preset_models(path=self.path, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
                                  num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level, extra_ag_args_fit=extra_ag_args_fit)
 
     def train(self, X_train, y_train, X_test=None, y_test=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, **kwargs):

@@ -42,10 +42,10 @@ class BaggedEnsembleModel(AbstractModel):
         except:
             feature_types_metadata = None
 
-        objective_func = kwargs.pop('objective_func', self.model_base.objective_func)
+        eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
         stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
 
-        super().__init__(problem_type=self.model_base.problem_type, objective_func=objective_func, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, **kwargs)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)

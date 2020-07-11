@@ -35,7 +35,7 @@ class AbstractTrainer:
     trainer_info_name = 'info.pkl'
     trainer_info_json_name = 'info.json'
 
-    def __init__(self, path: str, problem_type: str, scheduler_options=None, objective_func=None, stopping_metric=None,
+    def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
@@ -44,22 +44,22 @@ class AbstractTrainer:
         self.save_data = save_data
         self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
-        if objective_func is not None:
-            self.objective_func = objective_func
+        if eval_metric is not None:
+            self.eval_metric = eval_metric
         else:
-            self.objective_func = infer_eval_metric(problem_type=self.problem_type)
+            self.eval_metric = infer_eval_metric(problem_type=self.problem_type)
 
         # stopping_metric is used to early stop all models except for aux models.
         if stopping_metric is not None:
             self.stopping_metric = stopping_metric
-        elif self.objective_func.name == 'roc_auc':
+        elif self.eval_metric.name == 'roc_auc':
             self.stopping_metric = log_loss
         else:
-            self.stopping_metric = self.objective_func
+            self.stopping_metric = self.eval_metric
 
-        self.objective_func_expects_y_pred = scorer_expects_y_pred(scorer=self.objective_func)
-        logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.objective_func.name)
-        if not self.objective_func_expects_y_pred:
+        self.eval_metric_expects_y_pred = scorer_expects_y_pred(scorer=self.eval_metric)
+        logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.eval_metric.name)
+        if not self.eval_metric_expects_y_pred:
             logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
         logger.log(20, "To change this, specify the eval_metric argument of fit()")
@@ -308,7 +308,7 @@ class AbstractTrainer:
         else:
             self.model_types_inner[model.name] = type(model)
         if model.val_score is not None:
-            logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
+            logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
         if model.fit_time is not None:
             logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
         if model.predict_time is not None:
@@ -579,7 +579,7 @@ class AbstractTrainer:
             extra_params = {}
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        objective_func=self.objective_func, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level+self.random_seed, **extra_params)
+                                                        eval_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, **extra_params)
 
         self.train_multi(X_train=X, y_train=y, X_test=None, y_test=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
@@ -595,7 +595,7 @@ class AbstractTrainer:
 
     def generate_stack_log_reg(self, X, y, level, kfolds=0, stack_name=None):
         base_model_names, base_model_paths, base_model_types = self.get_models_load_info(model_names=self.models_level['core'][level - 1])
-        stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, objective_func=self.objective_func, num_classes=self.num_classes)
+        stacker_model_lr = get_preset_stacker_model(path=self.path, problem_type=self.problem_type, eval_metric=self.eval_metric, num_classes=self.num_classes)
         name_new = stacker_model_lr.name + '_STACKER_k' + str(kfolds) + '_l' + str(level)
 
         stacker_model_lr = StackerEnsembleModel(path=self.path, name=name_new, model_base=stacker_model_lr, base_model_names=base_model_names, base_model_paths_dict=base_model_paths, base_model_types_dict=base_model_types,
@@ -652,19 +652,19 @@ class AbstractTrainer:
         return X
 
     def score(self, X, y, model=None):
-        if self.objective_func_expects_y_pred:
+        if self.eval_metric_expects_y_pred:
             y_pred_ensemble = self.predict(X=X, model=model)
-            return self.objective_func(y, y_pred_ensemble)
+            return self.eval_metric(y, y_pred_ensemble)
         else:
             y_pred_proba_ensemble = self.predict_proba(X=X, model=model)
-            return self.objective_func(y, y_pred_proba_ensemble)
+            return self.eval_metric(y, y_pred_proba_ensemble)
 
     def score_with_y_pred_proba(self, y, y_pred_proba):
-        if self.objective_func_expects_y_pred:
+        if self.eval_metric_expects_y_pred:
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-            return self.objective_func(y, y_pred)
+            return self.eval_metric(y, y_pred)
         else:
-            return self.objective_func(y, y_pred_proba)
+            return self.eval_metric(y, y_pred_proba)
 
     def autotune(self, X_train, X_holdout, y_train, y_holdout, model_base: AbstractModel):
         model_base.feature_prune(X_train, X_holdout, y_train, y_holdout)
@@ -1016,7 +1016,7 @@ class AbstractTrainer:
                 base_models_dict[model_name] = self.models[model_name]
         dummy_stacker = StackerEnsembleModel(
             path='', name='',
-            model_base=AbstractModel(path='', name='', problem_type=self.problem_type, objective_func=self.objective_func),
+            model_base=AbstractModel(path='', name='', problem_type=self.problem_type, eval_metric=self.eval_metric),
             base_model_names=model_names, base_models_dict=base_models_dict, base_model_paths_dict=self.model_paths,
             base_model_types_dict=self.model_types, use_orig_features=use_orig_features, num_classes=self.num_classes, random_state=level+self.random_seed
         )
@@ -1213,7 +1213,7 @@ class AbstractTrainer:
         max_stack_level = self.get_max_level_all()
         best_model_stack_level = self.get_model_level(best_model)
         problem_type = self.problem_type
-        objective_func = self.objective_func.name
+        eval_metric = self.eval_metric.name
         stopping_metric = self.stopping_metric.name
         time_train_start = self.time_train_start
         num_rows_train = self.num_rows_train
@@ -1237,7 +1237,7 @@ class AbstractTrainer:
             'num_cols_train': num_cols_train,
             'num_classes': num_classes,
             'problem_type': problem_type,
-            'eval_metric': objective_func,
+            'eval_metric': eval_metric,
             'stopping_metric': stopping_metric,
             'best_model': best_model,
             'best_model_score_val': best_model_score_val,
