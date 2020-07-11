@@ -53,7 +53,7 @@ python setup.py develop
 
 - Use Python >= 3.6 for development, as these are the only versions where AutoGluon is fully functional.
 
-- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend lazy-import of external package if you are adding functionality that you believe will only be used by small fraction users.
+- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend [lazy-import](https://github.com/awslabs/autogluon/blob/master/autogluon/utils/try_import.py) of external package if you are adding functionality that you believe will only be used by small fraction users.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
