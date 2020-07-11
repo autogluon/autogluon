@@ -1,3 +1,4 @@
+import copy
 import logging
 
 import numpy as np
@@ -16,10 +17,12 @@ class LabelCleaner:
     ordered_class_labels_transformed = None
 
     @staticmethod
-    def construct(problem_type: str, y: Series, y_uncleaned: Series):
+    def construct(problem_type: str, y: Series, y_uncleaned: Series = None):
         if problem_type == BINARY:
             return LabelCleanerBinary(y)
         elif problem_type == MULTICLASS:
+            if y_uncleaned is None:
+                y_uncleaned = copy.deepcopy(y)
             if len(y.unique()) == 2:
                 return LabelCleanerMulticlassToBinary(y, y_uncleaned)
             else:
@@ -66,6 +69,8 @@ class LabelCleanerMulticlass(LabelCleaner):
         return y
 
     def inverse_transform(self, y: Series) -> Series:
+        if isinstance(y, list):
+            y = Series(y)
         y = y.map(self.cat_mappings_dependent_var)
         return y
 
@@ -140,6 +145,8 @@ class LabelCleanerBinary(LabelCleaner):
         return y
 
     def inverse_transform(self, y: Series) -> Series:
+        if isinstance(y, list):
+            y = Series(y)
         return y.map(self.cat_mappings_dependent_var)
 
 

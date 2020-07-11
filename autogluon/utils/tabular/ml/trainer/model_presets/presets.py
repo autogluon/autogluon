@@ -1,4 +1,5 @@
 import copy
+import inspect
 import logging
 from collections import defaultdict
 
@@ -28,6 +29,8 @@ DEFAULT_MODEL_PRIORITY = dict(
     LR=40,
     custom=0,
 )
+
+DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 MODEL_TYPES = dict(
     RF=RFModel,
@@ -99,7 +102,7 @@ def get_preset_models(path, problem_type, objective_func, hyperparameters, stopp
                 model[AG_ARGS] = dict()
             if 'model_type' not in model[AG_ARGS]:
                 model[AG_ARGS]['model_type'] = model_type
-            model_priority = model[AG_ARGS].get('priority', DEFAULT_MODEL_PRIORITY[model_type])
+            model_priority = model[AG_ARGS].get('priority', DEFAULT_MODEL_PRIORITY.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             # Check if model is valid
             if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
                 continue  # Not valid
@@ -109,11 +112,15 @@ def get_preset_models(path, problem_type, objective_func, hyperparameters, stopp
     models = []
     for model in model_priority_list:
         model_type = model[AG_ARGS]['model_type']
-        if not isinstance(model_type, AbstractModel):
+        if not inspect.isclass(model_type):
             model_type = MODEL_TYPES[model_type]
+        elif not issubclass(model_type, AbstractModel):
+            logger.warning(f'Warning: Custom model type {model_type} does not inherit from {AbstractModel}. This may lead to instability. Consider wrapping {model_type} with an implementation of {AbstractModel}!')
+        else:
+            logger.log(20, f'Custom Model Type Detected: {model_type}')
         name_orig = model[AG_ARGS].get('name', None)
         if name_orig is None:
-            name_main = model[AG_ARGS].get('name_main', DEFAULT_MODEL_NAMES[model_type])
+            name_main = model[AG_ARGS].get('name_main', DEFAULT_MODEL_NAMES.get(model_type, model_type.__name__))
             name_prefix = model[AG_ARGS].get('name_prefix', '')
             name_type_suffix = model[AG_ARGS].get('name_type_suffix', None)
             if name_type_suffix is None:

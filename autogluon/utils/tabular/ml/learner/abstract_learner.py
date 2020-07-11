@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier
+from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier, infer_problem_type
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.abstract_feature_generator import AbstractFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
@@ -560,65 +560,8 @@ class AbstractLearner:
         return learner_info
 
     @staticmethod
-    def get_problem_type(y: Series):
-        """ Identifies which type of prediction problem we are interested in (if user has not specified).
-            Ie. binary classification, multi-class classification, or regression.
-        """
-        if len(y) == 0:
-            raise ValueError("provided labels cannot have length = 0")
-        y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
-        num_rows = len(y)
-
-        unique_values = y.unique()
-        unique_count = len(unique_values)
-        if unique_count > 10:
-            logger.log(20, f'Here are the first 10 unique label values in your data:  {list(unique_values[:10])}')
-        else:
-            logger.log(20, f'Here are the {unique_count} unique label values in your data:  {list(unique_values)}')
-
-        MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-        if num_rows > 1000:
-            REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
-        else:
-            REGRESS_THRESHOLD = 0.1
-
-        if unique_count == 2:
-            problem_type = BINARY
-            reason = "only two unique label-values observed"
-        elif unique_values.dtype == 'object':
-            problem_type = MULTICLASS
-            reason = "dtype of label-column == object"
-        elif np.issubdtype(unique_values.dtype, np.floating):
-            unique_ratio = unique_count / float(num_rows)
-            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
-                try:
-                    can_convert_to_int = np.array_equal(y, y.astype(int))
-                    if can_convert_to_int:
-                        problem_type = MULTICLASS
-                        reason = "dtype of label-column == float, but few unique label-values observed and label-values can be converted to int"
-                    else:
-                        problem_type = REGRESSION
-                        reason = "dtype of label-column == float and label-values can't be converted to int"
-                except:
-                    problem_type = REGRESSION
-                    reason = "dtype of label-column == float and label-values can't be converted to int"
-            else:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == float and many unique label-values observed"
-        elif np.issubdtype(unique_values.dtype, np.integer):
-            unique_ratio = unique_count / float(num_rows)
-            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
-                problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
-                reason = "dtype of label-column == int, but few unique label-values observed"
-            else:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == int and many unique label-values observed"
-        else:
-            raise NotImplementedError('label dtype', unique_values.dtype, 'not supported!')
-        logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
-        logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
-                       f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})\n")
-        return problem_type
+    def infer_problem_type(y: Series):
+        return infer_problem_type(y=y)
 
     def save(self):
         save_pkl.save(path=self.save_path, object=self)

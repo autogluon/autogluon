@@ -5,6 +5,7 @@ import os
 import pickle
 import sys
 import time
+from typing import Union
 
 import pandas as pd
 import psutil
@@ -12,7 +13,7 @@ import psutil
 from .model_trial import model_trial
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas, infer_eval_metric
 from .... import metrics
 from ....features.feature_types_metadata import FeatureTypesMetadata
 from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
@@ -59,13 +60,13 @@ class AbstractModel:
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, objective_func, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, objective_func: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs.
                 name (str): name of subdirectory inside path where model will be saved.
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
-                objective_func (autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize.
+                objective_func (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
                 feature_types_metadata (autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime.
         """
@@ -76,7 +77,12 @@ class AbstractModel:
         self.num_classes = num_classes
         self.model = model
         self.problem_type = problem_type
-        self.objective_func = objective_func  # Note: we require higher values = better performance  # TODO: Make it possible to pass str here as in TabularPrediction.fit()
+        # TODO: RENAME OBJECTIVE FUNC
+        if objective_func is not None:
+            self.objective_func = metrics.get_metric(objective_func, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance  # TODO: Make it possible to pass str here as in TabularPrediction.fit()
+        else:
+            self.objective_func = infer_eval_metric(problem_type=self.problem_type)
+            logger.log(20, f"Model {self.name}'s eval_metric inferred to be '{self.objective_func.name}' because problem_type='{self.problem_type}' and eval_metric was not specified during init.")
 
         if stopping_metric is None:
             self.stopping_metric = self.objective_func
@@ -171,7 +177,15 @@ class AbstractModel:
             params[param_name] = param_value
 
     def _get_default_searchspace(self) -> dict:
-        raise NotImplementedError
+        """
+        Get the default hyperparameter searchspace of the model.
+        See `autogluon.core.space` for available space classes.
+
+        Returns
+        -------
+        dict of hyperparameter search spaces.
+        """
+        return {}
 
     def _set_default_searchspace(self):
         """ Sets up default search space for HPO. Each hyperparameter which user did not specify is converted from

@@ -120,7 +120,7 @@ class DefaultLearner(AbstractLearner):
             X = X.drop(missinglabel_inds, axis=0)
 
         if self.problem_type is None:
-            self.problem_type = self.get_problem_type(X[self.label])
+            self.problem_type = self.infer_problem_type(X[self.label])
 
         if X_test is not None and self.label in X_test.columns:
             # TODO: This is not an ideal solution, instead check if bagging and X_test exists with label, then merge them prior to entering general data processing.

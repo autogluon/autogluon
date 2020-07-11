@@ -11,7 +11,7 @@ from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SO
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows, infer_eval_metric
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
@@ -46,12 +46,8 @@ class AbstractTrainer:
         self.verbosity = verbosity
         if objective_func is not None:
             self.objective_func = objective_func
-        elif self.problem_type == BINARY:
-            self.objective_func = accuracy
-        elif self.problem_type == MULTICLASS:
-            self.objective_func = accuracy
         else:
-            self.objective_func = root_mean_squared_error
+            self.objective_func = infer_eval_metric(problem_type=self.problem_type)
 
         # stopping_metric is used to early stop all models except for aux models.
         if stopping_metric is not None:
