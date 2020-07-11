@@ -15,10 +15,11 @@ When filing an issue, please check [existing open](https://github.com/awslabs/au
 reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
 
 * A reproducible test case or series of steps
-* The version of our code being used
+* The version of AutoGluon being used, the version of MXNet
 * Any modifications you've made relevant to the bug
 * Anything unusual about your environment or deployment
 
+Ideally, you can install AutoGluon and its dependencies in a fresh virtualenv to reproduce the bug.
 
 ## Contributing via Pull Requests
 Code contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
@@ -50,9 +51,9 @@ python setup.py develop
 
 - We recommend developing on Linux as this is the only OS where all features are currently 100% functional. Avoid introducing changes that will only work on a particular OS, as we're currently working to support MacOSX and Windows. Changes to existing code that improve cross-platform compatibility are most welcome!
 
-- Please use Python >= 3.6 for development, as these are the only versions where AutoGluon is fully functional.
+- Use Python >= 3.6 for development, as these are the only versions where AutoGluon is fully functional.
 
-- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package.
+- Please try to avoid introducing additional dependencies on 3rd party packages. We are currently working to reduce the number of external dependencies of our package. For now, we recommend lazy-import of external package if you are adding functionality that you believe will only be used by small fraction users.
 
 - All code should adhere to the [PEP8 style](https://www.python.org/dev/peps/pep-0008/).
 
@@ -61,7 +62,7 @@ python setup.py develop
 python3 -m pytest tests
 ```
 
-- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
+- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
 ```
 python3 -m pytest path_to_file::test_mytest
 ```
@@ -70,14 +71,18 @@ Or remove the ::test_mytest suffix to run all tests in the file:
 python3 -m pytest path_to_file
 ```
 
-- We also encourage you to contribute new tutorials using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/awslabs/autogluon/tree/master/docs/tutorials) for examples. All tutorials should be Jupyter notebooks converted into markdown (our build system will rebuild the .ipynb files from the markdown file and execute the notebooks).
+- To otherwise test your code changes, we recommend running AutoGluon on multiple datasets and verifying the code runs correctly and the resulting accuracy of the trained models is not harmed by your change.  One easy way to test is to simply modify the scripts in [`examples/`](https://github.com/awslabs/autogluon/tree/master/examples), or the [tutorial notebooks](https://github.com/awslabs/autogluon/tree/master/docs/tutorials), which already provide datasets.
 
-- After you open your pull request, our CI system will run for little while to check your code and report found errors. Please check back and fix any errors encountered at this stage (you can retrigger a new CI check by pushing updated code to the PR).
+- Remember to update all existing examples/tutorials/documentation affected by your code changes.
+
+- We also encourage you to contribute new tutorials or example scripts using AutoGluon for applications you think other users will be interested in. Please see [`docs/tutorials/`](https://github.com/awslabs/autogluon/tree/master/docs/tutorials) or [`examples/`](https://github.com/awslabs/autogluon/tree/master/examples). All tutorials should be Jupyter notebooks converted into markdown (our build system will rebuild the .ipynb files from the markdown file and execute the notebooks). This is especially important for major new functionality.
+
+- After you open your pull request, our CI system will run for little while to check your code and report found errors. Please check back and fix any errors encountered at this stage (you can retrigger a new CI check by pushing updated code to the same PR in a new commit).
 
 
 
 ## Finding Contributions to Work On
-Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any ['help wanted'](https://github.com/awslabs/auto-ml-with-gluon/labels/help%20wanted) issues is a great place to start.
+Looking at the existing issues is a great way to find something to contribute on. As our project uses the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any ['help wanted'](https://github.com/awslabs/auto-ml-with-gluon/labels/help%20wanted) issues is a great place to start.
 
 
 ## Code of Conduct
