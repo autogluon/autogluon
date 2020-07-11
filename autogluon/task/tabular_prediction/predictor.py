@@ -129,7 +129,7 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -160,7 +160,7 @@ class TabularPredictor(BasePredictor):
             For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
+        return self._learner.predict_proba(X=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.

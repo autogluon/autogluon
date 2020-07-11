@@ -18,11 +18,11 @@ class NaiveBayesModel(AbstractModel):
         X = X.drop(cat_columns, axis=1)
         return super().preprocess(X).fillna(0)
 
-    def _fit(self, X_train, Y_train, **kwargs):
+    def _fit(self, X_train, y_train, **kwargs):
         from sklearn.naive_bayes import GaussianNB
         X_train = self.preprocess(X_train)
         self.model = GaussianNB(**self.params)
-        self.model.fit(X_train, Y_train)
+        self.model.fit(X_train, y_train)
 
 
 ################
@@ -49,7 +49,7 @@ naive_bayes_model = NaiveBayesModel(path='AutogluonModels/', name='CustomNaiveBa
 label_cleaner = LabelCleaner.construct(problem_type=problem_type, y=y_train)
 y_train_clean = label_cleaner.transform(y_train)
 
-naive_bayes_model.fit(X_train=X_train, Y_train=y_train_clean)  # Fit custom model
+naive_bayes_model.fit(X_train=X_train, y_train=y_train_clean)  # Fit custom model
 
 # To save to disk and load the model, do the following:
 # load_path = naive_bayes_model.path

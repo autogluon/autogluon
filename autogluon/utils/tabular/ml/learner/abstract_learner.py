@@ -85,14 +85,14 @@ class AbstractLearner:
         save_path = path_context + self.learner_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
-        X_test = self.transform_features(X_test)
-        y_pred_proba = self.load_trainer().predict_proba(X_test, model=model)
+    def predict_proba(self, X: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
+        X = self.transform_features(X)
+        y_pred_proba = self.load_trainer().predict_proba(X, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):
@@ -107,39 +107,39 @@ class AbstractLearner:
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
-                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X_test[self.submission_columns].dtypes.to_dict())
+                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X[self.submission_columns].dtypes.to_dict())
             except Exception:
                 pass
 
         if use_pred_cache and (pred_cache is not None):
-            X_id = X_test[self.submission_columns]
+            X_id = X[self.submission_columns]
             X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
-            X_test_cache_miss = X_test[~X_test.index.isin(X_in_cache_with_pred.index)]
-            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X_test)} rows, '
+            X_cache_miss = X[~X.index.isin(X_in_cache_with_pred.index)]
+            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X)} rows, '
                            f'which have already been predicted previously. To make new predictions, set use_pred_cache=False')
         else:
             X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
-            X_test_cache_miss = X_test
+            X_cache_miss = X
 
-        if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False)
+        if len(X_cache_miss) > 0:
+            y_pred_proba = self.predict_proba(X=X_cache_miss, model=model, inverse_transform=False)
             problem_type = self.trainer_problem_type or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
-            y_pred.index = X_test_cache_miss.index
+            y_pred.index = X_cache_miss.index
         else:
-            logger.debug('All X_test rows found in cache, no need to load model')
+            logger.debug('All rows found in cache, no need to load model')
             y_pred = X_in_cache_with_pred[self.label].values
             if as_pandas:
                 y_pred = pd.Series(data=y_pred, name=self.label)
             return y_pred
 
         if add_to_pred_cache:
-            X_id_with_y_pred = X_test_cache_miss[self.submission_columns].copy()
+            X_id_with_y_pred = X_cache_miss[self.submission_columns].copy()
             X_id_with_y_pred[self.label] = y_pred
             if pred_cache is None:
                 pred_cache = X_id_with_y_pred.drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
@@ -148,7 +148,7 @@ class AbstractLearner:
             save_pd.save(path=self.pred_cache_path, df=pred_cache)
 
         if len(X_in_cache_with_pred) > 0:
-            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X_test.index)
+            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X.index)
 
         y_pred = y_pred.values
         if as_pandas:
@@ -337,7 +337,7 @@ class AbstractLearner:
         for model_name in model_names:
             model = trainer.load_model(model_name)
             time_start = time.time()
-            pred_probas = trainer.pred_proba_predictions(models=[model], X_test=X)
+            pred_probas = trainer.pred_proba_predictions(models=[model], X=X)
             if (self.problem_type == MULTICLASS) and (not trainer.eval_metric_expects_y_pred):
                 # Handles case where we need to add empty columns to represent classes that were not used for training
                 pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
@@ -463,8 +463,8 @@ class AbstractLearner:
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def submit_from_preds(self, X_test: DataFrame, y_pred_proba, save=True, save_proba=False):
-        submission = X_test[self.submission_columns].copy()
+    def submit_from_preds(self, X: DataFrame, y_pred_proba, save=True, save_proba=False):
+        submission = X[self.submission_columns].copy()
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
         submission[self.label] = y_pred
@@ -482,9 +482,9 @@ class AbstractLearner:
 
         return submission
 
-    def predict_and_submit(self, X_test: DataFrame, save=True, save_proba=False):
-        y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
-        return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
+    def predict_and_submit(self, X: DataFrame, save=True, save_proba=False):
+        y_pred_proba = self.predict_proba(X=X, inverse_transform=False)
+        return self.submit_from_preds(X=X, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
     def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
         if X is not None:

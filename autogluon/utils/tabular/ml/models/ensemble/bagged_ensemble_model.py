@@ -124,7 +124,7 @@ class BaggedEnsembleModel(AbstractModel):
                 raise ValueError(f'n_repeats must equal 0 when fitting a single model with k_fold < 2, values: ({self._n_repeats}, {k_fold})')
             model_base.set_contexts(path_context=self.path + model_base.name + os.path.sep)
             time_start_fit = time.time()
-            model_base.fit(X_train=X, Y_train=y, time_limit=time_limit, **kwargs)
+            model_base.fit(X_train=X, y_train=y, time_limit=time_limit, **kwargs)
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
@@ -182,13 +182,13 @@ class BaggedEnsembleModel(AbstractModel):
                     time_limit_fold = None
 
                 time_start_fold = time.time()
-                train_index, test_index = fold
-                X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
-                y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                train_index, val_index = fold
+                X_train, X_val = X.iloc[train_index, :], X.iloc[val_index, :]
+                y_train, y_val = y.iloc[train_index], y.iloc[val_index]
                 fold_model = copy.deepcopy(model_base)
                 fold_model.name = f'{fold_model.name}_fold_{i}'
                 fold_model.set_contexts(self.path + fold_model.name + os.path.sep)
-                fold_model.fit(X_train=X_train, Y_train=y_train, X_test=X_test, Y_test=y_test, time_limit=time_limit_fold, **kwargs)
+                fold_model.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, time_limit=time_limit_fold, **kwargs)
                 time_train_end_fold = time.time()
                 if time_limit is not None:  # Check to avoid unnecessarily predicting and saving a model when an Exception is going to be raised later
                     if i != (fold_end - 1):
@@ -198,11 +198,11 @@ class BaggedEnsembleModel(AbstractModel):
                         expected_remaining_time_required = expected_time_required * (folds_left - 1) / folds_to_fit
                         if expected_remaining_time_required > time_left:
                             raise TimeLimitExceeded
-                pred_proba = fold_model.predict_proba(X_test)
+                pred_proba = fold_model.predict_proba(X_val)
                 time_predict_end_fold = time.time()
                 fold_model.fit_time = time_train_end_fold - time_start_fold
                 fold_model.predict_time = time_predict_end_fold - time_train_end_fold
-                fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_test, y_pred_proba=pred_proba)
+                fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val, y_pred_proba=pred_proba)
                 fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
                 if not self.save_bagged_folds:
                     fold_model.model = None
@@ -211,8 +211,8 @@ class BaggedEnsembleModel(AbstractModel):
                     models.append(fold_model.name)
                 else:
                     models.append(fold_model)
-                oof_pred_proba[test_index] += pred_proba
-                oof_pred_model_repeats[test_index] += 1
+                oof_pred_proba[val_index] += pred_proba
+                oof_pred_model_repeats[val_index] += 1
                 self._add_child_times_to_bag(model=fold_model)
             if (fold_end_n_repeat != fold_end) or (k_fold == k_fold_end):
                 self._k_per_n_repeat.append(k_fold)

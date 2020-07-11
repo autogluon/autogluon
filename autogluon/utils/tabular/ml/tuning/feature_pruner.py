@@ -45,7 +45,7 @@ class FeaturePruner:
 
     # TODO: CV5 instead of holdout? Should be better
     # TODO: Add holdout here, it is overfitting with Logistic Regression
-    def tune(self, X_train, y_train, X_test, y_test, X_holdout, y_holdout, total_runs=999):
+    def tune(self, X_train, y_train, X_val, y_val, X_holdout, y_holdout, total_runs=999):
         objective_goal_is_negative = False  # Fixed to false if using sklearn scorers # self.model_base.problem_type == REGRESSION  # TODO: if objective function goal = lower (logloss, MAE, etc.)
         logger.log(15, 'Feature-pruning '+str(self.model_base.name)+' for '+str(total_runs)+' runs...')
 
@@ -60,7 +60,7 @@ class FeaturePruner:
             self.cur_iteration = iteration
             logger.debug('iteration: %s ' % iteration)
             X_train_subset = X_train[valid_features].copy()
-            X_test_subset = X_test[valid_features].copy()
+            X_val_subset = X_val[valid_features].copy()
             self.thresholds.append(self.threshold)
             self.valid_feature_counts.append(len(valid_features))
             self.features_in_iter.append(valid_features)
@@ -69,7 +69,7 @@ class FeaturePruner:
                 model_iter = self.model_base
             else:
                 model_iter = copy.deepcopy(self.model_base)
-                model_iter.fit(X_train=X_train_subset, Y_train=y_train, X_test=X_test_subset, Y_test=y_test)
+                model_iter.fit(X_train=X_train_subset, y_train=y_train, X_val=X_val_subset, y_val=y_val)
 
             banned_features = []
 
@@ -89,7 +89,7 @@ class FeaturePruner:
             else:
                 features_to_use = list(valid_features)
 
-            cur_score_val = model_iter.score(X=X_test_subset, y=y_test)
+            cur_score_val = model_iter.score(X=X_val_subset, y=y_val)
             cur_score = model_iter.score(X=X_holdout[valid_features], y=y_holdout)
 
             logger.log(15, 'Iter '+str(iteration)+'  Score: '+str(cur_score))
@@ -114,7 +114,7 @@ class FeaturePruner:
                 self.tuned = True
                 break
 
-            gain_df = model_iter.compute_feature_importance(X=X_test_subset, y=y_test, features_to_use=features_to_use)
+            gain_df = model_iter.compute_feature_importance(X=X_val_subset, y=y_val, features_to_use=features_to_use)
             if not objective_goal_is_negative:
                 gain_df = -gain_df
 
