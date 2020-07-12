@@ -492,6 +492,7 @@ class TabularPredictor(BasePredictor):
         return labels_transformed
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
+    # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
     def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False, **kwargs):
         """
         Calculates feature importance scores for the given model.

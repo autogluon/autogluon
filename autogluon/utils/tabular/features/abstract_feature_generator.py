@@ -85,9 +85,10 @@ class AbstractFeatureGenerator:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
         if banned_features:
-            self.banned_features = banned_features
+            self.banned_features = [str(feature) for feature in banned_features]
             self.features_to_remove += self.banned_features
         X_index = copy.deepcopy(X.index)
+        X.columns = X.columns.astype(str)  # Ensure all column names are strings
         self.get_feature_types(X)
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         self.features_init_to_keep = copy.deepcopy(list(X.columns))
@@ -170,6 +171,7 @@ class AbstractFeatureGenerator:
         if self.features is None:
             raise AssertionError('FeatureGenerator.features is None, have you called fit() yet?')
         X_index = copy.deepcopy(X.index)
+        X.columns = X.columns.astype(str)  # Ensure all column names are strings
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         X_columns = X.columns.tolist()
         # Create any columns present in the training dataset that are now missing from this dataframe:

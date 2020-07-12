@@ -479,8 +479,11 @@ class TabularPrediction(BaseTask):
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
-        if tuning_data is not None and np.any(train_data.columns != tuning_data.columns):
-            raise ValueError("Column names must match between training and tuning data")
+        if tuning_data is not None:
+            train_features = np.array([column for column in train_data.columns if column != label])
+            tuning_features = np.array([column for column in tuning_data.columns if column != label])
+            if np.any(train_features != tuning_features):
+                raise ValueError("Column names must match between training and tuning data")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option

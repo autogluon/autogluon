@@ -166,10 +166,11 @@ class LGBModel(AbstractModel):
 
         if is_train:
             for column in X.columns:
-                new_column = re.sub(r'[",:{}[\]]', '', column)
-                if new_column != column:
-                    self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
-                    break
+                if isinstance(column, str):
+                    new_column = re.sub(r'[",:{}[\]]', '', column)
+                    if new_column != column:
+                        self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
+                        break
 
         if self._internal_feature_map:
             new_columns = [self._internal_feature_map[column] for column in list(X.columns)]
