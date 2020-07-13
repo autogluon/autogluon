@@ -15,12 +15,12 @@ def tabular_nn_trial(args, reporter):
         model, args, util_args = model_trial.prepare_inputs(args=args)
 
         train_dataset = TabularNNDataset.load(util_args.train_path)
-        test_dataset = TabularNNDataset.load(util_args.test_path)
-        y_test = test_dataset.get_labels()
+        val_dataset = TabularNNDataset.load(util_args.val_path)
+        y_val = val_dataset.get_labels()
 
-        fit_model_args = dict(X_train=train_dataset, Y_train=None, X_test=test_dataset)
-        predict_proba_args = dict(X=test_dataset)
-        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=y_test,
+        fit_model_args = dict(X_train=train_dataset, y_train=None, X_val=val_dataset)
+        predict_proba_args = dict(X=val_dataset)
+        model_trial.fit_and_save_model(model=model, params=args, fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val,
                                        time_start=util_args.time_start, time_limit=util_args.get('time_limit', None), reporter=reporter)
     except Exception as e:
         if not isinstance(e, TimeLimitExceeded):

@@ -85,7 +85,7 @@ class TabularPredictor(BasePredictor):
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
         self.problem_type = self._learner.problem_type
-        self.eval_metric = self._learner.objective_func
+        self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label
         self.feature_types = self._trainer.feature_types_metadata
         self.class_labels = self._learner.class_labels
@@ -129,7 +129,7 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict(X_test=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
@@ -160,7 +160,7 @@ class TabularPredictor(BasePredictor):
             For binary classification problems, the output contains for each datapoint only the predicted probability of the positive class, unless you specify `as_multiclass=True`.
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict_proba(X_test=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
+        return self._learner.predict_proba(X=dataset, model=model, as_pandas=as_pandas, as_multiclass=as_multiclass)
 
     def evaluate(self, dataset, silent=False):
         """ Report the predictive performance evaluated for a given Dataset.
@@ -182,7 +182,7 @@ class TabularPredictor(BasePredictor):
         """
         dataset = self.__get_dataset(dataset)
         perf = self._learner.score(dataset)
-        sign = self._learner.objective_func._sign
+        sign = self._learner.eval_metric._sign
         perf = perf * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
         if not silent:
             print("Predictive performance on given dataset: %s = %s" % (self.eval_metric, perf))
@@ -492,6 +492,7 @@ class TabularPredictor(BasePredictor):
         return labels_transformed
 
     # TODO: Consider adding time_limit option to early stop the feature importance process
+    # TODO: Add option to specify list of features within features list, to check importances of groups of features. Make tuple to specify new feature name associated with group.
     def feature_importance(self, dataset=None, model=None, features=None, feature_stage='original', subsample_size=1000, silent=False, **kwargs):
         """
         Calculates feature importance scores for the given model.
@@ -604,6 +605,17 @@ class TabularPredictor(BasePredictor):
         """
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
         return refit_full_dict
+
+    def get_model_best(self):
+        """
+        Returns the string model name of the best model by validation score.
+        This is typically the same model used during inference when `predictor.predict` is called without specifying a model.
+
+        Returns
+        -------
+        String model name of the best model
+        """
+        return self._trainer.get_model_best(can_infer=True)
 
     def get_model_full_dict(self):
         """

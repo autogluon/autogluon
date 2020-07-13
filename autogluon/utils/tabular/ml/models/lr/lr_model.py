@@ -113,11 +113,11 @@ class LinearModel(AbstractModel):
 
     # TODO: It could be possible to adaptively set max_iter [1] to approximately respect time_limit based on sample-size, feature-dimensionality, and the solver used.
     #  [1] https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html#examples-using-sklearn-linear-model-logisticregression
-    def _fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         hyperparams = self.params.copy()
 
         if self.problem_type == BINARY:
-            Y_train = Y_train.astype(int).values
+            y_train = y_train.astype(int).values
 
         X_train = self.preprocess(X_train, is_train=True, vect_max_features=hyperparams['vectorizer_dict_size'], model_specific_preprocessing=True)
 
@@ -136,15 +136,15 @@ class LinearModel(AbstractModel):
         logger.log(15, f'Training Model with the following hyperparameter settings:')
         logger.log(15, model)
 
-        self.model = model.fit(X_train, Y_train)
+        self.model = model.fit(X_train, y_train)
 
     def _predict_proba(self, X, preprocess=True):
         X = self.preprocess(X, is_train=False, model_specific_preprocessing=True)
         return super()._predict_proba(X, preprocess=False)
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        self.fit(X_train=X_train, X_test=X_test, Y_train=Y_train, Y_test=Y_test, **kwargs)
-        hpo_model_performances = {self.name: self.score(X_test, Y_test)}
+    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
+        self.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, **kwargs)
+        hpo_model_performances = {self.name: self.score(X_val, y_val)}
         hpo_results = {}
         self.save()
         hpo_models = {self.name: self.path}

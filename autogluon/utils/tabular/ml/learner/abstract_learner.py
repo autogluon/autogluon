@@ -17,7 +17,7 @@ from sklearn.metrics import mean_absolute_error, explained_variance_score, r2_sc
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
-from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier
+from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier, infer_problem_type
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.abstract_feature_generator import AbstractFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
@@ -36,14 +36,14 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: AbstractFeatureGenerator, label_count_threshold=10,
-                 problem_type=None, objective_func=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.trainer_problem_type = None
-        self.objective_func = objective_func
+        self.eval_metric = eval_metric
         self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
         if random_seed is None:
@@ -85,14 +85,14 @@ class AbstractLearner:
         save_path = path_context + self.learner_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
-    def predict_proba(self, X_test: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
-        X_test = self.transform_features(X_test)
-        y_pred_proba = self.load_trainer().predict_proba(X_test, model=model)
+    def predict_proba(self, X: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
+        X = self.transform_features(X)
+        y_pred_proba = self.load_trainer().predict_proba(X, model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):
@@ -107,39 +107,39 @@ class AbstractLearner:
     # TODO: Add decorators for cache functionality, return core code to previous state
     # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
     # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X_test: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, X: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
         pred_cache = None
         if use_pred_cache or add_to_pred_cache:
             try:
-                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X_test[self.submission_columns].dtypes.to_dict())
+                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X[self.submission_columns].dtypes.to_dict())
             except Exception:
                 pass
 
         if use_pred_cache and (pred_cache is not None):
-            X_id = X_test[self.submission_columns]
+            X_id = X[self.submission_columns]
             X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
-            X_test_cache_miss = X_test[~X_test.index.isin(X_in_cache_with_pred.index)]
-            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X_test)} rows, '
+            X_cache_miss = X[~X.index.isin(X_in_cache_with_pred.index)]
+            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X)} rows, '
                            f'which have already been predicted previously. To make new predictions, set use_pred_cache=False')
         else:
             X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
-            X_test_cache_miss = X_test
+            X_cache_miss = X
 
-        if len(X_test_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X_test=X_test_cache_miss, model=model, inverse_transform=False)
+        if len(X_cache_miss) > 0:
+            y_pred_proba = self.predict_proba(X=X_cache_miss, model=model, inverse_transform=False)
             problem_type = self.trainer_problem_type or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
-            y_pred.index = X_test_cache_miss.index
+            y_pred.index = X_cache_miss.index
         else:
-            logger.debug('All X_test rows found in cache, no need to load model')
+            logger.debug('All rows found in cache, no need to load model')
             y_pred = X_in_cache_with_pred[self.label].values
             if as_pandas:
                 y_pred = pd.Series(data=y_pred, name=self.label)
             return y_pred
 
         if add_to_pred_cache:
-            X_id_with_y_pred = X_test_cache_miss[self.submission_columns].copy()
+            X_id_with_y_pred = X_cache_miss[self.submission_columns].copy()
             X_id_with_y_pred[self.label] = y_pred
             if pred_cache is None:
                 pred_cache = X_id_with_y_pred.drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
@@ -148,7 +148,7 @@ class AbstractLearner:
             save_pd.save(path=self.pred_cache_path, df=pred_cache)
 
         if len(X_in_cache_with_pred) > 0:
-            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X_test.index)
+            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X.index)
 
         y_pred = y_pred.values
         if as_pandas:
@@ -226,9 +226,9 @@ class AbstractLearner:
         trainer = self.load_trainer()
         if self.problem_type == MULTICLASS:
             y = y.fillna(-1)
-            if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
+            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
                 # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
         return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
@@ -240,9 +240,9 @@ class AbstractLearner:
         trainer = self.load_trainer()
         if self.problem_type == MULTICLASS:
             y = y.fillna(-1)
-            if (not trainer.objective_func_expects_y_pred) and (-1 in y.unique()):
+            if (not trainer.eval_metric_expects_y_pred) and (-1 in y.unique()):
                 # log_loss / pac_score
-                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
+                raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
 
         scores = {}
         all_trained_models = trainer.get_model_names_all()
@@ -252,7 +252,7 @@ class AbstractLearner:
 
         if compute_oracle:
             pred_probas = list(model_pred_proba_dict.values())
-            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.objective_func)
+            ensemble_selection = EnsembleSelection(ensemble_size=100, problem_type=trainer.problem_type, metric=self.eval_metric)
             ensemble_selection.fit(predictions=pred_probas, labels=y, identifiers=None)
             oracle_weights = ensemble_selection.weights_
             oracle_pred_time_start = time.time()
@@ -266,11 +266,11 @@ class AbstractLearner:
         for model_name, pred_proba in model_pred_proba_dict.items():
             if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
                 pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
-            if trainer.objective_func_expects_y_pred:
+            if trainer.eval_metric_expects_y_pred:
                 pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
-                scores[model_name] = self.objective_func(y, pred)
+                scores[model_name] = self.eval_metric(y, pred)
             else:
-                scores[model_name] = self.objective_func(y, pred_proba)
+                scores[model_name] = self.eval_metric(y, pred_proba)
 
         pred_time_test = {}
         # TODO: Add support for calculating pred_time_test_full for oracle_ensemble, need to copy graph from trainer and add oracle_ensemble to it with proper edges.
@@ -331,14 +331,14 @@ class AbstractLearner:
 
         return df_merged
 
-    def get_pred_probas_models_and_time(self, X, trainer, model_names):
+    def get_pred_probas_models_and_time(self, X, trainer: AbstractTrainer, model_names):
         pred_probas_lst = []
         pred_probas_time_lst = []
         for model_name in model_names:
             model = trainer.load_model(model_name)
             time_start = time.time()
-            pred_probas = trainer.pred_proba_predictions(models=[model], X_test=X)
-            if (self.problem_type == MULTICLASS) and (not trainer.objective_func_expects_y_pred):
+            pred_probas = trainer.pred_proba_predictions(models=[model], X=X)
+            if (self.problem_type == MULTICLASS) and (not trainer.eval_metric_expects_y_pred):
                 # Handles case where we need to add empty columns to represent classes that were not used for training
                 pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
             time_diff = time.time() - time_start
@@ -379,27 +379,27 @@ class AbstractLearner:
         # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
         y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
         trainer = self.load_trainer()
-        if trainer.objective_func_expects_y_pred:
+        if trainer.eval_metric_expects_y_pred:
             y_pred_cleaned = self.label_cleaner.transform(y_pred)
             y_true_cleaned = self.label_cleaner.transform(y_true)
             if self.problem_type == MULTICLASS:
                 y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
-            performance = self.objective_func(y_true_cleaned, y_pred_cleaned)
+            performance = self.eval_metric(y_true_cleaned, y_pred_cleaned)
         else:
             if self.problem_type == MULTICLASS:
                 y_true_cleaned = self.label_cleaner.transform(y_true)
                 y_true_cleaned = y_true_cleaned.fillna(-1)
-                if (not trainer.objective_func_expects_y_pred) and (-1 in y_true_cleaned.unique()):
+                if (not trainer.eval_metric_expects_y_pred) and (-1 in y_true_cleaned.unique()):
                     # log_loss / pac_score
-                    raise ValueError(f'Multiclass scoring with eval_metric=\'{self.objective_func.name}\' does not support unknown classes.')
-                performance = self.objective_func(y_true_cleaned, y_pred)
+                    raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
+                performance = self.eval_metric(y_true_cleaned, y_pred)
             else:
-                performance = self.objective_func(y_true, y_pred)
+                performance = self.eval_metric(y_true, y_pred)
 
-        metric = self.objective_func.name
+        metric = self.eval_metric.name
 
         if not high_always_good:
-            sign = self.objective_func._sign
+            sign = self.eval_metric._sign
             performance = performance * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
 
         if not silent:
@@ -463,8 +463,8 @@ class AbstractLearner:
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def submit_from_preds(self, X_test: DataFrame, y_pred_proba, save=True, save_proba=False):
-        submission = X_test[self.submission_columns].copy()
+    def submit_from_preds(self, X: DataFrame, y_pred_proba, save=True, save_proba=False):
+        submission = X[self.submission_columns].copy()
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
 
         submission[self.label] = y_pred
@@ -482,9 +482,9 @@ class AbstractLearner:
 
         return submission
 
-    def predict_and_submit(self, X_test: DataFrame, save=True, save_proba=False):
-        y_pred_proba = self.predict_proba(X_test=X_test, inverse_transform=False)
-        return self.submit_from_preds(X_test=X_test, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
+    def predict_and_submit(self, X: DataFrame, save=True, save_proba=False):
+        y_pred_proba = self.predict_proba(X=X, inverse_transform=False)
+        return self.submit_from_preds(X=X, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
     def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
         if X is not None:
@@ -560,65 +560,8 @@ class AbstractLearner:
         return learner_info
 
     @staticmethod
-    def get_problem_type(y: Series):
-        """ Identifies which type of prediction problem we are interested in (if user has not specified).
-            Ie. binary classification, multi-class classification, or regression.
-        """
-        if len(y) == 0:
-            raise ValueError("provided labels cannot have length = 0")
-        y = y.dropna()  # Remove missing values from y (there should not be any though as they were removed in Learner.general_data_processing())
-        num_rows = len(y)
-
-        unique_values = y.unique()
-        unique_count = len(unique_values)
-        if unique_count > 10:
-            logger.log(20, f'Here are the first 10 unique label values in your data:  {list(unique_values[:10])}')
-        else:
-            logger.log(20, f'Here are the {unique_count} unique label values in your data:  {list(unique_values)}')
-
-        MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
-        if num_rows > 1000:
-            REGRESS_THRESHOLD = 0.05  # if the unique-ratio is less than this, we assume multiclass classification, even when labels are integers
-        else:
-            REGRESS_THRESHOLD = 0.1
-
-        if unique_count == 2:
-            problem_type = BINARY
-            reason = "only two unique label-values observed"
-        elif unique_values.dtype == 'object':
-            problem_type = MULTICLASS
-            reason = "dtype of label-column == object"
-        elif np.issubdtype(unique_values.dtype, np.floating):
-            unique_ratio = unique_count / float(num_rows)
-            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
-                try:
-                    can_convert_to_int = np.array_equal(y, y.astype(int))
-                    if can_convert_to_int:
-                        problem_type = MULTICLASS
-                        reason = "dtype of label-column == float, but few unique label-values observed and label-values can be converted to int"
-                    else:
-                        problem_type = REGRESSION
-                        reason = "dtype of label-column == float and label-values can't be converted to int"
-                except:
-                    problem_type = REGRESSION
-                    reason = "dtype of label-column == float and label-values can't be converted to int"
-            else:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == float and many unique label-values observed"
-        elif np.issubdtype(unique_values.dtype, np.integer):
-            unique_ratio = unique_count / float(num_rows)
-            if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
-                problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
-                reason = "dtype of label-column == int, but few unique label-values observed"
-            else:
-                problem_type = REGRESSION
-                reason = "dtype of label-column == int and many unique label-values observed"
-        else:
-            raise NotImplementedError('label dtype', unique_values.dtype, 'not supported!')
-        logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
-        logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
-                       f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})\n")
-        return problem_type
+    def infer_problem_type(y: Series):
+        return infer_problem_type(y=y)
 
     def save(self):
         save_pkl.save(path=self.save_path, object=self)

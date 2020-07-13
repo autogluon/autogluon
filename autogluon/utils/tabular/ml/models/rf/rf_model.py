@@ -49,7 +49,7 @@ class RFModel(SKLearnModel):
         }
         return spaces
 
-    def _fit(self, X_train, Y_train, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, time_limit=None, **kwargs):
         time_start = time.time()
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
         hyperparams = self.params.copy()
@@ -97,7 +97,7 @@ class RFModel(SKLearnModel):
         for i, n_estimators in enumerate(n_estimator_increments):
             if i != 0:
                 self.model.n_estimators = n_estimators
-            self.model = self.model.fit(X_train, Y_train)
+            self.model = self.model.fit(X_train, y_train)
             if (i == 0) and (len(n_estimator_increments) > 1):
                 time_elapsed = time.time() - time_train_start
 
@@ -131,10 +131,10 @@ class RFModel(SKLearnModel):
 
         self.params_trained['n_estimators'] = self.model.n_estimators
 
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
-        fit_model_args = dict(X_train=X_train, Y_train=Y_train, **kwargs)
-        predict_proba_args = dict(X=X_test)
-        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_test=Y_test, time_start=time.time(), time_limit=None)
+    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
+        fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)
+        predict_proba_args = dict(X=X_val)
+        model_trial.fit_and_save_model(model=self, params=dict(), fit_args=fit_model_args, predict_proba_args=predict_proba_args, y_val=y_val, time_start=time.time(), time_limit=None)
         hpo_results = {'total_time': self.fit_time}
         hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}

@@ -170,18 +170,18 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=1)
 
         train_index, test_index = kfolds[0]
-        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
-        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        X_train, X_val = X.iloc[train_index, :], X.iloc[test_index, :]
+        y_train, y_val = y.iloc[train_index], y.iloc[test_index]
         orig_time = scheduler_options[1]['time_out']
         scheduler_options[1]['time_out'] = orig_time * 0.8  # TODO: Scheduler doesn't early stop on final model, this is a safety net. Scheduler should be updated to early stop
-        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X_train=X_train, X_test=X_test, Y_train=y_train, Y_test=y_test, scheduler_options=scheduler_options, **kwargs)
+        hpo_models, hpo_model_performances, hpo_results = self.model_base.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=scheduler_options, **kwargs)
         scheduler_options[1]['time_out'] = orig_time
 
         stackers = {}
         stackers_performance = {}
         for i, (model_name, model_path) in enumerate(hpo_models.items()):
             child: AbstractModel = self._child_type.load(path=model_path)
-            y_pred_proba = child.predict_proba(X_test)
+            y_pred_proba = child.predict_proba(X_val)
 
             # TODO: Create new StackerEnsemble Here
             stacker = copy.deepcopy(self)

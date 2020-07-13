@@ -30,11 +30,11 @@ class EnsembleSelection:
         else:
             self.random_state = np.random.RandomState(seed=0)
         if isinstance(metric, _ProbaScorer):
-            self.objective_func_expects_y_pred = False
+            self.eval_metric_expects_y_pred = False
         elif isinstance(metric, _ThresholdScorer):
-            self.objective_func_expects_y_pred = False
+            self.eval_metric_expects_y_pred = False
         else:
-            self.objective_func_expects_y_pred = True
+            self.eval_metric_expects_y_pred = True
 
     def fit(self, predictions, labels, time_limit=None, identifiers=None):
         self.ensemble_size = int(self.ensemble_size)
@@ -90,7 +90,7 @@ class EnsembleSelection:
             fant_ensemble_prediction = np.zeros(weighted_ensemble_prediction.shape)
             for j, pred in enumerate(predictions):
                 fant_ensemble_prediction[:] = weighted_ensemble_prediction + (1. / float(s + 1)) * pred
-                if self.objective_func_expects_y_pred:
+                if self.eval_metric_expects_y_pred:
                     preds = get_pred_from_proba(y_pred_proba=fant_ensemble_prediction, problem_type=self.problem_type)
                 else:
                     preds = fant_ensemble_prediction

@@ -52,7 +52,7 @@ class LGBModel(AbstractModel):
             eval_metric_name = eval_metric
         return eval_metric, eval_metric_name
 
-    def _fit(self, X_train=None, Y_train=None, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
         start_time = time.time()
         params = self.params.copy()
 
@@ -70,7 +70,7 @@ class LGBModel(AbstractModel):
             verbose_eval = 1
 
         eval_metric, eval_metric_name = self.get_eval_metric()
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params, X_test=X_test, Y_test=Y_test, dataset_train=dataset_train, dataset_val=dataset_val)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params, X_val=X_val, y_val=y_val, dataset_train=dataset_train, dataset_val=dataset_val)
         gc.collect()
 
         num_boost_round = params.pop('num_boost_round', 1000)
@@ -166,10 +166,11 @@ class LGBModel(AbstractModel):
 
         if is_train:
             for column in X.columns:
-                new_column = re.sub(r'[",:{}[\]]', '', column)
-                if new_column != column:
-                    self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
-                    break
+                if isinstance(column, str):
+                    new_column = re.sub(r'[",:{}[\]]', '', column)
+                    if new_column != column:
+                        self._internal_feature_map = {feature: i for i, feature in enumerate(list(X.columns))}
+                        break
 
         if self._internal_feature_map:
             new_columns = [self._internal_feature_map[column] for column in list(X.columns)]
@@ -179,7 +180,7 @@ class LGBModel(AbstractModel):
         else:
             return X
 
-    def generate_datasets(self, X_train: DataFrame, Y_train: Series, params, X_test=None, Y_test=None, dataset_train=None, dataset_val=None, save=False):
+    def generate_datasets(self, X_train: DataFrame, y_train: Series, params, X_val=None, y_val=None, dataset_train=None, dataset_val=None, save=False):
         lgb_dataset_params_keys = ['objective', 'two_round', 'num_threads', 'num_classes', 'verbose']  # Keys that are specific to lightGBM Dataset object construction.
         data_params = {key: params[key] for key in lgb_dataset_params_keys if key in params}.copy()
 
@@ -187,23 +188,23 @@ class LGBModel(AbstractModel):
         W_test = None  # TODO: Add weight support
         if X_train is not None:
             X_train = self.preprocess(X_train, is_train=True)
-        if X_test is not None:
-            X_test = self.preprocess(X_test)
+        if X_val is not None:
+            X_val = self.preprocess(X_val)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
         if not dataset_train:
             # X_train, W_train = self.convert_to_weight(X=X_train)
-            dataset_train = construct_dataset(x=X_train, y=Y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=W_train)
-            # dataset_train = construct_dataset_lowest_memory(X=X_train, y=Y_train, location=self.path + 'datasets/train', params=data_params)
-        if (not dataset_val) and (X_test is not None) and (Y_test is not None):
-            # X_test, W_test = self.convert_to_weight(X=X_test)
-            dataset_val = construct_dataset(x=X_test, y=Y_test, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
-            # dataset_val = construct_dataset_lowest_memory(X=X_test, y=Y_test, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
+            dataset_train = construct_dataset(x=X_train, y=y_train, location=f'{self.path}datasets{os.path.sep}train', params=data_params, save=save, weight=W_train)
+            # dataset_train = construct_dataset_lowest_memory(X=X_train, y=y_train, location=self.path + 'datasets/train', params=data_params)
+        if (not dataset_val) and (X_val is not None) and (y_val is not None):
+            # X_val, W_val = self.convert_to_weight(X=X_val)
+            dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
+            # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         return dataset_train, dataset_val
 
-    def debug_features_to_use(self, X_test_in):
+    def debug_features_to_use(self, X_val_in):
         feature_splits = self.model.feature_importance()
         total_splits = feature_splits.sum()
-        feature_names = list(X_test_in.columns.values)
+        feature_names = list(X_val_in.columns.values)
         feature_count = len(feature_names)
         feature_importances = pd.DataFrame(data=feature_names, columns=['feature'])
         feature_importances['splits'] = feature_splits
@@ -220,7 +221,7 @@ class LGBModel(AbstractModel):
     # FIXME: Requires major refactor + refactor lgb_trial.py
     #  model names are not aligned with what is communicated to trainer!
     # FIXME: Likely tabular_nn_trial.py and abstract trial also need to be refactored heavily + hyperparameter functions
-    def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options, **kwargs):
+    def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         time_start = time.time()
         logger.log(15, "Beginning hyperparameter tuning for Gradient Boosting Model...")
         self._set_default_searchspace()
@@ -244,7 +245,7 @@ class LGBModel(AbstractModel):
         params_copy['num_threads'] = num_threads
         # num_gpus = scheduler_options['resource']['num_gpus'] # TODO: unused
 
-        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, Y_train=Y_train, params=params_copy, X_test=X_test, Y_test=Y_test)
+        dataset_train, dataset_val = self.generate_datasets(X_train=X_train, y_train=y_train, params=params_copy, X_val=X_val, y_val=y_val)
         dataset_train_filename = "dataset_train.bin"
         train_file = self.path + dataset_train_filename
         if os.path.exists(train_file):  # clean up old files first
@@ -257,7 +258,7 @@ class LGBModel(AbstractModel):
         dataset_val.save_binary(val_file)
         dataset_val_pkl_filename = 'dataset_val.pkl'
         val_pkl_path = directory + dataset_val_pkl_filename
-        save_pkl.save(path=val_pkl_path, object=(X_test, Y_test))
+        save_pkl.save(path=val_pkl_path, object=(X_val, y_val))
 
         if not np.any([isinstance(params_copy[hyperparam], Space) for hyperparam in params_copy]):
             logger.warning("Attempting to do hyperparameter optimization without any search space (all hyperparameters are already fixed values)")

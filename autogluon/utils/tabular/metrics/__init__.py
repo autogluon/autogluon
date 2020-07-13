@@ -370,7 +370,7 @@ def get_metric(metric, problem_type, metric_type):
             return soft_log_loss
         else:
             raise ValueError(
-                f"{metric} is an unknown metric, see utils/tabular/metrics/ for available options "
+                f"{metric} is an unknown metric, see autogluon/utils/tabular/metrics/ for available options "
                 f"or how to define your own {metric_type} function"
             )
     else:

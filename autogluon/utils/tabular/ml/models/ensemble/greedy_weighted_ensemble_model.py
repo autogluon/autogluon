@@ -30,11 +30,11 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         return X
 
     # TODO: Check memory after loading best model predictions, only load top X model predictions that fit in memory
-    def _fit(self, X_train, Y_train, X_test=None, Y_test=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         X_train = self.preprocess(X_train)
 
         self.model = self.model_base(ensemble_size=self.params['ensemble_size'], problem_type=self.problem_type, metric=self.stopping_metric)
-        self.model = self.model.fit(X_train, Y_train, time_limit=time_limit)
+        self.model = self.model.fit(X_train, y_train, time_limit=time_limit)
         self.base_model_names, self.model.weights_ = self.remove_zero_weight_models(self.base_model_names, self.model.weights_)
         self.weights_ = self.model.weights_
         self.features, self.num_pred_cols_per_model = self.set_stack_columns(base_model_names=self.base_model_names)

@@ -27,16 +27,16 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-    def fit(self, X: DataFrame, X_test: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
-                X_test (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+                X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
-                holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_test != None, ignored if kfolds != 0)
+                holdout_frac (float): Fraction of data to hold out for evaluating validation performance (ignored if X_val != None, ignored if kfolds != 0)
                 num_bagging_folds (int): kfolds used for bagging of models, roughly increases model training time by a factor of k (0: disabled)
                 num_bagging_sets (int): number of repeats of kfold bagging to perform (values must be >= 1),
                     total number of models trained during bagging = num_bagging_folds * num_bagging_sets
@@ -47,7 +47,7 @@ class DefaultLearner(AbstractLearner):
         """
         if hyperparameters is None:
             hyperparameters = {'NN': {}, 'GBM': {}}
-        # TODO: if provided, feature_types in X, X_test are ignored right now, need to pass to Learner/trainer and update this documentation.
+        # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         if time_limit:
             self.time_limit = time_limit
             logger.log(20, f'Beginning AutoGluon training ... Time limit = {time_limit}s')
@@ -58,12 +58,12 @@ class DefaultLearner(AbstractLearner):
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
         logger.log(20, f'Train Data Columns: {len(X.columns)}')
-        if X_test is not None:
-            logger.log(20, f'Tuning Data Rows:    {len(X_test)}')
-            logger.log(20, f'Tuning Data Columns: {len(X_test.columns)}')
+        if X_val is not None:
+            logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
+            logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
-        X, y, X_test, y_test, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_test, holdout_frac, num_bagging_folds)
+        X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
         logger.log(20, f'\tData preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
@@ -75,7 +75,7 @@ class DefaultLearner(AbstractLearner):
         trainer = self.trainer_type(
             path=self.model_context,
             problem_type=self.trainer_problem_type,
-            objective_func=self.objective_func,
+            eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
             feature_types_metadata=self.feature_generator.feature_types_metadata,
@@ -92,13 +92,13 @@ class DefaultLearner(AbstractLearner):
         )
 
         self.trainer_path = trainer.path
-        if self.objective_func is None:
-            self.objective_func = trainer.objective_func
+        if self.eval_metric is None:
+            self.eval_metric = trainer.eval_metric
         if self.stopping_metric is None:
             self.stopping_metric = trainer.stopping_metric
 
         self.save()
-        trainer.train(X, y, X_test, y_test, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
+        trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
@@ -106,7 +106,7 @@ class DefaultLearner(AbstractLearner):
         self.time_fit_total = time_end - time_preprocessing_start
         logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
 
-    def general_data_processing(self, X: DataFrame, X_test: DataFrame, holdout_frac: float, num_bagging_folds: int):
+    def general_data_processing(self, X: DataFrame, X_val: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
         X = copy.deepcopy(X)
         # TODO: We should probably uncomment the below lines, NaN label should be treated as just another value in multiclass classification -> We will have to remove missing, compute problem type, and add back missing if multiclass
@@ -120,16 +120,16 @@ class DefaultLearner(AbstractLearner):
             X = X.drop(missinglabel_inds, axis=0)
 
         if self.problem_type is None:
-            self.problem_type = self.get_problem_type(X[self.label])
+            self.problem_type = self.infer_problem_type(X[self.label])
 
-        if X_test is not None and self.label in X_test.columns:
-            # TODO: This is not an ideal solution, instead check if bagging and X_test exists with label, then merge them prior to entering general data processing.
+        if X_val is not None and self.label in X_val.columns:
+            # TODO: This is not an ideal solution, instead check if bagging and X_val exists with label, then merge them prior to entering general data processing.
             #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
             self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
         else:
             self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
-        if (self.objective_func is not None) and (self.objective_func.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
+        if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
             X = self.augment_rare_classes(X)
 
         # Gets labels prior to removal of infrequent classes
@@ -150,31 +150,31 @@ class DefaultLearner(AbstractLearner):
         X, y = self.extract_label(X)
         y = self.label_cleaner.transform(y)
 
-        if X_test is not None and self.label in X_test.columns:
-            X_test = self.cleaner.transform(X_test)
-            if len(X_test) == 0:
-                logger.debug('All X_test data contained low frequency classes, ignoring X_test and generating from subset of X')
-                X_test = None
-                y_test = None
+        if X_val is not None and self.label in X_val.columns:
+            X_val = self.cleaner.transform(X_val)
+            if len(X_val) == 0:
+                logger.debug('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
+                X_val = None
+                y_val = None
             else:
-                X_test, y_test = self.extract_label(X_test)
-                y_test = self.label_cleaner.transform(y_test)
+                X_val, y_val = self.extract_label(X_val)
+                y_val = self.label_cleaner.transform(y_val)
         else:
-            y_test = None
+            y_val = None
 
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        if X_test is not None:
+        if X_val is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
-            X_super = pd.concat([X, X_test], ignore_index=True)
+            X_super = pd.concat([X, X_val], ignore_index=True)
             X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
             X = X_super.head(len(X)).set_index(X.index)
-            X_test = X_super.tail(len(X_test)).set_index(X_test.index)
+            X_val = X_super.tail(len(X_val)).set_index(X_val.index)
             del X_super
         else:
             X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
 
-        return X, y, X_test, y_test, holdout_frac, num_bagging_folds
+        return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)
