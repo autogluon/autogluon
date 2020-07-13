@@ -606,6 +606,17 @@ class TabularPredictor(BasePredictor):
         refit_full_dict = self._learner.refit_ensemble_full(model=model)
         return refit_full_dict
 
+    def get_model_best(self):
+        """
+        Returns the string model name of the best model by validation score.
+        This is typically the same model used during inference when `predictor.predict` is called without specifying a model.
+
+        Returns
+        -------
+        String model name of the best model
+        """
+        return self._trainer.get_model_best(can_infer=True)
+
     def get_model_full_dict(self):
         """
         Returns a dictionary of original model name -> refit full model name.
