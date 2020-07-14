@@ -198,15 +198,15 @@ class LGBModel(AbstractModel):
             X_val = self.preprocess(X_val)
         # TODO: Try creating multiple Datasets for subsets of features, then combining with Dataset.add_features_from(), this might avoid memory spike
 
+        y_train_og = None
+        y_val_og = None
         if self.problem_type == SOFTCLASS:
-            Y_train_og = None
-            Y_test_og = None
-            if (not dataset_train) and (X_train is not None) and (Y_train is not None):
-                Y_train_og = np.array(Y_train)
-                Y_train = pd.Series([0]*len(X_train))  # placeholder dummy labels to satisfy lgb.Dataset constructor
-            if (not dataset_val) and (X_test is not None) and (Y_test is not None):
-                Y_test_og = np.array(Y_test)
-                Y_test = pd.Series([0]*len(X_test))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+            if (not dataset_train) and (X_train is not None) and (y_train is not None):
+                y_train_og = np.array(y_train)
+                y_train = pd.Series([0]*len(X_train))  # placeholder dummy labels to satisfy lgb.Dataset constructor
+            if (not dataset_val) and (X_val is not None) and (y_val is not None):
+                y_val_og = np.array(y_val)
+                y_val = pd.Series([0]*len(X_val))  # placeholder dummy labels to satisfy lgb.Dataset constructor
 
         if not dataset_train:
             # X_train, W_train = self.convert_to_weight(X=X_train)
@@ -217,10 +217,10 @@ class LGBModel(AbstractModel):
             dataset_val = construct_dataset(x=X_val, y=y_val, location=f'{self.path}datasets{os.path.sep}val', reference=dataset_train, params=data_params, save=save, weight=W_test)
             # dataset_val = construct_dataset_lowest_memory(X=X_val, y=y_val, location=self.path + 'datasets/val', reference=dataset_train, params=data_params)
         if self.problem_type == SOFTCLASS:
-            if Y_train_og is not None:
-                dataset_train.softlabels = Y_train_og
-            if Y_test_og is not None:
-                dataset_val.softlabels = Y_test_og
+            if y_train_og is not None:
+                dataset_train.softlabels = y_train_og
+            if y_val_og is not None:
+                dataset_val.softlabels = y_val_og
         return dataset_train, dataset_val
 
     def debug_features_to_use(self, X_val_in):

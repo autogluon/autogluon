@@ -170,6 +170,7 @@ def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
         ), problem_type=problem_type, eval_metric=eval_metric)
     return model
 
+
 def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperparameter_tune=False, name_suffix=''):
     model_types_standard = ['GBM','NN','CAT']
     hyperparameters = copy.deepcopy(hyperparameters)
@@ -183,7 +184,7 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
         hyperparameters_standard ={key: hyperparameters_standard[key] for key in hyperparameters_standard if key in model_types_standard}
         hyperparameters_rf ={key: hyperparameters_rf[key] for key in hyperparameters_rf if key == 'RF'}
         # TODO: add support for per-stack level hyperparameters
-    models = get_preset_models(path=path, problem_type=SOFTCLASS, objective_func=soft_log_loss, stopping_metric=soft_log_loss,
+    models = get_preset_models(path=path, problem_type=SOFTCLASS, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
                                hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune=hyperparameter_tune,
                                 name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY)
     # Swap RF criterion for MSE:
@@ -206,7 +207,7 @@ def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperpa
             hyperparameters_rf['RF'] = rf_params
         elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
             hyperparameters_rf['default']['RF'] = rf_params
-        rf_models = get_preset_models(path=path, problem_type=REGRESSION, objective_func=mean_squared_error,
+        rf_models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=mean_squared_error,
                                       hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
                                       name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY)
     models_cat = [model for model in models if 'Catboost' in model.name]

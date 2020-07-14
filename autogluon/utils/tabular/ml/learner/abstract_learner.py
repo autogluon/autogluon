@@ -627,12 +627,12 @@ class AbstractLearner:
         save_json.save(path=self.path + self.learner_info_json_name, obj=info)
         return info
 
-    def distill(self, X=None, y=None, X_test=None, y_test=None, time_limits=None, hyperparameters=None, holdout_frac=None,
+    def distill(self, X=None, y=None, X_val=None, y_val=None, time_limits=None, hyperparameters=None, holdout_frac=None,
                 verbosity=None, models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ See abstract_trainer.distill() for details. """
         if X is not None:
-            if (self.objective_func is not None) and (self.objective_func.name == 'log_loss') and (self.problem_type == MULTICLASS):
+            if (self.eval_metric is not None) and (self.eval_metric.name == 'log_loss') and (self.problem_type == MULTICLASS):
                 X = augment_rare_classes(X, self.label, self.threshold)
             if y is None:
                 X, y = self.extract_label(X)
@@ -643,19 +643,19 @@ class AbstractLearner:
         else:
             y = None
 
-        if X_test is not None:
+        if X_val is not None:
             if X is None:
-                raise ValueError("Cannot specify X_test without specifying X")
-            if y_test is None:
-                X_test, y_test = self.extract_label(X_test)
-            X_test = self.transform_features(X_test)
-            y_test = self.label_cleaner.transform(y_test)
+                raise ValueError("Cannot specify X_val without specifying X")
+            if y_val is None:
+                X_val, y_val = self.extract_label(X_val)
+            X_val = self.transform_features(X_val)
+            y_val = self.label_cleaner.transform(y_val)
 
         if augmentation_data is not None:
             augmentation_data = self.transform_features(augmentation_data)
 
         trainer = self.load_trainer()
-        distilled_model_names = trainer.distill(X=X, y=y, X_test=X_test, y_test=y_test, time_limits=time_limits, hyperparameters=hyperparameters,
+        distilled_model_names = trainer.distill(X_train=X, y_train=y, X_val=X_val, y_val=y_val, time_limits=time_limits, hyperparameters=hyperparameters,
                                                 holdout_frac=holdout_frac, verbosity=verbosity, teacher_preds=teacher_preds, models_name_suffix=models_name_suffix,
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)

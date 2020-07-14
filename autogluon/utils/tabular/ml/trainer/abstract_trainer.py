@@ -1467,16 +1467,16 @@ class AbstractTrainer:
             hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
         return hyperparameters_valid
 
-    def distill(self, X=None, y=None, X_test=None, y_test=None,
+    def distill(self, X_train=None, y_train=None, X_val=None, y_val=None,
                 time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
                 models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
         """ Various distillation algorithms.
             Args:
-                X,y: pd.DataFrame and pd.Series of training data.
+                X_train, y_train: pd.DataFrame and pd.Series of training data.
                     If None, original training data used during TabularPrediction.fit() will be loaded.
-                    This data is split into train/validation if X_test,y_test are None.
-                X_test,y_test: pd.DataFrame and pd.Series of validation data.
+                    This data is split into train/validation if X_val, y_val are None.
+                X_val, y_val: pd.DataFrame and pd.Series of validation data.
                 time_limits, hyperparameters, holdout_frac: defined as in TabularPrediction.fit()
                 teacher_preds (None or str): If None, we only train with original labels (no data augmentation, overrides augment_method)
                     If 'hard', labels are hard teacher predictions given by: teacher.predict()
@@ -1500,34 +1500,32 @@ class AbstractTrainer:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
         logger.log(20, f"Distilling with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
-        if X is None:
-            if y is not None:
+        if X_train is None:
+            if y_train is not None:
                 raise ValueError("X cannot be None when y specified.")
-            X = self.load_X_train()
+            X_train = self.load_X_train()
             if not self.bagged_mode:
                 try:
-                    X_test = self.load_X_val()
-                    X_train = X
+                    X_val = self.load_X_val()
                 except FileNotFoundError:
                     pass
 
-        if y is None:
-            y = self.load_y_train()
+        if y_train is None:
+            y_train = self.load_y_train()
             if not self.bagged_mode:
                 try:
-                    y_test = self.load_y_val()
-                    y_train = y
+                    y_val = self.load_y_val()
                 except FileNotFoundError:
                     pass
 
-        if X_test is None:
-            if y_test is not None:
-                raise ValueError("X_test cannot be None when y_test specified.")
+        if X_val is None:
+            if y_val is not None:
+                raise ValueError("X_val cannot be None when y_val specified.")
             if holdout_frac is None:
-                holdout_frac = default_holdout_frac(len(X), hyperparameter_tune)
-            X_train, X_test, y_train, y_test = generate_train_test_split(X, y, problem_type=self.problem_type, test_size=holdout_frac)
+                holdout_frac = default_holdout_frac(len(X_train), hyperparameter_tune)
+            X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac)
 
-        y_test_og = y_test.copy()
+        y_val_og = y_val.copy()
         og_bagged_mode = self.bagged_mode
         og_verbosity = self.verbosity
         self.bagged_mode = False  # turn off bagging
@@ -1539,7 +1537,7 @@ class AbstractTrainer:
 
         if teacher_preds in ['onehot','soft']:
             y_train = format_distillation_labels(y_train, self.problem_type, self.num_classes)
-            y_test = format_distillation_labels(y_test, self.problem_type, self.num_classes)
+            y_val = format_distillation_labels(y_val, self.problem_type, self.num_classes)
 
         if augment_method is None and augmentation_data is None:
             if teacher_preds == 'hard':
@@ -1604,11 +1602,11 @@ class AbstractTrainer:
             hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=None, excluded_model_types=None)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
         if teacher_preds is None or teacher_preds == 'hard':
             models_distill = get_preset_models(path=self.path, problem_type=self.problem_type,
-                                objective_func=self.objective_func, stopping_metric=self.stopping_metric,
+                                eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
                                 num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
         else:
             models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
-                                objective_func=self.objective_func, stopping_metric=self.stopping_metric,
+                                eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
                                 num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
             if self.problem_type != REGRESSION:
                 self.regress_preds_asprobas = True
@@ -1623,17 +1621,17 @@ class AbstractTrainer:
                 time_left = time_limits - (time_start_model - self.time_train_start)
 
             logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
-            models = self.train_single_full(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, model=model,
-                                        hyperparameter_tune=False, stack_name=self.distill_stackname, time_limit=time_left)
+            models = self.train_single_full(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, model=model,
+                                            hyperparameter_tune=False, stack_name=self.distill_stackname, time_limit=time_left)
             for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
-                model_score = self.score(X_test, y_test_og, model=model_name)
+                model_score = self.score(X_val, y_val_og, model=model_name)
                 self.model_performance[model_name] = model_score
                 model_obj = self.load_model(model_name)
                 model_obj.val_score = model_score
                 model_obj.save()  # TODO: consider omitting for sake of efficiency
                 self.model_graph.nodes[model_name]['val_score'] = model_score
                 distilled_model_names.append(model_name)
-                logger.log(20, '\t' + str(round(model_obj.val_score, 4)) + '\t = Validation ' + self.objective_func.name + ' score')
+                logger.log(20, '\t' + str(round(model_obj.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
         # reset trainer to old state before distill() was called:
         self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
         self.verbosity = og_verbosity
