@@ -9,21 +9,17 @@ import numpy as np
 import pandas as pd
 from fastai.basic_data import DatasetType
 from fastai.basic_train import load_learner
-from fastai.callbacks import SaveModelCallback, EarlyStoppingCallback
+from fastai.callbacks import EarlyStoppingCallback, SaveModelCallback
 from fastai.data_block import FloatList
 from fastai.layers import LabelSmoothingCrossEntropy
-from fastai.metrics import mean_absolute_error, accuracy, root_mean_squared_error, AUROC, mean_squared_error, r2_score, FBeta, Precision, Recall
-from fastai.tabular import tabular_learner, TabularList, FillMissing, Categorify, Normalize
+from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_absolute_error, accuracy, FBeta, AUROC, Precision, Recall, r2_score
+from fastai.tabular import FillMissing, Categorify, Normalize, TabularList, tabular_learner
 from fastai.utils.mod_display import progress_disabled_ctx
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
 
 from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_param_baseline
 from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.searchspaces import get_default_searchspace
 from autogluon.utils.tabular.ml.constants import REGRESSION, BINARY, MULTICLASS
 from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.ml.models.tabular_nn.categorical_encoders import OrdinalMergeRaresHandleUnknownEncoder
 from autogluon.utils.tabular.utils.loaders import load_pkl
 from autogluon.utils.tabular.utils.savers import save_pkl
 
@@ -89,69 +85,32 @@ class NNFastAiTabularModel(AbstractModel):
 
     }
 
-    def __init__(self, path, name, problem_type, objective_func, stopping_metric=None, hyperparameters=None, features=None, feature_types_metadata=None,
-                 debug=0, max_unique_categorical_values=10000,
-                 y_scaler=None):
-        super().__init__(path=path, name=name, problem_type=problem_type, objective_func=objective_func, hyperparameters=hyperparameters, features=features,
-                         feature_types_metadata=feature_types_metadata, debug=debug)
+    def __init__(self, path: str, name: str, problem_type: str, eval_metric=None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None,
+                 features=None, feature_types_metadata=None, debug=0, y_scaler=None, **kwargs):
+        super().__init__(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, num_classes=num_classes, stopping_metric=stopping_metric,
+                         hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
         self.procs = [FillMissing, Categorify, Normalize]
-        self.cat_names = []
-        self.cont_names = []
-        self.max_unique_categorical_values = max_unique_categorical_values
-        self.eval_result = None
-
+        self.cat_columns = []
+        self.cont_columns = []
         self.col_after_transformer = None
-        self.col_transformer = None
+        self.max_unique_categorical_values = hyperparameters.get('max_unique_categorical_values', 10000)
         self.y_scaler = y_scaler
 
-    def _set_default_params(self):
-        default_params = get_param_baseline(problem_type=self.problem_type)
-        for param, val in default_params.items():
-            self._set_default_param_value(param, val)
-
-    def _get_default_searchspace(self, problem_type):
-        spaces = {}
-        return spaces
-
-    def preprocess(self, X, fit=False):
+    def fold_preprocess(self, X, fit=False):
         if fit:
-            self.col_after_transformer = list(X.columns)
-            self.col_transformer, self.col_after_transformer = self._construct_transformer(X=X)
-            X = self.col_transformer.fit_transform(X)
-        else:
-            X = self.col_transformer.transform(X)
+            cols_to_use = self.cont_columns + self.cat_columns
+            self.col_after_transformer = [col for col in X.columns if col in cols_to_use]
         X = pd.DataFrame(data=X, columns=self.col_after_transformer)
         X = super().preprocess(X)
         return X
 
-    def __get_feature_type_if_present(self, feature_type):
-        return self.feature_types_metadata[feature_type] if feature_type in self.feature_types_metadata else []
-
-    def _construct_transformer(self, X):
-        transformers = []
-        if len(self.cont_names) > 0:
-            continuous_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy='median')),
-                # ('scaler', StandardScaler())
-            ])
-            transformers.append(('continuous', continuous_transformer, self.cont_names))
-        if len(self.cat_names) > 0:
-            ordinal_transformer = Pipeline(steps=[
-                ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=self.max_unique_categorical_values))
-                # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
-            ])
-            transformers.append(('ordinal', ordinal_transformer, self.cat_names))
-        cols_to_use = self.cont_names + self.cat_names
-        col_after_transformer = [col for col in X.columns if col in cols_to_use]
-        return ColumnTransformer(transformers=transformers), col_after_transformer
-
-    def preprocess_train(self, X_train, Y_train, X_test, Y_test):
-        self.cat_names = self.__get_feature_type_if_present('object') + self.__get_feature_type_if_present('bool')
+    def preprocess_train(self, X_train, Y_train, X_test, Y_test, **kwargs):
+        self.cat_columns = X_train.select_dtypes(['category', 'object']).columns.values.tolist()
+        self.cont_columns = X_train.select_dtypes(['float', 'int', 'datetime']).columns.values.tolist()
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             Y_train_norm = pd.Series(self.y_scaler.fit_transform(Y_train.values.reshape(-1, 1)).reshape(-1))
             Y_test_norm = pd.Series(self.y_scaler.transform(Y_test.values.reshape(-1, 1)).reshape(-1)) if Y_test is not None else None
-            logger.log(15, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
+            logger.log(0, f'Training with scaled targets: {self.y_scaler} - !!! NN training metric will be different from the final results !!!')
         else:
             Y_train_norm = Y_train
             Y_test_norm = Y_test
@@ -161,36 +120,26 @@ class NNFastAiTabularModel(AbstractModel):
         except:
             cat_cols_to_drop = []
         cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
-        cat_cols_to_use = [col for col in self.cat_names if col in cat_cols_to_keep]
-        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_names)} categorical features')
-        self.cat_names = cat_cols_to_use
-        self.cat_names = [feature for feature in self.cat_names if feature in list(X_train.columns)]
-        self.cont_names = self.__get_feature_type_if_present('float') + self.__get_feature_type_if_present('int') + self.__get_feature_type_if_present(
-            'datetime')  # + self.__get_feature_type_if_present('vectorizers')  # Disabling vectorizers until more performance testing is done
-        self.cont_names = [feature for feature in self.cont_names if feature in list(X_train.columns)]
-        logger.log(15, f'Using {len(self.cont_names)} cont features')
-        X_train = self.preprocess(X_train, fit=True)
+        cat_cols_to_use = [col for col in self.cat_columns if col in cat_cols_to_keep]
+        logger.log(15, f'Using {len(cat_cols_to_use)}/{len(self.cat_columns)} categorical features')
+        self.cat_columns = cat_cols_to_use
+        self.cat_columns = [feature for feature in self.cat_columns if feature in list(X_train.columns)]
+        self.cont_columns = [feature for feature in self.cont_columns if feature in list(X_train.columns)]
+        logger.log(15, f'Using {len(self.cont_columns)} cont features')
+        X_train = self.fold_preprocess(X_train, fit=True)
         if X_test is not None:
-            X_test = self.preprocess(X_test)
+            X_test = self.fold_preprocess(X_test)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train_norm, X_test, Y_test_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
-        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs)
+        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=self.procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
-    def _generate_datasets(self, X_train, Y_train, X_test, Y_test):
-        df_train = pd.concat([X_train, X_test], ignore_index=True)
-        df_train[LABEL] = pd.concat([Y_train, Y_test], ignore_index=True)
-        train_idx = np.arange(len(X_train))
-        val_idx = np.arange(len(X_test)) + len(X_train)
-
-        return df_train, train_idx, val_idx
-
-    def fit(self, X_train, Y_train, X_test=None, Y_test=None, **kwargs):
-        logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
-        data = self.preprocess_train(X_train, Y_train, X_test, Y_test)
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, **kwargs):
+        logger.log(0, f'Fitting Neural Network with parameters {self.params}...')
+        data = self.preprocess_train(X_train, y_train, X_val, y_val)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
         objective_func_name_to_monitor = self.__get_objective_func_to_monitor(objective_func_name)
@@ -222,7 +171,7 @@ class NNFastAiTabularModel(AbstractModel):
             data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
-        logger.log(15, self.model.model)
+        logger.log(0, self.model.model)
 
         with make_temp_directory() as temp_dir:
             save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name)
@@ -239,11 +188,18 @@ class NNFastAiTabularModel(AbstractModel):
                 else:
                     self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
 
-                logger.log(15, f'Model validation metrics: {self.eval_result}')
+                logger.log(0, f'Model validation metrics: {self.eval_result}')
                 model.path = original_path
 
+    def _generate_datasets(self, X_train, Y_train, X_val, Y_val):
+        df_train = pd.concat([X_train, X_val], ignore_index=True)
+        df_train[LABEL] = pd.concat([Y_train, Y_val], ignore_index=True)
+        train_idx = np.arange(len(X_train))
+        val_idx = np.arange(len(X_val)) + len(X_train)
+        return df_train, train_idx, val_idx
+
     def __get_objective_func_name(self):
-        objective_func_name = self.objective_func.name
+        objective_func_name = self.eval_metric.name
         if objective_func_name in self.metrics_map.keys():
             nn_metric = self.metrics_map[objective_func_name]
         elif objective_func_name is None:
@@ -276,13 +232,10 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    def predict(self, X, preprocess=True):
-        return super().predict(X, preprocess)
-
     def predict_proba(self, X, preprocess=True):
         if preprocess:
             X = self.preprocess(X)
-        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_names, cont_names=self.cont_names, procs=self.procs))
+        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=self.procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
         if self.problem_type == REGRESSION:
@@ -307,8 +260,14 @@ class NNFastAiTabularModel(AbstractModel):
         obj.model = load_pkl.load_with_fn(f'{obj.path}{obj.model_internals_file_name}', lambda p: load_learner(obj.path, p), verbose=verbose)
         return obj
 
-    def _get_default_searchspace(self, problem_type):
-        return get_default_searchspace(problem_type)
+    def _set_default_params(self):
+        """ Specifies hyperparameter values to use by default """
+        default_params = get_param_baseline(self.problem_type)
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+
+    def _get_default_searchspace(self):
+        return get_default_searchspace(self.problem_type, num_classes=None)
 
     def hyperparameter_tune(self, X_train, X_test, Y_train, Y_test, scheduler_options=None, **kwargs):
         # TODO: add warning regarding dataloader leak: https://github.com/pytorch/pytorch/issues/31867
