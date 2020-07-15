@@ -1,5 +1,7 @@
-# This workflows will upload a Python Package using Twine when a release is created
+# This workflow will upload a Python Package to Pypi using Twine when a release is created in this Github repo.
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
+# Note: There is a bug in Github Actions, so do NOT use the “Save Draft” functionality when creating a new release: https://github.community/t/workflow-set-for-on-release-not-triggering-not-showing-up/16286/5
+# Remember to always verify tagged releases are actually available on the Pypi website: https://pypi.org/project/autogluon/
 
 name: Pypi Release
 
