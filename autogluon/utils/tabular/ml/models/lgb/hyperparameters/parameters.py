@@ -1,6 +1,6 @@
 """ Default (fixed) hyperparameter values used in Gradient Boosting model. """
 
-from ....constants import BINARY, MULTICLASS, REGRESSION
+from ....constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for single training run
 
@@ -12,6 +12,8 @@ def get_param_baseline_custom(problem_type, num_classes=None):
         return get_param_multiclass_baseline_custom(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression_baseline_custom()
+    elif problem_type == SOFTCLASS:
+        return get_param_softclass_baseline_custom(num_classes=num_classes)
     else:
         return get_param_binary_baseline_custom()
 
@@ -23,6 +25,8 @@ def get_param_baseline(problem_type, num_classes=None):
         return get_param_multiclass_baseline(num_classes=num_classes)
     elif problem_type == REGRESSION:
         return get_param_regression_baseline()
+    elif problem_type == SOFTCLASS:
+        return get_param_softclass_baseline(num_classes=num_classes)
     else:
         return get_param_binary_baseline()
 
@@ -129,4 +133,16 @@ def get_param_regression_baseline_custom():
         'two_round': True,
         'seed_value': 0,
     }
+    return params.copy()
+
+
+def get_param_softclass_baseline(num_classes):
+    params = get_param_multiclass_baseline(num_classes)
+    params.pop('metric', None)
+    return params.copy()
+
+
+def get_param_softclass_baseline_custom(num_classes):
+    params = get_param_multiclass_baseline_custom(num_classes)
+    params.pop('metric', None)
     return params.copy()

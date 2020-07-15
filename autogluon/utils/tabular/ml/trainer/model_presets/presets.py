@@ -14,7 +14,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
-from ....metrics import soft_log_loss
+from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,14 @@ DEFAULT_MODEL_PRIORITY = dict(
     CAT=60,
     NN=50,
     LR=40,
+    custom=0,
+)
+
+DEFAULT_SOFTCLASS_PRIORITY = dict(
+    GBM=100,
+    NN=90,
+    RF=80,
+    CAT=60,
     custom=0,
 )
 
@@ -85,8 +93,9 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, name_suffix=''):
-    if problem_type not in [BINARY, MULTICLASS, REGRESSION]:
+def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
+                      level='default', extra_ag_args_fit=None, name_suffix='', default_priorities=DEFAULT_MODEL_PRIORITY):
+    if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
         raise NotImplementedError
 
     if level in hyperparameters.keys():
@@ -102,7 +111,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
                 model[AG_ARGS] = dict()
             if 'model_type' not in model[AG_ARGS]:
                 model[AG_ARGS]['model_type'] = model_type
-            model_priority = model[AG_ARGS].get('priority', DEFAULT_MODEL_PRIORITY.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
+            model_priority = model[AG_ARGS].get('priority', default_priorities.get(model_type, DEFAULT_CUSTOM_MODEL_PRIORITY))
             # Check if model is valid
             if hyperparameter_tune and model[AG_ARGS].get('disable_in_hpo', False):
                 continue  # Not valid
@@ -124,7 +133,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             name_prefix = model[AG_ARGS].get('name_prefix', '')
             name_type_suffix = model[AG_ARGS].get('name_type_suffix', None)
             if name_type_suffix is None:
-                suffix_key = 'classifier' if problem_type in PROBLEM_TYPES_CLASSIFICATION else 'regressor'
+                suffix_key = 'classifier' if problem_type in (PROBLEM_TYPES_CLASSIFICATION+[SOFTCLASS]) else 'regressor'
                 name_type_suffix = DEFAULT_MODEL_TYPE_SUFFIX[suffix_key][model_type]
             name_suff = model[AG_ARGS].get('name_suffix', '')
             name_orig = name_prefix + name_main + name_type_suffix + name_suff
@@ -162,22 +171,100 @@ def get_preset_stacker_model(path, problem_type, eval_metric, num_classes=None,
     return model
 
 
-def get_preset_models_softclass(path, hyperparameters={}, hyperparameter_tune=False, name_suffix=''):
-    # print("Neural Net is currently the only model supported for multi-class distillation.")
-    models = []
-    # TODO: only NN supported for now. add other models. We use a big NN for distillation to ensure it has high capacity to approximate ensemble:
-    nn_options = {'num_epochs': 500, 'dropout_prob': 0, 'weight_decay': 1e-7, 'epochs_wo_improve': 50, 'layers': [2048]*2 + [512], 'numeric_embed_dim': 2048, 'activation': 'softrelu', 'embedding_size_factor': 2.0}
-    models.append(
-        TabularNeuralNetModel(path=path, name='NeuralNetSoftClassifier', problem_type=SOFTCLASS,
-                              eval_metric=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=nn_options.copy())
-    )
-    rf_options = dict(criterion='mse')
-    models.append(
-        RFModel(path=path, name='RandomForestRegressorMSE', problem_type=REGRESSION,
-                eval_metric=soft_log_loss, hyperparameters=rf_options),
-    )
-
+def get_preset_models_softclass(path, hyperparameters, num_classes=None, hyperparameter_tune=False, name_suffix=''):
+    model_types_standard = ['GBM','NN','CAT']
+    hyperparameters = copy.deepcopy(hyperparameters)
+    hyperparameters_standard = copy.deepcopy(hyperparameters)
+    hyperparameters_rf = copy.deepcopy(hyperparameters)
+    default_level_key = 'default'
+    if default_level_key in hyperparameters:
+        hyperparameters_standard[default_level_key] = {key: hyperparameters_standard[default_level_key][key] for key in hyperparameters_standard[default_level_key] if key in model_types_standard}
+        hyperparameters_rf[default_level_key] = {key: hyperparameters_rf[default_level_key][key] for key in hyperparameters_rf[default_level_key] if key == 'RF'}
+    else:
+        hyperparameters_standard ={key: hyperparameters_standard[key] for key in hyperparameters_standard if key in model_types_standard}
+        hyperparameters_rf ={key: hyperparameters_rf[key] for key in hyperparameters_rf if key == 'RF'}
+        # TODO: add support for per-stack level hyperparameters
+    models = get_preset_models(path=path, problem_type=SOFTCLASS, eval_metric=soft_log_loss, stopping_metric=soft_log_loss,
+                               hyperparameters=hyperparameters_standard, num_classes=num_classes, hyperparameter_tune=hyperparameter_tune,
+                                name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY)
+    # Swap RF criterion for MSE:
+    rf_models = []
+    if len(hyperparameters_rf) > 0:
+        rf_newparams = {'criterion': 'mse', 'AG_args': {'name_suffix': 'MSE'}}
+        if 'RF' in hyperparameters_rf:
+            rf_params = hyperparameters_rf['RF']
+        elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
+            rf_params = hyperparameters_rf['default']['RF']
+        else:
+            rf_params = None
+        if isinstance(rf_params, list):
+            for i in range(len(rf_params)):
+                rf_params[i].update(rf_newparams)
+            rf_params = [j for n, j in enumerate(rf_params) if j not in rf_params[(n+1):]]  # Remove duplicates which may arise after overwriting criterion
+        elif rf_params is not None:
+            rf_params.update(rf_newparams)
+        if 'RF' in hyperparameters_rf:
+            hyperparameters_rf['RF'] = rf_params
+        elif 'default' in hyperparameters_rf and 'RF' in hyperparameters_rf['default']:
+            hyperparameters_rf['default']['RF'] = rf_params
+        rf_models = get_preset_models(path=path, problem_type=REGRESSION, eval_metric=mean_squared_error,
+                                      hyperparameters=hyperparameters_rf, hyperparameter_tune=hyperparameter_tune,
+                                      name_suffix=name_suffix, default_priorities=DEFAULT_SOFTCLASS_PRIORITY)
+    models_cat = [model for model in models if 'Catboost' in model.name]
+    models_noncat = [model for model in models if 'Catboost' not in model.name]
+    models = models_noncat + rf_models + models_cat
+    if len(models) == 0:
+        raise ValueError("At least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF'], "
+                         "These are the only supported models for softclass prediction problems. "
+                         "Softclass problems are also not yet supported for fit() with per-stack level hyperparameters.")
     for model in models:
-        model.rename(model.name + name_suffix)
+        model.normalize_pred_probas = True
+        model.name = model.name.replace('Regressor', 'Classifier')  # conceal from user that model may actually be a regressor.
 
     return models
+
+
+"""
+def get_preset_models_softclassOLD(path, num_classes=None, hyperparameters={'GBM':{}, 'CAT':{}, 'NN':{}, 'RF':{}},
+                                hyperparameter_tune=False, name_suffix=''):
+    models = []
+    extra_models = []
+    model_types_standard = ['GBM','NN','CAT']
+    for modeltype_name in model_types_standard:
+        modeltype_options = None
+        if modeltype_name in hyperparameters:
+            modeltype_options = hyperparameters[modeltype_name]
+        elif 'default' in hyperparameters and modeltype_name in hyperparameters['default']:
+            modeltype_options = hyperparameters['default'][modeltype_name]
+        if modeltype_options is not None:
+            model_class = MODEL_TYPES[modeltype_name]
+            display_name = DEFAULT_MODEL_NAMES[model_class] + 'SoftClassifier'
+            if not isinstance(modeltype_options, list):
+                modeltype_options = [modeltype_options]
+            for modeltype_option in modeltype_options:
+                model_obj = model_class(path=path, name=display_name, problem_type=SOFTCLASS, num_classes=num_classes,
+                                        eval_metric=soft_log_loss, stopping_metric=soft_log_loss, hyperparameters=modeltype_option.copy())
+                if modeltype_name == 'CAT':
+                    extra_models.append(model_obj)  # only train CAT models last
+                else:
+                    models.append(model_obj)
+
+    rf_type_name = 'RF'
+    rf_options = hyperparameters.get(rf_type_name, None)
+    rf_params = {'model_type': 'rf'}
+    rf_params.update(hyperparameters.copy())
+    rf_params['criterion'] = 'mse'
+    if rf_options is not None:
+        rf_class = MODEL_TYPES[rf_type_name]
+        rf_display_name = DEFAULT_MODEL_NAMES[rf_class] + 'SoftClassifier'
+        models.append(rf_class(path=path, name=rf_display_name, problem_type=REGRESSION,
+                               eval_metric=mean_squared_error, hyperparameters=rf_params)
+        )
+
+    models = models + extra_models
+    for model in models:
+        model.rename(model.name + name_suffix)
+        model.normalize_pred_probas = True
+
+    return models
+"""

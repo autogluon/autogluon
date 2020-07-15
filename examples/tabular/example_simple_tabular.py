@@ -3,14 +3,15 @@
 from autogluon import TabularPrediction as task
 
 # Training time:
-train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv') # can be local CSV file as well, returns Pandas DataFrame
+train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')  # can be local CSV file as well, returns Pandas DataFrame
 train_data = train_data.head(500) # subsample for faster demo
 print(train_data.head())
 label_column = 'class' # specifies which column do we want to predict
 savedir = 'ag_models/' # where to save trained models
 
-predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir) # since tuning_data = None, automatically determines train/validation split
-results = predictor.fit_summary() # display summary of models trained during fit()
+predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir)
+# NOTE: Default settings above are intended to ensure reasonable runtime at the cost of accuracy. To maximize predictive accuracy, do this instead:  predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, presets='best_quality', eval_metric=YOUR_METRIC_NAME)
+results = predictor.fit_summary()
 
 # Inference time:
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv') # another Pandas DataFrame

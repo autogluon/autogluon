@@ -4,7 +4,7 @@ import numpy as np
 from pandas import DataFrame, Series
 
 from autogluon import try_import_lightgbm
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 
 # Mapping to specialized LightGBM metrics that are much faster than the standard metric computation
@@ -38,6 +38,13 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
                 y_true = data.get_label()
                 y_hat = y_hat.reshape(len(np.unique(y_true)), -1).T
                 return metric.name, metric(y_true, y_hat), is_higher_better
+        elif problem_type == SOFTCLASS:  # metric must take in soft labels array, like soft_log_loss
+            def function_template(y_hat, data):
+                y_true = data.softlabels
+                y_hat = y_hat.reshape(y_true.shape[1], -1).T
+                y_hat = np.exp(y_hat)
+                y_hat = np.multiply(y_hat, 1/np.sum(y_hat, axis=1)[:, np.newaxis])
+                return metric.name, metric(y_true, y_hat), is_higher_better
         else:
             def function_template(y_hat, data):
                 y_true = data.get_label()
@@ -56,6 +63,18 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
                 return metric.name, metric(y_true, y_hat), is_higher_better
     return function_template
 
+def softclass_lgbobj(preds, train_data):
+    """ Custom LightGBM loss function for soft (probabilistic, vector-valued) class-labels only,
+        which have been appended to lgb.Dataset (train_data) as additional ".softlabels" attribute (2D numpy array).
+    """
+    softlabels = train_data.softlabels
+    num_classes = softlabels.shape[1]
+    preds=np.reshape(preds, (len(softlabels), num_classes), order='F')
+    preds = np.exp(preds)
+    preds = np.multiply(preds, 1/np.sum(preds, axis=1)[:, np.newaxis])
+    grad = (preds - softlabels)
+    hess = 2.0 * preds * (1.0-preds)
+    return grad.flatten('F'), hess.flatten('F')
 
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
     try_import_lightgbm()

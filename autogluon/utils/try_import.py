@@ -8,6 +8,15 @@ def try_import_catboost():
         raise ImportError("Import catboost failed. Numpy version may be outdated, "
                           "Please ensure numpy version >=1.16.0. If it is not, please try 'pip uninstall numpy; pip install numpy>=1.17.0' Detailed info: {}".format(str(e)))
 
+def try_import_catboostdev():  # TODO: remove once Catboost 0.24 is released.
+    try:
+        import catboost  # Need to first import catboost before catboost_dev and not vice-versa
+        import catboost_dev
+    except (ValueError, ImportError) as e:
+        raise ImportError("Import catboost_dev failed (needed for distillation with CatBoost models). "
+                          "Make sure you can import catboost and then run: 'pip install catboost-dev'."
+                          "Detailed info: {}".format(str(e)))
+
 def try_import_lightgbm():
     try:
         import lightgbm

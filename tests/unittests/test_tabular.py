@@ -1,15 +1,15 @@
-""" Runs autogluon.tabular on multiple benchmark datasets. 
+""" Runs autogluon.tabular on multiple benchmark datasets.
     Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
     Classification performance = error-rate, Regression performance = 1 - R^2
-    
+
     # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
-    
+
     # TODO: may want to take allowed run-time of AutoGluon into account? Eg. can produce performance vs training time curves for each dataset.
-    
+
     # TODO: We'd like to add extra benchmark datasets with the following properties:
     - parquet file format
-    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand 
+    - poker hand data: https://archive.ics.uci.edu/ml/datasets/Poker+Hand
     - test dataset with just one data point
     - test dataset where order of columns different than in training data (same column names)
     - extreme-multiclass classification (500+ classes)
@@ -165,7 +165,7 @@ def run_tabular_benchmark_toy(fit_args):
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None):
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False):
     print("Running fit with args:")
     print(fit_args)
     # Each train/test dataset must be located in single directory with the given names.
@@ -195,8 +195,8 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
 
     toyregres_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
                          'name': 'toyRegression',
-                         'problem_type': REGRESSION, 
-                        'label_column': 'y', 
+                         'problem_type': REGRESSION,
+                        'label_column': 'y',
                         'performance_val': 0.183}
     # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
@@ -247,9 +247,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
             performance_vals[idx] = perf
             print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], performance_vals[idx], dataset['performance_val']))
             if (not fast_benchmark) and (performance_vals[idx] > dataset['performance_val'] * perf_threshold):
-                warnings.warn("Performance on dataset %s is %s times worse than previous performance." % 
+                warnings.warn("Performance on dataset %s is %s times worse than previous performance." %
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
-
+            if run_distill:
+                predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
     # Summarize:
     avg_perf = np.mean(performance_vals)
     median_perf = np.median(performance_vals)
@@ -519,5 +520,5 @@ def test_tabular_bagstack():
         fit_args['num_bagging_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
-                           seed_val=seed_val, fit_args=fit_args)
+                           seed_val=seed_val, fit_args=fit_args, run_distill=True)
 

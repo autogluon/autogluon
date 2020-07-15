@@ -11,14 +11,16 @@ from ..constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SO
 from ...utils.loaders import load_pkl
 from ...utils.savers import save_pkl, save_json
 from ...utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
-from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows, infer_eval_metric
+from ..utils import get_pred_from_proba, dd_list, generate_train_test_split, shuffle_df_rows, infer_eval_metric, default_holdout_frac
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import accuracy, log_loss, root_mean_squared_error, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel
-from ..trainer.model_presets.presets import get_preset_stacker_model
+from ..trainer.model_presets.presets import get_preset_stacker_model, get_preset_models
 from ..trainer.model_presets.presets_custom import get_preset_custom
+from ..trainer.model_presets.presets_distill import get_preset_models_distillation
 from ..models.ensemble.stacker_ensemble_model import StackerEnsembleModel
 from ..models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
+from ..augmentation.distill_utils import format_distillation_labels, augment_data, spunge_augment
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ class AbstractTrainer:
     trainer_file_name = 'trainer.pkl'
     trainer_info_name = 'info.pkl'
     trainer_info_json_name = 'info.json'
+    distill_stackname = 'distill'  # name of stack-level for distilled student models
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
@@ -122,6 +125,8 @@ class AbstractTrainer:
         self.num_cols_train = None
 
         self.is_data_saved = False
+
+        self.regress_preds_asprobas = False  # whether to treat regression predictions as class-probabilities (during distillation)
 
     # path_root is the directory containing learner.pkl
     @property
@@ -307,7 +312,7 @@ class AbstractTrainer:
             self.model_types_inner[model.name] = model._child_type
         else:
             self.model_types_inner[model.name] = type(model)
-        if model.val_score is not None:
+        if model.val_score is not None and stack_name != self.distill_stackname:  # TODO: may want to avoid hard-coding logic into specific stack names
             logger.log(20, '\t' + str(round(model.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
         if model.fit_time is not None:
             logger.log(20, '\t' + str(round(model.fit_time, 2)) + 's' + '\t = Training runtime')
@@ -626,7 +631,14 @@ class AbstractTrainer:
         if isinstance(model, str):
             model = self.load_model(model)
         X = self.get_inputs_to_model(model=model, X=X, model_pred_proba_dict=model_pred_proba_dict, fit=False)
-        return model.predict(X=X, preprocess=False)
+        y_pred = model.predict(X=X, preprocess=False)
+        if self.regress_preds_asprobas and model.problem_type == REGRESSION:  # Convert regression preds to classes (during distillation)
+            if (len(y_pred.shape) > 1) and (y_pred.shape[1] > 1):
+                problem_type = MULTICLASS
+            else:
+                problem_type = BINARY
+            y_pred = get_pred_from_proba(y_pred_proba=y_pred, problem_type=problem_type)
+        return y_pred
 
     def predict_proba_model(self, X, model, model_pred_proba_dict=None):
         if isinstance(model, str):
@@ -1454,3 +1466,173 @@ class AbstractTrainer:
             max_level_key = max(level_keys)
             hyperparameters_valid['default'] = copy.deepcopy(hyperparameters_valid[max_level_key])
         return hyperparameters_valid
+
+    def distill(self, X_train=None, y_train=None, X_val=None, y_val=None,
+                time_limits=None, hyperparameters=None, holdout_frac=None, verbosity=None,
+                models_name_suffix=None, teacher_preds='soft',
+                augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
+        """ Various distillation algorithms.
+            Args:
+                X_train, y_train: pd.DataFrame and pd.Series of training data.
+                    If None, original training data used during TabularPrediction.fit() will be loaded.
+                    This data is split into train/validation if X_val, y_val are None.
+                X_val, y_val: pd.DataFrame and pd.Series of validation data.
+                time_limits, hyperparameters, holdout_frac: defined as in TabularPrediction.fit()
+                teacher_preds (None or str): If None, we only train with original labels (no data augmentation, overrides augment_method)
+                    If 'hard', labels are hard teacher predictions given by: teacher.predict()
+                    If 'soft', labels are soft teacher predictions given by: teacher.predict_proba()
+                    Note: 'hard' and 'soft' are equivalent for regression problems.
+                    If augment_method specified, teacher predictions are only used to label augmented data (training data keeps original labels).
+                    To apply label-smoothing: teacher_preds='onehot' will use original training data labels converted to one-hots for multiclass (no data augmentation).  # TODO: expose smoothing-hyperparameter.
+                models_name_suffix (str): Suffix to append to each student model's name, new names will look like: 'MODELNAME_dstl_SUFFIX'
+                augmentation_data: pd.DataFrame of additional data to use as "augmented data" (does not contain labels).
+                    When specified, augment_method, augment_args are ignored, and this is the only augmented data that is used (teacher_preds cannot be None).
+                augment_method (None or str): specifies which augmentation strategy to utilize. Options: [None, 'spunge','munge']
+                    If None, no augmentation gets applied.
+                }
+                augment_args (dict): args passed into the augmentation function corresponding to augment_method.
+        """
+        if verbosity is None:
+            verbosity = self.verbosity
+
+        hyperparameter_tune = False  # TODO: add as argument with scheduler options.
+        if augmentation_data is not None and teacher_preds is None:
+            raise ValueError("augmentation_data must be None if teacher_preds is None")
+
+        logger.log(20, f"Distilling with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...")
+        if X_train is None:
+            if y_train is not None:
+                raise ValueError("X cannot be None when y specified.")
+            X_train = self.load_X_train()
+            if not self.bagged_mode:
+                try:
+                    X_val = self.load_X_val()
+                except FileNotFoundError:
+                    pass
+
+        if y_train is None:
+            y_train = self.load_y_train()
+            if not self.bagged_mode:
+                try:
+                    y_val = self.load_y_val()
+                except FileNotFoundError:
+                    pass
+
+        if X_val is None:
+            if y_val is not None:
+                raise ValueError("X_val cannot be None when y_val specified.")
+            if holdout_frac is None:
+                holdout_frac = default_holdout_frac(len(X_train), hyperparameter_tune)
+            X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac)
+
+        y_val_og = y_val.copy()
+        og_bagged_mode = self.bagged_mode
+        og_verbosity = self.verbosity
+        self.bagged_mode = False  # turn off bagging
+        self.verbosity = verbosity  # change verbosity for distillation
+
+        if teacher_preds is None or teacher_preds == 'onehot':
+            augment_method = None
+            logger.log(20, "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.")
+
+        if teacher_preds in ['onehot','soft']:
+            y_train = format_distillation_labels(y_train, self.problem_type, self.num_classes)
+            y_val = format_distillation_labels(y_val, self.problem_type, self.num_classes)
+
+        if augment_method is None and augmentation_data is None:
+            if teacher_preds == 'hard':
+                y_pred = pd.Series(self.predict(X_train))
+                if (self.problem_type != REGRESSION) and (len(y_pred.unique()) < len(y_train.unique())):  # add missing labels
+                    logger.log(15, "Adding missing labels to distillation dataset by including some real training examples")
+                    indices_to_add = []
+                    for clss in y_train.unique():
+                        if clss not in y_pred.unique():
+                            logger.log(15, f"Fetching a row with label={clss} from training data")
+                            clss_index = y_train[y_train == clss].index[0]
+                            indices_to_add.append(clss_index)
+                    X_extra = X_train.loc[indices_to_add].copy()
+                    y_extra = y_train.loc[indices_to_add].copy()  # these are actually real training examples
+                    X_train = pd.concat([X_train, X_extra])
+                    y_pred = pd.concat([y_pred, y_extra])
+                y_train = y_pred
+            elif teacher_preds == 'soft':
+                y_train = self.predict_proba(X_train)
+                if self.problem_type == MULTICLASS:
+                    y_train = pd.DataFrame(y_train)
+                else:
+                    y_train = pd.Series(y_train)
+        else:
+            X_aug = augment_data(X_train=X_train, feature_types_metadata=self.feature_types_metadata,
+                                augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
+            if len(X_aug) > 0:
+                if teacher_preds == 'hard':
+                    y_aug = pd.Series(self.predict(X_aug))
+                elif teacher_preds == 'soft':
+                    y_aug = self.predict_proba(X_aug)
+                    if self.problem_type == MULTICLASS:
+                        y_aug = pd.DataFrame(y_aug)
+                    else:
+                        y_aug = pd.Series(y_aug)
+                else:
+                    raise ValueError(f"Unknown teacher_preds specified: {teacher_preds}")
+
+                X_train = pd.concat([X_train, X_aug])
+                y_train = pd.concat([y_train, y_aug])
+
+        X_train.reset_index(drop=True, inplace=True)
+        y_train.reset_index(drop=True, inplace=True)
+
+        student_suffix = '_DSTL'  # all student model names contain this substring
+        if models_name_suffix is not None:
+            student_suffix = student_suffix + "_" + models_name_suffix
+
+        if hyperparameters is None:
+            hyperparameters = copy.deepcopy(self.hyperparameters)
+            student_model_types = ['GBM','CAT','NN','RF']  # only model types considered for distillation
+            default_level_key = 'default'
+            if default_level_key in hyperparameters:
+                hyperparameters[default_level_key] = {key: hyperparameters[default_level_key][key] for key in hyperparameters[default_level_key] if key in student_model_types}
+            else:
+                hyperparameters ={key: hyperparameters[key] for key in hyperparameters if key in student_model_types}
+                if len(hyperparameters) == 0:
+                    raise ValueError("Distillation not yet supported for fit() with per-stack level hyperparameters. "
+                        "Please either manually specify `hyperparameters` in `distill()` or call `fit()` again without per-level hyperparameters before distillation."
+                        "Also at least one of the following model-types must be present in hyperparameters: ['GBM','CAT','NN','RF']")
+        else:
+            hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=None, excluded_model_types=None)  # TODO: consider exposing ag_args_fit, excluded_model_types as distill() arguments.
+        if teacher_preds is None or teacher_preds == 'hard':
+            models_distill = get_preset_models(path=self.path, problem_type=self.problem_type,
+                                eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
+                                num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
+        else:
+            models_distill = get_preset_models_distillation(path=self.path, problem_type=self.problem_type,
+                                eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
+                                num_classes=self.num_classes, hyperparameters=hyperparameters, name_suffix=student_suffix)
+            if self.problem_type != REGRESSION:
+                self.regress_preds_asprobas = True
+
+        self.time_train_start = time.time()
+        self.time_limit = time_limits
+        distilled_model_names = []
+        for model in models_distill:
+            time_left = None
+            if time_limits is not None:
+                time_start_model = time.time()
+                time_left = time_limits - (time_start_model - self.time_train_start)
+
+            logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
+            models = self.train_single_full(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, model=model,
+                                            hyperparameter_tune=False, stack_name=self.distill_stackname, time_limit=time_left)
+            for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
+                model_score = self.score(X_val, y_val_og, model=model_name)
+                self.model_performance[model_name] = model_score
+                model_obj = self.load_model(model_name)
+                model_obj.val_score = model_score
+                model_obj.save()  # TODO: consider omitting for sake of efficiency
+                self.model_graph.nodes[model_name]['val_score'] = model_score
+                distilled_model_names.append(model_name)
+                logger.log(20, '\t' + str(round(model_obj.val_score, 4)) + '\t = Validation ' + self.eval_metric.name + ' score')
+        # reset trainer to old state before distill() was called:
+        self.bagged_mode = og_bagged_mode  # TODO: Confirm if safe to train future models after training models in both bagged and non-bagged modes
+        self.verbosity = og_verbosity
+        return distilled_model_names

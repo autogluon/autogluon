@@ -1,6 +1,9 @@
+import logging
 import numpy as np
 
-from ...constants import BINARY, MULTICLASS, REGRESSION
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Add weight support?
@@ -88,6 +91,12 @@ metric_classes_dict = {
 
 # TODO: Refactor as a dictionary mapping as done in LGBM
 def construct_custom_catboost_metric(metric, is_higher_better, needs_pred_proba, problem_type):
+    if problem_type == SOFTCLASS:
+        from .catboost_softclass_utils import SoftclassCustomMetric
+        if metric.name != 'soft_log_loss':
+            logger.warning("Setting metric=soft_log_loss, the only metric supported for softclass problem_type")
+        # SoftclassCustomMetric = make_softclass_metric()  # TODO: remove after catboost 0.24
+        return SoftclassCustomMetric(metric=None, is_higher_better=True, needs_pred_proba=True)
     if (metric.name == 'log_loss') and (problem_type == MULTICLASS) and needs_pred_proba:
         return 'MultiClass'
     if metric.name == 'accuracy':
