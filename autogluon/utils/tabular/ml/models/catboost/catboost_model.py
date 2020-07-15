@@ -75,7 +75,7 @@ class CatboostModel(AbstractModel):
             else:
                 num_classes = 10  # Guess if not given, can do better by looking at y_train
         elif self.problem_type == SOFTCLASS:  # TODO: delete this elif if it's unnecessary.
-            num_classes = Y_train.shape[1]
+            num_classes = y_train.shape[1]
             self.num_classes = num_classes
         else:
             num_classes = 1
