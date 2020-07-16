@@ -4,10 +4,10 @@ import sys
 import time
 
 import psutil
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from .knn_utils import KNeighborsClassifier, KNeighborsRegressor
 
 from ..abstract import model_trial
-from ..abstract.abstract_model import SKLearnModel
+from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Normalize data!
-class KNNModel(SKLearnModel):
+class KNNModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.problem_type == REGRESSION:
@@ -32,7 +32,7 @@ class KNNModel(SKLearnModel):
     def _set_default_params(self):
         default_params = {
             'weights': 'uniform',
-            'n_jobs': -1,
+            'index_factory_string' : 'Flat',
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
