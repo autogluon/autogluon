@@ -1,0 +1,15 @@
+google_electra_small/vocab-e6d2b21d.json             e6d2b21d910ccb356aa18f27a1c7d70660edc058   323235
+google_electra_small/model-2654c8b4.params           2654c8b4e240a5713078d2bd79582285c3f1b333   53945262
+google_electra_small/gen_model-d11fd0b1.params       d11fd0b1544541d6a53a03bc7fcfea5acf76de27   54202512
+google_electra_small/model-9ffb21c8.yml              9ffb21c8885bdb3e5f62c3f7a670d406167ec10c   472
+google_electra_small/disc_model-137714b6.params      137714b6c7f327e642861a7380dd94c8b3dbf1ea   54211975
+google_electra_base/vocab-e6d2b21d.json              e6d2b21d910ccb356aa18f27a1c7d70660edc058   323235
+google_electra_base/model-31c235cc.params            31c235cc6da6f1872adffb31efe9318600b89ae5   435579680
+google_electra_base/gen_model-665ce594.params        665ce594e476190ed7d1249825a5e87cf0fb8ad0   134978192
+google_electra_base/model-5b35ca0b.yml               5b35ca0b7f117978e372cfd8d98970d2d726e6c0   477
+google_electra_base/disc_model-514bd353.params       514bd353f9d42bc907bfa7e1175f4013b0147d7e   437947611
+google_electra_large/vocab-e6d2b21d.json             e6d2b21d910ccb356aa18f27a1c7d70660edc058   323235
+google_electra_large/model-9baf9ff5.params           9baf9ff55cee0195b7754aee7fcb3a1019c99f45   1336395080
+google_electra_large/gen_model-667121df.params       667121df73c6b521687f96894316dbc9adf27126   205211944
+google_electra_large/model-31b7dfdd.yml              31b7dfdd343bd2b2e43e200a735c83b0af1963f1   476
+google_electra_large/disc_model-5b820c02.params      5b820c026aa2ad779c1e9a41ff4ff1408fefacbf   1340602227

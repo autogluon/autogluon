@@ -1,0 +1,4 @@
+google_uncased_mobilebert/model-1c33216b.yml             1c33216b256a76713e0906b7ceefb3b37d4d35a0   510
+google_uncased_mobilebert/vocab-e6d2b21d.json            e6d2b21d910ccb356aa18f27a1c7d70660edc058   323235
+google_uncased_mobilebert/model-c8346cf2.params          c8346cf2caf9cc422f081f03b50bc69945328894   98424130
+google_uncased_mobilebert/model_mlm-53948e82.params      53948e82d8ec091927af357387b36ade0e42b34c   146503986
