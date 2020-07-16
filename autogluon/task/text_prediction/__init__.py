@@ -4,3 +4,4 @@ from . import constants
 from . import dataset
 from . import fields
 from . import preprocessing
+from . import text_prediction
