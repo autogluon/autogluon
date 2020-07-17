@@ -2,15 +2,24 @@ import abc
 
 
 class BaseEstimator(abc.ABC):
-    def __init__(self, config=None, logger=None, reporter=None):
+    def __init__(self, config=None, logger=None):
+        """
+
+        Parameters
+        ----------
+        base_config
+            The basic configuration of the estimator
+        search_space
+            The search space. Here, we may just specify part of the
+        logger
+        """
         super().__init__()
-        if config is None:
+        if base_config is None:
             self._config = self.__class__.get_cfg()
         else:
             base_config = self.__class__.get_cfg()
             self._config = base_config.clone_merge(config)
         self._logger = logger
-        self._reporter = reporter
 
     @property
     def config(self):

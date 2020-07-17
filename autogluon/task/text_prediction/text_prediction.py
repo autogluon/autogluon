@@ -1,23 +1,50 @@
+import pandas as pd
+import logging
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ... import core
-from .dataset import load_pandas_df, random_split_train_val, TabularDataset
+from ...contrib.nlp.utils.registry import Registry
+from ..base import BaseTask
+from ...utils.tabular.utils.loaders import load_pd
+from .dataset import random_split_train_val, TabularDataset
 from .estimators.basic_v1 import BertForTextPredictionBasic
 
+__all__ = ['TextPrediction']
 
-class TextPrediction:
+logger = logging.getLogger()  # return root logger
+
+ag_text_params = Registry('ag_text_params')
+
+
+@ag_text_params.register()
+def default():
+    """Default configuration"""
+    ret = {
+        'BertForTextPredictionBasic': {
+            'model.backbone.name': 'google_uncased_mobilebert',
+            'optimization.num_train_epochs': core.space.Choice([3, 10]),
+            'optimization.lr': core.space.Real(1E-5, 1E-4)
+        }
+    }
+    return ret
+
+
+class TextPrediction(BaseTask):
+    Dataset = pd.DataFrame
+
     @staticmethod
     def fit(train_data,
-            valid_data=None,
-            feature_columns=None,
             label=None,
-            valid_ratio=0.15,
-            exp_dir='./autonlp',
-            stop_metric=None,
-            eval_metrics=None,
-            log_metrics=None,
+            tuning_data=None,
             time_limits=5 * 60 * 60,
-            num_cpus=None,
-            num_gpus=None,
+            output_directory='./ag_text',
+            feature_columns=None,
+            holdout_frac=0.15,
+            eval_metric=None,
+            stopping_metric=None,
+            nthreads_per_trial=None,
+            ngpus_per_trial=None,
+            search_strategy='random',
+            search_options=None,
             hyperparameters=None):
         """
 
@@ -25,39 +52,44 @@ class TextPrediction:
         ----------
         train_data
             Training dataset
-        valid_data
-            Validation dataset
-        feature_columns
-            The feature columns
         label
-            Name of the label column
-        valid_ratio
-            Valid ratio
-        exp_dir
-            The experiment directory
-        stop_metric
-            Stop metric for model selection
-        eval_metrics
-            How you may potentially evaluate the model
-        log_metrics
-            The logging metrics
+            Name of the label column. By default, we will search for a column named "
+        tuning_data
+            The tuning dataset. We will tune the model
         time_limits
             The time limits.
-        num_cpus
-            The number of CPUs. By default, we will use all available CPUs.
-        num_gpus
-            The number of GPUs to use for the fit job. By default, we will use
-            all the available GPUs.
+        output_directory
+            The output directory
+        feature_columns
+            The feature columns
+        holdout_frac
+            Ratio of the training data that will be held out as the tuning data / or dev data.
+        eval_metric
+            The evaluation metric, i.e., how you will finally evaluate the model.
+        stopping_metric
+            The intrinsic metric used for early stopping.
+            By default, we will select the best metric that
+        nthreads_per_trial
+            The number of threads per trial. By default, we will use all available CPUs.
+        ngpus_per_trial
+            The number of GPUs to use for the fit job. By default, we decide the usage
+            based on the total number of GPUs available.
+        search_strategy
+            The search strategy
+        search_options
+            The options for running the hyper-parameter search
         hyperparameters
-            The hyper-parameters of the fit function. It will include the configuration of
-            the search space.
+            The hyper-parameters of the fit function.
+            Including the configuration of the search space.
+            There are two options:
+            1) You are given a predefined search space
 
         Returns
         -------
         estimator
             An estimator object
         """
-        train_data = load_pandas_df(train_data)
+        train_data = load_pd.load(train_data)
         if label is None:
             # Perform basic label inference
             if 'label' in train_data.columns:
@@ -66,42 +98,45 @@ class TextPrediction:
                 label = 'score'
             else:
                 label = train_data.columns[-1]
+        if not isinstance(label, list):
+            label = [label]
         if feature_columns is None:
-            used_columns = train_data.columns
-            feature_columns = [ele for ele in used_columns if ele is not label]
+            all_columns = train_data.columns
+            feature_columns = [ele for ele in all_columns if ele is not label]
         else:
             if isinstance(feature_columns, str):
                 feature_columns = [feature_columns]
-            used_columns = feature_columns + [label]
+            all_columns = feature_columns + [label]
         train_data = TabularDataset(train_data,
-                                    columns=used_columns,
+                                    columns=all_columns,
                                     label_columns=label)
         column_properties = train_data.column_properties
-        if valid_data is None:
-            train_data, valid_data = random_split_train_val(train_data.table,
-                                                            valid_ratio=valid_ratio)
+        if tuning_data is None:
+            train_data, tuning_data = random_split_train_val(train_data.table,
+                                                             valid_ratio=holdout_frac)
             train_data = TabularDataset(train_data,
-                                        columns=used_columns,
+                                        columns=all_columns,
                                         column_properties=column_properties)
         else:
-            valid_data = load_pandas_df(valid_data)
-        valid_data = TabularDataset(valid_data,
-                                    columns=used_columns,
-                                    column_properties=column_properties)
-        if num_cpus is None:
-            num_cpus = get_cpu_count()
-        if num_gpus is None:
-            num_gpus = get_gpu_count()
-        if 'search_space' in hyperparameters:
-            search_space = hyperparameters['search_space']
+            tuning_data = load_pd.load(tuning_data)
+        tuning_data = TabularDataset(tuning_data,
+                                     columns=all_columns,
+                                     column_properties=column_properties)
+        if nthreads_per_trial is None:
+            nthreads_per_trial = min(get_cpu_count(), 4)
+        if ngpus_per_trial is None:
+            ngpus_per_trial = min(get_gpu_count(), 2)
         if hyperparameters is None:
-            hyperparameters = {
-                'BertForTextPredictionBasic': {
-                    'model.backbone.name': ['google_uncased_mobilebert'],
-                    'optimization.num_train_epochs': core.space.Int(3, 10),
-                    'optimization.lr': core.space.Real(1E-5, 1E-4)
-                }
-            }
+            hyperparameters = 'default'
+        if isinstance(hyperparameters, str):
+            hyperparameters = ag_text_params.create(hyperparameters)
+        model_candidates = []
+        for model_name, model_search_space in hyperparameters.items():
+            if model_name == 'BertForTextPredictionBasic':
+                estimator = BertForTextPredictionBasic(model_search_space)
+                model_candidates.append(estimator)
+            else:
+                raise NotImplementedError
         args_decorator = core.args(hyperparameters)
         cfg = BertForTextPredictionBasic.get_cfg()
         cfg.defrost()
