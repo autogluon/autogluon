@@ -38,7 +38,7 @@ def _get_weights(dist, weights):
         raise ValueError("weights not recognized: should be 'uniform', 'distance', or a callable function")
 
 class KNeighborsRegressor:
-    def __init__(self, n_neighbors = 5, weights='uniform', index_factory_string = "Flat"): 
+    def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
         """
         Creates a KNN regressor model based on FAISS. FAISS allows you to compose different
         near-neighbor search algorithms from several different preprocessing / search algorithms
@@ -51,6 +51,10 @@ class KNeighborsRegressor:
         self.index_factory_string = index_factory_string
         self.n_neighbors = n_neighbors
         self.weights = weights
+        self.n_jobs = n_jobs
+        if n_jobs > 0:
+            # global config, affects all faiss indexes
+            faiss.omp_set_num_threads(n_jobs)
 
 
     def fit(self, X_train, y_train):
@@ -105,7 +109,7 @@ class KNeighborsRegressor:
 
 
 class KNeighborsClassifier:
-    def __init__(self, n_neighbors = 5, weights='uniform', index_factory_string = "Flat"): 
+    def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
         """
         Creates a KNN classifier model based on FAISS. FAISS allows you to compose different
         near-neighbor search algorithms from several different preprocessing / search algorithms
@@ -119,6 +123,10 @@ class KNeighborsClassifier:
         self.n_neighbors = n_neighbors
         self.weights = weights
         self.classes = []
+        self.n_jobs = n_jobs
+        if n_jobs > 0:
+            # global config, affects all faiss indexes
+            faiss.omp_set_num_threads(n_jobs) 
 
     def fit(self, X_train, y_train):
         X_train = X_train.astype(np.float32)

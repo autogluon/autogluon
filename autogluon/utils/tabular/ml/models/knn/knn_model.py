@@ -32,6 +32,7 @@ class KNNModel(AbstractModel):
     def _set_default_params(self):
         default_params = {
             'weights': 'uniform',
+            'n_jobs': -1,
             'index_factory_string' : 'Flat',
         }
         for param, val in default_params.items():
