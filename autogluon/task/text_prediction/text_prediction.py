@@ -1,4 +1,5 @@
-from ...contrib.nlp.utils.misc import get_num_gpus
+from ...scheduler.resource import get_cpu_count, get_gpu_count
+from ... import core
 from .dataset import load_pandas_df, random_split_train_val, TabularDataset
 from .estimators.basic_v1 import BertForTextPredictionBasic
 
@@ -15,6 +16,7 @@ class TextPrediction:
             eval_metrics=None,
             log_metrics=None,
             time_limits=5 * 60 * 60,
+            num_cpus=None,
             num_gpus=None,
             hyperparameters=None):
         """
@@ -41,8 +43,11 @@ class TextPrediction:
             The logging metrics
         time_limits
             The time limits.
+        num_cpus
+            The number of CPUs. By default, we will use all available CPUs.
         num_gpus
-            The number of GPUs to use for the fit job. By default, we will
+            The number of GPUs to use for the fit job. By default, we will use
+            all the available GPUs.
         hyperparameters
             The hyper-parameters of the fit function. It will include the configuration of
             the search space.
@@ -83,18 +88,29 @@ class TextPrediction:
         valid_data = TabularDataset(valid_data,
                                     columns=used_columns,
                                     column_properties=column_properties)
+        if num_cpus is None:
+            num_cpus = get_cpu_count()
         if num_gpus is None:
-            num_gpus = get_num_gpus()
+            num_gpus = get_gpu_count()
         if 'search_space' in hyperparameters:
             search_space = hyperparameters['search_space']
+        if hyperparameters is None:
+            hyperparameters = {
+                'BertForTextPredictionBasic': {
+                    'model.backbone.name': ['google_uncased_mobilebert'],
+                    'optimization.num_train_epochs': core.space.Int(3, 10),
+                    'optimization.lr': core.space.Real(1E-5, 1E-4)
+                }
+            }
+        args_decorator = core.args(hyperparameters)
         cfg = BertForTextPredictionBasic.get_cfg()
         cfg.defrost()
         if exp_dir is not None:
-            cfg.MISC.exp_dir = exp_dir
+            cfg.misc.exp_dir = exp_dir
         if log_metrics is not None:
-            cfg.LEARNING.log_metrics = log_metrics
+            cfg.learning.log_metrics = log_metrics
         if stop_metric is not None:
-            cfg.LEARNING.stop_metric = stop_metric
+            cfg.learning.stop_metric = stop_metric
         cfg.freeze()
         estimator = BertForTextPredictionBasic(cfg)
         estimator.fit(train_data=train_data, valid_data=valid_data,

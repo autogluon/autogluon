@@ -79,9 +79,9 @@ class CategoricalFeatureNet(HybridBlock):
         else:
             cfg = CategoricalFeatureNet.get_cfg().clone_merge(cfg)
         self.cfg = cfg
-        embed_initializer = mx.init.create(*cfg.INITIALIZER.embed)
-        weight_initializer = mx.init.create(*cfg.INITIALIZER.weight)
-        bias_initializer = mx.init.create(*cfg.INITIALIZER.bias)
+        embed_initializer = mx.init.create(*cfg.initializer.embed)
+        weight_initializer = mx.init.create(*cfg.initializer.weight)
+        bias_initializer = mx.init.create(*cfg.initializer.bias)
         with self.name_scope():
             self.embedding = nn.Embedding(input_dim=num_class,
                                           output_dim=cfg.emb_units,
@@ -110,10 +110,10 @@ class CategoricalFeatureNet(HybridBlock):
             cfg.activation = 'leaky'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
-            cfg.INITIALIZER = CfgNode()
-            cfg.INITIALIZER.embed = ['xavier', 'gaussian', 'in', 1.0]
-            cfg.INITIALIZER.weight = ['xavier', 'uniform', 'avg', 3.0]
-            cfg.INITIALIZER.bias = ['zeros']
+            cfg.initializer = CfgNode()
+            cfg.initializer.embed = ['xavier', 'gaussian', 'in', 1.0]
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
             return cfg
         else:
             raise NotImplementedError
@@ -132,8 +132,8 @@ class NumericalFeatureNet(HybridBlock):
         self.input_shape = input_shape
         self.in_units = int(np.prod(input_shape))
         self.cfg = NumericalFeatureNet.get_cfg().clone_merge(cfg)
-        weight_initializer = mx.init.create(*cfg.INITIALIZER.weight)
-        bias_initializer = mx.init.create(*cfg.INITIALIZER.bias)
+        weight_initializer = mx.init.create(*cfg.initializer.weight)
+        bias_initializer = mx.init.create(*cfg.initializer.bias)
         with self.name_scope():
             if self.cfg.input_centering:
                 self.data_bn = nn.BatchNorm(in_channels=self.in_units)
@@ -161,9 +161,9 @@ class NumericalFeatureNet(HybridBlock):
             cfg.activation = 'leaky'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
-            cfg.INITIALIZER = CfgNode()
-            cfg.INITIALIZER.weight = ['xavier', 'uniform', 'avg', 3.0]
-            cfg.INITIALIZER.bias = ['zeros']
+            cfg.initializer = CfgNode()
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
         else:
             raise NotImplementedError
         return cfg
@@ -186,8 +186,8 @@ class FeatureAggregator(HybridBlock):
         self.num_fields = num_fields
         self.out_shape = out_shape
         self.in_units = in_units
-        weight_initializer = mx.init.create(*self.cfg.INITIALIZER.weight)
-        bias_initializer = mx.init.create(*self.cfg.INITIALIZER.bias)
+        weight_initializer = mx.init.create(*self.cfg.initializer.weight)
+        bias_initializer = mx.init.create(*self.cfg.initializer.bias)
         out_units = int(np.prod(out_shape))
         with self.name_scope():
             if self.cfg.agg_type == 'mean':
@@ -221,9 +221,9 @@ class FeatureAggregator(HybridBlock):
             cfg.activation = 'tanh'
             cfg.normalization = 'layer_norm'
             cfg.norm_eps = 1e-5
-            cfg.INITIALIZER = CfgNode()
-            cfg.INITIALIZER.weight = ['xavier', 'uniform', 'avg', 3.0]
-            cfg.INITIALIZER.bias = ['zeros']
+            cfg.initializer = CfgNode()
+            cfg.initializer.weight = ['xavier', 'uniform', 'avg', 3.0]
+            cfg.initializer.bias = ['zeros']
         else:
             raise NotImplementedError
         return cfg
@@ -348,9 +348,9 @@ class BERTForTabularBasicV1(HybridBlock):
             cfg.AGG_NET = FeatureAggregator.get_cfg()
             cfg.CATEGORICAL_NET = CategoricalFeatureNet.get_cfg()
             cfg.NUMERICAL_NET = NumericalFeatureNet.get_cfg()
-            cfg.INITIALIZER = CfgNode()
-            cfg.INITIALIZER.weight = ['truncnorm', 0, 0.02]
-            cfg.INITIALIZER.bias = ['zeros']
+            cfg.initializer = CfgNode()
+            cfg.initializer.weight = ['truncnorm', 0, 0.02]
+            cfg.initializer.bias = ['zeros']
             return cfg
         else:
             raise NotImplementedError

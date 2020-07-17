@@ -125,7 +125,7 @@ def base_optimization_config():
     cfg.final_lr = 0.0
     cfg.num_train_epochs = 3.0
     cfg.warmup_portion = 0.1
-    cfg.layerwise_lr_decay = -1  # The layer_wise decay
+    cfg.layerwise_lr_decay = 0.8  # The layer_wise decay
     cfg.wd = 0.01  # Weight Decay
     cfg.max_grad_norm = 1.0  # Maximum Gradient Norm
     # The validation frequency = validation frequency * num_updates_in_an_epoch
@@ -137,12 +137,12 @@ def base_optimization_config():
 
 def base_model_config():
     cfg = CfgNode()
-    cfg.PREPROCESS = CfgNode()
-    cfg.PREPROCESS.merge_text = True
-    cfg.PREPROCESS.max_length = 128
-    cfg.BACKBONE = CfgNode()
-    cfg.BACKBONE.name = 'google_electra_base'
-    cfg.NETWORK = BERTForTabularBasicV1.get_cfg()
+    cfg.preprocess = CfgNode()
+    cfg.preprocess.merge_text = True
+    cfg.preprocess.max_length = 128
+    cfg.backbone = CfgNode()
+    cfg.backbone.name = 'google_electra_base'
+    cfg.network = BERTForTabularBasicV1.get_cfg()
     return cfg
 
 
@@ -165,11 +165,11 @@ def base_misc_config():
 
 def base_cfg():
     cfg = CfgNode()
-    cfg.VERSION = 1
-    cfg.OPTIMIZATION = base_optimization_config()
-    cfg.LEARNING = base_learning_config()
-    cfg.MODEL = base_model_config()
-    cfg.MISC = base_misc_config()
+    cfg.version = 1
+    cfg.optimization = base_optimization_config()
+    cfg.learning = base_learning_config()
+    cfg.model = base_model_config()
+    cfg.misc = base_misc_config()
     cfg.freeze()
     return cfg
 
@@ -179,7 +179,7 @@ def electra_base():
     """The search space of Electra Base"""
     cfg = base_cfg()
     cfg.defrost()
-    cfg.OPTIMIZATION.layerwise_lr_decay = 0.8
+    cfg.optimization.layerwise_lr_decay = 0.8
     cfg.freeze()
     return cfg
 
@@ -189,10 +189,10 @@ def mobile_bert():
     """The search space of MobileBERT"""
     cfg = base_cfg()
     cfg.defrost()
-    cfg.OPTIMIZATION.layerwise_lr_decay = -1
-    cfg.BACKBONE.name = 'google_uncased_mobilebert'
-    cfg.OPTIMIZATION.lr = 1E-5
-    cfg.OPTIMIZATION.num_train_epochs = 5.0
+    cfg.optimization.layerwise_lr_decay = -1
+    cfg.model.backbone.name = 'google_uncased_mobilebert'
+    cfg.optimization.lr = 1E-5
+    cfg.optimization.num_train_epochs = 5.0
     cfg.freeze()
     return cfg
 
@@ -372,7 +372,7 @@ class BertForTextPredictionBasic(BaseEstimator):
 
     @staticmethod
     def get_cfg(key=None):
-        """
+        """Get the configuration
 
         Parameters
         ----------
@@ -382,11 +382,12 @@ class BertForTextPredictionBasic(BaseEstimator):
         Returns
         -------
         cfg
+            The configuration specified by the key
         """
         if key is None:
-            return electra_base_fixed()
+            return electra_base()
         else:
-            return v1_prebuild_search_space.get(key)
+            return v1_prebuild_config.create(key)
 
     def fit(self, train_data, label, feature_columns=None, valid_data=None,
             time_limits=None):
@@ -461,7 +462,7 @@ class BertForTextPredictionBasic(BaseEstimator):
         logging.info(valid_data)
         # Load backbone model
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.MODEL.BACKBONE.name)
+            = get_backbone(cfg.model.backbone.name)
         with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
             f.write(str(cfg))
         with open(os.path.join(exp_dir, 'backbone_cfg.yml'), 'w') as f:
@@ -471,8 +472,8 @@ class BertForTextPredictionBasic(BaseEstimator):
         preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
                                                     column_properties=column_properties,
                                                     label_columns=label,
-                                                    max_length=cfg.MODEL.PREPROCESS.max_length,
-                                                    merge_text=cfg.MODEL.PREPROCESS.merge_text)
+                                                    max_length=cfg.model.preprocess.max_length,
+                                                    merge_text=cfg.model.preprocess.merge_text)
         self._preprocessor = preprocessor
         logging.info('Process training set...')
         processed_train = preprocessor.process_train(train_data.table)
@@ -483,11 +484,11 @@ class BertForTextPredictionBasic(BaseEstimator):
         # Get the ground-truth dev labels
         gt_dev_labels = np.array(valid_data.table[label].apply(column_properties[label].transform))
         np.save(os.path.join(exp_dir, 'gt_dev_labels.npy'), gt_dev_labels)
-        batch_size = cfg.OPTIMIZATION.batch_size\
-                     // len(ctx_l) // cfg.OPTIMIZATION.num_accumulated
-        inference_batch_size = batch_size * cfg.OPTIMIZATION.val_batch_size_mult
-        assert batch_size * cfg.OPTIMIZATION.num_accumulated * len(ctx_l)\
-               == cfg.OPTIMIZATION.batch_size
+        batch_size = cfg.optimization.batch_size\
+                     // len(ctx_l) // cfg.optimization.num_accumulated
+        inference_batch_size = batch_size * cfg.optimization.val_batch_size_mult
+        assert batch_size * cfg.optimization.num_accumulated * len(ctx_l)\
+               == cfg.optimization.batch_size
         train_dataloader = DataLoader(processed_train,
                                       batch_size=batch_size,
                                       shuffle=True,
@@ -499,7 +500,7 @@ class BertForTextPredictionBasic(BaseEstimator):
         net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=label_shape,
-                                    cfg=cfg.MODEL.NETWORK)
+                                    cfg=cfg.model.network)
         self._net = net
         net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
         net.hybridize()
@@ -508,26 +509,26 @@ class BertForTextPredictionBasic(BaseEstimator):
                                                                num_total_fixed_params))
         # Initialize the optimizer
         updates_per_epoch = int(
-            len(train_dataloader) / (cfg.OPTIMIZATION.num_accumulated * len(ctx_l)))
-        optimizer, optimizer_params, max_update = get_optimizer(cfg.OPTIMIZATION,
+            len(train_dataloader) / (cfg.optimization.num_accumulated * len(ctx_l)))
+        optimizer, optimizer_params, max_update = get_optimizer(cfg.optimization,
                                                                 updates_per_epoch=updates_per_epoch)
-        valid_interval = math.ceil(cfg.OPTIMIZATION.valid_frequency * updates_per_epoch)
-        train_log_interval = math.ceil(cfg.OPTIMIZATION.log_frequency * updates_per_epoch)
+        valid_interval = math.ceil(cfg.optimization.valid_frequency * updates_per_epoch)
+        train_log_interval = math.ceil(cfg.optimization.log_frequency * updates_per_epoch)
         trainer = mx.gluon.Trainer(net.collect_params(),
                                    optimizer, optimizer_params,
                                    update_on_kvstore=False)
-        if cfg.OPTIMIZATION.layerwise_lr_decay > 0:
+        if cfg.optimization.layerwise_lr_decay > 0:
             apply_layerwise_decay(net.text_backbone,
-                                  cfg.OPTIMIZATION.layerwise_lr_decay)
+                                  cfg.optimization.layerwise_lr_decay)
         # Do not apply weight decay to all the LayerNorm and bias
         for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
             v.wd_mult = 0.0
         params = [p for p in net.collect_params().values() if p.grad_req != 'null']
 
         # Set grad_req if gradient accumulation is required
-        if cfg.OPTIMIZATION.num_accumulated > 1:
+        if cfg.optimization.num_accumulated > 1:
             logging.info('Using gradient accumulation. Global batch size = {}'
-                         .format(cfg.OPTIMIZATION.batch_size))
+                         .format(cfg.optimization.batch_size))
             for p in params:
                 p.grad_req = 'add'
             net.collect_params().zero_grad()
@@ -541,7 +542,7 @@ class BertForTextPredictionBasic(BaseEstimator):
                                               + log_metrics + ['find_better', 'time_spent']) + '\n')
         mx.npx.waitall()
         no_better_rounds = 0
-        num_grad_accum = cfg.OPTIMIZATION.num_accumulated
+        num_grad_accum = cfg.optimization.num_accumulated
         for update_idx in range(max_update):
             num_samples_per_update_l = [0 for _ in ctx_l]
             for accum_idx in range(num_grad_accum):
@@ -571,12 +572,12 @@ class BertForTextPredictionBasic(BaseEstimator):
             trainer.allreduce_grads()
             num_samples_per_update = sum(num_samples_per_update_l)
             total_norm, ratio, is_finite = \
-                clip_grad_global_norm(params, cfg.OPTIMIZATION.max_grad_norm * num_grad_accum)
+                clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_grad_accum)
             total_norm = total_norm / num_grad_accum
             trainer.update(num_samples_per_update)
 
             # Clear after update
-            if cfg.OPTIMIZATION.num_accumulated > 1:
+            if cfg.optimization.num_accumulated > 1:
                 net.collect_params().zero_grad()
             if (update_idx + 1) % train_log_interval == 0:
                 log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
@@ -654,11 +655,11 @@ class BertForTextPredictionBasic(BaseEstimator):
             test_data = TabularDataset(test_data,
                                        column_properties=self._column_properties)
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.MODEL.BACKBONE.name)
+            = get_backbone(cfg.model.backbone.name)
         processed_test = self._preprocessor.process_test(test_data.table)
         ctx_l = parse_ctx(cfg.MISC.context)
-        batch_size = cfg.OPTIMIZATION.batch_size // len(ctx_l) // cfg.OPTIMIZATION.num_accumulated
-        inference_batch_size = batch_size * cfg.OPTIMIZATION.val_batch_size_mult
+        batch_size = cfg.optimization.batch_size // len(ctx_l) // cfg.optimization.num_accumulated
+        inference_batch_size = batch_size * cfg.optimization.val_batch_size_mult
         test_dataloader = DataLoader(processed_test,
                                      batch_size=inference_batch_size,
                                      shuffle=False,
@@ -760,7 +761,7 @@ class BertForTextPredictionBasic(BaseEstimator):
         model._problem_type = assets['problem_type']
         model._feature_columns = assets['feature_columns']
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(loaded_config.MODEL.BACKBONE.name)
+            = get_backbone(loaded_config.model.backbone.name)
         model._column_properties = get_column_properties_from_metadata(
             os.path.join(dir_path, 'column_metadata.json'))
         # Initialize the preprocessor
@@ -768,12 +769,12 @@ class BertForTextPredictionBasic(BaseEstimator):
             tokenizer=tokenizer,
             column_properties=model.column_properties,
             label_columns=model._label,
-            max_length=model.config.MODEL.PREPROCESS.max_length,
-            merge_text=model.config.MODEL.PREPROCESS.merge_text)
+            max_length=loaded_config.model.preprocess.max_length,
+            merge_text=loaded_config.model.preprocess.merge_text)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         model._preprocessor = preprocessor
         model._net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                            feature_field_info=preprocessor.feature_field_info(),
                                            label_shape=model.label_shape,
-                                           cfg=loaded_config.MODEL.NETWORK)
+                                           cfg=loaded_config.model.network)
         return model

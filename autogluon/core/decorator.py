@@ -32,7 +32,8 @@ def sample_config(args, config):
                 sub_config = _strip_config_space(config, prefix=k)
                 args_dict[k] = v.sample(**sub_config)
             else:
-                if '.' in k: continue
+                if '.' in k:
+                    continue
                 args_dict[k] = config[k]
         elif isinstance(v, AutoGluonObject):
             args_dict[k] = v.init()
@@ -118,7 +119,7 @@ class _autogluon_method(object):
         return repr(self.f)
 
 
-def args(default={}, **kwvars):
+def args(default=None, **kwvars):
     """Decorator for a Python training script that registers its arguments as hyperparameters. 
        Each hyperparameter takes fixed value or is a searchable space, and the arguments may either be:
        built-in Python objects (e.g. floats, strings, lists, etc.), AutoGluon objects (see :func:`autogluon.obj`), 
@@ -131,7 +132,10 @@ def args(default={}, **kwvars):
     >>> def train_func(args):
     ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
     """
+    if default is None:
+        default = dict()
     kwvars['_default_config'] = default
+
     def registered_func(func):
         @_autogluon_method
         @functools.wraps(func)
