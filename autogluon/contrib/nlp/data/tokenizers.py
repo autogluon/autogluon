@@ -18,7 +18,8 @@
 __all__ = ['WhitespaceTokenizer', 'SpacyTokenizer', 'JiebaTokenizer', 'MosesTokenizer',
            'SubwordNMTTokenizer', 'YTTMTokenizer', 'SentencepieceTokenizer',
            'HuggingFaceBPETokenizer', 'HuggingFaceByteBPETokenizer',
-           'HuggingFaceWordPieceTokenizer', 'create', 'create_with_json', 'list_all']
+           'HuggingFaceWordPieceTokenizer',
+           'create', 'create_with_json', 'list_all']
 
 from typing import List, Tuple, Union, Optional
 import os
@@ -34,12 +35,12 @@ import jieba
 from uuid import uuid4
 from .vocab import Vocab
 from ..registry import TOKENIZER_REGISTRY
-from ..utils.lazy_imports import try_import_subword_nmt,\
-                                 try_import_sentencepiece,\
-                                 try_import_huggingface_tokenizers,\
-                                 try_import_yttm,\
-                                 try_import_spacy
-
+from ..utils.lazy_imports import try_import_subword_nmt, \
+    try_import_sentencepiece, \
+    try_import_huggingface_tokenizers, \
+    try_import_yttm, \
+    try_import_spacy, \
+    try_import_jieba
 
 SentencesType = NewType('SentencesType', Union[str, List[str]])
 TokensType = NewType('TokensType', Union[List[str], List[List[str]]])
@@ -114,7 +115,7 @@ def _get_vocab(vocab: Union[str, Vocab]) -> Vocab:
                                   .format(type(vocab)))
 
 
-def _rebuild_offset_from_tokens(sentence: str, tokens: List[str])\
+def _rebuild_offset_from_tokens(sentence: str, tokens: List[str]) \
         -> List[Tuple[int, int]]:
     """Recover the offset of the tokens in the original sentence.
 
@@ -165,7 +166,7 @@ def _get_char_offset_from_byte_offset(sentence: str, byte_offsets: List[Tuple[in
 class BaseTokenizer(abc.ABC):
     @abc.abstractmethod
     def encode(self, sentences: SentencesType,
-               output_type: Union[type, str] = str)\
+               output_type: Union[type, str] = str) \
             -> Union[TokensType, TokenIDsType]:
         """Encode the input sentence(s) into multiple tokens.
 
@@ -202,9 +203,8 @@ class BaseTokenizer(abc.ABC):
         """
         pass
 
-
     def encode_with_offsets(self, sentences: SentencesType,
-                            output_type: type = str)\
+                            output_type: type = str) \
             -> Tuple[Union[TokensType, TokenIDsType], TokenOffsetsType]:
         """Encode the input sentence(s) into multiple tokens. Different from encode, it
         will also return the character start and end positions of each token in the original text.
@@ -366,6 +366,7 @@ class SpacyTokenizer(BaseTokenizerWithVocab):
     ['Das', 'Gluon', 'NLP-Toolkit', 'stellt', 'eine', 'Reihe', 'von', 'Textverarbeitungstools', \
 'zur', 'Verfügung', '.']
     """
+
     def __init__(self, lang: Optional[str] = 'en', model: Optional[str] = None,
                  vocab: Optional[Vocab] = None):
         self._vocab = vocab
@@ -380,21 +381,26 @@ class SpacyTokenizer(BaseTokenizerWithVocab):
                 model = 'fr_core_news_sm'
             else:
                 model = 'xx_ent_wiki_sm'
+        retries = 5
         try:
             self._nlp = spacy.load(model, disable=['parser', 'tagger', 'ner'])
-        except IOError:
+        except Exception:
             from spacy.cli import download
-            try:
-                download(model, False, '--user')
-                self._nlp = spacy.load(model, disable=['parser', 'tagger', 'ner'])
-            except:
-                print('SpaCy Model for the specified model="{model}" has not been '
-                      'successfully loaded. You need to check the installation guide in '
-                      'https://spacy.io/usage/models. Usually, the installation command '
-                      'should be `python -m spacy download {model}`.\n'
-                      'Compete Error Message: {err_msg}'.format(model=model,
-                                                                err_msg=sys.exc_info()[0]))
-                raise
+            while retries >= 0:
+                try:
+                    download(model, False, '--user')
+                    self._nlp = spacy.load(model, disable=['parser', 'tagger', 'ner'])
+                    break
+                except Exception as download_err:
+                    retries -= 1
+                    if retries < 0:
+                        print('SpaCy Model for the specified model="{model}" has not been '
+                              'successfully loaded. You need to check the installation guide in '
+                              'https://spacy.io/usage/models. Usually, the installation command '
+                              'should be `python -m spacy download {model}`.\n'
+                              'Complete Error Message: {err_msg}'.format(model=model,
+                                                                        err_msg=str(download_err)))
+                        raise
 
     def encode(self, sentences, output_type=str):
         if output_type is str:
@@ -469,6 +475,7 @@ class MosesTokenizer(BaseTokenizerWithVocab):
     lang
         The language of the input.
     """
+
     def __init__(self, lang: str = 'en', vocab: Optional[Vocab] = None):
         self._lang = lang
         self._vocab = vocab
@@ -545,8 +552,10 @@ class JiebaTokenizer(BaseTokenizerWithVocab):
     For more details, you may refer to [jieba](https://github.com/fxsjy/jieba)
 
     """
+
     def __init__(self, ditionary=None, vocab: Optional[Vocab] = None):
         self._vocab = vocab
+        jieba = try_import_jieba()
         self._tokenizer = jieba.Tokenizer(ditionary)
         self._tokenizer.initialize(self._tokenizer.dictionary)
 
@@ -646,8 +655,8 @@ class SubwordNMTTokenizer(BaseTokenizerWithVocab):
         with open(self._codec_path, 'r', encoding='utf-8') as merge_codes:
             self._bpe = BPE(codes=merge_codes, separator=self._separator)
         self._last_subword_id_set = frozenset([self._vocab[ele]
-                                                for ele in self._vocab.all_tokens
-                                                if not ele.endswith(self._separator)])
+                                               for ele in self._vocab.all_tokens
+                                               if not ele.endswith(self._separator)])
 
     def transform_sentence(self, sentence):
         # replace the separator in encoded result with suffix
@@ -660,12 +669,14 @@ class SubwordNMTTokenizer(BaseTokenizerWithVocab):
         if not is_multi_sentences:
             sentences = [sentences]
         if output_type is str:
-            ret = [self.transform_sentence(self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))
+            ret = [self.transform_sentence(
+                self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))
                    for sentence in sentences]
         elif output_type is int:
             if self._vocab is None:
                 raise ValueError(_encode_no_vocab_err_msg())
-            ret = [self._vocab[self.transform_sentence(self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))]
+            ret = [self._vocab[self.transform_sentence(
+                self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))]
                    for sentence in sentences]
         else:
             raise ValueError(_token_type_unsupported_err_msg(output_type))
@@ -682,7 +693,8 @@ class SubwordNMTTokenizer(BaseTokenizerWithVocab):
         token_ids = []
         offsets = []
         for sentence in sentences:
-            encode_token = self.transform_sentence(self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))
+            encode_token = self.transform_sentence(
+                self._bpe.segment(sentence, dropout=self._bpe_dropout).split(' '))
             encode_id = self._vocab[encode_token]
             encode_token_without_suffix = [x.replace(self._suffix, '') for x in encode_token]
             encode_offset = _rebuild_offset_from_tokens(sentence, encode_token_without_suffix)
@@ -720,7 +732,7 @@ class SubwordNMTTokenizer(BaseTokenizerWithVocab):
         else:
             return ret[0]
 
-    def is_last_subword(self, tokens: Union[str, int, List[str], List[int]])\
+    def is_last_subword(self, tokens: Union[str, int, List[str], List[int]]) \
             -> Union[bool, List[bool]]:
         """Whether the token is the last subword token
 
@@ -783,7 +795,8 @@ class SubwordNMTTokenizer(BaseTokenizerWithVocab):
         from subword_nmt.apply_bpe import BPE
         with open(self._codec_path, 'r', encoding='utf-8') as merge_codes:
             self._bpe = BPE(codes=merge_codes, separator=self._separator)
-        
+
+
 class HuggingFaceTokenizer(BaseTokenizerWithVocab):
     def encode(self, sentences, output_type=str):
         is_multi_sentences = isinstance(sentences, list)
@@ -825,7 +838,8 @@ class HuggingFaceTokenizer(BaseTokenizerWithVocab):
             tokens = [tokens]
         token_type = _get_token_type(tokens)
         if token_type is str:
-            id_tokens = [[self._bpe.token_to_id(token) for token in sentence] for sentence in tokens]
+            id_tokens = [[self._bpe.token_to_id(token) for token in sentence] for sentence in
+                         tokens]
             ret = self._bpe.decode_batch(id_tokens)
         elif token_type is int:
             ret = self._bpe.decode_batch(tokens)
@@ -859,10 +873,10 @@ class HuggingFaceBPETokenizer(HuggingFaceTokenizer):
         self._unicode_normalizer = unicode_normalizer
         self.__rebuild_tokenizer()
         self._last_subword_id_set = frozenset([self._vocab[ele]
-                                                for ele in self._vocab.all_tokens
-                                                if ele.endswith(self._suffix)])
+                                               for ele in self._vocab.all_tokens
+                                               if ele.endswith(self._suffix)])
 
-    def is_last_subword(self, tokens: Union[str, int, List[str], List[int]])\
+    def is_last_subword(self, tokens: Union[str, int, List[str], List[int]]) \
             -> Union[bool, List[bool]]:
         """Whether the token is the last subword token
 
@@ -929,10 +943,11 @@ class HuggingFaceBPETokenizer(HuggingFaceTokenizer):
             self._vocab = Vocab(all_tokens, unk_token=self._unk_token)
             temp_hf_vocab_file = None
         assert self._unk_token == self._vocab.unk_token
-        self._bpe = tokenizers.CharBPETokenizer(vocab_file=temp_hf_vocab_file if temp_hf_vocab_file else self._vocab_file,
-                                                merges_file=self._merges_file,
-                                                unk_token=self._unk_token, suffix=self._suffix, dropout=self._dropout,
-                                                lowercase=self._lowercase, unicode_normalizer=self._unicode_normalizer)
+        self._bpe = tokenizers.CharBPETokenizer(
+            vocab_file=temp_hf_vocab_file if temp_hf_vocab_file else self._vocab_file,
+            merges_file=self._merges_file,
+            unk_token=self._unk_token, suffix=self._suffix, dropout=self._dropout,
+            lowercase=self._lowercase, unicode_normalizer=self._unicode_normalizer)
         if temp_hf_vocab_file:
             os.remove(temp_hf_vocab_file)
 
@@ -966,9 +981,11 @@ class HuggingFaceBPETokenizer(HuggingFaceTokenizer):
 @TOKENIZER_REGISTRY.register('hf_bytebpe')
 class HuggingFaceByteBPETokenizer(HuggingFaceTokenizer):
     def __init__(self, merges_file: Optional[str] = None, vocab_file: Optional[str] = None,
-                 add_prefix_space: bool = False, lowercase: bool = False, dropout: Optional[float] = None,
-                 unicode_normalizer: Optional[str] = None, continuing_subword_prefix: Optional[str] = None,
-                 end_of_word_suffix: Optional[str] = None, trim_offsets:bool=False):
+                 add_prefix_space: bool = False, lowercase: bool = False,
+                 dropout: Optional[float] = None,
+                 unicode_normalizer: Optional[str] = None,
+                 continuing_subword_prefix: Optional[str] = None,
+                 end_of_word_suffix: Optional[str] = None, trim_offsets: bool = False):
         self._merges_file = merges_file
         self._vocab_file = vocab_file
         self._add_prefix_space = add_prefix_space
@@ -1016,13 +1033,14 @@ class HuggingFaceByteBPETokenizer(HuggingFaceTokenizer):
             # and the default special_tokens=[]
             self._vocab = Vocab(all_tokens)
             temp_hf_vocab_file = None
-        self._bpe = tokenizers.ByteLevelBPETokenizer(vocab_file=temp_hf_vocab_file if temp_hf_vocab_file else self._vocab_file,
-                                                     merges_file=self._merges_file,
-                                                     add_prefix_space=self._add_prefix_space, lowercase=self._lowercase,
-                                                     dropout=self._dropout, unicode_normalizer=self._unicode_normalizer,
-                                                     continuing_subword_prefix=self._continuing_subword_prefix,
-                                                     end_of_word_suffix=self._end_of_word_suffix,
-                                                     trim_offsets=self._trim_offsets)
+        self._bpe = tokenizers.ByteLevelBPETokenizer(
+            vocab_file=temp_hf_vocab_file if temp_hf_vocab_file else self._vocab_file,
+            merges_file=self._merges_file,
+            add_prefix_space=self._add_prefix_space, lowercase=self._lowercase,
+            dropout=self._dropout, unicode_normalizer=self._unicode_normalizer,
+            continuing_subword_prefix=self._continuing_subword_prefix,
+            end_of_word_suffix=self._end_of_word_suffix,
+            trim_offsets=self._trim_offsets)
         if temp_hf_vocab_file:
             os.remove(temp_hf_vocab_file)
 
@@ -1081,7 +1099,7 @@ class HuggingFaceWordPieceTokenizer(HuggingFaceTokenizer):
         self._first_subword_id_set = frozenset([self._vocab[ele]
                                                 for ele in self._vocab.all_tokens
                                                 if not ele.startswith(self._wordpieces_prefix) and
-                                                   not ele in [self._sep_token, self._cls_token]])
+                                                not ele in [self._sep_token, self._cls_token]])
 
     def encode(self, sentences, output_type=str):
         """
@@ -1127,17 +1145,19 @@ class HuggingFaceWordPieceTokenizer(HuggingFaceTokenizer):
         else:
             return ret[0], offsets[0]
 
-    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]])\
+    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]]) \
             -> Union[bool, List[bool]]:
         if isinstance(tokens, str):
-            return not tokens.startswith(self._wordpieces_prefix) and not tokens in [self._cls_token, self._sep_token]
+            return not tokens.startswith(self._wordpieces_prefix) and not tokens in [
+                self._cls_token, self._sep_token]
         elif isinstance(tokens, int):
             return tokens in self._first_subword_id_set
         elif isinstance(tokens, list):
             if len(tokens) == 0:
                 return []
             if isinstance(tokens[0], str):
-                return [not ele.startswith(self._wordpieces_prefix) and not ele in [self._cls_token, self._sep_token]
+                return [not ele.startswith(self._wordpieces_prefix) and not ele in [self._cls_token,
+                                                                                    self._sep_token]
                         for ele in tokens]
             elif isinstance(tokens[0], int):
                 return [ele in self._first_subword_id_set for ele in tokens]
@@ -1170,10 +1190,10 @@ class HuggingFaceWordPieceTokenizer(HuggingFaceTokenizer):
             # defualt special tokens corresponding to the default
             # special_tokens setting in BertWordPieceTokenizer.train
             # and the default special_tokens=[pad, unk, cls, sep, mask]
-            default_special_tokens = {'pad_token':self._pad_token,
-                                      'cls_token':self._cls_token,
-                                      'sep_token':self._sep_token,
-                                      'mask_token':self._mask_token}
+            default_special_tokens = {'pad_token': self._pad_token,
+                                      'cls_token': self._cls_token,
+                                      'sep_token': self._sep_token,
+                                      'mask_token': self._mask_token}
             self._vocab = Vocab(all_tokens, unk_token=self._unk_token, **default_special_tokens)
             all_tokens = self._vocab.all_tokens
         # for safety, also use temp file when using wordpiece vocab file
@@ -1183,7 +1203,8 @@ class HuggingFaceWordPieceTokenizer(HuggingFaceTokenizer):
         with open(temp_hf_vocab_file, 'w', encoding='utf-8') as ftv:
             ftv.write('\n'.join(all_tokens))
         self._vocab.mask_token_id = self._vocab.mask_id
-        assert [self._unk_token, self._sep_token, self._cls_token, self._pad_token, self._mask_token] == \
+        assert [self._unk_token, self._sep_token, self._cls_token, self._pad_token,
+                self._mask_token] == \
                [self._vocab.unk_token, self._vocab.sep_token, self._vocab.cls_token,
                 self._vocab.pad_token, self._vocab.mask_token]
         self._bpe = tokenizers.BertWordPieceTokenizer(
@@ -1271,6 +1292,7 @@ class SentencepieceTokenizer(BaseTokenizerWithVocab):
     >>> os.remove('test_ende-a9bee4.model')
 
     """
+
     def __init__(self, model_path: Optional[str] = None,
                  vocab: Optional[Union[str, Vocab]] = None,
                  nbest: int = 0, alpha: float = 0.0, do_lower=False,
@@ -1307,7 +1329,7 @@ class SentencepieceTokenizer(BaseTokenizerWithVocab):
             token_id_to_token_name[self._sp_model.eos_id()] = 'eos_token'
         existing_control_tokens = set([self._sp_model.id_to_piece(ele)
                                        for ele in existing_control_token_ids])
-        other_control_tokens_ids =\
+        other_control_tokens_ids = \
             [i for i in range(len(self._sp_model))
              if self._sp_model.is_control(i) and i not in existing_control_token_ids]
         other_control_tokens = set([self._sp_model.id_to_piece(ele)
@@ -1316,14 +1338,15 @@ class SentencepieceTokenizer(BaseTokenizerWithVocab):
         for k, v in kwargs.items():
             if k in special_tokens_kv:
                 if v != special_tokens_kv[k]:
-                    raise ValueError('"vocab.{}" is already set to "{}" in the sentencepiece model. '
-                                     'Cannot reset it to "{}"'.format(k, special_tokens_kv[k], v))
+                    raise ValueError(
+                        '"vocab.{}" is already set to "{}" in the sentencepiece model. '
+                        'Cannot reset it to "{}"'.format(k, special_tokens_kv[k], v))
                 continue
             if v in existing_control_tokens:
                 if k != token_id_to_token_name[v]:
                     raise ValueError('"{}" is already registered as "vocab.{}". '
                                      'We cannot rename it to "vocab.{}".'
-                                     .format(v, token_id_to_token_name[v],k))
+                                     .format(v, token_id_to_token_name[v], k))
                 continue
             if v in other_control_tokens:
                 if v in matched_other_control_tokens:
@@ -1353,7 +1376,7 @@ class SentencepieceTokenizer(BaseTokenizerWithVocab):
             if self._sp_model.is_unknown(piece_id):
                 assert self._vocab[token] == self._sp_model.unk_id()
             else:
-                assert self._sp_model.is_control(piece_id),\
+                assert self._sp_model.is_control(piece_id), \
                     'Vocab mismatch! "{}" is a special token in the given vocab but not in the ' \
                     'sentencepiece model!'.format(token)
         self._first_subword_id_set = frozenset([self._vocab[ele]
@@ -1425,7 +1448,7 @@ class SentencepieceTokenizer(BaseTokenizerWithVocab):
         else:
             raise ValueError(_token_type_unsupported_err_msg(output_type))
 
-    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]])\
+    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]]) \
             -> Union[bool, List[bool]]:
         """Whether the token is the first subword token
 
@@ -1588,7 +1611,7 @@ class YTTMTokenizer(BaseTokenizerWithVocab):
             encode_token_without_meta_symbol = [x.replace(self._meta_symbol, ' ')
                                                 for x in encode_token]
             if len(encode_token_without_meta_symbol) > 0:
-                encode_token_without_meta_symbol[0] =\
+                encode_token_without_meta_symbol[0] = \
                     encode_token_without_meta_symbol[0].replace(' ', '')
             encode_offset = _rebuild_offset_from_tokens(sentence, encode_token_without_meta_symbol)
             tokens.append(encode_token)
@@ -1605,7 +1628,7 @@ class YTTMTokenizer(BaseTokenizerWithVocab):
         else:
             raise ValueError(_token_type_unsupported_err_msg(output_type))
 
-    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]])\
+    def is_first_subword(self, tokens: Union[str, int, List[str], List[int]]) \
             -> Union[bool, List[bool]]:
         """Whether the token is the first subword token
 

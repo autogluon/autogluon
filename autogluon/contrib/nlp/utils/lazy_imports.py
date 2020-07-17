@@ -24,7 +24,8 @@ __all__ = ['try_import_sentencepiece',
            'try_import_mwparserfromhell',
            'try_import_fasttext',
            'try_import_langid',
-           'try_import_boto3']
+           'try_import_boto3',
+           'try_import_jieba']
 
 
 def try_import_sentencepiece():
@@ -145,3 +146,12 @@ def try_import_boto3():
                           'If you are using EC2, downloading from s3:// will '
                           'be multiple times faster than using the traditional http/https URL.')
     return boto3
+
+
+def try_import_jieba():
+    try:
+        import jieba
+    except ImportError:
+        raise ImportError('"jieba" is not installed. You must install jieba tokenizer. '
+                          'You may try to use `pip install jieba`')
+    return jieba
