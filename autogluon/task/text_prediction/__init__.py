@@ -5,3 +5,4 @@ from . import dataset
 from . import fields
 from . import preprocessing
 from . import text_prediction
+from .text_prediction import TextPrediction

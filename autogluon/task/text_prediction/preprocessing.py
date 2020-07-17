@@ -4,12 +4,13 @@ import os
 from collections import OrderedDict
 from typing import Dict, Optional, List, Tuple, Union
 import numpy as np
-from ..data import batchify as bf
+from ...contrib.nlp.data import batchify as bf
+from ...contrib.nlp.utils.preprocessing import get_trimmed_lengths, match_tokens_with_char_spans
+from ...contrib.nlp.utils.misc import num_mp_workers
 from .dataset import TabularDataset
 from .fields import TextTokenIdsField, EntityField, CategoricalField, NumericalField
-from ..utils.preprocessing import get_trimmed_lengths, match_tokens_with_char_spans
-from ..utils.misc import num_mp_workers
 from . import constants as _C
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 

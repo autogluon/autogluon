@@ -60,6 +60,17 @@ requirements = [
     'networkx>=2.3,<3.0'
 ]
 
+# Requirements to the text package
+text_requirements = [
+    'sacremoses>=0.0.38',
+    'yacs>=0.1.6',
+    'sacrebleu',
+    'flake8',
+    'regex',
+    'sentencepiece',
+    'tokenizers>=0.7.0'
+]
+
 test_requirements = [
     'pytest',
     'openml'
@@ -82,7 +93,7 @@ if __name__ == '__main__':
         packages=find_packages(exclude=('docs', 'tests', 'scripts')),
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements + test_requirements,
+        install_requires=requirements + text_requirements + test_requirements,
         python_requires=MIN_PYTHON_VERSION,
         package_data={'autogluon': [
             'LICENSE',

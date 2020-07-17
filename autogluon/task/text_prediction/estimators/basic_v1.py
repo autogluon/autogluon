@@ -5,26 +5,25 @@ import logging
 import time
 import json
 import mxnet as mx
-import autogluon as ag
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
 from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
 from scipy.stats import pearsonr, spearmanr
+from ....contrib.nlp.models import get_backbone
+from ....contrib.nlp.lr_scheduler import InverseSquareRootScheduler
+from ....contrib.nlp.utils.config import CfgNode
+from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper, count_parameters, repeat
+from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
+from ....contrib.nlp.utils.registry import Registry
 from .. import constants as _C
-from ...models import get_backbone
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
-from ...lr_scheduler import InverseSquareRootScheduler
-from ..modules.classification import BERTForTabularBasicV1
-from ...utils.config import CfgNode
-from ...utils.misc import set_seed, logging_config, parse_ctx, grouper, count_parameters, repeat
-from ...utils.parameter import move_to_ctx, clip_grad_global_norm
-from ...utils.registry import Registry
+from ..modules.basic_prediction import BERTForTabularBasicV1
 from .base import BaseEstimator
 from ..dataset import TabularDataset, random_split_train_val
 
-v1_prebuild_search_space = Registry('v1_prebuild_search_space')
+v1_prebuild_config = Registry('v1_prebuild_config')
 
 
 @use_np
@@ -175,8 +174,8 @@ def base_cfg():
     return cfg
 
 
-@v1_prebuild_search_space.register()
-def electra_base_fixed():
+@v1_prebuild_config.register()
+def electra_base():
     """The search space of Electra Base"""
     cfg = base_cfg()
     cfg.defrost()
@@ -185,8 +184,8 @@ def electra_base_fixed():
     return cfg
 
 
-@v1_prebuild_search_space.register()
-def mobile_bert_fixed():
+@v1_prebuild_config.register()
+def mobile_bert():
     """The search space of MobileBERT"""
     cfg = base_cfg()
     cfg.defrost()

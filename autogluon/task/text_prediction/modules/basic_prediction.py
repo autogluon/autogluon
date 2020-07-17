@@ -2,9 +2,9 @@ import numpy as np
 import mxnet as mx
 from mxnet.gluon import nn, HybridBlock
 from mxnet.util import use_np
+from ....contrib.nlp.utils.config import CfgNode
+from ....contrib.nlp.layers import get_activation, get_norm_layer
 from .. import constants as _C
-from ...utils.config import CfgNode
-from ...layers import get_activation, get_norm_layer
 
 
 @use_np

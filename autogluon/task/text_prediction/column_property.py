@@ -5,8 +5,9 @@ import json
 import collections
 from typing import List, Optional, Union, Tuple, Hashable
 from . import constants as _C
-from ..base import INT_TYPES, BOOL_TYPES
-from ..data.vocab import Vocab
+from ...contrib.nlp.base import INT_TYPES, BOOL_TYPES
+from ...contrib.nlp.data.vocab import Vocab
+
 __all__ = ['CategoricalColumnProperty',
            'TextColumnProperty',
            'NumericalColumnProperty',

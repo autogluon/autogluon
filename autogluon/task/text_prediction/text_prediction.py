@@ -1,9 +1,9 @@
-from ..utils.misc import get_num_gpus
+from ...contrib.nlp.utils.misc import get_num_gpus
 from .dataset import load_pandas_df, random_split_train_val, TabularDataset
 from .estimators.basic_v1 import BertForTextPredictionBasic
 
 
-class AutoNLP:
+class TextPrediction:
     @staticmethod
     def fit(train_data,
             valid_data=None,
