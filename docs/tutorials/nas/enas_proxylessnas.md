@@ -26,7 +26,7 @@ Basic NN blocks for CNN.
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
         return x
-    
+
 class ConvBNReLU(mx.gluon.HybridBlock):
     def __init__(self, in_channels, channels, kernel, stride):
         super().__init__()
@@ -142,6 +142,22 @@ The resulting architecture is:
 mynet.graph
 ```
 
+## Store the trained model as a static network
+
+The trained ENAS network can be saved to disk for future inferences.
+
+```{.python .input}
+mynet.export('enas')
+```
+
+Load it back with mxnet:
+
+```{.python .input}
+mynet.export('enas', 0)
+mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas-0000.params")
+y = mynet(mx.nd.zeros((1, 1, 28, 28)))
+y.shape
+```
 
 ## Reference
 
