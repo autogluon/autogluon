@@ -574,13 +574,13 @@ def num_mp_workers(max_worker=4):
     return min(mp.cpu_count(), max_worker)
 
 
-def get_num_gpus():
-    """Get the total number of GPUs available
+def get_mxnet_visible_gpus():
+    """Get the number of GPUs that are visible to MXNet.
 
     Returns
     -------
-    gpu_count
-        The number of GPUs
+    ctx_l
+        The ctx list
     """
     import mxnet as mx
     gpu_count = 0
@@ -593,4 +593,4 @@ def get_num_gpus():
             break
         finally:
             break
-    return gpu_count
+    return [mx.gpu(i) for i in range(gpu_count)]
