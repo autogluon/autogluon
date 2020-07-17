@@ -70,7 +70,7 @@ def enas_net(**kwvars):
             def __init__(self, *args, **kwargs):
                 kwvars.update(kwargs)
                 super().__init__(*args, **kwvars)
-                # 
+                #
                 self._modules = {}
                 self._kwspaces = collections.OrderedDict()
                 for k, module in kwvars.items():
@@ -242,7 +242,7 @@ class ENAS_Sequential(gluon.HybridBlock):
                     e.edge(pre_node, i)
                 pre_node = i
         return e
- 
+
     @property
     def kwspaces(self):
         return self._kwspaces
@@ -302,6 +302,44 @@ class ENAS_Sequential(gluon.HybridBlock):
             reprstr += '\n\t{}: {}'.format(i, op)
         reprstr += ')\n'
         return reprstr
+
+    def export(self, path, epoch=0, remove_amp_cast=True):
+        """Export HybridBlock to json format that can be loaded by
+        `gluon.SymbolBlock.imports`, `mxnet.mod.Module` or the C++ interface.
+
+        .. note:: When there are only one input, it will have name `data`. When there
+                  Are more than one inputs, they will be named as `data0`, `data1`, etc.
+
+        Parameters
+        ----------
+        path : str
+            Path to save model. Two files `path-symbol.json` and `path-xxxx.params`
+            will be created, where xxxx is the 4 digits epoch number.
+        epoch : int
+            Epoch number of saved model.
+        """
+        from mxnet import npx as _mx_npx
+        from mxnet.util import is_np_array
+        from mxnet import ndarray
+        if not self._cached_graph:
+            raise RuntimeError(
+                "Please first call block.hybridize() and then run forward with "
+                "this block at least once before calling export.")
+        sym = self._cached_graph[1]
+        sym.save('%s-symbol.json'%path, remove_amp_cast=remove_amp_cast)
+
+        arg_names = set(sym.list_arguments())
+        aux_names = set(sym.list_auxiliary_states())
+        arg_dict = {}
+        for name, param in self.collect_params().items():
+            if name in arg_names:
+                arg_dict['arg:%s'%name] = param._reduce()
+            elif name in aux_names:
+                arg_dict['aux:%s'%name] = param._reduce()
+            else:
+                pass
+        save_fn = _mx_npx.save if is_np_array() else ndarray.save
+        save_fn('%s-%04d.params'%(path, epoch), arg_dict)
 
 class Zero_Unit(gluon.HybridBlock):
     def hybrid_forward(self, F, x):
