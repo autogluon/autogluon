@@ -348,6 +348,10 @@ class BertForTextPredictionBasic:
             self._base_config = base_cfg()
         else:
             self._base_config = base_cfg().clone_merge(base_config)
+        self._base_config.defrost()
+        if output_directory is not None:
+            self._base_config.misc.exp_dir = output_directory
+        self._base_config.freeze()
         self._search_space = search_space
         self._column_properties = column_properties
         self._stopping_metric = stopping_metric
