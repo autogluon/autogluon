@@ -1,4 +1,5 @@
 import numpy as np
+from pandas import DataFrame
 from scipy.stats import mode
 from sklearn.utils.extmath import weighted_mode
 import faiss
@@ -58,8 +59,12 @@ class KNeighborsRegressor:
 
 
     def fit(self, X_train, y_train):
-        X_train = X_train.astype(np.float32)
-        X_train = np.ascontiguousarray(X_train)
+        if isinstance(X_train, DataFrame):
+            X_train = X_train.to_numpy(dtype = np.float32)
+        else: 
+            X_train = X_train.astype(np.float32)
+        if not X_train.flags['C_CONTIGUOUS']: 
+            X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
         self.index = faiss.index_factory(d, self.index_factory_string)
         self.y = np.array(y_train)
@@ -129,8 +134,12 @@ class KNeighborsClassifier:
             faiss.omp_set_num_threads(n_jobs) 
 
     def fit(self, X_train, y_train):
-        X_train = X_train.astype(np.float32)
-        X_train = np.ascontiguousarray(X_train)
+        if isinstance(X_train, DataFrame):
+            X_train = X_train.to_numpy(dtype = np.float32)
+        else: 
+            X_train = X_train.astype(np.float32)
+        if not X_train.flags['C_CONTIGUOUS']: 
+            X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
         self.index = faiss.index_factory(d, self.index_factory_string)
         self.labels = np.array(y_train)
