@@ -279,7 +279,7 @@ def is_better_score(metric_name, baseline, new_score):
 
 @use_np
 def _classification_regression_predict(net, dataloader,
-                                       proble_type, ctx_l, has_label=True):
+                                       problem_type, ctx_l, has_label=True):
     """
 
     Parameters
@@ -288,7 +288,7 @@ def _classification_regression_predict(net, dataloader,
         The network
     dataloader
         The dataloader
-    proble_type
+    problem_type
         Types of the labels
     ctx_l
 
