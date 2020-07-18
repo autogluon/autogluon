@@ -174,9 +174,13 @@ class TextPrediction(BaseTask):
         else:
             tuning_data = load_pd.load(tuning_data)
         if nthreads_per_trial is None:
-            nthreads_per_trial = min(get_cpu_count(), 4)
+            nthreads_per_trial = get_cpu_count()
+        else:
+            nthreads_per_trial = min(get_cpu_count(), nthreads_per_trial)
         if ngpus_per_trial is None:
-            ngpus_per_trial = min(get_gpu_count(), 2)
+            ngpus_per_trial = get_gpu_count()
+        else:
+            ngpus_per_trial = min(get_gpu_count(), ngpus_per_trial)
         if hyperparameters is None:
             hyperparameters = 'default'
         if isinstance(hyperparameters, str):
