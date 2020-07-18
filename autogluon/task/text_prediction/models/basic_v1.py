@@ -369,6 +369,14 @@ class BertForTextPredictionBasic:
     def search_space(self):
         return self._search_space
 
+    @property
+    def base_config(self):
+        return self._base_config
+
+    @property
+    def problem_types(self):
+        return self._problem_types
+
     @staticmethod
     def default_config():
         """Get the default configuration
