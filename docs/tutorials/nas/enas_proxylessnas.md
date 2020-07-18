@@ -155,7 +155,7 @@ Load it back with mxnet:
 ```{.python .input}
 mynet.export('enas', 0)
 mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas-0000.params")
-y = mynet(mx.nd.zeros((1, 1, 28, 28)))
+y = mynet_static(mx.nd.zeros((1, 1, 28, 28)))
 y.shape
 ```
 
