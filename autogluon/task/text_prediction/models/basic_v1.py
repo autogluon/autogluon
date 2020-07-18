@@ -279,7 +279,7 @@ def is_better_score(metric_name, baseline, new_score):
 
 @use_np
 def _classification_regression_predict(net, dataloader,
-                                       label_types, ctx_l, has_label=True):
+                                       proble_type, ctx_l, has_label=True):
     """
 
     Parameters
@@ -288,7 +288,7 @@ def _classification_regression_predict(net, dataloader,
         The network
     dataloader
         The dataloader
-    label_types
+    proble_type
         Types of the labels
     ctx_l
 
@@ -311,7 +311,7 @@ def _classification_regression_predict(net, dataloader,
                 batch_feature = sample
             batch_feature = move_to_ctx(batch_feature, ctx)
             pred = net(batch_feature)
-            if label_types == _C.CATEGORICAL:
+            if proble_type == _C.CLASSIFICATION:
                 pred = mx.npx.softmax(pred, axis=-1)
             iter_pred_l.append(pred)
         for pred in iter_pred_l:
