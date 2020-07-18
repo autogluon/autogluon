@@ -167,6 +167,7 @@ class TextPrediction(BaseTask):
             if isinstance(feature_columns, str):
                 feature_columns = [feature_columns]
             all_columns = feature_columns + label
+            all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
