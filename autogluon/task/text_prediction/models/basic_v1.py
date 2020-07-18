@@ -414,7 +414,7 @@ class BertForTextPredictionBasic:
             cfg.defrost()
             cfg.misc.exp_dir = exp_dir
             cfg.freeze()
-        logging_config(folder=exp_dir, name='training.log')
+        logging_config(folder=exp_dir, name='training')
         logging.info(cfg)
         # Load backbone model
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
