@@ -365,6 +365,10 @@ class BertForTextPredictionBasic:
         self._tuning_data = None
         self._config = None
 
+    @property
+    def search_space(self):
+        return self._search_space
+
     @staticmethod
     def default_config():
         """Get the default configuration
@@ -380,7 +384,7 @@ class BertForTextPredictionBasic:
         start_tick = time.time()
         cfg = self.base_config.clone()
         specified_values = []
-        for key in self.search_space:
+        for key in self._search_space:
             specified_values.append(key)
             # TODO(?) Fix this!
             #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
@@ -575,8 +579,6 @@ class BertForTextPredictionBasic:
         self._label_columns = label_columns
         self._feature_columns = feature_columns
         assert len(self._label_columns) == 1
-        self._problem_types = []
-        self._label_shapes = []
         self._train_data = train_data
         self._tuning_data = tuning_data
         os.makedirs(self._output_directory, exist_ok=True)
