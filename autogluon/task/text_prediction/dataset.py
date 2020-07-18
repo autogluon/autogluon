@@ -114,7 +114,7 @@ def is_categorical_column(data: pd.Series,
     """
     threshold = min(int(len(data) * ratio), threshold)
     sample_set = set()
-    element = data.iloc[data.first_valid_index()]
+    element = data[data.first_valid_index()]
     if isinstance(element, str):
         for idx, sample in data.items():
             sample_set.add(sample)
@@ -134,7 +134,6 @@ def is_categorical_column(data: pd.Series,
         return True, False
     else:
         return False, False
-
 
 
 def get_column_properties(
