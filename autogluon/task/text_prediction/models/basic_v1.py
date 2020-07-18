@@ -404,6 +404,8 @@ class BertForTextPredictionBasic:
         return base_cfg()
 
     def _train_function(self, args=None, reporter=None):
+        if args is not None:
+            args = {key.replace('___', '.'): value for key, value in args.items()}
         start_tick = time.time()
         cfg = self.base_config.clone()
         specified_values = []
@@ -605,7 +607,9 @@ class BertForTextPredictionBasic:
         self._train_data = train_data
         self._tuning_data = tuning_data
         os.makedirs(self._output_directory, exist_ok=True)
-        search_space_decorator = args(self.search_space)
+        # We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
+        search_space_decorator = args({key.replace('.', '___'):
+                                           value for key, value in self.search_space.items()})
         train_fn = search_space_decorator(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
