@@ -66,6 +66,7 @@ def train(args):
                      feature_columns=feature_columns,
                      label=label_columns,
                      output_directory=args.exp_dir,
+                     ngpus_per_trial=1,
                      stopping_metric=stop_metric,
                      eval_metric=eval_metrics)
     dev_metrics_scores = model.evaluate(args.dev_file, metrics=eval_metrics)
