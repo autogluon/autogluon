@@ -10,9 +10,9 @@ Train on SST-2 dataset in the GLUE benchmark
 ```bash
 python run_text_prediction.py \
      --do_train \
-     --train_file glue/sst/train.pd.pkl \
-     --dev_file glue/sst/dev.pd.pkl \
-     --test_file glue/sst/test.pd.pkl \
+     --train_file glue/sst/train.parquet \
+     --dev_file glue/sst/dev.parquet \
+     --test_file glue/sst/test.parquet \
      --task sst \
      --ctx gpu0
 ```
