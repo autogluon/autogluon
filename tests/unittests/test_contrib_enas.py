@@ -1,6 +1,7 @@
 import os
 
 import pytest
+import numpy
 
 import autogluon as ag
 import mxnet as mx
@@ -53,9 +54,13 @@ def test_enas_net():
 
     x = mx.nd.random.uniform(shape=(1, 1, 28, 28))
     y = mynet.evaluate_latency(x)
-    y = mynet(x)
+    yy = mynet(x)
     assert mynet.nparams == 8714
-    mynet.export('enas_example', 0)
+    assert np.testing.assert_almost_equal(y.asnumpy(), yy.asnumpy())
+    mynet.export('enas', 0)
+    mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas-0000.params")
+    yy = mynet_static(x)
+    assert np.testing.assert_almost_equal(y.asnumpy(), yy.asnumpy())
 
 if __name__ == "__main__":
     test_enas_net()

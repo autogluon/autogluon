@@ -303,7 +303,7 @@ class ENAS_Sequential(gluon.HybridBlock):
         reprstr += ')\n'
         return reprstr
 
-    def export(self, path, epoch=0, remove_amp_cast=True):
+    def export(self, path, epoch=0):
         """Export HybridBlock to json format that can be loaded by
         `gluon.SymbolBlock.imports`, `mxnet.mod.Module` or the C++ interface.
 
@@ -317,6 +317,15 @@ class ENAS_Sequential(gluon.HybridBlock):
             will be created, where xxxx is the 4 digits epoch number.
         epoch : int
             Epoch number of saved model.
+
+        Examples
+        --------
+
+        >>> mynet.export('enas', 0)
+        >>> mynet_static = mx.gluon.nn.SymbolBlock.imports(
+            "enas-symbol.json", ['data'], "enas-0000.params")
+        >>> x = mx.nd.random.uniform(shape=(1, 1, 28, 28))
+        >>> y = mynet_static(x)
         """
         from mxnet import npx as _mx_npx
         from mxnet.util import is_np_array
@@ -326,7 +335,7 @@ class ENAS_Sequential(gluon.HybridBlock):
                 "Please first call block.hybridize() and then run forward with "
                 "this block at least once before calling export.")
         sym = self._cached_graph[1]
-        sym.save('%s-symbol.json'%path, remove_amp_cast=remove_amp_cast)
+        sym.save('%s-symbol.json'%path, remove_amp_cast=True)
 
         arg_names = set(sym.list_arguments())
         aux_names = set(sym.list_auxiliary_states())

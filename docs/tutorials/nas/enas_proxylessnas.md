@@ -147,16 +147,15 @@ mynet.graph
 The trained ENAS network can be saved to disk for future inferences.
 
 ```{.python .input}
-mynet.export('enas')
+mynet.export('enas', 0)
 ```
 
 Load it back with mxnet:
 
 ```{.python .input}
-mynet.export('enas', 0)
 mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas-0000.params")
 y = mynet_static(mx.nd.zeros((1, 1, 28, 28)))
-y.shape
+print(y.shape)
 ```
 
 ## Reference
