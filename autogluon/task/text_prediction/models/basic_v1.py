@@ -608,11 +608,13 @@ class BertForTextPredictionBasic:
         search_space_decorator = args(self.search_space)
         train_fn = search_space_decorator(self._train_function)
         scheduler = FIFOScheduler(train_fn,
+                                  time_out=time_limits,
                                   num_trials=2,
                                   resource=resources,
                                   checkpoint=os.path.join(self._output_directory,
                                                           'scheduler.checkpoint'),
-                                  reward_attr=self.evalute_metric)
+                                  reward_attr='eval_metric_score',
+                                  time_attr='time_spent')
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
 
