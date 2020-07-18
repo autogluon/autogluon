@@ -311,7 +311,7 @@ def _classification_regression_predict(net, dataloader,
                 batch_feature = sample
             batch_feature = move_to_ctx(batch_feature, ctx)
             pred = net(batch_feature)
-            if proble_type == _C.CLASSIFICATION:
+            if problem_type == _C.CLASSIFICATION:
                 pred = mx.npx.softmax(pred, axis=-1)
             iter_pred_l.append(pred)
         for pred in iter_pred_l:
