@@ -200,7 +200,8 @@ class TextPrediction(BaseTask):
                                                            label_col_name=label_col_name)
             problem_types.append(problem_type)
             label_shapes.append(label_shape)
-        logging.info('Label/Problem/Shape={}'.format(zip(label, problem_types, label_shapes)))
+        logging.info('Label={}, Problem={}, Label shape={}'.format(label,
+                                                                   problem_types, label_shapes))
         eval_metric, stopping_metric, log_metrics =\
             infer_eval_stop_log_metrics(problem_types[0],
                                         label_shapes[0],
