@@ -401,7 +401,6 @@ class BertForTextPredictionBasic:
             #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
             specified_values.append(getattr(args, key.replace('.', '___')))
         cfg.merge_from_list(specified_values)
-        logging.info(cfg)
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
             task_id = args.task_id
@@ -411,6 +410,8 @@ class BertForTextPredictionBasic:
             cfg.defrost()
             cfg.misc.exp_dir = exp_dir
             cfg.freeze()
+        logging_config(folder=exp_dir, name='training.log')
+        logging.info(cfg)
         # Load backbone model
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
