@@ -413,7 +413,7 @@ class BertForTextPredictionBasic:
         specified_values = []
         for key in self.search_space:
             specified_values.append(key)
-            specified_values.append(args[key])
+            specified_values.append(getattr(args, key))
         cfg.merge_from_list(specified_values)
         logging.info(cfg)
         exp_dir = cfg.misc.exp_dir
