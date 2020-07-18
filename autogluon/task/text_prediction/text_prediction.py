@@ -30,31 +30,57 @@ def default():
     return ret
 
 
-def infer_stop_eval_metrics(problem_type, label_shape):
-    """
+def infer_eval_stop_log_metrics(problem_type, label_shape,
+                                eval_metric=None,
+                                stopping_metric=None):
+    """Infer the evaluate, stopping and logging metrics
 
     Parameters
     ----------
     problem_type
+        Type of the problem
     label_shape
+        Shape of the label
+    eval_metric
+        The eval metric provided by the user
+    stopping_metric
+        The stopping metric provided by the user
 
     Returns
     -------
-    stop_metric
+    eval_metric
+    stopping_metric
     log_metrics
     """
+    if eval_metric is not None and stopping_metric is None:
+        stopping_metric = eval_metric
+        if isinstance(eval_metric, list):
+            stopping_metric = eval_metric[0]
     if problem_type == _C.CLASSIFICATION:
-        stop_metric = 'acc'
+        if stopping_metric is None:
+            stopping_metric = 'acc'
+        if eval_metric is None:
+            eval_metric = 'acc'
         if label_shape == 2:
             log_metrics = ['f1', 'mcc', 'auc', 'acc', 'nll']
         else:
             log_metrics = ['acc', 'nll']
     elif problem_type == _C.REGRESSION:
-        stop_metric = 'mse'
+        if stopping_metric is None:
+            stopping_metric = 'mse'
+        if eval_metric is None:
+            eval_metric = 'mse'
         log_metrics = ['mse', 'rmse', 'mae']
     else:
         raise NotImplementedError
-    return stop_metric, log_metrics
+    for other_log_metric in [stopping_metric, eval_metric]:
+        if isinstance(other_log_metric, str) and other_log_metric not in log_metrics:
+            log_metrics.append(other_log_metric)
+        else:
+            for ele in other_log_metric:
+                if ele not in log_metrics:
+                    log_metrics.append(ele)
+    return eval_metric, stopping_metric, log_metrics
 
 
 class TextPrediction(BaseTask):
@@ -169,11 +195,14 @@ class TextPrediction(BaseTask):
             problem_types.append(problem_type)
             label_shapes.append(label_shape)
         logging.info('Label/Problem/Shape={}'.format(zip(label, problem_types, label_shapes)))
-        inferred_stopping_metric, log_metrics = infer_stop_eval_metrics(problem_types[0],
-                                                                        label_shapes[0])
-        if stopping_metric is not None:
-            stopping_metric = inferred_stopping_metric
-        logging.info('Stop Metric={}, Log Metrics={}'.format(stopping_metric, log_metrics))
+        eval_metric, stopping_metric, log_metrics =\
+            infer_eval_stop_log_metrics(problem_types[0],
+                                        label_shapes[0],
+                                        eval_metric=eval_metric,
+                                        stopping_metric=stopping_metric)
+        logging.info('Eval Metric={}, Stop Metric={}, Log Metrics={}'.format(eval_metric,
+                                                                             stopping_metric,
+                                                                             log_metrics))
         model_candidates = []
         for model_name, model_search_space in hyperparameters.items():
             if model_name == 'BertForTextPredictionBasic':
@@ -182,16 +211,17 @@ class TextPrediction(BaseTask):
                                                    feature_columns=feature_columns,
                                                    label_shapes=label_shapes,
                                                    problem_types=problem_types,
+                                                   eval_metric=eval_metric,
                                                    stopping_metric=stopping_metric,
                                                    log_metrics=log_metrics,
                                                    base_config=None,
                                                    search_space=model_search_space,
+                                                   output_directory=output_directory,
                                                    logger=logger)
                 model_candidates.append(model)
             else:
                 raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
-        model_candidates = model_candidates[0]
         resources = {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
         model = model_candidates[0].fit(train_data=train_data,
                                         tuning_data=tuning_data,

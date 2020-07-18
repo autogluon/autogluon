@@ -319,8 +319,26 @@ def _classification_regression_predict(net, dataloader,
 @use_np
 class BertForTextPredictionBasic:
     def __init__(self, column_properties, label_columns, feature_columns,
-                 label_shapes, problem_types, stopping_metric, log_metrics,
-                 base_config=None, search_space=None, logger=None):
+                 label_shapes, problem_types, eval_metric,
+                 stopping_metric, log_metrics, output_directory, logger,
+                 base_config=None, search_space=None):
+        """
+
+        Parameters
+        ----------
+        column_properties
+        label_columns
+        feature_columns
+        label_shapes
+        problem_types
+        eval_metric
+        stopping_metric
+        log_metrics
+        output_directory
+        logger
+        base_config
+        search_space
+        """
         super(BertForTextPredictionBasic, self).__init__()
         if base_config is None:
             self._base_config = base_cfg()
@@ -329,8 +347,10 @@ class BertForTextPredictionBasic:
         self._search_space = search_space
         self._column_properties = column_properties
         self._stopping_metric = stopping_metric
+        self._eval_metric = eval_metric
         self._log_metrics = log_metrics
         self._logger = logger
+        self._output_directory = output_directory
 
         self._label_columns = label_columns
         self._feature_columns = feature_columns
@@ -382,9 +402,9 @@ class BertForTextPredictionBasic:
         """
         return base_cfg()
 
-    def train_function(self, args=None, reporter=None):
+    def _train_function(self, args=None, reporter=None):
         start_tick = time.time()
-        cfg = self.base_config().clone()
+        cfg = self.base_config.clone()
         specified_values = []
         for key in self.search_space:
             specified_values.append(key)
@@ -476,9 +496,6 @@ class BertForTextPredictionBasic:
         log_num_samples_l = [0 for _ in ctx_l]
         logging_start_tick = time.time()
         best_dev_metric = None
-        dev_metrics_csv_logger = open(os.path.join(exp_dir, 'metrics.csv'), 'w')
-        dev_metrics_csv_logger.write(','.join(['update_idx', 'epoch']
-                                              + self._log_metrics + ['find_better', 'time_spent']) + '\n')
         mx.npx.waitall()
         no_better_rounds = 0
         num_grad_accum = cfg.optimization.num_accumulated
@@ -558,20 +575,26 @@ class BertForTextPredictionBasic:
                 logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={}'.format(
                     update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                     loss_string, valid_time_spent))
-                dev_metrics_csv_logger.write(','.join(
-                    map(str, [update_idx + 1,
-                              int(update_idx / updates_per_epoch)]
-                        + [metric_scores[key] for key in self._log_metrics]
-                        + [find_better, valid_time_spent])) + '\n')
+                report_items = [('iteration', update_idx + 1),
+                                ('epoch', int(update_idx / updates_per_epoch))] + \
+                               [(k, v.item()) for k, v in metric_scores.items()] + \
+                               [('fine_better', find_better),
+                                ('time_spent', time.time() - start_tick)]
+                if isinstance(self._eval_metric, str):
+                    eval_metric_score = metric_scores[self._eval_metric].item()
+                else:
+                    eval_metric_score = np.mean([metric_scores[ele]
+                                                 for ele in self._eval_metric]).item()
+                report_items.append([('eval_metric_score', eval_metric_score)])
+                reporter(**dict(report_items))
                 if no_better_rounds >= cfg.LEARNING.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
                     break
-        # TODO(sxjscience) Add SWA
         net.load_parameters(filename=os.path.join(exp_dir, 'best_model.params'))
         return net
 
-    def fit(self, train_data, tuning_data, label_columns, feature_columns,
-            resources, time_limits=None):
+    def train(self, train_data, tuning_data, label_columns, feature_columns,
+              resources, time_limits=None):
         self._column_properties = train_data.column_properties
         self._label_columns = label_columns
         self._feature_columns = feature_columns
@@ -580,10 +603,13 @@ class BertForTextPredictionBasic:
         self._label_shapes = []
         self._train_data = train_data
         self._tuning_data = tuning_data
+        os.makedirs(self._output_directory, exist_ok=True)
         scheduler = FIFOScheduler(self.train_function,
-                                  num_trials=1,
-                                  resource={'num_cpus': 2,
-                                            'num_gpus': 0})
+                                  num_trials=2,
+                                  resource=resources,
+                                  checkpoint=os.path.join(self._output_directory,
+                                                          'scheduler.checkpoint'),
+                                  reward_attr=self.evalute_metric)
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
 
