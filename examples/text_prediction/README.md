@@ -14,7 +14,6 @@ python run_text_prediction.py \
      --dev_file glue/sst/dev.pd.pkl \
      --test_file glue/sst/test.pd.pkl \
      --task sst \
-     --batch_size 32 \
      --num_accumulated 1 \
      --ctx gpu0
 ```

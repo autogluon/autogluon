@@ -13,10 +13,10 @@ import pathlib
 import pandas as pd
 import pyarrow
 import pyarrow.json
-from gluonnlp.utils.misc import download, load_checksum_stats
-from gluonnlp.base import get_data_home_dir
-from gluonnlp.registry import DATA_MAIN_REGISTRY, DATA_PARSER_REGISTRY
-from gluonnlp.data.tokenizers import WhitespaceTokenizer
+from autogluon.contrib.nlp.utils.misc import download, load_checksum_stats
+from autogluon.contrib.nlp.base import get_data_home_dir
+from autogluon.contrib.nlp.registry import DATA_MAIN_REGISTRY, DATA_PARSER_REGISTRY
+from autogluon.contrib.nlp.data.tokenizers import WhitespaceTokenizer
 
 
 _CITATIONS = """
@@ -44,9 +44,9 @@ SUPERGLUE_TASKS = ["cb", "copa", "multirc", "rte", "wic", "wsc", "boolq", "recor
 
 _CURR_DIR = os.path.realpath(os.path.dirname(os.path.realpath(__file__)))
 _URL_FILE_STATS = load_checksum_stats(os.path.join(
-    _CURR_DIR, '..', 'url_checksums', 'glue.txt'))
+    _CURR_DIR, 'url_checksums', 'glue.txt'))
 _URL_FILE_STATS.update(load_checksum_stats(os.path.join(
-    _CURR_DIR, '..', 'url_checksums', 'superglue.txt')))
+    _CURR_DIR, 'url_checksums', 'superglue.txt')))
 
 
 def read_tsv_glue(tsv_file, num_skip=1, keep_column_names=False):
