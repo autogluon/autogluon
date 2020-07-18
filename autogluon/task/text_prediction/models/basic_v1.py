@@ -71,7 +71,7 @@ def get_optimizer(cfg, updates_per_epoch):
 
 
 @use_np
-def apply_layerwise_decay(model, layerwise_decay, model_name, not_included=None):
+def apply_layerwise_decay(model, layerwise_decay, backbone_name, not_included=None):
     """Apply the layer-wise gradient decay
     .. math::
         lr = lr * layerwise_decay^(max_depth - layer_depth)
@@ -89,7 +89,7 @@ def apply_layerwise_decay(model, layerwise_decay, model_name, not_included=None)
         not_included = []
     # consider the task specific fine-tuning layer as the last layer, following with pooler
     # In addition, the embedding parameters have the smaller learning rate based on this setting.
-    if 'electra' in model_name:
+    if 'electra' in backbone_name:
         all_layers = model.encoder.all_encoder_layers
     else:
         all_layers = model.encoder.all_layers
@@ -404,8 +404,13 @@ class BertForTextPredictionBasic:
         logging.info(cfg)
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
-            exp_dir = os.path.join(exp_dir, str(uuid.uuid4()))
+            task_id = args.task_id
+            printable_time = time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time()))
+            exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, printable_time))
             os.makedirs(exp_dir)
+            cfg.defrost()
+            cfg.misc.exp_dir = exp_dir
+            cfg.freeze()
         # Load backbone model
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
@@ -469,7 +474,8 @@ class BertForTextPredictionBasic:
                                    update_on_kvstore=False)
         if cfg.optimization.layerwise_lr_decay > 0:
             apply_layerwise_decay(net.text_backbone,
-                                  cfg.optimization.layerwise_lr_decay)
+                                  cfg.optimization.layerwise_lr_decay,
+                                  backbone_name=cfg.model.backbone.name)
         # Do not apply weight decay to all the LayerNorm and bias
         for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
             v.wd_mult = 0.0
