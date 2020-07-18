@@ -650,9 +650,9 @@ class BertForTextPredictionBasic:
         test_predictions = _classification_regression_predict(self._net,
                                                               dataloader=test_dataloader,
                                                               ctx_l=ctx_l,
-                                                              problem_type=self._problem_type,
+                                                              problem_type=self._problem_types[0],
                                                               has_label=False)
-        if self.problem_type == _C.CLASSIFICATION:
+        if self._problem_types[0] == _C.CLASSIFICATION:
             if get_probabilities:
                 return test_predictions
             else:
@@ -676,7 +676,7 @@ class BertForTextPredictionBasic:
         probabilities
             The probabilities. Shape (#Samples, num_class)
         """
-        assert self.problem_type == _C.CLASSIFICATION
+        assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
                                       get_original_labels=False,
                                       get_probabilities=True)
@@ -718,7 +718,7 @@ class BertForTextPredictionBasic:
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
             json.dump({'label': self._label,
                        'label_shape': self._label_shape,
-                       'problem_type': self._problem_type,
+                       'problem_types': self._problem_types,
                        'feature_columns': self._feature_columns},
                       of, ensure_ascii=True)
 
