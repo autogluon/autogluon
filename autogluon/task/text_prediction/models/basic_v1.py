@@ -429,8 +429,8 @@ class BertForTextPredictionBasic:
         # Build Preprocessor + Preprocess the training dataset + Inference problem type
         # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
         preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                    column_properties=self.column_properties,
-                                                    label_columns=self.label_columns,
+                                                    column_properties=self._column_properties,
+                                                    label_columns=self._label_columns,
                                                     max_length=cfg.model.preprocess.max_length,
                                                     merge_text=cfg.model.preprocess.merge_text)
         self._preprocessor = preprocessor
@@ -443,7 +443,7 @@ class BertForTextPredictionBasic:
         label = self._label_columns[0]
         # Get the ground-truth dev labels
         gt_dev_labels = np.array(self._tuning_data.table[label].apply(
-            self.column_properties[label].transform))
+            self._column_properties[label].transform))
         gpu_ctx_l = get_mxnet_visible_gpus()
         if len(gpu_ctx_l) == 0:
             ctx_l = [mx.cpu()]
