@@ -55,6 +55,7 @@ class FAISSNeighborsRegressor:
         """
         try_import_faiss()
         import faiss
+        self.faiss = faiss
         self.index_factory_string = index_factory_string
         self.n_neighbors = n_neighbors
         self.weights = weights
@@ -64,15 +65,14 @@ class FAISSNeighborsRegressor:
             faiss.omp_set_num_threads(n_jobs)
 
     def fit(self, X_train, y_train):
-        import faiss
         if isinstance(X_train, DataFrame):
             X_train = X_train.to_numpy(dtype=np.float32)
-        else: 
+        else:
             X_train = X_train.astype(np.float32)
         if not X_train.flags['C_CONTIGUOUS']:
             X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
-        self.index = faiss.index_factory(d, self.index_factory_string)
+        self.index = self.faiss.index_factory(d, self.index_factory_string)
         self.y = np.array(y_train)
         self.index.train(X_train)
         self.index.add(X_train)
@@ -102,20 +102,20 @@ class FAISSNeighborsRegressor:
         return y_pred
 
     def __getstate__(self):
-        import faiss
         state = {}
-        for k,v in self.__dict__.items():
-            if v is not self.index:
+        for k, v in self.__dict__.items():
+            if (v is not self.index) and (v is not self.faiss):
                 state[k] = v
             else:
-                state[k] = faiss.serialize_index(self.index)
+                state[k] = self.faiss.serialize_index(self.index)
         return state
 
     def __setstate__(self, state):
         try_import_faiss()
         import faiss
         self.__dict__.update(state)
-        self.index = faiss.deserialize_index(self.index)
+        self.faiss = faiss
+        self.index = self.faiss.deserialize_index(self.index)
 
 
 class FAISSNeighborsClassifier:
@@ -131,6 +131,7 @@ class FAISSNeighborsClassifier:
         """
         try_import_faiss()
         import faiss
+        self.faiss = faiss
         self.index_factory_string = index_factory_string
         self.n_neighbors = n_neighbors
         self.weights = weights
@@ -141,7 +142,6 @@ class FAISSNeighborsClassifier:
             faiss.omp_set_num_threads(n_jobs)
 
     def fit(self, X_train, y_train):
-        import faiss
         if isinstance(X_train, DataFrame):
             X_train = X_train.to_numpy(dtype=np.float32)
         else:
@@ -149,7 +149,7 @@ class FAISSNeighborsClassifier:
         if not X_train.flags['C_CONTIGUOUS']:
             X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
-        self.index = faiss.index_factory(d, self.index_factory_string)
+        self.index = self.faiss.index_factory(d, self.index_factory_string)
         self.labels = np.array(y_train)
         self.index.train(X_train)
         self.index.add(X_train)
@@ -192,17 +192,17 @@ class FAISSNeighborsClassifier:
         return probabilities
 
     def __getstate__(self):
-        import faiss
         state = {}
-        for k,v in self.__dict__.items():
-            if v is not self.index:
+        for k, v in self.__dict__.items():
+            if (v is not self.index) and (v is not self.faiss):
                 state[k] = v
             else:
-                state[k] = faiss.serialize_index(self.index)
+                state[k] = self.faiss.serialize_index(self.index)
         return state
 
     def __setstate__(self, state):
         try_import_faiss()
         import faiss
         self.__dict__.update(state)
-        self.index = faiss.deserialize_index(self.index)
+        self.faiss = faiss
+        self.index = self.faiss.deserialize_index(self.index)
