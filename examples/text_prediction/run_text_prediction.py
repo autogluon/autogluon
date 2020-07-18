@@ -63,7 +63,7 @@ def train(args):
     else:
         raise NotImplementedError
     if args.exp_dir is None:
-        args.exp_dir = '{}_{}'.format(args.task, args.backbone_name)
+        args.exp_dir = '{}'.format(args.task)
     model = task.fit(train_data=args.train_file,
                      feature_columns=feature_columns,
                      label=label_columns,
