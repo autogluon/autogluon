@@ -4,7 +4,7 @@ import sys
 import time
 
 import psutil
-from .knn_utils import KNeighborsClassifier, KNeighborsRegressor
+from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
 from ..abstract import model_trial
 from ..abstract.abstract_model import AbstractModel
@@ -19,9 +19,9 @@ class KNNModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.problem_type == REGRESSION:
-            self._model_type = KNeighborsRegressor
+            self._model_type = FAISSNeighborsRegressor
         else:
-            self._model_type = KNeighborsClassifier
+            self._model_type = FAISSNeighborsClassifier
 
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns

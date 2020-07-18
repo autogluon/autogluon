@@ -38,7 +38,7 @@ def _get_weights(dist, weights):
     else:
         raise ValueError("weights not recognized: should be 'uniform', 'distance', or a callable function")
 
-class KNeighborsRegressor:
+class FAISSNeighborsRegressor:
     def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
         """
         Creates a KNN regressor model based on FAISS. FAISS allows you to compose different
@@ -113,7 +113,7 @@ class KNeighborsRegressor:
 
 
 
-class KNeighborsClassifier:
+class FAISSNeighborsClassifier:
     def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
         """
         Creates a KNN classifier model based on FAISS. FAISS allows you to compose different
