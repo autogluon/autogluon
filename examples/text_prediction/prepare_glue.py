@@ -647,7 +647,7 @@ def main(args):
                          path=os.path.join(base_dir, 'diagnostic-full.tsv'),
                          sha1_hash=_URL_FILE_STATS[TASK2PATH['diagnostic'][1]])
                 df = reader(base_dir)
-                df.to_pickle(os.path.join(base_dir, 'diagnostic-full.pd.pkl'))
+                df.to_parquet(os.path.join(base_dir, 'diagnostic-full.parquet'))
             else:
                 for key, name in [('broadcoverage-diagnostic', 'AX-b'),
                                   ('winogender-diagnostic', 'AX-g')]:
@@ -658,7 +658,7 @@ def main(args):
                     with zipfile.ZipFile(data_file) as zipdata:
                         zipdata.extractall(args.data_dir)
                     df = reader(os.path.join(args.data_dir, name))
-                    df.to_pickle(os.path.join(args.data_dir, name, '{}.pd.pkl'.format(name)))
+                    df.to_parquet(os.path.join(args.data_dir, name, '{}.parquet'.format(name)))
         elif task == 'mrpc':
             reader = TASK2READER[task]
             format_mrpc(args.data_dir)
@@ -666,7 +666,7 @@ def main(args):
             for key, df in df_dict.items():
                 if key == 'val':
                     key = 'dev'
-                df.to_pickle(os.path.join(args.data_dir, 'mrpc', '{}.pd.pkl'.format(key)))
+                df.to_parquet(os.path.join(args.data_dir, 'mrpc', '{}.parquet'.format(key)))
             with open(os.path.join(args.data_dir, 'mrpc', 'metadata.json'), 'w') as f:
                 json.dump(meta_data, f)
         else:
@@ -690,7 +690,7 @@ def main(args):
             for key, df in df_dict.items():
                 if key == 'val':
                     key = 'dev'
-                df.to_pickle(os.path.join(base_dir, '{}.pd.pkl'.format(key)))
+                df.to_parquet(os.path.join(base_dir, '{}.parquet'.format(key)))
             if meta_data is not None:
                 with open(os.path.join(base_dir, 'metadata.json'), 'w') as f:
                     json.dump(meta_data, f)

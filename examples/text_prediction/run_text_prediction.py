@@ -30,12 +30,6 @@ def parse_args():
     parser.add_argument('--test_file', type=str,
                         help='The test pandas dataframe',
                         default=None)
-    parser.add_argument('--metadata', type=str, help='The metadata of the problem.',
-                        default=None)
-    parser.add_argument('--num_accumulated', type=int, help='Num of gradient accumulation',
-                        default=None)
-    parser.add_argument('--backbone_name', type=str, help='Name of the backbone model',
-                        default=None)
     parser.add_argument('--seed', type=int, help='The seed',
                         default=None)
     parser.add_argument('--task', type=str,

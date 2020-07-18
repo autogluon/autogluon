@@ -148,6 +148,7 @@ class TextPrediction(BaseTask):
         model
             A model object
         """
+        np.random.seed(seed)
         train_data = load_pd.load(train_data)
         if label is None:
             # Perform basic label inference
