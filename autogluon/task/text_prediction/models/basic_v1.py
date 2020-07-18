@@ -609,8 +609,8 @@ class BertForTextPredictionBasic:
         os.makedirs(self._output_directory, exist_ok=True)
         # TODO(?) Fix this!
         #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
-        search_space_decorator = args({key.replace('.', '___'): value
-                                       for key, value in self.search_space.items()})
+        search_space_decorator = args(**{key.replace('.', '___'): value
+                                         for key, value in self.search_space.items()})
         train_fn = search_space_decorator(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
