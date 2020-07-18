@@ -482,7 +482,7 @@ class BertForTextPredictionBasic:
         params = [p for p in net.collect_params().values() if p.grad_req != 'null']
 
         # Set grad_req if gradient accumulation is required
-        if cfg.optimization.num_accumulated > 1:
+        if num_accumulated > 1:
             logging.info('Using gradient accumulation. Global batch size = {}'
                          .format(cfg.optimization.batch_size))
             for p in params:
@@ -495,10 +495,9 @@ class BertForTextPredictionBasic:
         best_dev_metric = None
         mx.npx.waitall()
         no_better_rounds = 0
-        num_grad_accum = cfg.optimization.num_accumulated
         for update_idx in range(max_update):
             num_samples_per_update_l = [0 for _ in ctx_l]
-            for accum_idx in range(num_grad_accum):
+            for accum_idx in range(num_accumulated):
                 sample_l = next(train_loop_dataloader)
                 loss_l = []
                 num_samples_l = [0 for _ in ctx_l]
@@ -525,8 +524,8 @@ class BertForTextPredictionBasic:
             trainer.allreduce_grads()
             num_samples_per_update = sum(num_samples_per_update_l)
             total_norm, ratio, is_finite = \
-                clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_grad_accum)
-            total_norm = total_norm / num_grad_accum
+                clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_accumulated)
+            total_norm = total_norm / num_accumulated
             trainer.update(num_samples_per_update)
 
             # Clear after update
