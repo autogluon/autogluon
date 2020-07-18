@@ -71,7 +71,7 @@ def get_optimizer(cfg, updates_per_epoch):
 
 
 @use_np
-def apply_layerwise_decay(model, layerwise_decay, not_included=None):
+def apply_layerwise_decay(model, layerwise_decay, model_name, not_included=None):
     """Apply the layer-wise gradient decay
     .. math::
         lr = lr * layerwise_decay^(max_depth - layer_depth)
@@ -89,7 +89,10 @@ def apply_layerwise_decay(model, layerwise_decay, not_included=None):
         not_included = []
     # consider the task specific fine-tuning layer as the last layer, following with pooler
     # In addition, the embedding parameters have the smaller learning rate based on this setting.
-    all_layers = model.encoder.all_encoder_layers
+    if 'electra' in model_name:
+        all_layers = model.encoder.all_encoder_layers
+    else:
+        all_layers = model.encoder.all_layers
     max_depth = len(all_layers) + 2
     for key, value in model.collect_params().items():
         if 'scores' in key:
