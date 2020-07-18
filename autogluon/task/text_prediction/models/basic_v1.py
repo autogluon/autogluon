@@ -586,7 +586,7 @@ class BertForTextPredictionBasic:
                                                  for ele in self._eval_metric]).item()
                 report_items.append(('eval_metric_score', eval_metric_score))
                 reporter(**dict(report_items))
-                if no_better_rounds >= cfg.LEARNING.early_stopping_patience:
+                if no_better_rounds >= cfg.learning.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
                     break
         net.load_parameters(filename=os.path.join(exp_dir, 'best_model.params'))
