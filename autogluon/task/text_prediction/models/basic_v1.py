@@ -19,6 +19,7 @@ from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grou
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ....contrib.nlp.utils.registry import Registry
 from .. import constants as _C
+from ....core import args
 from ....scheduler import FIFOScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
@@ -604,7 +605,9 @@ class BertForTextPredictionBasic:
         self._train_data = train_data
         self._tuning_data = tuning_data
         os.makedirs(self._output_directory, exist_ok=True)
-        scheduler = FIFOScheduler(self.train_function,
+        search_space_decorator = args(self.search_space)
+        train_fn = search_space_decorator(self._train_function)
+        scheduler = FIFOScheduler(train_fn,
                                   num_trials=2,
                                   resource=resources,
                                   checkpoint=os.path.join(self._output_directory,
