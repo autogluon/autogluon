@@ -5,9 +5,10 @@
 python prepare_glue.py --benchmark glue
 ```
 
+Train on SST-2 dataset in the GLUE benchmark
 
 ```bash
-python run_text_classification.py \
+python run_text_prediction.py \
      --do_train \
      --train_file glue/sst/train.pd.pkl \
      --dev_file glue/sst/dev.pd.pkl \
