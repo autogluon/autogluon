@@ -363,34 +363,7 @@ class BertForTextPredictionBasic:
         self._preprocessor = None
         self._train_data = None
         self._tuning_data = None
-
-    @property
-    def base_config(self):
-        return self._base_config
-
-    @property
-    def search_space(self):
-        return self._search_space
-
-    @property
-    def problem_types(self):
-        return self._problem_types
-
-    @property
-    def label_shapes(self):
-        return self._label_shapes
-
-    @property
-    def label_columns(self):
-        return self._label_columns
-
-    @property
-    def preprocessor(self):
-        return self._preprocessor
-
-    @property
-    def net(self):
-        return self._net
+        self._config = None
 
     @staticmethod
     def default_config():
@@ -462,7 +435,7 @@ class BertForTextPredictionBasic:
                                     batchify_fn=preprocessor.batchify(is_test=True))
         net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                     feature_field_info=preprocessor.feature_field_info(),
-                                    label_shape=self.label_shapes[0],
+                                    label_shape=self._label_shapes[0],
                                     cfg=cfg.model.network)
         net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
         net.hybridize()
@@ -630,7 +603,7 @@ class BertForTextPredictionBasic:
                                         column_properties=self._column_properties)
         ground_truth = np.array(valid_data.table[self._label].apply(
             self._column_properties[self._label].transform))
-        if self.problem_type == _C.CLASSIFICATION:
+        if self._problem_types[0] == _C.CLASSIFICATION:
             predictions = self.predict_proba(valid_data)
         else:
             predictions = self.predict(valid_data)
