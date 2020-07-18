@@ -23,7 +23,7 @@ def default():
     ret = {
         'BertForTextPredictionBasic': {
             'model.backbone.name': 'google_uncased_mobilebert',
-            'optimization.num_train_epochs': core.space.Choice(3, 10),
+            'optimization.num_train_epochs': core.space.Categorical(3, 10),
             'optimization.lr': core.space.Real(1E-5, 1E-4)
         }
     }
