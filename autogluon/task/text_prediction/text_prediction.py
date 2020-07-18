@@ -23,6 +23,7 @@ def default():
     ret = {
         'BertForTextPredictionBasic': {
             'model.backbone.name': 'google_electra_base',
+            'optimization.batch_size': core.space.Categorical(32, 64),
             'optimization.num_train_epochs': core.space.Categorical(3, 10),
             'optimization.lr': core.space.Real(1E-5, 1E-4)
         }
