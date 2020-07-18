@@ -50,8 +50,6 @@ def parse_args():
                         help='Whether to evaluate the model')
     parser.add_argument('--exp_dir', type=str, default=None,
                         help='The experiment directory where the model params will be written.')
-    parser.add_argument('--ctx', type=str, default='gpu0',
-                        help='list of gpus to run, e.g. 0 or 0,2,5. -1 means using cpu.')
     parser.add_argument('--config_file', type=str, default=None)
     args = parser.parse_args()
     return args
