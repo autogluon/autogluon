@@ -529,7 +529,7 @@ class BertForTextPredictionBasic:
             trainer.update(num_samples_per_update)
 
             # Clear after update
-            if cfg.optimization.num_accumulated > 1:
+            if num_accumulated > 1:
                 net.collect_params().zero_grad()
             if (update_idx + 1) % train_log_interval == 0:
                 log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
@@ -640,8 +640,8 @@ class BertForTextPredictionBasic:
             = get_backbone(cfg.model.backbone.name)
         processed_test = self._preprocessor.process_test(test_data.table)
         ctx_l = parse_ctx(cfg.MISC.context)
-        batch_size = cfg.optimization.batch_size // len(ctx_l) // cfg.optimization.num_accumulated
-        inference_batch_size = batch_size * cfg.optimization.val_batch_size_mult
+        base_batch_size = cfg.optimization.per_device_batch_size
+        inference_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
         test_dataloader = DataLoader(processed_test,
                                      batch_size=inference_batch_size,
                                      shuffle=False,
