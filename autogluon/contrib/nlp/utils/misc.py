@@ -591,6 +591,4 @@ def get_mxnet_visible_gpus():
             gpu_count += 1
         except Exception:
             break
-        finally:
-            break
     return [mx.gpu(i) for i in range(gpu_count)]
