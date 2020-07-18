@@ -6,7 +6,9 @@ import faiss
 
 import logging
 
+
 logger = logging.getLogger(__name__)
+
 
 # Rather than try to import non-public sklearn internals, we implement our own weighting functions here
 # These support the same operations as the sklearn functions - at least as far as possible with FAISS
@@ -18,6 +20,7 @@ def _check_weights(weights):
         return weights
     else:
         raise ValueError("weights not recognized: should be 'uniform', 'distance', or a callable function")
+
 
 def _get_weights(dist, weights):
     """Get the weights from an array of distances and a parameter weights"""
@@ -38,6 +41,7 @@ def _get_weights(dist, weights):
     else:
         raise ValueError("weights not recognized: should be 'uniform', 'distance', or a callable function")
 
+
 class FAISSNeighborsRegressor:
     def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
         """
@@ -57,13 +61,12 @@ class FAISSNeighborsRegressor:
             # global config, affects all faiss indexes
             faiss.omp_set_num_threads(n_jobs)
 
-
     def fit(self, X_train, y_train):
         if isinstance(X_train, DataFrame):
-            X_train = X_train.to_numpy(dtype = np.float32)
+            X_train = X_train.to_numpy(dtype=np.float32)
         else: 
             X_train = X_train.astype(np.float32)
-        if not X_train.flags['C_CONTIGUOUS']: 
+        if not X_train.flags['C_CONTIGUOUS']:
             X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
         self.index = faiss.index_factory(d, self.index_factory_string)
@@ -85,32 +88,28 @@ class FAISSNeighborsRegressor:
         if weights is None:
             y_pred = np.mean(outputs, axis=1)
         else:
-            denom = np.sum(weights,axis = 1)
+            denom = np.sum(weights, axis=1)
             if outputs.ndim == 1:
-                y_pred = np.sum(weights * outputs,axis = 1)
+                y_pred = np.sum(weights * outputs, axis=1)
                 y_pred /= denom
-            else: 
-                y_pred = np.sum(weights * outputs,axis = 1)
+            else:
+                y_pred = np.sum(weights * outputs, axis=1)
                 y_pred /= denom
 
         return y_pred
 
     def __getstate__(self):
         state = {}
-        for k,v in self.__dict__.items(): 
-            if v is not self.index: 
+        for k,v in self.__dict__.items():
+            if v is not self.index:
                 state[k] = v
-            else: 
+            else:
                 state[k] = faiss.serialize_index(self.index)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.index = faiss.deserialize_index(self.index)
-
-
-
-
 
 
 class FAISSNeighborsClassifier:
@@ -131,14 +130,14 @@ class FAISSNeighborsClassifier:
         self.n_jobs = n_jobs
         if n_jobs > 0:
             # global config, affects all faiss indexes
-            faiss.omp_set_num_threads(n_jobs) 
+            faiss.omp_set_num_threads(n_jobs)
 
     def fit(self, X_train, y_train):
         if isinstance(X_train, DataFrame):
-            X_train = X_train.to_numpy(dtype = np.float32)
-        else: 
+            X_train = X_train.to_numpy(dtype=np.float32)
+        else:
             X_train = X_train.astype(np.float32)
-        if not X_train.flags['C_CONTIGUOUS']: 
+        if not X_train.flags['C_CONTIGUOUS']:
             X_train = np.ascontiguousarray(X_train)
         d = X_train.shape[1]
         self.index = faiss.index_factory(d, self.index_factory_string)
@@ -157,9 +156,9 @@ class FAISSNeighborsClassifier:
         outputs = np.squeeze(self.labels[I])
         weights = _get_weights(D, self.weights)
         if weights is None:
-            y_pred, _ = mode(outputs, axis = 1)
-        else: 
-            y_pred,_ = weighted_mode(outputs, weights, axis = 1)
+            y_pred, _ = mode(outputs, axis=1)
+        else:
+            y_pred, _ = weighted_mode(outputs, weights, axis=1)
         return y_pred
 
     def predict_proba(self, X):
@@ -167,35 +166,31 @@ class FAISSNeighborsClassifier:
         X = np.ascontiguousarray(X)
         if X.ndim == 1:
             X = X[np.newaxis]
-        D, I = self.index.search(X, self.n_neighbors)  
+        D, I = self.index.search(X, self.n_neighbors)
         outputs = np.squeeze(self.labels[I])
         weights = _get_weights(D, self.weights)
         if weights is None:
             weights = np.ones_like(I)
 
-        probabilities = np.empty((X.shape[0], len(self.classes)), dtype = np.float64)
-        for k, class_k in enumerate(self.classes): 
-            proba_k = np.sum( np.multiply(outputs == class_k, weights ), axis = 1 )
-            probabilities[:,k] = proba_k
+        probabilities = np.empty((X.shape[0], len(self.classes)), dtype=np.float64)
+        for k, class_k in enumerate(self.classes):
+            proba_k = np.sum(np.multiply(outputs == class_k, weights), axis=1)
+            probabilities[:, k] = proba_k
 
-        normalizer = np.sum(probabilities, axis = 1)
+        normalizer = np.sum(probabilities, axis=1)
         normalizer[normalizer == 0.0] = 1.0
-        probabilities /= normalizer[:,np.newaxis]
+        probabilities /= normalizer[:, np.newaxis]
         return probabilities
 
     def __getstate__(self):
         state = {}
-        for k,v in self.__dict__.items(): 
-            if v is not self.index: 
+        for k,v in self.__dict__.items():
+            if v is not self.index:
                 state[k] = v
-            else: 
+            else:
                 state[k] = faiss.serialize_index(self.index)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.index = faiss.deserialize_index(self.index)
-
-
-
-
