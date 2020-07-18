@@ -586,7 +586,7 @@ class BertForTextPredictionBasic:
                 else:
                     eval_metric_score = np.mean([metric_scores[ele]
                                                  for ele in self._eval_metric]).item()
-                report_items.append([('eval_metric_score', eval_metric_score)])
+                report_items.append(('eval_metric_score', eval_metric_score))
                 reporter(**dict(report_items))
                 if no_better_rounds >= cfg.LEARNING.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
