@@ -404,6 +404,8 @@ class BertForTextPredictionBasic:
         return base_cfg()
 
     def _train_function(self, args=None, reporter=None):
+        # TODO(?) Fix this!
+        #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
         if args is not None:
             args = {key.replace('___', '.'): value for key, value in args.items()}
         start_tick = time.time()
@@ -607,7 +609,8 @@ class BertForTextPredictionBasic:
         self._train_data = train_data
         self._tuning_data = tuning_data
         os.makedirs(self._output_directory, exist_ok=True)
-        # We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
+        # TODO(?) Fix this!
+        #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
         search_space_decorator = args({key.replace('.', '___'):
                                            value for key, value in self.search_space.items()})
         train_fn = search_space_decorator(self._train_function)
