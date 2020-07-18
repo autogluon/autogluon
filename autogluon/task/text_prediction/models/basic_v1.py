@@ -404,16 +404,14 @@ class BertForTextPredictionBasic:
         return base_cfg()
 
     def _train_function(self, args=None, reporter=None):
-        # TODO(?) Fix this!
-        #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
-        if args is not None:
-            args = {key.replace('___', '.'): value for key, value in args.items()}
         start_tick = time.time()
         cfg = self.base_config.clone()
         specified_values = []
         for key in self.search_space:
             specified_values.append(key)
-            specified_values.append(getattr(args, key))
+            # TODO(?) Fix this!
+            #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
+            specified_values.append(getattr(args, key.replace('.', '___')))
         cfg.merge_from_list(specified_values)
         logging.info(cfg)
         exp_dir = cfg.misc.exp_dir
