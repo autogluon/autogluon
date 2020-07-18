@@ -2,7 +2,7 @@ import numpy as np
 from pandas import DataFrame
 from scipy.stats import mode
 from sklearn.utils.extmath import weighted_mode
-import faiss
+from .....try_import import try_import_faiss
 
 import logging
 
@@ -43,7 +43,7 @@ def _get_weights(dist, weights):
 
 
 class FAISSNeighborsRegressor:
-    def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
+    def __init__(self, n_neighbors=5, weights='uniform', n_jobs=-1, index_factory_string="Flat"):
         """
         Creates a KNN regressor model based on FAISS. FAISS allows you to compose different
         near-neighbor search algorithms from several different preprocessing / search algorithms
@@ -53,6 +53,8 @@ class FAISSNeighborsRegressor:
 
         The model itself is a clone of the sklearn one
         """
+        try_import_faiss()
+        import faiss
         self.index_factory_string = index_factory_string
         self.n_neighbors = n_neighbors
         self.weights = weights
@@ -62,6 +64,7 @@ class FAISSNeighborsRegressor:
             faiss.omp_set_num_threads(n_jobs)
 
     def fit(self, X_train, y_train):
+        import faiss
         if isinstance(X_train, DataFrame):
             X_train = X_train.to_numpy(dtype=np.float32)
         else: 
@@ -99,6 +102,7 @@ class FAISSNeighborsRegressor:
         return y_pred
 
     def __getstate__(self):
+        import faiss
         state = {}
         for k,v in self.__dict__.items():
             if v is not self.index:
@@ -108,12 +112,14 @@ class FAISSNeighborsRegressor:
         return state
 
     def __setstate__(self, state):
+        try_import_faiss()
+        import faiss
         self.__dict__.update(state)
         self.index = faiss.deserialize_index(self.index)
 
 
 class FAISSNeighborsClassifier:
-    def __init__(self, n_neighbors = 5, weights='uniform', n_jobs = -1, index_factory_string = "Flat"): 
+    def __init__(self, n_neighbors=5, weights='uniform', n_jobs=-1, index_factory_string="Flat"):
         """
         Creates a KNN classifier model based on FAISS. FAISS allows you to compose different
         near-neighbor search algorithms from several different preprocessing / search algorithms
@@ -123,6 +129,8 @@ class FAISSNeighborsClassifier:
 
         The model itself is a clone of the sklearn one
         """
+        try_import_faiss()
+        import faiss
         self.index_factory_string = index_factory_string
         self.n_neighbors = n_neighbors
         self.weights = weights
@@ -133,6 +141,7 @@ class FAISSNeighborsClassifier:
             faiss.omp_set_num_threads(n_jobs)
 
     def fit(self, X_train, y_train):
+        import faiss
         if isinstance(X_train, DataFrame):
             X_train = X_train.to_numpy(dtype=np.float32)
         else:
@@ -183,6 +192,7 @@ class FAISSNeighborsClassifier:
         return probabilities
 
     def __getstate__(self):
+        import faiss
         state = {}
         for k,v in self.__dict__.items():
             if v is not self.index:
@@ -192,5 +202,7 @@ class FAISSNeighborsClassifier:
         return state
 
     def __setstate__(self, state):
+        try_import_faiss()
+        import faiss
         self.__dict__.update(state)
         self.index = faiss.deserialize_index(self.index)
