@@ -32,7 +32,6 @@ def parse_args():
                         default=None)
     parser.add_argument('--metadata', type=str, help='The metadata of the problem.',
                         default=None)
-    parser.add_argument('--batch_size', type=int, help='Total batch_size', default=None)
     parser.add_argument('--num_accumulated', type=int, help='Num of gradient accumulation',
                         default=None)
     parser.add_argument('--backbone_name', type=str, help='Name of the backbone model',
