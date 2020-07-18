@@ -77,9 +77,10 @@ def infer_eval_stop_log_metrics(problem_type, label_shape,
         if isinstance(other_log_metric, str) and other_log_metric not in log_metrics:
             log_metrics.append(other_log_metric)
         else:
-            for ele in other_log_metric:
-                if ele not in log_metrics:
-                    log_metrics.append(ele)
+            if isinstance(other_log_metric, list):
+                for ele in other_log_metric:
+                    if ele not in log_metrics:
+                        log_metrics.append(ele)
     return eval_metric, stopping_metric, log_metrics
 
 
