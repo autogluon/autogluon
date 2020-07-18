@@ -224,12 +224,12 @@ class TextPrediction(BaseTask):
                 raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         resources = {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
-        model = model_candidates[0].fit(train_data=train_data,
-                                        tuning_data=tuning_data,
-                                        label_columns=label,
-                                        feature_columns=feature_columns,
-                                        resources=resources,
-                                        time_limits=time_limits)
+        model = model_candidates[0].train(train_data=train_data,
+                                          tuning_data=tuning_data,
+                                          label_columns=label,
+                                          feature_columns=feature_columns,
+                                          resources=resources,
+                                          time_limits=time_limits)
         return model
 
     @staticmethod
