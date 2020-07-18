@@ -265,6 +265,31 @@ def normalize_df(df, convert_text_to_numerical=True, remove_none=True):
         return pd.DataFrame(series_l)
 
 
+def infer_problem_type(column_properties, label_col_name):
+    """
+
+    Parameters
+    ----------
+    column_properties
+        The property of the columns
+    label_col_name
+        Name of the label column
+
+    Returns
+    -------
+    problem_type
+        Type of the problem
+    label_shape
+        Shape of the label
+    """
+    if column_properties[label_col_name].type == _C.CATEGORICAL:
+        return _C.CLASSIFICATION, column_properties[label_col_name].num_class
+    elif column_properties[label_col_name].type == _C.NUMERICAL:
+        return _C.REGRESSION, column_properties[label_col_name].shape
+    else:
+        raise NotImplementedError('Cannot infer the problem type')
+
+
 class TabularDataset:
     def __init__(self, path_or_df: Union[str, pd.DataFrame],
                  *,
@@ -322,28 +347,6 @@ class TabularDataset:
     @property
     def column_properties(self):
         return self._column_properties
-
-    def infer_problem_type(self, label_col_name):
-        """
-
-        Parameters
-        ----------
-        label_col_name
-            Name of the label column
-
-        Returns
-        -------
-        problem_type
-            Type of the problem
-        label_shape
-            Shape of the label
-        """
-        if self.column_properties[label_col_name].type == _C.CATEGORICAL:
-            return _C.CLASSIFICATION, self.column_properties[label_col_name].num_class
-        elif self.column_properties[label_col_name].type == _C.NUMERICAL:
-            return _C.REGRESSION, self.column_properties[label_col_name].shape
-        else:
-            raise NotImplementedError('Cannot infer the problem type')
 
     def __str__(self):
         ret = 'Columns:\n\n'

@@ -5,6 +5,7 @@ import logging
 import time
 import json
 import mxnet as mx
+import uuid
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
@@ -13,17 +14,16 @@ from scipy.stats import pearsonr, spearmanr
 from ....contrib.nlp.models import get_backbone
 from ....contrib.nlp.lr_scheduler import InverseSquareRootScheduler
 from ....contrib.nlp.utils.config import CfgNode
-from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper, count_parameters, repeat
+from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
+    count_parameters, repeat, get_mxnet_visible_gpus
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ....contrib.nlp.utils.registry import Registry
 from .. import constants as _C
+from ....scheduler import FIFOScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
-from .base import BaseEstimator
-from ..dataset import TabularDataset, random_split_train_val
-
-v1_prebuild_config = Registry('v1_prebuild_config')
+from ..dataset import TabularDataset, infer_problem_type
 
 
 @use_np
@@ -119,7 +119,7 @@ def base_optimization_config():
     cfg.begin_lr = 0.0
     cfg.batch_size = 32
     cfg.model_average = 5
-    cfg.num_accumulated = 2
+    cfg.per_device_batch_size = 16  # Per-device batch-size
     cfg.val_batch_size_mult = 2  # By default, we double the batch size for validation
     cfg.lr = 1E-4
     cfg.final_lr = 0.0
@@ -174,7 +174,6 @@ def base_cfg():
     return cfg
 
 
-@v1_prebuild_config.register()
 def electra_base():
     """The search space of Electra Base"""
     cfg = base_cfg()
@@ -184,7 +183,6 @@ def electra_base():
     return cfg
 
 
-@v1_prebuild_config.register()
 def mobile_bert():
     """The search space of MobileBERT"""
     cfg = base_cfg()
@@ -195,33 +193,6 @@ def mobile_bert():
     cfg.optimization.num_train_epochs = 5.0
     cfg.freeze()
     return cfg
-
-
-def infer_stop_eval_metrics(problem_type, label_shape):
-    """
-
-    Parameters
-    ----------
-    problem_type
-    label_shape
-
-    Returns
-    -------
-    stop_metric
-    log_metrics
-    """
-    if problem_type == _C.CLASSIFICATION:
-        stop_metric = 'acc'
-        if label_shape == 2:
-            log_metrics = ['f1', 'mcc', 'auc', 'acc', 'nll']
-        else:
-            log_metrics = ['acc', 'nll']
-    elif problem_type == _C.REGRESSION:
-        stop_metric = 'mse'
-        log_metrics = ['mse', 'rmse', 'mae']
-    else:
-        raise NotImplementedError
-    return stop_metric, log_metrics
 
 
 def calculate_metric_scores(metrics, predictions, gt_labels,
@@ -303,17 +274,22 @@ def is_better_score(metric_name, baseline, new_score):
 
 
 @use_np
-def _classification_regression_predict(net, dataloader, problem_type, ctx_l,
-                                       has_label=True):
+def _classification_regression_predict(net, dataloader,
+                                       label_types, ctx_l, has_label=True):
     """
 
     Parameters
     ----------
     net
+        The network
     dataloader
-    problem_type
+        The dataloader
+    label_types
+        Types of the labels
     ctx_l
+
     has_label
+
 
     Returns
     -------
@@ -331,7 +307,7 @@ def _classification_regression_predict(net, dataloader, problem_type, ctx_l,
                 batch_feature = sample
             batch_feature = move_to_ctx(batch_feature, ctx)
             pred = net(batch_feature)
-            if problem_type == _C.CLASSIFICATION:
+            if label_types == _C.CATEGORICAL:
                 pred = mx.npx.softmax(pred, axis=-1)
             iter_pred_l.append(pred)
         for pred in iter_pred_l:
@@ -341,124 +317,84 @@ def _classification_regression_predict(net, dataloader, problem_type, ctx_l,
 
 
 @use_np
-class BertForTextPredictionBasic(BaseEstimator):
-    def __init__(self, config=None, logger=None):
-        super(BertForTextPredictionBasic, self).__init__(config=config,
-                                                         logger=logger)
-        self._problem_type = None
+class BertForTextPredictionBasic:
+    def __init__(self, column_properties, label_columns, feature_columns,
+                 label_shapes, problem_types, stopping_metric, log_metrics,
+                 base_config=None, search_space=None, logger=None):
+        super(BertForTextPredictionBasic, self).__init__()
+        if base_config is None:
+            self._base_config = base_cfg()
+        else:
+            self._base_config = base_cfg().clone_merge(base_config)
+        self._search_space = search_space
+        self._column_properties = column_properties
+        self._stopping_metric = stopping_metric
+        self._log_metrics = log_metrics
+        self._logger = logger
+
+        self._label_columns = label_columns
+        self._feature_columns = feature_columns
+        self._label_shapes = label_shapes
+        self._problem_types = problem_types
+
+        # Need to be set in the fit call
         self._net = None
         self._preprocessor = None
-        self._column_properties = None
-        self._label = None
-        self._label_shape = None
-        self._feature_columns = None
+        self._train_data = None
+        self._tuning_data = None
 
     @property
-    def problem_type(self):
-        return self._problem_type
+    def base_config(self):
+        return self._base_config
 
     @property
-    def label_shape(self):
-        return self._label_shape
+    def search_space(self):
+        return self._search_space
 
     @property
-    def label(self):
-        return self._label
+    def problem_types(self):
+        return self._problem_types
+
+    @property
+    def label_shapes(self):
+        return self._label_shapes
+
+    @property
+    def label_columns(self):
+        return self._label_columns
+
+    @property
+    def preprocessor(self):
+        return self._preprocessor
 
     @property
     def net(self):
         return self._net
 
     @staticmethod
-    def get_cfg(key=None):
-        """Get the configuration
-
-        Parameters
-        ----------
-        key
-            Prebuilt configurations
+    def default_config():
+        """Get the default configuration
 
         Returns
         -------
         cfg
             The configuration specified by the key
         """
-        if key is None:
-            return electra_base()
-        else:
-            return v1_prebuild_config.create(key)
+        return base_cfg()
 
-    def fit(self, train_data, label, feature_columns=None, valid_data=None,
-            time_limits=None):
-        """Fit the train data with the given label
-
-        Parameters
-        ----------
-        train_data
-            The training data.
-            Should be a format that can be converted to a tabular dataset
-        label
-            The label column
-        feature_columns
-            The feature columns
-        valid_data
-            The validation data
-        time_limits
-            The time limits in seconds
-        """
-        fit_start_tick = time.time()
-        self._label = label
-        cfg = self.config
-        set_seed(cfg.MISC.seed)
-        exp_dir = cfg.MISC.exp_dir
-        logging_config(folder=exp_dir, name='train')
-        ctx_l = parse_ctx(cfg.MISC.context)
-        if feature_columns is None:
-            feature_columns = [ele for ele in train_data.columns if ele != label]
-        elif not isinstance(feature_columns, list):
-            feature_columns = [feature_columns]
-        self._feature_columns = feature_columns
-        all_columns = feature_columns + [label]
-        if not isinstance(train_data, TabularDataset):
-            train_data = TabularDataset(train_data,
-                                        columns=all_columns,
-                                        label_columns=label)
-        column_properties = train_data.column_properties
-        self._column_properties = column_properties
-
-        # Get the problem type + shape + metrics
-        problem_type, label_shape = train_data.infer_problem_type(label_col_name=label)
-        self._problem_type = problem_type
-        self._label_shape = label_shape
-        logging.info('Problem Type={}, Label Shape={}'.format(problem_type, label_shape))
-        inferred_stop_metric, inferred_log_metrics = infer_stop_eval_metrics(self.problem_type,
-                                                                             self.label_shape)
-        if cfg.LEARNING.stop_metric == 'auto':
-            stop_metric = inferred_stop_metric
-        else:
-            stop_metric = cfg.LEARNING.stop_metric
-        if cfg.LEARNING.log_metrics == 'auto':
-            log_metrics = inferred_log_metrics
-        else:
-            log_metrics = cfg.LEARNING.log_metrics.split(',')
-        if stop_metric not in log_metrics:
-            log_metrics.append(stop_metric)
-        logging.info('Stop Metric={}, Log Metrics={}'.format(stop_metric, log_metrics))
-        if valid_data is None:
-            train_df, valid_df = random_split_train_val(train_data.table,
-                                                        label=label,
-                                                        valid_ratio=cfg.LEARNING.valid_ratio)
-            train_data = TabularDataset(train_df, column_properties=column_properties)
-            valid_data = TabularDataset(valid_df, column_properties=column_properties)
-        else:
-            if not isinstance(valid_data, TabularDataset):
-                valid_data = TabularDataset(valid_data,
-                                            label_columns=label,
-                                            column_properties=column_properties)
-        logging.info('Train Dataset:')
-        logging.info(train_data)
-        logging.info('Dev Dataset:')
-        logging.info(valid_data)
+    def train_function(self, args=None, reporter=None):
+        start_tick = time.time()
+        cfg = self.base_config().clone()
+        specified_values = []
+        for key in self.search_space:
+            specified_values.append(key)
+            specified_values.append(args[key])
+        cfg.merge_from_list(specified_values)
+        logging.info(cfg)
+        exp_dir = cfg.misc.exp_dir
+        if reporter is not None:
+            exp_dir = os.path.join(exp_dir, str(uuid.uuid4()))
+            os.makedirs(exp_dir)
         # Load backbone model
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(cfg.model.backbone.name)
@@ -468,49 +404,53 @@ class BertForTextPredictionBasic(BaseEstimator):
             f.write(str(backbone_cfg))
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         # Build Preprocessor + Preprocess the training dataset + Inference problem type
+        # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
         preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                    column_properties=column_properties,
-                                                    label_columns=label,
+                                                    column_properties=self.column_properties,
+                                                    label_columns=self.label_columns,
                                                     max_length=cfg.model.preprocess.max_length,
                                                     merge_text=cfg.model.preprocess.merge_text)
         self._preprocessor = preprocessor
         logging.info('Process training set...')
-        processed_train = preprocessor.process_train(train_data.table)
+        processed_train = preprocessor.process_train(self._train_data.table)
         logging.info('Done!')
         logging.info('Process dev set...')
-        processed_dev = preprocessor.process_test(valid_data.table)
+        processed_dev = preprocessor.process_test(self._tuning_data.table)
         logging.info('Done!')
+        label = self._label_columns[0]
         # Get the ground-truth dev labels
-        gt_dev_labels = np.array(valid_data.table[label].apply(column_properties[label].transform))
-        np.save(os.path.join(exp_dir, 'gt_dev_labels.npy'), gt_dev_labels)
-        batch_size = cfg.optimization.batch_size\
-                     // len(ctx_l) // cfg.optimization.num_accumulated
-        inference_batch_size = batch_size * cfg.optimization.val_batch_size_mult
-        assert batch_size * cfg.optimization.num_accumulated * len(ctx_l)\
-               == cfg.optimization.batch_size
+        gt_dev_labels = np.array(self._tuning_data.table[label].apply(
+            self.column_properties[label].transform))
+        gpu_ctx_l = get_mxnet_visible_gpus()
+        if len(gpu_ctx_l) == 0:
+            ctx_l = [mx.cpu()]
+        else:
+            ctx_l = gpu_ctx_l
+        base_batch_size = cfg.optimization.per_device_batch_size
+        num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
+        inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
         train_dataloader = DataLoader(processed_train,
-                                      batch_size=batch_size,
+                                      batch_size=base_batch_size,
                                       shuffle=True,
                                       batchify_fn=preprocessor.batchify(is_test=False))
         dev_dataloader = DataLoader(processed_dev,
-                                    batch_size=inference_batch_size,
+                                    batch_size=inference_base_batch_size,
                                     shuffle=False,
                                     batchify_fn=preprocessor.batchify(is_test=True))
         net = BERTForTabularBasicV1(text_backbone=text_backbone,
                                     feature_field_info=preprocessor.feature_field_info(),
-                                    label_shape=label_shape,
+                                    label_shape=self.label_shapes[0],
                                     cfg=cfg.model.network)
-        self._net = net
         net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
         net.hybridize()
         num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
         logging.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                                num_total_fixed_params))
         # Initialize the optimizer
-        updates_per_epoch = int(
-            len(train_dataloader) / (cfg.optimization.num_accumulated * len(ctx_l)))
-        optimizer, optimizer_params, max_update = get_optimizer(cfg.optimization,
-                                                                updates_per_epoch=updates_per_epoch)
+        updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
+        optimizer, optimizer_params, max_update\
+            = get_optimizer(cfg.optimization,
+                            updates_per_epoch=updates_per_epoch)
         valid_interval = math.ceil(cfg.optimization.valid_frequency * updates_per_epoch)
         train_log_interval = math.ceil(cfg.optimization.log_frequency * updates_per_epoch)
         trainer = mx.gluon.Trainer(net.collect_params(),
@@ -538,7 +478,7 @@ class BertForTextPredictionBasic(BaseEstimator):
         best_dev_metric = None
         dev_metrics_csv_logger = open(os.path.join(exp_dir, 'metrics.csv'), 'w')
         dev_metrics_csv_logger.write(','.join(['update_idx', 'epoch']
-                                              + log_metrics + ['find_better', 'time_spent']) + '\n')
+                                              + self._log_metrics + ['find_better', 'time_spent']) + '\n')
         mx.npx.waitall()
         no_better_rounds = 0
         num_grad_accum = cfg.optimization.num_accumulated
@@ -554,10 +494,10 @@ class BertForTextPredictionBasic(BaseEstimator):
                     label_batch = move_to_ctx(label_batch, ctx)
                     with mx.autograd.record():
                         pred = net(feature_batch)
-                        if problem_type == _C.CLASSIFICATION:
+                        if self._problem_types[0] == _C.CLASSIFICATION:
                             logits = mx.npx.log_softmax(pred, axis=-1)
                             loss = - mx.npx.pick(logits, label_batch[0])
-                        elif problem_type == _C.REGRESSION:
+                        elif self._problem_types[0] == _C.REGRESSION:
                             loss = mx.np.square(pred - label_batch[0])
                         loss_l.append(loss.mean() / len(ctx_l))
                         num_samples_l[i] = loss.shape[0]
@@ -591,45 +531,61 @@ class BertForTextPredictionBasic(BaseEstimator):
                 logging_start_tick = time.time()
                 log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
                 log_num_samples_l = [0 for _ in ctx_l]
-                if time.time() - fit_start_tick > time_limits:
-                    logging.info('Reached time limit. Stop!')
-                    break
             if (update_idx + 1) % valid_interval == 0 or (update_idx + 1) == max_update:
                 valid_start_tick = time.time()
-                dev_predictions = _classification_regression_predict(net, dataloader=dev_dataloader,
-                                                                     ctx_l=ctx_l,
-                                                                     problem_type=problem_type,
-                                                                     has_label=False)
-                metric_scores = calculate_metric_scores(log_metrics,
+                dev_predictions =\
+                    _classification_regression_predict(net, dataloader=dev_dataloader,
+                                                       ctx_l=ctx_l,
+                                                       problem_type=self._problem_types[0],
+                                                       has_label=False)
+                metric_scores = calculate_metric_scores(self._log_metrics,
                                                         predictions=dev_predictions,
                                                         gt_labels=gt_dev_labels)
                 valid_time_spent = time.time() - valid_start_tick
-                if best_dev_metric is None or is_better_score(stop_metric,
+                if best_dev_metric is None or is_better_score(self._stopping_metric,
                                                               best_dev_metric,
-                                                              metric_scores[stop_metric]):
+                                                              metric_scores[self._stopping_metric]):
                     find_better = True
                     no_better_rounds = 0
-                    best_dev_metric = metric_scores[stop_metric]
+                    best_dev_metric = metric_scores[self._stopping_metric]
                 else:
                     find_better = False
                     no_better_rounds += 1
                 if find_better:
                     net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
                 loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
-                                         for key in log_metrics])
+                                         for key in self._log_metrics])
                 logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={}'.format(
                     update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                     loss_string, valid_time_spent))
                 dev_metrics_csv_logger.write(','.join(
                     map(str, [update_idx + 1,
                               int(update_idx / updates_per_epoch)]
-                        + [metric_scores[key] for key in log_metrics]
+                        + [metric_scores[key] for key in self._log_metrics]
                         + [find_better, valid_time_spent])) + '\n')
                 if no_better_rounds >= cfg.LEARNING.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
                     break
         # TODO(sxjscience) Add SWA
         net.load_parameters(filename=os.path.join(exp_dir, 'best_model.params'))
+        return net
+
+    def fit(self, train_data, tuning_data, label_columns, feature_columns,
+            resources, time_limits=None):
+        self._column_properties = train_data.column_properties
+        self._label_columns = label_columns
+        self._feature_columns = feature_columns
+        assert len(self._label_columns) == 1
+        self._problem_types = []
+        self._label_shapes = []
+        self._train_data = train_data
+        self._tuning_data = tuning_data
+        scheduler = FIFOScheduler(self.train_function,
+                                  num_trials=1,
+                                  resource={'num_cpus': 2,
+                                            'num_gpus': 0})
+        scheduler.run()
+        scheduler.join_jobs(timeout=time_limits)
 
     def evaluate(self, valid_data, metrics):
         assert self.net is not None
