@@ -421,8 +421,6 @@ class BertForTextPredictionBasic:
             = get_backbone(cfg.model.backbone.name)
         with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
             f.write(str(cfg))
-        with open(os.path.join(exp_dir, 'backbone_cfg.yml'), 'w') as f:
-            f.write(str(backbone_cfg))
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
         # Build Preprocessor + Preprocess the training dataset + Inference problem type
         # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
