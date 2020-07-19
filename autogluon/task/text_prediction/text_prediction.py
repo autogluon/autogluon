@@ -22,14 +22,14 @@ def default() -> dict:
     """The default hyper-parameters
 
     It will have a version key and a list of candidate models.
-    We will store the name and search space of each model.
+    Each model has its own search space inside.
     """
     ret = {
         'version': 1,
         'models':
             [
                 {
-                    'name': 'BertForTextPredictionBasic',
+                    'type': 'BertForTextPredictionBasic',
                     'search_space': {
                         'model.backbone.name': 'google_electra_base',
                         'optimization.batch_size': space.Categorical(32, 64),
@@ -111,6 +111,7 @@ class TextPrediction:
         params
             The parameters of the TextPrediction module.
         """
+        assert dist_ip_addrs is None, 'Distributed training is currently not supported!'
         self._dist_ip_addrs = dist_ip_addrs
         self._params = params
 

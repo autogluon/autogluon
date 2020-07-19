@@ -5,6 +5,7 @@ import logging
 import time
 import json
 import mxnet as mx
+import ast
 import uuid
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -152,7 +153,7 @@ def base_model_config():
 
 def base_learning_config():
     cfg = CfgNode()
-    cfg.early_stopping_patience = 5  # Stop if we cannot find better checkpoints
+    cfg.early_stopping_patience = 10  # Stop if we cannot find a better checkpoint
     cfg.valid_ratio = 0.15      # The ratio of dataset to split for validation
     cfg.stop_metric = 'auto'    # Automatically define the stopping metric
     cfg.log_metrics = 'auto'    # Automatically determine the metrics used in logging
@@ -400,6 +401,20 @@ class BertForTextPredictionBasic:
         return base_cfg()
 
     def _train_function(self, args=None, reporter=None):
+        """The internal training function
+
+        Parameters
+        ----------
+        args
+            The arguments
+        reporter
+            The reporter
+
+        Returns
+        -------
+        net
+            The
+        """
         start_tick = time.time()
         cfg = self.base_config.clone()
         specified_values = []
@@ -408,6 +423,8 @@ class BertForTextPredictionBasic:
         cfg.merge_from_list(specified_values)
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
+            # When the reporter is not None,
+            # we create the saved directory based on the
             task_id = args.task_id
             printable_time = time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time()))
             exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, printable_time))
@@ -590,8 +607,6 @@ class BertForTextPredictionBasic:
                 if no_better_rounds >= cfg.learning.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
                     break
-        net.load_parameters(filename=os.path.join(exp_dir, 'best_model.params'))
-        return net
 
     def train(self, train_data, tuning_data, label_columns, feature_columns,
               resources, time_limits=None):
