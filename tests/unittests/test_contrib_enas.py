@@ -1,7 +1,7 @@
 import os
 
 import pytest
-import numpy
+import numpy as np
 
 import autogluon as ag
 import mxnet as mx
