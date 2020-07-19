@@ -14,9 +14,9 @@ from ....contrib.nlp.models import get_backbone
 from ....contrib.nlp.lr_scheduler import InverseSquareRootScheduler
 from ....contrib.nlp.utils.config import CfgNode
 from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
-    count_parameters, repeat, get_mxnet_visible_gpus
+    count_parameters, repeat, get_mxnet_available_ctx
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ....contrib.nlp.utils.registry import Registry
+from ....utils.tabular.utils.loaders import load_pd
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
 from ....core import args
@@ -162,7 +162,6 @@ def base_learning_config():
 def base_misc_config():
     cfg = CfgNode()
     cfg.seed = 123
-    cfg.context = 'gpu0'
     cfg.exp_dir = './autonlp'
     return cfg
 
@@ -278,8 +277,7 @@ def is_better_score(metric_name, baseline, new_score):
 
 
 @use_np
-def _classification_regression_predict(net, dataloader,
-                                       problem_type, ctx_l, has_label=True):
+def _classification_regression_predict(net, dataloader, problem_type, has_label=True):
     """
 
     Parameters
@@ -290,8 +288,6 @@ def _classification_regression_predict(net, dataloader,
         The dataloader
     problem_type
         Types of the labels
-    ctx_l
-
     has_label
 
 
@@ -300,6 +296,7 @@ def _classification_regression_predict(net, dataloader,
     predictions
     """
     predictions = []
+    ctx_l = net.collect_params().list_ctx()
     for sample_l in grouper(dataloader, len(ctx_l)):
         iter_pred_l = []
         for sample, ctx in zip(sample_l, ctx_l):
@@ -323,9 +320,8 @@ def _classification_regression_predict(net, dataloader,
 @use_np
 class BertForTextPredictionBasic:
     def __init__(self, column_properties, label_columns, feature_columns,
-                 label_shapes, problem_types, eval_metric,
-                 stopping_metric, log_metrics, output_directory, logger,
-                 base_config=None, search_space=None):
+                 label_shapes, problem_types, stopping_metric, log_metrics,
+                 output_directory=None, logger=None, base_config=None, search_space=None):
         """
 
         Parameters
@@ -337,7 +333,6 @@ class BertForTextPredictionBasic:
         feature_columns
         label_shapes
         problem_types
-        eval_metric
         stopping_metric
         log_metrics
         output_directory
@@ -363,7 +358,6 @@ class BertForTextPredictionBasic:
             self._search_space = search_space
         self._column_properties = column_properties
         self._stopping_metric = stopping_metric
-        self._eval_metric = eval_metric
         self._log_metrics = log_metrics
         self._logger = logger
         self._output_directory = output_directory
@@ -376,6 +370,7 @@ class BertForTextPredictionBasic:
         # Need to be set in the fit call
         self._net = None
         self._preprocessor = None
+        self._scheduler = None
         self._train_data = None
         self._tuning_data = None
         self._config = None
@@ -391,6 +386,10 @@ class BertForTextPredictionBasic:
     @property
     def problem_types(self):
         return self._problem_types
+
+    @property
+    def config(self):
+        return self._config
 
     @staticmethod
     def default_config():
@@ -429,8 +428,7 @@ class BertForTextPredictionBasic:
             # When the reporter is not None,
             # we create the saved directory based on the task_id + time
             task_id = args.task_id
-            printable_time = time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time()))
-            exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, printable_time))
+            exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
             os.makedirs(exp_dir)
             cfg.defrost()
             cfg.misc.exp_dir = exp_dir
@@ -450,7 +448,6 @@ class BertForTextPredictionBasic:
                                                     label_columns=self._label_columns,
                                                     max_length=cfg.model.preprocess.max_length,
                                                     merge_text=cfg.model.preprocess.merge_text)
-        self._preprocessor = preprocessor
         logging.info('Process training set...')
         processed_train = preprocessor.process_train(self._train_data.table)
         logging.info('Done!')
@@ -461,11 +458,7 @@ class BertForTextPredictionBasic:
         # Get the ground-truth dev labels
         gt_dev_labels = np.array(self._tuning_data.table[label].apply(
             self._column_properties[label].transform))
-        gpu_ctx_l = get_mxnet_visible_gpus()
-        if len(gpu_ctx_l) == 0:
-            ctx_l = [mx.cpu()]
-        else:
-            ctx_l = gpu_ctx_l
+        ctx_l = get_mxnet_available_ctx()
         base_batch_size = cfg.optimization.per_device_batch_size
         num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
         inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
@@ -572,7 +565,6 @@ class BertForTextPredictionBasic:
                 valid_start_tick = time.time()
                 dev_predictions =\
                     _classification_regression_predict(net, dataloader=dev_dataloader,
-                                                       ctx_l=ctx_l,
                                                        problem_type=self._problem_types[0],
                                                        has_label=False)
                 metric_scores = calculate_metric_scores(self._log_metrics,
@@ -605,21 +597,18 @@ class BertForTextPredictionBasic:
                                [(k, v.item()) for k, v in metric_scores.items()] + \
                                [('fine_better', find_better),
                                 ('time_spent', time.time() - start_tick)]
-                report_items.append(('reward', performance_score))
+                report_items.append(('performance_score', performance_score))
                 report_items.append(('exp_dir', exp_dir))
                 reporter(**dict(report_items))
                 if no_better_rounds >= cfg.learning.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
                     break
 
-    def train(self, train_data, tuning_data, label_columns, feature_columns,
-              resources, time_limits=None):
-        self._column_properties = train_data.column_properties
-        self._label_columns = label_columns
-        self._feature_columns = feature_columns
+    def train(self, train_data, tuning_data, resources, time_limits=None):
         assert len(self._label_columns) == 1
         self._train_data = train_data
         self._tuning_data = tuning_data
+        # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(**self.search_space)
         train_fn = search_space_reg(self._train_function)
@@ -629,12 +618,35 @@ class BertForTextPredictionBasic:
                                   resource=resources,
                                   checkpoint=os.path.join(self._output_directory,
                                                           'scheduler.checkpoint'),
-                                  reward_attr='eval_metric_score',
+                                  reward_attr='performance_score',
                                   time_attr='time_spent')
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
-        scheduler.get_training_curves()
-        scheduler.get_best_config()
+        self._scheduler = scheduler
+        best_task_id = scheduler.get_best_task_id()
+        best_model_saved_dir_path = os.path.join(self._output_directory,
+                                                 'task{}'.format(best_task_id))
+        best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
+        cfg = self.base_config.clone_merge(best_cfg_path)
+        # Consider to move this to a separate predictor
+        self._config = cfg
+        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+            = get_backbone(cfg.model.backbone.name)
+        text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+        preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
+                                                    column_properties=self._column_properties,
+                                                    label_columns=self._label_columns,
+                                                    max_length=cfg.model.preprocess.max_length,
+                                                    merge_text=cfg.model.preprocess.merge_text)
+        self._preprocessor = preprocessor
+        net = BERTForTabularBasicV1(text_backbone=text_backbone,
+                                    feature_field_info=preprocessor.feature_field_info(),
+                                    label_shape=self._label_shapes[0],
+                                    cfg=cfg.model.network)
+        ctx_l = get_mxnet_available_ctx()
+        net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
+                            ctx=ctx_l)
+        self._net = net
 
     def evaluate(self, valid_data, metrics):
         assert self.net is not None
@@ -654,23 +666,17 @@ class BertForTextPredictionBasic:
 
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
         assert self.net is not None
-        cfg = self.config
-        if not isinstance(test_data, TabularDataset):
-            test_data = TabularDataset(test_data,
-                                       column_properties=self._column_properties)
-        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.model.backbone.name)
-        processed_test = self._preprocessor.process_test(test_data.table)
-        ctx_l = parse_ctx(cfg.MISC.context)
-        base_batch_size = cfg.optimization.per_device_batch_size
-        inference_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
+        assert self.config is not None
+        test_data = load_pd.load(test_data)
+        processed_test = self._preprocessor.process_test(test_data)
+        inference_batch_size = self.config.optimization.per_device_batch_size\
+                               * self.config.optimization.val_batch_size_mult
         test_dataloader = DataLoader(processed_test,
                                      batch_size=inference_batch_size,
                                      shuffle=False,
                                      batchify_fn=self._preprocessor.batchify(is_test=True))
         test_predictions = _classification_regression_predict(self._net,
                                                               dataloader=test_dataloader,
-                                                              ctx_l=ctx_l,
                                                               problem_type=self._problem_types[0],
                                                               has_label=False)
         if self._problem_types[0] == _C.CLASSIFICATION:
@@ -685,12 +691,12 @@ class BertForTextPredictionBasic:
         return test_predictions
 
     def predict_proba(self, test_data):
-        """
+        """Predict with probability
 
         Parameters
         ----------
         test_data
-            The test data
+            The test data. Can be a pandas DataFrame or a file containing a pandas dataframe
 
         Returns
         -------
@@ -703,14 +709,16 @@ class BertForTextPredictionBasic:
                                       get_probabilities=True)
 
     def predict(self, test_data, get_original_labels=True):
-        """
+        """Get the prediction results
 
         Parameters
         ----------
         test_data
             tabular dataset
         get_original_labels
-            Whether to get the original labels
+            Whether to get the original labels.
+            For example, the labels can be "entailment", "not_entailment" and whether
+            to get the original string labels or get the int values.
 
         Returns
         -------
@@ -737,11 +745,13 @@ class BertForTextPredictionBasic:
             json.dump(get_column_property_metadata(self._column_properties),
                       of, ensure_ascii=True)
         with open(os.path.join(dir_path, 'assets.json'), 'w') as of:
-            json.dump({'label': self._label,
-                       'label_shape': self._label_shape,
-                       'problem_types': self._problem_types,
-                       'feature_columns': self._feature_columns},
-                      of, ensure_ascii=True)
+            json.dump(
+                {
+                    'label_columns': self._label_columns,
+                    'label_shapes': self._label_shapes,
+                    'problem_types': self._problem_types,
+                    'feature_columns': self._feature_columns
+                }, of, ensure_ascii=True)
 
     @classmethod
     def load(cls, dir_path):
@@ -756,29 +766,39 @@ class BertForTextPredictionBasic:
         -------
         model
         """
-        loaded_config = cls.get_cfg().clone_merge(os.path.join(dir_path, 'cfg.yml'))
-        model = cls(loaded_config)
+        loaded_config = cls.default_config().clone_merge(os.path.join(dir_path, 'cfg.yml'))
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:
             assets = json.load(f)
-        model._label = assets['label']
-        model._label_shape = assets['label_shape']
-        model._problem_type = assets['problem_type']
-        model._feature_columns = assets['feature_columns']
+        label_columns = assets['label_columns']
+        feature_columns = assets['feature_columns']
+        label_shapes = assets['label_shapes']
+        problem_types = assets['problem_types']
+        column_properties = get_column_properties_from_metadata(
+            os.path.join(dir_path, 'column_properties.json'))
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(loaded_config.model.backbone.name)
-        model._column_properties = get_column_properties_from_metadata(
-            os.path.join(dir_path, 'column_metadata.json'))
         # Initialize the preprocessor
         preprocessor = TabularBasicBERTPreprocessor(
             tokenizer=tokenizer,
-            column_properties=model.column_properties,
-            label_columns=model._label,
+            column_properties=column_properties,
+            label_columns=label_columns,
             max_length=loaded_config.model.preprocess.max_length,
             merge_text=loaded_config.model.preprocess.merge_text)
         text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+        net = BERTForTabularBasicV1(text_backbone=text_backbone,
+                                    feature_field_info=preprocessor.feature_field_info(),
+                                    label_shape=label_shapes[0],
+                                    cfg=loaded_config.model.network)
+        net.load_parameters(os.path.join(dir_path, 'net.params'),
+                            ctx=get_mxnet_available_ctx())
+        model = cls(column_properties=column_properties,
+                    label_columns=label_columns,
+                    feature_columns=feature_columns,
+                    label_shapes=label_shapes,
+                    problem_types=problem_types,
+                    stopping_metric=None,
+                    log_metrics=None,
+                    base_config=loaded_config)
+        model._net = net
         model._preprocessor = preprocessor
-        model._net = BERTForTabularBasicV1(text_backbone=text_backbone,
-                                           feature_field_info=preprocessor.feature_field_info(),
-                                           label_shape=model.label_shape,
-                                           cfg=loaded_config.model.network)
-        return model
+        model._config = loaded_config

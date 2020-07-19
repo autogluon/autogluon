@@ -592,3 +592,20 @@ def get_mxnet_visible_gpus():
         except Exception:
             break
     return [mx.gpu(i) for i in range(gpu_count)]
+
+
+def get_mxnet_available_ctx():
+    """
+
+    Returns
+    -------
+    ctx_l
+        Get the available contexts
+    """
+    import mxnet as mx
+    gpu_ctx_l = get_mxnet_visible_gpus()
+    if len(gpu_ctx_l) == 0:
+        ctx_l = [mx.cpu()]
+    else:
+        ctx_l = gpu_ctx_l
+    return ctx_l
