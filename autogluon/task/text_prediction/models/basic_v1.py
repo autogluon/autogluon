@@ -352,7 +352,11 @@ class BertForTextPredictionBasic:
         if output_directory is not None:
             self._base_config.misc.exp_dir = output_directory
         self._base_config.freeze()
-        self._search_space = search_space
+        if search_space is None:
+            self._search_space = dict()
+        else:
+            assert isinstance(search_space, dict)
+            self._search_space = search_space
         self._column_properties = column_properties
         self._stopping_metric = stopping_metric
         self._eval_metric = eval_metric
@@ -401,9 +405,6 @@ class BertForTextPredictionBasic:
         specified_values = []
         for key in self._search_space:
             specified_values.append(key)
-            # TODO(?) Fix this!
-            #  We need to replace here due to issue: https://github.com/awslabs/autogluon/issues/560
-            specified_values.append(getattr(args, key.replace('.', '___')))
         cfg.merge_from_list(specified_values)
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
@@ -601,11 +602,7 @@ class BertForTextPredictionBasic:
         self._train_data = train_data
         self._tuning_data = tuning_data
         os.makedirs(self._output_directory, exist_ok=True)
-        # TODO(?) Fix this!
-        #  We need to add the  replace here due to issue:
-        #  https://github.com/awslabs/autogluon/issues/560
-        search_space_reg = args(**{key.replace('.', '___'): value
-                                   for key, value in self.search_space.items()})
+        search_space_reg = args(**self.search_space)
         train_fn = search_space_reg(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
