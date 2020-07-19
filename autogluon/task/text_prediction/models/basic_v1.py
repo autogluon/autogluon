@@ -421,7 +421,7 @@ class BertForTextPredictionBasic:
         cfg = self.base_config.clone()
         specified_values = []
         for key in self._search_space:
-            specified_values.append(key)
+            specified_values.append(key, args[key])
         cfg.merge_from_list(specified_values)
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
