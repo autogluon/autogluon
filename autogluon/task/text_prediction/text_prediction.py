@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from . import constants as _C
 from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ... import core
+from ...core import space
 from ...contrib.nlp.utils.registry import Registry
 from ..base import BaseTask
 from ...utils.tabular.utils.loaders import load_pd
@@ -19,14 +19,24 @@ ag_text_params = Registry('ag_text_params')
 
 @ag_text_params.register()
 def default():
-    """Default configuration"""
+    """The default hyper-parameters
+
+    It will have a version key and a list of candidate models. Each model is based on a
+    """
     ret = {
-        'BertForTextPredictionBasic': {
-            'model.backbone.name': 'google_electra_base',
-            'optimization.batch_size': core.space.Categorical(32, 64),
-            'optimization.num_train_epochs': core.space.Categorical(3, 10),
-            'optimization.lr': core.space.Real(1E-5, 1E-4)
-        }
+        'version': 1,
+        'models':
+            [
+                {
+                    'name': 'BertForTextPredictionBasic',
+                    'search_space': {
+                        'model.backbone.name': 'google_electra_base',
+                        'optimization.batch_size': space.Categorical(32, 64),
+                        'optimization.num_train_epochs': space.Categorical(3, 10),
+                        'optimization.lr': space.Real(1E-5, 1E-4)
+                    }
+                }
+            ]
     }
     return ret
 
