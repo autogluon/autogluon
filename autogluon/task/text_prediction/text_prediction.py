@@ -257,11 +257,11 @@ class TextPrediction:
                 raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         resources = {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
-        model = model_candidates[0].train(train_data=train_data,
-                                          tuning_data=tuning_data,
-                                          resources=resources,
-                                          time_limits=time_limits)
-        return model
+        model_candidates[0].train(train_data=train_data,
+                                  tuning_data=tuning_data,
+                                  resources=resources,
+                                  time_limits=time_limits)
+        return model_candidates[0]
 
     @staticmethod
     def load(dir_path):

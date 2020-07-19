@@ -2,7 +2,7 @@ import mxnet as mx
 import os
 import json
 import argparse
-from autogluon.task.text_prediction import TextPrediction as task
+from autogluon.task.text_prediction import TextPrediction
 mx.npx.set_np()
 
 
@@ -62,9 +62,10 @@ def train(args):
         raise NotImplementedError
     if args.exp_dir is None:
         args.exp_dir = 'autogluon_{}'.format(args.task)
+    task = TextPrediction()
     model = task.fit(train_data=args.train_file,
-                     feature_columns=feature_columns,
                      label=label_columns,
+                     feature_columns=feature_columns,
                      output_directory=args.exp_dir,
                      stopping_metric=stop_metric,
                      eval_metric=eval_metrics)
