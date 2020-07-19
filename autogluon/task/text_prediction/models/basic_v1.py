@@ -431,7 +431,7 @@ class BertForTextPredictionBasic:
             # we create the saved directory based on the task_id + time
             task_id = args.task_id
             exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
-            os.makedirs(exp_dir)
+            os.makedirs(exp_dir, exist_ok=True)
             cfg.defrost()
             cfg.misc.exp_dir = exp_dir
             cfg.freeze()
