@@ -372,8 +372,6 @@ class BertForTextPredictionBasic:
         self._net = None
         self._preprocessor = None
         self._scheduler = None
-        self._train_data = None
-        self._tuning_data = None
         self._config = None
 
     @property
@@ -403,7 +401,7 @@ class BertForTextPredictionBasic:
         """
         return base_cfg()
 
-    def _train_function(self, args=None, reporter=None):
+    def _train_function(self, args, reporter):
         """The internal training function
 
         Parameters
@@ -412,16 +410,15 @@ class BertForTextPredictionBasic:
             The arguments
         reporter
             The reporter
-
-        Returns
-        -------
-        net
-            The
         """
+        train_data = args['train_data']
+        tuning_data = args['tuning_data']
+        search_space = args['search_space']
+        base_config = args['base_config']
         start_tick = time.time()
-        cfg = self.base_config.clone()
+        cfg = base_config.clone()
         specified_values = []
-        for key in self._search_space:
+        for key in search_space:
             specified_values.append(key)
             specified_values.append(args[key])
         cfg.merge_from_list(specified_values)
@@ -451,14 +448,14 @@ class BertForTextPredictionBasic:
                                                     max_length=cfg.model.preprocess.max_length,
                                                     merge_text=cfg.model.preprocess.merge_text)
         logging.info('Process training set...')
-        processed_train = preprocessor.process_train(self._train_data.table)
+        processed_train = preprocessor.process_train(train_data.table)
         logging.info('Done!')
         logging.info('Process dev set...')
-        processed_dev = preprocessor.process_test(self._tuning_data.table)
+        processed_dev = preprocessor.process_test(tuning_data.table)
         logging.info('Done!')
         label = self._label_columns[0]
         # Get the ground-truth dev labels
-        gt_dev_labels = np.array(self._tuning_data.table[label].apply(
+        gt_dev_labels = np.array(tuning_data.table[label].apply(
             self._column_properties[label].transform))
         ctx_l = get_mxnet_available_ctx()
         base_batch_size = cfg.optimization.per_device_batch_size
@@ -608,11 +605,12 @@ class BertForTextPredictionBasic:
 
     def train(self, train_data, tuning_data, resources, time_limits=None):
         assert len(self._label_columns) == 1
-        self._train_data = train_data
-        self._tuning_data = tuning_data
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
-        search_space_reg = args(**self.search_space)
+        search_space_reg = args(search_space=self.search_space,
+                                train_data=train_data,
+                                tuning_data=tuning_data,
+                                base_config=self.base_config)
         train_fn = search_space_reg(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
