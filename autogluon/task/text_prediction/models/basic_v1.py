@@ -5,8 +5,6 @@ import logging
 import time
 import json
 import mxnet as mx
-import ast
-import uuid
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
@@ -19,6 +17,7 @@ from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grou
     count_parameters, repeat, get_mxnet_visible_gpus
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ....contrib.nlp.utils.registry import Registry
+from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
 from ....core import args
 from ....scheduler import FIFOScheduler
@@ -332,7 +331,9 @@ class BertForTextPredictionBasic:
         Parameters
         ----------
         column_properties
+            The column properties
         label_columns
+            Label columns
         feature_columns
         label_shapes
         problem_types
@@ -342,7 +343,9 @@ class BertForTextPredictionBasic:
         output_directory
         logger
         base_config
+            The basic configuration that the search space will be based upon
         search_space
+            The search space
         """
         super(BertForTextPredictionBasic, self).__init__()
         if base_config is None:
@@ -424,7 +427,7 @@ class BertForTextPredictionBasic:
         exp_dir = cfg.misc.exp_dir
         if reporter is not None:
             # When the reporter is not None,
-            # we create the saved directory based on the
+            # we create the saved directory based on the task_id + time
             task_id = args.task_id
             printable_time = time.strftime('%Y%m%d-%H%M%S', time.localtime(time.time()))
             exp_dir = os.path.join(exp_dir, 'task{}_{}'.format(task_id, printable_time))
@@ -513,7 +516,7 @@ class BertForTextPredictionBasic:
         log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
         log_num_samples_l = [0 for _ in ctx_l]
         logging_start_tick = time.time()
-        best_dev_metric = None
+        best_performance_score = None
         mx.npx.waitall()
         no_better_rounds = 0
         for update_idx in range(max_update):
@@ -575,13 +578,18 @@ class BertForTextPredictionBasic:
                 metric_scores = calculate_metric_scores(self._log_metrics,
                                                         predictions=dev_predictions,
                                                         gt_labels=gt_dev_labels)
+                performance_score = calculate_metric_by_expr(
+                    {self._label_columns[0]: metric_scores},
+                    [self._label_columns[0]],
+                    self._stopping_metric
+                )
                 valid_time_spent = time.time() - valid_start_tick
-                if best_dev_metric is None or is_better_score(self._stopping_metric,
-                                                              best_dev_metric,
-                                                              metric_scores[self._stopping_metric]):
+                if best_performance_score is None or is_better_score(self._stopping_metric,
+                                                                     best_performance_score,
+                                                                     performance_score):
                     find_better = True
                     no_better_rounds = 0
-                    best_dev_metric = metric_scores[self._stopping_metric]
+                    best_performance_score = performance_score
                 else:
                     find_better = False
                     no_better_rounds += 1
@@ -597,12 +605,8 @@ class BertForTextPredictionBasic:
                                [(k, v.item()) for k, v in metric_scores.items()] + \
                                [('fine_better', find_better),
                                 ('time_spent', time.time() - start_tick)]
-                if isinstance(self._eval_metric, str):
-                    eval_metric_score = metric_scores[self._eval_metric].item()
-                else:
-                    eval_metric_score = np.mean([metric_scores[ele]
-                                                 for ele in self._eval_metric]).item()
-                report_items.append(('eval_metric_score', eval_metric_score))
+                report_items.append(('reward', performance_score))
+                report_items.append(('exp_dir', exp_dir))
                 reporter(**dict(report_items))
                 if no_better_rounds >= cfg.learning.early_stopping_patience:
                     logging.info('Early stopping patience reached!')
@@ -629,6 +633,8 @@ class BertForTextPredictionBasic:
                                   time_attr='time_spent')
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
+        scheduler.get_training_curves()
+        scheduler.get_best_config()
 
     def evaluate(self, valid_data, metrics):
         assert self.net is not None
