@@ -113,7 +113,13 @@ class TextPrediction:
         """
         assert dist_ip_addrs is None, 'Distributed training is currently not supported!'
         self._dist_ip_addrs = dist_ip_addrs
+        if params is None:
+            params = ag_text_params.create('default')
         self._params = params
+
+    @property
+    def params(self):
+        return self._params
 
     def fit(self, train_data,
             label=None,
@@ -126,8 +132,6 @@ class TextPrediction:
             stopping_metric=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
-            latency=None,
-            memory_usage=None,
             search_strategy='random',
             search_options=None,
             seed=None,
@@ -165,11 +169,6 @@ class TextPrediction:
             The search strategy
         search_options
             The options for running the hyper-parameter search
-        hyperparameters
-            The hyper-parameters of the fit function.
-            Including the configuration of the search space.
-            There are two options:
-            1) You are given a predefined search space
         seed
             The seed of the random state
 
@@ -180,6 +179,7 @@ class TextPrediction:
         """
         np.random.seed(seed)
         train_data = load_pd.load(train_data)
+        # Inference the label
         if label is None:
             # Perform basic label inference
             if 'label' in train_data.columns:
@@ -211,10 +211,6 @@ class TextPrediction:
             ngpus_per_trial = get_gpu_count()
         else:
             ngpus_per_trial = min(get_gpu_count(), ngpus_per_trial)
-        if hyperparameters is None:
-            hyperparameters = 'default'
-        if isinstance(hyperparameters, str):
-            hyperparameters = ag_text_params.create(hyperparameters)
         train_data = TabularDataset(train_data, columns=all_columns, label_columns=label)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
         logger.info('Train Dataset:')
@@ -230,8 +226,8 @@ class TextPrediction:
                                                            label_col_name=label_col_name)
             problem_types.append(problem_type)
             label_shapes.append(label_shape)
-        logging.info('Label={}, Problem={}, Label shape={}'.format(label,
-                                                                   problem_types, label_shapes))
+        logging.info('Label columns={}, Problem types={}, Label shapes={}'.format(
+            label, problem_types, label_shapes))
         eval_metric, stopping_metric, log_metrics =\
             infer_eval_stop_log_metrics(problem_types[0],
                                         label_shapes[0],
@@ -241,18 +237,19 @@ class TextPrediction:
                                                                              stopping_metric,
                                                                              log_metrics))
         model_candidates = []
-        for model_name, model_search_space in hyperparameters.items():
-            if model_name == 'BertForTextPredictionBasic':
+        for model_params in self.params['models']:
+            model_type = model_params['type']
+            search_space = model_params['search_space']
+            if model_type == 'BertForTextPredictionBasic':
                 model = BertForTextPredictionBasic(column_properties=column_properties,
                                                    label_columns=label,
                                                    feature_columns=feature_columns,
                                                    label_shapes=label_shapes,
                                                    problem_types=problem_types,
-                                                   eval_metric=eval_metric,
                                                    stopping_metric=stopping_metric,
                                                    log_metrics=log_metrics,
                                                    base_config=None,
-                                                   search_space=model_search_space,
+                                                   search_space=search_space,
                                                    output_directory=output_directory,
                                                    logger=logger)
                 model_candidates.append(model)
@@ -262,19 +259,18 @@ class TextPrediction:
         resources = {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
         model = model_candidates[0].train(train_data=train_data,
                                           tuning_data=tuning_data,
-                                          label_columns=label,
-                                          feature_columns=feature_columns,
                                           resources=resources,
                                           time_limits=time_limits)
         return model
 
     @staticmethod
     def load(dir_path):
-        """
+        """Load model from the directory
 
         Parameters
         ----------
         dir_path
+
 
         Returns
         -------
