@@ -8,7 +8,7 @@ import multiprocessing as mp
 import ConfigSpace as CS
 
 from .space import *
-from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space
+from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space, SPILTTER
 from ..utils import EasyDict as ezdict
 from ..utils.deprecate import make_deprecate
 
@@ -18,9 +18,10 @@ __all__ = ['args', 'obj', 'func', 'sample_config',
 
 logger = logging.getLogger(__name__)
 
+
 def sample_config(args, config):
     args = copy.deepcopy(args)
-    striped_keys = [k.split('.')[0] for k in config.keys()]
+    striped_keys = [k.split(SPILTTER)[0] for k in config.keys()]
     if isinstance(args, (argparse.Namespace, argparse.ArgumentParser)):
         args_dict = vars(args)
     else:
@@ -32,7 +33,7 @@ def sample_config(args, config):
                 sub_config = _strip_config_space(config, prefix=k)
                 args_dict[k] = v.sample(**sub_config)
             else:
-                if '.' in k:
+                if SPILTTER in k:
                     continue
                 args_dict[k] = config[k]
         elif isinstance(v, AutoGluonObject):
@@ -103,9 +104,9 @@ class _autogluon_method(object):
         for k, v in self.kwvars.items():
             if isinstance(v, NestedSpace):
                 if isinstance(v, Categorical):
-                    kw_spaces['{}.choice'.format(k)] = v
+                    kw_spaces['{}{}choice'.format(k, SPILTTER)] = v
                 for sub_k, sub_v in v.kwspaces.items():
-                    new_k = '{}.{}'.format(k, sub_k)
+                    new_k = '{}{}{}'.format(k, SPILTTER, sub_k)
                     kw_spaces[new_k] = sub_v
             elif isinstance(v, Space):
                 kw_spaces[k] = v
@@ -135,7 +136,6 @@ def args(default=None, **kwvars):
     if default is None:
         default = dict()
     kwvars['_default_config'] = default
-
     def registered_func(func):
         @_autogluon_method
         @functools.wraps(func)
