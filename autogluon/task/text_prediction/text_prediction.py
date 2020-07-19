@@ -1,11 +1,11 @@
 import pandas as pd
 import logging
+from typing import Optional
 import numpy as np
 from . import constants as _C
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
 from ...contrib.nlp.utils.registry import Registry
-from ..base import BaseTask
 from ...utils.tabular.utils.loaders import load_pd
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
@@ -18,7 +18,7 @@ ag_text_params = Registry('ag_text_params')
 
 
 @ag_text_params.register()
-def default():
+def default() -> dict:
     """The default hyper-parameters
 
     It will have a version key and a list of candidate models.
@@ -42,7 +42,8 @@ def default():
     return ret
 
 
-def infer_eval_stop_log_metrics(problem_type, label_shape,
+def infer_eval_stop_log_metrics(problem_type,
+                                label_shape,
                                 eval_metric=None,
                                 stopping_metric=None):
     """Infer the evaluate, stopping and logging metrics
@@ -61,8 +62,11 @@ def infer_eval_stop_log_metrics(problem_type, label_shape,
     Returns
     -------
     eval_metric
+        The updated evaluation metric
     stopping_metric
+        The updated stopping metric
     log_metrics
+        The updated logging metric
     """
     if eval_metric is not None and stopping_metric is None:
         stopping_metric = eval_metric
@@ -96,11 +100,21 @@ def infer_eval_stop_log_metrics(problem_type, label_shape,
     return eval_metric, stopping_metric, log_metrics
 
 
-class TextPrediction(BaseTask):
-    Dataset = pd.DataFrame
+class TextPrediction:
+    def __init__(self, dist_ip_addrs=None, params=None):
+        """Construct the TextPrediction object for training models.
 
-    @staticmethod
-    def fit(train_data,
+        Parameters
+        ----------
+        dist_ip_addrs
+            A list of IP addresses for distributed training.
+        params
+            The parameters of the TextPrediction module.
+        """
+        self._dist_ip_addrs = dist_ip_addrs
+        self._params = params
+
+    def fit(self, train_data,
             label=None,
             tuning_data=None,
             time_limits=None,
@@ -111,10 +125,12 @@ class TextPrediction(BaseTask):
             stopping_metric=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
+            latency=None,
+            memory_usage=None,
             search_strategy='random',
             search_options=None,
-            hyperparameters=None,
-            seed=None):
+            seed=None,
+            **kwargs):
         """
 
         Parameters
@@ -122,7 +138,7 @@ class TextPrediction(BaseTask):
         train_data
             Training dataset
         label
-            Name of the label column. By default, we will search for a column named "
+            Name of the label column. It can be a stringBy default, we will search for a column named
         tuning_data
             The tuning dataset. We will tune the model
         time_limits
