@@ -21,7 +21,8 @@ ag_text_params = Registry('ag_text_params')
 def default():
     """The default hyper-parameters
 
-    It will have a version key and a list of candidate models. Each model is based on a
+    It will have a version key and a list of candidate models.
+    We will store the name and search space of each model.
     """
     ret = {
         'version': 1,
