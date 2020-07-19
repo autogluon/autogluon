@@ -19,7 +19,7 @@ from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ....utils.tabular.utils.loaders import load_pd
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
-from ....core import args
+from ....core import args, obj
 from ....scheduler import FIFOScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
@@ -608,9 +608,9 @@ class BertForTextPredictionBasic:
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=self.search_space,
-                                train_data=train_data,
-                                tuning_data=tuning_data,
-                                base_config=self.base_config)
+                                train_data=obj()(train_data),
+                                tuning_data=obj()(tuning_data),
+                                base_config=obj()(self.base_config))
         train_fn = search_space_reg(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
