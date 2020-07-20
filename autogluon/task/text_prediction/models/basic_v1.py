@@ -414,7 +414,7 @@ class BertForTextPredictionBasic:
         train_data = args['train_data']
         tuning_data = args['tuning_data']
         search_space = args['search_space']
-        base_config = args['base_config']
+        base_config = self.base_config
         start_tick = time.time()
         cfg = base_config.clone()
         specified_values = []
@@ -608,9 +608,8 @@ class BertForTextPredictionBasic:
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=self.search_space,
-                                train_data=obj()(train_data),
-                                tuning_data=obj()(tuning_data),
-                                base_config=obj()(self.base_config))
+                                train_data=train_data,
+                                tuning_data=tuning_data)
         train_fn = search_space_reg(self._train_function)
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,

@@ -9,6 +9,7 @@ from .column_property import CategoricalColumnProperty, EntityColumnProperty,\
     get_column_properties_from_metadata
 from ...contrib.nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple
+from ...core import obj
 
 
 def load_pandas_df(data: Union[str, pd.DataFrame]):
@@ -289,6 +290,7 @@ def infer_problem_type(column_properties, label_col_name):
         raise NotImplementedError('Cannot infer the problem type')
 
 
+@obj()
 class TabularDataset:
     def __init__(self, path_or_df: Union[str, pd.DataFrame],
                  *,
