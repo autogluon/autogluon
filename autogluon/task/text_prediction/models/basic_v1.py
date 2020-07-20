@@ -642,9 +642,13 @@ class BertForTextPredictionBasic:
                     grace_period = time_limits * 0.01
                 else:
                     grace_period = 60 * 10  # 10 minutes
+            if time_limits is not None:
+                max_t = time_limits
+            else:
+                max_t = 5 * 60 * 60  # 5 hour
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
-                                           max_t=time_limits,
+                                           max_t=max_t,
                                            resource=resource,
                                            searcher=searcher,
                                            grace_period=grace_period,
