@@ -204,11 +204,11 @@ class TextPrediction:
         else:
             tuning_data = load_pd.load(tuning_data)
         if nthreads_per_trial is None:
-            nthreads_per_trial = get_cpu_count()
+            nthreads_per_trial = min(get_cpu_count(), 4)
         else:
             nthreads_per_trial = min(get_cpu_count(), nthreads_per_trial)
         if ngpus_per_trial is None:
-            ngpus_per_trial = get_gpu_count()
+            ngpus_per_trial = min(get_gpu_count(), 1)
         else:
             ngpus_per_trial = min(get_gpu_count(), ngpus_per_trial)
         train_data = TabularDataset(train_data, columns=all_columns, label_columns=label)
