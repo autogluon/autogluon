@@ -318,6 +318,7 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
     return predictions
 
 
+@use_np
 def train_function(args, reporter, train_data, tuning_data,
                    base_config, problem_types,
                    column_properties, label_columns, label_shapes,
