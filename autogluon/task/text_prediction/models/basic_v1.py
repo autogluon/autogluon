@@ -4,6 +4,7 @@ import math
 import logging
 import time
 import json
+import functools
 import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -317,6 +318,199 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
     return predictions
 
 
+def train_function(args, reporter, train_data, tuning_data,
+                   base_config, problem_types,
+                   column_properties, label_columns, label_shapes,
+                   log_metrics, stopping_metric):
+    search_space = args['search_space']
+    start_tick = time.time()
+    cfg = base_config.clone()
+    specified_values = []
+    for key in search_space:
+        specified_values.append(key)
+        specified_values.append(args[key])
+    cfg.merge_from_list(specified_values)
+    exp_dir = cfg.misc.exp_dir
+    if reporter is not None:
+        # When the reporter is not None,
+        # we create the saved directory based on the task_id + time
+        task_id = args.task_id
+        exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
+        os.makedirs(exp_dir, exist_ok=True)
+        cfg.defrost()
+        cfg.misc.exp_dir = exp_dir
+        cfg.freeze()
+    logging_config(folder=exp_dir, name='training')
+    logging.info(cfg)
+    # Load backbone model
+    backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
+        = get_backbone(cfg.model.backbone.name)
+    with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
+        f.write(str(cfg))
+    text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
+    # Build Preprocessor + Preprocess the training dataset + Inference problem type
+    # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
+    preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
+                                                column_properties=column_properties,
+                                                label_columns=label_columns,
+                                                max_length=cfg.model.preprocess.max_length,
+                                                merge_text=cfg.model.preprocess.merge_text)
+    logging.info('Process training set...')
+    processed_train = preprocessor.process_train(train_data.table)
+    logging.info('Done!')
+    logging.info('Process dev set...')
+    processed_dev = preprocessor.process_test(tuning_data.table)
+    logging.info('Done!')
+    label = label_columns[0]
+    # Get the ground-truth dev labels
+    gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
+    ctx_l = get_mxnet_available_ctx()
+    base_batch_size = cfg.optimization.per_device_batch_size
+    num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
+    inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
+    train_dataloader = DataLoader(processed_train,
+                                  batch_size=base_batch_size,
+                                  shuffle=True,
+                                  batchify_fn=preprocessor.batchify(is_test=False))
+    dev_dataloader = DataLoader(processed_dev,
+                                batch_size=inference_base_batch_size,
+                                shuffle=False,
+                                batchify_fn=preprocessor.batchify(is_test=True))
+    net = BERTForTabularBasicV1(text_backbone=text_backbone,
+                                feature_field_info=preprocessor.feature_field_info(),
+                                label_shape=label_shapes[0],
+                                cfg=cfg.model.network)
+    net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
+    net.hybridize()
+    num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
+    logging.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
+                                                           num_total_fixed_params))
+    # Initialize the optimizer
+    updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
+    optimizer, optimizer_params, max_update \
+        = get_optimizer(cfg.optimization,
+                        updates_per_epoch=updates_per_epoch)
+    valid_interval = math.ceil(cfg.optimization.valid_frequency * updates_per_epoch)
+    train_log_interval = math.ceil(cfg.optimization.log_frequency * updates_per_epoch)
+    trainer = mx.gluon.Trainer(net.collect_params(),
+                               optimizer, optimizer_params,
+                               update_on_kvstore=False)
+    if cfg.optimization.layerwise_lr_decay > 0:
+        apply_layerwise_decay(net.text_backbone,
+                              cfg.optimization.layerwise_lr_decay,
+                              backbone_name=cfg.model.backbone.name)
+    # Do not apply weight decay to all the LayerNorm and bias
+    for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
+        v.wd_mult = 0.0
+    params = [p for p in net.collect_params().values() if p.grad_req != 'null']
+
+    # Set grad_req if gradient accumulation is required
+    if num_accumulated > 1:
+        logging.info('Using gradient accumulation. Global batch size = {}'
+                     .format(cfg.optimization.batch_size))
+        for p in params:
+            p.grad_req = 'add'
+        net.collect_params().zero_grad()
+    train_loop_dataloader = grouper(repeat(train_dataloader), len(ctx_l))
+    log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
+    log_num_samples_l = [0 for _ in ctx_l]
+    logging_start_tick = time.time()
+    best_performance_score = None
+    mx.npx.waitall()
+    no_better_rounds = 0
+    for update_idx in range(max_update):
+        num_samples_per_update_l = [0 for _ in ctx_l]
+        for accum_idx in range(num_accumulated):
+            sample_l = next(train_loop_dataloader)
+            loss_l = []
+            num_samples_l = [0 for _ in ctx_l]
+            for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
+                feature_batch, label_batch = sample
+                feature_batch = move_to_ctx(feature_batch, ctx)
+                label_batch = move_to_ctx(label_batch, ctx)
+                with mx.autograd.record():
+                    pred = net(feature_batch)
+                    if problem_types[0] == _C.CLASSIFICATION:
+                        logits = mx.npx.log_softmax(pred, axis=-1)
+                        loss = - mx.npx.pick(logits, label_batch[0])
+                    elif problem_types[0] == _C.REGRESSION:
+                        loss = mx.np.square(pred - label_batch[0])
+                    loss_l.append(loss.mean() / len(ctx_l))
+                    num_samples_l[i] = loss.shape[0]
+                    num_samples_per_update_l[i] += loss.shape[0]
+            for loss in loss_l:
+                loss.backward()
+            for i in range(len(ctx_l)):
+                log_loss_l[i] += loss_l[i] * len(ctx_l) * num_samples_l[i]
+                log_num_samples_l[i] += num_samples_per_update_l[i]
+        # Begin to update
+        trainer.allreduce_grads()
+        num_samples_per_update = sum(num_samples_per_update_l)
+        total_norm, ratio, is_finite = \
+            clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_accumulated)
+        total_norm = total_norm / num_accumulated
+        trainer.update(num_samples_per_update)
+
+        # Clear after update
+        if num_accumulated > 1:
+            net.collect_params().zero_grad()
+        if (update_idx + 1) % train_log_interval == 0:
+            log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
+            log_num_samples = sum(log_num_samples_l)
+            logging.info(
+                '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
+                ' #sample per second={}'
+                    .format(update_idx + 1, max_update, int(update_idx / updates_per_epoch),
+                            log_loss / log_num_samples, total_norm, trainer.learning_rate,
+                            log_num_samples,
+                            log_num_samples / (time.time() - logging_start_tick)))
+            logging_start_tick = time.time()
+            log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
+            log_num_samples_l = [0 for _ in ctx_l]
+        if (update_idx + 1) % valid_interval == 0 or (update_idx + 1) == max_update:
+            valid_start_tick = time.time()
+            dev_predictions = \
+                _classification_regression_predict(net, dataloader=dev_dataloader,
+                                                   problem_type=problem_types[0],
+                                                   has_label=False)
+            metric_scores = calculate_metric_scores(log_metrics,
+                                                    predictions=dev_predictions,
+                                                    gt_labels=gt_dev_labels)
+            performance_score = calculate_metric_by_expr(
+                {label_columns[0]: metric_scores},
+                [label_columns[0]],
+                stopping_metric
+            )
+            valid_time_spent = time.time() - valid_start_tick
+            if best_performance_score is None or is_better_score(stopping_metric,
+                                                                 best_performance_score,
+                                                                 performance_score):
+                find_better = True
+                no_better_rounds = 0
+                best_performance_score = performance_score
+            else:
+                find_better = False
+                no_better_rounds += 1
+            if find_better:
+                net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
+            loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
+                                     for key in log_metrics])
+            logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={}'.format(
+                update_idx + 1, max_update, int(update_idx / updates_per_epoch),
+                loss_string, valid_time_spent))
+            report_items = [('iteration', update_idx + 1),
+                            ('epoch', int(update_idx / updates_per_epoch))] + \
+                           [(k, v.item()) for k, v in metric_scores.items()] + \
+                           [('fine_better', find_better),
+                            ('time_spent', time.time() - start_tick)]
+            report_items.append(('performance_score', performance_score))
+            report_items.append(('exp_dir', exp_dir))
+            reporter(**dict(report_items))
+            if no_better_rounds >= cfg.learning.early_stopping_patience:
+                logging.info('Early stopping patience reached!')
+                break
+
+
 @use_np
 class BertForTextPredictionBasic:
     def __init__(self, column_properties, label_columns, feature_columns,
@@ -401,216 +595,21 @@ class BertForTextPredictionBasic:
         """
         return base_cfg()
 
-    def _train_function(self, args, reporter):
-        """The internal training function
-
-        Parameters
-        ----------
-        args
-            The arguments
-        reporter
-            The reporter
-        """
-        train_data = args['train_data']
-        tuning_data = args['tuning_data']
-        search_space = args['search_space']
-        base_config = self.base_config
-        start_tick = time.time()
-        cfg = base_config.clone()
-        specified_values = []
-        for key in search_space:
-            specified_values.append(key)
-            specified_values.append(args[key])
-        cfg.merge_from_list(specified_values)
-        exp_dir = cfg.misc.exp_dir
-        if reporter is not None:
-            # When the reporter is not None,
-            # we create the saved directory based on the task_id + time
-            task_id = args.task_id
-            exp_dir = os.path.join(exp_dir, 'task{}'.format(task_id))
-            os.makedirs(exp_dir, exist_ok=True)
-            cfg.defrost()
-            cfg.misc.exp_dir = exp_dir
-            cfg.freeze()
-        logging_config(folder=exp_dir, name='training')
-        logging.info(cfg)
-        # Load backbone model
-        backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
-            = get_backbone(cfg.model.backbone.name)
-        with open(os.path.join(exp_dir, 'cfg.yml'), 'w') as f:
-            f.write(str(cfg))
-        text_backbone = backbone_model_cls.from_cfg(backbone_cfg)
-        # Build Preprocessor + Preprocess the training dataset + Inference problem type
-        # TODO Move preprocessor + Dataloader to outer loop to better cache the dataloader
-        preprocessor = TabularBasicBERTPreprocessor(tokenizer=tokenizer,
-                                                    column_properties=self._column_properties,
-                                                    label_columns=self._label_columns,
-                                                    max_length=cfg.model.preprocess.max_length,
-                                                    merge_text=cfg.model.preprocess.merge_text)
-        logging.info('Process training set...')
-        processed_train = preprocessor.process_train(train_data.table)
-        logging.info('Done!')
-        logging.info('Process dev set...')
-        processed_dev = preprocessor.process_test(tuning_data.table)
-        logging.info('Done!')
-        label = self._label_columns[0]
-        # Get the ground-truth dev labels
-        gt_dev_labels = np.array(tuning_data.table[label].apply(
-            self._column_properties[label].transform))
-        ctx_l = get_mxnet_available_ctx()
-        base_batch_size = cfg.optimization.per_device_batch_size
-        num_accumulated = int(np.ceil(cfg.optimization.batch_size / base_batch_size))
-        inference_base_batch_size = base_batch_size * cfg.optimization.val_batch_size_mult
-        train_dataloader = DataLoader(processed_train,
-                                      batch_size=base_batch_size,
-                                      shuffle=True,
-                                      batchify_fn=preprocessor.batchify(is_test=False))
-        dev_dataloader = DataLoader(processed_dev,
-                                    batch_size=inference_base_batch_size,
-                                    shuffle=False,
-                                    batchify_fn=preprocessor.batchify(is_test=True))
-        net = BERTForTabularBasicV1(text_backbone=text_backbone,
-                                    feature_field_info=preprocessor.feature_field_info(),
-                                    label_shape=self._label_shapes[0],
-                                    cfg=cfg.model.network)
-        net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
-        net.hybridize()
-        num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
-        logging.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
-                                                               num_total_fixed_params))
-        # Initialize the optimizer
-        updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
-        optimizer, optimizer_params, max_update\
-            = get_optimizer(cfg.optimization,
-                            updates_per_epoch=updates_per_epoch)
-        valid_interval = math.ceil(cfg.optimization.valid_frequency * updates_per_epoch)
-        train_log_interval = math.ceil(cfg.optimization.log_frequency * updates_per_epoch)
-        trainer = mx.gluon.Trainer(net.collect_params(),
-                                   optimizer, optimizer_params,
-                                   update_on_kvstore=False)
-        if cfg.optimization.layerwise_lr_decay > 0:
-            apply_layerwise_decay(net.text_backbone,
-                                  cfg.optimization.layerwise_lr_decay,
-                                  backbone_name=cfg.model.backbone.name)
-        # Do not apply weight decay to all the LayerNorm and bias
-        for _, v in net.collect_params('.*beta|.*gamma|.*bias').items():
-            v.wd_mult = 0.0
-        params = [p for p in net.collect_params().values() if p.grad_req != 'null']
-
-        # Set grad_req if gradient accumulation is required
-        if num_accumulated > 1:
-            logging.info('Using gradient accumulation. Global batch size = {}'
-                         .format(cfg.optimization.batch_size))
-            for p in params:
-                p.grad_req = 'add'
-            net.collect_params().zero_grad()
-        train_loop_dataloader = grouper(repeat(train_dataloader), len(ctx_l))
-        log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
-        log_num_samples_l = [0 for _ in ctx_l]
-        logging_start_tick = time.time()
-        best_performance_score = None
-        mx.npx.waitall()
-        no_better_rounds = 0
-        for update_idx in range(max_update):
-            num_samples_per_update_l = [0 for _ in ctx_l]
-            for accum_idx in range(num_accumulated):
-                sample_l = next(train_loop_dataloader)
-                loss_l = []
-                num_samples_l = [0 for _ in ctx_l]
-                for i, (sample, ctx) in enumerate(zip(sample_l, ctx_l)):
-                    feature_batch, label_batch = sample
-                    feature_batch = move_to_ctx(feature_batch, ctx)
-                    label_batch = move_to_ctx(label_batch, ctx)
-                    with mx.autograd.record():
-                        pred = net(feature_batch)
-                        if self._problem_types[0] == _C.CLASSIFICATION:
-                            logits = mx.npx.log_softmax(pred, axis=-1)
-                            loss = - mx.npx.pick(logits, label_batch[0])
-                        elif self._problem_types[0] == _C.REGRESSION:
-                            loss = mx.np.square(pred - label_batch[0])
-                        loss_l.append(loss.mean() / len(ctx_l))
-                        num_samples_l[i] = loss.shape[0]
-                        num_samples_per_update_l[i] += loss.shape[0]
-                for loss in loss_l:
-                    loss.backward()
-                for i in range(len(ctx_l)):
-                    log_loss_l[i] += loss_l[i] * len(ctx_l) * num_samples_l[i]
-                    log_num_samples_l[i] += num_samples_per_update_l[i]
-            # Begin to update
-            trainer.allreduce_grads()
-            num_samples_per_update = sum(num_samples_per_update_l)
-            total_norm, ratio, is_finite = \
-                clip_grad_global_norm(params, cfg.optimization.max_grad_norm * num_accumulated)
-            total_norm = total_norm / num_accumulated
-            trainer.update(num_samples_per_update)
-
-            # Clear after update
-            if num_accumulated > 1:
-                net.collect_params().zero_grad()
-            if (update_idx + 1) % train_log_interval == 0:
-                log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
-                log_num_samples = sum(log_num_samples_l)
-                logging.info(
-                    '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
-                    ' #sample per second={}'
-                    .format(update_idx + 1, max_update, int(update_idx / updates_per_epoch),
-                            log_loss / log_num_samples, total_norm, trainer.learning_rate,
-                            log_num_samples,
-                            log_num_samples / (time.time() - logging_start_tick)))
-                logging_start_tick = time.time()
-                log_loss_l = [mx.np.array(0.0, dtype=np.float32, ctx=ctx) for ctx in ctx_l]
-                log_num_samples_l = [0 for _ in ctx_l]
-            if (update_idx + 1) % valid_interval == 0 or (update_idx + 1) == max_update:
-                valid_start_tick = time.time()
-                dev_predictions =\
-                    _classification_regression_predict(net, dataloader=dev_dataloader,
-                                                       problem_type=self._problem_types[0],
-                                                       has_label=False)
-                metric_scores = calculate_metric_scores(self._log_metrics,
-                                                        predictions=dev_predictions,
-                                                        gt_labels=gt_dev_labels)
-                performance_score = calculate_metric_by_expr(
-                    {self._label_columns[0]: metric_scores},
-                    [self._label_columns[0]],
-                    self._stopping_metric
-                )
-                valid_time_spent = time.time() - valid_start_tick
-                if best_performance_score is None or is_better_score(self._stopping_metric,
-                                                                     best_performance_score,
-                                                                     performance_score):
-                    find_better = True
-                    no_better_rounds = 0
-                    best_performance_score = performance_score
-                else:
-                    find_better = False
-                    no_better_rounds += 1
-                if find_better:
-                    net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
-                loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
-                                         for key in self._log_metrics])
-                logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={}'.format(
-                    update_idx + 1, max_update, int(update_idx / updates_per_epoch),
-                    loss_string, valid_time_spent))
-                report_items = [('iteration', update_idx + 1),
-                                ('epoch', int(update_idx / updates_per_epoch))] + \
-                               [(k, v.item()) for k, v in metric_scores.items()] + \
-                               [('fine_better', find_better),
-                                ('time_spent', time.time() - start_tick)]
-                report_items.append(('performance_score', performance_score))
-                report_items.append(('exp_dir', exp_dir))
-                reporter(**dict(report_items))
-                if no_better_rounds >= cfg.learning.early_stopping_patience:
-                    logging.info('Early stopping patience reached!')
-                    break
-
     def train(self, train_data, tuning_data, resources, time_limits=None):
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
-        search_space_reg = args(search_space=self.search_space,
-                                train_data=train_data,
-                                tuning_data=tuning_data)
-        train_fn = search_space_reg(self._train_function)
+        search_space_reg = args(search_space=self.search_space)
+        train_fn = search_space_reg(functools.partial(train_function,
+                                                      train_data=train_data,
+                                                      tuning_data=tuning_data,
+                                                      base_config=self.base_config,
+                                                      problem_types=self.problem_types,
+                                                      column_properties=self._column_properties,
+                                                      label_columns=self._label_columns,
+                                                      label_shapes=self._label_shapes,
+                                                      log_metrics=self._log_metrics,
+                                                      stopping_metric=self._stopping_metric))
         scheduler = FIFOScheduler(train_fn,
                                   time_out=time_limits,
                                   num_trials=5,
