@@ -644,6 +644,7 @@ class BertForTextPredictionBasic:
                     grace_period = 60 * 10  # 10 minutes
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
+                                           max_t=time_limits,
                                            resource=resource,
                                            searcher=searcher,
                                            grace_period=grace_period,
