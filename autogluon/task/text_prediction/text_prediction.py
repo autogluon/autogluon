@@ -323,11 +323,16 @@ class TextPrediction:
         """
         return BertForTextPredictionBasic.load(dir_path)
 
-    def analyze(self):
-        """Analyze the search results
+    def report(self, output_directory):
+        """Get a report about the search results.
 
-        Returns
-        -------
-        df
+        Parameters
+        ----------
+        output_directory
+            The directory that we will write the report
         """
         raise NotImplementedError
+
+    def cleanup(self):
+        raise NotImplementedError
+
