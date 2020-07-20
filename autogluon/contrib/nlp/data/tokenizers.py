@@ -31,7 +31,6 @@ import warnings
 import itertools
 from typing import NewType
 import sacremoses
-import jieba
 from uuid import uuid4
 from .vocab import Vocab
 from ..registry import TOKENIZER_REGISTRY

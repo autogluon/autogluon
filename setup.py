@@ -68,7 +68,8 @@ text_requirements = [
     'flake8',
     'regex',
     'sentencepiece',
-    'tokenizers>=0.7.0'
+    'tokenizers>=0.7.0',
+    'pyarrow'
 ]
 
 test_requirements = [
