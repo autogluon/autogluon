@@ -293,6 +293,7 @@ def infer_problem_type(column_properties, label_col_name):
 @obj()
 class TabularDataset:
     def __init__(self, path_or_df: Union[str, pd.DataFrame],
+                 *,
                  columns=None,
                  label_columns=None,
                  column_metadata: Optional[Union[str, Dict]] = None,
@@ -315,6 +316,7 @@ class TabularDataset:
         categorical_default_handle_missing_value
             Whether to handle missing value in categorical columns by default
         """
+        super().__init__()
         df = load_pandas_df(path_or_df)
         if columns is not None:
             if not isinstance(columns, list):
