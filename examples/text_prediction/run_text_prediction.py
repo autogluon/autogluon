@@ -2,8 +2,11 @@ import mxnet as mx
 import os
 import json
 import argparse
+import warnings
 from autogluon.task.text_prediction import TextPrediction
 mx.npx.set_np()
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 TASKS = \
