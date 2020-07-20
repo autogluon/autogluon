@@ -303,7 +303,7 @@ class ENAS_Sequential(gluon.HybridBlock):
         reprstr += ')\n'
         return reprstr
 
-    def export(self, path, epoch=0):
+    def export(self, path):
         """Export HybridBlock to json format that can be loaded by
         `gluon.SymbolBlock.imports`, `mxnet.mod.Module` or the C++ interface.
 
@@ -313,17 +313,15 @@ class ENAS_Sequential(gluon.HybridBlock):
         Parameters
         ----------
         path : str
-            Path to save model. Two files `path-symbol.json` and `path-xxxx.params`
-            will be created, where xxxx is the 4 digits epoch number.
-        epoch : int
-            Epoch number of saved model.
+            Path to save model. Two files `path-symbol.json` and `path.params`
+            will be created.
 
         Examples
         --------
 
-        >>> mynet.export('enas', 0)
+        >>> mynet.export('enas')
         >>> mynet_static = mx.gluon.nn.SymbolBlock.imports(
-            "enas-symbol.json", ['data'], "enas-0000.params")
+            "enas-symbol.json", ['data'], "enas.params")
         >>> x = mx.nd.random.uniform(shape=(1, 1, 28, 28))
         >>> y = mynet_static(x)
         """
@@ -348,7 +346,7 @@ class ENAS_Sequential(gluon.HybridBlock):
             else:
                 pass
         save_fn = _mx_npx.save if is_np_array() else ndarray.save
-        save_fn('%s-%04d.params'%(path, epoch), arg_dict)
+        save_fn('%s.params'%(path), arg_dict)
 
 class Zero_Unit(gluon.HybridBlock):
     def hybrid_forward(self, F, x):

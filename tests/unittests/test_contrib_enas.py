@@ -56,8 +56,8 @@ def test_enas_net():
     xx = mynet.evaluate_latency(x)
     y = mynet(x)
     assert mynet.nparams == 8714
-    mynet.export('enas', 0)
-    mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas-0000.params")
+    mynet.export('enas')
+    mynet_static = mx.gluon.nn.SymbolBlock.imports("enas-symbol.json", ['data'], "enas.params")
     yy = mynet_static(x)
     np.testing.assert_almost_equal(y.asnumpy(), yy.asnumpy())
 
