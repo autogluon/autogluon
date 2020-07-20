@@ -328,7 +328,7 @@ def train_function(args, reporter, train_data, tuning_data,
     specified_values = []
     for key in search_space:
         specified_values.append(key)
-        specified_values.append(args[key])
+        specified_values.append(search_space[key])
     cfg.merge_from_list(specified_values)
     exp_dir = cfg.misc.exp_dir
     if reporter is not None:
