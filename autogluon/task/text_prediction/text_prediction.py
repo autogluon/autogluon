@@ -323,7 +323,7 @@ class TextPrediction:
         """
         return BertForTextPredictionBasic.load(dir_path)
 
-    def report(self, output_directory):
+    def write_report(self, output_directory):
         """Get a report about the search results.
 
         Parameters
