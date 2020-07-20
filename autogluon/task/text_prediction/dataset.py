@@ -293,7 +293,6 @@ def infer_problem_type(column_properties, label_col_name):
 @obj()
 class TabularDataset:
     def __init__(self, path_or_df: Union[str, pd.DataFrame],
-                 *,
                  columns=None,
                  label_columns=None,
                  column_metadata: Optional[Union[str, Dict]] = None,
