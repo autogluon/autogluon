@@ -22,7 +22,7 @@ TASKS = \
      'snli': (['sentence1', 'sentence2'], 'label', 'acc', ['acc'])}
 
 
-def parse_args():
+def get_parser():
     parser = argparse.ArgumentParser(description='AutoML for Tabular Prediction Basic Example.')
     parser.add_argument('--train_file', type=str,
                         help='The training pandas dataframe.',
@@ -38,8 +38,8 @@ def parse_args():
     parser.add_argument('--task', type=str,
                         help='The default tasks',
                         default=None)
-    parser.add_argument('--save_dir', type=str,
-                        help='The directory to save the experiment',
+    parser.add_argument('--model_dir', type=str,
+                        help='The directory to load the model',
                         default=None)
     parser.add_argument('--eval_metrics', type=str,
                         help='The metrics for evaluating the models.',
@@ -54,8 +54,7 @@ def parse_args():
     parser.add_argument('--exp_dir', type=str, default=None,
                         help='The experiment directory where the model params will be written.')
     parser.add_argument('--config_file', type=str, default=None)
-    args = parser.parse_args()
-    return args
+    return parser
 
 
 def train(args):
@@ -89,11 +88,18 @@ def train(args):
 
 
 def predict(args):
-    raise NotImplementedError
+    model = TextPrediction.load(args.model_dir)
+    test_prediction = model.predict(args.test_file)
+    if args.exp_dir is None:
+        args.exp_dir = '.'
+    with open(os.path.join(args.exp_dir, 'test_predictions.txt'), 'w') as of:
+        for ele in test_prediction:
+            of.write(str(ele) + '\n')
 
 
 if __name__ == '__main__':
-    args = parse_args()
+    parser = get_parser()
+    args = parser.parse_args()
     if args.do_train:
         train(args)
     if args.do_eval:
