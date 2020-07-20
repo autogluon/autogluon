@@ -324,7 +324,7 @@ class TextPrediction:
         return BertForTextPredictionBasic.load(dir_path)
 
     def write_report(self, output_directory):
-        """Get a report about the search results.
+        """Write a report about the training job into a folder.
 
         Parameters
         ----------
