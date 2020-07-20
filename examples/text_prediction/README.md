@@ -1,6 +1,10 @@
-# Run GLUE Tasks with AutoGluon Text
+# Solve Text Prediction Problems in AutoGluon 
 
-## Prepare the data
+We solve two types of 
+
+## Run GLUE Tasks with AutoGluon Text
+
+### Prepare the data
 ```bash
 python prepare_glue.py --benchmark glue
 ```
@@ -15,3 +19,4 @@ python run_text_prediction.py \
      --test_file glue/sst/test.parquet \
      --task sst
 ```
+

@@ -689,8 +689,8 @@ class BertForTextPredictionBasic:
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
                                         column_properties=self._column_properties)
-        ground_truth = np.array(valid_data.table[self._label].apply(
-            self._column_properties[self._label].transform))
+        ground_truth = np.array(valid_data.table[self._label_columns[0]].apply(
+            self._column_properties[self._label_columns[0]].transform))
         if self._problem_types[0] == _C.CLASSIFICATION:
             predictions = self.predict_proba(valid_data)
         else:
@@ -722,7 +722,7 @@ class BertForTextPredictionBasic:
                 test_predictions = test_predictions.argmax(axis=-1)
                 if get_original_labels:
                     test_predictions = np.array(
-                        list(map(self._column_properties[self._label].inv_transform,
+                        list(map(self._column_properties[self._label_columns[0]].inv_transform,
                                  test_predictions)))
         return test_predictions
 
