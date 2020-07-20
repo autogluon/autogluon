@@ -290,7 +290,6 @@ def infer_problem_type(column_properties, label_col_name):
         raise NotImplementedError('Cannot infer the problem type')
 
 
-@obj()
 class TabularDataset:
     def __init__(self, path_or_df: Union[str, pd.DataFrame],
                  *,
