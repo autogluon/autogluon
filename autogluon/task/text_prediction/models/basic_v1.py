@@ -21,7 +21,7 @@ from ....utils.tabular.utils.loaders import load_pd
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
 from ....core import args, space
-from ....scheduler import FIFOScheduler
+from ....scheduler import FIFOScheduler, HyperbandScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
@@ -585,6 +585,10 @@ class BertForTextPredictionBasic:
     def config(self):
         return self._config
 
+    @property
+    def net(self):
+        return self._net
+
     @staticmethod
     def default_config():
         """Get the default configuration
@@ -596,7 +600,14 @@ class BertForTextPredictionBasic:
         """
         return base_cfg()
 
-    def train(self, train_data, tuning_data, resources, time_limits=None):
+    def train(self, train_data, tuning_data, resource,
+              time_limits=None,
+              scheduler='fifo',
+              searcher=None,
+              num_trials=10,
+              grace_period=None,
+              reduction_factor=4,
+              brackets=1):
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
@@ -611,14 +622,39 @@ class BertForTextPredictionBasic:
                                                       label_shapes=self._label_shapes,
                                                       log_metrics=self._log_metrics,
                                                       stopping_metric=self._stopping_metric))
-        scheduler = FIFOScheduler(train_fn,
-                                  time_out=time_limits,
-                                  num_trials=5,
-                                  resource=resources,
-                                  checkpoint=os.path.join(self._output_directory,
-                                                          'scheduler.checkpoint'),
-                                  reward_attr='performance_score',
-                                  time_attr='time_spent')
+        if scheduler == 'fifo':
+            if searcher is None:
+                searcher = 'random'
+            scheduler = FIFOScheduler(train_fn,
+                                      time_out=time_limits,
+                                      num_trials=num_trials,
+                                      resource=resource,
+                                      searcher=searcher,
+                                      checkpoint=os.path.join(self._output_directory,
+                                                              'scheduler.checkpoint'),
+                                      reward_attr='performance_score',
+                                      time_attr='time_spent')
+        elif scheduler == 'hyperband':
+            if searcher is None:
+                searcher = 'random'
+            if grace_period is None:
+                if time_limits is not None:
+                    grace_period = time_limits * 0.01
+                else:
+                    grace_period = 60 * 10  # 10 minutes
+            scheduler = HyperbandScheduler(train_fn,
+                                           time_out=time_limits,
+                                           resource=resource,
+                                           searcher=searcher,
+                                           grace_period=grace_period,
+                                           reduction_factor=reduction_factor,
+                                           brackets=brackets,
+                                           checkpoint=os.path.join(self._output_directory,
+                                                                   'scheduler.checkpoint'),
+                                           reward_attr='performance_score',
+                                           time_attr='time_spent')
+        else:
+            raise NotImplementedError
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
         self._scheduler = scheduler
@@ -646,6 +682,7 @@ class BertForTextPredictionBasic:
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
                             ctx=ctx_l)
         self._net = net
+        return scheduler
 
     def evaluate(self, valid_data, metrics):
         assert self.net is not None

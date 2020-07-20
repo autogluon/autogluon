@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import yaml
 from typing import Optional
 import numpy as np
 from . import constants as _C
@@ -35,11 +36,48 @@ def default() -> dict:
                         'optimization.batch_size': space.Categorical(32, 64),
                         'optimization.num_train_epochs': space.Categorical(3, 10),
                         'optimization.lr': space.Real(1E-5, 1E-4)
-                    }
+                    },
                 }
-            ]
+            ],
+        'hpo_params': {
+            'scheduler': 'fifo',          # Can be 'fifo', 'hyperband'
+            'search_strategy': 'random',  # Can be 'random', 'bayesopt'
+            'time_limits': None,          # The total budget
+            'num_trials': 10,             # The number of trials
+            'reduction_factor': 4,        # The reduction factor
+            'time_attr': 'time_spent'     # The time attribute used in hyperband searcher
+        }
     }
     return ret
+
+
+def get_recommended_resource(nthreads_per_trial=None,
+                             ngpus_per_trial=None):
+    """Get the recommended resource.
+
+    Parameters
+    ----------
+    nthreads_per_trial
+        The number of threads per trial
+    ngpus_per_trial
+        The number of GPUs per trial
+
+    Returns
+    -------
+    resource
+        The resource
+    """
+    if nthreads_per_trial is None and ngpus_per_trial is None:
+        nthreads_per_trial = get_cpu_count()
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is not None and ngpus_per_trial is None:
+        ngpus_per_trial = get_gpu_count()
+    elif nthreads_per_trial is None and ngpus_per_trial is not None:
+        num_parallel_jobs = get_gpu_count() // ngpus_per_trial
+        nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+    nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
+    ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
+    return {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
 
 
 def infer_eval_stop_log_metrics(problem_type,
@@ -116,6 +154,7 @@ class TextPrediction:
         if params is None:
             params = ag_text_params.create('default')
         self._params = params
+        self._scheduler = None
 
     @property
     def params(self):
@@ -132,10 +171,10 @@ class TextPrediction:
             stopping_metric=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
-            search_strategy='random',
+            scheduler=None,
+            search_strategy=None,
             search_options=None,
-            seed=None,
-            **kwargs):
+            seed=None):
         """
 
         Parameters
@@ -165,6 +204,8 @@ class TextPrediction:
         ngpus_per_trial
             The number of GPUs to use for the fit job. By default, we decide the usage
             based on the total number of GPUs available.
+        scheduler
+            The scheduler of HPO
         search_strategy
             The search strategy
         search_options
@@ -203,14 +244,6 @@ class TextPrediction:
                                                              valid_ratio=holdout_frac)
         else:
             tuning_data = load_pd.load(tuning_data)
-        if nthreads_per_trial is None:
-            nthreads_per_trial = min(get_cpu_count(), 4)
-        else:
-            nthreads_per_trial = min(get_cpu_count(), nthreads_per_trial)
-        if ngpus_per_trial is None:
-            ngpus_per_trial = min(get_gpu_count(), 1)
-        else:
-            ngpus_per_trial = min(get_gpu_count(), ngpus_per_trial)
         train_data = TabularDataset(train_data, columns=all_columns, label_columns=label)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
         logger.info('Train Dataset:')
@@ -256,12 +289,23 @@ class TextPrediction:
             else:
                 raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
-        resources = {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
-        model_candidates[0].train(train_data=train_data,
-                                  tuning_data=tuning_data,
-                                  resources=resources,
-                                  time_limits=time_limits)
-        return model_candidates[0]
+        resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
+                                            ngpus_per_trial=ngpus_per_trial)
+        if scheduler is None:
+            scheduler = self.params['hpo_params']['scheduler']
+        if search_strategy is None:
+            search_strategy = self.params['hpo_params']['search_strategy']
+        model = model_candidates[0]
+        scheduler = model.train(train_data=train_data,
+                                tuning_data=tuning_data,
+                                resource=resource,
+                                time_limits=time_limits,
+                                scheduler=scheduler,
+                                searcher=search_strategy,
+                                num_trials=self.params['hpo_params']['num_trials'],
+                                reduction_factor=self.params['hpo_params']['reduction_factor'])
+        self._scheduler = scheduler
+        return model
 
     @staticmethod
     def load(dir_path):
@@ -278,3 +322,12 @@ class TextPrediction:
             The loaded model
         """
         return BertForTextPredictionBasic.load(dir_path)
+
+    def analyze(self):
+        """Analyze the search results
+
+        Returns
+        -------
+        df
+        """
+        raise NotImplementedError
