@@ -706,7 +706,7 @@ class BertForTextPredictionBasic:
         assert self.config is not None
         if not isinstance(test_data, TabularDataset):
             test_data = TabularDataset(test_data,
-                                       columns=self._feature_columns + self._label_columns,
+                                       columns=self._feature_columns,
                                        column_properties=self._column_properties)
         processed_test = self._preprocessor.process_test(test_data)
         inference_batch_size = self.config.optimization.per_device_batch_size\
