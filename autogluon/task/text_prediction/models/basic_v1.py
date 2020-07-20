@@ -688,6 +688,7 @@ class BertForTextPredictionBasic:
         assert self.net is not None
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
+                                        columns=self._feature_columns + self._label_columns,
                                         column_properties=self._column_properties)
         ground_truth = np.array(valid_data.table[self._label_columns[0]].apply(
             self._column_properties[self._label_columns[0]].transform))
@@ -703,7 +704,10 @@ class BertForTextPredictionBasic:
     def _internal_predict(self, test_data, get_original_labels=True, get_probabilities=False):
         assert self.net is not None
         assert self.config is not None
-        test_data = load_pd.load(test_data)
+        if not isinstance(test_data, TabularDataset):
+            test_data = TabularDataset(test_data,
+                                       columns=self._feature_columns + self._label_columns,
+                                       column_properties=self._column_properties)
         processed_test = self._preprocessor.process_test(test_data)
         inference_batch_size = self.config.optimization.per_device_batch_size\
                                * self.config.optimization.val_batch_size_mult

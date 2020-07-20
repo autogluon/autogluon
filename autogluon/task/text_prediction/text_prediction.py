@@ -43,7 +43,7 @@ def default() -> dict:
             'scheduler': 'fifo',          # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',  # Can be 'random', 'bayesopt'
             'time_limits': None,          # The total budget
-            'num_trials': 10,             # The number of trials
+            'num_trials': 4,             # The number of trials
             'reduction_factor': 4,        # The reduction factor
             'time_attr': 'time_spent'     # The time attribute used in hyperband searcher
         }
