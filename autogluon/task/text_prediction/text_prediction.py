@@ -323,8 +323,8 @@ class TextPrediction:
         """
         return BertForTextPredictionBasic.load(dir_path)
 
-    def write_report(self, output_directory):
-        """Write a report about the training job into a folder.
+    def get_report(self, output_directory):
+        """Get a report about the training job into a folder.
 
         Parameters
         ----------
@@ -335,4 +335,3 @@ class TextPrediction:
 
     def cleanup(self):
         raise NotImplementedError
-
