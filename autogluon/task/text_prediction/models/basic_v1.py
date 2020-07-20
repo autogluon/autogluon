@@ -20,7 +20,7 @@ from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ....utils.tabular.utils.loaders import load_pd
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
-from ....core import args, obj
+from ....core import args, space
 from ....scheduler import FIFOScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
@@ -599,7 +599,7 @@ class BertForTextPredictionBasic:
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
-        search_space_reg = args(search_space=self.search_space)
+        search_space_reg = args(search_space=space.Dict(**self.search_space))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
                                                       tuning_data=tuning_data,
