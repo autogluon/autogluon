@@ -1,0 +1,7 @@
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/ag_news_csv.tar.gz 00b73919ec0527118ca35d819029985c33ca4005 11784327
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/imdb.tar.gz af11c368141a0cec4d49563000a2a54f9afdc38d 35673480
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/dbpedia_csv.tar.gz f39ead1841501739a34a5bbb22d405677e3165f7 68341698
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/yelp_review_polarity_csv.tar.gz dd08ed616d28c633b1ff7a5e12d900426e5db779 166373322
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/yelp_review_full_csv.tar.gz d0a1011a88be15254054e94144c83e92a048e318 196146693
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/amazon_review_polarity_csv.tar.gz 9689538a9ee0630340da8aa456a0888cc6733919 688340758
+https://gluonnlp-numpy-data.s3-accelerate.amazonaws.com/datasets/text_classification/amazon_review_full_csv.tar.gz e85b2d264aa8d8d3cc4dbe08adba88c0db92ff5b 643695117
