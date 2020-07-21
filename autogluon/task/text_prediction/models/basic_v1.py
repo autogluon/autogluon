@@ -816,7 +816,7 @@ class BertForTextPredictionBasic:
         label_shapes = assets['label_shapes']
         problem_types = assets['problem_types']
         column_properties = get_column_properties_from_metadata(
-            os.path.join(dir_path, 'column_properties.json'))
+            os.path.join(dir_path, 'column_metadata.json'))
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
             = get_backbone(loaded_config.model.backbone.name)
         # Initialize the preprocessor
