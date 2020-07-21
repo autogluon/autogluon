@@ -47,6 +47,18 @@ class FeatureTypesMetadata:
 
     def get_feature_types_raw_flattened(self):
         return {feature: type_family for type_family, features in self.feature_types_raw.items() for feature in features}
+    
+    def get_features_by_type_raw(self, feature_type):
+        if feature_type in self.feature_types_raw:
+            return self.feature_types_raw[feature_type]
+        else:
+            return []
+
+    def get_features_by_type_special(self, feature_type):
+        if feature_type in self.feature_types_special:
+            return self.feature_types_special[feature_type]
+        else:
+            return []
 
     @staticmethod
     def _get_feature_type(feature, feature_types_dict):

@@ -116,7 +116,8 @@ class AbstractFeatureGenerator:
             if unique_value_count == 1:
                 self.features_to_remove_post.append(column)
             # TODO: Consider making 0.99 a parameter to FeatureGenerator
-            elif 'object' in self.feature_type_family and column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
+            elif ('object' in self.feature_type_family and column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99) 
+                and ('text' not in self.feature_type_family or column not in self.feature_type_family['text'])):
                 self.features_to_remove_post.append(column)
 
         self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))

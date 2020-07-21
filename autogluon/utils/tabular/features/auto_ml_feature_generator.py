@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class AutoMLFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, enable_text_ngram_features=True, enable_text_special_features=True,
                  enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
+                 enable_nlp_raw=True,  # keep raw NLP fields so that we can have NLP models
                  vectorizer=None):
         super().__init__()
         self.enable_nlp_features = enable_text_ngram_features
@@ -26,6 +27,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         self.enable_categorical_features = enable_categorical_features
         self.enable_raw_features = enable_raw_features
         self.enable_datetime_features = enable_datetime_features
+        self.enable_nlp_raw = enable_nlp_raw
         if vectorizer is None:
             self.vectorizer_default_raw = vectorizer_auto_ml_default()
         else:
@@ -46,6 +48,8 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 self.feature_transformations['text_special'] += text_features
             if self.enable_nlp_features:
                 self.feature_transformations['text_ngram'] += text_features
+            if self.enable_nlp_raw:
+                self.feature_transformations['text_raw'] += text_features
 
         if 'datetime' in self.feature_type_family:
             datetime_features = self.feature_type_family['datetime']
@@ -101,6 +105,14 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 if not self.fit:
                     self.feature_type_family_generated['datetime'].append(datetime_feature)
                 # TODO: Add fastai date features
+
+        if self.feature_transformations['text_raw']:
+            if not self.fit:
+                logger.info("carry over raw NLP features %s", self.feature_transformations['text_raw'])
+                self.feature_type_family_generated['text_raw'] = self.feature_transformations['text_raw']
+                # some text columns are already passed through as categorical variables
+                nlp_features_remaining = list(set(self.feature_transformations['text_raw']) - set(X_features.columns))
+                X_features = X_features.join(X[nlp_features_remaining])
 
         if self.feature_transformations['text_ngram']:
             # Combine Text Fields
