@@ -608,6 +608,7 @@ class BertForTextPredictionBasic:
               grace_period=None,
               reduction_factor=4,
               brackets=1):
+        logging_config(folder=self._output_directory, name='main')
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
@@ -657,6 +658,7 @@ class BertForTextPredictionBasic:
             raise NotImplementedError
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
+        logging.info('Best_config={}'.format(scheduler.get_best_config()))
         self._scheduler = scheduler
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,

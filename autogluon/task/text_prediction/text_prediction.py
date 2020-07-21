@@ -33,17 +33,17 @@ def default() -> dict:
                     'type': 'BertForTextPredictionBasic',
                     'search_space': {
                         'model.backbone.name': 'google_electra_base',
-                        'optimization.batch_size': space.Categorical(32, 64),
+                        'optimization.batch_size': 32,
                         'optimization.num_train_epochs': space.Categorical(3, 10),
-                        'optimization.lr': space.Real(1E-5, 1E-4)
+                        'optimization.lr': space.Real(1E-5, 2E-4)
                     },
                 }
             ],
         'hpo_params': {
-            'scheduler': 'fifo',          # Can be 'fifo', 'hyperband'
+            'scheduler': 'hyperband',     # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',  # Can be 'random', 'bayesopt'
             'time_limits': None,          # The total budget
-            'num_trials': 4,             # The number of trials
+            'num_trials': 4,              # The number of trials
             'reduction_factor': 4,        # The reduction factor
             'time_attr': 'time_spent'     # The time attribute used in hyperband searcher
         }
