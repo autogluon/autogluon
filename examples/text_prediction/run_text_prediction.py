@@ -30,14 +30,11 @@ def get_parser():
     parser.add_argument('--test_file', type=str,
                         help='The test pandas dataframe',
                         default=None)
-    parser.add_argument('--seed', type=int, help='The seed',
+    parser.add_argument('--seed', type=int,
+                        help='The seed',
                         default=None)
-    parser.add_argument('--task', type=str,
-                        help='The default tasks',
-                        default=None)
-    parser.add_argument('--model_dir', type=str,
-                        help='The directory to load the model',
-                        default=None)
+    parser.add_argument('--feature_columns', help='Feature columns', default=None)
+    parser.add_argument('--label_columns', help='Label columns', default=None)
     parser.add_argument('--eval_metrics', type=str,
                         help='The metrics for evaluating the models.',
                         default=None)
@@ -50,7 +47,9 @@ def get_parser():
                         help='Whether to evaluate the model')
     parser.add_argument('--exp_dir', type=str, default=None,
                         help='The experiment directory where the model params will be written.')
-    parser.add_argument('--config_file', type=str, default=None)
+    parser.add_argument('--config_file', type=str,
+                        help='The configuration of the TextPrediction module',
+                        default=None)
     return parser
 
 
