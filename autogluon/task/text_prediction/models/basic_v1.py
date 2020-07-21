@@ -503,7 +503,7 @@ def train_function(args, reporter, train_data, tuning_data,
                             ('epoch', int(update_idx / updates_per_epoch))] + \
                            [(k, v.item()) for k, v in metric_scores.items()] + \
                            [('fine_better', find_better),
-                            ('time_spent', time.time() - start_tick)]
+                            ('time_spent', int(time.time() - start_tick))]
             report_items.append(('performance_score', performance_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
@@ -641,7 +641,7 @@ class BertForTextPredictionBasic:
             if time_limits is None:
                 time_limits = 5 * 60 * 60  # 5 hour
             if grace_period is None:
-                grace_period = time_limits * 0.01
+                grace_period = int(time_limits * 0.01)
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
                                            max_t=time_limits,
