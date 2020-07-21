@@ -17,7 +17,7 @@ do
     TRAIN_FILE=glue/${TASK}/train.pd.pkl
     DEV_FILE=glue/${TASK}/dev.pd.pkl
     TEST_FILE=glue/${TASK}/test.pd.pkl
-    python run_prediction.py \
+    python run_text_prediction.py \
      --do_train \
      --train_file ${TRAIN_FILE} \
      --dev_file ${DEV_FILE} \
@@ -26,7 +26,7 @@ do
      --ctx ${CTX}
 done
 
-python run_prediction.py \
+python run_text_prediction.py \
      --do_train \
      --train_file glue/mnli/train.pd.pkl \
      --dev_file glue/mnli/dev_matched.pd.pkl \
@@ -34,7 +34,7 @@ python run_prediction.py \
      --task mnli \
      --ctx ${CTX}
 
-python run_prediction.py \
+python run_text_prediction.py \
      --do_train \
      --train_file glue/mnli/train.pd.pkl \
      --dev_file glue/mnli/dev_mismatched.pd.pkl \
