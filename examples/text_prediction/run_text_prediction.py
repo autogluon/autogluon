@@ -41,6 +41,7 @@ def get_parser():
     parser.add_argument('--stop_metric', type=str,
                         help='The metrics for early stopping',
                         default=None)
+    parser.add_argument('--task', type=str, default=None)
     parser.add_argument('--do_train', action='store_true',
                         help='Whether to train the model')
     parser.add_argument('--do_eval', action='store_true',
