@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 import yaml
 from typing import Optional
+import copy
 import numpy as np
 from . import constants as _C
 from ...scheduler.resource import get_cpu_count, get_gpu_count
@@ -49,6 +50,36 @@ def default() -> dict:
         }
     }
     return ret
+
+
+def merge_params(base_params, partial_params=None):
+    """Merge a partial change to the base configuration.
+
+    Parameters
+    ----------
+    base_params
+        The base parameters
+    partial_params
+        The partial parameters
+
+    Returns
+    -------
+    final_params
+        The final parameters
+    """
+    if partial_params is None:
+        return base_params
+    else:
+        final_params = copy.deepcopy(base_params)
+        for key in partial_params:
+            if key == 'version':
+                final_params[key] = partial_params[key]
+            elif key == 'hpo_params':
+                for sub_key, value in partial_params.items():
+                    final_params[key][sub_key] = value
+            elif key == 'models':
+                final_params[key] = partial_params[key]
+        return final_params
 
 
 def get_recommended_resource(nthreads_per_trial=None,
@@ -153,15 +184,26 @@ class TextPrediction:
         self._dist_ip_addrs = dist_ip_addrs
         if params is None:
             params = ag_text_params.create('default')
+        elif isinstance(params, str):
+            params = ag_text_params.create(params)
+        else:
+            base_params = ag_text_params.create('default')
+            params = merge_params(base_params, params)
         self._params = params
         self._scheduler = None
+
+    def __repr__(self):
+        ret = 'TextPrediction('
+        ret += '   dist_ip_addrs={}'.format(self._dist_ip_addrs)
+        ret += ')'
+        return ret
 
     @property
     def params(self):
         return self._params
 
     def fit(self, train_data,
-            label=None,
+            label,
             tuning_data=None,
             time_limits=None,
             output_directory='./ag_text',
@@ -173,7 +215,6 @@ class TextPrediction:
             ngpus_per_trial=None,
             scheduler=None,
             search_strategy=None,
-            search_options=None,
             seed=None):
         """
 
@@ -208,8 +249,6 @@ class TextPrediction:
             The scheduler of HPO
         search_strategy
             The search strategy
-        search_options
-            The options for running the hyper-parameter search
         seed
             The seed of the random state
 
@@ -238,7 +277,7 @@ class TextPrediction:
             else:
                 label_columns.append(ele)
         if feature_columns is None:
-            all_columns = train_data.columns
+            all_columns = list(train_data.columns)
             feature_columns = [ele for ele in all_columns if ele is not label]
         else:
             if isinstance(feature_columns, str):
@@ -330,7 +369,7 @@ class TextPrediction:
         """
         return BertForTextPredictionBasic.load(dir_path)
 
-    def get_report(self, output_directory):
+    def report(self, output_directory):
         """Get a report about the training job into a folder.
 
         Parameters
@@ -338,7 +377,7 @@ class TextPrediction:
         output_directory
             The directory that we will write the report
         """
-        raise NotImplementedError
+        
 
     def cleanup(self):
         raise NotImplementedError
