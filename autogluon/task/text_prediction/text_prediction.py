@@ -377,7 +377,7 @@ class TextPrediction:
         output_directory
             The directory that we will write the report
         """
-        
+
 
     def cleanup(self):
         raise NotImplementedError
