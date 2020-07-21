@@ -17,7 +17,6 @@ from ....contrib.nlp.utils.config import CfgNode
 from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ....utils.tabular.utils.loaders import load_pd
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
 from ....core import args, space
@@ -844,3 +843,4 @@ class BertForTextPredictionBasic:
         model._net = net
         model._preprocessor = preprocessor
         model._config = loaded_config
+        return model
