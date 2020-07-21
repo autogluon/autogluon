@@ -2,7 +2,6 @@ import mxnet as mx
 import os
 import json
 import argparse
-import warnings
 from autogluon.task.text_prediction import TextPrediction
 mx.npx.set_np()
 
@@ -21,7 +20,7 @@ TASKS = \
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='AutoML for Tabular Prediction Basic Example.')
+    parser = argparse.ArgumentParser(description='The Basic Example of AutoML for Text Prediction.')
     parser.add_argument('--train_file', type=str,
                         help='The training pandas dataframe.',
                         default=None)
@@ -74,14 +73,15 @@ def train(args):
     with open(os.path.join(args.exp_dir, 'final_model_dev_score.json'), 'w') as of:
         json.dump(dev_metrics_scores, of)
     dev_prediction = model.predict(args.dev_file)
-    test_prediction = model.predict(args.test_file)
     with open(os.path.join(args.exp_dir, 'dev_predictions.txt'), 'w') as of:
         for ele in dev_prediction:
             of.write(str(ele) + '\n')
+    model.save(os.path.join(args.exp_dir, 'saved_model'))
+    model = TextPrediction.load(os.path.join(args.exp_dir, 'saved_model'))
+    test_prediction = model.predict(args.test_file)
     with open(os.path.join(args.exp_dir, 'test_predictions.txt'), 'w') as of:
         for ele in test_prediction:
             of.write(str(ele) + '\n')
-    model.save(os.path.join(args.exp_dir, 'saved_model'))
 
 
 def predict(args):

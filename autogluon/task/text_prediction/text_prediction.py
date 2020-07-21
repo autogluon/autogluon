@@ -231,20 +231,27 @@ class TextPrediction:
                 label = train_data.columns[-1]
         if not isinstance(label, list):
             label = [label]
+        label_columns = []
+        for ele in label:
+            if isinstance(ele, int):
+                label_columns.append(train_data.columns[ele])
+            else:
+                label_columns.append(ele)
         if feature_columns is None:
             all_columns = train_data.columns
             feature_columns = [ele for ele in all_columns if ele is not label]
         else:
             if isinstance(feature_columns, str):
                 feature_columns = [feature_columns]
-            all_columns = feature_columns + label
+            all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
         else:
             tuning_data = load_pd.load(tuning_data)
-        train_data = TabularDataset(train_data, columns=all_columns, label_columns=label)
+        train_data = TabularDataset(train_data, columns=all_columns,
+                                    label_columns=label_columns)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
         logger.info('Train Dataset:')
         logger.info(train_data)
@@ -254,13 +261,13 @@ class TextPrediction:
 
         problem_types = []
         label_shapes = []
-        for label_col_name in label:
+        for label_col_name in label_columns:
             problem_type, label_shape = infer_problem_type(column_properties=column_properties,
                                                            label_col_name=label_col_name)
             problem_types.append(problem_type)
             label_shapes.append(label_shape)
         logging.info('Label columns={}, Problem types={}, Label shapes={}'.format(
-            label, problem_types, label_shapes))
+            label_columns, problem_types, label_shapes))
         eval_metric, stopping_metric, log_metrics =\
             infer_eval_stop_log_metrics(problem_types[0],
                                         label_shapes[0],
@@ -275,7 +282,7 @@ class TextPrediction:
             search_space = model_params['search_space']
             if model_type == 'BertForTextPredictionBasic':
                 model = BertForTextPredictionBasic(column_properties=column_properties,
-                                                   label_columns=label,
+                                                   label_columns=label_columns,
                                                    feature_columns=feature_columns,
                                                    label_shapes=label_shapes,
                                                    problem_types=problem_types,
