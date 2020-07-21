@@ -7,10 +7,14 @@ from ..utils import DeprecationHelper, EasyDict, classproperty
 __all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'List', 'Dict',
            'Categorical', 'Choice', 'Real', 'Int', 'Bool']
 
+SPLITTER = u'▁'  # Use U+2581 as the special symbol for splitting the space
+
+
 class Space(object):
     """Basic search space describing set of possible values for hyperparameter.
     """
     pass
+
 
 class SimpleSpace(Space):
     """Non-nested search space (i.e. corresponds to a single simple hyperparameter).
@@ -192,7 +196,7 @@ class List(NestedSpace):
         """
         ret = []
         kwspaces = self.kwspaces
-        striped_keys = [k.split('.')[0] for k in config.keys()]
+        striped_keys = [k.split(SPLITTER)[0] for k in config.keys()]
         for idx, obj in enumerate(self.data):
             if isinstance(obj, NestedSpace):
                 sub_config = _strip_config_space(config, prefix=str(idx))
@@ -226,7 +230,7 @@ class List(NestedSpace):
             if isinstance(obj, NestedSpace):
                 kw_spaces[k] = obj
                 for sub_k, sub_v in obj.kwspaces.items():
-                    new_k = '{}.{}'.format(k, sub_k)
+                    new_k = '{}{}{}'.format(k, SPLITTER, sub_k)
                     kw_spaces[new_k] = sub_v
             elif isinstance(obj, Space):
                 kw_spaces[k] = obj
@@ -294,7 +298,7 @@ class Dict(NestedSpace):
             if isinstance(obj, NestedSpace):
                 kw_spaces[k] = obj
                 for sub_k, sub_v in obj.kwspaces.items():
-                    new_k = '{}.{}'.format(k, sub_k)
+                    new_k = '{}{}{}'.format(k, SPLITTER, sub_k)
                     kw_spaces[new_k] = sub_v
                     kw_spaces[new_k] = sub_v
             elif isinstance(obj, Space):
@@ -308,7 +312,7 @@ class Dict(NestedSpace):
         ret.update(self.data)
         kwspaces = self.kwspaces
         kwspaces.update(config)
-        striped_keys = [k.split('.')[0] for k in config.keys()]
+        striped_keys = [k.split(SPLITTER)[0] for k in config.keys()]
         for k, v in kwspaces.items():
             if k in striped_keys:
                 if isinstance(v, NestedSpace):
@@ -321,6 +325,7 @@ class Dict(NestedSpace):
     def __repr__(self):
         reprstr = self.__class__.__name__ + str(self.data)
         return reprstr
+
 
 class Categorical(NestedSpace):
     """Nested search space for hyperparameters which are categorical. Such a hyperparameter takes one value out of the discrete set of provided options.
@@ -384,7 +389,7 @@ class Categorical(NestedSpace):
         for idx, obj in enumerate(self.data):
             if isinstance(obj, NestedSpace):
                 for sub_k, sub_v in obj.kwspaces.items():
-                    new_k = '{}.{}'.format(idx, sub_k)
+                    new_k = '{}{}{}'.format(idx, SPLITTER, sub_k)
                     kw_spaces[new_k] = sub_v
         return kw_spaces
 
@@ -483,7 +488,7 @@ def _add_cs(master_cs, sub_cs, prefix, delimiter='.', parent_hp=None):
         if new_parameter.name == '':
             new_parameter.name = prefix
         elif not prefix == '':
-            new_parameter.name = "%s%s%s" % (prefix, '.', new_parameter.name)
+            new_parameter.name = "{}{}{}".format(prefix, SPLITTER, new_parameter.name)
         new_parameters.append(new_parameter)
     for hp in new_parameters:
         _add_hp(master_cs, hp)
@@ -492,5 +497,5 @@ def _rm_hp(cs, k):
     if k in cs._hyperparameters:
         cs._hyperparameters.pop(k)
     for hp in cs.get_hyperparameters():
-        if  hp.name.startswith("%s."%(k)):
+        if  hp.name.startswith('{}'.format(k)):
             cs._hyperparameters.pop(hp.name)
