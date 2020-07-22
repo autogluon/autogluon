@@ -377,25 +377,6 @@ class AbstractFeatureGenerator:
 
         return True
 
-    def generate_text_features(self, X: Series, feature: str) -> DataFrame:
-        X: DataFrame = X.to_frame(name=feature)
-        X[feature + '.char_count'] = [self.char_count(value) for value in X[feature]]
-        X[feature + '.word_count'] = [self.word_count(value) for value in X[feature]]
-        X[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X[feature]]
-        X[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X[feature]]
-        X[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X[feature]]
-        X[feature + '.special_ratio'] = [self.special_ratio(value) for value in X[feature]]
-
-        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
-        for symbol in symbols:
-            X[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X[feature]]
-            X[feature + '.symbol_ratio.' + symbol] = X[feature + '.symbol_count.' + symbol] / X[feature + '.char_count']
-            X[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
-
-        X = X.drop(feature, axis=1)
-
-        return X
-
     def minimize_memory_usage(self, X_features):
         if self.minimize_categorical_memory_usage_flag:
             X_features = self.minimize_categorical_memory_usage(X_features=X_features)
@@ -440,49 +421,6 @@ class AbstractFeatureGenerator:
     @staticmethod
     def get_type_family(dtype):
         return get_type_family(dtype=dtype)
-
-    @staticmethod
-    def word_count(string):
-        return len(string.split())
-
-    @staticmethod
-    def char_count(string):
-        return len(string)
-
-    @staticmethod
-    def special_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        new_str = re.sub(r'[\w]+', '', string)
-        return len(new_str) / len(string)
-
-    @staticmethod
-    def digit_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(c.isdigit() for c in string) / len(string)
-
-    @staticmethod
-    def lower_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(c.islower() for c in string) / len(string)
-
-    @staticmethod
-    def capital_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(1 for c in string if c.isupper()) / len(string)
-
-    @staticmethod
-    def symbol_in_string_count(string, character):
-        if not string:
-            return 0
-        return sum(1 for c in string if c == character)
 
     # TODO: optimize by not considering columns with unique sums/means
     # TODO: Multithread?
