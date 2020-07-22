@@ -22,22 +22,21 @@ logger = logging.getLogger(__name__)
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractFeatureGenerator:
     def __init__(self):
-        self.features_init = []
-        self.features_init_to_keep = []
-        self.features_to_remove = []
-        self.features_to_remove_post = []
+        self.features_init_to_keep = []  # Original features to use as input to feature generation
+        self.features_to_remove = []  # Original features to remove prior to feature generation
+        self.features_to_remove_post = []  # Final features to remove prior to sending to models
         self.features_init_types = dict()  # Initial feature types prior to transformation
         self.feature_type_family_init_raw = defaultdict(list)  # Feature types of original features, without inferring.
         self.feature_type_family = defaultdict(list)  # Feature types of original features, after inferring.
         self.feature_type_family_generated = defaultdict(list)  # Feature types (special) of generated features.
         self.feature_transformations = defaultdict(list)  # Dictionary of transformation pipelines (keys) and the list of original features transformed through them (values)
-        self.features_categorical_final = []
-        self.features_categorical_final_mapping = defaultdict()
+        self.features_categorical_final = []  # Categorical features
+        self.features_categorical_final_mapping = defaultdict()  # Categorical features original value -> category code mapping
         self.features_binned = []  # Features to be binned
-        self.features_binned_mapping = defaultdict()
+        self.features_binned_mapping = defaultdict()  # Binned features original value ranges -> binned category code mapping
         self.features = []  # Final list of features after transformation
-        self.banned_features = []
-        self.fit = False
+
+        self.fit = False  # Whether the feature generation has been fit
 
         self.minimize_categorical_memory_usage_flag = True
 
@@ -45,29 +44,9 @@ class AbstractFeatureGenerator:
         self.pre_memory_usage_per_row = None
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
-        self.is_dummy = False
+        self.is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
 
-        self.feature_types_metadata: FeatureTypesMetadata = None
-
-    def get_feature_types_metadata_full(self):
-        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.feature_types_special)
-
-        for key_raw in self.feature_types_metadata.feature_types_raw:
-            values = self.feature_types_metadata.feature_types_raw[key_raw]
-            for key_special in self.feature_types_metadata.feature_types_special:
-                values = [value for value in values if value not in self.feature_types_metadata.feature_types_special[key_special]]
-            if values:
-                feature_types_metadata_full[key_raw] += values
-
-        return feature_types_metadata_full
-
-    @staticmethod
-    def train_vectorizer(text_list, vectorizer):
-        logger.log(15, 'Fitting vectorizer...')
-        transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
-        vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
-        logger.log(15, f'Vectorizer fit with vocabulary size = {len(vectorizer.vocabulary_)}')
-        return vectorizer, transform_matrix
+        self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the final features. Passed to models to enable advanced functionality.
 
     def preprocess(self, X: DataFrame):
         return X
@@ -85,8 +64,7 @@ class AbstractFeatureGenerator:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
         if banned_features:
-            self.banned_features = [str(feature) for feature in banned_features]
-            self.features_to_remove += self.banned_features
+            self.features_to_remove += [str(feature) for feature in banned_features]
         X_index = copy.deepcopy(X.index)
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         self.get_feature_types(X)
@@ -109,7 +87,6 @@ class AbstractFeatureGenerator:
         self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
-            # print(X_features[column].value_counts().sort_index())
         X_features = X_features.drop(self.features_to_remove_post, axis=1)
         if drop_duplicates:
             X_features = self.drop_duplicate_features(X_features)
@@ -146,21 +123,7 @@ class AbstractFeatureGenerator:
         self.features = list(X_features.columns)
         self.fit = True
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
-        logger.log(20, 'Original Features (raw dtypes):')
-        for key, val in self.feature_type_family_init_raw.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Original Features (inferred dtypes):')
-        for key, val in self.feature_type_family.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Generated Features (special dtypes):')
-        for key, val in self.feature_types_metadata.feature_types_special.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Final Features (raw dtypes):')
-        for key, val in self.feature_types_metadata.feature_types_raw.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Final Features:')
-        for key, val in self.get_feature_types_metadata_full().items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        self.print_feature_type_info()
 
         return X_features
 
@@ -199,141 +162,23 @@ class AbstractFeatureGenerator:
 
         return X_features
 
-    @staticmethod
-    def bin_column(series, mapping):
-        mapping_dict = {k: v for v, k in enumerate(list(mapping))}
-        series_out = pd.cut(series, mapping)
-        # series_out.cat.categories = [str(g) for g in series_out.cat.categories]  # LightGBM crashes at end of training without this
-        series_out_int = [mapping_dict[val] for val in series_out]
-        return series_out_int
-
-    # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
-    @staticmethod
-    def generate_bins(X_features: DataFrame, features_to_bin):
-        X_len = len(X_features)
-        ideal_cats = 10
-        starting_cats = 1000
-        bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
-        bin_epsilon = 0.000000001
-        bin_mapping = defaultdict()
-        max_iterations = 20
-        for column in features_to_bin:
-            num_cats_initial = starting_cats
-            bins_value_counts = X_features[column].value_counts(ascending=False, normalize=True)
-            max_bins = len(bins_value_counts)
-
-            if max_bins <= ideal_cats:
-                bins = pd.Series(data=sorted(X_features[column].unique()))
-                num_cats_initial = max_bins
-                cur_len = max_bins
-                bin_index = range(num_cats_initial)
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
-            else:
-                cur_len = X_len
-                bins = X_features[column].sort_values(ascending=True)
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
-
-            max_desired_bins = min(ideal_cats, max_bins)
-            min_desired_bins = min(ideal_cats, max_bins)
-
-            if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
-                is_satisfied = True
-            else:
-                is_satisfied = False
-
-            num_cats_current = num_cats_initial
-            # print(column, min_desired_bins, max_desired_bins)
-            cur_iteration = 0
-            while not is_satisfied:
-                if len(interval_index) > max_desired_bins:
-                    pass
-                elif len(interval_index) < min_desired_bins:
-                    pass
-                ratio_reduction = max_desired_bins / len(interval_index)
-                num_cats_current = int(np.floor(num_cats_current * ratio_reduction))
-                bin_index = [np.floor(cur_len * (num + 1) / num_cats_current) for num in range(num_cats_current - 1)]
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
-
-                if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
-                    is_satisfied = True
-                    # print('satisfied', column, len(interval_index))
-                cur_iteration += 1
-                if cur_iteration >= max_iterations:
-                    is_satisfied = True
-                    # print('max_iterations met, stopping prior to satisfaction!', column, len(interval_index))
-
-            bin_mapping[column] = interval_index
-        return bin_mapping
-
-    # TODO: Move this outside of here
-    # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
-    @staticmethod
-    def get_approximate_df_mem_usage(df, sample_ratio=0.2):
-        if sample_ratio >= 1:
-            return df.memory_usage(deep=True)
-        else:
-            num_rows = len(df)
-            num_rows_sample = math.ceil(sample_ratio * num_rows)
-            return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
-
-    # TODO: Clean code
-    # bins is a sorted int/float series, ascending=True
-    @staticmethod
-    def get_bins(bins: Series, bin_index, bin_epsilon):
-        max_val = bins.max()
-        bins_2 = bins.iloc[bin_index]
-        bins_3 = list(bins_2.values)
-        bins_unique = sorted(list(set(bins_3)))
-        bins_with_epsilon_max = set([i for i in bins_unique] + [i - bin_epsilon for i in bins_unique if i == max_val])
-        removal_bins = set([bins_unique[index - 1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
-        bins_4 = sorted(list(bins_with_epsilon_max - removal_bins))
-        bins_5 = [np.inf if (x == max_val) else x for x in bins_4]
-        bins_6 = sorted(list(set([-np.inf] + bins_5 + [np.inf])))
-        bins_7 = [(bins_6[i], bins_6[i + 1]) for i in range(len(bins_6) - 1)]
-        interval_index = pd.IntervalIndex.from_tuples(bins_7)
-        return interval_index
-
     def get_feature_types(self, X: DataFrame):
-        self.features_init = list(X.columns)
-        self.features_init = [feature for feature in self.features_init if feature not in self.features_to_remove]
-        for column in self.features_init:
+        features_init = list(X.columns)
+        features_init = [feature for feature in features_init if feature not in self.features_to_remove]
+        for column in features_init:
             mark_for_removal = False
             col_val = X[column]
             dtype = col_val.dtype
             num_unique = len(col_val.unique())
-            unique_counts = col_val.value_counts()
-
-            # num_unique_duplicates = len(unique_counts[unique_counts > 100])
-            # num_rows = len(col_val)
-            # unique_ratio = num_unique / float(num_rows)
-            # print(column)
-            # print(num_unique)
-            # # print(num_rows)
-            # # print(unique_ratio)
-            # print(dtype)
 
             type_family = self.get_type_family(dtype)
-            # print(num_unique, '\t', num_unique_duplicates, '\t', unique_ratio, '\t', type_family, '\t', column,)
+            if self.check_if_datetime_feature(col_val):
+                type_family = 'datetime'
+            elif self.check_if_nlp_feature(col_val):
+                type_family = 'text'
 
             if num_unique == 1:
                 mark_for_removal = True
-
-            # if num_unique == num_rows:
-            #     print('fully unique!')
-            # if unique_ratio > 0.5:
-            #     print('fairly unique!')
-            # print(col_val.value_counts())
-
-            if self.check_if_datetime_feature(col_val):
-                type_family = 'datetime'  # TODO: Verify
-                dtype = 'datetime'
-                logger.debug(f'date: {column}')
-                logger.debug(unique_counts.head(5))
-            elif self.check_if_nlp_feature(col_val):
-                type_family = 'text'
-                logger.debug(f'nlp: {column}')
-                logger.debug(unique_counts.head(5))
-
             if mark_for_removal:
                 self.features_to_remove.append(column)
             else:
@@ -440,6 +285,129 @@ class AbstractFeatureGenerator:
         logger.log(15, f'Removed {len(columns_removed)} duplicate columns before training models')
 
         return X[columns_new]
+
+    def get_feature_types_metadata_full(self):
+        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.feature_types_special)
+
+        for key_raw in self.feature_types_metadata.feature_types_raw:
+            values = self.feature_types_metadata.feature_types_raw[key_raw]
+            for key_special in self.feature_types_metadata.feature_types_special:
+                values = [value for value in values if value not in self.feature_types_metadata.feature_types_special[key_special]]
+            if values:
+                feature_types_metadata_full[key_raw] += values
+
+        return feature_types_metadata_full
+
+    @staticmethod
+    def bin_column(series, mapping):
+        mapping_dict = {k: v for v, k in enumerate(list(mapping))}
+        series_out = pd.cut(series, mapping)
+        # series_out.cat.categories = [str(g) for g in series_out.cat.categories]  # LightGBM crashes at end of training without this
+        series_out_int = [mapping_dict[val] for val in series_out]
+        return series_out_int
+
+    # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
+    @staticmethod
+    def generate_bins(X_features: DataFrame, features_to_bin):
+        X_len = len(X_features)
+        ideal_cats = 10
+        starting_cats = 1000
+        bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
+        bin_epsilon = 0.000000001
+        bin_mapping = defaultdict()
+        max_iterations = 20
+        for column in features_to_bin:
+            num_cats_initial = starting_cats
+            bins_value_counts = X_features[column].value_counts(ascending=False, normalize=True)
+            max_bins = len(bins_value_counts)
+
+            if max_bins <= ideal_cats:
+                bins = pd.Series(data=sorted(X_features[column].unique()))
+                num_cats_initial = max_bins
+                cur_len = max_bins
+                bin_index = range(num_cats_initial)
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
+            else:
+                cur_len = X_len
+                bins = X_features[column].sort_values(ascending=True)
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
+
+            max_desired_bins = min(ideal_cats, max_bins)
+            min_desired_bins = min(ideal_cats, max_bins)
+
+            if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
+                is_satisfied = True
+            else:
+                is_satisfied = False
+
+            num_cats_current = num_cats_initial
+            # print(column, min_desired_bins, max_desired_bins)
+            cur_iteration = 0
+            while not is_satisfied:
+                if len(interval_index) > max_desired_bins:
+                    pass
+                elif len(interval_index) < min_desired_bins:
+                    pass
+                ratio_reduction = max_desired_bins / len(interval_index)
+                num_cats_current = int(np.floor(num_cats_current * ratio_reduction))
+                bin_index = [np.floor(cur_len * (num + 1) / num_cats_current) for num in range(num_cats_current - 1)]
+                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
+
+                if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
+                    is_satisfied = True
+                    # print('satisfied', column, len(interval_index))
+                cur_iteration += 1
+                if cur_iteration >= max_iterations:
+                    is_satisfied = True
+                    # print('max_iterations met, stopping prior to satisfaction!', column, len(interval_index))
+
+            bin_mapping[column] = interval_index
+        return bin_mapping
+
+    # TODO: Move this outside of here
+    # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
+    @staticmethod
+    def get_approximate_df_mem_usage(df, sample_ratio=0.2):
+        if sample_ratio >= 1:
+            return df.memory_usage(deep=True)
+        else:
+            num_rows = len(df)
+            num_rows_sample = math.ceil(sample_ratio * num_rows)
+            return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
+
+    # TODO: Clean code
+    # bins is a sorted int/float series, ascending=True
+    @staticmethod
+    def get_bins(bins: Series, bin_index, bin_epsilon):
+        max_val = bins.max()
+        bins_2 = bins.iloc[bin_index]
+        bins_3 = list(bins_2.values)
+        bins_unique = sorted(list(set(bins_3)))
+        bins_with_epsilon_max = set([i for i in bins_unique] + [i - bin_epsilon for i in bins_unique if i == max_val])
+        removal_bins = set([bins_unique[index - 1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
+        bins_4 = sorted(list(bins_with_epsilon_max - removal_bins))
+        bins_5 = [np.inf if (x == max_val) else x for x in bins_4]
+        bins_6 = sorted(list(set([-np.inf] + bins_5 + [np.inf])))
+        bins_7 = [(bins_6[i], bins_6[i + 1]) for i in range(len(bins_6) - 1)]
+        interval_index = pd.IntervalIndex.from_tuples(bins_7)
+        return interval_index
+
+    def print_feature_type_info(self):
+        logger.log(20, 'Original Features (raw dtypes):')
+        for key, val in self.feature_type_family_init_raw.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Original Features (inferred dtypes):')
+        for key, val in self.feature_type_family.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Generated Features (special dtypes):')
+        for key, val in self.feature_types_metadata.feature_types_special.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Final Features (raw dtypes):')
+        for key, val in self.feature_types_metadata.feature_types_raw.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Final Features:')
+        for key, val in self.get_feature_types_metadata_full().items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
 
     def save_self(self, path):
         save_pkl.save(path=path, object=self)
