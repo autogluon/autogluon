@@ -34,8 +34,9 @@ def default() -> dict:
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 32,
-                    'optimization.num_train_epochs': space.Categorical(3, 10),
-                    'optimization.lr': space.Real(1E-5, 2E-4)
+                    'optimization.num_train_epochs': space.Categorical(3, 5, 10),
+                    'optimization.lr': space.Categorical(1E-5, 2E-5, 5E-5,
+                                                         1E-4, 2E-4, 5E-4, 1E-3)
                 }
             },
         },
