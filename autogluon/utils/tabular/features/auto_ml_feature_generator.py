@@ -68,12 +68,12 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             else:
                 X[column].fillna(np.nan, inplace=True)
 
-        X_text_features_combined = []
+        X_text_special_combined = []
         if self.feature_transformations['text_special']:
             for nlp_feature in self.feature_transformations['text_special']:
-                X_text_features = self.generate_text_special(X[nlp_feature], nlp_feature)
-                X_text_features_combined.append(X_text_features)
-            X_text_features_combined = pd.concat(X_text_features_combined, axis=1)
+                X_text_special = self.generate_text_special(X[nlp_feature], nlp_feature)
+                X_text_special_combined.append(X_text_special)
+            X_text_special_combined = pd.concat(X_text_special_combined, axis=1)
 
         X = self.preprocess(X)
 
@@ -84,16 +84,17 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_categoricals = X[self.feature_transformations['category']]
             # TODO: Add stateful categorical generator, merge rare cases to an unknown value
             # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
-            if 'text' in self.feature_type_family:
-                self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
+            if not self.fit:
+                if 'text' in self.feature_type_family:
+                    self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
             X_categoricals = X_categoricals.astype('category')
             X_features = X_features.join(X_categoricals)
 
         if self.feature_transformations['text_special']:
             if not self.fit:
-                self.features_binned += list(X_text_features_combined.columns)
-                self.feature_type_family_generated['text_special'] += list(X_text_features_combined.columns)
-            X_features = X_features.join(X_text_features_combined)
+                self.features_binned += list(X_text_special_combined.columns)
+                self.feature_type_family_generated['text_special'] += list(X_text_special_combined.columns)
+            X_features = X_features.join(X_text_special_combined)
 
         if self.feature_transformations['datetime']:
             for datetime_feature in self.feature_transformations['datetime']:
