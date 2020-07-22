@@ -46,7 +46,8 @@ def default() -> dict:
             'time_limits': 1 * 60 * 60,   # The total budget
             'num_trials': 4,              # The number of trials
             'reduction_factor': 4,        # The reduction factor
-            'time_attr': 'time_spent'     # The time attribute used in hyperband searcher
+            'time_attr': 'report_idx'     # The time attribute used in hyperband searcher.
+                                          # We report the validation accuracy 5 times each epoch.
         }
     }
     return ret
