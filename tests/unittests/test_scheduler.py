@@ -1,5 +1,7 @@
 import numpy as np
+import pickle
 import autogluon as ag
+
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),
@@ -29,6 +31,10 @@ def test_fifo_scheduler():
                                            checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
+    best_config = scheduler.get_best_config()
+    best_task_id = scheduler.get_best_task_id()
+    assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
+
 
 def test_hyperband_scheduler():
     scheduler = ag.scheduler.HyperbandScheduler(train_fn,
@@ -40,6 +46,10 @@ def test_hyperband_scheduler():
                                                 checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
+    best_config = scheduler.get_best_config()
+    best_task_id = scheduler.get_best_task_id()
+    assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
+
 
 def test_rl_scheduler():
     scheduler = ag.scheduler.RLScheduler(rl_train_fn,
@@ -50,3 +60,6 @@ def test_rl_scheduler():
                                          checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
+    best_config = scheduler.get_best_config()
+    best_task_id = scheduler.get_best_task_id()
+    assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
