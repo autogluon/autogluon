@@ -99,7 +99,8 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             for datetime_feature in self.feature_transformations['datetime']:
                 X_features[datetime_feature] = pd.to_datetime(X[datetime_feature])
                 X_features[datetime_feature] = pd.to_numeric(X_features[datetime_feature])  # TODO: Use actual date info
-                self.feature_type_family_generated['datetime'].append(datetime_feature)
+                if not self.fit:
+                    self.feature_type_family_generated['datetime'].append(datetime_feature)
                 # TODO: Add fastai date features
 
         if self.feature_transformations['text_ngram']:
