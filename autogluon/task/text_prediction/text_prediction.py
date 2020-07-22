@@ -315,24 +315,23 @@ class TextPrediction(BaseTask):
                                                                              stopping_metric,
                                                                              log_metrics))
         model_candidates = []
-        for model_params in hyperparameters['models']:
-            for model_type, kwargs in model_params.items():
-                search_space = kwargs['search_space']
-                if model_type == 'BertForTextPredictionBasic':
-                    model = BertForTextPredictionBasic(column_properties=column_properties,
-                                                       label_columns=label_columns,
-                                                       feature_columns=feature_columns,
-                                                       label_shapes=label_shapes,
-                                                       problem_types=problem_types,
-                                                       stopping_metric=stopping_metric,
-                                                       log_metrics=log_metrics,
-                                                       base_config=None,
-                                                       search_space=search_space,
-                                                       output_directory=output_directory,
-                                                       logger=logger)
-                    model_candidates.append(model)
-                else:
-                    raise NotImplementedError
+        for model_type, kwargs in hyperparameters['models'].items():
+            search_space = kwargs['search_space']
+            if model_type == 'BertForTextPredictionBasic':
+                model = BertForTextPredictionBasic(column_properties=column_properties,
+                                                   label_columns=label_columns,
+                                                   feature_columns=feature_columns,
+                                                   label_shapes=label_shapes,
+                                                   problem_types=problem_types,
+                                                   stopping_metric=stopping_metric,
+                                                   log_metrics=log_metrics,
+                                                   base_config=None,
+                                                   search_space=search_space,
+                                                   output_directory=output_directory,
+                                                   logger=logger)
+                model_candidates.append(model)
+            else:
+                raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
                                             ngpus_per_trial=ngpus_per_trial)
