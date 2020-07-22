@@ -1,14 +1,15 @@
-import pandas as pd
 import logging
-import yaml
-from typing import Optional
 import copy
+import time
 import numpy as np
+from .. import tabular_prediction
 from . import constants as _C
+from ..base import BaseTask
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
 from ...contrib.nlp.utils.registry import Registry
 from ...utils.tabular.utils.loaders import load_pd
+from ...utils.miscs import verbosity2loglevel
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
 
@@ -28,21 +29,20 @@ def default() -> dict:
     """
     ret = {
         'version': 1,
-        'models':
-            [
-                {
-                    'type': 'BertForTextPredictionBasic',
-                    'search_space': {
-                        'model.backbone.name': 'google_electra_base',
-                        'optimization.batch_size': 32,
-                        'optimization.num_train_epochs': space.Categorical(3, 10),
-                        'optimization.lr': space.Real(1E-5, 2E-4)
-                    },
+        'models': {
+            'BertForTextPredictionBasic': {
+                'search_space': {
+                    'model.backbone.name': 'google_electra_base',
+                    'optimization.batch_size': 32,
+                    'optimization.num_train_epochs': space.Categorical(3, 10),
+                    'optimization.lr': space.Real(1E-5, 2E-4)
                 }
-            ],
+            },
+        },
         'hpo_params': {
             'scheduler': 'hyperband',     # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',  # Can be 'random', 'bayesopt'
+            'search_options': None,       # The search option
             'time_limits': None,          # The total budget
             'num_trials': 4,              # The number of trials
             'reduction_factor': 4,        # The reduction factor
@@ -79,6 +79,8 @@ def merge_params(base_params, partial_params=None):
                     final_params[key][sub_key] = value
             elif key == 'models':
                 final_params[key] = partial_params[key]
+            else:
+                raise KeyError('Key not found!')
         return final_params
 
 
@@ -169,40 +171,11 @@ def infer_eval_stop_log_metrics(problem_type,
     return eval_metric, stopping_metric, log_metrics
 
 
-class TextPrediction:
-    def __init__(self, dist_ip_addrs=None, params=None):
-        """Construct the TextPrediction object for training models.
+class TextPrediction(BaseTask):
+    Dataset = tabular_prediction.TabularDataset
 
-        Parameters
-        ----------
-        dist_ip_addrs
-            A list of IP addresses for distributed training.
-        params
-            The parameters of the TextPrediction module.
-        """
-        assert dist_ip_addrs is None, 'Distributed training is currently not supported!'
-        self._dist_ip_addrs = dist_ip_addrs
-        if params is None:
-            params = ag_text_params.create('default')
-        elif isinstance(params, str):
-            params = ag_text_params.create(params)
-        else:
-            base_params = ag_text_params.create('default')
-            params = merge_params(base_params, params)
-        self._params = params
-        self._scheduler = None
-
-    def __repr__(self):
-        ret = 'TextPrediction('
-        ret += '   dist_ip_addrs={}'.format(self._dist_ip_addrs)
-        ret += ')'
-        return ret
-
-    @property
-    def params(self):
-        return self._params
-
-    def fit(self, train_data,
+    @staticmethod
+    def fit(train_data,
             label,
             tuning_data=None,
             time_limits=None,
@@ -214,8 +187,12 @@ class TextPrediction:
             nthreads_per_trial=None,
             ngpus_per_trial=None,
             scheduler=None,
+            dist_ip_addrs=None,
             search_strategy=None,
-            seed=None):
+            search_options=None,
+            hyperparameters=None,
+            seed=None,
+            verbosity=2):
         """
 
         Parameters
@@ -247,27 +224,49 @@ class TextPrediction:
             based on the total number of GPUs available.
         scheduler
             The scheduler of HPO
+        dist_ip_addrs
+            The distributed IP address
         search_strategy
             The search strategy
+        search_options
+            The search options
+        hyperparameters
+            The hyper-parameters of the search-space.
         seed
             The seed of the random state
+        verbosity
+            Verbosity levels range from 0 to 4 and control how much information is printed
+            during fit().
+            Higher levels correspond to more detailed print statements
+            (you can set verbosity = 0 to suppress warnings).
+            If using logging, you can alternatively control amount of information printed
+            via `logger.setLevel(L)`,
+            where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print
+            statements, opposite of verbosity levels)
 
         Returns
         -------
         model
             A model object
         """
+        assert dist_ip_addrs is None, 'Training on remote machine is currently not supported.'
+        if verbosity < 0:
+            verbosity = 0
+        elif verbosity > 4:
+            verbosity = 4
+
+        logger.setLevel(verbosity2loglevel(verbosity))
+        # Parse the hyper-parameters
+        if hyperparameters is None:
+            hyperparameters = ag_text_params.create('default')
+        elif isinstance(hyperparameters, str):
+            hyperparameters = ag_text_params.create(hyperparameters)
+        else:
+            base_params = ag_text_params.create('default')
+            hyperparameters = merge_params(base_params, hyperparameters)
         np.random.seed(seed)
         train_data = load_pd.load(train_data)
         # Inference the label
-        if label is None:
-            # Perform basic label inference
-            if 'label' in train_data.columns:
-                label = 'label'
-            elif 'score' in train_data.columns:
-                label = 'score'
-            else:
-                label = train_data.columns[-1]
         if not isinstance(label, list):
             label = [label]
         label_columns = []
@@ -316,7 +315,7 @@ class TextPrediction:
                                                                              stopping_metric,
                                                                              log_metrics))
         model_candidates = []
-        for model_params in self.params['models']:
+        for model_params in hyperparameters['models']:
             model_type = model_params['type']
             search_space = model_params['search_space']
             if model_type == 'BertForTextPredictionBasic':
@@ -338,9 +337,9 @@ class TextPrediction:
         resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
                                             ngpus_per_trial=ngpus_per_trial)
         if scheduler is None:
-            scheduler = self.params['hpo_params']['scheduler']
+            scheduler = hyperparameters['hpo_params']['scheduler']
         if search_strategy is None:
-            search_strategy = self.params['hpo_params']['search_strategy']
+            search_strategy = hyperparameters['hpo_params']['search_strategy']
         model = model_candidates[0]
         scheduler = model.train(train_data=train_data,
                                 tuning_data=tuning_data,
@@ -348,9 +347,8 @@ class TextPrediction:
                                 time_limits=time_limits,
                                 scheduler=scheduler,
                                 searcher=search_strategy,
-                                num_trials=self.params['hpo_params']['num_trials'],
-                                reduction_factor=self.params['hpo_params']['reduction_factor'])
-        self._scheduler = scheduler
+                                num_trials=hyperparameters['hpo_params']['num_trials'],
+                                reduction_factor=hyperparameters['hpo_params']['reduction_factor'])
         return model
 
     @staticmethod
@@ -368,16 +366,3 @@ class TextPrediction:
             The loaded model
         """
         return BertForTextPredictionBasic.load(dir_path)
-
-    def report(self, output_directory):
-        """Get a report about the training job into a folder.
-
-        Parameters
-        ----------
-        output_directory
-            The directory that we will write the report
-        """
-
-
-    def cleanup(self):
-        raise NotImplementedError

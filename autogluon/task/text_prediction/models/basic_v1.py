@@ -17,7 +17,7 @@ from ....contrib.nlp.utils.config import CfgNode
 from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ..metrics import calculate_metric_by_expr
+from ..metrics import calculate_metric_by_expr, in_ipynb
 from .. import constants as _C
 from ....core import args, space
 from ....scheduler import FIFOScheduler, HyperbandScheduler
@@ -565,8 +565,24 @@ class BertForTextPredictionBasic:
         # Need to be set in the fit call
         self._net = None
         self._preprocessor = None
-        self._scheduler = None
         self._config = None
+        self._results = None
+
+    @property
+    def label_columns(self):
+        return self._label_columns
+
+    @property
+    def label_shapes(self):
+        return self._label_shapes
+
+    @property
+    def problem_types(self):
+        return self._problem_types
+
+    @property
+    def feature_columns(self):
+        return self._feature_columns
 
     @property
     def search_space(self):
@@ -606,7 +622,9 @@ class BertForTextPredictionBasic:
               num_trials=10,
               grace_period=None,
               reduction_factor=4,
-              brackets=1):
+              brackets=1,
+              plot_results=True):
+        start_tick = time.time()
         logging_config(folder=self._output_directory, name='main')
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
@@ -658,12 +676,24 @@ class BertForTextPredictionBasic:
         scheduler.run()
         scheduler.join_jobs(timeout=time_limits)
         logging.info('Best_config={}'.format(scheduler.get_best_config()))
-        self._scheduler = scheduler
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))
         best_cfg_path = os.path.join(best_model_saved_dir_path, 'cfg.yml')
         cfg = self.base_config.clone_merge(best_cfg_path)
+        self._results = dict()
+        self._results.update(best_reward=scheduler.get_best_reward(),
+                             best_config=scheduler.get_best_config(),
+                             total_time=time.time() - start_tick,
+                             metadata=scheduler.metadata,
+                             training_history=scheduler.training_history,
+                             config_history=scheduler.config_history,
+                             reward_attr=scheduler._reward_attr,
+                             config=cfg)
+        if plot_results or in_ipynb():
+            plot_training_curves = os.path.join(self._output_directory, 'plot_training_curves.png')
+            scheduler.get_training_curves(filename=plot_training_curves, plot=True,
+                                          use_legend=False)
         # Consider to move this to a separate predictor
         self._config = cfg
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \

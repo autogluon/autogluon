@@ -2,7 +2,7 @@ import mxnet as mx
 import os
 import json
 import argparse
-from autogluon.task.text_prediction import TextPrediction
+from autogluon.task import TextPrediction as task
 mx.npx.set_np()
 
 
@@ -61,7 +61,6 @@ def train(args):
         raise NotImplementedError
     if args.exp_dir is None:
         args.exp_dir = 'autogluon_{}'.format(args.task)
-    task = TextPrediction()
     model = task.fit(train_data=args.train_file,
                      label=label_columns,
                      feature_columns=feature_columns,
@@ -77,7 +76,7 @@ def train(args):
         for ele in dev_prediction:
             of.write(str(ele) + '\n')
     model.save(os.path.join(args.exp_dir, 'saved_model'))
-    model = TextPrediction.load(os.path.join(args.exp_dir, 'saved_model'))
+    model = task.load(os.path.join(args.exp_dir, 'saved_model'))
     test_prediction = model.predict(args.test_file)
     with open(os.path.join(args.exp_dir, 'test_predictions.txt'), 'w') as of:
         for ele in test_prediction:
@@ -85,7 +84,7 @@ def train(args):
 
 
 def predict(args):
-    model = TextPrediction.load(args.model_dir)
+    model = task.load(args.model_dir)
     test_prediction = model.predict(args.test_file)
     if args.exp_dir is None:
         args.exp_dir = '.'
