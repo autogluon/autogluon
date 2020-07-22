@@ -17,7 +17,8 @@ from ....contrib.nlp.utils.config import CfgNode
 from ....contrib.nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
 from ....contrib.nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
-from ..metrics import calculate_metric_by_expr, in_ipynb
+from ..metrics import calculate_metric_by_expr
+from ....utils import in_ipynb
 from .. import constants as _C
 from ....core import args, space
 from ....scheduler import FIFOScheduler, HyperbandScheduler
