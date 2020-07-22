@@ -1,11 +1,12 @@
 import copy
 import logging
+import re
 import traceback
 
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from .abstract_feature_generator import AbstractFeatureGenerator
 from .vectorizers import get_ngram_freq, downscale_vectorizer
@@ -70,7 +71,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         X_text_features_combined = []
         if self.feature_transformations['text_special']:
             for nlp_feature in self.feature_transformations['text_special']:
-                X_text_features = self.generate_text_features(X[nlp_feature], nlp_feature)
+                X_text_features = self.generate_text_special(X[nlp_feature], nlp_feature)
                 X_text_features_combined.append(X_text_features)
             X_text_features_combined = pd.concat(X_text_features_combined, axis=1)
 
@@ -222,3 +223,63 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_nlp_features_combined = pd.concat(X_nlp_features_combined, axis=1)
 
         return X_nlp_features_combined
+
+    def generate_text_special(self, X: Series, feature: str) -> DataFrame:
+        X_text_special: DataFrame = DataFrame(index=X.index)
+        X_text_special[feature + '.char_count'] = [self.char_count(value) for value in X]
+        X_text_special[feature + '.word_count'] = [self.word_count(value) for value in X]
+        X_text_special[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X]
+        X_text_special[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X]
+        X_text_special[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X]
+        X_text_special[feature + '.special_ratio'] = [self.special_ratio(value) for value in X]
+
+        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
+        for symbol in symbols:
+            X_text_special[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X]
+            X_text_special[feature + '.symbol_ratio.' + symbol] = X_text_special[feature + '.symbol_count.' + symbol] / X_text_special[feature + '.char_count']
+            X_text_special[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
+
+        return X_text_special
+
+    @staticmethod
+    def word_count(string):
+        return len(string.split())
+
+    @staticmethod
+    def char_count(string):
+        return len(string)
+
+    @staticmethod
+    def special_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        new_str = re.sub(r'[\w]+', '', string)
+        return len(new_str) / len(string)
+
+    @staticmethod
+    def digit_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(c.isdigit() for c in string) / len(string)
+
+    @staticmethod
+    def lower_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(c.islower() for c in string) / len(string)
+
+    @staticmethod
+    def capital_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(1 for c in string if c.isupper()) / len(string)
+
+    @staticmethod
+    def symbol_in_string_count(string, character):
+        if not string:
+            return 0
+        return sum(1 for c in string if c == character)
