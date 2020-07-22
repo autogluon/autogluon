@@ -419,6 +419,7 @@ def train_function(args, reporter, train_data, tuning_data,
     best_performance_score = None
     mx.npx.waitall()
     no_better_rounds = 0
+    report_idx = 0
     for update_idx in range(max_update):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
@@ -500,10 +501,12 @@ def train_function(args, reporter, train_data, tuning_data,
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent))
             report_items = [('iteration', update_idx + 1),
+                            ('report_idx', report_idx),
                             ('epoch', int(update_idx / updates_per_epoch))] + \
                            [(k, v.item()) for k, v in metric_scores.items()] + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
+            report_idx += 1
             report_items.append(('performance_score', performance_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
@@ -659,10 +662,10 @@ class BertForTextPredictionBasic:
             if time_limits is None:
                 time_limits = 5 * 60 * 60  # 5 hour
             if grace_period is None:
-                grace_period = int(time_limits * 0.01)
+                grace_period = 5
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
-                                           max_t=time_limits,
+                                           max_t=50,
                                            resource=resource,
                                            searcher=searcher,
                                            grace_period=grace_period,
@@ -671,7 +674,7 @@ class BertForTextPredictionBasic:
                                            checkpoint=os.path.join(self._output_directory,
                                                                    'scheduler.checkpoint'),
                                            reward_attr='performance_score',
-                                           time_attr='time_spent')
+                                           time_attr='report_idx')
         else:
             raise NotImplementedError
         scheduler.run()
