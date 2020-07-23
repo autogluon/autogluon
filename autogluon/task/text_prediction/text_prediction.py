@@ -35,13 +35,12 @@ def default() -> dict:
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 32,
                     'optimization.num_train_epochs': space.Categorical(3, 5, 10),
-                    'optimization.lr': space.Categorical(1E-5, 2E-5, 5E-5,
-                                                         1E-4, 2E-4, 5E-4, 1E-3)
+                    'optimization.lr': space.Real(1E-5, 5E-4)
                 }
             },
         },
         'hpo_params': {
-            'scheduler': 'hyperband',     # Can be 'fifo', 'hyperband'
+            'scheduler': 'fifo',     # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',  # Can be 'random', 'bayesopt'
             'search_options': None,       # The search option
             'time_limits': 1 * 60 * 60,   # The total budget
