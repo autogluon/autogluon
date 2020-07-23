@@ -4,7 +4,7 @@ dependencies:
 - graphviz
 - pip:
   - jupyter-sphinx>=0.2.2
-  - mxnet-cu100==1.6.0b20191013
+  - https://autogluon-kdd-mxnet-wheels.s3-accelerate.amazonaws.com/mxnet_cu100-1.7.0b20200713-py2.py3-none-manylinux2014_x86_64.whl
   - portalocker
   - nose
   - docutils

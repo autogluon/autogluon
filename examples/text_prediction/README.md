@@ -9,8 +9,9 @@ We solve two types of
 python prepare_glue.py --benchmark glue
 ```
 
-Train on SST-2 dataset in the GLUE benchmark
-
+### Run the benchmark
+Run on all datasets
+ 
 ```bash
 for TASK in cola sst mrpc sts qqp qnli rte wnli
 do
@@ -39,4 +40,5 @@ python run_text_prediction.py \
      --test_file glue/mnli/test_mismatched.parquet \
      --task mnli
 ```
+
 
