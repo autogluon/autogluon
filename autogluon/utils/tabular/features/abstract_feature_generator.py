@@ -63,9 +63,45 @@ class AbstractFeatureGenerator:
         if pre_memory_usage_percent > 0.05:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
+        X_index = copy.deepcopy(X.index)
+        X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+
+        X_features = self._fit_transform(X=X, y=y, banned_features=banned_features, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
+
+        X_features.index = X_index
+
+        for feature_type in self.feature_type_family_generated:
+            self.feature_type_family_generated[feature_type] = list(set(self.feature_type_family_generated[feature_type]) - set(self.features_to_remove_post))
+
+        self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
+        self.post_memory_usage_per_row = self.post_memory_usage / X_len
+
+        available_mem = psutil.virtual_memory().available
+        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
+
+        if post_memory_usage_percent > 0.15:
+            logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+
+        if len(list(X_features.columns)) == 0:
+            self.is_dummy = True
+            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            X_features['__dummy__'] = 0
+            self.feature_type_family_generated['int'] = ['__dummy__']
+
+        feature_types_raw = get_type_family_groups_df(X_features)
+        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=self.feature_type_family_generated)
+
+        self.features = list(X_features.columns)
+        self.fit = True
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
+        self.print_feature_type_info()
+
+        return X_features
+
+    def _fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
         if banned_features:
             self.features_to_remove += [str(feature) for feature in banned_features]
-        X_index = copy.deepcopy(X.index)
+
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         self.get_feature_types(X)
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
@@ -73,8 +109,8 @@ class AbstractFeatureGenerator:
         self.features_init_types = X.dtypes.to_dict()
         self.feature_type_family_init_raw = get_type_groups_df(X)
 
-        X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
+        X_len = len(X)
         for column in X_features:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
@@ -98,33 +134,6 @@ class AbstractFeatureGenerator:
 
         X_features = self.minimize_memory_usage(X_features=X_features)
 
-        for feature_type in self.feature_type_family_generated:
-            self.feature_type_family_generated[feature_type] = list(set(self.feature_type_family_generated[feature_type]) - set(self.features_to_remove_post))
-
-        self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
-        self.post_memory_usage_per_row = self.post_memory_usage / X_len
-
-        available_mem = psutil.virtual_memory().available
-        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
-
-        if post_memory_usage_percent > 0.15:
-            logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
-
-        X_features.index = X_index
-        if len(list(X_features.columns)) == 0:
-            self.is_dummy = True
-            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
-            X_features['__dummy__'] = 0
-            self.feature_type_family_generated['int'] = ['__dummy__']
-
-        feature_types_raw = get_type_family_groups_df(X_features)
-        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=self.feature_type_family_generated)
-
-        self.features = list(X_features.columns)
-        self.fit = True
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
-        self.print_feature_type_info()
-
         return X_features
 
     @calculate_time
@@ -134,6 +143,7 @@ class AbstractFeatureGenerator:
         if self.features is None:
             raise AssertionError('FeatureGenerator.features is None, have you called fit() yet?')
         X_index = copy.deepcopy(X.index)
+        X = X.reset_index(drop=True)
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         X = X.drop(self.features_to_remove, axis=1, errors='ignore')
         X_columns = X.columns.tolist()
@@ -146,7 +156,6 @@ class AbstractFeatureGenerator:
             raise ValueError(f'Required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
         X = X.astype(self.features_init_types)
-        X.reset_index(drop=True, inplace=True)
         X_features = self.generate_features(X)
         for column in self.features_binned:
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
