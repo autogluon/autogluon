@@ -697,7 +697,7 @@ class BertForTextPredictionBasic:
         if plot_results or in_ipynb():
             plot_training_curves = os.path.join(self._output_directory, 'plot_training_curves.png')
             scheduler.get_training_curves(filename=plot_training_curves, plot=True,
-                                          use_legend=False)
+                                          use_legend=True)
         # Consider to move this to a separate predictor
         self._config = cfg
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
