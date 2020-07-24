@@ -4,11 +4,11 @@ import math
 from collections import defaultdict
 
 import numpy as np
-import pandas as pd
 import psutil
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
+from . import binning
 from .feature_types_metadata import FeatureTypesMetadata
 from .types import get_type_family_special, get_type_groups_df, get_type_family_groups_df
 from .utils import check_if_useless_feature
@@ -122,9 +122,9 @@ class AbstractFeatureGenerator:
         self.features_to_remove_post = self._get_features_to_remove_post(X_features)
 
         self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
-        self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
+        self.features_binned_mapping = binning.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
-            X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+            X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
         X_features.drop(self.features_to_remove_post, axis=1, inplace=True)
         if drop_duplicates:
             X_features = self.drop_duplicate_features(X_features)
@@ -159,7 +159,7 @@ class AbstractFeatureGenerator:
         X = X.astype(self.features_init_types)
         X_features = self._generate_features(X)
         for column in self.features_binned:
-            X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+            X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
         if self.is_dummy:
             X_features.index = X_index
             X_features['__dummy__'] = 0
@@ -270,72 +270,6 @@ class AbstractFeatureGenerator:
 
         return feature_types_metadata_full
 
-    @staticmethod
-    def bin_column(series, mapping):
-        mapping_dict = {k: v for v, k in enumerate(list(mapping))}
-        series_out = pd.cut(series, mapping)
-        # series_out.cat.categories = [str(g) for g in series_out.cat.categories]  # LightGBM crashes at end of training without this
-        series_out_int = [mapping_dict[val] for val in series_out]
-        return series_out_int
-
-    # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
-    @staticmethod
-    def generate_bins(X_features: DataFrame, features_to_bin):
-        X_len = len(X_features)
-        ideal_cats = 10
-        starting_cats = 1000
-        bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
-        bin_epsilon = 0.000000001
-        bin_mapping = defaultdict()
-        max_iterations = 20
-        for column in features_to_bin:
-            num_cats_initial = starting_cats
-            bins_value_counts = X_features[column].value_counts(ascending=False, normalize=True)
-            max_bins = len(bins_value_counts)
-
-            if max_bins <= ideal_cats:
-                bins = pd.Series(data=sorted(X_features[column].unique()))
-                num_cats_initial = max_bins
-                cur_len = max_bins
-                bin_index = range(num_cats_initial)
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
-            else:
-                cur_len = X_len
-                bins = X_features[column].sort_values(ascending=True)
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
-
-            max_desired_bins = min(ideal_cats, max_bins)
-            min_desired_bins = min(ideal_cats, max_bins)
-
-            if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
-                is_satisfied = True
-            else:
-                is_satisfied = False
-
-            num_cats_current = num_cats_initial
-            # print(column, min_desired_bins, max_desired_bins)
-            cur_iteration = 0
-            while not is_satisfied:
-                if len(interval_index) > max_desired_bins:
-                    pass
-                elif len(interval_index) < min_desired_bins:
-                    pass
-                ratio_reduction = max_desired_bins / len(interval_index)
-                num_cats_current = int(np.floor(num_cats_current * ratio_reduction))
-                bin_index = [np.floor(cur_len * (num + 1) / num_cats_current) for num in range(num_cats_current - 1)]
-                interval_index = AbstractFeatureGenerator.get_bins(bins=bins, bin_index=bin_index, bin_epsilon=bin_epsilon)
-
-                if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
-                    is_satisfied = True
-                    # print('satisfied', column, len(interval_index))
-                cur_iteration += 1
-                if cur_iteration >= max_iterations:
-                    is_satisfied = True
-                    # print('max_iterations met, stopping prior to satisfaction!', column, len(interval_index))
-
-            bin_mapping[column] = interval_index
-        return bin_mapping
-
     # TODO: Move this outside of here
     # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
     @staticmethod
@@ -346,23 +280,6 @@ class AbstractFeatureGenerator:
             num_rows = len(df)
             num_rows_sample = math.ceil(sample_ratio * num_rows)
             return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
-
-    # TODO: Clean code
-    # bins is a sorted int/float series, ascending=True
-    @staticmethod
-    def get_bins(bins: Series, bin_index, bin_epsilon):
-        max_val = bins.max()
-        bins_2 = bins.iloc[bin_index]
-        bins_3 = list(bins_2.values)
-        bins_unique = sorted(list(set(bins_3)))
-        bins_with_epsilon_max = set([i for i in bins_unique] + [i - bin_epsilon for i in bins_unique if i == max_val])
-        removal_bins = set([bins_unique[index - 1] for index, i in enumerate(bins_unique[1:], start=1) if i == max_val])
-        bins_4 = sorted(list(bins_with_epsilon_max - removal_bins))
-        bins_5 = [np.inf if (x == max_val) else x for x in bins_4]
-        bins_6 = sorted(list(set([-np.inf] + bins_5 + [np.inf])))
-        bins_7 = [(bins_6[i], bins_6[i + 1]) for i in range(len(bins_6) - 1)]
-        interval_index = pd.IntervalIndex.from_tuples(bins_7)
-        return interval_index
 
     def print_feature_type_info(self):
         logger.log(20, 'Original Features (raw dtypes):')
