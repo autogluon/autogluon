@@ -30,7 +30,11 @@ class TabularDataset(pd.DataFrame):
     subsample : int (optional)
         If specified = k, we only keep first k rows of the provided dataset.
     name : str (optional)
-         Optional name to assign to dataset (has no effect beyond being accessible via `TabularDataset.name`).
+        Optional name to assign to dataset (has no effect beyond being accessible via `TabularDataset.name`).
+    copy : bool (optional, default=False)
+        If True and `df` is passed, then `df` will be deep copied, resulting in two instances of the provided data in memory.
+        If False, the original `df` and the new `TabularDataset` will share the same underlying data.
+        Set `copy=True` if you don't want AutoGluon to be able to modify the original DataFrame during it's training process (and your machine has enough memory).
 
     Attributes
     ----------
@@ -71,6 +75,7 @@ class TabularDataset(pd.DataFrame):
         feature_types = kwargs.get('feature_types', None)
         df = kwargs.get('df', None)
         subsample = kwargs.get('subsample', None)
+        copy = kwargs.get('copy', False)
         construct_from_df = False  # whether or not we are constructing new dataset object from scratch based on provided DataFrame.
         # if df is None and file_path is None: # Cannot be used currently!
         #     raise ValueError("Must specify either named argument 'file_path' or 'df' in order to construct tabular Dataset")
@@ -80,7 +85,8 @@ class TabularDataset(pd.DataFrame):
                 raise ValueError("'df' must be existing pandas DataFrame. To read dataset from file instead, use 'file_path' string argument.")
             if file_path is not None:
                 warnings.warn("Both 'df' and 'file_path' supplied. Creating dataset based on DataFrame 'df' rather than reading from file_path.")
-            df = df.copy(deep=True)
+            if copy:
+                df = df.copy(deep=True)
         elif file_path is not None:  # Read from file to create dataset
             construct_from_df = True
             df = load_pd.load(file_path)
