@@ -35,19 +35,19 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
     def _compute_feature_transformations(self):
         """Determines which features undergo which feature transformations."""
         if self.enable_categorical_features:
-            if 'object' in self.feature_type_family:
+            if self.feature_type_family['object']:
                 self.feature_transformations['category'] += self.feature_type_family['object']
-            if 'text' in self.feature_type_family:
+            if self.feature_type_family['text']:
                 self.feature_transformations['category'] += self.feature_type_family['text']
 
-        if 'text' in self.feature_type_family:
+        if self.feature_type_family['text']:
             text_features = self.feature_type_family['text']
             if self.enable_text_special_features:
                 self.feature_transformations['text_special'] += text_features
             if self.enable_nlp_features:
                 self.feature_transformations['text_ngram'] += text_features
 
-        if 'datetime' in self.feature_type_family:
+        if self.feature_type_family['datetime']:
             datetime_features = self.feature_type_family['datetime']
             if self.enable_datetime_features:
                 self.feature_transformations['datetime'] += datetime_features
@@ -58,7 +58,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                     self.feature_transformations['raw'] += self.feature_type_family[type_family]
 
     # TODO: Parallelize with decorator!
-    def generate_features(self, X: DataFrame):
+    def _generate_features(self, X: DataFrame):
         if not self.fit:
             self._compute_feature_transformations()
         X_features = pd.DataFrame(index=X.index)

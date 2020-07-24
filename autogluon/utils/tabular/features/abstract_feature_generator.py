@@ -1,7 +1,6 @@
 import copy
 import logging
 import math
-import re
 from collections import defaultdict
 
 import numpy as np
@@ -11,7 +10,8 @@ from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
 from .feature_types_metadata import FeatureTypesMetadata
-from .utils import get_type_family, get_type_groups_df, get_type_family_groups_df
+from .types import get_type_family_special, get_type_groups_df, get_type_family_groups_df
+from .utils import check_if_useless_feature
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
 
@@ -28,6 +28,7 @@ class AbstractFeatureGenerator:
         self.features_init_types = dict()  # Initial feature types prior to transformation
         self.feature_type_family_init_raw = defaultdict(list)  # Feature types of original features, without inferring.
         self.feature_type_family = defaultdict(list)  # Feature types of original features, after inferring.
+        self.feature_type_family_direct = dict()
         self.feature_type_family_generated = defaultdict(list)  # Feature types (special) of generated features.
         self.feature_transformations = defaultdict(list)  # Dictionary of transformation pipelines (keys) and the list of original features transformed through them (values)
         self.features_categorical_final = []  # Categorical features
@@ -54,7 +55,8 @@ class AbstractFeatureGenerator:
     # TODO: Save this to disk and remove from memory if large categoricals!
     @calculate_time
     def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
-        self.fit = False
+        if self.fit:
+            raise AssertionError('fit_transform cannot be called on an already fit feature generator.')
         X_len = len(X)
         self.pre_memory_usage = self.get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
@@ -99,31 +101,31 @@ class AbstractFeatureGenerator:
         return X_features
 
     def _fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
-        if banned_features:
-            self.features_to_remove += [str(feature) for feature in banned_features]
-
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
-        self.get_feature_types(X)
-        X = X.drop(self.features_to_remove, axis=1, errors='ignore')
-        self.features_init_to_keep = copy.deepcopy(list(X.columns))
-        self.features_init_types = X.dtypes.to_dict()
-        self.feature_type_family_init_raw = get_type_groups_df(X)
 
-        X_features = self.generate_features(X)
-        X_len = len(X)
-        for column in X_features:
-            unique_value_count = len(X_features[column].unique())
-            if unique_value_count == 1:
-                self.features_to_remove_post.append(column)
-            # TODO: Consider making 0.99 a parameter to FeatureGenerator
-            elif 'object' in self.feature_type_family and column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
-                self.features_to_remove_post.append(column)
+        if banned_features:
+            features_to_remove = [str(feature) for feature in banned_features]
+        else:
+            features_to_remove = []
+        features_to_remove += [feature for feature in self._get_useless_features(X) if feature not in features_to_remove]
+        X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
+
+        self.features_init_to_keep = list(X.columns)
+        self.features_init_types = X.dtypes.to_dict()
+
+        self.feature_type_family_init_raw = get_type_groups_df(X)
+        self.feature_type_family_direct = self._get_feature_types_family(X)
+        for feature, type_family in self.feature_type_family_direct.items():
+            self.feature_type_family[type_family].append(feature)
+
+        X_features = self._generate_features(X)
+        self.features_to_remove_post = self._get_features_to_remove_post(X_features)
 
         self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
         self.features_binned_mapping = self.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
-        X_features = X_features.drop(self.features_to_remove_post, axis=1)
+        X_features.drop(self.features_to_remove_post, axis=1, inplace=True)
         if drop_duplicates:
             X_features = self.drop_duplicate_features(X_features)
         self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
@@ -145,18 +147,17 @@ class AbstractFeatureGenerator:
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
-        X = X.drop(self.features_to_remove, axis=1, errors='ignore')
-        X_columns = X.columns.tolist()
-        # Create any columns present in the training dataset that are now missing from this dataframe:
-        missing_cols = []
-        for col in self.features_init_to_keep:
-            if col not in X_columns:
-                missing_cols.append(col)
-        if len(missing_cols) > 0:
-            raise ValueError(f'Required columns are missing from the provided dataset. Missing columns: {missing_cols}')
+        try:
+            X = X[self.features_init_to_keep]
+        except KeyError:
+            missing_cols = []
+            for col in self.features_init_to_keep:
+                if col not in X.columns:
+                    missing_cols.append(col)
+            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
         X = X.astype(self.features_init_types)
-        X_features = self.generate_features(X)
+        X_features = self._generate_features(X)
         for column in self.features_binned:
             X_features[column] = self.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
         if self.is_dummy:
@@ -171,65 +172,8 @@ class AbstractFeatureGenerator:
 
         return X_features
 
-    def get_feature_types(self, X: DataFrame):
-        features_init = list(X.columns)
-        features_init = [feature for feature in features_init if feature not in self.features_to_remove]
-        for column in features_init:
-            mark_for_removal = False
-            col_val = X[column]
-            dtype = col_val.dtype
-            num_unique = len(col_val.unique())
-
-            type_family = self.get_type_family(dtype)
-            if self.check_if_datetime_feature(col_val):
-                type_family = 'datetime'
-            elif self.check_if_nlp_feature(col_val):
-                type_family = 'text'
-
-            if num_unique == 1:
-                mark_for_removal = True
-            if mark_for_removal:
-                self.features_to_remove.append(column)
-            else:
-                self.feature_type_family[type_family].append(column)
-
-    def generate_features(self, X: DataFrame):
+    def _generate_features(self, X: DataFrame) -> DataFrame:
         raise NotImplementedError()
-
-    # TODO: Expand to int64 -> date features (milli from epoch etc)
-    def check_if_datetime_feature(self, X: Series):
-        type_family = self.get_type_family(X.dtype)
-        # TODO: Check if low numeric numbers, could be categorical encoding!
-        # TODO: If low numeric, potentially it is just numeric instead of date
-        if X.isnull().all():
-            return False
-        if type_family == 'datetime':
-            return True
-        if type_family != 'object':  # TODO: seconds from epoch support
-            return False
-        try:
-            X.apply(pd.to_datetime)
-            return True
-        except:
-            return False
-
-    def check_if_nlp_feature(self, X: Series):
-        type_family = self.get_type_family(X.dtype)
-        if type_family != 'object':
-            return False
-        X_unique = X.unique()
-        num_unique = len(X_unique)
-        num_rows = len(X)
-        unique_ratio = num_unique / num_rows
-        # print(X_unique)
-        if unique_ratio <= 0.01:
-            return False
-        avg_words = np.mean([len(re.sub(' +', ' ', value).split(' ')) if isinstance(value, str) else 0 for value in X_unique])
-        # print(avg_words)
-        if avg_words < 3:
-            return False
-
-        return True
 
     def minimize_memory_usage(self, X_features):
         if self.minimize_categorical_memory_usage_flag:
@@ -271,10 +215,29 @@ class AbstractFeatureGenerator:
                 X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
         return X_features
 
-    # TODO: add option for user to specify dtypes on load
+    def _get_features_to_remove_post(self, X_features: DataFrame) -> list:
+        features_to_remove_post = []
+        X_len = len(X_features)
+        for column in X_features:
+            unique_value_count = len(X_features[column].unique())
+            if unique_value_count == 1:
+                features_to_remove_post.append(column)
+            # TODO: Consider making 0.99 a parameter to FeatureGenerator
+            elif column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
+                features_to_remove_post.append(column)
+        return features_to_remove_post
+
     @staticmethod
-    def get_type_family(dtype):
-        return get_type_family(dtype=dtype)
+    def _get_useless_features(X: DataFrame) -> list:
+        useless_features = []
+        for column in X:
+            if check_if_useless_feature(X[column]):
+                useless_features.append(column)
+        return useless_features
+
+    @staticmethod
+    def _get_feature_types_family(X: DataFrame) -> dict:
+        return {column: get_type_family_special(X[column]) for column in X}
 
     # TODO: optimize by not considering columns with unique sums/means
     # TODO: Multithread?
@@ -418,5 +381,5 @@ class AbstractFeatureGenerator:
         for key, val in self.get_feature_types_metadata_full().items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
 
-    def save_self(self, path):
+    def save(self, path):
         save_pkl.save(path=path, object=self)
