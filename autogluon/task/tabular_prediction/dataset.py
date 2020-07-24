@@ -34,6 +34,7 @@ class TabularDataset(pd.DataFrame):
     copy : bool (optional, default=False)
         If True and `df` is passed, then `df` will be deep copied, resulting in two instances of the provided data in memory.
         If False, the original `df` and the new `TabularDataset` will share the same underlying data.
+        Set `copy=True` if you don't want AutoGluon to be able to modify the original DataFrame during it's training process (and your machine has enough memory).
 
     Attributes
     ----------

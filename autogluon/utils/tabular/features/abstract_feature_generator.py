@@ -411,10 +411,10 @@ class AbstractFeatureGenerator:
         logger.log(20, 'Generated Features (special dtypes):')
         for key, val in self.feature_types_metadata.feature_types_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Final Features (raw dtypes):')
+        logger.log(20, 'Processed Features (raw dtypes):')
         for key, val in self.feature_types_metadata.feature_types_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Final Features:')
+        logger.log(20, 'Processed Features:')
         for key, val in self.get_feature_types_metadata_full().items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
 
