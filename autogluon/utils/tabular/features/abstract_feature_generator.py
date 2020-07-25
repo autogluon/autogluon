@@ -47,7 +47,7 @@ class AbstractFeatureGenerator:
 
         self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the final features. Passed to models to enable advanced functionality.
 
-    def preprocess(self, X: DataFrame):
+    def _preprocess(self, X: DataFrame):
         return X
 
     # TODO: Save this to disk and remove from memory if large categoricals!

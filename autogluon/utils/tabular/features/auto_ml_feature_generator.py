@@ -2,6 +2,7 @@ import copy
 import logging
 import re
 import traceback
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -34,74 +35,108 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
     def _compute_feature_transformations(self):
         """Determines which features undergo which feature transformations."""
+        feature_transformations = defaultdict(list)
         if self.enable_categorical_features:
             if self.feature_type_family['object']:
-                self.feature_transformations['category'] += self.feature_type_family['object']
+                feature_transformations['category'] += self.feature_type_family['object']
             if self.feature_type_family['text']:
-                self.feature_transformations['category'] += self.feature_type_family['text']
+                feature_transformations['category'] += self.feature_type_family['text']
 
         if self.feature_type_family['text']:
             text_features = self.feature_type_family['text']
             if self.enable_text_special_features:
-                self.feature_transformations['text_special'] += text_features
+                feature_transformations['text_special'] += text_features
             if self.enable_nlp_features:
-                self.feature_transformations['text_ngram'] += text_features
+                feature_transformations['text_ngram'] += text_features
 
         if self.feature_type_family['datetime']:
             datetime_features = self.feature_type_family['datetime']
             if self.enable_datetime_features:
-                self.feature_transformations['datetime'] += datetime_features
+                feature_transformations['datetime'] += datetime_features
 
         if self.enable_raw_features:
             for type_family in self.feature_type_family:
                 if type_family not in ['object', 'text', 'datetime']:
-                    self.feature_transformations['raw'] += self.feature_type_family[type_family]
+                    feature_transformations['raw'] += self.feature_type_family[type_family]
+
+        return feature_transformations
 
     # TODO: Parallelize with decorator!
     def _generate_features(self, X: DataFrame):
         if not self.fit:
-            self._compute_feature_transformations()
-        X_features = pd.DataFrame(index=X.index)
+            self.feature_transformations = self._compute_feature_transformations()
         for column in X.columns:
-            if X[column].dtype.name == 'object':
+            if self.features_init_types[column].name == 'object':
                 X[column].fillna('', inplace=True)
             else:
                 X[column].fillna(np.nan, inplace=True)
 
-        X = self.preprocess(X)
+        X = self._preprocess(X)
 
+        X_raw = self._generate_features_raw(X)
+        X_category = self._generate_features_category(X)
+        X_text_special = self._generate_features_text_special(X)
+        X_datetime = self._generate_features_datetime(X)
+        X_text_ngram = self._generate_features_text_ngram(X)
+
+        feature_df_list = [X_raw, X_category, X_text_special, X_datetime, X_text_ngram]
+        feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
+        if len(feature_df_list) == 1:
+            X_features = feature_df_list[0]
+        else:
+            X_features = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
+
+        return X_features
+
+    def _generate_features_raw(self, df: DataFrame):
         if self.feature_transformations['raw']:
-            X_features = X_features.join(X[self.feature_transformations['raw']])
+            return df[self.feature_transformations['raw']]
+        else:
+            return None
 
+    # TODO: Optimize lines
+    def _generate_features_category(self, df: DataFrame):
         if self.feature_transformations['category']:
-            X_categoricals = X[self.feature_transformations['category']]
+            df_category = df[self.feature_transformations['category']]
             # TODO: Add stateful categorical generator, merge rare cases to an unknown value
             # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
             if not self.fit:
-                if 'text' in self.feature_type_family:
+                if self.feature_type_family['text']:
                     self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
-            X_categoricals = X_categoricals.astype('category')
-            X_features = X_features.join(X_categoricals)
+            df_category = df_category.astype('category')
+        else:
+            df_category = None
+        return df_category
 
+    def _generate_features_text_special(self, df: DataFrame):
         if self.feature_transformations['text_special']:
-            X_text_special_combined = []
+            df_text_special_combined = []
             for nlp_feature in self.feature_transformations['text_special']:
-                X_text_special = self.generate_text_special(X[nlp_feature], nlp_feature)
-                X_text_special_combined.append(X_text_special)
-            X_text_special_combined = pd.concat(X_text_special_combined, axis=1)
+                df_text_special = self.generate_text_special(df[nlp_feature], nlp_feature)
+                df_text_special_combined.append(df_text_special)
+            df_text_special_combined = pd.concat(df_text_special_combined, axis=1)
             if not self.fit:
-                self.features_binned += list(X_text_special_combined.columns)
-                self.feature_type_family_generated['text_special'] += list(X_text_special_combined.columns)
-            X_features = X_features.join(X_text_special_combined)
+                self.features_binned += list(df_text_special_combined.columns)
+                self.feature_type_family_generated['text_special'] += list(df_text_special_combined.columns)
+        else:
+            df_text_special_combined = pd.DataFrame(index=df.index)
+        return df_text_special_combined
 
+    def _generate_features_datetime(self, df: DataFrame):
         if self.feature_transformations['datetime']:
+            df_datatime = pd.DataFrame(index=df.index)
             for datetime_feature in self.feature_transformations['datetime']:
-                X_features[datetime_feature] = pd.to_datetime(X[datetime_feature])
-                X_features[datetime_feature] = pd.to_numeric(X_features[datetime_feature])  # TODO: Use actual date info
+                df_datatime[datetime_feature] = pd.to_datetime(df[datetime_feature])
+                df_datatime[datetime_feature] = pd.to_numeric(df_datatime[datetime_feature])  # TODO: Use actual date info
                 if not self.fit:
                     self.feature_type_family_generated['datetime'].append(datetime_feature)
                 # TODO: Add fastai date features
+            return df_datatime
+        else:
+            return None
 
+    def _generate_features_text_ngram(self, df: DataFrame):
+        df_text_ngram = None
         if self.feature_transformations['text_ngram']:
             # Combine Text Fields
             features_nlp_current = ['__nlp__']
@@ -112,9 +147,9 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                 for nlp_feature in features_nlp_current:
                     # TODO: Preprocess text?
                     if nlp_feature == '__nlp__':
-                        text_list = list(set(['. '.join(row) for row in X[self.feature_transformations['text_ngram']].values]))
+                        text_list = list(set(['. '.join(row) for row in df[self.feature_transformations['text_ngram']].values]))
                     else:
-                        text_list = list(X[nlp_feature].drop_duplicates().values)
+                        text_list = list(df[nlp_feature].drop_duplicates().values)
                     vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
                     try:
                         vectorizer_fit, _ = self.train_vectorizer(text_list, vectorizer_raw)
@@ -125,19 +160,15 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
                 self.feature_transformations['text_ngram'] = [feature for feature in self.feature_transformations['text_ngram'] if feature not in features_nlp_to_remove]
 
-            X_features_cols_prior_to_nlp = list(X_features.columns)
             downsample_ratio = None
             nlp_failure_count = 0
             keep_trying_nlp = True
             while keep_trying_nlp:
                 try:
-                    X_nlp_features_combined = self.generate_text_ngrams(X=X, features_nlp_current=features_nlp_current, downsample_ratio=downsample_ratio)
-
-                    if self.feature_transformations['text_ngram']:
-                        X_features = X_features.join(X_nlp_features_combined)
+                    df_text_ngram = self.generate_text_ngrams(X=df, features_nlp_current=features_nlp_current, downsample_ratio=downsample_ratio)
 
                     if not self.fit:
-                        self.feature_type_family_generated['text_ngram'] += list(X_nlp_features_combined.columns)
+                        self.feature_type_family_generated['text_ngram'] += list(df_text_ngram.columns)
                     keep_trying_nlp = False
                 except Exception as err:
                     nlp_failure_count += 1
@@ -146,7 +177,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         raise
                     traceback.print_tb(err.__traceback__)
 
-                    X_features = X_features[X_features_cols_prior_to_nlp]
+                    df_text_ngram = None
                     skip_nlp = False
                     for vectorizer in self.vectorizers:
                         vocab_size = len(vectorizer.vocabulary_)
@@ -171,8 +202,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
                         logger.log(15, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
                         logger.debug(str(err))
                         downsample_ratio = 0.25
-
-        return X_features
+        return df_text_ngram
 
     def generate_text_ngrams(self, X, features_nlp_current, downsample_ratio: int = None):
         X_nlp_features_combined = []
