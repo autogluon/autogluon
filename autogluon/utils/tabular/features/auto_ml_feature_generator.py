@@ -1,17 +1,17 @@
 import copy
 import logging
-import re
-import traceback
 from collections import defaultdict
 
-import numpy as np
 import pandas as pd
-import psutil
 from pandas import DataFrame, Series
 
 from .abstract_feature_generator import AbstractFeatureGenerator
-from .vectorizers import get_ngram_freq, downscale_vectorizer
-from .vectorizers import vectorizer_auto_ml_default
+from .feature_types_metadata import FeatureTypesMetadata
+from .generators.category import CategoryFeatureGenerator
+from .generators.text_special import TextSpecialFeatureGenerator
+from .generators.identity import IdentityFeatureGenerator
+from .generators.datetime import DatetimeFeatureGenerator
+from .generators.text_ngram import TextNgramFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +21,23 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, enable_text_ngram_features=True, enable_text_special_features=True,
                  enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
                  vectorizer=None):
-        super().__init__()
         self.enable_nlp_features = enable_text_ngram_features
         self.enable_text_special_features = enable_text_special_features
         self.enable_categorical_features = enable_categorical_features
         self.enable_raw_features = enable_raw_features
         self.enable_datetime_features = enable_datetime_features
-        if vectorizer is None:
-            self.vectorizer_default_raw = vectorizer_auto_ml_default()
-        else:
-            self.vectorizer_default_raw = vectorizer
-        self.vectorizers = []
+        super().__init__(generators=self._get_default_generators(vectorizer=vectorizer))
+
+    # TODO: FIXME
+    def _get_default_generators(self, vectorizer=None):
+        generators = [
+            (IdentityFeatureGenerator(), 'raw'),
+            (CategoryFeatureGenerator(), 'category'),
+            (DatetimeFeatureGenerator(), 'datetime'),
+            (TextSpecialFeatureGenerator(), 'text_special'),
+            (TextNgramFeatureGenerator(vectorizer=vectorizer), 'text_ngram'),
+        ]
+        return generators
 
     def _compute_feature_transformations(self):
         """Determines which features undergo which feature transformations."""
@@ -63,261 +69,40 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: Parallelize with decorator!
     def _generate_features(self, X: DataFrame):
-        if not self.fit:
+        if not self._is_fit:
             self.feature_transformations = self._compute_feature_transformations()
-        for column in X.columns:
-            if self.features_init_types[column].name == 'object':
-                X[column].fillna('', inplace=True)
-            else:
-                X[column].fillna(np.nan, inplace=True)
 
         X = self._preprocess(X)
 
-        X_raw = self._generate_features_raw(X)
-        X_category = self._generate_features_category(X)
-        X_text_special = self._generate_features_text_special(X)
-        X_datetime = self._generate_features_datetime(X)
-        X_text_ngram = self._generate_features_text_ngram(X)
+        feature_df_list = []
+        for generator, transformation_key in self.generators:
+            if not self._is_fit:
+                X_out = generator.fit_transform(X[self.feature_transformations[transformation_key]])
+            else:
+                X_out = generator.transform(X)
+            feature_df_list.append(X_out)
 
-        feature_df_list = [X_raw, X_category, X_text_special, X_datetime, X_text_ngram]
-        feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
-        if len(feature_df_list) == 1:
+        if not self._is_fit:
+            self.generators = [generator_tuple for i, generator_tuple in enumerate(self.generators) if feature_df_list[i] is not None and len(feature_df_list[i].columns) > 0]
+            feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
+
+        if not feature_df_list:
+            X_features = DataFrame(index=X.index)
+        elif len(feature_df_list) == 1:
             X_features = feature_df_list[0]
         else:
             X_features = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
 
-        return X_features
-
-    def _generate_features_raw(self, df: DataFrame):
-        if self.feature_transformations['raw']:
-            return df[self.feature_transformations['raw']]
-        else:
-            return None
-
-    # TODO: Optimize lines
-    def _generate_features_category(self, df: DataFrame):
-        if self.feature_transformations['category']:
-            df_category = df[self.feature_transformations['category']]
-            # TODO: Add stateful categorical generator, merge rare cases to an unknown value
-            # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
-            if not self.fit:
-                if self.feature_type_family['text']:
-                    self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
-            df_category = df_category.astype('category')
-        else:
-            df_category = None
-        return df_category
-
-    def _generate_features_text_special(self, df: DataFrame):
-        if self.feature_transformations['text_special']:
-            df_text_special_combined = []
-            for nlp_feature in self.feature_transformations['text_special']:
-                df_text_special = self.generate_text_special(df[nlp_feature], nlp_feature)
-                df_text_special_combined.append(df_text_special)
-            df_text_special_combined = pd.concat(df_text_special_combined, axis=1)
-            if not self.fit:
-                self.features_binned += list(df_text_special_combined.columns)
-                self.feature_type_family_generated['text_special'] += list(df_text_special_combined.columns)
-        else:
-            df_text_special_combined = pd.DataFrame(index=df.index)
-        return df_text_special_combined
-
-    def _generate_features_datetime(self, df: DataFrame):
-        if self.feature_transformations['datetime']:
-            df_datatime = pd.DataFrame(index=df.index)
-            for datetime_feature in self.feature_transformations['datetime']:
-                df_datatime[datetime_feature] = pd.to_datetime(df[datetime_feature])
-                df_datatime[datetime_feature] = pd.to_numeric(df_datatime[datetime_feature])  # TODO: Use actual date info
-                if not self.fit:
-                    self.feature_type_family_generated['datetime'].append(datetime_feature)
-                # TODO: Add fastai date features
-            return df_datatime
-        else:
-            return None
-
-    def _generate_features_text_ngram(self, df: DataFrame):
-        df_text_ngram = None
-        if self.feature_transformations['text_ngram']:
-            # Combine Text Fields
-            features_nlp_current = ['__nlp__']
-
-            if not self.fit:
-                features_nlp_to_remove = []
-                logger.log(15, 'Fitting vectorizer for text features: ' + str(self.feature_transformations['text_ngram']))
-                for nlp_feature in features_nlp_current:
-                    # TODO: Preprocess text?
-                    if nlp_feature == '__nlp__':
-                        text_list = list(set(['. '.join(row) for row in df[self.feature_transformations['text_ngram']].values]))
-                    else:
-                        text_list = list(df[nlp_feature].drop_duplicates().values)
-                    vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
-                    try:
-                        vectorizer_fit, _ = self.train_vectorizer(text_list, vectorizer_raw)
-                        self.vectorizers.append(vectorizer_fit)
-                    except ValueError:
-                        logger.debug("Removing 'text_ngram' features due to error")
-                        features_nlp_to_remove = self.feature_transformations['text_ngram']
-
-                self.feature_transformations['text_ngram'] = [feature for feature in self.feature_transformations['text_ngram'] if feature not in features_nlp_to_remove]
-
-            downsample_ratio = None
-            nlp_failure_count = 0
-            keep_trying_nlp = True
-            while keep_trying_nlp:
-                try:
-                    df_text_ngram = self.generate_text_ngrams(X=df, features_nlp_current=features_nlp_current, downsample_ratio=downsample_ratio)
-
-                    if not self.fit:
-                        self.feature_type_family_generated['text_ngram'] += list(df_text_ngram.columns)
-                    keep_trying_nlp = False
-                except Exception as err:
-                    nlp_failure_count += 1
-                    if self.fit:
-                        logger.exception('Error: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
-                        raise
-                    traceback.print_tb(err.__traceback__)
-
-                    df_text_ngram = None
-                    skip_nlp = False
-                    for vectorizer in self.vectorizers:
-                        vocab_size = len(vectorizer.vocabulary_)
-                        if vocab_size <= 50:
-                            skip_nlp = True
-                            break
-                    else:
-                        if nlp_failure_count >= 3:
-                            skip_nlp = True
-
-                    if skip_nlp:
-                        logger.log(15, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
-                        logger.debug(str(err))
-                        self.vectorizers = []
-                        if 'text_ngram' in self.feature_transformations:
-                            self.feature_transformations.pop('text_ngram')
-                        if 'text_ngram' in self.feature_type_family_generated:
-                            self.feature_type_family_generated.pop('text_ngram')
-                        self.enable_nlp_features = False
-                        keep_trying_nlp = False
-                    else:
-                        logger.log(15, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
-                        logger.debug(str(err))
-                        downsample_ratio = 0.25
-        return df_text_ngram
-
-    def generate_text_ngrams(self, X, features_nlp_current, downsample_ratio: int = None):
-        X_nlp_features_combined = []
-        for i, nlp_feature in enumerate(features_nlp_current):
-            vectorizer_fit = self.vectorizers[i]
-
-            if nlp_feature == '__nlp__':
-                text_data = ['. '.join(row) for row in X[self.feature_transformations['text_ngram']].values]
+        # TODO: Remove the need for this
+        if not self._is_fit:
+            if self.generators:
+                self.feature_types_metadata = FeatureTypesMetadata.join_metadatas([generator.feature_types_metadata for generator, _ in self.generators])
             else:
-                text_data = X[nlp_feature].values
-            transform_matrix = vectorizer_fit.transform(text_data)
+                self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=defaultdict(list))
+            self.feature_type_family_generated = copy.deepcopy(self.feature_types_metadata.feature_types_special)
 
-            if not self.fit:
-                predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
-                mem_avail = psutil.virtual_memory().available
-                mem_rss = psutil.Process().memory_info().rss
-                # TODO: 0.25 causes OOM error with 72 GB ram on nyc-wendykan-lending-club-loan-data, fails on NN or Catboost, distributed.worker spams logs with memory warnings
-                # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
-                max_memory_percentage = 0.15  # TODO: Finetune this, or find a better metric
-                predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
-                predicted_percentage = predicted_rss / mem_avail
-                if downsample_ratio is None:
-                    if predicted_percentage > max_memory_percentage:
-                        downsample_ratio = max_memory_percentage / predicted_percentage
-                        logger.warning('Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+            self.features_binned += self.feature_types_metadata.feature_types_special['text_special']
+            if self.feature_type_family['text']:
+                self.feature_types_metadata.feature_types_special['text_as_category'] += [feature for feature in self.feature_type_family['text'] if feature in self.feature_types_metadata.feature_types_raw['category']]
 
-                if downsample_ratio is not None:
-                    if (downsample_ratio >= 1) or (downsample_ratio <= 0):
-                        raise ValueError(f'downsample_ratio must be >0 and <1, but downsample_ratio is {downsample_ratio}')
-                    vocab_size = len(vectorizer_fit.vocabulary_)
-                    downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
-                    logger.log(20, f'Reducing Vectorizer vocab size from {vocab_size} to {downsampled_vocab_size} to avoid OOM error')
-                    ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
-                    downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
-                    # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
-                    #  If we have this functionality, simply update transform_matrix each time OOM occurs instead of re-calling .transform
-                    transform_matrix = vectorizer_fit.transform(text_data)
-
-            nlp_features_names = vectorizer_fit.get_feature_names()
-
-            X_nlp_features = pd.DataFrame(transform_matrix.toarray())  # FIXME
-            X_nlp_features.columns = [f'{nlp_feature}.{x}' for x in nlp_features_names]
-            X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1)
-
-            X_nlp_features_combined.append(X_nlp_features)
-
-        if self.feature_transformations['text_ngram']:
-            X_nlp_features_combined = pd.concat(X_nlp_features_combined, axis=1)
-
-        return X_nlp_features_combined
-
-    def generate_text_special(self, X: Series, feature: str) -> DataFrame:
-        X_text_special: DataFrame = DataFrame(index=X.index)
-        X_text_special[feature + '.char_count'] = [self.char_count(value) for value in X]
-        X_text_special[feature + '.word_count'] = [self.word_count(value) for value in X]
-        X_text_special[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X]
-        X_text_special[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X]
-        X_text_special[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X]
-        X_text_special[feature + '.special_ratio'] = [self.special_ratio(value) for value in X]
-
-        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
-        for symbol in symbols:
-            X_text_special[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X]
-            X_text_special[feature + '.symbol_ratio.' + symbol] = X_text_special[feature + '.symbol_count.' + symbol] / X_text_special[feature + '.char_count']
-            X_text_special[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
-
-        return X_text_special
-
-    @staticmethod
-    def word_count(string):
-        return len(string.split())
-
-    @staticmethod
-    def char_count(string):
-        return len(string)
-
-    @staticmethod
-    def special_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        new_str = re.sub(r'[\w]+', '', string)
-        return len(new_str) / len(string)
-
-    @staticmethod
-    def digit_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(c.isdigit() for c in string) / len(string)
-
-    @staticmethod
-    def lower_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(c.islower() for c in string) / len(string)
-
-    @staticmethod
-    def capital_ratio(string):
-        string = string.replace(' ', '')
-        if not string:
-            return 0
-        return sum(1 for c in string if c.isupper()) / len(string)
-
-    @staticmethod
-    def symbol_in_string_count(string, character):
-        if not string:
-            return 0
-        return sum(1 for c in string if c == character)
-
-    @staticmethod
-    def train_vectorizer(text_list, vectorizer):
-        logger.log(15, 'Fitting vectorizer...')
-        transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
-        vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
-        logger.log(15, f'Vectorizer fit with vocabulary size = {len(vectorizer.vocabulary_)}')
-        return vectorizer, transform_matrix
+        return X_features

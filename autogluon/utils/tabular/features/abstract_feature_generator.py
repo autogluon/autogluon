@@ -3,12 +3,14 @@ import logging
 import math
 from collections import defaultdict
 
+import numpy as np
 import psutil
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
 from . import binning
 from .feature_types_metadata import FeatureTypesMetadata
+from .generators.dummy import DummyFeatureGenerator
 from .types import get_type_family_special, get_type_groups_df, get_type_family_groups_df
 from .utils import check_if_useless_feature, clip_and_astype
 from ..utils.decorators import calculate_time
@@ -19,15 +21,14 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
-class AbstractFeatureGenerator:
-    def __init__(self):
+class AbstractFeatureGenerator:  # TODO: RENAME
+    def __init__(self, generators):
         self.features_init_to_keep = []  # Original features to use as input to feature generation
         self.features_to_remove_post = []  # Final features to remove prior to sending to models  # TODO: REMOVE
         self.features_init_types = dict()  # Initial feature types prior to transformation
         self.feature_type_family_init_raw = defaultdict(list)  # Feature types of original features, without inferring.
         self.feature_type_family = defaultdict(list)  # Feature types of original features, after inferring.
         self.feature_type_family_direct = dict()  # TODO: RENAME
-        self.feature_type_family_generated = defaultdict(list)  # Feature types (special) of generated features.
         self.feature_transformations = defaultdict(list)  # Dictionary of transformation pipelines (keys) and the list of original features transformed through them (values)
         self.features_categorical_final = []  # Categorical features
         self.features_categorical_final_mapping = defaultdict()  # Categorical features original value -> category code mapping
@@ -35,7 +36,7 @@ class AbstractFeatureGenerator:
         self.features_binned_mapping = defaultdict()  # Binned features original value ranges -> binned category code mapping
         self.features = []  # Final list of features after transformation
 
-        self.fit = False  # Whether the feature generation has been fit
+        self._is_fit = False  # Whether the feature generation has been fit
 
         self.minimize_categorical_memory_usage_flag = True
 
@@ -43,20 +44,27 @@ class AbstractFeatureGenerator:
         self.pre_memory_usage_per_row = None
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
-        self.is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
+        self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
+
+        self.generators = generators
 
         self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the final features. Passed to models to enable advanced functionality.
 
     def _preprocess(self, X: DataFrame):
+        for column in X.columns:
+            if self.features_init_types[column].name == 'object':
+                X[column].fillna('', inplace=True)
+            else:
+                X[column].fillna(np.nan, inplace=True)
         return X
 
     # TODO: Save this to disk and remove from memory if large categoricals!
     @calculate_time
     def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
-        if self.fit:
+        if self._is_fit:
             raise AssertionError('fit_transform cannot be called on an already fit feature generator.')
         X_len = len(X)
-        self.pre_memory_usage = self.get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
+        self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
         available_mem = psutil.virtual_memory().available
         pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
@@ -70,10 +78,9 @@ class AbstractFeatureGenerator:
 
         X_features.index = X_index
 
-        for feature_type in self.feature_type_family_generated:
-            self.feature_type_family_generated[feature_type] = list(set(self.feature_type_family_generated[feature_type]) - set(self.features_to_remove_post))
+        self.feature_types_metadata.remove_features(features=self.features_to_remove_post, inplace=True)
 
-        self.post_memory_usage = self.get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
+        self.post_memory_usage = self._get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
 
         available_mem = psutil.virtual_memory().available
@@ -83,16 +90,17 @@ class AbstractFeatureGenerator:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
         if len(list(X_features.columns)) == 0:
-            self.is_dummy = True
+            self._is_dummy = True
             logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
-            X_features['__dummy__'] = 0
-            self.feature_type_family_generated['int'] = ['__dummy__']
+            dummy_generator = DummyFeatureGenerator()
+            X_features = dummy_generator.fit_transform(X=X_features)
+            self.feature_types_metadata = copy.deepcopy(dummy_generator.feature_types_metadata)
+            self.generators = [(dummy_generator, None)]
 
-        feature_types_raw = get_type_family_groups_df(X_features)
-        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=self.feature_type_family_generated)
-
+        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=get_type_family_groups_df(X_features), feature_types_special=self.feature_types_metadata.feature_types_special)
         self.features = list(X_features.columns)
-        self.fit = True
+
+        self._is_fit = True
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
         self.print_feature_type_info()
 
@@ -111,6 +119,7 @@ class AbstractFeatureGenerator:
         self.features_init_to_keep = list(X.columns)
         self.features_init_types = X.dtypes.to_dict()
 
+        # TODO: Make into metadata object
         self.feature_type_family_init_raw = get_type_groups_df(X)
         self.feature_type_family_direct = self._get_feature_types_family(X)
         for feature, type_family in self.feature_type_family_direct.items():
@@ -121,15 +130,15 @@ class AbstractFeatureGenerator:
 
         self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
         self.features_binned_mapping = binning.generate_bins(X_features, self.features_binned)
-        for column in self.features_binned:  # TODO: Should binned columns be continuous or categorical if they were initially continuous? (Currently categorical)
+        for column in self.features_binned:
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
 
         X_features.drop(self.features_to_remove_post, axis=1, inplace=True)
         if drop_duplicates:
-            X_features = self.drop_duplicate_features(X_features)
+            X_features = self._drop_duplicate_features(X_features)
         self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
-            X_features = self.fix_categoricals_for_sklearn(X_features=X_features)
+            X_features = self._fix_categoricals_for_sklearn(X_features=X_features)
         for column in self.features_categorical_final:
             self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
 
@@ -139,12 +148,16 @@ class AbstractFeatureGenerator:
 
     @calculate_time
     def transform(self, X: DataFrame) -> DataFrame:
-        if not self.fit:
+        if not self._is_fit:
             raise AssertionError('FeatureGenerator has not yet been fit.')
-        if self.features is None:
-            raise AssertionError('FeatureGenerator.features is None, have you called fit() yet?')
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)
+        X_features = self._transform(X=X)
+        X_features.index = X_index
+
+        return X_features
+
+    def _transform(self, X: DataFrame) -> DataFrame:
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         try:
             X = X[self.features_init_to_keep]
@@ -155,19 +168,17 @@ class AbstractFeatureGenerator:
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
-        X = X.astype(self.features_init_types)
+        if self.features_init_types:
+            X = X.astype(self.features_init_types)
         X_features = self._generate_features(X)
         for column in self.features_binned:
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
-        if self.is_dummy:
-            X_features.index = X_index
-            X_features['__dummy__'] = 0
-            return X_features
+
         X_features = X_features[self.features]
         for column in self.features_categorical_final:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
+
         X_features = self._minimize_memory_usage(X_features=X_features)
-        X_features.index = X_index
 
         return X_features
 
@@ -176,25 +187,25 @@ class AbstractFeatureGenerator:
 
     def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
         if self.minimize_categorical_memory_usage_flag:
-            self.minimize_categorical_memory_usage(X_features=X_features)
+            self._minimize_categorical_memory_usage(X_features=X_features)
         X_features = self._minimize_ngram_memory_usage(X_features=X_features)
         X_features = self._minimize_binned_memory_usage(X_features=X_features)
         return X_features
 
     def _minimize_ngram_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.feature_type_family_generated['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
+        return clip_and_astype(df=X_features, columns=self.feature_types_metadata.feature_types_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
 
     def _minimize_binned_memory_usage(self, X_features: DataFrame) -> DataFrame:
         return clip_and_astype(df=X_features, columns=self.features_binned, clip_min=0, clip_max=255, dtype='uint8')
 
     # TODO: Compress further, uint16, etc.
     # Performs in-place updates
-    def minimize_categorical_memory_usage(self, X_features: DataFrame):
+    def _minimize_categorical_memory_usage(self, X_features: DataFrame):
         for column in self.features_categorical_final:
             new_categories = list(range(len(X_features[column].cat.categories.values)))
             X_features[column].cat.rename_categories(new_categories, inplace=True)
 
-    def fix_categoricals_for_sklearn(self, X_features: DataFrame) -> DataFrame:
+    def _fix_categoricals_for_sklearn(self, X_features: DataFrame) -> DataFrame:
         for column in self.features_categorical_final:
             rank = X_features[column].value_counts().sort_values(ascending=True)
             rank = rank[rank >= 3]
@@ -235,7 +246,7 @@ class AbstractFeatureGenerator:
     # TODO: optimize by not considering columns with unique sums/means
     # TODO: Multithread?
     @staticmethod
-    def drop_duplicate_features(X: DataFrame) -> DataFrame:
+    def _drop_duplicate_features(X: DataFrame) -> DataFrame:
         X_without_dups = X.T.drop_duplicates().T
         logger.debug(f"X_without_dups.shape: {X_without_dups.shape}")
 
@@ -266,7 +277,7 @@ class AbstractFeatureGenerator:
     # TODO: Move this outside of here
     # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
     @staticmethod
-    def get_approximate_df_mem_usage(df, sample_ratio=0.2):
+    def _get_approximate_df_mem_usage(df, sample_ratio=0.2):
         if sample_ratio >= 1:
             return df.memory_usage(deep=True)
         else:
