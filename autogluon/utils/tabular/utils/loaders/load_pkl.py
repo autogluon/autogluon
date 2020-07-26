@@ -1,4 +1,4 @@
-import io, logging, pickle, boto3
+import io, logging, pickle, boto3, gzip
 
 from . import load_pointer
 from .. import s3_utils
@@ -22,7 +22,11 @@ def load(path, format=None, verbose=True):
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()['Body'].read())
 
     if verbose: logger.log(15, 'Loading: %s' % path)
-    with open(path, 'rb') as fin:
+    # TODO: refactor/remove - temp testing
+    # TODO: checking path/gzip logic
+    # with open(path, 'rb') as fin:
+    #     object = pickle.load(fin)
+    with gzip.open(path, 'rb') as fin:
         object = pickle.load(fin)
     return object
 

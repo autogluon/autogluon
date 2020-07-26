@@ -86,7 +86,7 @@ class AbstractLearner:
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
+            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2, compression_level=0):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
@@ -563,8 +563,8 @@ class AbstractLearner:
     def infer_problem_type(y: Series):
         return infer_problem_type(y=y)
 
-    def save(self):
-        save_pkl.save(path=self.save_path, object=self)
+    def save(self, compression_level=0):
+        save_pkl.save(path=self.save_path, object=self, compression_level=compression_level)
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models

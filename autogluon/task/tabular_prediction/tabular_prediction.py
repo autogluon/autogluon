@@ -80,6 +80,7 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=None,
             visualizer='none',
             verbosity=2,
+            compression_level=0,
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -322,6 +323,11 @@ class TabularPrediction(BaseTask):
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
+        compression_level : int, default = 0
+            compression_level ranges from 0 to 9 and controls the gzip compression level of pickle files being saved to
+            disk. 0 is the default value and corresponds to no compression.  1 is the lowest level with compression and
+            will result in the fastest save/load times.  9 is the highest level of compression, with the smallest files
+            and slowest load/save times.
 
         Kwargs can include additional arguments for advanced users:
             AG_args_fit : dict, default={}
@@ -449,6 +455,11 @@ class TabularPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
+
+        if compression_level < 0:
+            compression_level = 0
+        elif compression_level > 9:
+            compression_level = 9
 
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
@@ -597,7 +608,8 @@ class TabularPrediction(BaseTask):
         learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
-                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
+                    hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig,
+                    save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, compression_level=compression_level)
 
         predictor = TabularPredictor(learner=learner)
 

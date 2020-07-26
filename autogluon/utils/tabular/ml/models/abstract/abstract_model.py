@@ -327,11 +327,11 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
+    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_level=0):
         if directory is None:
             directory = self.path
         file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self, verbose=verbose)
+        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_level=compression_level)
         if return_filename:
             return file_name
 

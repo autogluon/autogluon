@@ -30,7 +30,8 @@ class DefaultLearner(AbstractLearner):
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
     def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
+            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2,
+            compression_level=0):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -89,7 +90,8 @@ class DefaultLearner(AbstractLearner):
             save_data=save_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
-            verbosity=verbosity
+            verbosity=verbosity,
+            compression_level=compression_level
         )
 
         self.trainer_path = trainer.path
@@ -98,7 +100,7 @@ class DefaultLearner(AbstractLearner):
         if self.stopping_metric is None:
             self.stopping_metric = trainer.stopping_metric
 
-        self.save()
+        self.save(compression_level=compression_level)
         trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
         self.save_trainer(trainer=trainer)
