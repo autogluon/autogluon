@@ -9,7 +9,7 @@ from ...utils import generate_kfold
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ...constants import MULTICLASS
-from ....features.feature_types_metadata import FeatureTypesMetadata
+from ....features.feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -121,11 +121,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if len(self.models) == 0:
             type_map_raw = {column: 'float' for column in self.stack_columns}
             type_group_map_special = {'stack': self.stack_columns}
-            stacker_feature_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
-            if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
-                self.feature_types_metadata = stacker_feature_metadata
+            stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+            if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
+                self.feature_metadata = stacker_feature_metadata
             else:
-                self.feature_types_metadata = self.feature_types_metadata.join_metadata(stacker_feature_metadata)
+                self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)
         super()._fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
@@ -152,12 +152,12 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if len(self.models) == 0:
             type_map_raw = {column: 'float' for column in self.stack_columns}
             type_group_map_special = {'stack': self.stack_columns}
-            stacker_feature_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
-            if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
-                self.feature_types_metadata = stacker_feature_metadata
+            stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+            if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
+                self.feature_metadata = stacker_feature_metadata
             else:
-                self.feature_types_metadata = self.feature_types_metadata.join_metadata(stacker_feature_metadata)
-        self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Move this
+                self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)
+        self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
 
         # TODO: Preprocess data here instead of repeatedly
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)

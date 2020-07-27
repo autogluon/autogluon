@@ -1,7 +1,7 @@
 import logging
 
 from ..types import get_type_map_raw
-from ..feature_types_metadata import FeatureTypesMetadata
+from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ class AbstractFeatureGenerator:
         # TODO TODO TODO TODO: Add post_generators
         # TODO TODO TODO TODO: Add y to fit calls
         self._is_fit = False
-        self.feature_types_metadata: FeatureTypesMetadata = None
+        self.feature_metadata: FeatureMetadata = None
         self.features_in = features_in
         self.features_out = None
 
@@ -27,7 +27,7 @@ class AbstractFeatureGenerator:
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in])
         self.features_out = list(X_out.columns)
         type_map_raw = get_type_map_raw(X_out)
-        self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+        self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         self._is_fit = True
         return X_out
 

@@ -31,13 +31,13 @@ class TabularPredictor(BasePredictor):
             What metric is used to evaluate predictive performance.
         label_column : str
             Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-        feature_types : :class:`autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata`
+        feature_metadata : :class:`autogluon.utils.tabular.features.feature_metadata.FeatureMetadata`
             Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
             Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime', 'text', 'text_ngram').
             Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
-                `feature_types.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
-                `feature_types.type_group_map_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
-                `feature_types.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+                `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
+                `feature_metadata.type_group_map_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
+                `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
             For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
@@ -88,7 +88,7 @@ class TabularPredictor(BasePredictor):
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label
-        self.feature_types = self._trainer.feature_types_metadata
+        self.feature_metadata = self._trainer.feature_metadata
         self.class_labels = self._learner.class_labels
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map

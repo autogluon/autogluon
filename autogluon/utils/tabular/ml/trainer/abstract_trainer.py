@@ -40,11 +40,11 @@ class AbstractTrainer:
     distill_stackname = 'distill'  # name of stack-level for distilled student models
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
-                 num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
+                 num_classes=None, low_memory=False, feature_metadata=None, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2):
         self.path = path
         self.problem_type = problem_type
-        self.feature_types_metadata = feature_types_metadata
+        self.feature_metadata = feature_metadata
         self.save_data = save_data
         self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
@@ -233,8 +233,8 @@ class AbstractTrainer:
             kfolds = self.kfolds
         if n_repeats is None:
             n_repeats = self.n_repeats
-        if model.feature_types_metadata is None:
-            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: move this into model creation process?
+        if model.feature_metadata is None:
+            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'verbosity': self.verbosity,
@@ -334,7 +334,7 @@ class AbstractTrainer:
     def train_single_full(self, X_train, y_train, X_val, y_val, model: AbstractModel, feature_prune=False,
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
-            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: Don't set feature_types_metadata here
+            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: Don't set feature_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
@@ -1733,7 +1733,7 @@ class AbstractTrainer:
                 else:
                     y_train = pd.Series(y_train)
         else:
-            X_aug = augment_data(X_train=X_train, feature_types_metadata=self.feature_types_metadata,
+            X_aug = augment_data(X_train=X_train, feature_metadata=self.feature_metadata,
                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
             if len(X_aug) > 0:
                 if teacher_preds == 'hard':

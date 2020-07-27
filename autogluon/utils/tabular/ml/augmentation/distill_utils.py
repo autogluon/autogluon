@@ -5,7 +5,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from ..constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ..models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
-from ...features.feature_types_metadata import FeatureTypesMetadata
+from ...features.feature_metadata import FeatureMetadata
 from ...metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def format_distillation_labels(y, problem_type, num_classes=None, eps_labelsmoot
     return y
 
 
-def augment_data(X_train, feature_types_metadata: FeatureTypesMetadata, augmentation_data=None, augment_method='spunge', augment_args=None):
+def augment_data(X_train, feature_metadata: FeatureMetadata, augmentation_data=None, augment_method='spunge', augment_args=None):
     """ augment_method options: ['spunge', 'munge']
     """
     if augment_args is None:
@@ -41,9 +41,9 @@ def augment_data(X_train, feature_types_metadata: FeatureTypesMetadata, augmenta
             augment_args['num_augmented_samples'] = int(min(augment_args['max_size'], augment_args['size_factor']*len(X_train)))
 
         if augment_method == 'spunge':
-            X_aug = spunge_augment(X_train, feature_types_metadata, **augment_args)
+            X_aug = spunge_augment(X_train, feature_metadata, **augment_args)
         elif augment_method == 'munge':
-            X_aug = munge_augment(X_train, feature_types_metadata, **augment_args)
+            X_aug = munge_augment(X_train, feature_metadata, **augment_args)
         else:
             raise ValueError(f"unknown augment_method: {augment_method}")
 
@@ -61,7 +61,7 @@ def postprocess_augmented(X_aug, X):
     return X_aug.reset_index(drop=True, inplace=False)
 
 
-def spunge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented_samples=10000, frac_perturb=0.1, continuous_feature_noise=0.1, **kwargs):
+def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, frac_perturb=0.1, continuous_feature_noise=0.1, **kwargs):
     """ Generates synthetic datapoints for learning to mimic teacher model in distillation
         via simplified version of MUNGE strategy (that does not require near-neighbor search).
 
@@ -79,8 +79,8 @@ def spunge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmente
     continuous_types = ['float', 'int']
     continuous_featnames = [] # these features will have shuffled values with added noise
     for contype in continuous_types:
-        if contype in feature_types_metadata.type_group_map_raw:
-            continuous_featnames += feature_types_metadata.type_group_map_raw[contype]
+        if contype in feature_metadata.type_group_map_raw:
+            continuous_featnames += feature_metadata.type_group_map_raw[contype]
 
     for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
         og_ind = i % len(X)
@@ -104,7 +104,7 @@ def spunge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmente
     return X_aug
 
 
-def munge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs):
+def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10000, perturb_prob=0.5, s=1.0, **kwargs):
     """ Uses MUNGE algorithm to generate synthetic datapoints for learning to mimic teacher model in distillation: https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf
         Args:
             num_augmented_samples: number of additional augmented data points to return
@@ -113,7 +113,7 @@ def munge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented
     """
     nn_dummy = TabularNeuralNetModel(path='nn_dummy', name='nn_dummy', problem_type=REGRESSION, eval_metric=mean_squared_error,
                                      hyperparameters={'num_dataloading_workers': 0, 'proc.embed_min_categories': np.inf},
-                                     features = list(X.columns), feature_types_metadata=feature_types_metadata)
+                                     features = list(X.columns), feature_metadata=feature_metadata)
     processed_data = nn_dummy.process_train_data(df=nn_dummy.preprocess(X), labels=pd.Series([1]*len(X)), batch_size=nn_dummy.params['batch_size'],
                         num_dataloading_workers=0, impute_strategy=nn_dummy.params['proc.impute_strategy'],
                         max_category_levels=nn_dummy.params['proc.max_category_levels'], skew_threshold=nn_dummy.params['proc.skew_threshold'],
@@ -141,8 +141,8 @@ def munge_augment(X, feature_types_metadata: FeatureTypesMetadata, num_augmented
     continuous_types = ['float', 'int']
     continuous_featnames = [] # these features will have shuffled values with added noise
     for contype in continuous_types:
-        if contype in feature_types_metadata.type_group_map_raw:
-            continuous_featnames += feature_types_metadata.type_group_map_raw[contype]
+        if contype in feature_metadata.type_group_map_raw:
+            continuous_featnames += feature_metadata.type_group_map_raw[contype]
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)

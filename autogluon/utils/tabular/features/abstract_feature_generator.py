@@ -9,7 +9,7 @@ from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
 from . import binning
-from .feature_types_metadata import FeatureTypesMetadata
+from .feature_metadata import FeatureMetadata
 from .generators.dummy import DummyFeatureGenerator
 from .types import get_type_group_map_real, get_type_map_raw, get_type_map_real, get_type_map_special, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
@@ -42,9 +42,9 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         self.generators = generators
 
-        self._feature_metadata_in: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the original input features.
-        self._feature_metadata_in_real: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
-        self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the processed features. Passed to models to enable advanced functionality.
+        self._feature_metadata_in: FeatureMetadata = None  # FeatureMetadata object based on the original input features.
+        self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Passed to models to enable advanced functionality.
 
     def _preprocess(self, X: DataFrame):
         for column in X.columns:
@@ -77,7 +77,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
             dummy_generator = DummyFeatureGenerator()
             X_features = dummy_generator.fit_transform(X=X_features)
-            self.feature_types_metadata = copy.deepcopy(dummy_generator.feature_types_metadata)
+            self.feature_metadata = copy.deepcopy(dummy_generator.feature_metadata)
             self.generators = [(dummy_generator, None)]
 
         X_features.index = X_index
@@ -115,8 +115,8 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         type_map_raw = get_type_map_raw(X)
         type_group_map_special = self._get_type_group_map_special(X)
         # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
-        self._feature_metadata_in_real = FeatureTypesMetadata(type_map_raw=type_map_real)
-        self._feature_metadata_in = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real)
+        self._feature_metadata_in = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
         X_features = self._generate_features(X)
 
@@ -124,7 +124,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         X_features.drop(features_to_remove_post, axis=1, inplace=True)
         self._remove_features(features=features_to_remove_post)
 
-        feature_names = self.feature_types_metadata.get_features()
+        feature_names = self.feature_metadata.get_features()
 
         self.features_binned_mapping = binning.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:
@@ -141,13 +141,13 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
             self._remove_features(features=features_to_remove_post)
 
-        for column in self.feature_types_metadata.type_group_map_raw['category']:
+        for column in self.feature_metadata.type_group_map_raw['category']:
             self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
 
         X_features = self._minimize_memory_usage(X_features=X_features)
 
-        self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=get_type_map_raw(X_features), type_group_map_special=self.feature_types_metadata.type_group_map_special)
-        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_types_metadata.type_map_raw]
+        self.feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_features), type_group_map_special=self.feature_metadata.type_group_map_special)
+        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_metadata.type_map_raw]
 
         return X_features
 
@@ -180,7 +180,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
 
         X_features = X_features[self.features]
-        for column in self.feature_types_metadata.type_group_map_raw['category']:
+        for column in self.feature_metadata.type_group_map_raw['category']:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
 
         X_features = self._minimize_memory_usage(X_features=X_features)
@@ -192,8 +192,8 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
     # TODO: Remove self.features_binned from here
     def _remove_features(self, features):
-        self.feature_types_metadata.remove_features(features=features, inplace=True)
-        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_types_metadata.type_map_raw]
+        self.feature_metadata.remove_features(features=features, inplace=True)
+        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_metadata.type_map_raw]
 
     def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
         if self.minimize_categorical_memory_usage_flag:
@@ -203,7 +203,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         return X_features
 
     def _minimize_ngram_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.feature_types_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
+        return clip_and_astype(df=X_features, columns=self.feature_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
 
     def _minimize_binned_memory_usage(self, X_features: DataFrame) -> DataFrame:
         return clip_and_astype(df=X_features, columns=self.features_binned, clip_min=0, clip_max=255, dtype='uint8')
@@ -211,13 +211,13 @@ class AbstractFeatureGenerator:  # TODO: RENAME
     # TODO: Compress further, uint16, etc.
     # Performs in-place updates
     def _minimize_categorical_memory_usage(self, X_features: DataFrame):
-        for column in self.feature_types_metadata.type_group_map_raw['category']:
+        for column in self.feature_metadata.type_group_map_raw['category']:
             new_categories = list(range(len(X_features[column].cat.categories.values)))
             X_features[column].cat.rename_categories(new_categories, inplace=True)
 
     def _fix_categoricals_for_sklearn(self, X_features: DataFrame) -> DataFrame:
         features_to_remove = []
-        for column in self.feature_types_metadata.type_group_map_raw['category']:
+        for column in self.feature_metadata.type_group_map_raw['category']:
             rank = X_features[column].value_counts().sort_values(ascending=True)
             rank = rank[rank >= 3]
             rank = rank.reset_index()
@@ -273,17 +273,17 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         return X[columns_new]
 
-    def get_feature_types_metadata_full(self):
-        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.type_group_map_special)
+    def get_feature_metadata_full(self):
+        feature_metadata_full = copy.deepcopy(self.feature_metadata.type_group_map_special)
 
-        for key_raw in self.feature_types_metadata.type_group_map_raw:
-            values = self.feature_types_metadata.type_group_map_raw[key_raw]
-            for key_special in self.feature_types_metadata.type_group_map_special:
-                values = [value for value in values if value not in self.feature_types_metadata.type_group_map_special[key_special]]
+        for key_raw in self.feature_metadata.type_group_map_raw:
+            values = self.feature_metadata.type_group_map_raw[key_raw]
+            for key_special in self.feature_metadata.type_group_map_special:
+                values = [value for value in values if value not in self.feature_metadata.type_group_map_special[key_special]]
             if values:
-                feature_types_metadata_full[key_raw] += values
+                feature_metadata_full[key_raw] += values
 
-        return feature_types_metadata_full
+        return feature_metadata_full
 
     # TODO: Move this outside of here
     # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
@@ -304,13 +304,13 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         for key, val in self._feature_metadata_in.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Generated Features (special dtypes):')
-        for key, val in self.feature_types_metadata.type_group_map_special.items():
+        for key, val in self.feature_metadata.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Processed Features (raw dtypes):')
-        for key, val in self.feature_types_metadata.type_group_map_raw.items():
+        for key, val in self.feature_metadata.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Processed Features:')
-        for key, val in self.get_feature_types_metadata_full().items():
+        for key, val in self.get_feature_metadata_full().items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
 
     def save(self, path):

@@ -79,7 +79,7 @@ class DefaultLearner(AbstractLearner):
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
-            feature_types_metadata=self.feature_generator.feature_types_metadata,
+            feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
             kfolds=num_bagging_folds,
             n_repeats=num_bagging_sets,

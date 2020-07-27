@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Rename to FeatureMetadata
-class FeatureTypesMetadata:
+class FeatureMetadata:
     """
     Contains feature type metadata information such as type family groups (type_group_map_raw) and special feature type groups (type_group_map_special)
 
@@ -108,7 +108,7 @@ class FeatureTypesMetadata:
             else:
                 type_group_map_special[key] = features
 
-        return FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     @staticmethod
     def _get_feature_type(feature, feature_types_dict):

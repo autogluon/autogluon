@@ -176,8 +176,8 @@ class TabularNeuralNetModel(AbstractModel):
         params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         # print('features: ', self.features)
         if 'num_cpus' in kwargs:
             self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
@@ -575,7 +575,7 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
 
-        feature_types = self.feature_types_metadata.type_group_map_raw
+        feature_types = self.feature_metadata.type_group_map_raw
 
         categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
         continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
@@ -746,8 +746,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace() # changes non-specified default hyperparams from fixed values to search-spaces.
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         scheduler_func = scheduler_options[0]
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:

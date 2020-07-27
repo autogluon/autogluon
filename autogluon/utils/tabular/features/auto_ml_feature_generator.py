@@ -6,7 +6,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from .abstract_feature_generator import AbstractFeatureGenerator
-from .feature_types_metadata import FeatureTypesMetadata
+from .feature_metadata import FeatureMetadata
 from .generators.category import CategoryFeatureGenerator
 from .generators.text_special import TextSpecialFeatureGenerator
 from .generators.identity import IdentityFeatureGenerator
@@ -96,12 +96,12 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         # TODO: Remove the need for this
         if not self._is_fit:
             if self.generators:
-                self.feature_types_metadata = FeatureTypesMetadata.join_metadatas([generator.feature_types_metadata for generator, _ in self.generators])
+                self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator, _ in self.generators])
             else:
-                self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=dict())
+                self.feature_metadata = FeatureMetadata(type_map_raw=dict())
 
-            self.features_binned += self.feature_types_metadata.type_group_map_special['text_special']
+            self.features_binned += self.feature_metadata.type_group_map_special['text_special']
             if self._feature_metadata_in.type_group_map_special['text']:
-                self.feature_types_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_types_metadata.type_group_map_raw['category']]
+                self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
 
         return X_features
