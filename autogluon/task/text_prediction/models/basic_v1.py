@@ -11,12 +11,12 @@ from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
 from mxnet.gluon.data import DataLoader
 from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef, roc_auc_score
 from scipy.stats import pearsonr, spearmanr
-from .autogluon_contrib_nlp.models import get_backbone
-from .autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
-from .autogluon_contrib_nlp.utils.config import CfgNode
-from .autogluon_contrib_nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
+from autogluon_contrib_nlp.models import get_backbone
+from autogluon_contrib_nlp.lr_scheduler import InverseSquareRootScheduler
+from autogluon_contrib_nlp.utils.config import CfgNode
+from autogluon_contrib_nlp.utils.misc import set_seed, logging_config, parse_ctx, grouper,\
     count_parameters, repeat, get_mxnet_available_ctx
-from .autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
+from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ..metrics import calculate_metric_by_expr
 from ....utils import in_ipynb
 from .. import constants as _C
