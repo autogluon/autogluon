@@ -28,7 +28,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         self.enable_datetime_features = enable_datetime_features
         super().__init__(generators=self._get_default_generators(vectorizer=vectorizer))
 
-    # TODO: FIXME
+    # TODO: Move type strings into generators, or have generators determine the proper features at fit time
     def _get_default_generators(self, vectorizer=None):
         generators = [
             (IdentityFeatureGenerator(), 'raw'),
@@ -43,41 +43,41 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         """Determines which features undergo which feature transformations."""
         feature_transformations = defaultdict(list)
         if self.enable_categorical_features:
-            if self.feature_type_family['object']:
-                feature_transformations['category'] += self.feature_type_family['object']
-            if self.feature_type_family['text']:
-                feature_transformations['category'] += self.feature_type_family['text']
+            if self._feature_metadata_in.type_group_map_special['object']:
+                feature_transformations['category'] += self._feature_metadata_in.type_group_map_special['object']
+            if self._feature_metadata_in.type_group_map_special['text']:
+                feature_transformations['category'] += self._feature_metadata_in.type_group_map_special['text']
 
-        if self.feature_type_family['text']:
-            text_features = self.feature_type_family['text']
+        if self._feature_metadata_in.type_group_map_special['text']:
+            text_features = self._feature_metadata_in.type_group_map_special['text']
             if self.enable_text_special_features:
                 feature_transformations['text_special'] += text_features
             if self.enable_nlp_features:
                 feature_transformations['text_ngram'] += text_features
 
-        if self.feature_type_family['datetime']:
-            datetime_features = self.feature_type_family['datetime']
+        if self._feature_metadata_in.type_group_map_special['datetime']:
+            datetime_features = self._feature_metadata_in.type_group_map_special['datetime']
             if self.enable_datetime_features:
                 feature_transformations['datetime'] += datetime_features
 
         if self.enable_raw_features:
-            for type_family in self.feature_type_family:
+            for type_family in self._feature_metadata_in.type_group_map_special:
                 if type_family not in ['object', 'text', 'datetime']:
-                    feature_transformations['raw'] += self.feature_type_family[type_family]
+                    feature_transformations['raw'] += self._feature_metadata_in.type_group_map_special[type_family]
 
         return feature_transformations
 
     # TODO: Parallelize with decorator!
     def _generate_features(self, X: DataFrame):
         if not self._is_fit:
-            self.feature_transformations = self._compute_feature_transformations()
+            feature_transformations = self._compute_feature_transformations()
 
         X = self._preprocess(X)
 
         feature_df_list = []
         for generator, transformation_key in self.generators:
             if not self._is_fit:
-                X_out = generator.fit_transform(X[self.feature_transformations[transformation_key]])
+                X_out = generator.fit_transform(X[feature_transformations[transformation_key]])
             else:
                 X_out = generator.transform(X)
             feature_df_list.append(X_out)
@@ -98,11 +98,10 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             if self.generators:
                 self.feature_types_metadata = FeatureTypesMetadata.join_metadatas([generator.feature_types_metadata for generator, _ in self.generators])
             else:
-                self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=defaultdict(list))
-            self.feature_type_family_generated = copy.deepcopy(self.feature_types_metadata.feature_types_special)
+                self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=dict())
 
-            self.features_binned += self.feature_types_metadata.feature_types_special['text_special']
-            if self.feature_type_family['text']:
-                self.feature_types_metadata.feature_types_special['text_as_category'] += [feature for feature in self.feature_type_family['text'] if feature in self.feature_types_metadata.feature_types_raw['category']]
+            self.features_binned += self.feature_types_metadata.type_group_map_special['text_special']
+            if self._feature_metadata_in.type_group_map_special['text']:
+                self.feature_types_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_types_metadata.type_group_map_raw['category']]
 
         return X_features

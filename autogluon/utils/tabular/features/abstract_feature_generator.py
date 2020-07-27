@@ -11,7 +11,7 @@ from pandas.api.types import CategoricalDtype
 from . import binning
 from .feature_types_metadata import FeatureTypesMetadata
 from .generators.dummy import DummyFeatureGenerator
-from .types import get_type_family_special, get_type_groups_df, get_type_family_groups_df
+from .types import get_type_group_map_real, get_type_map_raw, get_type_map_real, get_type_map_special, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
@@ -24,13 +24,7 @@ logger = logging.getLogger(__name__)
 class AbstractFeatureGenerator:  # TODO: RENAME
     def __init__(self, generators):
         self.features_init_to_keep = []  # Original features to use as input to feature generation
-        self.features_to_remove_post = []  # Final features to remove prior to sending to models  # TODO: REMOVE
         self.features_init_types = dict()  # Initial feature types prior to transformation
-        self.feature_type_family_init_raw = defaultdict(list)  # Feature types of original features, without inferring.
-        self.feature_type_family = defaultdict(list)  # Feature types of original features, after inferring.
-        self.feature_type_family_direct = dict()  # TODO: RENAME
-        self.feature_transformations = defaultdict(list)  # Dictionary of transformation pipelines (keys) and the list of original features transformed through them (values)
-        self.features_categorical_final = []  # Categorical features
         self.features_categorical_final_mapping = defaultdict()  # Categorical features original value -> category code mapping
         self.features_binned = []  # Features to be binned
         self.features_binned_mapping = defaultdict()  # Binned features original value ranges -> binned category code mapping
@@ -48,7 +42,9 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         self.generators = generators
 
-        self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the final features. Passed to models to enable advanced functionality.
+        self._feature_metadata_in: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the original input features.
+        self._feature_metadata_in_real: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
+        self.feature_types_metadata: FeatureTypesMetadata = None  # FeatureTypesMetadata object based on the processed features. Passed to models to enable advanced functionality.
 
     def _preprocess(self, X: DataFrame):
         for column in X.columns:
@@ -76,9 +72,16 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         X_features = self._fit_transform(X=X, y=y, banned_features=banned_features, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
 
-        X_features.index = X_index
+        if len(list(X_features.columns)) == 0:
+            self._is_dummy = True
+            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            dummy_generator = DummyFeatureGenerator()
+            X_features = dummy_generator.fit_transform(X=X_features)
+            self.feature_types_metadata = copy.deepcopy(dummy_generator.feature_types_metadata)
+            self.generators = [(dummy_generator, None)]
 
-        self.feature_types_metadata.remove_features(features=self.features_to_remove_post, inplace=True)
+        X_features.index = X_index
+        self.features = list(X_features.columns)
 
         self.post_memory_usage = self._get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
@@ -88,17 +91,6 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         if post_memory_usage_percent > 0.15:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
-
-        if len(list(X_features.columns)) == 0:
-            self._is_dummy = True
-            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
-            dummy_generator = DummyFeatureGenerator()
-            X_features = dummy_generator.fit_transform(X=X_features)
-            self.feature_types_metadata = copy.deepcopy(dummy_generator.feature_types_metadata)
-            self.generators = [(dummy_generator, None)]
-
-        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=get_type_family_groups_df(X_features), feature_types_special=self.feature_types_metadata.feature_types_special)
-        self.features = list(X_features.columns)
 
         self._is_fit = True
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
@@ -119,30 +111,43 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         self.features_init_to_keep = list(X.columns)
         self.features_init_types = X.dtypes.to_dict()
 
-        # TODO: Make into metadata object
-        self.feature_type_family_init_raw = get_type_groups_df(X)
-        self.feature_type_family_direct = self._get_feature_types_family(X)
-        for feature, type_family in self.feature_type_family_direct.items():
-            self.feature_type_family[type_family].append(feature)
+        type_map_real = get_type_map_real(X)
+        type_map_raw = get_type_map_raw(X)
+        type_group_map_special = self._get_type_group_map_special(X)
+        # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
+        self._feature_metadata_in_real = FeatureTypesMetadata(type_map_raw=type_map_real)
+        self._feature_metadata_in = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
         X_features = self._generate_features(X)
-        self.features_to_remove_post = self._get_features_to_remove_post(X_features)
 
-        self.features_binned = list(set(self.features_binned) - set(self.features_to_remove_post))
+        features_to_remove_post = self._get_features_to_remove_post(X_features)
+        X_features.drop(features_to_remove_post, axis=1, inplace=True)
+        self._remove_features(features=features_to_remove_post)
+
+        feature_names = self.feature_types_metadata.get_features()
+
         self.features_binned_mapping = binning.generate_bins(X_features, self.features_binned)
         for column in self.features_binned:
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
 
-        X_features.drop(self.features_to_remove_post, axis=1, inplace=True)
-        if drop_duplicates:
-            X_features = self._drop_duplicate_features(X_features)
-        self.features_categorical_final = list(X_features.select_dtypes(include='category').columns.values)
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
             X_features = self._fix_categoricals_for_sklearn(X_features=X_features)
-        for column in self.features_categorical_final:
+
+        if drop_duplicates:
+            X_features = self._drop_duplicate_features(X_features)
+
+        feature_names_post = list(X_features.columns)
+        if set(feature_names) != set(feature_names_post):
+            features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
+            self._remove_features(features=features_to_remove_post)
+
+        for column in self.feature_types_metadata.type_group_map_raw['category']:
             self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
 
         X_features = self._minimize_memory_usage(X_features=X_features)
+
+        self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=get_type_map_raw(X_features), type_group_map_special=self.feature_types_metadata.type_group_map_special)
+        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_types_metadata.type_map_raw]
 
         return X_features
 
@@ -175,7 +180,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
 
         X_features = X_features[self.features]
-        for column in self.features_categorical_final:
+        for column in self.feature_types_metadata.type_group_map_raw['category']:
             X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
 
         X_features = self._minimize_memory_usage(X_features=X_features)
@@ -185,6 +190,11 @@ class AbstractFeatureGenerator:  # TODO: RENAME
     def _generate_features(self, X: DataFrame) -> DataFrame:
         raise NotImplementedError()
 
+    # TODO: Remove self.features_binned from here
+    def _remove_features(self, features):
+        self.feature_types_metadata.remove_features(features=features, inplace=True)
+        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_types_metadata.type_map_raw]
+
     def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
         if self.minimize_categorical_memory_usage_flag:
             self._minimize_categorical_memory_usage(X_features=X_features)
@@ -193,7 +203,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         return X_features
 
     def _minimize_ngram_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.feature_types_metadata.feature_types_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
+        return clip_and_astype(df=X_features, columns=self.feature_types_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
 
     def _minimize_binned_memory_usage(self, X_features: DataFrame) -> DataFrame:
         return clip_and_astype(df=X_features, columns=self.features_binned, clip_min=0, clip_max=255, dtype='uint8')
@@ -201,22 +211,23 @@ class AbstractFeatureGenerator:  # TODO: RENAME
     # TODO: Compress further, uint16, etc.
     # Performs in-place updates
     def _minimize_categorical_memory_usage(self, X_features: DataFrame):
-        for column in self.features_categorical_final:
+        for column in self.feature_types_metadata.type_group_map_raw['category']:
             new_categories = list(range(len(X_features[column].cat.categories.values)))
             X_features[column].cat.rename_categories(new_categories, inplace=True)
 
     def _fix_categoricals_for_sklearn(self, X_features: DataFrame) -> DataFrame:
-        for column in self.features_categorical_final:
+        features_to_remove = []
+        for column in self.feature_types_metadata.type_group_map_raw['category']:
             rank = X_features[column].value_counts().sort_values(ascending=True)
             rank = rank[rank >= 3]
             rank = rank.reset_index()
             val_list = list(rank['index'].values)
             if len(val_list) <= 1:
-                self.features_to_remove_post.append(column)
-                self.features_categorical_final = [feature for feature in self.features_categorical_final if feature != column]
-                logger.debug(f'Dropping {column}')
+                features_to_remove.append(column)
             else:
                 X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
+        if features_to_remove:
+            X_features.drop(features_to_remove, axis=1, inplace=True)
         return X_features
 
     def _get_features_to_remove_post(self, X_features: DataFrame) -> list:
@@ -227,7 +238,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             if unique_value_count == 1:
                 features_to_remove_post.append(column)
             # TODO: Consider making 0.99 a parameter to FeatureGenerator
-            elif column in self.feature_type_family['object'] and (unique_value_count / X_len > 0.99):
+            elif column in self._feature_metadata_in.type_group_map_raw['object'] and (unique_value_count / X_len > 0.99):
                 features_to_remove_post.append(column)
         return features_to_remove_post
 
@@ -240,8 +251,8 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         return useless_features
 
     @staticmethod
-    def _get_feature_types_family(X: DataFrame) -> dict:
-        return {column: get_type_family_special(X[column]) for column in X}
+    def _get_type_group_map_special(X: DataFrame) -> defaultdict:
+        return get_type_group_map_special(X)
 
     # TODO: optimize by not considering columns with unique sums/means
     # TODO: Multithread?
@@ -263,12 +274,12 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         return X[columns_new]
 
     def get_feature_types_metadata_full(self):
-        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.feature_types_special)
+        feature_types_metadata_full = copy.deepcopy(self.feature_types_metadata.type_group_map_special)
 
-        for key_raw in self.feature_types_metadata.feature_types_raw:
-            values = self.feature_types_metadata.feature_types_raw[key_raw]
-            for key_special in self.feature_types_metadata.feature_types_special:
-                values = [value for value in values if value not in self.feature_types_metadata.feature_types_special[key_special]]
+        for key_raw in self.feature_types_metadata.type_group_map_raw:
+            values = self.feature_types_metadata.type_group_map_raw[key_raw]
+            for key_special in self.feature_types_metadata.type_group_map_special:
+                values = [value for value in values if value not in self.feature_types_metadata.type_group_map_special[key_special]]
             if values:
                 feature_types_metadata_full[key_raw] += values
 
@@ -287,16 +298,16 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
     def print_feature_type_info(self):
         logger.log(20, 'Original Features (raw dtypes):')
-        for key, val in self.feature_type_family_init_raw.items():
+        for key, val in self._feature_metadata_in_real.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Original Features (inferred dtypes):')
-        for key, val in self.feature_type_family.items():
+        for key, val in self._feature_metadata_in.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Generated Features (special dtypes):')
-        for key, val in self.feature_types_metadata.feature_types_special.items():
+        for key, val in self.feature_types_metadata.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Processed Features (raw dtypes):')
-        for key, val in self.feature_types_metadata.feature_types_raw.items():
+        for key, val in self.feature_types_metadata.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Processed Features:')
         for key, val in self.get_feature_types_metadata_full().items():

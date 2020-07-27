@@ -1,6 +1,6 @@
 import logging
 
-from ..types import get_type_family_groups_df
+from ..types import get_type_map_raw
 from ..feature_types_metadata import FeatureTypesMetadata
 
 logger = logging.getLogger(__name__)
@@ -26,8 +26,8 @@ class AbstractFeatureGenerator:
             self.features_in = list(X.columns)
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in])
         self.features_out = list(X_out.columns)
-        type_family_groups_raw = get_type_family_groups_df(X_out)
-        self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=type_family_groups_raw, feature_types_special=type_family_groups_special)
+        type_map_raw = get_type_map_raw(X_out)
+        self.feature_types_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         self._is_fit = True
         return X_out
 

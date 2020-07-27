@@ -165,8 +165,8 @@ class AbstractModel:
             # max_early_stopping_rounds=None,
             # use_orig_features=True,  # TODO: Only for stackers
             # TODO: add option for only top-k ngrams
-            ignored_feature_types_special=[],  # List, drops any features in `self.feature_types_metadata.feature_types_special[type]` for type in `ignored_feature_types_special`. | Currently undocumented in task.
-            ignored_feature_types_raw=[],  # List, drops any features in `self.feature_types_metadata.feature_types_raw[type]` for type in `ignored_feature_types_raw`. | Currently undocumented in task.
+            ignored_type_group_special=[],  # List, drops any features in `self.feature_types_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
+            ignored_type_group_raw=[],  # List, drops any features in `self.feature_types_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -226,17 +226,17 @@ class AbstractModel:
                 return X[self.features]
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
-            ignored_feature_types_raw = self.params_aux.get('ignored_feature_types_raw', [])
-            if ignored_feature_types_raw:
-                for ignored_feature_type in ignored_feature_types_raw:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_raw[ignored_feature_type]]
-            ignored_feature_types_special = self.params_aux.get('ignored_feature_types_special', [])
-            if ignored_feature_types_special:
-                for ignored_feature_type in ignored_feature_types_special:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_special[ignored_feature_type]]
+            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
+            if ignored_type_group_raw:
+                for ignored_feature_type in ignored_type_group_raw:
+                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.type_group_map_raw[ignored_feature_type]]
+            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
+            if ignored_type_group_special:
+                for ignored_feature_type in ignored_type_group_special:
+                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.type_group_map_special[ignored_feature_type]]
             if not self.features:
                 raise NoValidFeatures
-            if ignored_feature_types_raw or ignored_feature_types_special:
+            if ignored_type_group_raw or ignored_type_group_special:
                 if list(X.columns) != self.features:
                     X = X[self.features]
         return X

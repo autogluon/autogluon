@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from pandas import Series
+from pandas import DataFrame, Series
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,22 @@ def get_type_family_raw(dtype) -> str:
         return dtype.name
 
 
+# Real dtypes
+def get_type_map_real(df: DataFrame) -> dict:
+    features_types = df.dtypes.to_dict()
+    return {k: v.name for k, v in features_types.items()}
+
+
+# Raw dtypes (Real dtypes family)
+def get_type_map_raw(df: DataFrame) -> dict:
+    features_types = df.dtypes.to_dict()
+    return {k: get_type_family_raw(v) for k, v in features_types.items()}
+
+
+def get_type_map_special(X: DataFrame) -> dict:
+    return {column: get_type_family_special(X[column]) for column in X}
+
+
 def get_type_family_special(X: Series) -> str:
     type_family = get_type_family_raw(X.dtype)
     if check_if_datetime_feature(X):
@@ -41,24 +57,26 @@ def get_type_family_special(X: Series) -> str:
     return type_family
 
 
-def get_type_groups_df(df):
-    features_types = df.dtypes.to_dict()
-
-    features_type_groups = defaultdict(list)
-    features_types_tmp = {k: v.name for k, v in features_types.items()}
-    for key, val in features_types_tmp.items():
-        features_type_groups[val].append(key)
-    return features_type_groups
+def get_type_group_map(type_map: dict) -> defaultdict:
+    type_group_map = defaultdict(list)
+    for key, val in type_map.items():
+        type_group_map[val].append(key)
+    return type_group_map
 
 
-def get_type_family_groups_df(df):
-    features_types = df.dtypes.to_dict()
+def get_type_group_map_real(df: DataFrame) -> defaultdict:
+    type_map_real = get_type_map_real(df)
+    return get_type_group_map(type_map_real)
 
-    features_type_groups = defaultdict(list)
-    features_types_tmp = {k: get_type_family_raw(v) for k, v in features_types.items()}
-    for key, val in features_types_tmp.items():
-        features_type_groups[val].append(key)
-    return features_type_groups
+
+def get_type_group_map_raw(df: DataFrame) -> defaultdict:
+    type_map_raw = get_type_map_raw(df)
+    return get_type_group_map(type_map_raw)
+
+
+def get_type_group_map_special(df: DataFrame) -> defaultdict:
+    type_map_special = get_type_map_special(df)
+    return get_type_group_map(type_map_special)
 
 
 # TODO: Expand to int64 -> date features (milli from epoch etc)

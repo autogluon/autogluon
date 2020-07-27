@@ -119,16 +119,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         if len(self.models) == 0:
+            type_map_raw = {column: 'float' for column in self.stack_columns}
+            type_group_map_special = {'stack': self.stack_columns}
+            stacker_feature_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
             if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
-                feature_types_raw = defaultdict(list)
-                feature_types_raw['float'] = self.stack_columns
-                feature_types_special = defaultdict(list)
-                feature_types_special['stack'] = self.stack_columns
-                self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=feature_types_special)
+                self.feature_types_metadata = stacker_feature_metadata
             else:
-                self.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)
-                self.feature_types_metadata.feature_types_raw['float'] += self.stack_columns
-                self.feature_types_metadata.feature_types_special['stack'] += self.stack_columns
+                self.feature_types_metadata = self.feature_types_metadata.join_metadata(stacker_feature_metadata)
         super()._fit(X=X, y=y, k_fold=k_fold, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, time_limit=time_limit, **kwargs)
 
     def set_contexts(self, path_context):
@@ -153,16 +150,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         if len(self.models) == 0:
+            type_map_raw = {column: 'float' for column in self.stack_columns}
+            type_group_map_special = {'stack': self.stack_columns}
+            stacker_feature_metadata = FeatureTypesMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
             if self.feature_types_metadata is None:  # TODO: This is probably not the best way to do this
-                feature_types_raw = defaultdict(list)
-                feature_types_raw['float'] = self.stack_columns
-                feature_types_special = defaultdict(list)
-                feature_types_special['stack'] = self.stack_columns
-                self.feature_types_metadata = FeatureTypesMetadata(feature_types_raw=feature_types_raw, feature_types_special=feature_types_special)
+                self.feature_types_metadata = stacker_feature_metadata
             else:
-                self.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)
-                self.feature_types_metadata.feature_types_raw['float'] += self.stack_columns
-                self.feature_types_metadata.feature_types_special['stack'] += self.stack_columns
+                self.feature_types_metadata = self.feature_types_metadata.join_metadata(stacker_feature_metadata)
         self.model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Move this
 
         # TODO: Preprocess data here instead of repeatedly

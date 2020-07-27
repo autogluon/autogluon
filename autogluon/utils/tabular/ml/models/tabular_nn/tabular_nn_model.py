@@ -104,7 +104,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_feature_types_special=['text_ngram', 'text_as_category'],
+            ignored_type_group_special=['text_ngram', 'text_as_category'],
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -575,7 +575,7 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
 
-        feature_types = self.feature_types_metadata.feature_types_raw
+        feature_types = self.feature_types_metadata.type_group_map_raw
 
         categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
         continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')

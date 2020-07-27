@@ -35,9 +35,9 @@ class TabularPredictor(BasePredictor):
             Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
             Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime', 'text', 'text_ngram').
             Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
-                `feature_types.get_feature_types_raw_flattened()`: Dictionary of feature name -> raw dtype mappings.
-                `feature_types.feature_types_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
-                `feature_types.feature_types_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+                `feature_types.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
+                `feature_types.type_group_map_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
+                `feature_types.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
             For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
