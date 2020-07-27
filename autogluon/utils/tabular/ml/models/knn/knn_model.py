@@ -5,9 +5,10 @@ import time
 
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
 from ..abstract import model_trial
-from ..abstract.abstract_model import SKLearnModel
+from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError
 
@@ -15,13 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Normalize data!
-class KNNModel(SKLearnModel):
+class KNNModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._model_type = self._get_model_type()
+
+    def _get_model_type(self):
         if self.problem_type == REGRESSION:
-            self._model_type = KNeighborsRegressor
+            return KNeighborsRegressor
         else:
-            self._model_type = KNeighborsClassifier
+            return KNeighborsClassifier
 
     def preprocess(self, X):
         cat_columns = X.select_dtypes(['category']).columns
@@ -75,3 +79,19 @@ class KNNModel(SKLearnModel):
         hpo_model_performances = {self.name: self.val_score}
         hpo_models = {self.name: self.path}
         return hpo_models, hpo_model_performances, hpo_results
+
+
+class FAISSModel(KNNModel):
+    def _get_model_type(self):
+        if self.problem_type == REGRESSION:
+            return FAISSNeighborsRegressor
+        else:
+            return FAISSNeighborsClassifier
+
+    def _set_default_params(self):
+        default_params = {
+            'index_factory_string': 'Flat',
+        }
+        for param, val in default_params.items():
+            self._set_default_param_value(param, val)
+        super()._set_default_params()
