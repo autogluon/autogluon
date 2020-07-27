@@ -100,7 +100,7 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             else:
                 self.feature_metadata = FeatureMetadata(type_map_raw=dict())
 
-            self.features_binned += self.feature_metadata.type_group_map_special['text_special']
+            self._features_binned += self.feature_metadata.type_group_map_special['text_special']
             if self._feature_metadata_in.type_group_map_special['text']:
                 self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
 

@@ -11,7 +11,7 @@ from pandas.api.types import CategoricalDtype
 from . import binning
 from .feature_metadata import FeatureMetadata
 from .generators.dummy import DummyFeatureGenerator
-from .types import get_type_group_map_real, get_type_map_raw, get_type_map_real, get_type_map_special, get_type_group_map_special
+from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
 from ..utils.decorators import calculate_time
 from ..utils.savers import save_pkl
@@ -23,32 +23,32 @@ logger = logging.getLogger(__name__)
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractFeatureGenerator:  # TODO: RENAME
     def __init__(self, generators):
-        self.features_init_to_keep = []  # Original features to use as input to feature generation
-        self.features_init_types = dict()  # Initial feature types prior to transformation
-        self.features_categorical_final_mapping = defaultdict()  # Categorical features original value -> category code mapping
-        self.features_binned = []  # Features to be binned
-        self.features_binned_mapping = defaultdict()  # Binned features original value ranges -> binned category code mapping
-        self.features = []  # Final list of features after transformation
+        self.features_in = []  # Original features to use as input to feature generation
+        self.features_in_types = dict()  # Initial feature types prior to transformation
+        self.features_out = []  # Final list of features after transformation
+
+        self.generators = generators
+
+        self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Passed to models to enable advanced functionality.
+        self._feature_metadata_in: FeatureMetadata = None  # FeatureMetadata object based on the original input features.
+        self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
         self._is_fit = False  # Whether the feature generation has been fit
+        self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
 
-        self.minimize_categorical_memory_usage_flag = True
+        self._features_category_code_map = defaultdict()  # Categorical features original value -> category code mapping
+        self._features_binned = []  # Features to be binned
+        self._features_binned_map = defaultdict()  # Binned features original value ranges -> binned category code mapping
+        self._minimize_categorical_memory_usage_flag = True
 
         self.pre_memory_usage = None
         self.pre_memory_usage_per_row = None
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
-        self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
-
-        self.generators = generators
-
-        self._feature_metadata_in: FeatureMetadata = None  # FeatureMetadata object based on the original input features.
-        self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
-        self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Passed to models to enable advanced functionality.
 
     def _preprocess(self, X: DataFrame):
         for column in X.columns:
-            if self.features_init_types[column].name == 'object':
+            if self._feature_metadata_in.type_map_raw[column] == 'object':
                 X[column].fillna('', inplace=True)
             else:
                 X[column].fillna(np.nan, inplace=True)
@@ -81,7 +81,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             self.generators = [(dummy_generator, None)]
 
         X_features.index = X_index
-        self.features = list(X_features.columns)
+        self.features_out = list(X_features.columns)
 
         self.post_memory_usage = self._get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
@@ -93,7 +93,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
         self._is_fit = True
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features)))
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features_out)))
         self.print_feature_type_info()
 
         return X_features
@@ -108,8 +108,8 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         features_to_remove += [feature for feature in self._get_useless_features(X) if feature not in features_to_remove]
         X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
 
-        self.features_init_to_keep = list(X.columns)
-        self.features_init_types = X.dtypes.to_dict()
+        self.features_in = list(X.columns)
+        self.features_in_types = X.dtypes.to_dict()
 
         type_map_real = get_type_map_real(X)
         type_map_raw = get_type_map_raw(X)
@@ -126,9 +126,9 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         feature_names = self.feature_metadata.get_features()
 
-        self.features_binned_mapping = binning.generate_bins(X_features, self.features_binned)
-        for column in self.features_binned:
-            X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+        self._features_binned_map = binning.generate_bins(X_features, self._features_binned)
+        for column in self._features_binned:
+            X_features[column] = binning.bin_column(series=X_features[column], mapping=self._features_binned_map[column])
 
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
             X_features = self._fix_categoricals_for_sklearn(X_features=X_features)
@@ -142,12 +142,12 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             self._remove_features(features=features_to_remove_post)
 
         for column in self.feature_metadata.type_group_map_raw['category']:
-            self.features_categorical_final_mapping[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
+            self._features_category_code_map[column] = copy.deepcopy(X_features[column].cat.categories)  # dict(enumerate(X_features[column].cat.categories))
 
         X_features = self._minimize_memory_usage(X_features=X_features)
 
         self.feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_features), type_group_map_special=self.feature_metadata.type_group_map_special)
-        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_metadata.type_map_raw]
+        self._features_binned = [feature for feature in self._features_binned if feature in self.feature_metadata.type_map_raw]
 
         return X_features
 
@@ -165,23 +165,23 @@ class AbstractFeatureGenerator:  # TODO: RENAME
     def _transform(self, X: DataFrame) -> DataFrame:
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         try:
-            X = X[self.features_init_to_keep]
+            X = X[self.features_in]
         except KeyError:
             missing_cols = []
-            for col in self.features_init_to_keep:
+            for col in self.features_in:
                 if col not in X.columns:
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
-        if self.features_init_types:
-            X = X.astype(self.features_init_types)
+        if self.features_in_types:
+            X = X.astype(self.features_in_types)
         X_features = self._generate_features(X)
-        for column in self.features_binned:
-            X_features[column] = binning.bin_column(series=X_features[column], mapping=self.features_binned_mapping[column])
+        for column in self._features_binned:
+            X_features[column] = binning.bin_column(series=X_features[column], mapping=self._features_binned_map[column])
 
-        X_features = X_features[self.features]
+        X_features = X_features[self.features_out]
         for column in self.feature_metadata.type_group_map_raw['category']:
-            X_features[column].cat.set_categories(self.features_categorical_final_mapping[column], inplace=True)
+            X_features[column].cat.set_categories(self._features_category_code_map[column], inplace=True)
 
         X_features = self._minimize_memory_usage(X_features=X_features)
 
@@ -193,10 +193,10 @@ class AbstractFeatureGenerator:  # TODO: RENAME
     # TODO: Remove self.features_binned from here
     def _remove_features(self, features):
         self.feature_metadata.remove_features(features=features, inplace=True)
-        self.features_binned = [feature for feature in self.features_binned if feature in self.feature_metadata.type_map_raw]
+        self._features_binned = [feature for feature in self._features_binned if feature in self.feature_metadata.type_map_raw]
 
     def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        if self.minimize_categorical_memory_usage_flag:
+        if self._minimize_categorical_memory_usage_flag:
             self._minimize_categorical_memory_usage(X_features=X_features)
         X_features = self._minimize_ngram_memory_usage(X_features=X_features)
         X_features = self._minimize_binned_memory_usage(X_features=X_features)
@@ -206,7 +206,7 @@ class AbstractFeatureGenerator:  # TODO: RENAME
         return clip_and_astype(df=X_features, columns=self.feature_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
 
     def _minimize_binned_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.features_binned, clip_min=0, clip_max=255, dtype='uint8')
+        return clip_and_astype(df=X_features, columns=self._features_binned, clip_min=0, clip_max=255, dtype='uint8')
 
     # TODO: Compress further, uint16, etc.
     # Performs in-place updates
