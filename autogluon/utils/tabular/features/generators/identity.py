@@ -8,10 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 class IdentityFeatureGenerator(AbstractFeatureGenerator):
-    def fit(self, X):
-        self.fit_transform(X)
+    def fit(self, X, y=None):
+        self.fit_transform(X, y=y)
 
-    def _fit_transform(self, X):
+    def _fit_transform(self, X, y=None):
         X_out = self._transform(X)
         return X_out, None
 

@@ -5,7 +5,7 @@ from collections import defaultdict
 import pandas as pd
 from pandas import DataFrame, Series
 
-from .abstract_feature_generator import AbstractFeatureGenerator
+from .abstract_pipeline_feature_generator import AbstractPipelineFeatureGenerator
 from .feature_metadata import FeatureMetadata
 from .generators.category import CategoryFeatureGenerator
 from .generators.text_special import TextSpecialFeatureGenerator
@@ -16,8 +16,7 @@ from .generators.text_ngram import TextNgramFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add verbose descriptions of each special dtype this generator can create.
-class AutoMLFeatureGenerator(AbstractFeatureGenerator):
+class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
     def __init__(self, enable_text_ngram_features=True, enable_text_special_features=True,
                  enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
                  vectorizer=None):
@@ -67,7 +66,6 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
 
         return feature_transformations
 
-    # TODO: Parallelize with decorator!
     def _generate_features(self, X: DataFrame):
         if not self._is_fit:
             feature_transformations = self._compute_feature_transformations()

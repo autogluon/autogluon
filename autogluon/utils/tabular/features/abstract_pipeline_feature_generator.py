@@ -10,6 +10,7 @@ from pandas.api.types import CategoricalDtype
 
 from . import binning
 from .feature_metadata import FeatureMetadata
+from .generators.abstract import AbstractFeatureGenerator
 from .generators.dummy import DummyFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
@@ -21,19 +22,16 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
-class AbstractFeatureGenerator:  # TODO: RENAME
+class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, generators):
-        self.features_in = []  # Original features to use as input to feature generation
+        super().__init__()
         self.features_in_types = dict()  # Initial feature types prior to transformation
-        self.features_out = []  # Final list of features after transformation
 
         self.generators = generators
 
-        self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Passed to models to enable advanced functionality.
         self._feature_metadata_in: FeatureMetadata = None  # FeatureMetadata object based on the original input features.
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
-        self._is_fit = False  # Whether the feature generation has been fit
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
 
         self._features_category_code_map = defaultdict()  # Categorical features original value -> category code mapping
@@ -53,6 +51,9 @@ class AbstractFeatureGenerator:  # TODO: RENAME
             else:
                 X[column].fillna(np.nan, inplace=True)
         return X
+
+    def fit(self, X: DataFrame, **kwargs):
+        self.fit_transform(X=X, **kwargs)
 
     # TODO: Save this to disk and remove from memory if large categoricals!
     @calculate_time
@@ -151,7 +152,6 @@ class AbstractFeatureGenerator:  # TODO: RENAME
 
         return X_features
 
-    @calculate_time
     def transform(self, X: DataFrame) -> DataFrame:
         if not self._is_fit:
             raise AssertionError('FeatureGenerator has not yet been fit.')

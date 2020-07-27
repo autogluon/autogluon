@@ -19,7 +19,7 @@ from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier, infer_problem_type, augment_rare_classes
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ...features.abstract_feature_generator import AbstractFeatureGenerator
+from ...features.abstract_pipeline_feature_generator import AbstractPipelineFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
 from ...metrics.classification_metrics import confusion_matrix
@@ -37,7 +37,7 @@ class AbstractLearner:
     learner_info_name = 'info.pkl'
     learner_info_json_name = 'info.json'
 
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: AbstractFeatureGenerator, label_count_threshold=10,
+    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: AbstractPipelineFeatureGenerator, label_count_threshold=10,
                  problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
@@ -52,7 +52,7 @@ class AbstractLearner:
         self.random_seed = random_seed
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
-        self.feature_generator: AbstractFeatureGenerator = feature_generator
+        self.feature_generator: AbstractPipelineFeatureGenerator = feature_generator
         self.feature_generators = [self.feature_generator]
 
         self.trainer: AbstractTrainer = None

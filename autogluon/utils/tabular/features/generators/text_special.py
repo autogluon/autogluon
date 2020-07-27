@@ -14,10 +14,10 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def fit(self, X):
-        self.fit_transform(X)
+    def fit(self, X, y=None):
+        self.fit_transform(X, y=y)
 
-    def _fit_transform(self, X):
+    def _fit_transform(self, X, y=None):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             # binned=list(X_out.columns),  # TODO: Add binning component?

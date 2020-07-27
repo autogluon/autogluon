@@ -25,10 +25,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         else:
             self.vectorizer_default_raw = vectorizer
 
-    def fit(self, X):
-        self.fit_transform(X)
+    def fit(self, X, y=None):
+        self.fit_transform(X, y=y)
 
-    def _fit_transform(self, X):
+    def _fit_transform(self, X, y=None):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             text_ngram=list(X_out.columns)
