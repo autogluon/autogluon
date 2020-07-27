@@ -68,13 +68,6 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             else:
                 X[column].fillna(np.nan, inplace=True)
 
-        X_text_features_combined = []
-        if self.feature_transformations['text_special']:
-            for nlp_feature in self.feature_transformations['text_special']:
-                X_text_features = self.generate_text_special(X[nlp_feature], nlp_feature)
-                X_text_features_combined.append(X_text_features)
-            X_text_features_combined = pd.concat(X_text_features_combined, axis=1)
-
         X = self.preprocess(X)
 
         if self.feature_transformations['raw']:
@@ -84,22 +77,29 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_categoricals = X[self.feature_transformations['category']]
             # TODO: Add stateful categorical generator, merge rare cases to an unknown value
             # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
-            if 'text' in self.feature_type_family:
-                self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
+            if not self.fit:
+                if 'text' in self.feature_type_family:
+                    self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
             X_categoricals = X_categoricals.astype('category')
             X_features = X_features.join(X_categoricals)
 
         if self.feature_transformations['text_special']:
+            X_text_special_combined = []
+            for nlp_feature in self.feature_transformations['text_special']:
+                X_text_special = self.generate_text_special(X[nlp_feature], nlp_feature)
+                X_text_special_combined.append(X_text_special)
+            X_text_special_combined = pd.concat(X_text_special_combined, axis=1)
             if not self.fit:
-                self.features_binned += list(X_text_features_combined.columns)
-                self.feature_type_family_generated['text_special'] += list(X_text_features_combined.columns)
-            X_features = X_features.join(X_text_features_combined)
+                self.features_binned += list(X_text_special_combined.columns)
+                self.feature_type_family_generated['text_special'] += list(X_text_special_combined.columns)
+            X_features = X_features.join(X_text_special_combined)
 
         if self.feature_transformations['datetime']:
             for datetime_feature in self.feature_transformations['datetime']:
                 X_features[datetime_feature] = pd.to_datetime(X[datetime_feature])
                 X_features[datetime_feature] = pd.to_numeric(X_features[datetime_feature])  # TODO: Use actual date info
-                self.feature_type_family_generated['datetime'].append(datetime_feature)
+                if not self.fit:
+                    self.feature_type_family_generated['datetime'].append(datetime_feature)
                 # TODO: Add fastai date features
 
         if self.feature_transformations['text_ngram']:
@@ -283,3 +283,11 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
         if not string:
             return 0
         return sum(1 for c in string if c == character)
+
+    @staticmethod
+    def train_vectorizer(text_list, vectorizer):
+        logger.log(15, 'Fitting vectorizer...')
+        transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
+        logger.log(15, f'Vectorizer fit with vocabulary size = {len(vectorizer.vocabulary_)}')
+        return vectorizer, transform_matrix
