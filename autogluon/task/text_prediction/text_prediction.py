@@ -1,6 +1,5 @@
 import logging
 import copy
-import time
 import numpy as np
 from .. import tabular_prediction
 from . import constants as _C
