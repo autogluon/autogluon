@@ -61,7 +61,7 @@ requirements = [
 ]
 
 text_requirements = [
-    'git+https://github.com/sxjscience/autogluon-contrib-nlp.git'
+    'autogluon_contrib_nlp @ git+https://github.com/sxjscience/autogluon-contrib-nlp.git@master'
 ]
 
 test_requirements = [
