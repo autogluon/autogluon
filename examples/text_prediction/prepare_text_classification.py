@@ -1,18 +1,11 @@
 import os
-import sys
-import shutil
-import tempfile
 import argparse
-import zipfile
-import json
-import pathlib
 import pandas as pd
 import shutil
 import tarfile
-from autogluon.contrib.nlp.utils.misc import download, load_checksum_stats
-from autogluon.contrib.nlp.base import get_data_home_dir, get_repo_url
-from autogluon.contrib.nlp.registry import DATA_MAIN_REGISTRY, DATA_PARSER_REGISTRY
-from autogluon.contrib.nlp.data.tokenizers import WhitespaceTokenizer
+from autogluon_contrib_nlp.utils.misc import download, load_checksum_stats
+from autogluon_contrib_nlp.base import get_data_home_dir, get_repo_url
+
 
 TASK2PATH = {
     "ag": get_repo_url() + "datasets/text_classification/ag_news_csv.tar.gz",

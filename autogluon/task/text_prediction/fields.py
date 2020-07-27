@@ -1,5 +1,5 @@
 from . import constants as _C
-from ...contrib.nlp.data import batchify as bf
+from autogluon_contrib_nlp.data import batchify as bf
 
 
 class _TextTokenIdsFieldBatchify:

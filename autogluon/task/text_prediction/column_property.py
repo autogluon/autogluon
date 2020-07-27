@@ -5,8 +5,8 @@ import json
 import collections
 from typing import List, Optional, Union, Tuple, Hashable
 from . import constants as _C
-from ...contrib.nlp.base import INT_TYPES, BOOL_TYPES
-from ...contrib.nlp.data.vocab import Vocab
+from autogluon_contrib_nlp.base import INT_TYPES, BOOL_TYPES
+from autogluon_contrib_nlp.data.vocab import Vocab
 
 __all__ = ['CategoricalColumnProperty',
            'TextColumnProperty',

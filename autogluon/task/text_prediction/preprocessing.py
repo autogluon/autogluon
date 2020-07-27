@@ -4,9 +4,9 @@ import os
 from collections import OrderedDict
 from typing import Dict, Optional, List, Tuple, Union
 import numpy as np
-from ...contrib.nlp.data import batchify as bf
-from ...contrib.nlp.utils.preprocessing import get_trimmed_lengths, match_tokens_with_char_spans
-from ...contrib.nlp.utils.misc import num_mp_workers
+from autogluon_contrib_nlp.data import batchify as bf
+from autogluon_contrib_nlp.utils.preprocessing import get_trimmed_lengths, match_tokens_with_char_spans
+from autogluon_contrib_nlp.utils.misc import num_mp_workers
 from .dataset import TabularDataset
 from .fields import TextTokenIdsField, EntityField, CategoricalField, NumericalField
 from . import constants as _C

@@ -1,9 +1,7 @@
-import mxnet as mx
 import os
 import json
 import argparse
 from autogluon.task import TextPrediction as task
-mx.npx.set_np()
 
 
 TASKS = \

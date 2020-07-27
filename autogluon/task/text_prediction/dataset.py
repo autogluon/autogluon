@@ -7,7 +7,7 @@ from . import constants as _C
 from .column_property import CategoricalColumnProperty, EntityColumnProperty,\
                              TextColumnProperty, NumericalColumnProperty,\
     get_column_properties_from_metadata
-from ...contrib.nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
+from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple
 from ...core import obj
 

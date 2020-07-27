@@ -7,7 +7,7 @@ from . import constants as _C
 from ..base import BaseTask
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
-from ...contrib.nlp.utils.registry import Registry
+from autogluon_contrib_nlp.utils.registry import Registry
 from ...utils.tabular.utils.loaders import load_pd
 from ...utils.miscs import verbosity2loglevel
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
