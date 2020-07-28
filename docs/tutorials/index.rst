@@ -119,6 +119,7 @@ Neural Architecture Search
    image_classification/index
    object_detection/index
    text_classification/index
+   text_prediction/index
    tabular_prediction/index
    customize/index
    nas/index
