@@ -86,7 +86,7 @@ From this summary, we can see that AutoGluon trained many different types of mod
 
 ```{.python .input}
 print("AutoGluon infers problem type is: ", predictor.problem_type)
-print("AutoGluon categorized the features as: ", predictor.feature_types)
+print("AutoGluon categorized the features as: ", predictor.feature_metadata.type_map_raw)
 ```
 
 AutoGluon correctly recognized our prediction problem to be a binary classification task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects.
