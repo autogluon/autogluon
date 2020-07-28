@@ -7,6 +7,7 @@ from .identity import IdentityFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
+# TODO: Add stateful version
 class CategoryFeatureGenerator(IdentityFeatureGenerator):
     def _transform(self, X):
         return self._generate_features_category(X)

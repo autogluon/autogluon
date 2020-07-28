@@ -14,11 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
+# TODO: Add argument to combine text or make separate vectorizers for each text features (currently combined)
+# TODO: Add argument to define the text preprocessing logic
+# TODO: Add argument to output ngrams as a sparse matrix
+# TODO: Add HashingVectorizer support
+# TODO: Add TFIDF support
 class TextNgramFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, vectorizer=None, **kwargs):
+    def __init__(self, vectorizer=None, max_memory_ratio=0.15, **kwargs):
         super().__init__(**kwargs)
 
         self.vectorizers = []
+        # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
+        # TODO: Finetune this, or find a better way to ennsure stability
+        self.max_memory_ratio = max_memory_ratio  # Ratio of maximium memory the output ngram features are allowed to use in dense int64 form.
 
         if vectorizer is None:
             self.vectorizer_default_raw = vectorizer_auto_ml_default()
@@ -117,14 +125,11 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                 predicted_ngrams_memory_usage_bytes = len(X) * 8 * (transform_matrix.shape[1] + 1) + 80
                 mem_avail = psutil.virtual_memory().available
                 mem_rss = psutil.Process().memory_info().rss
-                # TODO: 0.25 causes OOM error with 72 GB ram on nyc-wendykan-lending-club-loan-data, fails on NN or Catboost, distributed.worker spams logs with memory warnings
-                # TODO: 0.20 causes OOM error with 64 GB ram on NN with several datasets. LightGBM and CatBoost succeed
-                max_memory_percentage = 0.15  # TODO: Finetune this, or find a better metric
                 predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
                 predicted_percentage = predicted_rss / mem_avail
                 if downsample_ratio is None:
-                    if predicted_percentage > max_memory_percentage:
-                        downsample_ratio = max_memory_percentage / predicted_percentage
+                    if predicted_percentage > self.max_memory_ratio:
+                        downsample_ratio = self.max_memory_ratio / predicted_percentage
                         logger.warning('Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
 
                 if downsample_ratio is not None:

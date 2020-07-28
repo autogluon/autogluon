@@ -38,11 +38,14 @@ class FeatureMetadata:
             type_group_map_special_expanded += self.type_group_map_special[key]
         type_group_map_raw_expanded_set = set(type_group_map_raw_expanded)
         if len(type_group_map_raw_expanded) != len(type_group_map_raw_expanded_set):
-            raise AssertionError('type_group_map_raw contains features that appear multiple times!')
+            raise AssertionError('type_group_map_raw contains features that appear multiple times.')
 
+        features_invalid = []
         for feature in type_group_map_special_expanded:
             if feature not in type_group_map_raw_expanded:
-                raise AssertionError(f"feature '{feature}' is present in type_group_map_special but not in type_group_map_raw!")
+                features_invalid.append(feature)
+        if features_invalid:
+            raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_group_map_raw. Invalid features: {features_invalid}")
 
     def get_features(self):
         return list(self.type_map_raw.keys())

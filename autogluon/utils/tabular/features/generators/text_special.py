@@ -11,8 +11,11 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
 class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, **kwargs):
+    def __init__(self, symbols=None, **kwargs):
         super().__init__(**kwargs)
+        if symbols is None:
+            symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
+        self.symbols = symbols  # Symbols to generate count and ratio features for.
 
     def fit(self, X, y=None):
         self.fit_transform(X, y=y)
@@ -48,8 +51,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         X_text_special[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X]
         X_text_special[feature + '.special_ratio'] = [self.special_ratio(value) for value in X]
 
-        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
-        for symbol in symbols:
+        for symbol in self.symbols:
             X_text_special[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X]
             X_text_special[feature + '.symbol_ratio.' + symbol] = X_text_special[feature + '.symbol_count.' + symbol] / X_text_special[feature + '.char_count']
             X_text_special[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)

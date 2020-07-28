@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
-    def __init__(self, enable_text_ngram_features=True, enable_text_special_features=True,
+    def __init__(self, generators=None, enable_text_ngram_features=True, enable_text_special_features=True,
                  enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
                  vectorizer=None):
         self.enable_nlp_features = enable_text_ngram_features
@@ -25,7 +25,9 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
         self.enable_categorical_features = enable_categorical_features
         self.enable_raw_features = enable_raw_features
         self.enable_datetime_features = enable_datetime_features
-        super().__init__(generators=self._get_default_generators(vectorizer=vectorizer))
+        if generators is None:
+            generators = self._get_default_generators(vectorizer=vectorizer)
+        super().__init__(generators=generators)
 
     # TODO: Move type strings into generators, or have generators determine the proper features at fit time
     def _get_default_generators(self, vectorizer=None):
@@ -38,6 +40,7 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
         ]
         return generators
 
+    # TODO: Change this or remove the need for it
     def _compute_feature_transformations(self):
         """Determines which features undergo which feature transformations."""
         feature_transformations = defaultdict(list)
