@@ -1,7 +1,9 @@
+import copy
 import logging
 
 from ..types import get_type_map_raw
 from ..feature_metadata import FeatureMetadata
+from ...utils.savers import save_pkl
 
 logger = logging.getLogger(__name__)
 
@@ -65,3 +67,29 @@ class AbstractFeatureGenerator:
         if X_columns_orig != list(X.columns):
             self._is_updated_name = True
         return X, type_family_groups
+
+    def _get_feature_metadata_full(self):
+        feature_metadata_full = copy.deepcopy(self.feature_metadata.type_group_map_special)
+
+        for key_raw in self.feature_metadata.type_group_map_raw:
+            values = self.feature_metadata.type_group_map_raw[key_raw]
+            for key_special in self.feature_metadata.type_group_map_special:
+                values = [value for value in values if value not in self.feature_metadata.type_group_map_special[key_special]]
+            if values:
+                feature_metadata_full[key_raw] += values
+
+        return feature_metadata_full
+
+    def print_feature_metadata_info(self):
+        logger.log(20, 'Processed Features (special dtypes):')
+        for key, val in self.feature_metadata.type_group_map_special.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Processed Features (raw dtypes):')
+        for key, val in self.feature_metadata.type_group_map_raw.items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Processed Features:')
+        for key, val in self._get_feature_metadata_full().items():
+            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+
+    def save(self, path):
+        save_pkl.save(path=path, object=self)

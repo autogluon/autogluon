@@ -10,9 +10,6 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def fit(self, X, y=None):
         self.fit_transform(X, y=y)
 

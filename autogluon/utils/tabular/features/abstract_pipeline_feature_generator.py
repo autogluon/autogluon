@@ -15,7 +15,6 @@ from .generators.dummy import DummyFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
 from ..utils.decorators import calculate_time
-from ..utils.savers import save_pkl
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         self._is_fit = True
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features_out)))
-        self.print_feature_type_info()
+        self.print_feature_metadata_info()
 
         return X_features
 
@@ -273,18 +272,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         return X[columns_new]
 
-    def get_feature_metadata_full(self):
-        feature_metadata_full = copy.deepcopy(self.feature_metadata.type_group_map_special)
-
-        for key_raw in self.feature_metadata.type_group_map_raw:
-            values = self.feature_metadata.type_group_map_raw[key_raw]
-            for key_special in self.feature_metadata.type_group_map_special:
-                values = [value for value in values if value not in self.feature_metadata.type_group_map_special[key_special]]
-            if values:
-                feature_metadata_full[key_raw] += values
-
-        return feature_metadata_full
-
     # TODO: Move this outside of here
     # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
     @staticmethod
@@ -296,22 +283,11 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             num_rows_sample = math.ceil(sample_ratio * num_rows)
             return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
 
-    def print_feature_type_info(self):
+    def print_feature_metadata_info(self):
         logger.log(20, 'Original Features (raw dtypes):')
         for key, val in self._feature_metadata_in_real.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Original Features (inferred dtypes):')
         for key, val in self._feature_metadata_in.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Generated Features (special dtypes):')
-        for key, val in self.feature_metadata.type_group_map_special.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Processed Features (raw dtypes):')
-        for key, val in self.feature_metadata.type_group_map_raw.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Processed Features:')
-        for key, val in self.get_feature_metadata_full().items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-
-    def save(self, path):
-        save_pkl.save(path=path, object=self)
+        super().print_feature_metadata_info()
