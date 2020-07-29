@@ -22,6 +22,8 @@ from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.abstract_feature_generator import AbstractFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
+from ...metrics.classification_metrics import confusion_matrix
+
 
 logger = logging.getLogger(__name__)
 
@@ -425,16 +427,26 @@ class AbstractLearner:
                 #   return auc(fpr, tpr)
                 f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
                 f1micro_score.__name__ = f1_score.__name__
-                auxiliary_metrics += [f1micro_score]  # TODO: add auc?
+                auxiliary_metrics += [f1micro_score, (confusion_matrix, {'labels': self.label_cleaner.ordered_class_labels, 'output_format': 'pandas_dataframe' })]  # TODO: add auc?
             elif self.problem_type == MULTICLASS:  # multiclass metrics
-                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
+                auxiliary_metrics += [(confusion_matrix, {'labels': self.label_cleaner.ordered_class_labels, 'output_format': 'pandas_dataframe' })]  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
 
         performance_dict = OrderedDict({metric: performance})
         for metric_function in auxiliary_metrics:
+            if isinstance(metric_function, tuple):
+                metric_function, metric_kwargs = metric_function
+            else:
+                metric_kwargs = None
             metric_name = metric_function.__name__
             if metric_name not in performance_dict:
                 try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
-                    performance_dict[metric_name] = metric_function(y_true, y_pred)
+                    if metric_kwargs:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred, **metric_kwargs)
+                    else:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred)
+                    if metric_name == 'confusion_matrix':
+                        # Pandas Dataframe is not JSON Serializable. TODO: Standardize output format of each data type
+                        performance_dict[metric_name] = performance_dict[metric_name].to_json()
                 except ValueError:
                     pass
 
