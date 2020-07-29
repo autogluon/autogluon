@@ -134,6 +134,7 @@ class TabularPredictor(BasePredictor):
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+            If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
             Parameters
             ----------
