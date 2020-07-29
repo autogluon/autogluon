@@ -128,7 +128,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X))
+            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
             self._n_repeats = 1
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
@@ -148,12 +148,12 @@ class BaggedEnsembleModel(AbstractModel):
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
         elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape)
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
         else:
             oof_pred_proba = np.zeros(shape=len(X))
-        oof_pred_model_repeats = np.zeros(shape=len(X))
+        oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
 
         models = []
         folds_to_fit = fold_end - fold_start

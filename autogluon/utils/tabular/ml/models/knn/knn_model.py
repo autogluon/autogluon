@@ -3,6 +3,7 @@ import pickle
 import sys
 import time
 
+import numpy as np
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
@@ -28,9 +29,8 @@ class KNNModel(AbstractModel):
             return KNeighborsClassifier
 
     def preprocess(self, X):
-        cat_columns = X.select_dtypes(['category']).columns
-        X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
         X = super().preprocess(X).fillna(0)
+        X = X.to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):
