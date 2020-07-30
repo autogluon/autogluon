@@ -40,7 +40,7 @@ def default() -> dict:
             },
         },
         'hpo_params': {
-            'scheduler': 'fifo',     # Can be 'fifo', 'hyperband'
+            'scheduler': 'fifo',           # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',   # Can be 'random', 'bayesopt'
             'search_options': None,        # The search option
             'time_limits': 1 * 60 * 60,    # The total time limit
@@ -49,7 +49,7 @@ def default() -> dict:
             'grace_period': 1,             # The grace period
             'max_t': 10,                   # The max_t in the hyperband
             'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
-                                           # We report the validation accuracy 5 times each epoch.
+                                           # We report the validation accuracy 10 times each epoch.
         }
     }
     return ret
@@ -289,10 +289,12 @@ class TextPrediction(BaseTask):
                 label_columns.append(ele)
         if feature_columns is None:
             all_columns = list(train_data.columns)
-            feature_columns = [ele for ele in all_columns if ele is not label]
+            feature_columns = [ele for ele in all_columns if ele is not label_columns]
         else:
             if isinstance(feature_columns, str):
                 feature_columns = [feature_columns]
+            for col in feature_columns:
+                assert col not in label_columns, 'Feature columns and label columns cannot overlap.'
             all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
@@ -301,7 +303,8 @@ class TextPrediction(BaseTask):
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
-        train_data = TabularDataset(train_data, columns=all_columns,
+        train_data = TabularDataset(train_data,
+                                    columns=all_columns,
                                     label_columns=label_columns)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
         logger.info('Train Dataset:')
