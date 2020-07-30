@@ -12,9 +12,9 @@ hyperparameter optimization.
 
    .. card::
       :title: Quick Start Using FIT
-      :link: beginner.html
+      :link: text_prediction_beginner.html
 
-      Quick start tutorial for text classification.
+      Quick start tutorial for text prediction problems.
 
 .. toctree::
    :maxdepth: 1

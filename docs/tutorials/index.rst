@@ -59,6 +59,17 @@ Tabular Prediction
       Using AutoGluon for Kaggle competitions with tabular data.
 
 
+Text Prediction
+---------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Tutorial
+      :link: text_predictioin/text_prediction_beginner.html
+
+      5 min tutorial on fitting models with text datasets.
+
+
 Tuning Custom Models
 --------------------
 .. container:: cards

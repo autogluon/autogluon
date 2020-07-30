@@ -70,5 +70,4 @@ The Paraphrasing Identification task is to identify whether two
 ```python
 train_data = load_pd.load('https://autogluon-text.s3-us-west-2.amazonaws.com/glue/mrpc/train.parquet')
 dev_data = load_pd.load('https://autogluon-text.s3-us-west-2.amazonaws.com/glue/mrpc/dev.parquet')
-
 ```
