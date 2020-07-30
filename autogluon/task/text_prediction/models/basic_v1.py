@@ -629,6 +629,7 @@ class BertForTextPredictionBasic:
               searcher=None,
               num_trials=10,
               grace_period=None,
+              max_t=None,
               reduction_factor=4,
               brackets=1,
               plot_results=True,
@@ -671,9 +672,11 @@ class BertForTextPredictionBasic:
                 time_limits = 5 * 60 * 60  # 5 hour
             if grace_period is None:
                 grace_period = 1
+            if max_t is None:
+                max_t = 10
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
-                                           max_t=10,
+                                           max_t=max_t,
                                            resource=resource,
                                            searcher=searcher,
                                            grace_period=grace_period,

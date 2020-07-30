@@ -46,6 +46,8 @@ def default() -> dict:
             'time_limits': 1 * 60 * 60,    # The total time limit
             'num_trials': 4,               # The number of trials
             'reduction_factor': 4,         # The reduction factor
+            'grace_period': 1,             # The grace period
+            'max_t': 10,                   # The max_t in the hyperband
             'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
                                            # We report the validation accuracy 5 times each epoch.
         }
@@ -191,6 +193,8 @@ class TextPrediction(BaseTask):
             scheduler=None,
             num_trials=None,
             reduction_factor=None,
+            grace_period=None,
+            max_t=None,
             search_strategy=None,
             search_options=None,
             hyperparameters=None,
@@ -356,6 +360,10 @@ class TextPrediction(BaseTask):
             num_trials = hyperparameters['hpo_params']['num_trials']
         if reduction_factor is None:
             reduction_factor = hyperparameters['hpo_params']['reduction_factor']
+        if grace_period is None:
+            grace_period = hyperparameters['hpo_params']['grace_period']
+        if max_t is None:
+            max_t = hyperparameters['hpo_params']['max_t']
         model = model_candidates[0]
         scheduler = model.train(train_data=train_data,
                                 tuning_data=tuning_data,
@@ -365,6 +373,8 @@ class TextPrediction(BaseTask):
                                 searcher=search_strategy,
                                 num_trials=num_trials,
                                 reduction_factor=reduction_factor,
+                                grace_period=grace_period,
+                                max_t=max_t,
                                 console_log=verbosity > 2)
         return model
 
