@@ -1,6 +1,7 @@
 import logging
 import copy
 import numpy as np
+import pandas as pd
 from .. import tabular_prediction
 from . import constants as _C
 from ..base import BaseTask
@@ -265,7 +266,8 @@ class TextPrediction(BaseTask):
             base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
         np.random.seed(seed)
-        train_data = load_pd.load(train_data)
+        if not isinstance(train_data, pd.DataFrame):
+            train_data = load_pd.load(train_data)
         # Inference the label
         if not isinstance(label, list):
             label = [label]
@@ -287,7 +289,8 @@ class TextPrediction(BaseTask):
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
         else:
-            tuning_data = load_pd.load(tuning_data)
+            if not isinstance(tuning_data, pd.DataFrame):
+                tuning_data = load_pd.load(tuning_data)
         train_data = TabularDataset(train_data, columns=all_columns,
                                     label_columns=label_columns)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
