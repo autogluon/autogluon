@@ -201,7 +201,7 @@ class TaskScheduler(object):
             except distributed.TimeoutError as e:
                 logger.error(str(e))
             except:
-                print("Unexpected error:", sys.exc_info()[0])
+                logger.error("Unexpected error:", sys.exc_info()[0])
                 raise
             self._clean_task_internal(task_dict)
         self._cleaning_tasks()
