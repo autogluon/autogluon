@@ -504,9 +504,10 @@ def train_function(args, reporter, train_data, tuning_data,
                 net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
             loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
                                      for key in log_metrics])
-            logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={}'.format(
+            logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
+                         ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
-                loss_string, valid_time_spent))
+                loss_string, valid_time_spent, (time.time() - start_tick) / 60))
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx),
                             ('epoch', int(update_idx / updates_per_epoch))] +\
