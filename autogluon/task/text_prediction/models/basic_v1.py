@@ -219,7 +219,7 @@ def calculate_metric_scores(metrics, predictions, gt_labels,
     """
     if isinstance(metrics, str):
         metrics = [metrics]
-    metric_scores = collections.OrdredDict()
+    metric_scores = collections.OrderedDict()
     for metric_name in metrics:
         if metric_name == 'acc':
             metric_scores[metric_name] = accuracy_score(gt_labels,
@@ -511,7 +511,7 @@ def train_function(args, reporter, train_data, tuning_data,
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx),
                             ('epoch', int(update_idx / updates_per_epoch))] + \
-                           metric_scores.items() + \
+                           list(metric_scores.items()) + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
