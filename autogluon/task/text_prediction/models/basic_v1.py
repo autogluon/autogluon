@@ -2,6 +2,7 @@ import numpy as np
 import os
 import math
 import logging
+import warnings
 import time
 import json
 import functools
@@ -322,10 +323,13 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
 def train_function(args, reporter, train_data, tuning_data,
                    time_limits, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
-                   log_metrics, stopping_metric, console_log):
+                   log_metrics, stopping_metric, console_log,
+                   ignore_warning=False):
+    if ignore_warning:
+        import warnings
+        warnings.filterwarnings("ignore")
     start_tick = time.time()
     search_space = args['search_space']
-    start_tick = time.time()
     cfg = base_config.clone()
     specified_values = []
     for key in search_space:
@@ -652,7 +656,8 @@ class BertForTextPredictionBasic:
                                                       label_shapes=self._label_shapes,
                                                       log_metrics=self._log_metrics,
                                                       stopping_metric=self._stopping_metric,
-                                                      console_log=console_log))
+                                                      console_log=console_log,
+                                                      ignore_warning=True))
         if scheduler == 'fifo':
             if searcher is None:
                 searcher = 'random'
