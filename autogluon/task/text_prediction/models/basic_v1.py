@@ -637,7 +637,8 @@ class BertForTextPredictionBasic:
               reduction_factor=4,
               brackets=1,
               plot_results=True,
-              console_log=True):
+              console_log=True,
+              ignore_warning=True):
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
                        console=console_log)
@@ -657,7 +658,7 @@ class BertForTextPredictionBasic:
                                                       log_metrics=self._log_metrics,
                                                       stopping_metric=self._stopping_metric,
                                                       console_log=console_log,
-                                                      ignore_warning=True))
+                                                      ignore_warning=ignore_warning))
         if scheduler == 'fifo':
             if searcher is None:
                 searcher = 'random'
