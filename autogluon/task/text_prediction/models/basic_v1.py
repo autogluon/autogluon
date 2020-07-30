@@ -320,9 +320,10 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
 
 @use_np
 def train_function(args, reporter, train_data, tuning_data,
-                   base_config, problem_types,
+                   time_limits, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric):
+    start_tick = time.time()
     search_space = args['search_space']
     start_tick = time.time()
     cfg = base_config.clone()
@@ -506,6 +507,9 @@ def train_function(args, reporter, train_data, tuning_data,
                            [(k, v.item()) for k, v in metric_scores.items()] + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
+            total_time_spent = time.time() - start_tick
+            if total_time_spent > time_limits:
+                break
             report_idx += 1
             report_items.append(('performance_score', performance_score))
             report_items.append(('exp_dir', exp_dir))
@@ -636,6 +640,7 @@ class BertForTextPredictionBasic:
         search_space_reg = args(search_space=space.Dict(**self.search_space))
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
+                                                      time_limits=time_limits,
                                                       tuning_data=tuning_data,
                                                       base_config=self.base_config,
                                                       problem_types=self.problem_types,
@@ -662,10 +667,10 @@ class BertForTextPredictionBasic:
             if time_limits is None:
                 time_limits = 5 * 60 * 60  # 5 hour
             if grace_period is None:
-                grace_period = 5
+                grace_period = 1
             scheduler = HyperbandScheduler(train_fn,
                                            time_out=time_limits,
-                                           max_t=50,
+                                           max_t=10,
                                            resource=resource,
                                            searcher=searcher,
                                            grace_period=grace_period,
