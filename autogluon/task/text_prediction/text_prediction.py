@@ -365,18 +365,18 @@ class TextPrediction(BaseTask):
         if max_t is None:
             max_t = hyperparameters['hpo_params']['max_t']
         model = model_candidates[0]
-        scheduler = model.train(train_data=train_data,
-                                tuning_data=tuning_data,
-                                resource=resource,
-                                time_limits=time_limits,
-                                scheduler=scheduler,
-                                searcher=search_strategy,
-                                num_trials=num_trials,
-                                reduction_factor=reduction_factor,
-                                grace_period=grace_period,
-                                max_t=max_t,
-                                console_log=verbosity > 2,
-                                ignore_warning=verbosity <= 0)
+        model.train(train_data=train_data,
+                    tuning_data=tuning_data,
+                    resource=resource,
+                    time_limits=time_limits,
+                    scheduler=scheduler,
+                    searcher=search_strategy,
+                    num_trials=num_trials,
+                    reduction_factor=reduction_factor,
+                    grace_period=grace_period,
+                    max_t=max_t,
+                    console_log=verbosity > 2,
+                    ignore_warning=verbosity <= 0)
         return model
 
     @staticmethod

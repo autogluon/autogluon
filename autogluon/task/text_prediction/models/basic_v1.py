@@ -737,7 +737,7 @@ class BertForTextPredictionBasic:
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
                             ctx=ctx_l)
         self._net = net
-        return scheduler
+        scheduler.shutdown()
 
     def evaluate(self, valid_data, metrics):
         assert self.net is not None
