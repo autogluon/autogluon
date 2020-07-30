@@ -510,7 +510,7 @@ def train_function(args, reporter, train_data, tuning_data,
                 loss_string, valid_time_spent))
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx),
-                            ('epoch', int(update_idx / updates_per_epoch))] + \
+                            ('epoch', int(update_idx / updates_per_epoch))] +\
                            list(metric_scores.items()) + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
