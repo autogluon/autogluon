@@ -45,27 +45,31 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
         """Determines which features undergo which feature transformations."""
         feature_transformations = defaultdict(list)
         if self.enable_categorical_features:
-            if self._feature_metadata_in.type_group_map_special['object']:
-                feature_transformations['category'] += self._feature_metadata_in.type_group_map_special['object']
-            if self._feature_metadata_in.type_group_map_special['text']:
-                feature_transformations['category'] += self._feature_metadata_in.type_group_map_special['text']
+            category_features = self._feature_metadata_in.type_group_map_raw['object']
+            datetime_as_object_features = set(self._feature_metadata_in.type_group_map_special['datetime_as_object'])
+            category_features = [feature for feature in category_features if feature not in datetime_as_object_features]
+            feature_transformations['category'] += category_features
 
-        if self._feature_metadata_in.type_group_map_special['text']:
-            text_features = self._feature_metadata_in.type_group_map_special['text']
-            if self.enable_text_special_features:
-                feature_transformations['text_special'] += text_features
-            if self.enable_nlp_features:
-                feature_transformations['text_ngram'] += text_features
+        text_features = self._feature_metadata_in.type_group_map_special['text']
+        if self.enable_text_special_features:
+            feature_transformations['text_special'] += text_features
+        if self.enable_nlp_features:
+            feature_transformations['text_ngram'] += text_features
 
-        if self._feature_metadata_in.type_group_map_special['datetime']:
-            datetime_features = self._feature_metadata_in.type_group_map_special['datetime']
-            if self.enable_datetime_features:
-                feature_transformations['datetime'] += datetime_features
+        datetime_features = self._feature_metadata_in.type_group_map_special['datetime_as_object'] + self._feature_metadata_in.type_group_map_raw['datetime']
+        if datetime_features and self.enable_datetime_features:
+            feature_transformations['datetime'] += datetime_features
 
         if self.enable_raw_features:
-            for type_family in self._feature_metadata_in.type_group_map_special:
-                if type_family not in ['object', 'text', 'datetime']:
-                    feature_transformations['raw'] += self._feature_metadata_in.type_group_map_special[type_family]
+            invalid_raw_types = {'object', 'datetime'}
+            invalid_special_types = {'text', 'datetime_as_object'}
+
+            features = self._feature_metadata_in.get_features()
+            for feature in features:
+                feature_type_raw = self._feature_metadata_in.get_feature_type_raw(feature)
+                feature_types_special = self._feature_metadata_in.get_feature_types_special(feature)
+                if feature_type_raw not in invalid_raw_types and invalid_special_types.isdisjoint(feature_types_special):
+                    feature_transformations['raw'].append(feature)
 
         return feature_transformations
 

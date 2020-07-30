@@ -1,7 +1,7 @@
 import copy
 import logging
 
-from ..types import get_type_map_raw
+from ..types import get_type_map_raw, get_type_group_map_special
 from ..feature_metadata import FeatureMetadata
 from ...utils.savers import save_pkl
 
@@ -22,14 +22,17 @@ class AbstractFeatureGenerator:
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None, feature_metadata_in=None):
         raise NotImplementedError
 
-    def fit_transform(self, X, y=None):
+    def fit_transform(self, X, y=None, feature_metadata_in=None):
         if self._is_fit:
             raise AssertionError('FeatureGenerator is already fit.')
+        # TODO: feature_metadata_in as class variable?
+        if feature_metadata_in is None:
+            feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
         if self.features_in is None:
-            self.features_in = list(X.columns)
+            self.features_in = self._infer_features_in_from_metadata(X, y=y, feature_metadata_in=feature_metadata_in)
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y)
         X_out, type_family_groups_special = self._update_feature_names(X_out, type_family_groups_special)
         self.features_out = list(X_out.columns)
@@ -46,11 +49,21 @@ class AbstractFeatureGenerator:
             X_out.columns = self.features_out
         return X_out
 
+    # TODO: feature_metadata_in as parameter?
     def _fit_transform(self, X, y=None):
         raise NotImplementedError
 
     def _transform(self, X):
         raise NotImplementedError
+
+    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
+        return list(X.columns)
+
+    @staticmethod
+    def _infer_feature_metadata_in(X, y=None) -> FeatureMetadata:
+        type_map_raw = get_type_map_raw(X)
+        type_group_map_special = get_type_group_map_special(X)
+        return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     def _update_feature_names(self, X, type_family_groups):
         X_columns_orig = list(X.columns)

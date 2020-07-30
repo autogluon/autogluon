@@ -45,16 +45,22 @@ def get_type_map_raw(df: DataFrame) -> dict:
 
 
 def get_type_map_special(X: DataFrame) -> dict:
-    return {column: get_type_family_special(X[column]) for column in X}
+    type_map_special = {}
+    for column in X:
+        type_special = get_type_special(X[column])
+        if type_special is not None:
+            type_map_special[column] = type_special
+    return type_map_special
 
 
-def get_type_family_special(X: Series) -> str:
-    type_family = get_type_family_raw(X.dtype)
-    if check_if_datetime_feature(X):
-        type_family = 'datetime'
+def get_type_special(X: Series) -> str:
+    if check_if_datetime_as_object_feature(X):
+        type_special = 'datetime_as_object'
     elif check_if_nlp_feature(X):
-        type_family = 'text'
-    return type_family
+        type_special = 'text'
+    else:
+        type_special = None
+    return type_special
 
 
 def get_type_group_map(type_map: dict) -> defaultdict:
@@ -74,20 +80,21 @@ def get_type_group_map_raw(df: DataFrame) -> defaultdict:
     return get_type_group_map(type_map_raw)
 
 
+# TODO: Expand to enable multiple special types per feature
 def get_type_group_map_special(df: DataFrame) -> defaultdict:
     type_map_special = get_type_map_special(df)
     return get_type_group_map(type_map_special)
 
 
 # TODO: Expand to int64 -> date features (milli from epoch etc)
-def check_if_datetime_feature(X: Series) -> bool:
+def check_if_datetime_as_object_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
     # TODO: Check if low numeric numbers, could be categorical encoding!
     # TODO: If low numeric, potentially it is just numeric instead of date
     if X.isnull().all():
         return False
-    if type_family == 'datetime':
-        return True
+    # if type_family == 'datetime':
+    #     return True
     if type_family != 'object':  # TODO: seconds from epoch support
         return False
     try:

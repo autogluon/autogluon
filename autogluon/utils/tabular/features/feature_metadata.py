@@ -50,11 +50,11 @@ class FeatureMetadata:
     def get_features(self):
         return list(self.type_map_raw.keys())
 
-    def get_feature_type_raw(self, feature):
-        return self._get_feature_type(feature=feature, feature_types_dict=self.type_group_map_raw)
+    def get_feature_type_raw(self, feature) -> str:
+        return self.type_map_raw[feature]
 
-    def get_feature_type_special(self, feature):
-        return self._get_feature_type(feature=feature, feature_types_dict=self.type_group_map_special)
+    def get_feature_types_special(self, feature) -> list:
+        return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     def get_type_group_map_raw_flattened(self):
         return {feature: type_family for type_family, features in self.type_group_map_raw.items() for feature in features}
@@ -114,12 +114,12 @@ class FeatureMetadata:
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     @staticmethod
-    def _get_feature_type(feature, feature_types_dict):
+    def _get_feature_types(feature, feature_types_dict):
+        feature_types = []
         for dtype_family in feature_types_dict:
             if feature in feature_types_dict[dtype_family]:
-                return dtype_family
-            else:
-                raise ValueError(f'Feature {feature} not found in provided feature_types_dict!')
+                feature_types.append(dtype_family)
+        return feature_types
 
     # Joins a list of metadata objects together, returning a new metadata object
     @staticmethod

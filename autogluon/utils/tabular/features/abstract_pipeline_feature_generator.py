@@ -56,7 +56,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
     # TODO: Save this to disk and remove from memory if large categoricals!
     @calculate_time
-    def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True):
+    def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=False):
         if self._is_fit:
             raise AssertionError('fit_transform cannot be called on an already fit feature generator.')
         X_len = len(X)
@@ -98,7 +98,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         return X_features
 
-    def _fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=True) -> DataFrame:
+    def _fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=False) -> DataFrame:
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
 
         if banned_features:
@@ -112,11 +112,9 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self.features_in_types = X.dtypes.to_dict()
 
         type_map_real = get_type_map_real(X)
-        type_map_raw = get_type_map_raw(X)
-        type_group_map_special = self._get_type_group_map_special(X)
         # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
         self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real)
-        self._feature_metadata_in = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+        self._feature_metadata_in = self._infer_feature_metadata_in(X)
 
         X_features = self._generate_features(X)
 
@@ -287,7 +285,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         logger.log(20, 'Original Features (raw dtypes):')
         for key, val in self._feature_metadata_in_real.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Original Features (inferred dtypes):')
+        logger.log(20, 'Original Features (inferred special dtypes):')
         for key, val in self._feature_metadata_in.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         super().print_feature_metadata_info()
