@@ -187,8 +187,10 @@ class TextPrediction(BaseTask):
             stopping_metric=None,
             nthreads_per_trial=None,
             ngpus_per_trial=None,
-            scheduler=None,
             dist_ip_addrs=None,
+            scheduler=None,
+            num_trials=None,
+            reduction_factor=None,
             search_strategy=None,
             search_options=None,
             hyperparameters=None,
@@ -223,10 +225,14 @@ class TextPrediction(BaseTask):
         ngpus_per_trial
             The number of GPUs to use for the fit job. By default, we decide the usage
             based on the total number of GPUs available.
-        scheduler
-            The scheduler of HPO
         dist_ip_addrs
             The distributed IP address
+        scheduler
+            The scheduler of HPO
+        num_trials
+            The number of trials in the HPO search
+        reduction_factor
+            The reduction factor in hyper-band scheduler
         search_strategy
             The search strategy
         search_options
@@ -346,6 +352,10 @@ class TextPrediction(BaseTask):
             search_strategy = hyperparameters['hpo_params']['search_strategy']
         if time_limits is None:
             time_limits = hyperparameters['hpo_params']['time_limits']
+        if num_trials is None:
+            num_trials = hyperparameters['hpo_params']['num_trials']
+        if reduction_factor is None:
+            reduction_factor = hyperparameters['hpo_params']['reduction_factor']
         model = model_candidates[0]
         scheduler = model.train(train_data=train_data,
                                 tuning_data=tuning_data,
@@ -353,8 +363,9 @@ class TextPrediction(BaseTask):
                                 time_limits=time_limits,
                                 scheduler=scheduler,
                                 searcher=search_strategy,
-                                num_trials=hyperparameters['hpo_params']['num_trials'],
-                                reduction_factor=hyperparameters['hpo_params']['reduction_factor'])
+                                num_trials=num_trials,
+                                reduction_factor=reduction_factor,
+                                console_log=verbosity > 2)
         return model
 
     @staticmethod

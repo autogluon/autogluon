@@ -322,7 +322,7 @@ def _classification_regression_predict(net, dataloader, problem_type, has_label=
 def train_function(args, reporter, train_data, tuning_data,
                    time_limits, base_config, problem_types,
                    column_properties, label_columns, label_shapes,
-                   log_metrics, stopping_metric):
+                   log_metrics, stopping_metric, console_log):
     start_tick = time.time()
     search_space = args['search_space']
     start_tick = time.time()
@@ -342,7 +342,7 @@ def train_function(args, reporter, train_data, tuning_data,
         cfg.defrost()
         cfg.misc.exp_dir = exp_dir
         cfg.freeze()
-    logging_config(folder=exp_dir, name='training')
+    logging_config(folder=exp_dir, name='training', console=console_log)
     logging.info(cfg)
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
@@ -631,9 +631,11 @@ class BertForTextPredictionBasic:
               grace_period=None,
               reduction_factor=4,
               brackets=1,
-              plot_results=True):
+              plot_results=True,
+              console_log=True):
         start_tick = time.time()
-        logging_config(folder=self._output_directory, name='main')
+        logging_config(folder=self._output_directory, name='main',
+                       console=console_log)
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
@@ -648,7 +650,8 @@ class BertForTextPredictionBasic:
                                                       label_columns=self._label_columns,
                                                       label_shapes=self._label_shapes,
                                                       log_metrics=self._log_metrics,
-                                                      stopping_metric=self._stopping_metric))
+                                                      stopping_metric=self._stopping_metric,
+                                                      console_log=console_log))
         if scheduler == 'fifo':
             if searcher is None:
                 searcher = 'random'
