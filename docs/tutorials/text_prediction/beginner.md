@@ -39,8 +39,8 @@ train_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/train.p
 dev_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/dev.parquet'
 test_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/test.parquet'
 
-
-predictor = task.fit(train_data, label='label')
+# For this simple example, we train for 5 minutes.
+predictor = task.fit(train_data, label='label', time_limits = 5 * 60)
 dev_score = predictor.evaluate(dev_data)
 ```
 
