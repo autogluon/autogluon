@@ -13,7 +13,7 @@ from ...utils.miscs import verbosity2loglevel
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
 
-__all__ = ['TextPrediction']
+__all__ = ['TextPrediction', 'ag_text_prediction_params']
 
 logger = logging.getLogger()  # return root logger
 
@@ -73,17 +73,14 @@ def merge_params(base_params, partial_params=None):
     if partial_params is None:
         return base_params
     else:
+        if not isinstance(partial_params, dict):
+            return partial_params
         final_params = copy.deepcopy(base_params)
         for key in partial_params:
-            if key == 'version':
-                final_params[key] = partial_params[key]
-            elif key == 'hpo_params':
-                for sub_key, value in partial_params.items():
-                    final_params[key][sub_key] = value
-            elif key == 'models':
-                final_params[key] = partial_params[key]
+            if key in base_params:
+                final_params[key] = merge_params(base_params[key], partial_params[key])
             else:
-                raise KeyError('Key not found!')
+                final_params[key] = partial_params[key]
         return final_params
 
 
