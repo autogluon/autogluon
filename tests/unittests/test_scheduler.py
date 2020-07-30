@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import time
 import autogluon as ag
 
 
@@ -63,3 +64,23 @@ def test_rl_scheduler():
     best_config = scheduler.get_best_config()
     best_task_id = scheduler.get_best_task_id()
     assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
+
+
+def test_timeout_scheduler():
+    @ag.args(lr=ag.space.Real(1E-5, 1E-3))
+    def foo(args, reporter):
+        start_tick = time.time()
+        for i in range(10):
+            # Sleep for 1 second
+            time.sleep(1)
+            reporter(reward=time.time() - start_tick,
+                     time_attr=i)
+    scheduler = ag.scheduler.FIFOScheduler(foo,
+                                           resource={'num_cpus': 4, 'num_gpus': 0},
+                                           num_trials=3,
+                                           reward_attr='reward',
+                                           time_attr='time_attr',
+                                           time_out=3,
+                                           checkpoint=None)
+    scheduler.run()
+    best_config = scheduler.join_jobs(timeout=3)
