@@ -2,6 +2,7 @@ import numpy as np
 import os
 import math
 import logging
+import pandas as pd
 import collections
 import time
 import json
@@ -758,6 +759,8 @@ class BertForTextPredictionBasic:
         assert self.net is not None
         assert self.config is not None
         if not isinstance(test_data, TabularDataset):
+            if isinstance(test_data, (list, dict)):
+                test_data = pd.DataFrame(test_data)
             test_data = TabularDataset(test_data,
                                        columns=self._feature_columns,
                                        column_properties=self._column_properties)
