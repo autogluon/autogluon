@@ -2,7 +2,7 @@ import numpy as np
 import os
 import math
 import logging
-import warnings
+import collections
 import time
 import json
 import functools
@@ -219,7 +219,7 @@ def calculate_metric_scores(metrics, predictions, gt_labels,
     """
     if isinstance(metrics, str):
         metrics = [metrics]
-    metric_scores = dict()
+    metric_scores = collections.OrdredDict()
     for metric_name in metrics:
         if metric_name == 'acc':
             metric_scores[metric_name] = accuracy_score(gt_labels,
@@ -250,6 +250,9 @@ def calculate_metric_scores(metrics, predictions, gt_labels,
             metric_scores[metric_name] = np.abs(predictions - gt_labels).mean()
         else:
             raise ValueError('Unknown metric = {}'.format(metric_name))
+    metric_scores = collections.OrderedDict(
+        [(k, v.item() if isinstance(v, np.ndarray) else v)
+         for k, v in metric_scores.items()])
     return metric_scores
 
 
@@ -508,7 +511,7 @@ def train_function(args, reporter, train_data, tuning_data,
             report_items = [('iteration', update_idx + 1),
                             ('report_idx', report_idx),
                             ('epoch', int(update_idx / updates_per_epoch))] + \
-                           [(k, v.item()) for k, v in metric_scores.items()] + \
+                           metric_scores.items() + \
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
