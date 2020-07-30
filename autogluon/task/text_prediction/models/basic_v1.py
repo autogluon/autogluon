@@ -330,7 +330,6 @@ def train_function(args, reporter, train_data, tuning_data,
     if ignore_warning:
         import warnings
         warnings.filterwarnings("ignore")
-    start_tick = time.time()
     search_space = args['search_space']
     cfg = base_config.clone()
     specified_values = []
@@ -427,6 +426,7 @@ def train_function(args, reporter, train_data, tuning_data,
     mx.npx.waitall()
     no_better_rounds = 0
     report_idx = 0
+    start_tick = time.time()
     for update_idx in range(max_update):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
