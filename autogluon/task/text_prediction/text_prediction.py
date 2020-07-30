@@ -289,7 +289,7 @@ class TextPrediction(BaseTask):
                 label_columns.append(ele)
         if feature_columns is None:
             all_columns = list(train_data.columns)
-            feature_columns = [ele for ele in all_columns if ele is not label_columns]
+            feature_columns = [ele for ele in all_columns if ele not in label_columns]
         else:
             if isinstance(feature_columns, str):
                 feature_columns = [feature_columns]
