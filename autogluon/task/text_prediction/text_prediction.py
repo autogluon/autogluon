@@ -184,7 +184,7 @@ class TextPrediction(BaseTask):
             time_limits=None,
             output_directory='./ag_text',
             feature_columns=None,
-            holdout_frac=0.1,
+            holdout_frac=0.15,
             eval_metric=None,
             stopping_metric=None,
             nthreads_per_trial=None,
