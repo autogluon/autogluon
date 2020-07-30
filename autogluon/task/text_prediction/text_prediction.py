@@ -258,11 +258,11 @@ class TextPrediction(BaseTask):
         logger.setLevel(verbosity2loglevel(verbosity))
         # Parse the hyper-parameters
         if hyperparameters is None:
-            hyperparameters = ag_text_params.create('default')
+            hyperparameters = ag_text_prediction_params.create('default')
         elif isinstance(hyperparameters, str):
-            hyperparameters = ag_text_params.create(hyperparameters)
+            hyperparameters = ag_text_prediction_params.create(hyperparameters)
         else:
-            base_params = ag_text_params.create('default')
+            base_params = ag_text_prediction_params.create('default')
             hyperparameters = merge_params(base_params, hyperparameters)
         np.random.seed(seed)
         train_data = load_pd.load(train_data)
