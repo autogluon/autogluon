@@ -60,9 +60,6 @@ class RLSearcher(BaseSearcher):
     def get_config(self, **kwargs):
         return self.controller.sample()[0]
 
-    def get_best_config(self):
-        return self.controller.inference()
-
     def state_dict(self, destination=None):
         if destination is None:
             destination = OrderedDict()
