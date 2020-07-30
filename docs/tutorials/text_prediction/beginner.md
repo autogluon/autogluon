@@ -1,15 +1,25 @@
 # Text Prediction - Quick Start
 :label:`sec_textquick`
 
-In this quick start, we will introduce the `TextPrediction` task in AutoGluon to illustrate basic usage of AutoGluon’s NLP capability.
+In this quick start, we will introduce the `TextPrediction` task in AutoGluon to illustrate basic
+usage of AutoGluon’s NLP capability.
 
 The AutoGluon Text functionality depends on the [GluonNLP](https://gluon-nlp.mxnet.io/) package. 
+We are currently using a customized version in [autogluon-contrib-nlp](https://github.com/sxjscience/autogluon-contrib-nlp.git).
+In a future release, we will switch to use the official GluonNLP.
 
-In this tutorial, we are using sentiment analysis as a text classification example. We will load sentences and the 
-corresponding labels (sentiment) into AutoGluon and use this data to obtain a neural network that can classify new sentences. 
-Different from traditional machine learning where we need to manually define the neural network, and specify 
-the hyperparameters in the training process, with just a single call to `AutoGluon`'s `fit` function, 
-AutoGluon will automatically train many models under thousands of different hyperparameter configurations and then return the best model.
+In this example, we use three examples to show how to use `TextPrediction` to solve different types
+of NLP tasks, including:
+ 
+- Sentiment Analysis
+- Sentence Similarity
+- Paraphrasing Detection
+
+We  load sentences and the corresponding labels (sentiment) into AutoGluon and 
+use this data to obtain a neural network that can classify new sentences. 
+Different from traditional machine learning where we need to manually define the neural network,
+and specify the hyperparameters in the training process, with just a single call to
+`AutoGluon`'s `fit` function, AutoGluon will automatically give you a model that performs the best.
 
 We begin by specifying `TextPrediction` as our task of interest:
 
@@ -29,8 +39,9 @@ train_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/train.p
 dev_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/dev.parquet'
 test_data = 'https://autogluon-text.s3-us-west-2.amazonaws.com/glue/sst/test.parquet'
 
+
 predictor = task.fit(train_data, label='label')
-predictions = predictor.predict(dev_data)
+dev_score = predictor.evaluate(dev_data)
 ```
 
 ## Customization the Search Space

@@ -16,10 +16,10 @@ __all__ = ['TextPrediction']
 
 logger = logging.getLogger()  # return root logger
 
-ag_text_params = Registry('ag_text_params')
+ag_text_prediction_params = Registry('ag_text_prediction_params')
 
 
-@ag_text_params.register()
+@ag_text_prediction_params.register()
 def default() -> dict:
     """The default hyper-parameters
 
@@ -33,20 +33,20 @@ def default() -> dict:
                 'search_space': {
                     'model.backbone.name': 'google_electra_base',
                     'optimization.batch_size': 32,
-                    'optimization.num_train_epochs': space.Categorical(3, 5, 10),
-                    'optimization.lr': space.Real(1E-5, 5E-4)
+                    'optimization.num_train_epochs': space.Categorical(3, 10),
+                    'optimization.lr': space.Real(1E-5, 1E-3)
                 }
             },
         },
         'hpo_params': {
             'scheduler': 'fifo',     # Can be 'fifo', 'hyperband'
-            'search_strategy': 'random',  # Can be 'random', 'bayesopt'
-            'search_options': None,       # The search option
-            'time_limits': 1 * 60 * 60,   # The total budget
-            'num_trials': 4,              # The number of trials
-            'reduction_factor': 4,        # The reduction factor
-            'time_attr': 'report_idx'     # The time attribute used in hyperband searcher.
-                                          # We report the validation accuracy 5 times each epoch.
+            'search_strategy': 'random',   # Can be 'random', 'bayesopt'
+            'search_options': None,        # The search option
+            'time_limits': 1 * 60 * 60,    # The total time limit
+            'num_trials': 4,               # The number of trials
+            'reduction_factor': 4,         # The reduction factor
+            'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
+                                           # We report the validation accuracy 5 times each epoch.
         }
     }
     return ret
@@ -341,6 +341,8 @@ class TextPrediction(BaseTask):
             scheduler = hyperparameters['hpo_params']['scheduler']
         if search_strategy is None:
             search_strategy = hyperparameters['hpo_params']['search_strategy']
+        if time_limits is None:
+            time_limits = hyperparameters['hpo_params']['time_limits']
         model = model_candidates[0]
         scheduler = model.train(train_data=train_data,
                                 tuning_data=tuning_data,
