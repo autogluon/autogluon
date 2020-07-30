@@ -222,32 +222,30 @@ def calculate_metric_scores(metrics, predictions, gt_labels,
     metric_scores = collections.OrderedDict()
     for metric_name in metrics:
         if metric_name == 'acc':
-            metric_scores[metric_name] = accuracy_score(gt_labels,
-                                                        predictions.argmax(axis=-1))
+            metric_scores[metric_name] = float(accuracy_score(gt_labels,
+                                                              predictions.argmax(axis=-1)))
         elif metric_name == 'f1':
-            metric_scores[metric_name] = f1_score(gt_labels,
-                                                  predictions.argmax(axis=-1),
-                                                  pos_label=pos_label)
+            metric_scores[metric_name] = float(f1_score(gt_labels,
+                                                        predictions.argmax(axis=-1),
+                                                        pos_label=pos_label))
         elif metric_name == 'mcc':
-            metric_scores[metric_name] = matthews_corrcoef(gt_labels,
-                                                           predictions.argmax(axis=-1))
+            metric_scores[metric_name] = float(matthews_corrcoef(gt_labels,
+                                                                 predictions.argmax(axis=-1)))
         elif metric_name == 'auc':
-            metric_scores[metric_name] = roc_auc_score(gt_labels,
-                                                       predictions[:, pos_label])
+            metric_scores[metric_name] = float(roc_auc_score(gt_labels, predictions[:, pos_label]))
         elif metric_name == 'nll':
             metric_scores[metric_name]\
-                = - np.log(predictions[np.arange(gt_labels.shape[0]),
-                                       gt_labels]).mean()
+                = float(- np.log(predictions[np.arange(gt_labels.shape[0]), gt_labels]).mean())
         elif metric_name == 'pearsonr':
-            metric_scores[metric_name] = pearsonr(gt_labels, predictions)[0]
+            metric_scores[metric_name] = float(pearsonr(gt_labels, predictions)[0])
         elif metric_name == 'spearmanr':
-            metric_scores[metric_name] = spearmanr(gt_labels, predictions)[0]
+            metric_scores[metric_name] = float(spearmanr(gt_labels, predictions)[0])
         elif metric_name == 'mse':
-            metric_scores[metric_name] = np.square(predictions - gt_labels).mean()
+            metric_scores[metric_name] = float(np.square(predictions - gt_labels).mean())
         elif metric_name == 'rmse':
-            metric_scores[metric_name] = np.sqrt(np.square(predictions - gt_labels).mean())
+            metric_scores[metric_name] = float(np.sqrt(np.square(predictions - gt_labels).mean()))
         elif metric_name == 'mae':
-            metric_scores[metric_name] = np.abs(predictions - gt_labels).mean()
+            metric_scores[metric_name] = float(np.abs(predictions - gt_labels).mean())
         else:
             raise ValueError('Unknown metric = {}'.format(metric_name))
     metric_scores = collections.OrderedDict(
