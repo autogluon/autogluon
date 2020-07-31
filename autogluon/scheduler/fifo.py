@@ -56,7 +56,7 @@ _CONSTRAINTS = {
     'delay_get_config': Boolean()}
 
 
-class FIFOScheduler(TaskScheduler):
+class FIFOScheduler(Tasget_best_task_idkScheduler):
     r"""Simple scheduler that just runs trials in submission order.
 
     Parameters
@@ -461,11 +461,12 @@ class FIFOScheduler(TaskScheduler):
         If there are duplicated configurations, we return the id of the first one.
         """
         best_config = self.get_best_config()
-        for task_id, config in self.config_history.items():
-            if pickle.dumps(best_config) == pickle.dumps(config):
-                return task_id
-        raise RuntimeError('The best config {} is not found in config history = {}. '
-                           'This should never happen!'.format(best_config, self.config_history))
+        with self._fifo_lock:
+            for task_id, config in self.config_history.items():
+                if pickle.dumps(best_config) == pickle.dumps(config):
+                    return task_id
+            raise RuntimeError('The best config {} is not found in config history = {}. '
+                               'This should never happen!'.format(best_config, self.config_history))
 
     def get_best_reward(self):
         """Get the best reward from the finished jobs.
