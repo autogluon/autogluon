@@ -4,8 +4,9 @@ import pickle
 import sys
 import time
 
+import numpy as np
 import psutil
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from ..abstract import model_trial
 from ..abstract.abstract_model import SKLearnModel
@@ -29,6 +30,7 @@ class RFModel(SKLearnModel):
     # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
         X = super().preprocess(X).fillna(0)
+        X = X.to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):

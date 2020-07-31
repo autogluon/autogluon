@@ -64,6 +64,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
         available_mem = psutil.virtual_memory().available
         pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
+        logger.log(20, f'Available Memory:                    {(round((self.pre_memory_usage + available_mem)/1e6, 2))} MB')
+        logger.log(20, f'Train Data (Original)  Memory Usage: {round(self.pre_memory_usage/1e6, 2)} MB ({round(pre_memory_usage_percent*100, 1)}% of available memory)')
         if pre_memory_usage_percent > 0.05:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
@@ -88,7 +90,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         available_mem = psutil.virtual_memory().available
         post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
-
+        logger.log(20, f'Train Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB ({round(post_memory_usage_percent * 100, 1)}% of available memory)')
         if post_memory_usage_percent > 0.15:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
