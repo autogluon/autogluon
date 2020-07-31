@@ -58,7 +58,8 @@ Tutorials
       :title: Text Prediction
       :link: tutorials/text_prediction/index.html
 
-      How to solve NLP problems that require you to predict categorical or numerical labels.
+      How to solve NLP problems that involves predicting categorical or numerical
+      labels from raw text.
 
    .. card::
       :title: Text Classification
@@ -97,6 +98,7 @@ Advanced Topics
    tutorials/tabular_prediction/index
    tutorials/image_classification/index
    tutorials/object_detection/index
+   tutorials/text_prediction/index
    tutorials/text_classification/index
    tutorials/course/index
    tutorials/nas/index
