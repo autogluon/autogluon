@@ -502,6 +502,7 @@ def train_function(args, reporter, train_data, tuning_data,
                 no_better_rounds += 1
             if find_better:
                 net.save_parameters(os.path.join(exp_dir, 'best_model.params'))
+            mx.npx.waitall()
             loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
                                      for key in log_metrics])
             logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
@@ -608,8 +609,8 @@ class BertForTextPredictionBasic:
         return self._base_config
 
     @property
-    def problem_types(self):
-        return self._problem_types
+    def results(self):
+        return self._results
 
     @property
     def config(self):
@@ -737,6 +738,7 @@ class BertForTextPredictionBasic:
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
                             ctx=ctx_l)
         self._net = net
+        mx.npx.waitall()
         scheduler.shutdown()
 
     def evaluate(self, valid_data, metrics):
