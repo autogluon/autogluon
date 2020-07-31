@@ -363,7 +363,7 @@ class TabularNeuralNetModel(AbstractModel):
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
                     reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
-            if e - val_improve_epoch > epochs_wo_improve:   
+            if e - val_improve_epoch > epochs_wo_improve:
                 break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
             if time_limit:
                 time_elapsed = time.time() - start_time
