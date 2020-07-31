@@ -2,6 +2,7 @@ import logging
 import copy
 import numpy as np
 import pandas as pd
+import warnings
 from .. import tabular_prediction
 from . import constants as _C
 from ..base import BaseTask
@@ -43,11 +44,11 @@ def default() -> dict:
             'scheduler': 'fifo',           # Can be 'fifo', 'hyperband'
             'search_strategy': 'random',   # Can be 'random', 'bayesopt'
             'search_options': None,        # The search option
-            'time_limits': 1 * 60 * 60,    # The total time limit
+            'time_limits': None,           # The total time limit
             'num_trials': 4,               # The number of trials
             'reduction_factor': 4,         # The reduction factor
             'grace_period': 1,             # The grace period
-            'max_t': 10,                   # The max_t in the hyperband
+            'max_t': 5,                    # The max_t in the hyperband
             'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
                                            # We report the validation accuracy 10 times each epoch.
         }
@@ -348,8 +349,8 @@ class TextPrediction(BaseTask):
             else:
                 raise NotImplementedError
         assert len(model_candidates) == 1, 'Only one model is supported currently'
-        resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
-                                            ngpus_per_trial=ngpus_per_trial)
+        recommended_resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
+                                                        ngpus_per_trial=ngpus_per_trial)
         if scheduler is None:
             scheduler = hyperparameters['hpo_params']['scheduler']
         if search_strategy is None:
@@ -364,10 +365,12 @@ class TextPrediction(BaseTask):
             grace_period = hyperparameters['hpo_params']['grace_period']
         if max_t is None:
             max_t = hyperparameters['hpo_params']['max_t']
+        if recommended_resource['num_gpus'] == 0:
+            warnings.warn('Recommend to use GPU to run the TextPrediction task!')
         model = model_candidates[0]
         model.train(train_data=train_data,
                     tuning_data=tuning_data,
-                    resource=resource,
+                    resource=recommended_resource,
                     time_limits=time_limits,
                     scheduler=scheduler,
                     searcher=search_strategy,
