@@ -56,7 +56,7 @@ _CONSTRAINTS = {
     'delay_get_config': Boolean()}
 
 
-class FIFOScheduler(Tasget_best_task_idkScheduler):
+class FIFOScheduler(TaskScheduler):
     r"""Simple scheduler that just runs trials in submission order.
 
     Parameters
