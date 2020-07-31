@@ -55,6 +55,12 @@ Tutorials
       How to detect objects and their location in images.
 
    .. card::
+      :title: Text Prediction
+      :link: tutorials/text_prediction/index.html
+
+      How to solve NLP problems that require you to predict categorical or numerical labels.
+
+   .. card::
       :title: Text Classification
       :link: tutorials/text_classification/index.html
 

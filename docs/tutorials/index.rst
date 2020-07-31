@@ -65,7 +65,7 @@ Text Prediction
 
    .. card::
       :title: Quick Start Tutorial
-      :link: text_predictioin/text_prediction_beginner.html
+      :link: text_prediction/text_prediction_beginner.html
 
       5 min tutorial on fitting models with text datasets.
 
