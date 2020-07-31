@@ -87,7 +87,11 @@ class AbstractLearner:
         save_path = path_context + self.learner_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+        self._validate_fit_input(X=X, X_val=X_val, **kwargs)
+        return self._fit(X=X, X_val=X_val, **kwargs)
+
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
@@ -156,6 +160,10 @@ class AbstractLearner:
         if as_pandas:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
+
+    def _validate_fit_input(self, X: DataFrame, **kwargs):
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
