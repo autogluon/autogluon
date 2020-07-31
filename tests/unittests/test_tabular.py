@@ -234,7 +234,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     raise ValueError("fast_benchmark specified without subsample_size")
                 train_data = train_data.head(subsample_size) # subsample for fast_benchmark
             predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, **fit_args)
-            results = predictor.fit_summary(verbosity=0)
+            results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
             predictor = task.load(savedir)  # Test loading previously-trained predictor from file
