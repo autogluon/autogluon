@@ -327,6 +327,10 @@ def train_function(args, reporter, train_data, tuning_data,
                    column_properties, label_columns, label_shapes,
                    log_metrics, stopping_metric, console_log,
                    ignore_warning=False):
+    import os
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['MKL_DYNAMIC'] = 'FALSE'
     if ignore_warning:
         import warnings
         warnings.filterwarnings("ignore")
