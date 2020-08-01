@@ -175,8 +175,8 @@ def infer_eval_stop_log_metrics(problem_type,
 class TextPrediction(BaseTask):
     Dataset = tabular_prediction.TabularDataset
 
-    @staticmethod
-    def fit(train_data,
+    @classmethod
+    def fit(cls, train_data,
             label,
             tuning_data=None,
             time_limits=None,
