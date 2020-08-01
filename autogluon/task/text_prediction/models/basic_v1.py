@@ -7,6 +7,7 @@ import collections
 import time
 import json
 import functools
+import tqdm
 import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -27,7 +28,7 @@ from ....scheduler import FIFOScheduler, HyperbandScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1
-from ..dataset import TabularDataset, infer_problem_type
+from ..dataset import TabularDataset
 
 
 @use_np
@@ -431,7 +432,7 @@ def train_function(args, reporter, train_data, tuning_data,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
-    for update_idx in range(max_update):
+    for update_idx in tqdm.tqdm(range(max_update)):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
