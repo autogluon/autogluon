@@ -738,11 +738,10 @@ class BertForTextPredictionBasic:
                                     feature_field_info=preprocessor.feature_field_info(),
                                     label_shape=self._label_shapes[0],
                                     cfg=cfg.model.network)
-        ctx_l = get_mxnet_available_ctx()
+        # Here, we cannot use GPU due to https://github.com/awslabs/autogluon/issues/602
         net.load_parameters(os.path.join(best_model_saved_dir_path, 'best_model.params'),
-                            ctx=ctx_l)
+                            ctx=mx.cpu())
         self._net = net
-        del scheduler
         mx.npx.waitall()
 
     def evaluate(self, valid_data, metrics):
