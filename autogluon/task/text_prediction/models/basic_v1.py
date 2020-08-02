@@ -523,7 +523,7 @@ def train_function(args, reporter, train_data, tuning_data,
                            [('fine_better', find_better),
                             ('time_spent', int(time.time() - start_tick))]
             total_time_spent = time.time() - start_tick
-            if total_time_spent > time_limits:
+            if time_limits is not None and total_time_spent > time_limits:
                 break
             report_idx += 1
             if stopping_metric in ['mse', 'mae', 'rmse']:
