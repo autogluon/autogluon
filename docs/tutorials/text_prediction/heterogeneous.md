@@ -1,5 +1,4 @@
 # Text Prediction - Mixed Data Type
-:label:`sec_text_prediction_heterogeneous`
 
 In the real-world applications, text data are usually mixed with other common data types like numerical data and categorical data. Here, the `TextPrediction` task in AutoGluon handles the mix of multiple feature types, including text, categorical, and numerical. Next, we will use the Semantic Textual Segmentation dataset that we have used to illustrate this functionality
 
@@ -50,5 +49,5 @@ predictor_genre = task.fit(train_data, label='genre',
 
 ```{.python .input}
 score = predictor_genre.evaluate(dev_data, metrics='acc')
-print('Genre Accuracy=', score['acc'])
+print('Genre Accuracy = {}%'.format(score['acc'] * 100))
 ```

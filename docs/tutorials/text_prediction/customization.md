@@ -1,5 +1,4 @@
 # Text Prediction - Customization and HPO
-:label:`sec_text_prediction_customization`
 
 In this tutorial, we will learn how to customize the `TextPrediction` task in AutoGluon. We will use the "Paraphrasing Identification" for illustration. The goal of the task is to identify whether one sentence is a restatement of the other. In this example, we will use the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398). 
 
@@ -77,8 +76,8 @@ predictor_mrpc = task.fit(train_data, label='label',
 dev_score = predictor_mrpc.evaluate(dev_data, metrics=['acc', 'f1'])
 print('Best Config = {}'.format(predictor_mrpc.results['best_config']))
 print('Total Time = {}s'.format(predictor_mrpc.results['total_time']))
-print('Accuracy = {:.2f}'.format(dev_score['acc']))
-print('F1 = {:.2f}'.format(dev_score['f1']))
+print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
+print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
 
@@ -102,10 +101,9 @@ print('Prediction = "{}"'.format(prediction2[0] == 1))
 print('Prob = "{}"'.format(prediction2_prob[0]))
 ```
 
-
-```{.python .input}
 ## Use Bayesian Optimization
-```
+
+Apart from random search, we can use the scikit-optimize package as the searcher:
 
 
 ```{.python .input}
@@ -127,8 +125,8 @@ predictor_mrpc_skopt = task.fit(train_data, label='label',
 dev_score = predictor_mrpc_skopt.evaluate(dev_data, metrics=['acc', 'f1'])
 print('Best Config = {}'.format(predictor_mrpc_skopt.results['best_config']))
 print('Total Time = {}s'.format(predictor_mrpc_skopt.results['total_time']))
-print('Accuracy = {:.2f}'.format(dev_score['acc']))
-print('F1 = {:.2f}'.format(dev_score['f1']))
+print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
+print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
 
@@ -150,6 +148,8 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 ```
 
 ## Use Hyperband
+
+We can also use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf):
 
 
 ```{.python .input}
@@ -173,8 +173,8 @@ predictor_mrpc_hyperband = task.fit(train_data, label='label',
 dev_score = predictor_mrpc_hyperband.evaluate(dev_data, metrics=['acc', 'f1'])
 print('Best Config = {}'.format(predictor_mrpc_hyperband.results['best_config']))
 print('Total Time = {}s'.format(predictor_mrpc_hyperband.results['total_time']))
-print('Accuracy = {:.2f}'.format(dev_score['acc']))
-print('F1 = {:.2f}'.format(dev_score['f1']))
+print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
+print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
 
@@ -193,4 +193,9 @@ print('A = "{}"'.format(sentence1))
 print('B = "{}"'.format(sentence3))
 print('Prediction = "{}"'.format(prediction2[0] == 1))
 print('Prob = "{}"'.format(prediction2_prob[0]))
+```
+
+
+```{.python .input}
+
 ```

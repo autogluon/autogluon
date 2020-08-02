@@ -1,5 +1,4 @@
 # Text Prediction - Quick Start
-:label:`sec_text_prediction_beginner`
 
 In this quick start, we will introduce the `TextPrediction` task in AutoGluon, which helps you solve solve NLP problems automatically.
 
@@ -54,7 +53,7 @@ Next, you can use `predictor.evaluate()` to evaluate the model on the dev set.
 dev_score = predictor.evaluate(dev_data, metrics='acc')
 print('Best Config = {}'.format(predictor.results['best_config']))
 print('Total Time = {}s'.format(predictor.results['total_time']))
-print('Accuracy = {:.2f}'.format(dev_score['acc']))
+print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 ```
 
 To get the prediction, use `predictor.predict()`.
