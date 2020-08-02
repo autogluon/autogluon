@@ -363,11 +363,11 @@ class BERTForTabularBasicV1(HybridBlock):
         else:
             raise NotImplementedError
 
-    def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None, verbose=False):
+    def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
         self.agg_layer.initialize(ctx=ctx)
         self.categorical_networks.initialize(ctx=ctx)
-        self.numerical_networks.initialize(ctx=ctx)
+        self.numerical_network.initialize(ctx=ctx)
 
     def hybrid_forward(self, F, features):
         """
