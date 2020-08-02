@@ -379,7 +379,7 @@ class TextPrediction(BaseTask):
                     grace_period=grace_period,
                     max_t=max_t,
                     console_log=verbosity > 2,
-                    ignore_warning=verbosity <= 0)
+                    ignore_warning=verbosity <= 2)
         return model
 
     @staticmethod

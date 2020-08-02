@@ -655,6 +655,8 @@ class BertForTextPredictionBasic:
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)
         search_space_reg = args(search_space=space.Dict(**self.search_space))
+        if scheduler == 'hyperband' and time_limits is None:
+            time_limits = 5 * 60 * 60  # 5 hour
         train_fn = search_space_reg(functools.partial(train_function,
                                                       train_data=train_data,
                                                       time_limits=time_limits,
@@ -683,8 +685,6 @@ class BertForTextPredictionBasic:
         elif scheduler == 'hyperband':
             if searcher is None:
                 searcher = 'random'
-            if time_limits is None:
-                time_limits = 5 * 60 * 60  # 5 hour
             if grace_period is None:
                 grace_period = 1
             if max_t is None:
