@@ -37,7 +37,7 @@ def default() -> dict:
                     'model.backbone.name': 'google_electra_small',
                     'optimization.batch_size': 32,
                     'optimization.num_train_epochs': 4,
-                    'optimization.lr': space.Real(1E-5, 1E-3)
+                    'optimization.lr': space.Real(1E-5, 1E-4)
                 }
             },
         },
