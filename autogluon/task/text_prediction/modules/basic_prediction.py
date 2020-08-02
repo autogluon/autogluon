@@ -323,11 +323,13 @@ class BERTForTabularBasicV1(HybridBlock):
                                                out_shape=out_shape,
                                                in_units=feature_units,
                                                cfg=cfg.AGG_NET)
-            self.categorical_networks = nn.HybridSequential()
+            self.categorical_networks = None
             self.numerical_network = None
             numerical_elements = None
             for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
                 if field_type_code == _C.CATEGORICAL:
+                    if self.categorical_networks is None:
+                        self.categorical_networks = nn.HybridSequential()
                     with self.categorical_networks.name_scope():
                         self.categorical_networks.add(
                             CategoricalFeatureNet(num_class=field_attrs['prop'].num_class,
@@ -366,8 +368,10 @@ class BERTForTabularBasicV1(HybridBlock):
     def initialize_with_pretrained_backbone(self, backbone_params_path, ctx=None):
         self.text_backbone.load_parameters(backbone_params_path, ctx=ctx)
         self.agg_layer.initialize(ctx=ctx)
-        self.categorical_networks.initialize(ctx=ctx)
-        self.numerical_network.initialize(ctx=ctx)
+        if self.categorical_networks is not None:
+            self.categorical_networks.initialize(ctx=ctx)
+        if self.numerical_network is not None:
+            self.numerical_network.initialize(ctx=ctx)
 
     def hybrid_forward(self, F, features):
         """
