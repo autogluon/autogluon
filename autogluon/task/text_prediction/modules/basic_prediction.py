@@ -304,7 +304,7 @@ class BERTForTabularBasicV1(HybridBlock):
         if cfg is None:
             cfg = BERTForTabularBasicV1.get_cfg()
         self.cfg = BERTForTabularBasicV1.get_cfg().clone_merge(cfg)
-        assert self.cfg.TEXT_NET.pool_type == 'cls'
+        assert self.cfg.text_net.pool_type == 'cls'
         feature_units = self.cfg.feature_units
         if feature_units == -1:
             feature_units = text_backbone.units
@@ -322,7 +322,7 @@ class BERTForTabularBasicV1(HybridBlock):
             self.agg_layer = FeatureAggregator(num_fields=len(feature_field_info),
                                                out_shape=out_shape,
                                                in_units=feature_units,
-                                               cfg=cfg.AGG_NET)
+                                               cfg=cfg.agg_net)
             self.categorical_networks = None
             self.numerical_network = None
             numerical_elements = None
@@ -334,7 +334,7 @@ class BERTForTabularBasicV1(HybridBlock):
                         self.categorical_networks.add(
                             CategoricalFeatureNet(num_class=field_attrs['prop'].num_class,
                                                   out_units=feature_units,
-                                                  cfg=cfg.CATEGORICAL_NET))
+                                                  cfg=cfg.categorical_net))
                 elif field_type_code == _C.NUMERICAL:
                     if numerical_elements is None:
                         numerical_elements = int(np.prod(field_attrs['prop'].shape))
@@ -342,7 +342,8 @@ class BERTForTabularBasicV1(HybridBlock):
                         numerical_elements += int(np.prod(field_attrs['prop'].shape))
             if numerical_elements is not None:
                 self.numerical_network = NumericalFeatureNet(input_shape=(numerical_elements,),
-                                                             out_units=feature_units)
+                                                             out_units=feature_units,
+                                                             cfg=cfg.numerical_net)
             else:
                 self.numerical_network = None
 
@@ -352,12 +353,12 @@ class BERTForTabularBasicV1(HybridBlock):
             cfg = CfgNode()
             cfg.feature_units = -1  # -1 means not given and we will use the units of BERT
             # TODO(sxjscience) Use a class to store the TextNet
-            cfg.TEXT_NET = CfgNode()
-            cfg.TEXT_NET.use_segment_id = True
-            cfg.TEXT_NET.pool_type = 'cls'
-            cfg.AGG_NET = FeatureAggregator.get_cfg()
-            cfg.CATEGORICAL_NET = CategoricalFeatureNet.get_cfg()
-            cfg.NUMERICAL_NET = NumericalFeatureNet.get_cfg()
+            cfg.text_net = CfgNode()
+            cfg.text_net.use_segment_id = True
+            cfg.text_net.pool_type = 'cls'
+            cfg.agg_net = FeatureAggregator.get_cfg()
+            cfg.categorical_net = CategoricalFeatureNet.get_cfg()
+            cfg.numerical_net = NumericalFeatureNet.get_cfg()
             cfg.initializer = CfgNode()
             cfg.initializer.weight = ['truncnorm', 0, 0.02]
             cfg.initializer.bias = ['zeros']
@@ -393,7 +394,7 @@ class BERTForTabularBasicV1(HybridBlock):
         for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
             if field_type_code == _C.TEXT:
                 batch_token_ids, batch_valid_length, batch_segment_ids, _ = features[i]
-                if self.cfg.TEXT_NET.use_segment_id:
+                if self.cfg.text_net.use_segment_id:
                     contextual_embedding, pooled_output = self.text_backbone(batch_token_ids,
                                                                              batch_segment_ids,
                                                                              batch_valid_length)
