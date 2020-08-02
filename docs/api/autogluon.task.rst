@@ -41,6 +41,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    ImageClassification
    ObjectDetection
    TextClassification
+   TextPrediction
 
 
 :hidden:`TabularPrediction`
@@ -96,6 +97,20 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
     .. rubric:: Methods
 
     .. autoautosummary:: TextClassification
+        :methods:
+
+
+:hidden:`TextPrediction`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: TextPrediction
+   :members:
+   :inherited-members:
+   :exclude-members: run_fit
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: TextPrediction
         :methods:
 
 
