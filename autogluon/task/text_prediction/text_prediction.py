@@ -48,8 +48,8 @@ def default() -> dict:
             'time_limits': None,           # The total time limit
             'num_trials': 4,               # The number of trials
             'reduction_factor': 4,         # The reduction factor
-            'grace_period': 1,             # The grace period
-            'max_t': 5,                    # The max_t in the hyperband
+            'grace_period': 5,             # The grace period
+            'max_t': 50,                   # The max_t in the hyperband
             'time_attr': 'report_idx'      # The time attribute used in hyperband searcher.
                                            # We report the validation accuracy 10 times each epoch.
         }
