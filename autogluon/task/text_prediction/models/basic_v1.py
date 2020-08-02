@@ -525,7 +525,10 @@ def train_function(args, reporter, train_data, tuning_data,
             if total_time_spent > time_limits:
                 break
             report_idx += 1
-            report_items.append(('performance_score', performance_score))
+            if stopping_metric in ['mse', 'mae', 'rmse']:
+                report_items.append(('reward', -performance_score))
+            else:
+                report_items.append(('reward', performance_score))
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
@@ -682,7 +685,7 @@ class BertForTextPredictionBasic:
                                       searcher=searcher,
                                       checkpoint=os.path.join(self._output_directory,
                                                               'scheduler.checkpoint'),
-                                      reward_attr='performance_score',
+                                      reward_attr='reward',
                                       time_attr='time_spent')
         elif scheduler == 'hyperband':
             if searcher is None:
