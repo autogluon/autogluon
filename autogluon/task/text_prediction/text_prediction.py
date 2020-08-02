@@ -264,8 +264,10 @@ class TextPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
-        folder = logging_config(folder=output_directory, name='ag_text_prediction',
-                                logger=logger, level=verbosity2loglevel(verbosity))
+        console_log = verbosity > 2
+        logging_config(folder=output_directory, name='ag_text_prediction',
+                       logger=logger, level=verbosity2loglevel(verbosity),
+                       console=console_log)
         # Parse the hyper-parameters
         if hyperparameters is None:
             hyperparameters = ag_text_prediction_params.create('default')
@@ -379,7 +381,7 @@ class TextPrediction(BaseTask):
                     reduction_factor=reduction_factor,
                     grace_period=grace_period,
                     max_t=max_t,
-                    console_log=verbosity > 2,
+                    console_log=console_log,
                     ignore_warning=verbosity <= 2)
         return model
 
