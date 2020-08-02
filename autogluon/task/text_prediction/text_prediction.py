@@ -381,7 +381,7 @@ class TextPrediction(BaseTask):
                     reduction_factor=reduction_factor,
                     grace_period=grace_period,
                     max_t=max_t,
-                    console_log=console_log,
+                    console_log=verbosity > 2,
                     ignore_warning=verbosity <= 2)
         return model
 

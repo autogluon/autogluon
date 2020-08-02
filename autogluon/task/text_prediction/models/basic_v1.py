@@ -354,7 +354,7 @@ def train_function(args, reporter, train_data, tuning_data,
         cfg.freeze()
     logger = logging.getLogger()
     logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
-    logging.info(cfg)
+    logger.info(cfg)
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
         = get_backbone(cfg.model.backbone.name)
@@ -368,12 +368,12 @@ def train_function(args, reporter, train_data, tuning_data,
                                                 label_columns=label_columns,
                                                 max_length=cfg.model.preprocess.max_length,
                                                 merge_text=cfg.model.preprocess.merge_text)
-    logging.info('Process training set...')
+    logger.info('Process training set...')
     processed_train = preprocessor.process_train(train_data.table)
-    logging.info('Done!')
-    logging.info('Process dev set...')
+    logger.info('Done!')
+    logger.info('Process dev set...')
     processed_dev = preprocessor.process_test(tuning_data.table)
-    logging.info('Done!')
+    logger.info('Done!')
     label = label_columns[0]
     # Get the ground-truth dev labels
     gt_dev_labels = np.array(tuning_data.table[label].apply(column_properties[label].transform))
@@ -396,7 +396,7 @@ def train_function(args, reporter, train_data, tuning_data,
     net.initialize_with_pretrained_backbone(backbone_params_path, ctx=ctx_l)
     net.hybridize()
     num_total_params, num_total_fixed_params = count_parameters(net.collect_params())
-    logging.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
+    logger.info('#Total Params/Fixed Params={}/{}'.format(num_total_params,
                                                            num_total_fixed_params))
     # Initialize the optimizer
     updates_per_epoch = int(len(train_dataloader) / (num_accumulated * len(ctx_l)))
@@ -419,7 +419,7 @@ def train_function(args, reporter, train_data, tuning_data,
 
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
-        logging.info('Using gradient accumulation. Global batch size = {}'
+        logger.info('Using gradient accumulation. Global batch size = {}'
                      .format(cfg.optimization.batch_size))
         for p in params:
             p.grad_req = 'add'
@@ -472,7 +472,7 @@ def train_function(args, reporter, train_data, tuning_data,
         if (update_idx + 1) % train_log_interval == 0:
             log_loss = sum([ele.as_in_ctx(ctx_l[0]) for ele in log_loss_l]).asnumpy()
             log_num_samples = sum(log_num_samples_l)
-            logging.info(
+            logger.info(
                 '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
                 ' #sample per second={}'
                     .format(update_idx + 1, max_update, int(update_idx / updates_per_epoch),
@@ -511,7 +511,7 @@ def train_function(args, reporter, train_data, tuning_data,
             mx.npx.waitall()
             loss_string = ', '.join(['{}={}'.format(key, metric_scores[key])
                                      for key in log_metrics])
-            logging.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
+            logger.info('[Iter {}/{}, Epoch {}] valid {}, time spent={},'
                          ' total_time={:.2f}min'.format(
                 update_idx + 1, max_update, int(update_idx / updates_per_epoch),
                 loss_string, valid_time_spent, (time.time() - start_tick) / 60))
@@ -529,7 +529,7 @@ def train_function(args, reporter, train_data, tuning_data,
             report_items.append(('exp_dir', exp_dir))
             reporter(**dict(report_items))
             if no_better_rounds >= cfg.learning.early_stopping_patience:
-                logging.info('Early stopping patience reached!')
+                logger.info('Early stopping patience reached!')
                 break
 
 
@@ -707,7 +707,7 @@ class BertForTextPredictionBasic:
             raise NotImplementedError
         scheduler.run()
         scheduler.join_jobs()
-        logging.info('Best_config={}'.format(scheduler.get_best_config()))
+        logger.info('Best_config={}'.format(scheduler.get_best_config()))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))
