@@ -43,7 +43,7 @@ def default() -> dict:
         },
         'hpo_params': {
             'scheduler': 'fifo',           # Can be 'fifo', 'hyperband'
-            'search_strategy': 'random',   # Can be 'random', 'bayesopt'
+            'search_strategy': 'random',   # Can be 'random', 'skopt', or 'bayesopt'
             'search_options': None,        # The search option
             'time_limits': None,           # The total time limit
             'num_trials': 4,               # The number of trials
