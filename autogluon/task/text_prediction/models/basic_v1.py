@@ -707,7 +707,7 @@ class BertForTextPredictionBasic:
             raise NotImplementedError
         scheduler.run()
         scheduler.join_jobs()
-        logger.info('Best_config={}'.format(scheduler.get_best_config()))
+        self._logger.info('Best_config={}'.format(scheduler.get_best_config()))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))
