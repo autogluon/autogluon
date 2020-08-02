@@ -130,6 +130,7 @@ class NumericalFeatureNet(HybridBlock):
         if cfg is None:
             cfg = NumericalFeatureNet.get_cfg()
         self.input_shape = input_shape
+        self.need_first_reshape = isinstance(input_shape, (list, tuple)) and len(input_shape) != 1
         self.in_units = int(np.prod(input_shape))
         self.cfg = NumericalFeatureNet.get_cfg().clone_merge(cfg)
         weight_initializer = mx.init.create(*cfg.initializer.weight)
@@ -169,7 +170,8 @@ class NumericalFeatureNet(HybridBlock):
         return cfg
 
     def hybrid_forward(self, F, features):
-        feature = F.np.reshap(features, (-1, self.in_units))
+        if self.need_first_reshape:
+            feature = F.np.reshape(features, (-1, self.in_units))
         if self.cfg.input_centering:
             feature = self.data_bn(feature)
         return self.proj(feature)
@@ -322,7 +324,8 @@ class BERTForTabularBasicV1(HybridBlock):
                                                in_units=feature_units,
                                                cfg=cfg.AGG_NET)
             self.categorical_networks = nn.HybridSequential()
-            self.numerical_networks = nn.HybridSequential()
+            self.numerical_network = None
+            numerical_elements = None
             for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
                 if field_type_code == _C.CATEGORICAL:
                     with self.categorical_networks.name_scope():
@@ -331,10 +334,15 @@ class BERTForTabularBasicV1(HybridBlock):
                                                   out_units=feature_units,
                                                   cfg=cfg.CATEGORICAL_NET))
                 elif field_type_code == _C.NUMERICAL:
-                    with self.numerical_networks.name_scope():
-                        self.numerical_networks.add(
-                            NumericalFeatureNet(input_shape=field_attrs['prop'].shape,
-                                                out_units=feature_units))
+                    if numerical_elements is None:
+                        numerical_elements = int(np.prod(field_attrs['prop'].shape))
+                    else:
+                        numerical_elements += int(np.prod(field_attrs['prop'].shape))
+            if numerical_elements is not None:
+                self.numerical_network = NumericalFeatureNet(input_shape=(numerical_elements,),
+                                                             out_units=feature_units)
+            else:
+                self.numerical_network = None
 
     @staticmethod
     def get_cfg(key=None):
@@ -377,7 +385,7 @@ class BERTForTabularBasicV1(HybridBlock):
         field_features = []
         text_contextual_features = dict()
         categorical_count = 0
-        numerical_count = 0
+        numerical_samples = []
         for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
             if field_type_code == _C.TEXT:
                 batch_token_ids, batch_valid_length, batch_segment_ids, _ = features[i]
@@ -400,7 +408,13 @@ class BERTForTabularBasicV1(HybridBlock):
                 field_features.append(extracted_feature)
             elif field_type_code == _C.NUMERICAL:
                 batch_sample = features[i]
-                extracted_feature = self.numerical_networks[numerical_count](batch_sample)
-                numerical_count += 1
-                field_features.append(extracted_feature)
+                numerical_samples.append(F.np.reshape(
+                    batch_sample, (-1, int(np.prod(field_attrs['prop'].shape)))))
+        if len(numerical_samples) > 0:
+            if len(numerical_samples) == 1:
+                numerical_feature = self.numerical_network(numerical_samples[0])
+            else:
+                numerical_feature = self.numerical_network(F.np.concatenate(numerical_samples,
+                                                                            axis=-1))
+            field_features.append(numerical_feature)
         return self.agg_layer(field_features)
