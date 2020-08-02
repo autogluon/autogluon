@@ -240,6 +240,8 @@ class NumericalColumnProperty(ColumnProperty):
             assert self._shape == inferred_shape, 'Shape mismatch!. Expected shape={},' \
                                      ' shape in the dataset is {}'.format(self._shape,
                                                                           inferred_shape)
+        else:
+            self._shape = inferred_shape
 
     def clone(self):
         return NumericalColumnProperty(shape=self.shape)
@@ -255,13 +257,6 @@ class TextColumnProperty(ColumnProperty):
     type = _C.TEXT
 
     def __init__(self):
-        """
-
-        Parameters
-        ----------
-        lang
-            The language of the text column
-        """
         super().__init__()
         self._min_length = None
         self._max_length = None
