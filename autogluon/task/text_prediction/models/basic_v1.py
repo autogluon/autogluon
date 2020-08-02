@@ -7,7 +7,7 @@ import collections
 import time
 import json
 import functools
-from tqdm.auto import tqdm
+import tqdm
 import mxnet as mx
 from mxnet.util import use_np
 from mxnet.lr_scheduler import PolyScheduler, CosineScheduler
@@ -419,8 +419,8 @@ def train_function(args, reporter, train_data, tuning_data,
 
     # Set grad_req if gradient accumulation is required
     if num_accumulated > 1:
-        logger.info('Using gradient accumulation. Global batch size = {}'
-                     .format(cfg.optimization.batch_size))
+        logger.info('Using gradient accumulation.'
+                    ' Global batch size = {}'.format(cfg.optimization.batch_size))
         for p in params:
             p.grad_req = 'add'
         net.collect_params().zero_grad()
@@ -433,7 +433,7 @@ def train_function(args, reporter, train_data, tuning_data,
     no_better_rounds = 0
     report_idx = 0
     start_tick = time.time()
-    for update_idx in tqdm(range(max_update)):
+    for update_idx in tqdm.tqdm(range(max_update)):
         num_samples_per_update_l = [0 for _ in ctx_l]
         for accum_idx in range(num_accumulated):
             sample_l = next(train_loop_dataloader)
