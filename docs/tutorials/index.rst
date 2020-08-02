@@ -80,8 +80,7 @@ Text Prediction
       :title:
       :link: text_prediction/heterogeneous.html
 
-      Learning how to use AutoGluon to handle datasets with mixed text, numerical and
-      categorical fields.
+      Learning how to use AutoGluon to handle datasets with mixed data types.
 
 
 Tuning Custom Models
