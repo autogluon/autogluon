@@ -65,9 +65,23 @@ Text Prediction
 
    .. card::
       :title: Quick Start Tutorial
-      :link: text_prediction/text_prediction_beginner.html
+      :link: text_prediction/beginner.html
 
-      5 min tutorial on fitting models with text datasets.
+      10 min tutorial on fitting prediction models with text in the dataset.
+
+.. card::
+      :title:
+      :link: text_prediction/customization.html
+
+      In-depth tutorial on learning how to customize the search space and try different
+      HPO algorithms.
+
+.. card::
+      :title:
+      :link: text_prediction/heterogeneous.html
+
+      Learning how to use AutoGluon to handle datasets with mixed text, numerical and
+      categorical fields.
 
 
 Tuning Custom Models

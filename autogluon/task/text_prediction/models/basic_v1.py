@@ -408,7 +408,7 @@ def train_function(args, reporter, train_data, tuning_data,
     trainer = mx.gluon.Trainer(net.collect_params(),
                                optimizer, optimizer_params,
                                update_on_kvstore=False)
-    if cfg.optimization.layerwise_lr_decay > 0:
+    if 0 < cfg.optimization.layerwise_lr_decay < 1:
         apply_layerwise_decay(net.text_backbone,
                               cfg.optimization.layerwise_lr_decay,
                               backbone_name=cfg.model.backbone.name)
@@ -475,7 +475,8 @@ def train_function(args, reporter, train_data, tuning_data,
             logger.info(
                 '[Iter {}/{}, Epoch {}] train loss={}, gnorm={}, lr={}, #samples processed={},'
                 ' #sample per second={}'
-                    .format(update_idx + 1, max_update, int(update_idx / updates_per_epoch),
+                    .format(update_idx + 1, max_update,
+                            int(update_idx / updates_per_epoch),
                             log_loss / log_num_samples, total_norm, trainer.learning_rate,
                             log_num_samples,
                             log_num_samples / (time.time() - logging_start_tick)))
@@ -704,7 +705,7 @@ class BertForTextPredictionBasic:
                                            brackets=brackets,
                                            checkpoint=os.path.join(self._output_directory,
                                                                    'scheduler.checkpoint'),
-                                           reward_attr='performance_score',
+                                           reward_attr='reward',
                                            time_attr='report_idx')
         else:
             raise NotImplementedError
