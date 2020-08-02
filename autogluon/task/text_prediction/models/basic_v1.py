@@ -352,7 +352,8 @@ def train_function(args, reporter, train_data, tuning_data,
         cfg.defrost()
         cfg.misc.exp_dir = exp_dir
         cfg.freeze()
-    logging_config(folder=exp_dir, name='training', console=console_log)
+    logger = logging.getLogger()
+    logging_config(folder=exp_dir, name='training', logger=logger, console=console_log)
     logging.info(cfg)
     # Load backbone model
     backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \
@@ -650,7 +651,8 @@ class BertForTextPredictionBasic:
               ignore_warning=True):
         start_tick = time.time()
         logging_config(folder=self._output_directory, name='main',
-                       console=console_log)
+                       console=console_log,
+                       logger=self._logger)
         assert len(self._label_columns) == 1
         # TODO(sxjscience) Try to support S3
         os.makedirs(self._output_directory, exist_ok=True)

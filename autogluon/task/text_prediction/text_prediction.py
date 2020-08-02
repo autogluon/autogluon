@@ -9,6 +9,7 @@ from ..base import BaseTask
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
 from autogluon_contrib_nlp.utils.registry import Registry
+from autogluon_contrib_nlp.utils.misc import logging_config
 from ...utils.tabular.utils.loaders import load_pd
 from ...utils.miscs import verbosity2loglevel
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
@@ -263,8 +264,8 @@ class TextPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
-
-        logger.setLevel(verbosity2loglevel(verbosity))
+        folder = logging_config(folder=output_directory, name='ag_text_prediction',
+                                logger=logger, level=verbosity2loglevel(verbosity))
         # Parse the hyper-parameters
         if hyperparameters is None:
             hyperparameters = ag_text_prediction_params.create('default')
