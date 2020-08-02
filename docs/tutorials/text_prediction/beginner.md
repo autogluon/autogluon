@@ -104,8 +104,8 @@ dev_score = predictor_sts.evaluate(dev_data, metrics=['rmse', 'pearsonr', 'spear
 print('Best Config = {}'.format(predictor_sts.results['best_config']))
 print('Total Time = {}s'.format(predictor_sts.results['total_time']))
 print('RMSE = {:.2f}'.format(dev_score['rmse']))
-print('PEARSONR = {:.2f}'.format(dev_score['pearsonr']))
-print('SPEARMANR = {:.2f}'.format(dev_score['spearmanr']))
+print('PEARSONR = {:.4f}'.format(dev_score['pearsonr']))
+print('SPEARMANR = {:.4f}'.format(dev_score['spearmanr']))
 ```
 
 
