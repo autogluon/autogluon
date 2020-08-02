@@ -171,10 +171,10 @@ class NumericalFeatureNet(HybridBlock):
 
     def hybrid_forward(self, F, features):
         if self.need_first_reshape:
-            feature = F.np.reshape(features, (-1, self.in_units))
+            features = F.np.reshape(features, (-1, self.in_units))
         if self.cfg.input_centering:
-            feature = self.data_bn(feature)
-        return self.proj(feature)
+            features = self.data_bn(features)
+        return self.proj(features)
 
 
 @use_np
