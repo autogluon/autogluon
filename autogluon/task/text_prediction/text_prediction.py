@@ -264,7 +264,7 @@ class TextPrediction(BaseTask):
             verbosity = 0
         elif verbosity > 4:
             verbosity = 4
-        console_log = verbosity > 2
+        console_log = verbosity >= 2
         logging_config(folder=output_directory, name='ag_text_prediction',
                        logger=logger, level=verbosity2loglevel(verbosity),
                        console=console_log)
