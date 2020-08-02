@@ -413,7 +413,7 @@ class BERTForTabularBasicV1(HybridBlock):
             elif field_type_code == _C.NUMERICAL:
                 batch_sample = features[i]
                 numerical_samples.append(F.np.reshape(
-                    batch_sample, (-1, int(np.prod(field_attrs['prop'].shape)))))
+                    batch_sample, (-1, int(np.prod(field_attrs['prop'])))))
         if len(numerical_samples) > 0:
             if len(numerical_samples) == 1:
                 numerical_feature = self.numerical_network(numerical_samples[0])
