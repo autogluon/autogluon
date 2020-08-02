@@ -309,8 +309,8 @@ class TextPrediction(BaseTask):
         logger.info(train_data)
         logger.info('Tuning Dataset:')
         logger.info(tuning_data)
-        logger.info('Hyperparameters:')
-        logger.info(hyperparameters)
+        logger.debug('Hyperparameters:')
+        logger.debug(hyperparameters)
         column_properties = train_data.column_properties
 
         problem_types = []
