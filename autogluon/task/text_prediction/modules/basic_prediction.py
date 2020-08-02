@@ -56,7 +56,7 @@ class BasicMLP(HybridBlock):
                     self.proj.add(get_norm_layer(normalization,
                                                  axis=-1,
                                                  epsilon=norm_eps,
-                                                 in_channels=in_units))
+                                                 in_channels=mid_units))
                     self.proj.add(get_activation(activation))
                     in_units = mid_units
                 self.proj.add(nn.Dropout(dropout))
