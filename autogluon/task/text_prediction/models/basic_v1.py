@@ -21,7 +21,6 @@ from autogluon_contrib_nlp.utils.misc import set_seed, logging_config, parse_ctx
     count_parameters, repeat, get_mxnet_available_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ..metrics import calculate_metric_by_expr
-from ....utils import in_ipynb
 from .. import constants as _C
 from ....core import args, space
 from ....scheduler import FIFOScheduler, HyperbandScheduler
@@ -650,7 +649,7 @@ class BertForTextPredictionBasic:
               max_t=None,
               reduction_factor=4,
               brackets=1,
-              plot_results=True,
+              plot_results=False,
               console_log=True,
               ignore_warning=True):
         start_tick = time.time()
@@ -726,10 +725,9 @@ class BertForTextPredictionBasic:
                              config_history=scheduler.config_history,
                              reward_attr=scheduler._reward_attr,
                              config=cfg)
-        if plot_results or in_ipynb():
-            plot_training_curves = os.path.join(self._output_directory, 'plot_training_curves.png')
-            scheduler.get_training_curves(filename=plot_training_curves, plot=True,
-                                          use_legend=True)
+        plot_training_curves = os.path.join(self._output_directory, 'plot_training_curves.png')
+        scheduler.get_training_curves(filename=plot_training_curves, plot=plot_results,
+                                      use_legend=True)
         # Consider to move this to a separate predictor
         self._config = cfg
         backbone_model_cls, backbone_cfg, tokenizer, backbone_params_path, _ \

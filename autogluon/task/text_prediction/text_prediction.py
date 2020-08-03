@@ -8,6 +8,7 @@ from . import constants as _C
 from ..base import BaseTask
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
+from ...utils import in_ipynb
 from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
 from ...utils.tabular.utils.loaders import load_pd
@@ -197,6 +198,7 @@ class TextPrediction(BaseTask):
             search_strategy=None,
             search_options=None,
             hyperparameters=None,
+            plot_results=None,
             seed=None,
             verbosity=2):
         """
@@ -242,6 +244,8 @@ class TextPrediction(BaseTask):
             The search options
         hyperparameters
             The hyper-parameters of the search-space.
+        plot_results
+            Whether to plot the fitting results
         seed
             The seed of the random state
         verbosity
@@ -371,6 +375,13 @@ class TextPrediction(BaseTask):
         if recommended_resource['num_gpus'] == 0:
             warnings.warn('Recommend to use GPU to run the TextPrediction task!')
         model = model_candidates[0]
+        if plot_results is None:
+            if in_ipynb():
+                plot_results = True
+            else:
+                plot_results = False
+        import mxnet as mx
+        mx.npx.set_np()
         model.train(train_data=train_data,
                     tuning_data=tuning_data,
                     resource=recommended_resource,
@@ -381,8 +392,10 @@ class TextPrediction(BaseTask):
                     reduction_factor=reduction_factor,
                     grace_period=grace_period,
                     max_t=max_t,
+                    plot_results=plot_results,
                     console_log=verbosity > 2,
                     ignore_warning=verbosity <= 2)
+        mx.npx.reset_np()
         return model
 
     @staticmethod
