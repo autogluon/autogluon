@@ -98,15 +98,4 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
         else:
             X_features = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
 
-        # TODO: Remove the need for this
-        if not self._is_fit:
-            if self.generators:
-                self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator, _ in self.generators])
-            else:
-                self.feature_metadata = FeatureMetadata(type_map_raw=dict())
-
-            self._features_binned += self.feature_metadata.type_group_map_special['text_special']
-            if self._feature_metadata_in.type_group_map_special['text']:
-                self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
-
         return X_features
