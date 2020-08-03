@@ -683,8 +683,7 @@ class BertForTextPredictionBasic:
                                       num_trials=num_trials,
                                       resource=resource,
                                       searcher=searcher,
-                                      checkpoint=os.path.join(self._output_directory,
-                                                              'scheduler.checkpoint'),
+                                      checkpoint=None,
                                       reward_attr='reward',
                                       time_attr='time_spent')
         elif scheduler == 'hyperband':
@@ -702,8 +701,7 @@ class BertForTextPredictionBasic:
                                            grace_period=grace_period,
                                            reduction_factor=reduction_factor,
                                            brackets=brackets,
-                                           checkpoint=os.path.join(self._output_directory,
-                                                                   'scheduler.checkpoint'),
+                                           checkpoint=None,
                                            reward_attr='reward',
                                            time_attr='report_idx')
         else:
