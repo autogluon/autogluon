@@ -4,6 +4,7 @@ import math
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import psutil
 from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
@@ -80,7 +81,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             dummy_generator = DummyFeatureGenerator()
             X_features = dummy_generator.fit_transform(X=X_features)
             self.feature_metadata = copy.deepcopy(dummy_generator.feature_metadata)
-            self.generators = [(dummy_generator, None)]
+            self.generators = [dummy_generator]
 
         X_features.index = X_index
         self.features_out = list(X_features.columns)
@@ -121,7 +122,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         X_features = self._generate_features(X)
 
         if self.generators:
-            self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator, _ in self.generators])
+            self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators])
         else:
             self.feature_metadata = FeatureMetadata(type_map_raw=dict())
 
@@ -196,8 +197,30 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         return X_features
 
+    # TODO: Add _fit_transform_generators, _transform_generators instead of this
     def _generate_features(self, X: DataFrame) -> DataFrame:
-        raise NotImplementedError()
+        X = self._preprocess(X)
+
+        feature_df_list = []
+        for generator in self.generators:
+            if not self._is_fit:
+                X_out = generator.fit_transform(X, feature_metadata_in=self._feature_metadata_in)
+            else:
+                X_out = generator.transform(X)
+            feature_df_list.append(X_out)
+
+        if not self._is_fit:
+            self.generators = [generator for i, generator in enumerate(self.generators) if feature_df_list[i] is not None and len(feature_df_list[i].columns) > 0]
+            feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
+
+        if not feature_df_list:
+            X_features = DataFrame(index=X.index)
+        elif len(feature_df_list) == 1:
+            X_features = feature_df_list[0]
+        else:
+            X_features = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
+
+        return X_features
 
     # TODO: Remove self.features_binned from here
     def _remove_features(self, features):
@@ -242,12 +265,13 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
     def _get_features_to_remove_post(self, X_features: DataFrame) -> list:
         features_to_remove_post = []
         X_len = len(X_features)
+        # TODO: Consider making 0.99 a parameter to FeatureGenerator
+        max_unique_value_count = X_len * 0.99
         for column in X_features:
             unique_value_count = len(X_features[column].unique())
             if unique_value_count == 1:
                 features_to_remove_post.append(column)
-            # TODO: Consider making 0.99 a parameter to FeatureGenerator
-            elif column in self._feature_metadata_in.type_group_map_raw['object'] and (unique_value_count / X_len > 0.99):
+            elif column in self.feature_metadata.type_group_map_raw['category'] and (unique_value_count > max_unique_value_count):
                 features_to_remove_post.append(column)
         return features_to_remove_post
 

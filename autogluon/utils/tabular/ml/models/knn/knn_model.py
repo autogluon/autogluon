@@ -41,7 +41,7 @@ class KNNModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_type_group_special=['text_ngram', 'text_special'],
+            ignored_type_group_special=['text_ngram', 'text_special', 'datetime_as_int'],
             ignored_type_group_raw=['category', 'object'],  # TODO: Eventually use category features
         )
         for key, value in default_auxiliary_params.items():

@@ -5,9 +5,10 @@ import traceback
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
+from ..feature_metadata import FeatureMetadata
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
 
 logger = logging.getLogger(__name__)
@@ -33,20 +34,21 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         else:
             self.vectorizer_default_raw = vectorizer
 
-    def fit(self, X, y=None):
-        self.fit_transform(X, y=y)
-
-    def _fit_transform(self, X, y=None):
+    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             text_ngram=list(X_out.columns)
         )
         return X_out, type_family_groups_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_ngram(X)
 
-    def _generate_features_text_ngram(self, X: DataFrame):
+    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
+        text_features = feature_metadata_in.type_group_map_special['text']
+        return text_features
+
+    def _generate_features_text_ngram(self, X: DataFrame) -> DataFrame:
         X_text_ngram = None
         if self.features_in:
             # Combine Text Fields

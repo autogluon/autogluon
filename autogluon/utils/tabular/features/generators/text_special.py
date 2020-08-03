@@ -5,6 +5,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
+from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         self.symbols = symbols  # Symbols to generate count and ratio features for.
 
-    def fit(self, X, y=None):
-        self.fit_transform(X, y=y)
-
-    def _fit_transform(self, X, y=None):
+    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             # binned=list(X_out.columns),  # TODO: Add binning component?
@@ -28,10 +26,14 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         )
         return X_out, type_family_groups_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_special(X)
 
-    def _generate_features_text_special(self, X: DataFrame):
+    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
+        text_features = feature_metadata_in.type_group_map_special['text']
+        return text_features
+
+    def _generate_features_text_special(self, X: DataFrame) -> DataFrame:
         if self.features_in:
             X_text_special_combined = []
             for nlp_feature in self.features_in:
