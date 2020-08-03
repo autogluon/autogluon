@@ -184,6 +184,18 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
         if self.features_in_types:
+            int_features = self._feature_metadata_in.type_group_map_raw['int']
+            if int_features:
+                null_count = X[int_features].isnull().sum()
+                with_null = null_count[null_count != 0]
+                # If int feature contains null during inference but not during fit.
+                if len(with_null) > 0:
+                    # TODO: Consider imputing to mode? This is tricky because training data had no missing values.
+                    # TODO: Add unit test for this situation, to confirm it is handled properly.
+                    with_null_features = list(with_null.index)
+                    logger.warning(f'WARNING: Int features contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
+                    logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
+                    X[with_null_features] = X[with_null_features].fillna(0)
             X = X.astype(self.features_in_types)
         X_features = self._generate_features(X)
         for column in self._features_binned:
