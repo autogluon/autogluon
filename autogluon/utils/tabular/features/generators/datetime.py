@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
-    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             datetime_as_int=list(X_out.columns)
@@ -21,8 +21,8 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_datetime(X)
 
-    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
-        datetime_features = feature_metadata_in.type_group_map_special['datetime_as_object'] + feature_metadata_in.type_group_map_raw['datetime']
+    def _infer_features_in(self, X, y=None) -> list:
+        datetime_features = self.feature_metadata_in.type_group_map_special['datetime_as_object'] + self.feature_metadata_in.type_group_map_raw['datetime']
         return datetime_features
 
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:

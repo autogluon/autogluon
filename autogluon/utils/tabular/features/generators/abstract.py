@@ -25,10 +25,10 @@ class AbstractFeatureGenerator:
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
-    def fit(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
-        self.fit_transform(X, y=y, feature_metadata_in=feature_metadata_in)
+    def fit(self, X: DataFrame, **kwargs):
+        self.fit_transform(X, **kwargs)
 
-    def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> DataFrame:
+    def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         if self._is_fit:
             raise AssertionError('FeatureGenerator is already fit.')
         if self.feature_metadata_in is None:
@@ -38,9 +38,9 @@ class AbstractFeatureGenerator:
         if self.feature_metadata_in is None:
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
         if self.features_in is None:
-            self.features_in = self._infer_features_in_from_metadata(X, y=y, feature_metadata_in=self.feature_metadata_in)
+            self.features_in = self._infer_features_in(X, y=y)
         self.feature_metadata_in = self.feature_metadata_in.keep_features(features=self.features_in)
-        X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, feature_metadata_in=self.feature_metadata_in)
+        X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
         X_out, type_family_groups_special = self._update_feature_names(X_out, type_family_groups_special)
         self.features_out = list(X_out.columns)
         type_map_raw = get_type_map_raw(X_out)
@@ -57,14 +57,14 @@ class AbstractFeatureGenerator:
         return X_out
 
     # TODO: feature_metadata_in as parameter?
-    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         raise NotImplementedError
 
     def _transform(self, X: DataFrame) -> DataFrame:
         raise NotImplementedError
 
     # TODO: Find way to increase flexibility here, possibly through init args
-    def _infer_features_in_from_metadata(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> list:
+    def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
         return list(X.columns)
 
     @staticmethod

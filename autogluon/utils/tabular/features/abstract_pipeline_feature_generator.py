@@ -50,10 +50,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
                 X[column].fillna(np.nan, inplace=True)
         return X
 
-    def fit(self, X: DataFrame, **kwargs):
-        self.fit_transform(X=X, **kwargs)
-
     # TODO: Save this to disk and remove from memory if large categoricals!
+    # TODO: Rename this, use abstract's fit_transform and transform!
     @calculate_time
     def fit_transform(self, X: DataFrame, y=None, banned_features=None, fix_categoricals=False, drop_duplicates=False):
         if self._is_fit:

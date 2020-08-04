@@ -13,9 +13,9 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_category(X)
 
-    def _infer_features_in_from_metadata(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> list:
-        object_features = feature_metadata_in.type_group_map_raw['object']
-        datetime_as_object_features = feature_metadata_in.type_group_map_special['datetime_as_object']
+    def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
+        object_features = self.feature_metadata_in.type_group_map_raw['object']
+        datetime_as_object_features = self.feature_metadata_in.type_group_map_special['datetime_as_object']
         object_features = [feature for feature in object_features if feature not in datetime_as_object_features]
         return object_features
 

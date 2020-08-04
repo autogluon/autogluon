@@ -34,7 +34,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         else:
             self.vectorizer_default_raw = vectorizer
 
-    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
             text_ngram=list(X_out.columns)
@@ -44,8 +44,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_ngram(X)
 
-    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
-        text_features = feature_metadata_in.type_group_map_special['text']
+    def _infer_features_in(self, X, y=None) -> list:
+        text_features = self.feature_metadata_in.type_group_map_special['text']
         return text_features
 
     def _generate_features_text_ngram(self, X: DataFrame) -> DataFrame:

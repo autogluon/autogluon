@@ -9,19 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 class IdentityFeatureGenerator(AbstractFeatureGenerator):
-    def _fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None) -> (DataFrame, dict):
+    def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         return X_out, None
 
     def _transform(self, X):
         return self._generate_features_identity(X)
 
-    def _infer_features_in_from_metadata(self, X, y=None, feature_metadata_in: FeatureMetadata = None) -> list:
+    def _infer_features_in(self, X, y=None) -> list:
         identity_features = []
         invalid_raw_types = {'object', 'datetime'}
-        features = feature_metadata_in.get_features()
+        features = self.feature_metadata_in.get_features()
         for feature in features:
-            feature_type_raw = feature_metadata_in.get_feature_type_raw(feature)
+            feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)
             if feature_type_raw not in invalid_raw_types:
                 identity_features.append(feature)
         return identity_features
