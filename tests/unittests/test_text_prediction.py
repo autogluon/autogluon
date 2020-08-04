@@ -21,9 +21,10 @@ def verify_sst():
     dev_data = dev_data.iloc[:10]
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
-                         ngpus_per_trial=0,
+                         ngpus_per_trial=1,
                          verbosity=4,
-                         output_directory='./sst')
+                         output_directory='./sst',
+                         plot_results=False)
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor.predict(dev_data)
     dev_pred_prob = predictor.predict_proba(dev_data)
@@ -39,8 +40,9 @@ def verify_mrpc():
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
                          verbosity=4,
-                         ngpus_per_trial=0,
-                         output_directory='./mrpc')
+                         ngpus_per_trial=1,
+                         output_directory='./mrpc',
+                         plot_results=False)
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor.predict(dev_data)
     dev_pred_prob = predictor.predict_proba(dev_data)
@@ -56,7 +58,9 @@ def verify_sts():
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='score', num_trials=1,
                          verbosity=4,
-                         output_directory='./sts')
+                         ngpus_per_trial=1,
+                         output_directory='./sts',
+                         plot_results=False)
     dev_rmse = predictor.evaluate(dev_data, metrics=['rmse'])
     dev_prediction = predictor.predict(dev_data)
 
