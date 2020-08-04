@@ -3,8 +3,9 @@ dependencies:
 - python=3.7
 - graphviz
 - pip:
+  - --find-links https://sxjscience.github.io/KDD2020/
   - jupyter-sphinx>=0.2.2
-  - https://autogluon-kdd-mxnet-wheels.s3-accelerate.amazonaws.com/mxnet_cu100-1.7.0b20200722-py2.py3-none-manylinux2014_x86_64.whl
+  - mxnet_cu100>=1.7.0b20200713, <2.0.0
   - portalocker
   - nose
   - docutils
