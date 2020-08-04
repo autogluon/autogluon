@@ -896,7 +896,7 @@ class BertForTextPredictionBasic:
                                     label_shape=label_shapes[0],
                                     cfg=loaded_config.model.network)
         net.load_parameters(os.path.join(dir_path, 'net.params'),
-                            ctx=get_mxnet_available_ctx())
+                            ctx=mx.cpu())
         model = cls(column_properties=column_properties,
                     label_columns=label_columns,
                     feature_columns=feature_columns,

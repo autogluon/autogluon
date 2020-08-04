@@ -14,7 +14,7 @@ stage("Unit Test") {
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         pip install --upgrade -e .
