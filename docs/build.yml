@@ -6,6 +6,7 @@ dependencies:
   - --find-links https://sxjscience.github.io/KDD2020/
   - jupyter-sphinx>=0.2.2
   - mxnet_cu100>=1.7.0b20200713, <2.0.0
+  - gluonnlp==0.8.1
   - portalocker
   - nose
   - docutils
