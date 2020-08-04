@@ -25,11 +25,9 @@ logger = logging.getLogger(__name__)
 class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, generators):
         super().__init__()
-        self.features_in_types = dict()  # Initial feature types prior to transformation
 
         self.generators = generators
 
-        self._feature_metadata_in: FeatureMetadata = None  # FeatureMetadata object based on the original input features.
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
@@ -46,7 +44,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
     def _preprocess(self, X: DataFrame):
         for column in X.columns:
-            if self._feature_metadata_in.type_map_raw[column] == 'object':
+            if self.feature_metadata_in.type_map_raw[column] == 'object':
                 X[column].fillna('', inplace=True)
             else:
                 X[column].fillna(np.nan, inplace=True)
@@ -112,12 +110,11 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
 
         self.features_in = list(X.columns)
-        self.features_in_types = X.dtypes.to_dict()
 
         type_map_real = get_type_map_real(X)
         # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
         self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real)
-        self._feature_metadata_in = self._infer_feature_metadata_in(X)
+        self.feature_metadata_in = self._infer_feature_metadata_in(X)
 
         X_features = self._generate_features(X)
 
@@ -128,8 +125,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         # TODO: Remove the need for this
         self._features_binned += self.feature_metadata.type_group_map_special['text_special']
-        if self._feature_metadata_in.type_group_map_special['text']:
-            self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self._feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
+        if self.feature_metadata_in.type_group_map_special['text']:
+            self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self.feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
 
         features_to_remove_post = self._get_features_to_remove_post(X_features)
         X_features.drop(features_to_remove_post, axis=1, inplace=True)
@@ -183,20 +180,20 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
 
-        if self.features_in_types:
-            int_features = self._feature_metadata_in.type_group_map_raw['int']
-            if int_features:
-                null_count = X[int_features].isnull().sum()
-                with_null = null_count[null_count != 0]
-                # If int feature contains null during inference but not during fit.
-                if len(with_null) > 0:
-                    # TODO: Consider imputing to mode? This is tricky because training data had no missing values.
-                    # TODO: Add unit test for this situation, to confirm it is handled properly.
-                    with_null_features = list(with_null.index)
-                    logger.warning(f'WARNING: Int features contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
-                    logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
-                    X[with_null_features] = X[with_null_features].fillna(0)
-            X = X.astype(self.features_in_types)
+        int_features = self.feature_metadata_in.type_group_map_raw['int']
+        if int_features:
+            null_count = X[int_features].isnull().sum()
+            with_null = null_count[null_count != 0]
+            # If int feature contains null during inference but not during fit.
+            if len(with_null) > 0:
+                # TODO: Consider imputing to mode? This is tricky because training data had no missing values.
+                # TODO: Add unit test for this situation, to confirm it is handled properly.
+                with_null_features = list(with_null.index)
+                logger.warning(f'WARNING: Int features contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
+                logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
+                X[with_null_features] = X[with_null_features].fillna(0)
+        X = X.astype(self._feature_metadata_in_real.type_map_raw)
+
         X_features = self._generate_features(X)
         for column in self._features_binned:
             X_features[column] = binning.bin_column(series=X_features[column], mapping=self._features_binned_map[column])
@@ -216,7 +213,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         feature_df_list = []
         for generator in self.generators:
             if not self._is_fit:
-                X_out = generator.fit_transform(X, feature_metadata_in=self._feature_metadata_in)
+                X_out = generator.fit_transform(X, feature_metadata_in=self.feature_metadata_in)
             else:
                 X_out = generator.transform(X)
             feature_df_list.append(X_out)
@@ -334,6 +331,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         for key, val in self._feature_metadata_in_real.type_group_map_raw.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         logger.log(20, 'Original Features (inferred special dtypes):')
-        for key, val in self._feature_metadata_in.type_group_map_special.items():
+        for key, val in self.feature_metadata_in.type_group_map_special.items():
             if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
         super().print_feature_metadata_info()

@@ -50,13 +50,14 @@ class FeatureMetadata:
     def get_features(self):
         return list(self.type_map_raw.keys())
 
-    def get_feature_type_raw(self, feature) -> str:
+    def get_feature_type_raw(self, feature: str) -> str:
         return self.type_map_raw[feature]
 
-    def get_feature_types_special(self, feature) -> list:
+    def get_feature_types_special(self, feature: str) -> list:
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
-    def get_type_group_map_raw_flattened(self):
+    # TODO: Can remove, this is same output as self.type_map_raw
+    def get_type_group_map_raw_flattened(self) -> dict:
         return {feature: type_family for type_family, features in self.type_group_map_raw.items() for feature in features}
 
     @staticmethod
@@ -66,15 +67,26 @@ class FeatureMetadata:
             type_group_map_raw[dtype].append(feature)
         return type_group_map_raw
 
-    def remove_features(self, features, inplace=False):
+    def remove_features(self, features: list, inplace=False):
         if inplace:
             metadata = self
         else:
             metadata = copy.deepcopy(self)
+        features_invalid = [feature for feature in features if feature not in self.get_features()]
+        if features_invalid:
+            raise KeyError(f'remove_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}')
         metadata._remove_features_from_type_map(d=metadata.type_map_raw, features=features)
         metadata._remove_features_from_type_group_map(d=metadata.type_group_map_raw, features=features)
         metadata._remove_features_from_type_group_map(d=metadata.type_group_map_special, features=features)
         return metadata
+
+    def keep_features(self, features: list, inplace=False):
+        '''Removes all features except for those in `features`'''
+        features_invalid = [feature for feature in features if feature not in self.get_features()]
+        if features_invalid:
+            raise KeyError(f'keep_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}')
+        features_to_remove = [feature for feature in self.get_features() if feature not in features]
+        return self.remove_features(features=features_to_remove, inplace=inplace)
 
     @staticmethod
     def _remove_features_from_type_group_map(d, features):
