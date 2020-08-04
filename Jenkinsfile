@@ -8,6 +8,7 @@ stage("Unit Test") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda update -n base -c defaults conda
         conda env update -n autogluon_py3 -f docs/build.yml
         conda activate autogluon_py3
         conda list
@@ -33,6 +34,7 @@ stage("Build Docs") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
+        conda update -n base -c defaults conda
         conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
         conda list
