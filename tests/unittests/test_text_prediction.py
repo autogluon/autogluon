@@ -21,6 +21,7 @@ def verify_sst():
     dev_data = dev_data.iloc[:10]
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
+                         ngpus_per_trial=0,
                          verbosity=4,
                          output_directory='./sst')
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
@@ -36,7 +37,9 @@ def verify_mrpc():
     train_data = train_data.iloc[:100]
     dev_data = dev_data.iloc[:10]
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
-                         label='label', num_trials=1, verbosity=4,
+                         label='label', num_trials=1,
+                         verbosity=4,
+                         ngpus_per_trial=0,
                          output_directory='./mrpc')
     dev_acc = predictor.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor.predict(dev_data)

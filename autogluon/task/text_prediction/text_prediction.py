@@ -109,10 +109,15 @@ def get_recommended_resource(nthreads_per_trial=None,
     elif nthreads_per_trial is not None and ngpus_per_trial is None:
         ngpus_per_trial = get_gpu_count()
     elif nthreads_per_trial is None and ngpus_per_trial is not None:
-        num_parallel_jobs = get_gpu_count() // ngpus_per_trial
-        nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+        if ngpus_per_trial != 0:
+            num_parallel_jobs = get_gpu_count() // ngpus_per_trial
+            nthreads_per_trial = max(get_cpu_count() // num_parallel_jobs, 1)
+        else:
+            nthreads_per_trial = min(get_cpu_count(), 4)
     nthreads_per_trial = min(nthreads_per_trial, get_cpu_count())
     ngpus_per_trial = min(ngpus_per_trial, get_gpu_count())
+    assert nthreads_per_trial > 0 and ngpus_per_trial >= 0,\
+        'Invalid number of threads and number of GPUs.'
     return {'num_cpus': nthreads_per_trial, 'num_gpus': ngpus_per_trial}
 
 
