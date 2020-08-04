@@ -1,7 +1,10 @@
 import os
 import autogluon as ag
 from autogluon import TextClassification as task
+import pytest
 
+
+@pytest.skip
 def test_fit():
     dataset = task.Dataset(name='ToySST')
     predictor = task.fit(dataset,
@@ -18,6 +21,8 @@ def test_fit():
     print('accuracy is %.2f' % test_acc)
     print('finished')
 
+
+@pytest.skip
 def test_custom_dataset_fit():
     os.system('wget https://autogluon-hackathon.s3.amazonaws.com/demodata.zip')
     os.system('unzip -o demodata.zip')
