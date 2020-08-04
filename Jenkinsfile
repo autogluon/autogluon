@@ -16,8 +16,8 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        pip install --force-reinstall --upgrade gluonnlp==0.8.1
-        pip install --upgrade --force-reinstall -e .
+        pip install --upgrade gluonnlp==0.8.1
+        pip install --upgrade -e .
         pip install pytest
         python3 -m pytest --junitxml=results.xml --runslow tests
         """
@@ -43,8 +43,8 @@ stage("Build Docs") {
         export AG_DOCS=1
         git clean -fx
         pip install git+https://github.com/zhanghang1989/d2l-book
-        pip install --force-reinstall --upgrade gluonnlp==0.8.1
-        pip install --upgrade --force-reinstall -e .
+        pip install --upgrade gluonnlp==0.8.1
+        pip install --upgrade -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
