@@ -369,6 +369,12 @@ class TextPrediction(BaseTask):
             search_strategy = hyperparameters['hpo_params']['search_strategy']
         if time_limits is None:
             time_limits = hyperparameters['hpo_params']['time_limits']
+        else:
+            if isinstance(time_limits, str):
+                if time_limits.endswith('min'):
+                    time_limits = int(float(time_limits[:-3]) * 60)
+                elif time_limits.endswith('hour'):
+                    time_limits = int(float(time_limits[:-4]) * 60 * 60)
         if num_trials is None:
             num_trials = hyperparameters['hpo_params']['num_trials']
         if reduction_factor is None:
