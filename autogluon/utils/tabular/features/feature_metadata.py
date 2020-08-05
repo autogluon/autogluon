@@ -5,7 +5,6 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 
-# TODO: Rename to FeatureMetadata
 class FeatureMetadata:
     """
     Contains feature type metadata information such as type family groups (type_group_map_raw) and special feature type groups (type_group_map_special)
@@ -126,11 +125,12 @@ class FeatureMetadata:
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     @staticmethod
-    def _get_feature_types(feature, feature_types_dict):
+    def _get_feature_types(feature: str, feature_types_dict: dict) -> list:
         feature_types = []
         for dtype_family in feature_types_dict:
             if feature in feature_types_dict[dtype_family]:
                 feature_types.append(dtype_family)
+        feature_types = sorted(feature_types)
         return feature_types
 
     # Joins a list of metadata objects together, returning a new metadata object
@@ -140,3 +140,31 @@ class FeatureMetadata:
         for metadata in metadata_list[1:]:
             metadata_new = metadata_new.join_metadata(metadata, allow_shared_raw_features=allow_shared_raw_features)
         return metadata_new
+
+    def _get_feature_metadata_full(self):
+        feature_metadata_full = defaultdict(list)
+
+        for feature in self.get_features():
+            feature_type_raw = self.type_map_raw[feature]
+            feature_types_special = tuple(self.get_feature_types_special(feature))
+            feature_metadata_full[(feature_type_raw, feature_types_special)].append(feature)
+
+        return feature_metadata_full
+
+    def print_feature_metadata_full(self, log_prefix=''):
+        feature_metadata_full = self._get_feature_metadata_full()
+        keys = list(feature_metadata_full.keys())
+        keys = sorted(keys)
+        output = [((key[0], list(key[1])), feature_metadata_full[key]) for key in keys]
+        max_key_len = max([len(str(key)) for key, _ in output])
+        max_val_len = max([len(str(len(val))) for _, val in output])
+        for key, val in output:
+            key_len = len(str(key))
+            val_len = len(str(len(val)))
+            max_key_minus_cur = max(max_key_len - key_len, 0)
+            max_val_minus_cur = max(max_val_len - val_len, 0)
+            features = str(val[:3])
+            if len(val) > 3:
+                features = features[:-1] + ', ...]'
+            if val:
+                logger.log(20, f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}')

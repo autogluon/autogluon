@@ -1,9 +1,8 @@
-import copy
 import logging
 
 from pandas import DataFrame, Series
 
-from ..types import get_type_map_raw, get_type_group_map_special
+from ..types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from ..feature_metadata import FeatureMetadata
 from ...utils.savers import save_pkl
 
@@ -18,6 +17,8 @@ class AbstractFeatureGenerator:
         self._is_fit = False  # Whether the feature generator has been fit
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
         self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
+        # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes, and special dtypes all at once.
+        self.feature_metadata_real: FeatureMetadata = None  # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.). Pass to models to enable advanced functionality.
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
         self.name_prefix = name_prefix  # Prefix added to all output feature names
@@ -36,6 +37,7 @@ class AbstractFeatureGenerator:
         elif feature_metadata_in is not None:
             logger.warning('Warning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
         if self.feature_metadata_in is None:
+            logger.log(20, f'feature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X, y=y)
@@ -43,8 +45,10 @@ class AbstractFeatureGenerator:
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
         X_out, type_family_groups_special = self._update_feature_names(X_out, type_family_groups_special)
         self.features_out = list(X_out.columns)
+        type_map_real = get_type_map_real(X_out)
         type_map_raw = get_type_map_raw(X_out)
         self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+        self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.type_group_map_raw)
         self._is_fit = True
         return X_out
 
@@ -89,28 +93,13 @@ class AbstractFeatureGenerator:
             self._is_updated_name = True
         return X, type_family_groups
 
-    def _get_feature_metadata_full(self):
-        feature_metadata_full = copy.deepcopy(self.feature_metadata.type_group_map_special)
-
-        for key_raw in self.feature_metadata.type_group_map_raw:
-            values = self.feature_metadata.type_group_map_raw[key_raw]
-            for key_special in self.feature_metadata.type_group_map_special:
-                values = [value for value in values if value not in self.feature_metadata.type_group_map_special[key_special]]
-            if values:
-                feature_metadata_full[key_raw] += values
-
-        return feature_metadata_full
-
     def print_feature_metadata_info(self):
-        logger.log(20, 'Processed Features (special dtypes):')
-        for key, val in self.feature_metadata.type_group_map_special.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Processed Features (raw dtypes):')
-        for key, val in self.feature_metadata.type_group_map_raw.items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
-        logger.log(20, 'Processed Features:')
-        for key, val in self._get_feature_metadata_full().items():
-            if val: logger.log(20, '\t%s features: %s' % (key, len(val)))
+        logger.log(20, 'Original Features (raw dtype, special dtypes):')
+        self.feature_metadata_in.print_feature_metadata_full('\t')
+        logger.log(20, 'Processed Features (exact raw dtype, raw dtype):')
+        self.feature_metadata_real.print_feature_metadata_full('\t')
+        logger.log(20, 'Processed Features (raw dtype, special dtypes):')
+        self.feature_metadata.print_feature_metadata_full('\t')
 
     def save(self, path):
         save_pkl.save(path=path, object=self)
