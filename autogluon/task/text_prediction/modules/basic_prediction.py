@@ -186,9 +186,9 @@ class FeatureAggregator(HybridBlock):
             cfg = FeatureAggregator.get_cfg()
         self.cfg = FeatureAggregator.get_cfg().clone_merge(cfg)
         self.num_fields = num_fields
-        self.out_shape = out_shape
         if isinstance(out_shape, list):
             out_shape = tuple(out_shape)
+        self.out_shape = out_shape
         self.in_units = in_units
         weight_initializer = mx.init.create(*self.cfg.initializer.weight)
         bias_initializer = mx.init.create(*self.cfg.initializer.bias)
