@@ -375,6 +375,9 @@ class TextPrediction(BaseTask):
                     time_limits = int(float(time_limits[:-3]) * 60)
                 elif time_limits.endswith('hour'):
                     time_limits = int(float(time_limits[:-4]) * 60 * 60)
+                else:
+                    raise ValueError('The given time_limits="{}" cannot be parsed!'
+                                     .format(time_limits))
         if num_trials is None:
             num_trials = hyperparameters['hpo_params']['num_trials']
         if reduction_factor is None:
