@@ -522,3 +522,7 @@ def test_tabular_bagstack():
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
                            seed_val=seed_val, fit_args=fit_args, run_distill=True)
 
+
+if __name__ == "__main__":
+    test_tabular()
+

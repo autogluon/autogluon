@@ -14,6 +14,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
+from ...models.tab_transformer.TabTransformer_model import TabTransformerModel
 from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ DEFAULT_MODEL_PRIORITY = dict(
     GBM=70,
     CAT=60,
     NN=50,
+    Transf=50,
     LR=40,
     custom=0,
 )
@@ -48,6 +50,7 @@ MODEL_TYPES = dict(
     CAT=CatboostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
+    Transf=TabTransformerModel,
 )
 
 DEFAULT_MODEL_NAMES = {

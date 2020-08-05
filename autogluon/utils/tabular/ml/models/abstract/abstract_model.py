@@ -273,6 +273,7 @@ class AbstractModel:
 
     def predict(self, X, preprocess=True):
         y_pred_proba = self.predict_proba(X, preprocess=preprocess)
+
         y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
         return y_pred
 
