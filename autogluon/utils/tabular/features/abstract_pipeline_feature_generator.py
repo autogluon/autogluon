@@ -65,16 +65,15 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         features_to_remove += self._useless_features_in
         X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
 
-        X_features = super().fit_transform(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates, **kwargs)
-        X_features.index = X_index
+        X_out = super().fit_transform(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates, **kwargs)
+        X_out.index = X_index
 
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_features), len(self.features_out)))
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
         self.print_feature_metadata_info()
 
-        return X_features
+        return X_out
 
     # TODO: Save this to disk and remove from memory if large categoricals!
-    @calculate_time
     def _fit_transform(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False, **kwargs):
         X_len = len(X)
         self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
@@ -86,17 +85,17 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         if pre_memory_usage_percent > 0.05:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
-        X_features, type_group_map_special = self._fit_transform_custom(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
+        X_out, type_group_map_special = self._fit_transform_custom(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
 
-        if len(list(X_features.columns)) == 0:
+        if len(list(X_out.columns)) == 0:
             self._is_dummy = True
             logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
             dummy_generator = DummyFeatureGenerator()
-            X_features = dummy_generator.fit_transform(X=X_features)
+            X_out = dummy_generator.fit_transform(X=X_out)
             type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)  # TODO: Remove
             self.generators = [dummy_generator]
 
-        self.post_memory_usage = self._get_approximate_df_mem_usage(X_features, sample_ratio=0.2).sum()
+        self.post_memory_usage = self._get_approximate_df_mem_usage(X_out, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
 
         available_mem = psutil.virtual_memory().available
@@ -105,11 +104,11 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         if post_memory_usage_percent > 0.15:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
-        return X_features, type_group_map_special
+        return X_out, type_group_map_special
 
     def _fit_transform_custom(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False) -> (DataFrame, dict):
         # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
-        X_features = self._generate_features(X)
+        X_out = self._generate_features(X)
 
         if self.generators:
             feature_metadata_in_generators = FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators], allow_shared_raw_features=True)
@@ -130,57 +129,45 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         if self.feature_metadata_in.type_group_map_special['text']:
             self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self.feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
 
-        features_to_remove_post = self._get_features_to_remove_post(X_features, self.feature_metadata)
-        X_features.drop(features_to_remove_post, axis=1, inplace=True)
+        features_to_remove_post = self._get_features_to_remove_post(X_out, self.feature_metadata)
+        X_out.drop(features_to_remove_post, axis=1, inplace=True)
         self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
         feature_names = self.feature_metadata.get_features()
 
         features_binned = self.feature_metadata.type_group_map_special['text_special']
-        self._features_binned_map = binning.generate_bins(X_features, features_binned)
+        self._features_binned_map = binning.generate_bins(X_out, features_binned)
         for column in features_binned:
-            X_features[column] = binning.bin_column(series=X_features[column], mapping=self._features_binned_map[column])
+            X_out[column] = binning.bin_column(series=X_out[column], mapping=self._features_binned_map[column])
         self.feature_metadata.type_group_map_special['binned'] = copy.deepcopy(features_binned)  # TODO: Avoid doing this, instead have it occur in _generate_features naturally
 
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
-            X_features = self._fix_categoricals_for_sklearn(X_features=X_features)
+            X_out = self._fix_categoricals_for_sklearn(X=X_out)
 
         if drop_duplicates:
-            X_features = self._drop_duplicate_features(X_features)
+            X_out = self._drop_duplicate_features(X_out)
 
-        feature_names_post = list(X_features.columns)
+        feature_names_post = list(X_out.columns)
         if set(feature_names) != set(feature_names_post):
             features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
             self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
         for column in self.feature_metadata.type_group_map_raw['category']:
-            self._features_category_code_map[column] = copy.deepcopy(X_features[column].cat.categories)
+            self._features_category_code_map[column] = copy.deepcopy(X_out[column].cat.categories)
 
-        X_features = self._minimize_memory_usage(X_features=X_features)
+        X_out = self._minimize_memory_usage(X=X_out)
 
-        return X_features, self.feature_metadata.type_group_map_special
+        return X_out, self.feature_metadata.type_group_map_special
 
     def transform(self, X: DataFrame) -> DataFrame:
-        if not self._is_fit:
-            raise AssertionError('FeatureGenerator has not yet been fit.')
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)
-        X_features = self._transform(X=X)
-        X_features.index = X_index
-
-        return X_features
+        X.columns = X.columns.astype(str)  # Ensure all column names are strings
+        X_out = super().transform(X=X)
+        X_out.index = X_index
+        return X_out
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        X.columns = X.columns.astype(str)  # Ensure all column names are strings
-        try:
-            X = X[self.features_in]
-        except KeyError:
-            missing_cols = []
-            for col in self.features_in:
-                if col not in X.columns:
-                    missing_cols.append(col)
-            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
-
         int_features = self.feature_metadata_in.type_group_map_raw['int']
         if int_features:
             null_count = X[int_features].isnull().sum()
@@ -197,17 +184,17 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             # TODO: Confirm this works with sparse and other feature types!
             X = X.astype(self._feature_metadata_in_real.type_map_raw)
 
-        X_features = self._generate_features(X)
+        X_out = self._generate_features(X)
         for column in self.feature_metadata.type_group_map_special['binned']:
-            X_features[column] = binning.bin_column(series=X_features[column], mapping=self._features_binned_map[column])
+            X_out[column] = binning.bin_column(series=X_out[column], mapping=self._features_binned_map[column])
 
-        X_features = X_features[self.features_out]
+        X_out = X_out[self.features_out]
         for column in self.feature_metadata.type_group_map_raw['category']:
-            X_features[column].cat.set_categories(self._features_category_code_map[column], inplace=True)
+            X_out[column].cat.set_categories(self._features_category_code_map[column], inplace=True)
 
-        X_features = self._minimize_memory_usage(X_features=X_features)
+        X_out = self._minimize_memory_usage(X=X_out)
 
-        return X_features
+        return X_out
 
     # TODO: Add _fit_transform_generators, _transform_generators instead of this
     def _generate_features(self, X: DataFrame) -> DataFrame:
@@ -226,13 +213,13 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
 
         if not feature_df_list:
-            X_features = DataFrame(index=X.index)
+            X_out = DataFrame(index=X.index)
         elif len(feature_df_list) == 1:
-            X_features = feature_df_list[0]
+            X_out = feature_df_list[0]
         else:
-            X_features = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
+            X_out = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
 
-        return X_features
+        return X_out
 
     def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
@@ -244,48 +231,48 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
         self.features_in = self.feature_metadata_in.get_features()
 
-    def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
+    def _minimize_memory_usage(self, X: DataFrame) -> DataFrame:
         if self._minimize_categorical_memory_usage_flag:
-            self._minimize_categorical_memory_usage(X_features=X_features)
-        X_features = self._minimize_ngram_memory_usage(X_features=X_features)
-        X_features = self._minimize_binned_memory_usage(X_features=X_features)
-        return X_features
+            self._minimize_categorical_memory_usage(X=X)
+        X = self._minimize_ngram_memory_usage(X=X)
+        X = self._minimize_binned_memory_usage(X=X)
+        return X
 
-    def _minimize_ngram_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.feature_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
+    def _minimize_ngram_memory_usage(self, X: DataFrame) -> DataFrame:
+        return clip_and_astype(df=X, columns=self.feature_metadata.type_group_map_special['text_ngram'], clip_min=0, clip_max=255, dtype='uint8')
 
-    def _minimize_binned_memory_usage(self, X_features: DataFrame) -> DataFrame:
-        return clip_and_astype(df=X_features, columns=self.feature_metadata.type_group_map_special['binned'], clip_min=0, clip_max=255, dtype='uint8')
+    def _minimize_binned_memory_usage(self, X: DataFrame) -> DataFrame:
+        return clip_and_astype(df=X, columns=self.feature_metadata.type_group_map_special['binned'], clip_min=0, clip_max=255, dtype='uint8')
 
     # TODO: Compress further, uint16, etc.
     # Performs in-place updates
-    def _minimize_categorical_memory_usage(self, X_features: DataFrame):
+    def _minimize_categorical_memory_usage(self, X: DataFrame):
         for column in self.feature_metadata.type_group_map_raw['category']:
-            new_categories = list(range(len(X_features[column].cat.categories.values)))
-            X_features[column].cat.rename_categories(new_categories, inplace=True)
+            new_categories = list(range(len(X[column].cat.categories.values)))
+            X[column].cat.rename_categories(new_categories, inplace=True)
 
-    def _fix_categoricals_for_sklearn(self, X_features: DataFrame) -> DataFrame:
+    def _fix_categoricals_for_sklearn(self, X: DataFrame) -> DataFrame:
         features_to_remove = []
         for column in self.feature_metadata.type_group_map_raw['category']:
-            rank = X_features[column].value_counts().sort_values(ascending=True)
+            rank = X[column].value_counts().sort_values(ascending=True)
             rank = rank[rank >= 3]
             rank = rank.reset_index()
             val_list = list(rank['index'].values)
             if len(val_list) <= 1:
                 features_to_remove.append(column)
             else:
-                X_features[column] = X_features[column].astype(CategoricalDtype(categories=val_list))
+                X[column] = X[column].astype(CategoricalDtype(categories=val_list))
         if features_to_remove:
-            X_features.drop(features_to_remove, axis=1, inplace=True)
-        return X_features
+            X.drop(features_to_remove, axis=1, inplace=True)
+        return X
 
-    def _get_features_to_remove_post(self, X_features: DataFrame, feature_metadata: FeatureMetadata) -> list:
+    def _get_features_to_remove_post(self, X: DataFrame, feature_metadata: FeatureMetadata) -> list:
         features_to_remove_post = []
-        X_len = len(X_features)
+        X_len = len(X)
         # TODO: Consider making 0.99 a parameter to FeatureGenerator
         max_unique_value_count = X_len * 0.99
-        for column in X_features:
-            unique_value_count = len(X_features[column].unique())
+        for column in X:
+            unique_value_count = len(X[column].unique())
             if unique_value_count == 1:
                 features_to_remove_post.append(column)
             elif column in feature_metadata.type_group_map_raw['category'] and (unique_value_count > max_unique_value_count):

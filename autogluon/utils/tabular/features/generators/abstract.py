@@ -46,7 +46,15 @@ class AbstractFeatureGenerator:
     def transform(self, X: DataFrame) -> DataFrame:
         if not self._is_fit:
             raise AssertionError('FeatureGenerator is not fit.')
-        X_out = self._transform(X[self.features_in])
+        try:
+            X = X[self.features_in]
+        except KeyError:
+            missing_cols = []
+            for col in self.features_in:
+                if col not in X.columns:
+                    missing_cols.append(col)
+            raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
+        X_out = self._transform(X)
         if self._is_updated_name:
             X_out.columns = self.features_out
         return X_out
