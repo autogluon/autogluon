@@ -32,16 +32,7 @@ class AbstractFeatureGenerator:
     def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         if self._is_fit:
             raise AssertionError('FeatureGenerator is already fit.')
-        if self.feature_metadata_in is None:
-            self.feature_metadata_in = feature_metadata_in
-        elif feature_metadata_in is not None:
-            logger.warning('Warning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
-        if self.feature_metadata_in is None:
-            logger.log(20, f'feature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
-            self.feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
-        if self.features_in is None:
-            self.features_in = self._infer_features_in(X, y=y)
-        self.feature_metadata_in = self.feature_metadata_in.keep_features(features=self.features_in)
+        self._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
         X_out, type_family_groups_special = self._update_feature_names(X_out, type_family_groups_special)
         self.features_out = list(X_out.columns)
@@ -66,6 +57,18 @@ class AbstractFeatureGenerator:
 
     def _transform(self, X: DataFrame) -> DataFrame:
         raise NotImplementedError
+
+    def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
+        if self.feature_metadata_in is None:
+            self.feature_metadata_in = feature_metadata_in
+        elif feature_metadata_in is not None:
+            logger.warning('Warning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
+        if self.feature_metadata_in is None:
+            logger.log(20, f'feature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
+            self.feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
+        if self.features_in is None:
+            self.features_in = self._infer_features_in(X, y=y)
+        self.feature_metadata_in = self.feature_metadata_in.keep_features(features=self.features_in)
 
     # TODO: Find way to increase flexibility here, possibly through init args
     def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:

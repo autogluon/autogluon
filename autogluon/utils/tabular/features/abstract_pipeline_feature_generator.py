@@ -6,14 +6,14 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
 from . import binning
 from .feature_metadata import FeatureMetadata
 from .generators.abstract import AbstractFeatureGenerator
 from .generators.dummy import DummyFeatureGenerator
-from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
+from .types import get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature, clip_and_astype
 from ..utils.decorators import calculate_time
 
@@ -28,6 +28,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         self.generators = generators
 
+        self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
@@ -35,6 +36,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self._features_category_code_map = defaultdict()  # Categorical features original value -> category code mapping
         self._features_binned_map = defaultdict()  # Binned features original value ranges -> binned category code mapping
         self._minimize_categorical_memory_usage_flag = True
+
+        self._useless_features_in: list = None
 
         self.pre_memory_usage = None
         self.pre_memory_usage_per_row = None
@@ -58,7 +61,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             features_to_remove = [str(feature) for feature in banned_features]
         else:
             features_to_remove = []
-        features_to_remove += [feature for feature in self._get_useless_features(X) if feature not in features_to_remove]
+        self._useless_features_in = [feature for feature in self._get_useless_features(X) if feature not in features_to_remove]
+        features_to_remove += self._useless_features_in
         X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
 
         X_features = super().fit_transform(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates, **kwargs)
@@ -70,7 +74,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         return X_features
 
     # TODO: Save this to disk and remove from memory if large categoricals!
-    # TODO: Rename this, use abstract's fit_transform and transform!
     @calculate_time
     def _fit_transform(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False, **kwargs):
         X_len = len(X)
@@ -105,14 +108,21 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         return X_features, type_group_map_special
 
     def _fit_transform_custom(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False) -> (DataFrame, dict):
-        type_map_real = get_type_map_real(X)
         # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
-        self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.type_group_map_raw)
-
         X_features = self._generate_features(X)
 
         if self.generators:
-            self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators])
+            feature_metadata_in_generators = FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators], allow_shared_raw_features=True)
+        else:
+            feature_metadata_in_generators = FeatureMetadata(type_map_raw=dict())
+
+        used_features_in = feature_metadata_in_generators.get_features()
+        unused_features_in = [feature for feature in self.feature_metadata_in.get_features() if feature not in used_features_in]
+        self._feature_metadata_in_unused = self.feature_metadata_in.keep_features(features=unused_features_in)
+        self._remove_features_in(features=unused_features_in)
+
+        if self.generators:
+            self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators], allow_shared_raw_features=False)
         else:
             self.feature_metadata = FeatureMetadata(type_map_raw=dict())
 
@@ -183,7 +193,9 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
                 logger.warning(f'WARNING: Int features contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
                 logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
                 X[with_null_features] = X[with_null_features].fillna(0)
-        X = X.astype(self._feature_metadata_in_real.type_map_raw)
+        if self._feature_metadata_in_real.type_map_raw:
+            # TODO: Confirm this works with sparse and other feature types!
+            X = X.astype(self._feature_metadata_in_real.type_map_raw)
 
         X_features = self._generate_features(X)
         for column in self.feature_metadata.type_group_map_special['binned']:
@@ -222,8 +234,15 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         return X_features
 
-    def _remove_features(self, features):
-        self.feature_metadata.remove_features(features=features, inplace=True)
+    def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
+        super()._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
+        type_map_real = get_type_map_real(X)
+        self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.type_group_map_raw)
+
+    def _remove_features_in(self, features):
+        self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
+        self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
+        self.features_in = self.feature_metadata_in.get_features()
 
     def _minimize_memory_usage(self, X_features: DataFrame) -> DataFrame:
         if self._minimize_categorical_memory_usage_flag:
@@ -316,6 +335,15 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
 
     def print_feature_metadata_info(self):
+        if self._useless_features_in:
+            logger.log(20, f'Useless Original Features (Count: {len(self._useless_features_in)}): {list(self._useless_features_in)}')
+            logger.log(20, f'\tThese features carry no predictive signal and should be manually investigated.')  # TODO: What about features with 1 unique value but also np.nan?
+            logger.log(20, f'\tThese features do not need to be present at inference time for this FeatureGenerator.')
+        if self._feature_metadata_in_unused.get_features():
+            logger.log(20, f'Unused Original Features (Count: {len(self._feature_metadata_in_unused.get_features())}): {self._feature_metadata_in_unused.get_features()}')
+            logger.log(20, f'\tThese features were not valid input to any of the feature generators. Add a feature generator compatible with these features to utilize them.')
+            logger.log(20, f'\tThese features do not need to be present at inference time for this FeatureGenerator.')
+            self._feature_metadata_in_unused.print_feature_metadata_full('\t')
         logger.log(20, 'Original Features (exact raw dtype, raw dtype):')
         self._feature_metadata_in_real.print_feature_metadata_full('\t')
         super().print_feature_metadata_info()

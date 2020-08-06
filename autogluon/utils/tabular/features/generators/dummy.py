@@ -3,15 +3,18 @@ import logging
 from pandas import DataFrame
 
 from .identity import IdentityFeatureGenerator
+from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
 
 class DummyFeatureGenerator(IdentityFeatureGenerator):
-    def __init__(self, features_in='empty', **kwargs):
+    def __init__(self, features_in='empty', feature_metadata_in='empty', **kwargs):
         if features_in == 'empty':
             features_in = []
-        super().__init__(features_in=features_in, **kwargs)
+        if feature_metadata_in == 'empty':
+            feature_metadata_in = FeatureMetadata(type_map_raw={})
+        super().__init__(features_in=features_in, feature_metadata_in=feature_metadata_in, **kwargs)
 
     def _transform(self, X):
         return self._generate_features_dummy(X)

@@ -153,6 +153,8 @@ class FeatureMetadata:
 
     def print_feature_metadata_full(self, log_prefix=''):
         feature_metadata_full = self._get_feature_metadata_full()
+        if not feature_metadata_full:
+            return
         keys = list(feature_metadata_full.keys())
         keys = sorted(keys)
         output = [((key[0], list(key[1])), feature_metadata_full[key]) for key in keys]
