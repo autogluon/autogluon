@@ -75,7 +75,7 @@ class DefaultLearner(AbstractLearner):
 
         trainer = self.trainer_type(
             path=self.model_context,
-            problem_type=self.trainer_problem_type,
+            problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
@@ -134,27 +134,22 @@ class DefaultLearner(AbstractLearner):
             X = augment_rare_classes(X, self.label, self.threshold)
 
         # Gets labels prior to removal of infrequent classes
-        y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
+        y_uncleaned = X[self.label].copy()
 
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
-        if (self.label_cleaner.num_classes is not None) and (self.label_cleaner.num_classes == 2):
-            self.trainer_problem_type = BINARY
-        else:
-            self.trainer_problem_type = self.problem_type
+        X, y = self.extract_label(X)
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
+        y = self.label_cleaner.transform(y)
 
         if self.label_cleaner.num_classes is not None:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
-        X, y = self.extract_label(X)
-        y = self.label_cleaner.transform(y)
-
         if X_val is not None and self.label in X_val.columns:
             X_val = self.cleaner.transform(X_val)
             if len(X_val) == 0:
-                logger.debug('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
+                logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
                 X_val = None
                 y_val = None
             else:

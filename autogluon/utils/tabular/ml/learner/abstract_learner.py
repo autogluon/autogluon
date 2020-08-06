@@ -44,7 +44,6 @@ class AbstractLearner:
         self.submission_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self.trainer_problem_type = None
         self.eval_metric = eval_metric
         self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
@@ -133,7 +132,7 @@ class AbstractLearner:
 
         if len(X_cache_miss) > 0:
             y_pred_proba = self.predict_proba(X=X_cache_miss, model=model, inverse_transform=False)
-            problem_type = self.trainer_problem_type or self.problem_type
+            problem_type = self.label_cleaner.problem_type_transform or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_cache_miss.index
