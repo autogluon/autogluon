@@ -30,22 +30,29 @@ class AbstractFeatureGenerator:
         self.fit_transform(X, **kwargs)
 
     def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
+        logger.log(15, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
-            raise AssertionError('FeatureGenerator is already fit.')
+            raise AssertionError(f'{self.__class__.__name__} is already fit.')
         self._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
-        X_out, type_family_groups_special = self._update_feature_names(X_out, type_family_groups_special)
-        self.features_out = list(X_out.columns)
         type_map_real = get_type_map_real(X_out)
         type_map_raw = get_type_map_raw(X_out)
+        self.features_out = list(X_out.columns)
         self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.type_group_map_raw)
+        self._post_fit_cleanup()
+        self._features_out_internal = self.features_out.copy()
+        column_rename_map, self._is_updated_name = self._get_renamed_features(X_out)
+        if self._is_updated_name:
+            X_out.columns = [column_rename_map.get(col, col) for col in X_out.columns]
+            self._rename_features_out(column_rename_map=column_rename_map)
         self._is_fit = True
+        logger.log(15, f'Fitted {self.__class__.__name__}.')
         return X_out
 
     def transform(self, X: DataFrame) -> DataFrame:
         if not self._is_fit:
-            raise AssertionError('FeatureGenerator is not fit.')
+            raise AssertionError(f'{self.__class__.__name__} is not fit.')
         try:
             X = X[self.features_in]
         except KeyError:
@@ -80,7 +87,9 @@ class AbstractFeatureGenerator:
 
     # TODO: Find way to increase flexibility here, possibly through init args
     def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
-        return list(X.columns)
+        feature_metadata_in_features = self.feature_metadata_in.get_features()
+        features_in = [feature for feature in X.columns if feature in feature_metadata_in_features]
+        return features_in
 
     @staticmethod
     def _infer_feature_metadata_in(X: DataFrame, y: Series = None) -> FeatureMetadata:
@@ -88,21 +97,31 @@ class AbstractFeatureGenerator:
         type_group_map_special = get_type_group_map_special(X)
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
-    def _update_feature_names(self, X: DataFrame, type_family_groups: dict) -> (DataFrame, dict):
+    def _rename_features_out(self, column_rename_map: dict):
+        self.feature_metadata = self.feature_metadata.rename_features(column_rename_map)
+        self.feature_metadata_real = self.feature_metadata_real.rename_features(column_rename_map)
+        self.features_out = [column_rename_map.get(col, col) for col in self.features_out]
+
+    def _get_renamed_features(self, X: DataFrame) -> (DataFrame, dict):
         X_columns_orig = list(X.columns)
+        X_columns_new = list(X.columns)
         if self.name_prefix:
-            X.columns = [self.name_prefix + column for column in X.columns]
-            if type_family_groups:
-                for type in type_family_groups:
-                    type_family_groups[type] = [self.name_prefix + feature for feature in type_family_groups[type]]
+            X_columns_new = [self.name_prefix + column for column in X_columns_new]
         if self.name_suffix:
-            X.columns = [column + self.name_suffix for column in X.columns]
-            if type_family_groups:
-                for type in type_family_groups:
-                    type_family_groups[type] = [feature + self.name_suffix for feature in type_family_groups[type]]
-        if X_columns_orig != list(X.columns):
-            self._is_updated_name = True
-        return X, type_family_groups
+            X_columns_new = [column + self.name_suffix for column in X_columns_new]
+        if X_columns_orig != X_columns_new:
+            is_updated_name = True
+        else:
+            is_updated_name = False
+        column_rename_map = {orig: new for orig, new in zip(X_columns_orig, X_columns_new)}
+        return column_rename_map, is_updated_name
+
+    def _post_fit_cleanup(self):
+        """
+        Any cleanup operations after all metadata objects have been constructed, but prior to feature renaming, should be done here
+        This includes removing keys from internal lists and dictionaries of features which have been removed, and deletion of any temp variables.
+        """
+        pass
 
     def print_feature_metadata_info(self):
         logger.log(20, 'Original Features (raw dtype, special dtypes):')

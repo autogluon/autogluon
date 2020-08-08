@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
     def __init__(self, generators=None, enable_text_ngram_features=True, enable_text_special_features=True,
                  enable_categorical_features=True, enable_raw_features=True, enable_datetime_features=True,
-                 vectorizer=None):
+                 vectorizer=None, **kwargs):
         self.enable_nlp_features = enable_text_ngram_features
         self.enable_text_special_features = enable_text_special_features
         self.enable_categorical_features = enable_categorical_features
@@ -23,7 +23,7 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
             generators = self._get_default_generators(vectorizer=vectorizer)
         # TODO: no nlp preset must be addressed here! Currently doesn't work anymore!
         # TODO: Add generators_extra, generators_banned args.
-        super().__init__(generators=generators)
+        super().__init__(generators=generators, **kwargs)
 
     def _get_default_generators(self, vectorizer=None):
         generators = [

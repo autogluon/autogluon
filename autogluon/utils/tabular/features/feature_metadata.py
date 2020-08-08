@@ -2,6 +2,8 @@ import copy
 import logging
 from collections import defaultdict
 
+from .types import get_type_map_raw, get_type_group_map_special
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,8 +100,22 @@ class FeatureMetadata:
             if feature in d:
                 d.pop(feature)
 
+    def rename_features(self, rename_map: dict, inplace=False):
+        if inplace:
+            metadata = self
+        else:
+            metadata = copy.deepcopy(self)
+        metadata.type_map_raw = {rename_map.get(key, key): val for key, val in metadata.type_map_raw.items()}
+        metadata.type_group_map_raw = metadata.get_type_group_map_raw_from_flattened(type_map_raw=metadata.type_map_raw)
+        for type in metadata.type_group_map_special:
+            metadata.type_group_map_special[type] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[type]]
+        return metadata
+
     # Joins two metadata objects together, returning a new metadata object
-    def join_metadata(self, metadata, allow_shared_raw_features=False):
+    # TODO: Add documentation on shared_raw_features usage
+    def join_metadata(self, metadata, shared_raw_features='error'):
+        if shared_raw_features not in ['error', 'error_if_diff', 'overwrite']:
+            raise ValueError(f"shared_raw_features must be one of {['error', 'error_if_diff', 'overwrite']}, but was: '{shared_raw_features}'")
         type_map_raw = copy.deepcopy(self.type_map_raw)
         shared_features = []
         shared_features_diff_types = []
@@ -108,21 +124,34 @@ class FeatureMetadata:
                 shared_features.append(key)
                 if type_map_raw[key] != metadata.type_map_raw[key]:
                     shared_features_diff_types.append(key)
-        if not allow_shared_raw_features and shared_features:
-            raise AssertionError(f'Metadata objects to join share a raw feature, but `allow_shared_raw_features=False`. Shared features: {shared_features}')
-        if shared_features_diff_types:
-            raise AssertionError(f'Metadata objects to join share raw features but do not agree on raw dtypes. Shared conflicting features: {shared_features_diff_types}')
+        if shared_features:
+            if shared_raw_features == 'error':
+                raise AssertionError(f"Metadata objects to join share raw features, but `shared_raw_features='error'`. Shared features: {shared_features}")
+            if shared_features_diff_types:
+                if shared_raw_features == 'overwrite':
+                    logger.log(20, f'Overwriting type_map_raw during FeatureMetadata join. Shared features with conflicting types: {shared_features_diff_types}')
+                    shared_features = []
+                elif shared_raw_features == 'error_if_diff':
+                    raise AssertionError(f"Metadata objects to join share raw features but do not agree on raw dtypes, and `shared_raw_features='error_if_diff'`. Shared conflicting features: {shared_features_diff_types}")
         type_map_raw.update({key: val for key, val in metadata.type_map_raw.items() if key not in shared_features})
 
-        type_group_map_special = copy.deepcopy(self.type_group_map_special)
-        for key, features in metadata.type_group_map_special.items():
-            if key in type_group_map_special:
-                features_to_add = [feature for feature in features if feature not in type_group_map_special[key]]
-                type_group_map_special[key] += features_to_add
-            else:
-                type_group_map_special[key] = features
+        type_group_map_special = self.add_type_group_map_special([self.type_group_map_special, metadata.type_group_map_special])
 
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    @staticmethod
+    def add_type_group_map_special(type_group_map_special_lst: list):
+        if not type_group_map_special_lst:
+            return defaultdict(list)
+        type_group_map_special_combined = copy.deepcopy(type_group_map_special_lst[0])
+        for type_group_map_special in type_group_map_special_lst[1:]:
+            for key, features in type_group_map_special.items():
+                if key in type_group_map_special_combined:
+                    features_to_add = [feature for feature in features if feature not in type_group_map_special_combined[key]]
+                    type_group_map_special_combined[key] += features_to_add
+                else:
+                    type_group_map_special_combined[key] = features
+        return type_group_map_special_combined
 
     @staticmethod
     def _get_feature_types(feature: str, feature_types_dict: dict) -> list:
@@ -135,10 +164,10 @@ class FeatureMetadata:
 
     # Joins a list of metadata objects together, returning a new metadata object
     @staticmethod
-    def join_metadatas(metadata_list, allow_shared_raw_features=False):
+    def join_metadatas(metadata_list, shared_raw_features='error'):
         metadata_new = copy.deepcopy(metadata_list[0])
         for metadata in metadata_list[1:]:
-            metadata_new = metadata_new.join_metadata(metadata, allow_shared_raw_features=allow_shared_raw_features)
+            metadata_new = metadata_new.join_metadata(metadata, shared_raw_features=shared_raw_features)
         return metadata_new
 
     def _get_feature_metadata_full(self):
@@ -170,3 +199,9 @@ class FeatureMetadata:
                 features = features[:-1] + ', ...]'
             if val:
                 logger.log(20, f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}')
+
+    @classmethod
+    def from_df(cls, df):
+        type_map_raw = get_type_map_raw(df)
+        type_group_map_special = get_type_group_map_special(df)
+        return cls(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
