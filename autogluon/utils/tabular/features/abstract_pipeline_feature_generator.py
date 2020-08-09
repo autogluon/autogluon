@@ -131,10 +131,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         else:
             self.feature_metadata = FeatureMetadata(type_map_raw=dict())
 
-        # TODO: Remove the need for this
-        if self.feature_metadata_in.type_group_map_special['text']:
-            self.feature_metadata.type_group_map_special['text_as_category'] += [feature for feature in self.feature_metadata_in.type_group_map_special['text'] if feature in self.feature_metadata.type_group_map_raw['category']]
-
         features_to_remove_post = self._get_features_to_remove_post(X_out, self.feature_metadata)
         X_out.drop(features_to_remove_post, axis=1, inplace=True)
         self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)

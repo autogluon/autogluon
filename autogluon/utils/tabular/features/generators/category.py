@@ -30,7 +30,11 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
 
         else:
             X_out = self._transform(X)
-        return X_out, self.feature_metadata_in.type_group_map_special
+        feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
+        if 'text' in feature_metadata_out_type_group_map_special:
+            text_features = feature_metadata_out_type_group_map_special.pop('text')
+            feature_metadata_out_type_group_map_special['text_as_category'] += [feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special['text_as_category']]
+        return X_out, feature_metadata_out_type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_category(X)
