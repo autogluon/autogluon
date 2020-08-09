@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add documentation
 # TODO: Add unit tests
 class AbstractFeatureGenerator:
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, name_prefix: str = None, name_suffix: str = None):
+    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None):
         # TODO: Add post_generators
         self._is_fit = False  # Whether the feature generator has been fit
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
@@ -21,8 +21,15 @@ class AbstractFeatureGenerator:
         self.feature_metadata_real: FeatureMetadata = None  # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.). Pass to models to enable advanced functionality.
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
+        self._features_out_internal = None  # Final list of features after transformation, before the feature renaming from self._get_renamed_features() is applied
         self.name_prefix = name_prefix  # Prefix added to all output feature names
         self.name_suffix = name_suffix  # Suffix added to all output feature names
+
+        if post_generators is None:
+            post_generators = []
+        elif not isinstance(post_generators, list):
+            post_generators = [post_generators]
+        self.post_generators: list = post_generators  # TODO: Description
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
@@ -35,11 +42,17 @@ class AbstractFeatureGenerator:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
         self._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
-        type_map_real = get_type_map_real(X_out)
+
         type_map_raw = get_type_map_raw(X_out)
+        if self.post_generators:
+            feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+            X_out, self.feature_metadata, self.post_generators = self._fit_post_generators(X=X_out, y=y, feature_metadata=feature_metadata, post_generators=self.post_generators, **kwargs)
+        else:
+            self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+        type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
-        self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.type_group_map_raw)
+
         self._post_fit_cleanup()
         self._features_out_internal = self.features_out.copy()
         column_rename_map, self._is_updated_name = self._get_renamed_features(X_out)
@@ -62,6 +75,8 @@ class AbstractFeatureGenerator:
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
         X_out = self._transform(X)
+        if self.post_generators:
+            X_out = self._transform_post_generators(X=X_out, post_generators=self.post_generators)
         if self._is_updated_name:
             X_out.columns = self.features_out
         return X_out
@@ -96,6 +111,19 @@ class AbstractFeatureGenerator:
         type_map_raw = get_type_map_raw(X)
         type_group_map_special = get_type_group_map_special(X)
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    @staticmethod
+    def _fit_post_generators(X, y, feature_metadata, post_generators: list, **kwargs):
+        for post_generator in post_generators:
+            X = post_generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
+            feature_metadata = post_generator.feature_metadata
+        return X, feature_metadata, post_generators
+
+    @staticmethod
+    def _transform_post_generators(X, post_generators: list):
+        for post_generator in post_generators:
+            X = post_generator.transform(X=X)
+        return X
 
     def _rename_features_out(self, column_rename_map: dict):
         self.feature_metadata = self.feature_metadata.rename_features(column_rename_map)

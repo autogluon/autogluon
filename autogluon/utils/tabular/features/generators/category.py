@@ -15,19 +15,14 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
         self.minimize_memory = minimize_memory
-        self._minimize_memory_generator = None
         self._category_map = None
+
+        if self.minimize_memory:
+            self.post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self.post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         if self._stateful_categories:
             X_out, self._category_map = self._generate_category_map(X=X)
-            if self.minimize_memory:
-                # TODO: Technically incorrect feature_metadata_in raw dtypes
-                # TODO: postfit generator!
-                self._minimize_memory_generator = CategoryMemoryMinimizeFeatureGenerator(features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, inplace=True)
-                # TODO: Add to type_special if new special
-                X_out = self._minimize_memory_generator.fit_transform(X=X_out)
-
         else:
             X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
@@ -54,8 +49,6 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
                 X_category = copy.deepcopy(X_category)  # TODO: Add inplace version / parameter
                 for column in self._category_map:
                     X_category[column].cat.set_categories(self._category_map[column], inplace=True)
-                if self._minimize_memory_generator is not None:
-                    X_category = self._minimize_memory_generator.transform(X_category)
         else:
             X_category = DataFrame(index=X.index)
         return X_category
