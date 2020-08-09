@@ -141,9 +141,7 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         feature_names = self.feature_metadata.get_features()
 
-        features_binned = self.feature_metadata.type_group_map_special['text_special']
-
-        self._bin_generator = BinnedFeatureGenerator(features_in=features_binned)
+        self._bin_generator = BinnedFeatureGenerator(features_in=self.feature_metadata.type_group_map_special['text_special'])
         X_out[self._bin_generator.features_in] = self._bin_generator.fit_transform(X=X_out[self._bin_generator.features_in], feature_metadata_in=self.feature_metadata)
         self.feature_metadata = self.feature_metadata.join_metadata(metadata=self._bin_generator.feature_metadata, shared_raw_features='overwrite')
 

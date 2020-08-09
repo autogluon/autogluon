@@ -1,6 +1,6 @@
-import copy
 import logging
 
+import numpy as np
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
@@ -47,6 +47,10 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
 
 # TODO: What about nulls / unknowns?
 class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
+    def __init__(self, dtype_out=np.uint8, **kwargs):
+        super().__init__(**kwargs)
+        self.dtype_out, self._clip_min, self._clip_max = self._get_dtype_clip_args(dtype_out)
+
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         return X_out, self.feature_metadata_in.type_group_map_special
@@ -54,9 +58,17 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X):
         return self._minimize_numeric_memory_usage(X)
 
+    @staticmethod
+    def _get_dtype_clip_args(dtype) -> (np.dtype, int, int):
+        try:
+            dtype_info = np.iinfo(dtype)
+        except ValueError:
+            dtype_info = np.finfo(dtype)
+        return dtype_info.dtype, dtype_info.min, dtype_info.max
+
     def _infer_features_in(self, X, y=None) -> list:
         numeric_features = [feature for feature in self.feature_metadata_in.get_features() if self.feature_metadata_in.get_feature_type_raw(feature) in ['int']]  # TODO: floats?
         return numeric_features
 
     def _minimize_numeric_memory_usage(self, X: DataFrame):
-        return clip_and_astype(df=X, clip_min=0, clip_max=255, dtype='uint8')
+        return clip_and_astype(df=X, clip_min=self._clip_min, clip_max=self._clip_max, dtype=self.dtype_out)
