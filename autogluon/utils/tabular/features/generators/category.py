@@ -2,6 +2,7 @@ import copy
 import logging
 
 from pandas import DataFrame, Series
+from pandas.api.types import CategoricalDtype
 
 from .identity import IdentityFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
@@ -9,11 +10,17 @@ from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add stateful version
+# TODO: Retroactively prune mappings if feature was removed downstream
+# TODO: Have a concept of a 1:1 mapping, so you can safely remove features from features_in and features_out
+#  Have a method remove_features() where each generator implements custom logic, default is just to only remove from features_out, but Category could remove from features_in + inner generators + category_map.
 class CategoryFeatureGenerator(IdentityFeatureGenerator):
-    def __init__(self, stateful_categories=True, minimize_memory=True, **kwargs):
+    def __init__(self, stateful_categories=True, minimize_memory=True, minimum_cat_count: int = None, maximum_num_cat: int = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
+        if minimum_cat_count is not None and minimum_cat_count <= 1:
+            minimum_cat_count = None
+        self._minimum_cat_count = minimum_cat_count
+        self._maximum_num_cat = maximum_num_cat
         self._category_map = None
 
         if minimize_memory:
@@ -57,6 +64,17 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
             category_map = dict()
             X_category = X.astype('category')
             for column in X_category:
+                if self._minimum_cat_count is not None or self._maximum_num_cat is not None:
+                    rank = X_category[column].value_counts().sort_values(ascending=True)
+                    if self._minimum_cat_count is not None:
+                        rank = rank[rank >= self._minimum_cat_count]
+                    if self._maximum_num_cat is not None:
+                        rank = rank[-self._maximum_num_cat:]
+                    rank = rank.reset_index()
+
+                    val_list = list(rank['index'].values)
+                    X_category[column] = X_category[column].astype(CategoricalDtype(categories=val_list))  # TODO: Remove columns if all NaN after this?
+                    # TODO: Check if this reorders column codes to most-frequent -> least-frequent instead of alphanumeric
                 category_map[column] = copy.deepcopy(X_category[column].cat.categories)
             return X_category, category_map
         else:

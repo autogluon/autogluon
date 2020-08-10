@@ -7,10 +7,8 @@ import numpy as np
 import pandas as pd
 import psutil
 from pandas import DataFrame, Series
-from pandas.api.types import CategoricalDtype
 
 from .feature_metadata import FeatureMetadata
-from .generators.abstract import AbstractFeatureGenerator
 from .generators.dummy import DummyFeatureGenerator
 from .generators.bulk import BulkFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
@@ -46,7 +44,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         return X
 
     @calculate_time
-    def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, banned_features=None, fix_categoricals=False, drop_duplicates=False, **kwargs) -> DataFrame:
+    def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, banned_features=None, drop_duplicates=False, **kwargs) -> DataFrame:
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
@@ -64,7 +62,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         if self.features_in is not None:
             self.features_in = [feature for feature in self.features_in if feature not in features_to_remove]
 
-        X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates, **kwargs)
+        X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, drop_duplicates=drop_duplicates, **kwargs)
         X_out.index = X_index
 
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
@@ -73,7 +71,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         return X_out
 
     # TODO: Save this to disk and remove from memory if large categoricals!
-    def _fit_transform(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False, **kwargs):
+    def _fit_transform(self, X: DataFrame, y=None, drop_duplicates=False, **kwargs):
         X_len = len(X)
         self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
@@ -86,7 +84,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         X = self._preprocess(X)
         X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
-        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
+        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y, drop_duplicates=drop_duplicates)
 
         if len(list(X_out.columns)) == 0:
             self._is_dummy = True
@@ -107,7 +105,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         return X_out, type_group_map_special
 
-    def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None, fix_categoricals=False, drop_duplicates=False) -> (DataFrame, dict):
+    def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None, drop_duplicates=False) -> (DataFrame, dict):
         feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_out), type_group_map_special=type_group_map_special)
 
         features_to_remove_post = self._get_features_to_remove_post(X_out, feature_metadata)
@@ -115,10 +113,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
         feature_names = feature_metadata.get_features()
-
-        # FIXME: DOES NOT WORK ANYMORE
-        # if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
-        #     X_out = self._fix_categoricals_for_sklearn(X=X_out)
 
         if drop_duplicates:
             X_out = self._drop_duplicate_features(X_out)
@@ -194,21 +188,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
     def _remove_features_in(self, features):
         super()._remove_features_in(features)
         self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
-
-    def _fix_categoricals_for_sklearn(self, X: DataFrame) -> DataFrame:
-        features_to_remove = []
-        for column in self.feature_metadata.type_group_map_raw['category']:
-            rank = X[column].value_counts().sort_values(ascending=True)
-            rank = rank[rank >= 3]
-            rank = rank.reset_index()
-            val_list = list(rank['index'].values)
-            if len(val_list) <= 1:
-                features_to_remove.append(column)
-            else:
-                X[column] = X[column].astype(CategoricalDtype(categories=val_list))
-        if features_to_remove:
-            X.drop(features_to_remove, axis=1, inplace=True)
-        return X
 
     def _get_features_to_remove_post(self, X: DataFrame, feature_metadata: FeatureMetadata) -> list:
         features_to_remove_post = []
