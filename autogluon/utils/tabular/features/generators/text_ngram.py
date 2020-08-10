@@ -150,7 +150,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
             X_nlp_features = pd.DataFrame(transform_matrix.toarray())  # FIXME
             X_nlp_features.columns = [f'{nlp_feature}.{x}' for x in nlp_features_names]
-            X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1)
+            X_nlp_features[nlp_feature + '._total_'] = X_nlp_features.gt(0).sum(axis=1).astype(np.int32)
 
             X_nlp_features_combined.append(X_nlp_features)
 

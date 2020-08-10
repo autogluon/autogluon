@@ -14,10 +14,9 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
     def __init__(self, stateful_categories=True, minimize_memory=True, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
-        self.minimize_memory = minimize_memory
         self._category_map = None
 
-        if self.minimize_memory:
+        if minimize_memory:
             self.post_generators = [CategoryMemoryMinimizeFeatureGenerator(inplace=True)] + self.post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):

@@ -9,13 +9,10 @@ import psutil
 from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
-from . import binning
 from .feature_metadata import FeatureMetadata
 from .generators.abstract import AbstractFeatureGenerator
-from .generators.binned import BinnedFeatureGenerator
 from .generators.dummy import DummyFeatureGenerator
-from .generators.memory_minimize import NumericMemoryMinimizeFeatureGenerator
-from .types import get_type_map_real, get_type_group_map_special
+from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature
 from ..utils.decorators import calculate_time
 
@@ -34,8 +31,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
-
-        self._minimize_categorical_memory_usage_flag = True
 
         self._useless_features_in: list = None
 
@@ -137,10 +132,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         feature_names = self.feature_metadata.get_features()
 
-        self._bin_generator = BinnedFeatureGenerator(features_in=self.feature_metadata.type_group_map_special['text_special'])
-        X_out[self._bin_generator.features_in] = self._bin_generator.fit_transform(X=X_out[self._bin_generator.features_in], feature_metadata_in=self.feature_metadata)
-        self.feature_metadata = self.feature_metadata.join_metadata(metadata=self._bin_generator.feature_metadata, shared_raw_features='overwrite')
-
         if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
             X_out = self._fix_categoricals_for_sklearn(X=X_out)
 
@@ -151,8 +142,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         if set(feature_names) != set(feature_names_post):
             features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
             self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
-
-        X_out = self._minimize_memory_usage(X=X_out)
 
         return X_out, self.feature_metadata.type_group_map_special
 
@@ -183,10 +172,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         X_out = self._generate_features(X)
         X_out = X_out[self._features_out_internal]
-
-        X_out[self._bin_generator.features_out] = self._bin_generator.transform(X=X_out)
-
-        X_out = self._minimize_memory_usage(X=X_out)
 
         return X_out
 
@@ -224,16 +209,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
         self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
         self.features_in = self.feature_metadata_in.get_features()
-
-    def _minimize_memory_usage(self, X: DataFrame) -> DataFrame:
-        if not self._is_fit:
-            valid_special_types = {'text_ngram', 'binned'}
-            features_in = [feature for feature in self.feature_metadata.get_features() if valid_special_types.intersection(self.feature_metadata.get_feature_types_special(feature))]
-            self.numeric_min = NumericMemoryMinimizeFeatureGenerator(features_in=features_in)
-            X[features_in] = self.numeric_min.fit_transform(X=X[features_in], feature_metadata_in=self.feature_metadata)
-        else:
-            X[self.numeric_min.features_out] = self.numeric_min.transform(X=X)
-        return X
 
     def _fix_categoricals_for_sklearn(self, X: DataFrame) -> DataFrame:
         features_to_remove = []
@@ -295,7 +270,6 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         return X[columns_new]
 
     # TODO: Move this outside of here
-    # TODO: Not accurate for categoricals, will count categorical mapping dict as taking more memory than it actually does.
     @staticmethod
     def _get_approximate_df_mem_usage(df, sample_ratio=0.2):
         if sample_ratio >= 1:
@@ -303,7 +277,23 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         else:
             num_rows = len(df)
             num_rows_sample = math.ceil(sample_ratio * num_rows)
-            return df.head(num_rows_sample).memory_usage(deep=True) / sample_ratio
+            sample_ratio = num_rows_sample / num_rows
+            exact_dtypes = ['int', 'float']
+            category_dtypes = ['category']
+            dtypes_raw = get_type_map_raw(df)
+            columns_category = [column for column in df if dtypes_raw[column] in category_dtypes]
+            columns_inexact = [column for column in df if dtypes_raw[column] not in exact_dtypes + category_dtypes]
+            memory_usage = df.memory_usage()
+            if columns_category:
+                for column in columns_category:
+                    num_categories = len(df[column].cat.categories)
+                    num_categories_sample = math.ceil(sample_ratio * num_categories)
+                    sample_ratio_cat = num_categories_sample / num_categories
+                    memory_usage[column] = df[column].cat.codes.dtype.itemsize * num_rows + df[column].cat.categories[:num_categories_sample].memory_usage(deep=True) / sample_ratio_cat
+            if columns_inexact:
+                memory_usage_inexact = df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
+                memory_usage = memory_usage_inexact.combine_first(memory_usage)
+            return memory_usage
 
     def print_feature_metadata_info(self):
         if self._useless_features_in:

@@ -5,6 +5,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
+from .binned import BinnedFeatureGenerator
 from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
@@ -12,11 +13,13 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
 class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, symbols=None, **kwargs):
+    def __init__(self, symbols=None, bin_features=True, **kwargs):
         super().__init__(**kwargs)
         if symbols is None:
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         self.symbols = symbols  # Symbols to generate count and ratio features for.
+        if bin_features:
+            self.post_generators = [BinnedFeatureGenerator(inplace=True)] + self.post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
