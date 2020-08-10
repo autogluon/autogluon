@@ -155,7 +155,7 @@ class AbstractFeatureGenerator:
         logger.log(20, 'Original Features (raw dtype, special dtypes):')
         self.feature_metadata_in.print_feature_metadata_full('\t')
         logger.log(20, 'Processed Features (exact raw dtype, raw dtype):')
-        self.feature_metadata_real.print_feature_metadata_full('\t')
+        self.feature_metadata_real.print_feature_metadata_full('\t', print_only_one_special=True)
         logger.log(20, 'Processed Features (raw dtype, special dtypes):')
         self.feature_metadata.print_feature_metadata_full('\t')
 

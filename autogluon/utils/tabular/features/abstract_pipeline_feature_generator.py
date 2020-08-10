@@ -12,6 +12,7 @@ from pandas.api.types import CategoricalDtype
 from .feature_metadata import FeatureMetadata
 from .generators.abstract import AbstractFeatureGenerator
 from .generators.dummy import DummyFeatureGenerator
+from .generators.bulk import BulkFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from .utils import check_if_useless_feature
 from ..utils.decorators import calculate_time
@@ -21,13 +22,10 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
-class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, generators, **kwargs):
+class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.generators = generators
-
-        self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
@@ -86,7 +84,9 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         if pre_memory_usage_percent > 0.05:
             logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
-        X_out, type_group_map_special = self._fit_transform_custom(X=X, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
+        X = self._preprocess(X)
+        X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
+        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y, fix_categoricals=fix_categoricals, drop_duplicates=drop_duplicates)
 
         if len(list(X_out.columns)) == 0:
             self._is_dummy = True
@@ -107,33 +107,18 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
 
         return X_out, type_group_map_special
 
-    def _fit_transform_custom(self, X: DataFrame, y=None, fix_categoricals=False, drop_duplicates=False) -> (DataFrame, dict):
-        # TODO: Add ability for user to specify type_group_map_special as input to fit_transform
-        X_out = self._generate_features(X)
+    def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None, fix_categoricals=False, drop_duplicates=False) -> (DataFrame, dict):
+        feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_out), type_group_map_special=type_group_map_special)
 
-        if self.generators:
-            feature_metadata_in_generators = FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators], shared_raw_features='error_if_diff')
-        else:
-            feature_metadata_in_generators = FeatureMetadata(type_map_raw=dict())
-
-        used_features_in = feature_metadata_in_generators.get_features()
-        unused_features_in = [feature for feature in self.feature_metadata_in.get_features() if feature not in used_features_in]
-        self._feature_metadata_in_unused = self.feature_metadata_in.keep_features(features=unused_features_in)
-        self._remove_features_in(features=unused_features_in)
-
-        if self.generators:
-            self.feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators], shared_raw_features='error')
-        else:
-            self.feature_metadata = FeatureMetadata(type_map_raw=dict())
-
-        features_to_remove_post = self._get_features_to_remove_post(X_out, self.feature_metadata)
+        features_to_remove_post = self._get_features_to_remove_post(X_out, feature_metadata)
         X_out.drop(features_to_remove_post, axis=1, inplace=True)
-        self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
+        feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
-        feature_names = self.feature_metadata.get_features()
+        feature_names = feature_metadata.get_features()
 
-        if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
-            X_out = self._fix_categoricals_for_sklearn(X=X_out)
+        # FIXME: DOES NOT WORK ANYMORE
+        # if fix_categoricals:  # if X_test is not used in fit_transform and the model used is from SKLearn
+        #     X_out = self._fix_categoricals_for_sklearn(X=X_out)
 
         if drop_duplicates:
             X_out = self._drop_duplicate_features(X_out)
@@ -141,9 +126,9 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         feature_names_post = list(X_out.columns)
         if set(feature_names) != set(feature_names_post):
             features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
-            self.feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
+            feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
-        return X_out, self.feature_metadata.type_group_map_special
+        return X_out, feature_metadata.type_group_map_special
 
     def transform(self, X: DataFrame) -> DataFrame:
         X_index = copy.deepcopy(X.index)
@@ -170,7 +155,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             # TODO: Confirm this works with sparse and other feature types!
             X = X.astype(self._feature_metadata_in_real.type_map_raw)
 
-        X_out = self._generate_features(X)
+        X = self._preprocess(X)
+        X_out = super()._transform(X)
         X_out = X_out[self._features_out_internal]
 
         return X_out
@@ -206,9 +192,8 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
         self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.type_group_map_raw)
 
     def _remove_features_in(self, features):
-        self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
+        super()._remove_features_in(features)
         self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
-        self.features_in = self.feature_metadata_in.get_features()
 
     def _fix_categoricals_for_sklearn(self, X: DataFrame) -> DataFrame:
         features_to_remove = []
@@ -306,5 +291,5 @@ class AbstractPipelineFeatureGenerator(AbstractFeatureGenerator):
             logger.log(20, f'\tThese features do not need to be present at inference time for this FeatureGenerator.')
             self._feature_metadata_in_unused.print_feature_metadata_full('\t')
         logger.log(20, 'Original Features (exact raw dtype, raw dtype):')
-        self._feature_metadata_in_real.print_feature_metadata_full('\t')
+        self._feature_metadata_in_real.print_feature_metadata_full('\t', print_only_one_special=True)
         super().print_feature_metadata_info()

@@ -180,13 +180,22 @@ class FeatureMetadata:
 
         return feature_metadata_full
 
-    def print_feature_metadata_full(self, log_prefix=''):
+    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False):
         feature_metadata_full = self._get_feature_metadata_full()
         if not feature_metadata_full:
             return
         keys = list(feature_metadata_full.keys())
         keys = sorted(keys)
         output = [((key[0], list(key[1])), feature_metadata_full[key]) for key in keys]
+        if print_only_one_special:
+            for i, ((raw, special), features) in enumerate(output):
+                if len(special) == 1:
+                    output[i] = ((raw, special[0]), features)
+                elif len(special) > 1:
+                    output[i] = ((raw, special[0]), features)
+                    logger.warning(f'Warning: print_only_one_special=True was set, but features with {len(special)} special types were found. Invalid Types: {output[i]}')
+                else:
+                    output[i] = ((raw, None), features)
         max_key_len = max([len(str(key)) for key, _ in output])
         max_val_len = max([len(str(len(val))) for _, val in output])
         for key, val in output:
