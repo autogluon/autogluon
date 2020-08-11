@@ -23,14 +23,13 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
     @staticmethod
     def _drop_duplicate_features(X: DataFrame) -> list:
         X_without_dups = X.T.drop_duplicates().T
-        logger.debug(f"X_without_dups.shape: {X_without_dups.shape}")
 
         columns_orig = X.columns.values
         columns_new = X_without_dups.columns.values
         columns_removed = [column for column in columns_orig if column not in columns_new]
 
-        logger.log(15, 'Warning: duplicate columns removed ')
-        logger.log(15, columns_removed)
-        logger.log(15, f'Removed {len(columns_removed)} duplicate columns before training models')
+        if columns_removed:
+            logger.log(15, f'Warning: {len(columns_removed)} duplicate columns removed:')
+            logger.log(15, columns_removed)
 
         return columns_removed

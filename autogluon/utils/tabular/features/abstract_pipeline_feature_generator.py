@@ -27,8 +27,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         self._is_dummy = False  # If True, returns a single dummy feature as output. Occurs if fit with no useful features.
 
-        self._useless_features_in: list = None
-
         self.pre_memory_usage = None
         self.pre_memory_usage_per_row = None
         self.post_memory_usage = None
@@ -50,29 +48,12 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
             y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
 
-        X_len = len(X)
-        self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
-        self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
-        available_mem = psutil.virtual_memory().available
-        pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
-        logger.log(20, f'Available Memory:                    {(round((self.pre_memory_usage + available_mem) / 1e6, 2))} MB')
-        logger.log(20, f'Train Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB ({round(pre_memory_usage_percent * 100, 1)}% of available memory)')
-        if pre_memory_usage_percent > 0.05:
-            logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
-
+        self._compute_pre_memory_usage(X)
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
         X_out.index = X_index
+        self._compute_post_memory_usage(X_out)
 
-        self.post_memory_usage = self._get_approximate_df_mem_usage(X_out, sample_ratio=0.2).sum()
-        self.post_memory_usage_per_row = self.post_memory_usage / X_len
-
-        available_mem = psutil.virtual_memory().available
-        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
-        logger.log(20, f'Train Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB ({round(post_memory_usage_percent * 100, 1)}% of available memory)')
-        if post_memory_usage_percent > 0.15:
-            logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
-
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features_out)))
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
         self.print_feature_metadata_info()
 
         return X_out
@@ -82,16 +63,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         X = self._preprocess(X)
         X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
         X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)
-
-        if len(list(X_out.columns)) == 0:
-            self._is_dummy = True
-            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
-            dummy_generator = DummyFeatureGenerator()
-            X_out = dummy_generator.fit_transform(X=X_out)
-            type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
-            self.generators = [dummy_generator]
-            self.post_generators = []
-
         return X_out, type_group_map_special
 
     def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None) -> (DataFrame, dict):
@@ -101,7 +72,18 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         X_out.drop(features_to_remove_post, axis=1, inplace=True)
         feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
-        return X_out, feature_metadata.type_group_map_special
+        if len(list(X_out.columns)) == 0:
+            self._is_dummy = True
+            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            dummy_generator = DummyFeatureGenerator()
+            X_out = dummy_generator.fit_transform(X=X_out)
+            type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
+            self.generators = [dummy_generator]
+            self.post_generators = []
+        else:
+            type_group_map_special = feature_metadata.type_group_map_special
+
+        return X_out, type_group_map_special
 
     def transform(self, X: DataFrame) -> DataFrame:
         X_index = copy.deepcopy(X.index)
@@ -186,6 +168,28 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
                 memory_usage_inexact = df[columns_inexact].head(num_rows_sample).memory_usage(deep=True)[columns_inexact] / sample_ratio
                 memory_usage = memory_usage_inexact.combine_first(memory_usage)
             return memory_usage
+
+    def _compute_pre_memory_usage(self, X: DataFrame):
+        X_len = len(X)
+        self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
+        self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
+        available_mem = psutil.virtual_memory().available
+        pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
+        logger.log(20, f'Available Memory:                    {(round((self.pre_memory_usage + available_mem) / 1e6, 2))} MB')
+        logger.log(20, f'Train Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB ({round(pre_memory_usage_percent * 100, 1)}% of available memory)')
+        if pre_memory_usage_percent > 0.05:
+            logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+
+    def _compute_post_memory_usage(self, X: DataFrame):
+        X_len = len(X)
+        self.post_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
+        self.post_memory_usage_per_row = self.post_memory_usage / X_len
+
+        available_mem = psutil.virtual_memory().available
+        post_memory_usage_percent = self.post_memory_usage / (available_mem + self.post_memory_usage + self.pre_memory_usage)
+        logger.log(20, f'Train Data (Processed) Memory Usage: {round(self.post_memory_usage / 1e6, 2)} MB ({round(post_memory_usage_percent * 100, 1)}% of available memory)')
+        if post_memory_usage_percent > 0.15:
+            logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
     def print_feature_metadata_info(self):
         if self._useless_features_in:

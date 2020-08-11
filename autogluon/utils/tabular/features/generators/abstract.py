@@ -10,6 +10,8 @@ from ...utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
+# TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
+# TODO: Make logging 20 for fitting/fitted.
 # TODO: Add documentation
 # TODO: Add unit tests
 class AbstractFeatureGenerator:
