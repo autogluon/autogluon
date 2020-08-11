@@ -1,10 +1,9 @@
 import logging
 
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +24,9 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         datetime_features = self.feature_metadata_in.type_group_map_special['datetime_as_object'] + self.feature_metadata_in.type_group_map_raw['datetime']
         return datetime_features
 
+    # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:
-        X_datetime = pd.DataFrame(index=X.index)
+        X_datetime = DataFrame(index=X.index)
         for datetime_feature in self.features_in:
             # TODO: Be aware: When converted to float32 by downstream models, the seconds value will be up to 3 seconds off the true time due to rounding error. If seconds matter, find a separate way to generate (Possibly subtract smallest datetime from all values).
             X_datetime[datetime_feature] = pd.to_datetime(X[datetime_feature])

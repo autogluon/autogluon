@@ -47,6 +47,8 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, banned_features=None, drop_duplicates=False, **kwargs) -> DataFrame:
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+        if y is not None and isinstance(y, Series):
+            y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
         if banned_features:
             features_to_remove = [str(feature) for feature in banned_features]
