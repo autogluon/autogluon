@@ -1,7 +1,7 @@
 import mxnet
 from autogluon import TextPrediction as task
 from autogluon.utils.tabular.utils.loaders import load_pd
-mxnet.npx.set_np()
+
 
 test_hyperparameters = {
     'models': {

@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import pandas as pd
 import warnings
+from mxnet.util import use_np
 from .. import tabular_prediction
 from . import constants as _C
 from ..base import BaseTask
@@ -179,6 +180,7 @@ def infer_eval_stop_log_metrics(problem_type,
     return eval_metric, stopping_metric, log_metrics
 
 
+@use_np
 class TextPrediction(BaseTask):
     Dataset = tabular_prediction.TabularDataset
 
@@ -394,8 +396,6 @@ class TextPrediction(BaseTask):
                 plot_results = True
             else:
                 plot_results = False
-        import mxnet as mx
-        mx.npx.set_np()
         model.train(train_data=train_data,
                     tuning_data=tuning_data,
                     resource=recommended_resource,
@@ -409,7 +409,6 @@ class TextPrediction(BaseTask):
                     plot_results=plot_results,
                     console_log=verbosity > 2,
                     ignore_warning=verbosity <= 2)
-        mx.npx.reset_np()
         return model
 
     @staticmethod
