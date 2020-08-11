@@ -1,4 +1,3 @@
-import mxnet
 from autogluon import TextPrediction as task
 from autogluon.utils.tabular.utils.loaders import load_pd
 
