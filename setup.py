@@ -60,10 +60,6 @@ requirements = [
     'networkx>=2.3,<3.0'
 ]
 
-text_requirements = [
-    'https://autogluon-kdd-mxnet-wheels.s3.amazonaws.com/autogluon_contrib_nlp-1.0.0.dev0b20200804-py3-none-any.whl'
-]
-
 test_requirements = [
     'pytest',
     'openml'
@@ -86,7 +82,7 @@ if __name__ == '__main__':
         packages=find_packages(exclude=('docs', 'tests', 'scripts')),
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements + test_requirements + text_requirements,
+        install_requires=requirements + test_requirements,
         python_requires=MIN_PYTHON_VERSION,
         package_data={'autogluon': [
             'LICENSE',
