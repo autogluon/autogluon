@@ -1,5 +1,4 @@
 import collections
-import warnings
 import numpy as np
 import pandas as pd
 import json
@@ -9,7 +8,6 @@ from .column_property import CategoricalColumnProperty, EntityColumnProperty,\
     get_column_properties_from_metadata
 from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple
-from ...core import obj
 
 
 def load_pandas_df(data: Union[str, pd.DataFrame]):

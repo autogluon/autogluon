@@ -4,7 +4,6 @@ from autogluon import TextClassification as task
 import pytest
 
 
-@pytest.mark.skip()
 def test_fit():
     dataset = task.Dataset(name='ToySST')
     predictor = task.fit(dataset,
@@ -22,7 +21,6 @@ def test_fit():
     print('finished')
 
 
-@pytest.mark.skip()
 def test_custom_dataset_fit():
     os.system('wget https://autogluon-hackathon.s3.amazonaws.com/demodata.zip')
     os.system('unzip -o demodata.zip')
