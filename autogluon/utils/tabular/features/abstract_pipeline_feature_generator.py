@@ -12,7 +12,6 @@ from .feature_metadata import FeatureMetadata
 from .generators.dummy import DummyFeatureGenerator
 from .generators.bulk import BulkFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
-from .utils import check_if_useless_feature
 from ..utils.decorators import calculate_time
 
 logger = logging.getLogger(__name__)
@@ -21,8 +20,8 @@ logger = logging.getLogger(__name__)
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, pre_drop_useless=True, **kwargs):
+        super().__init__(pre_drop_useless=pre_drop_useless, **kwargs)
 
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
@@ -44,57 +43,25 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         return X
 
     @calculate_time
-    def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, banned_features=None, drop_duplicates=False, **kwargs) -> DataFrame:
+    def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         X_index = copy.deepcopy(X.index)
         X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
         if y is not None and isinstance(y, Series):
             y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
         X.columns = X.columns.astype(str)  # Ensure all column names are strings
-        if banned_features:
-            features_to_remove = [str(feature) for feature in banned_features]
-        else:
-            features_to_remove = []
-        self._useless_features_in = [feature for feature in self._get_useless_features(X) if feature not in features_to_remove]
-        features_to_remove += self._useless_features_in
-        X.drop(features_to_remove, axis=1, errors='ignore', inplace=True)
-        if self.feature_metadata_in is not None:
-            self.feature_metadata_in = self.feature_metadata_in.remove_features(features_to_remove)
-        if feature_metadata_in is not None:
-            feature_metadata_in = feature_metadata_in.remove_features(features_to_remove)
-        if self.features_in is not None:
-            self.features_in = [feature for feature in self.features_in if feature not in features_to_remove]
 
-        X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, drop_duplicates=drop_duplicates, **kwargs)
-        X_out.index = X_index
-
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
-        self.print_feature_metadata_info()
-
-        return X_out
-
-    # TODO: Save this to disk and remove from memory if large categoricals!
-    def _fit_transform(self, X: DataFrame, y=None, drop_duplicates=False, **kwargs):
         X_len = len(X)
         self.pre_memory_usage = self._get_approximate_df_mem_usage(X, sample_ratio=0.2).sum()
         self.pre_memory_usage_per_row = self.pre_memory_usage / X_len
         available_mem = psutil.virtual_memory().available
         pre_memory_usage_percent = self.pre_memory_usage / (available_mem + self.pre_memory_usage)
-        logger.log(20, f'Available Memory:                    {(round((self.pre_memory_usage + available_mem)/1e6, 2))} MB')
-        logger.log(20, f'Train Data (Original)  Memory Usage: {round(self.pre_memory_usage/1e6, 2)} MB ({round(pre_memory_usage_percent*100, 1)}% of available memory)')
+        logger.log(20, f'Available Memory:                    {(round((self.pre_memory_usage + available_mem) / 1e6, 2))} MB')
+        logger.log(20, f'Train Data (Original)  Memory Usage: {round(self.pre_memory_usage / 1e6, 2)} MB ({round(pre_memory_usage_percent * 100, 1)}% of available memory)')
         if pre_memory_usage_percent > 0.05:
-            logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
+            logger.warning(f'Warning: Data size prior to feature transformation consumes {round(pre_memory_usage_percent * 100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
-        X = self._preprocess(X)
-        X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
-        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y, drop_duplicates=drop_duplicates)
-
-        if len(list(X_out.columns)) == 0:
-            self._is_dummy = True
-            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
-            dummy_generator = DummyFeatureGenerator()
-            X_out = dummy_generator.fit_transform(X=X_out)
-            type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)  # TODO: Remove
-            self.generators = [dummy_generator]
+        X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
+        X_out.index = X_index
 
         self.post_memory_usage = self._get_approximate_df_mem_usage(X_out, sample_ratio=0.2).sum()
         self.post_memory_usage_per_row = self.post_memory_usage / X_len
@@ -105,24 +72,34 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         if post_memory_usage_percent > 0.15:
             logger.warning(f'Warning: Data size post feature transformation consumes {round(post_memory_usage_percent*100, 1)}% of available memory. Consider increasing memory or subsampling the data to avoid instability.')
 
+        logger.log(20, 'Feature Generator processed %s data points with %s features' % (X_len, len(self.features_out)))
+        self.print_feature_metadata_info()
+
+        return X_out
+
+    # TODO: Save this to disk and remove from memory if large categoricals!
+    def _fit_transform(self, X: DataFrame, y=None, **kwargs):
+        X = self._preprocess(X)
+        X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
+        X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)
+
+        if len(list(X_out.columns)) == 0:
+            self._is_dummy = True
+            logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
+            dummy_generator = DummyFeatureGenerator()
+            X_out = dummy_generator.fit_transform(X=X_out)
+            type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
+            self.generators = [dummy_generator]
+            self.post_generators = []
+
         return X_out, type_group_map_special
 
-    def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None, drop_duplicates=False) -> (DataFrame, dict):
+    def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None) -> (DataFrame, dict):
         feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_out), type_group_map_special=type_group_map_special)
 
         features_to_remove_post = self._get_features_to_remove_post(X_out, feature_metadata)
         X_out.drop(features_to_remove_post, axis=1, inplace=True)
         feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
-
-        feature_names = feature_metadata.get_features()
-
-        if drop_duplicates:
-            X_out = self._drop_duplicate_features(X_out)
-
-        feature_names_post = list(X_out.columns)
-        if set(feature_names) != set(feature_names_post):
-            features_to_remove_post = [feature for feature in feature_names if feature not in feature_names_post]
-            feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
 
         return X_out, feature_metadata.type_group_map_special
 
@@ -157,31 +134,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         return X_out
 
-    # TODO: Add _fit_transform_generators, _transform_generators instead of this
-    def _generate_features(self, X: DataFrame) -> DataFrame:
-        X = self._preprocess(X)
-
-        feature_df_list = []
-        for generator in self.generators:
-            if not self._is_fit:
-                X_out = generator.fit_transform(X, feature_metadata_in=self.feature_metadata_in)
-            else:
-                X_out = generator.transform(X)
-            feature_df_list.append(X_out)
-
-        if not self._is_fit:
-            self.generators = [generator for i, generator in enumerate(self.generators) if feature_df_list[i] is not None and len(feature_df_list[i].columns) > 0]
-            feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
-
-        if not feature_df_list:
-            X_out = DataFrame(index=X.index)
-        elif len(feature_df_list) == 1:
-            X_out = feature_df_list[0]
-        else:
-            X_out = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
-
-        return X_out
-
     def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
@@ -191,7 +143,8 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         super()._remove_features_in(features)
         self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
 
-    def _get_features_to_remove_post(self, X: DataFrame, feature_metadata: FeatureMetadata) -> list:
+    @staticmethod
+    def _get_features_to_remove_post(X: DataFrame, feature_metadata: FeatureMetadata) -> list:
         features_to_remove_post = []
         X_len = len(X)
         # TODO: Consider making 0.99 a parameter to FeatureGenerator
@@ -205,35 +158,8 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         return features_to_remove_post
 
     @staticmethod
-    def _get_useless_features(X: DataFrame) -> list:
-        useless_features = []
-        for column in X:
-            if check_if_useless_feature(X[column]):
-                useless_features.append(column)
-        return useless_features
-
-    @staticmethod
     def _get_type_group_map_special(X: DataFrame) -> defaultdict:
         return get_type_group_map_special(X)
-
-    # TODO: optimize by not considering columns with unique sums/means
-    # TODO: Multithread?
-    @staticmethod
-    def _drop_duplicate_features(X: DataFrame) -> DataFrame:
-        X_without_dups = X.T.drop_duplicates().T
-        logger.debug(f"X_without_dups.shape: {X_without_dups.shape}")
-
-        columns_orig = X.columns.values
-        columns_new = X_without_dups.columns.values
-        columns_removed = [column for column in columns_orig if column not in columns_new]
-
-        del X_without_dups
-
-        logger.log(15, 'Warning: duplicate columns removed ')
-        logger.log(15, columns_removed)
-        logger.log(15, f'Removed {len(columns_removed)} duplicate columns before training models')
-
-        return X[columns_new]
 
     # TODO: Move this outside of here
     @staticmethod

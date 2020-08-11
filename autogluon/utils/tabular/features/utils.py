@@ -15,7 +15,7 @@ def clip_and_astype(df: DataFrame, columns: list = None, clip_min=0, clip_max=25
     return df
 
 
-def check_if_useless_feature(X: Series) -> bool:
+def is_useless_feature(X: Series) -> bool:
     if len(X.unique()) <= 1:
         return True
     else:
