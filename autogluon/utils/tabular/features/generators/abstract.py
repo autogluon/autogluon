@@ -125,6 +125,10 @@ class AbstractFeatureGenerator:
             X = post_generator.transform(X=X)
         return X
 
+    def _remove_features_in(self, features):
+        self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
+        self.features_in = self.feature_metadata_in.get_features()
+
     def _rename_features_out(self, column_rename_map: dict):
         self.feature_metadata = self.feature_metadata.rename_features(column_rename_map)
         self.feature_metadata_real = self.feature_metadata_real.rename_features(column_rename_map)

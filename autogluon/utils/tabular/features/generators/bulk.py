@@ -61,7 +61,3 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             X_out = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
 
         return X_out
-
-    def _remove_features_in(self, features):
-        self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
-        self.features_in = self.feature_metadata_in.get_features()
