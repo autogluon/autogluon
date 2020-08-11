@@ -21,7 +21,7 @@ def verify_sst():
     dev_data = dev_data.iloc[:10]
     predictor = task.fit(train_data, hyperparameters=test_hyperparameters,
                          label='label', num_trials=1,
-                         ngpus_per_trial=1,
+                         ngpus_per_trial=0,
                          verbosity=4,
                          output_directory='./sst',
                          plot_results=False)
@@ -67,5 +67,5 @@ def verify_sts():
 
 def test_fit():
     verify_sst()
-    #  verify_sts()
+    # verify_sts()
     # verify_mrpc()
