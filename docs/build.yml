@@ -7,7 +7,7 @@ dependencies:
   - jupyter-sphinx>=0.2.2
   - mxnet_cu100>=1.7.0b20200713, <2.0.0
   - gluonnlp==0.8.1
-  - autogluon_contrib_nlp
+  - https://autogluon-kdd-mxnet-wheels.s3.amazonaws.com/autogluon_contrib_nlp-1.0.0.dev0b20200804-py3-none-any.whl
   - portalocker
   - nose
   - docutils
