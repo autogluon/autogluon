@@ -7,6 +7,7 @@ import sys
 import time
 from typing import Union
 
+import numpy as np
 import pandas as pd
 import psutil
 
@@ -283,6 +284,7 @@ class AbstractModel:
         y_pred_proba = self._predict_proba(X=X, preprocess=preprocess)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
+        y_pred_proba = y_pred_proba.astype(np.float32)
         return y_pred_proba
 
     def _predict_proba(self, X, preprocess=True):

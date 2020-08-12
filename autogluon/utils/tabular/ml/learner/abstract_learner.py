@@ -22,6 +22,8 @@ from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.abstract_feature_generator import AbstractFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
+from ...metrics.classification_metrics import confusion_matrix
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,6 @@ class AbstractLearner:
         self.submission_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self.trainer_problem_type = None
         self.eval_metric = eval_metric
         self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
@@ -85,7 +86,11 @@ class AbstractLearner:
         save_path = path_context + self.learner_file_name
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+        self._validate_fit_input(X=X, X_val=X_val, **kwargs)
+        return self._fit(X=X, X_val=X_val, **kwargs)
+
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
@@ -127,7 +132,7 @@ class AbstractLearner:
 
         if len(X_cache_miss) > 0:
             y_pred_proba = self.predict_proba(X=X_cache_miss, model=model, inverse_transform=False)
-            problem_type = self.trainer_problem_type or self.problem_type
+            problem_type = self.label_cleaner.problem_type_transform or self.problem_type
             y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
             y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
             y_pred.index = X_cache_miss.index
@@ -154,6 +159,10 @@ class AbstractLearner:
         if as_pandas:
             y_pred = pd.Series(data=y_pred, name=self.label)
         return y_pred
+
+    def _validate_fit_input(self, X: DataFrame, **kwargs):
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
@@ -362,6 +371,10 @@ class AbstractLearner:
                           f"You should carefully study why there are missing labels in your evaluation data.")
         return y_true, y_pred
 
+    # TODO: Refactor to be less brittle.
+    # TODO: Instead take y_pred_proba as input, convert to y_pred when necessary. Treat y_pred_proba as y_pred for regression.
+    #  This makes this function behave much nicer, currently confusion matrix is only able to be constructed when y_pred is supplied, and crashes when y_pred_proba is supplied.
+    #  Therefore, it is impossible to get confusion matrix when eval_metric is log_loss. This shouldn't be the case.
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions.
             Args:
@@ -374,33 +387,16 @@ class AbstractLearner:
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
         assert isinstance(y_true, (np.ndarray, pd.Series))
-        assert isinstance(y_pred, (np.ndarray, pd.Series))
+        assert isinstance(y_pred, (np.ndarray, pd.Series))  # TODO: Enable DataFrame for y_pred_proba
 
         # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
         y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
-        trainer = self.load_trainer()
-        if trainer.eval_metric_expects_y_pred:
-            y_pred_cleaned = self.label_cleaner.transform(y_pred)
-            y_true_cleaned = self.label_cleaner.transform(y_true)
-            if self.problem_type == MULTICLASS:
-                y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
-            performance = self.eval_metric(y_true_cleaned, y_pred_cleaned)
-        else:
-            if self.problem_type == MULTICLASS:
-                y_true_cleaned = self.label_cleaner.transform(y_true)
-                y_true_cleaned = y_true_cleaned.fillna(-1)
-                if (not trainer.eval_metric_expects_y_pred) and (-1 in y_true_cleaned.unique()):
-                    # log_loss / pac_score
-                    raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
-                performance = self.eval_metric(y_true_cleaned, y_pred)
-            else:
-                performance = self.eval_metric(y_true, y_pred)
+        performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
 
         if not high_always_good:
-            sign = self.eval_metric._sign
-            performance = performance * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+            performance = performance * self.eval_metric._sign  # flip negative once again back to positive (so higher is no longer necessarily better)
 
         if not silent:
             logger.log(20, f"Evaluation: {metric} on test data: {performance}")
@@ -426,15 +422,22 @@ class AbstractLearner:
                 f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
                 f1micro_score.__name__ = f1_score.__name__
                 auxiliary_metrics += [f1micro_score]  # TODO: add auc?
-            elif self.problem_type == MULTICLASS:  # multiclass metrics
-                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
+            # elif self.problem_type == MULTICLASS:  # multiclass metrics
+            #     auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
 
         performance_dict = OrderedDict({metric: performance})
         for metric_function in auxiliary_metrics:
+            if isinstance(metric_function, tuple):
+                metric_function, metric_kwargs = metric_function
+            else:
+                metric_kwargs = None
             metric_name = metric_function.__name__
             if metric_name not in performance_dict:
-                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
-                    performance_dict[metric_name] = metric_function(y_true, y_pred)
+                try:  # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                    if metric_kwargs:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred, **metric_kwargs)
+                    else:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred)
                 except ValueError:
                     pass
 
@@ -443,11 +446,16 @@ class AbstractLearner:
             logger.log(20, json.dumps(performance_dict, indent=4))
 
         if detailed_report and (self.problem_type != REGRESSION):
+            # Construct confusion matrix
+            try:
+                performance_dict['confusion_matrix'] = confusion_matrix(y_true, y_pred, labels=self.label_cleaner.ordered_class_labels, output_format='pandas_dataframe')
+            except ValueError:
+                pass
             # One final set of metrics to report
             cl_metric = lambda y_true, y_pred: classification_report(y_true, y_pred, output_dict=True)
             metric_name = 'classification_report'
             if metric_name not in performance_dict:
-                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                try:  # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
                     performance_dict[metric_name] = cl_metric(y_true, y_pred)
                 except ValueError:
                     pass
