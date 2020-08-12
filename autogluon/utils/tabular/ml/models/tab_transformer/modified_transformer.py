@@ -1,3 +1,10 @@
+"""
+This code is a modification of the official PyTorch Transformer code found at: 
+https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/transformer.py
+
+The modification allows the option of fixing the attention map 
+"""
+
 import torch
 from torch.nn import Module
 from torch._overrides import has_torch_function, handle_torch_function

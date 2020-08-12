@@ -1,44 +1,26 @@
 import torch
-from itertools import product
 import torch.nn as nn
 from copy import deepcopy
 import numpy as np
 
-class CONTRASTIVE_pretext(nn.Module):
-    def __init__(self, kwargs):
-        super().__init__()
-        self.kwargs = kwargs
-
-    def pairwise_loss(out, temperature):
-        #TODO: implement for arbitrary modalities
-        out_1, out_2 = out[:,0,:], out[:,1,:]
-        len_out = out_1.shape[0]
-        out = out_1, out_2 
-        out = torch.cat(out, dim=0)
-        
-        sim_matrix = torch.exp(torch.mm(out, out.t().contiguous()) / temperature)
-        pos_sim = torch.cat([sim_matrix[:len_out,len_out:].diag(),sim_matrix[len_out:,:len_out].diag()])
-        loss = (- torch.log(pos_sim / sim_matrix.sum(dim=-1))).mean()
-        return loss
-
-    def forward(self, out, target):
-        return self.pairwise_loss(out, self.kwargs['temperature']), None
-
-    def get(self, data, target):
-        data  = data.to(device,self.kwargs['device'], non_blocking=True) 
-        return data, None
-
+"""
+possible TODO: although there is a supervised pretext option below, i.e. pretrain using
+labeled data presumably from a different but related task, curently this cannot be handled 
+by the AG API. One simple way to handle it would be to have an optional "pretext label" 
+argument to task.fit that tells the pretraining module to use the supervised pretext task
+with that particular column as the label.
+"""
 
 class SUPERVISED_pretext(nn.Module):
-    #holder class to handle supervised learning in the framework of "pretext" tasks.
+    #holder class to handle supervised pretraining.
     def __init__(self, kwargs):
         super().__init__()
         self.kwargs    = kwargs
-        self.cross_ent = nn.CrossEntropyLoss()
+        self.loss_funct = nn.MSELoss() if kwargs['problem_type']=='regression' else nn.CrossEntropyLoss()
 
 
     def forward(self, out, target):
-        loss = self.cross_ent(out,target)
+        loss = self.loss_funct(out,target)
         pred    = out.max(dim=1, keepdim=True)[1]
         correct = pred.eq(target.view_as(pred)).sum()
         correct = correct.float()
@@ -52,10 +34,29 @@ class SUPERVISED_pretext(nn.Module):
 
 
 class BERT_pretext(nn.Module):
+    """
+    This is the current default pretext task module. 
+
+    Functionality:
+
+        self.get: 
+            inputs: (data, target) (target will often be None)
+            outputs: (pretext_data, pretext_target)
+
+            called before the forward pass through the TabTransformer to create the 
+            input and label for a BERT-style pretext task.
+
+        self.forward:
+            inputs: out (embedding for TabTransformer), target (pretext task label)
+            outputs: loss, % accuracy on pretext task
+
+            given the embedding it passes it through a classifier which learns to 
+            predict the pretext label.
+    """
     def __init__(self, kwargs, replacement_noise='random', p_replace=0.3):
         super().__init__()
         self.kwargs            = kwargs
-        self.cross_ent         = nn.CrossEntropyLoss()
+        self.loss_funct        = nn.CrossEntropyLoss()
         self.p_replace         = p_replace
         self.predicters        = nn.ModuleList()
         self.n_cat_feats       = len(kwargs['cat_feat_origin_cards'])
@@ -71,7 +72,7 @@ class BERT_pretext(nn.Module):
         prob   = prob.view(-1,2)
         target = target.view(-1)
 
-        loss    = self.cross_ent(prob,target)
+        loss    = self.loss_funct(prob,target)
         pred    = prob.max(dim=1, keepdim=True)[1]
         correct = pred.eq(target.view_as(pred)).sum()
         correct = correct.float()

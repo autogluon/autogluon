@@ -8,7 +8,7 @@ from ....utils.loaders import load_pkl
 from autogluon.utils.tabular.ml.models.tab_transformer import utils
 from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformer import TabTransformer, TabTransformer_fix_attention
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
-from autogluon.utils.tabular.ml.models.tab_transformer.kwargs import get_kwargs
+from autogluon.utils.tabular.ml.models.tab_transformer.hyperparameters.kwargs import get_kwargs
 
 from tqdm import tqdm
 import torch.nn as nn
@@ -43,7 +43,8 @@ class TabNet(nn.Module):
 
             def fit(self, trainloader, valloader=None, state=None):
                 """
-                valid valued for state: [None, 'pretrain', 'finetune']
+                Main training function for TabTransformer
+                "state" must be one of [None, 'pretrain', 'finetune']
                 None: corresponds to purely supervised learning
                 pretrain: discirminative task will be a pretext task
                 finetune: same as superised learning except that the model base has 
@@ -72,7 +73,7 @@ class TabNet(nn.Module):
                     raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
 
                 if self.kwargs['problem_type']=='regression':
-                    loss_criterion = nn.MSE()
+                    loss_criterion = nn.MSELoss()
                 else:
                     loss_criterion = nn.CrossEntropyLoss()
 
@@ -103,32 +104,16 @@ class TabTransformerModel(AbstractModel):
     params_file_name="tab_trans_params.pth"
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-
-    def _get_feature_type_map(self):
-        """ Returns OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language') """
-        if self.feature_arraycol_map is None:
-            raise ValueError("must first call _get_feature_arraycol_map() before _get_feature_type_map()")
-        vector_features = self.types_of_features['continuous'] + self.types_of_features['skewed'] + self.types_of_features['onehot']
-        feature_type_map = OrderedDict()
-        for feature_name in self.feature_arraycol_map:
-            if feature_name in vector_features:
-                feature_type_map[feature_name] = 'vector'
-            elif feature_name in self.types_of_features['embed']:
-                feature_type_map[feature_name] = 'embed'
-            elif feature_name in self.types_of_features['language']:
-                feature_type_map[feature_name] = 'language'
-            else:
-                raise ValueError("unknown feature type encountered")
-        return feature_type_map
+        self.types_of_features=None
 
 
-    def _get_types_of_features(self, df, skew_threshold, embed_min_categories):
+    def _get_types_of_features(self, df):
         """ Returns dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = ordered list of feature-names falling into each category.
             Each value is a list of feature-names corresponding to columns in original dataframe.
             TODO: ensure features with zero variance have already been removed before this function is called.
         """
         if self.types_of_features is not None:
-            Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
+            Warning("Attempting to _get_types_of_features for TabTransformerModel, but previously already did this.")
 
         feature_types = self.feature_types_metadata.feature_types_raw
 
@@ -138,33 +123,23 @@ class TabTransformerModel(AbstractModel):
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
-            # print('unknown features:', unknown_features)
+
             df = df.drop(columns=unknown_features)
             self.features = list(df.columns)
-            # raise ValueError("unknown feature types present in DataFrame")
 
-        types_of_features = {'continuous': [], 'skewed': [], 'onehot': [], 'embed': [], 'language': []}
-        # continuous = numeric features to rescale
-        # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
-        # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
-        for feature in self.features:
-            feature_data = df[feature] # pd.Series
-            num_unique_vals = len(feature_data.unique())
-            if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
-                types_of_features['onehot'].append(feature)
+        self.types_of_features=[]
+        for feature in valid_features:
+            if feature in categorical_featnames:
+                type='CATEGORICAL'
             elif feature in continuous_featnames:
-                if np.abs(feature_data.skew()) > skew_threshold:
-                    types_of_features['skewed'].append(feature)
-                else:
-                    types_of_features['continuous'].append(feature)
-            elif feature in categorical_featnames:
-                if num_unique_vals >= embed_min_categories: # sufficiently many categories to warrant learned embedding dedicated to this feature
-                    types_of_features['embed'].append(feature)
-                else:
-                    types_of_features['onehot'].append(feature)
+                type='SCALAR'
             elif feature in language_featnames:
-                types_of_features['language'].append(feature)
-        return types_of_features
+                type='TEXT'
+  
+            self.types_of_features.append({"name": feature, "type": type})
+
+               
+    
 
     def set_default_params(self, y_train):
         if self.problem_type is None:
@@ -178,7 +153,7 @@ class TabTransformerModel(AbstractModel):
 
         device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
 
-        #self.tabtrans_kwargs=get_kwargs()
+        #gets default kwargs for TabTransformer model.
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
 
     def get_model(self):
@@ -187,29 +162,22 @@ class TabTransformerModel(AbstractModel):
 
     def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         #X = X.select_dtypes(['category', 'object'])
-
-
-        breakpoint()
-
-        skew_threshold=self.kwargs['proc.skew_threshold']
-        embed_min_categories=self.kwargs['proc.embed_min_categories']
-        self._get_types_of_features(X, skew_threshold, embed_min_categories)
-        breakpoint()
+        self._get_types_of_features(X)
         
-        data = utils.TabTransformerDataset(X,**self.kwargs)
+        data = utils.TabTransformerDataset(X, col_info=self.types_of_features, **self.kwargs)
         self.fe=fe
         if self.fe is not None:
             if X_unlabeled is None:
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = utils.TabTransformerDataset(X_unlabeled,**self.kwargs)
+                unlab_data = utils.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
         if self.fe is None:
             if X_unlabeled is None:
                 data.fit_feat_encoders()
                 self.fe = data.feature_encoders
                 unlab_data=None
             elif X_unlabeled is not None:
-                unlab_data = utils.TabTransformerDataset(X_unlabeled,**self.kwargs)
+                unlab_data = utils.TabTransformerDataset(X_unlabeled, col_info=self.types_of_features, **self.kwargs)
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
@@ -217,7 +185,7 @@ class TabTransformerModel(AbstractModel):
         data.encode(self.fe)
 
         if X_val is not None:
-            val_data = utils.TabTransformerDataset(X_val, **self.kwargs)
+            val_data = utils.TabTransformerDataset(X_val, col_info=self.types_of_features, **self.kwargs)
             val_data.encode(self.fe)
         else:
             val_data=None
@@ -230,18 +198,13 @@ class TabTransformerModel(AbstractModel):
 
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, **kwargs):
-        #label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y_train)
-        #y_train = label_cleaner.transform(y_train)
-    
         self.set_default_params(y_train)
-        #X_unlabeled=pd.concat([X_train, X_unlabeled])
-        #X_train=X_train.head(100)
-        #X_unlabeled=None
+
         train, val, unlab = self.preprocess(X_train, X_val, X_unlabeled)
    
         if self.problem_type=='regression':
-            train.targets = torch.FloatTensor(y_train)
-            val.targets   = torch.FloatTensor(y_val)
+            train.targets = torch.FloatTensor(list(y_train))
+            val.targets   = torch.FloatTensor(list(y_val))
         else:
             train.targets = torch.LongTensor(list(y_train))
             val.targets   = torch.LongTensor(list(y_val))
@@ -255,11 +218,14 @@ class TabTransformerModel(AbstractModel):
             self.model.fit(unlabloader, valloader, state='pretrain')
             self.model.fit(trainloader, valloader, state='finetune')
         else:
-        #self.model.pretrain()
             self.model.fit(trainloader, valloader) #X_train, y_train)
-
+         
 
     def predict_proba(self, X, preprocess=False):
+        """
+        X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
+        returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
+        """
         if preprocess or isinstance(X,pd.DataFrame):
             X, _, _ =self.preprocess(X, fe=self.fe)
         else:
@@ -317,5 +283,18 @@ class TabTransformerModel(AbstractModel):
         obj.model=torch.load(path+cls.params_file_name)
 
         return obj
+
+        """
+        list of features to add / lmitations: 
+            doesn't properly work for regression problems yet
+            
+            training of TabTransformer currently saves intermediate model simply to 'tab_trans_temp.pth'
+            Should move this to be saved in the directory corresponding to the specific training job.
+
+            Not connected to HPO functionaity yet.
+        """
+
+
+
 
 

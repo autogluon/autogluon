@@ -7,10 +7,9 @@ import pandas as pd
 import numpy as np
 from autogluon.utils.tabular.ml.models.tab_transformer import TabTransormerEncoder
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
-# train or test for one epoch
 
 
-def augmentation(data, target, mask_prob=0.5, num_augs=4):
+def augmentation(data, target, mask_prob=0.4, num_augs=4):
     shape=data.shape
     cat_data=torch.cat([data for _ in range(num_augs)])
     target=torch.cat([target for _ in range(num_augs)]).view(-1)
@@ -29,20 +28,19 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
 
     with (torch.enable_grad() if is_train else torch.no_grad()):
         for data, target in data_bar:
-
             data, target = pretext.get(data, target)
+        
             if state in [None, 'finetune']:
                 data, target = augmentation(data,target)
-            #if pretext is 
-            if state in [None, 'finetune']:
                 out, _    = net(data)
+              
             elif state=='pretrain':
                 _, out    = net(data)
             else:
                 raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
         
             loss, correct  = pretext(out, target)
-            #loss   = loss_criterion(out, target)
+   
             if is_train:
                 for optimizer in optimizers:
                     optimizer.zero_grad()
@@ -50,15 +48,19 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
                 for optimizer in optimizers:
                     optimizer.step()
     
-            total_num += 1 #target.size(0)
-            total_loss += loss.item() #* target.size(0)
+            total_num += 1
+            total_loss += loss.item() 
 
-            #batch_size=out.shape[0]
-            if correct is not None:
-                total_correct += correct.mean().cpu().numpy() #* batch_size
-                data_bar.set_description('Train Epoch: [{}/{}] Loss: {:.4f} Acc: {:.2f}%'.format(epoch, epochs, total_loss / total_num, total_correct / total_num * 100))
+            if epochs==1:
+                train_test = 'Test'
             else:
-                data_bar.set_description('Train Epoch: [{}/{}] Loss: {:.4f}'.format(epoch, epochs, total_loss / total_num))
+                train_test = 'Train'
+
+            if correct is not None:
+                total_correct += correct.mean().cpu().numpy() 
+                data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f} Acc: {:.2f}%'.format(train_test, epoch, epochs, total_loss / total_num, total_correct / total_num * 100))
+            else:
+                data_bar.set_description('{} Epoch: [{}/{}] Loss: {:.4f}'.format(train_test, epoch, epochs, total_loss / total_num))
         return total_loss / total_num, total_correct / total_num * 100
 
     if scheduler is not None:
@@ -79,10 +81,11 @@ class TabTransformerDataset(Dataset):
         self,
         X,
         y=None,
+        col_info=None,
         **kwargs):
         self.encoders = kwargs['encoders']
         self.kwargs   = kwargs
-
+        self.col_info = col_info
 
         self.raw_data = X
 
@@ -93,16 +96,17 @@ class TabTransformerDataset(Dataset):
         else:
             self.targets = torch.LongTensor(y)
         
-        
-        self.columns = get_col_info(X)
+        if col_info is None:
+            self.columns = get_col_info(X) #this is a stop-gap -- it just sets all feature types to CATEGORICAL.
+        else:
+            self.columns = self.col_info
+
+       
         """must be a list of dicts, each dict is of the form {"name": col_name, "type": col_type} 
         where col_name is obtained from the df X, and col_type is CATEGORICAL, TEXT or SCALAR
  
         #TODO FIX THIS self.ds_info['meta']['columns'][1:]
         """
-
-        
-
         self.cat_feat_origin_cards = None
         self.cont_feat_origin = None
         self.feature_encoders = None
@@ -163,7 +167,7 @@ class TabTransformerDataset(Dataset):
     def build_loader(self):
         loader = DataLoader(self, batch_size=self.kwargs['batch_size'], 
                             shuffle=False, num_workers=16, 
-                            pin_memory=True) #,collate_fn=self.collate_fn)
+                            pin_memory=True)
 
         loader.cat_feat_origin_cards=self.cat_feat_origin_cards 
         return loader
