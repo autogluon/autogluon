@@ -33,7 +33,6 @@ stage("Build Docs") {
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
         sh """#!/bin/bash
         set -ex
-        conda update -n base -c defaults conda
         conda env update -n autogluon_docs -f docs/build_contrib.yml
         conda activate autogluon_docs
         conda list
@@ -42,8 +41,8 @@ stage("Build Docs") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
         export AG_DOCS=1
         git clean -fx
-        pip install git+https://github.com/zhanghang1989/d2l-book
-        pip install --upgrade -e .
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --upgrade -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
