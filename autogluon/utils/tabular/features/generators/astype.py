@@ -48,7 +48,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         if features:
             self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
 
-    def print_feature_metadata_info(self):
-        logger.log(20, 'Original Features (exact raw dtype, raw dtype):')
-        self._feature_metadata_in_real.print_feature_metadata_full('\t', print_only_one_special=True)
-        super().print_feature_metadata_info()
+    def print_feature_metadata_info(self, log_level=20):
+        self.log(log_level, '\tOriginal Features (exact raw dtype, raw dtype):')
+        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
+        super().print_feature_metadata_info(log_level=log_level)

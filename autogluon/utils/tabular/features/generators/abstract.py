@@ -11,12 +11,13 @@ from ...utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
+# TODO: Add features_in_special_types, features_in_raw_types, features_in_type_pairs, banned_features_in_type_pairs/special_types/raw_types
 # TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
-# TODO: Make logging 20 for fitting/fitted.
 # TODO: Add documentation
 # TODO: Add unit tests
 class AbstractFeatureGenerator:
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None, pre_enforce_types=False, pre_drop_useless=False, post_drop_duplicates=False, reset_index=False, column_names_as_str=True):
+    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None,
+                 name_suffix: str = None, pre_enforce_types=False, pre_drop_useless=False, post_drop_duplicates=False, reset_index=False, column_names_as_str=True, log_prefix='', verbosity=2):
         self._is_fit = False  # Whether the feature generator has been fit
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
         self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
@@ -46,11 +47,14 @@ class AbstractFeatureGenerator:
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
 
+        self.log_prefix = log_prefix
+        self.verbosity = verbosity
+
     def fit(self, X: DataFrame, **kwargs):
         self.fit_transform(X, **kwargs)
 
     def fit_transform(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
-        logger.log(15, f'Fitting {self.__class__.__name__}...')
+        self.log(20, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
         if self.reset_index:
@@ -78,9 +82,11 @@ class AbstractFeatureGenerator:
                 self._remove_features_in(self._useless_features_in)
         if self.pre_enforce_types:
             from .astype import AsTypeFeatureGenerator
-            self._pre_astype_generator = AsTypeFeatureGenerator(features_in=self.features_in, feature_metadata_in=self.feature_metadata_in)
+            self._pre_astype_generator = AsTypeFeatureGenerator(features_in=self.features_in, feature_metadata_in=self.feature_metadata_in, log_prefix=self.log_prefix + '\t')
             self._pre_astype_generator.fit(X)
 
+        # TODO: Add option to return feature_metadata instead to avoid data copy
+        #  If so, consider adding validation step to check that X_out matches the feature metadata, error/warning if not
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
 
         type_map_raw = get_type_map_raw(X_out)
@@ -102,7 +108,10 @@ class AbstractFeatureGenerator:
         if self.reset_index:
             X_out.index = X_index
         self._is_fit = True
-        logger.log(15, f'Fitted {self.__class__.__name__}.')
+        if self.verbosity >= 3:
+            self.print_feature_metadata_info(log_level=20)
+        elif self.verbosity == 2:
+            self.print_feature_metadata_info(log_level=15)
         return X_out
 
     def transform(self, X: DataFrame) -> DataFrame:
@@ -145,9 +154,9 @@ class AbstractFeatureGenerator:
         if self.feature_metadata_in is None:
             self.feature_metadata_in = feature_metadata_in
         elif feature_metadata_in is not None:
-            logger.warning('Warning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
+            self.log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
         if self.feature_metadata_in is None:
-            logger.log(20, f'feature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
+            self.log(20, f'\tfeature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X, y=y)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X, y=y)
@@ -165,9 +174,9 @@ class AbstractFeatureGenerator:
         type_group_map_special = get_type_group_map_special(X)
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
-    @staticmethod
-    def _fit_generators(X, y, feature_metadata, generators: list, **kwargs):
+    def _fit_generators(self, X, y, feature_metadata, generators: list, **kwargs):
         for generator in generators:
+            generator.set_log_prefix(log_prefix=self.log_prefix + '\t', prepend=True)
             X = generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
             feature_metadata = generator.feature_metadata
         return X, feature_metadata, generators
@@ -223,13 +232,30 @@ class AbstractFeatureGenerator:
                 useless_features.append(column)
         return useless_features
 
-    def print_feature_metadata_info(self):
-        logger.log(20, 'Original Features (raw dtype, special dtypes):')
-        self.feature_metadata_in.print_feature_metadata_full('\t')
-        logger.log(20, 'Processed Features (exact raw dtype, raw dtype):')
-        self.feature_metadata_real.print_feature_metadata_full('\t', print_only_one_special=True)
-        logger.log(20, 'Processed Features (raw dtype, special dtypes):')
-        self.feature_metadata.print_feature_metadata_full('\t')
+    def set_log_prefix(self, log_prefix, prepend=False):
+        if prepend:
+            self.log_prefix = log_prefix + self.log_prefix
+        else:
+            self.log_prefix = log_prefix
+
+    def set_verbosity(self, verbosity):
+        self.verbosity = verbosity
+
+    def log(self, level, msg, log_prefix=None, verb_min=None):
+        if self.verbosity == 0:
+            return
+        if verb_min is None or self.verbosity >= verb_min:
+            if log_prefix is None:
+                log_prefix = self.log_prefix
+            logger.log(level, f'{log_prefix}{msg}')
+
+    def print_feature_metadata_info(self, log_level=20):
+        self.log(log_level, '\tOriginal Features (raw dtype, special dtypes):')
+        self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
+        self.log(log_level, '\tProcessed Features (exact raw dtype, raw dtype):')
+        self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
+        self.log(log_level, '\tProcessed Features (raw dtype, special dtypes):')
+        self.feature_metadata.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
 
     def save(self, path):
         save_pkl.save(path=path, object=self)

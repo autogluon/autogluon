@@ -10,6 +10,7 @@ from ..feature_metadata import FeatureMetadata
 logger = logging.getLogger(__name__)
 
 
+# TODO: Add parameter to add prefix to each generator to guarantee no name collisions: 'G1_', 'G2_', etc.
 class BulkFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, generators: List[List[AbstractFeatureGenerator]], pre_generators: List[AbstractFeatureGenerator] = None, **kwargs):
         super().__init__(**kwargs)
@@ -36,9 +37,10 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         feature_metadata = self.feature_metadata_in
         for i, generator_group in enumerate(self.generators):
-            logger.log(20, f'Stage {i+1} Generators:')
+            self.log(20, f'\tStage {i+1} Generators:')
             feature_df_list = []
             for generator in generator_group:
+                generator.set_log_prefix(log_prefix=self.log_prefix + '\t\t', prepend=True)
                 feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))
 
             self.generators[i] = [generator for j, generator in enumerate(generator_group) if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
