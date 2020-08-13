@@ -1,3 +1,4 @@
+import copy
 import logging
 
 from pandas import DataFrame, Series
@@ -15,8 +16,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add documentation
 # TODO: Add unit tests
 class AbstractFeatureGenerator:
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None, pre_drop_useless=False, post_drop_duplicates=False):
-        # TODO: Add post_generators
+    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None, pre_drop_useless=False, post_drop_duplicates=False, reset_index=False, column_names_as_str=True):
         self._is_fit = False  # Whether the feature generator has been fit
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
         self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
@@ -38,6 +38,8 @@ class AbstractFeatureGenerator:
             self.post_generators.append(DropDuplicatesFeatureGenerator(post_drop_duplicates=False))
 
         self.pre_drop_useless = pre_drop_useless  # TODO: Description
+        self.reset_index = reset_index
+        self.column_names_as_str = column_names_as_str
         self._useless_features_in: list = None
 
         self._is_updated_name = False  # If feature names have been altered by name_prefix or name_suffix
@@ -49,6 +51,24 @@ class AbstractFeatureGenerator:
         logger.log(15, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
+        if self.reset_index:
+            X_index = copy.deepcopy(X.index)
+            X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+            if y is not None and isinstance(y, Series):
+                y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
+        else:
+            X_index = None
+        if self.column_names_as_str:
+            columns_orig = list(X.columns)
+            X.columns = X.columns.astype(str)  # Ensure all column names are strings
+            columns_new = list(X.columns)
+            if columns_orig != columns_new:
+                rename_map = {orig: new for orig, new in zip(columns_orig, columns_new)}
+                if feature_metadata_in is not None:
+                    feature_metadata_in.rename_features(rename_map=rename_map)
+                self._rename_features_in(rename_map)
+            else:
+                self.column_names_as_str = False  # Columns were already string, so don't do conversion. Better to error if they change types at inference.
         self._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
         if self.pre_drop_useless:
             self._useless_features_in = self._get_useless_features(X)
@@ -60,7 +80,7 @@ class AbstractFeatureGenerator:
         type_map_raw = get_type_map_raw(X_out)
         if self.post_generators:
             feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
-            X_out, self.feature_metadata, self.post_generators = self._fit_post_generators(X=X_out, y=y, feature_metadata=feature_metadata, post_generators=self.post_generators, **kwargs)
+            X_out, self.feature_metadata, self.post_generators = self._fit_generators(X=X_out, y=y, feature_metadata=feature_metadata, generators=self.post_generators, **kwargs)
         else:
             self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         type_map_real = get_type_map_real(X_out)
@@ -73,6 +93,8 @@ class AbstractFeatureGenerator:
         if self._is_updated_name:
             X_out.columns = [column_rename_map.get(col, col) for col in X_out.columns]
             self._rename_features_out(column_rename_map=column_rename_map)
+        if self.reset_index:
+            X_out.index = X_index
         self._is_fit = True
         logger.log(15, f'Fitted {self.__class__.__name__}.')
         return X_out
@@ -80,6 +102,13 @@ class AbstractFeatureGenerator:
     def transform(self, X: DataFrame) -> DataFrame:
         if not self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is not fit.')
+        if self.reset_index:
+            X_index = copy.deepcopy(X.index)
+            X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
+        else:
+            X_index = None
+        if self.column_names_as_str:
+            X.columns = X.columns.astype(str)  # Ensure all column names are strings
         try:
             X = X[self.features_in]
         except KeyError:
@@ -90,9 +119,11 @@ class AbstractFeatureGenerator:
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
         X_out = self._transform(X)
         if self.post_generators:
-            X_out = self._transform_post_generators(X=X_out, post_generators=self.post_generators)
+            X_out = self._transform_generators(X=X_out, generators=self.post_generators)
         if self._is_updated_name:
             X_out.columns = self.features_out
+        if self.reset_index:
+            X_out.index = X_index
         return X_out
 
     # TODO: feature_metadata_in as parameter?
@@ -127,21 +158,27 @@ class AbstractFeatureGenerator:
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     @staticmethod
-    def _fit_post_generators(X, y, feature_metadata, post_generators: list, **kwargs):
-        for post_generator in post_generators:
-            X = post_generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
-            feature_metadata = post_generator.feature_metadata
-        return X, feature_metadata, post_generators
+    def _fit_generators(X, y, feature_metadata, generators: list, **kwargs):
+        for generator in generators:
+            X = generator.fit_transform(X=X, y=y, feature_metadata_in=feature_metadata, **kwargs)
+            feature_metadata = generator.feature_metadata
+        return X, feature_metadata, generators
 
     @staticmethod
-    def _transform_post_generators(X, post_generators: list):
-        for post_generator in post_generators:
-            X = post_generator.transform(X=X)
+    def _transform_generators(X, generators: list):
+        for generator in generators:
+            X = generator.transform(X=X)
         return X
 
     def _remove_features_in(self, features):
         self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
         self.features_in = self.feature_metadata_in.get_features()
+
+    def _rename_features_in(self, column_rename_map: dict):
+        if self.feature_metadata_in is not None:
+            self.feature_metadata_in = self.feature_metadata_in.rename_features(column_rename_map)
+        if self.features_in is not None:
+            self.features_in = [column_rename_map.get(col, col) for col in self.features_in]
 
     def _rename_features_out(self, column_rename_map: dict):
         self.feature_metadata = self.feature_metadata.rename_features(column_rename_map)

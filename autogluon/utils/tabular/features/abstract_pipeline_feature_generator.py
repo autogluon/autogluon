@@ -11,6 +11,7 @@ from pandas import DataFrame, Series
 from .feature_metadata import FeatureMetadata
 from .generators.dummy import DummyFeatureGenerator
 from .generators.bulk import BulkFeatureGenerator
+from .generators.fillna import FillNaFeatureGenerator
 from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
 from ..utils.decorators import calculate_time
 
@@ -20,8 +21,11 @@ logger = logging.getLogger(__name__)
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
-    def __init__(self, pre_drop_useless=True, **kwargs):
-        super().__init__(pre_drop_useless=pre_drop_useless, **kwargs)
+    def __init__(self, pre_generators=None, pre_drop_useless=True, reset_index=True, **kwargs):
+        if pre_generators is None:
+            pre_generators = [FillNaFeatureGenerator(inplace=True)]
+
+        super().__init__(pre_generators=pre_generators, pre_drop_useless=pre_drop_useless, reset_index=reset_index, **kwargs)
 
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
@@ -32,25 +36,10 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
 
-    def _preprocess(self, X: DataFrame):
-        for column in X.columns:
-            if self.feature_metadata_in.type_map_raw[column] == 'object':
-                X[column].fillna('', inplace=True)
-            else:
-                X[column].fillna(np.nan, inplace=True)
-        return X
-
     @calculate_time
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
-        X_index = copy.deepcopy(X.index)
-        X = X.reset_index(drop=True)  # TODO: Theoretically inplace=True avoids data copy, but can lead to altering of original DataFrame outside of method context.
-        if y is not None and isinstance(y, Series):
-            y = y.reset_index(drop=True)  # TODO: this assumes y and X had matching indices prior
-        X.columns = X.columns.astype(str)  # Ensure all column names are strings
-
         self._compute_pre_memory_usage(X)
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
-        X_out.index = X_index
         self._compute_post_memory_usage(X_out)
 
         logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
@@ -60,7 +49,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
     # TODO: Save this to disk and remove from memory if large categoricals!
     def _fit_transform(self, X: DataFrame, y=None, **kwargs):
-        X = self._preprocess(X)
         X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
         X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)
         return X_out, type_group_map_special
@@ -85,14 +73,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         return X_out, type_group_map_special
 
-    def transform(self, X: DataFrame) -> DataFrame:
-        X_index = copy.deepcopy(X.index)
-        X = X.reset_index(drop=True)
-        X.columns = X.columns.astype(str)  # Ensure all column names are strings
-        X_out = super().transform(X=X)
-        X_out.index = X_index
-        return X_out
-
     def _transform(self, X: DataFrame) -> DataFrame:
         int_features = self.feature_metadata_in.type_group_map_raw['int']
         if int_features:
@@ -110,7 +90,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
             # TODO: Confirm this works with sparse and other feature types!
             X = X.astype(self._feature_metadata_in_real.type_map_raw)
 
-        X = self._preprocess(X)
         X_out = super()._transform(X)
         X_out = X_out[self._features_out_internal]
 

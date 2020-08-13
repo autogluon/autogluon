@@ -26,11 +26,11 @@ class AutoMLPipelineFeatureGenerator(AbstractPipelineFeatureGenerator):
         super().__init__(generators=generators, **kwargs)
 
     def _get_default_generators(self, vectorizer=None):
-        generators = [
+        generators = [[
             IdentityFeatureGenerator(),
             CategoryFeatureGenerator(),
             DatetimeFeatureGenerator(),
             TextSpecialFeatureGenerator(),
             TextNgramFeatureGenerator(vectorizer=vectorizer),
-        ]
+        ]]
         return generators
