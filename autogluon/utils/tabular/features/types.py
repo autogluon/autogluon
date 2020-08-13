@@ -98,9 +98,14 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
     if type_family != 'object':  # TODO: seconds from epoch support
         return False
     try:
-        X.apply(pd.to_datetime)
-        return True
+        X.apply(pd.to_numeric)
     except:
+        try:
+            X.apply(pd.to_datetime)
+            return True
+        except:
+            return False
+    else:
         return False
 
 

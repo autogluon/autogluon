@@ -126,12 +126,22 @@ class FeatureMetadata:
                     shared_features_diff_types.append(key)
         if shared_features:
             if shared_raw_features == 'error':
+                logger.error('ERROR: Conflicting metadata:')
+                logger.error('Metadata 1:')
+                self.print_feature_metadata_full(log_prefix='\t', log_level=40)
+                logger.error('Metadata 2:')
+                metadata.print_feature_metadata_full(log_prefix='\t', log_level=40)
                 raise AssertionError(f"Metadata objects to join share raw features, but `shared_raw_features='error'`. Shared features: {shared_features}")
             if shared_features_diff_types:
                 if shared_raw_features == 'overwrite':
                     logger.log(20, f'Overwriting type_map_raw during FeatureMetadata join. Shared features with conflicting types: {shared_features_diff_types}')
                     shared_features = []
                 elif shared_raw_features == 'error_if_diff':
+                    logger.error('ERROR: Conflicting metadata:')
+                    logger.error('Metadata 1:')
+                    self.print_feature_metadata_full(log_prefix='\t', log_level=40)
+                    logger.error('Metadata 2:')
+                    metadata.print_feature_metadata_full(log_prefix='\t', log_level=40)
                     raise AssertionError(f"Metadata objects to join share raw features but do not agree on raw dtypes, and `shared_raw_features='error_if_diff'`. Shared conflicting features: {shared_features_diff_types}")
         type_map_raw.update({key: val for key, val in metadata.type_map_raw.items() if key not in shared_features})
 
@@ -180,7 +190,7 @@ class FeatureMetadata:
 
         return feature_metadata_full
 
-    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False):
+    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20):
         feature_metadata_full = self._get_feature_metadata_full()
         if not feature_metadata_full:
             return
@@ -207,7 +217,7 @@ class FeatureMetadata:
             if len(val) > 3:
                 features = features[:-1] + ', ...]'
             if val:
-                logger.log(20, f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}')
+                logger.log(log_level, f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}')
 
     @classmethod
     def from_df(cls, df):

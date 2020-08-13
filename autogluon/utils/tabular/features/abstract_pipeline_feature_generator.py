@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
 class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
-    def __init__(self, pre_generators=None, pre_drop_useless=True, reset_index=True, **kwargs):
+    def __init__(self, pre_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, **kwargs):
         if pre_generators is None:
             pre_generators = [FillNaFeatureGenerator(inplace=True)]
 
-        super().__init__(pre_generators=pre_generators, pre_drop_useless=pre_drop_useless, reset_index=reset_index, **kwargs)
+        super().__init__(pre_generators=pre_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types, reset_index=reset_index, **kwargs)
 
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
@@ -42,7 +42,7 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
         self._compute_post_memory_usage(X_out)
 
-        logger.log(20, 'Feature Generator processed %s data points with %s features' % (len(X_out), len(self.features_out)))
+        logger.log(20, f'{self.__class__.__name__} processed %s data points with %s features' % (len(X_out), len(self.features_out)))
         self.print_feature_metadata_info()
 
         return X_out
@@ -72,28 +72,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
             type_group_map_special = feature_metadata.type_group_map_special
 
         return X_out, type_group_map_special
-
-    def _transform(self, X: DataFrame) -> DataFrame:
-        int_features = self.feature_metadata_in.type_group_map_raw['int']
-        if int_features:
-            null_count = X[int_features].isnull().sum()
-            with_null = null_count[null_count != 0]
-            # If int feature contains null during inference but not during fit.
-            if len(with_null) > 0:
-                # TODO: Consider imputing to mode? This is tricky because training data had no missing values.
-                # TODO: Add unit test for this situation, to confirm it is handled properly.
-                with_null_features = list(with_null.index)
-                logger.warning(f'WARNING: Int features contain null values at inference time! Imputing nulls to 0. To avoid this, pass the features as floats during fit!')
-                logger.warning(f'WARNING: Int features with nulls: {with_null_features}')
-                X[with_null_features] = X[with_null_features].fillna(0)
-        if self._feature_metadata_in_real.type_map_raw:
-            # TODO: Confirm this works with sparse and other feature types!
-            X = X.astype(self._feature_metadata_in_real.type_map_raw)
-
-        X_out = super()._transform(X)
-        X_out = X_out[self._features_out_internal]
-
-        return X_out
 
     def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)

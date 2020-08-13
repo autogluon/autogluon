@@ -31,6 +31,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         feature_metadata = self.feature_metadata_in
         for i, generator_group in enumerate(self.generators):
+            logger.log(20, f'Stage {i+1} Generators:')
             feature_df_list = []
             for generator in generator_group:
                 feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))

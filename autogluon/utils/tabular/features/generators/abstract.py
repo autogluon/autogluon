@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add documentation
 # TODO: Add unit tests
 class AbstractFeatureGenerator:
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None, pre_drop_useless=False, post_drop_duplicates=False, reset_index=False, column_names_as_str=True):
+    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, name_prefix: str = None, name_suffix: str = None, pre_enforce_types=False, pre_drop_useless=False, post_drop_duplicates=False, reset_index=False, column_names_as_str=True):
         self._is_fit = False  # Whether the feature generator has been fit
         self.feature_metadata_in: FeatureMetadata = feature_metadata_in  # FeatureMetadata object based on the original input features.
         self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
@@ -37,6 +37,8 @@ class AbstractFeatureGenerator:
             from .drop_duplicates import DropDuplicatesFeatureGenerator
             self.post_generators.append(DropDuplicatesFeatureGenerator(post_drop_duplicates=False))
 
+        self.pre_enforce_types = pre_enforce_types
+        self._pre_astype_generator = None
         self.pre_drop_useless = pre_drop_useless  # TODO: Description
         self.reset_index = reset_index
         self.column_names_as_str = column_names_as_str
@@ -74,6 +76,10 @@ class AbstractFeatureGenerator:
             self._useless_features_in = self._get_useless_features(X)
             if self._useless_features_in:
                 self._remove_features_in(self._useless_features_in)
+        if self.pre_enforce_types:
+            from .astype import AsTypeFeatureGenerator
+            self._pre_astype_generator = AsTypeFeatureGenerator(features_in=self.features_in, feature_metadata_in=self.feature_metadata_in)
+            self._pre_astype_generator.fit(X)
 
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
 
@@ -117,6 +123,8 @@ class AbstractFeatureGenerator:
                 if col not in X.columns:
                     missing_cols.append(col)
             raise KeyError(f'{len(missing_cols)} required columns are missing from the provided dataset. Missing columns: {missing_cols}')
+        if self._pre_astype_generator:
+            X = self._pre_astype_generator.transform(X)
         X_out = self._transform(X)
         if self.post_generators:
             X_out = self._transform_generators(X=X_out, generators=self.post_generators)
