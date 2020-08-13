@@ -24,7 +24,12 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         elif not isinstance(pre_generators, list):
             pre_generators = [pre_generators]
         pre_generators = [[pre_generator] for pre_generator in pre_generators]
-        self.generators = pre_generators + self.generators
+        if self.post_generators is not None:
+            post_generators = [[post_generator] for post_generator in self.post_generators]
+            self.post_generators = []
+        else:
+            post_generators = []
+        self.generators = pre_generators + self.generators + post_generators
 
         self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
 

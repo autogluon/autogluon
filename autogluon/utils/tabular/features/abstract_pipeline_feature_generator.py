@@ -1,10 +1,7 @@
 import copy
 import logging
 import math
-from collections import defaultdict
 
-import numpy as np
-import pandas as pd
 import psutil
 from pandas import DataFrame, Series
 
@@ -12,20 +9,22 @@ from .feature_metadata import FeatureMetadata
 from .generators.dummy import DummyFeatureGenerator
 from .generators.bulk import BulkFeatureGenerator
 from .generators.fillna import FillNaFeatureGenerator
-from .types import get_type_map_raw, get_type_map_real, get_type_group_map_special
-from ..utils.decorators import calculate_time
+from .generators.drop_unique import DropUniqueFeatureGenerator
+from .types import get_type_map_raw, get_type_map_real
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
-# TODO: Use code from problem type detection for column types! Ints/Floats could be Categorical through this method! Maybe try both?
+# TODO: Use code from problem type detection for column types. Ints/Floats could be Categorical through this method. Maybe try both?
 class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
-    def __init__(self, pre_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, **kwargs):
+    def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, **kwargs):
         if pre_generators is None:
             pre_generators = [FillNaFeatureGenerator(inplace=True)]
+        if post_generators is None:
+            post_generators = [DropUniqueFeatureGenerator()]
 
-        super().__init__(pre_generators=pre_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types, reset_index=reset_index, **kwargs)
+        super().__init__(pre_generators=pre_generators, post_generators=post_generators, pre_drop_useless=pre_drop_useless, pre_enforce_types=pre_enforce_types, reset_index=reset_index, **kwargs)
 
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').
 
@@ -36,7 +35,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         self.post_memory_usage = None
         self.post_memory_usage_per_row = None
 
-    @calculate_time
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
         self._compute_pre_memory_usage(X)
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
@@ -56,10 +54,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
     def _fit_transform_custom(self, X_out: DataFrame, type_group_map_special: dict, y=None) -> (DataFrame, dict):
         feature_metadata = FeatureMetadata(type_map_raw=get_type_map_raw(X_out), type_group_map_special=type_group_map_special)
 
-        features_to_remove_post = self._get_features_to_remove_post(X_out, feature_metadata)
-        X_out.drop(features_to_remove_post, axis=1, inplace=True)
-        feature_metadata.remove_features(features=features_to_remove_post, inplace=True)
-
         if len(list(X_out.columns)) == 0:
             self._is_dummy = True
             logger.warning(f'WARNING: No useful features were detected in the data! AutoGluon will train using 0 features, and will always predict the same value. Ensure that you are passing the correct data to AutoGluon!')
@@ -78,27 +72,10 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
         self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.type_group_map_raw)
 
-    def _remove_features_in(self, features):
+    def _remove_features_in(self, features: list):
         super()._remove_features_in(features)
-        self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
-
-    @staticmethod
-    def _get_features_to_remove_post(X: DataFrame, feature_metadata: FeatureMetadata) -> list:
-        features_to_remove_post = []
-        X_len = len(X)
-        # TODO: Consider making 0.99 a parameter to FeatureGenerator
-        max_unique_value_count = X_len * 0.99
-        for column in X:
-            unique_value_count = len(X[column].unique())
-            if unique_value_count == 1:
-                features_to_remove_post.append(column)
-            elif column in feature_metadata.type_group_map_raw['category'] and (unique_value_count > max_unique_value_count):
-                features_to_remove_post.append(column)
-        return features_to_remove_post
-
-    @staticmethod
-    def _get_type_group_map_special(X: DataFrame) -> defaultdict:
-        return get_type_group_map_special(X)
+        if features:
+            self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
 
     # TODO: Move this outside of here
     @staticmethod

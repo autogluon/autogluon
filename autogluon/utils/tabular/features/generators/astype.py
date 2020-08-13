@@ -45,7 +45,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
 
     def _remove_features_in(self, features):
         super()._remove_features_in(features)
-        self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
+        if features:
+            self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
 
     def print_feature_metadata_info(self):
         logger.log(20, 'Original Features (exact raw dtype, raw dtype):')

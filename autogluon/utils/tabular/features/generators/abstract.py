@@ -178,9 +178,10 @@ class AbstractFeatureGenerator:
             X = generator.transform(X=X)
         return X
 
-    def _remove_features_in(self, features):
-        self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
-        self.features_in = self.feature_metadata_in.get_features()
+    def _remove_features_in(self, features: list):
+        if features:
+            self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
+            self.features_in = self.feature_metadata_in.get_features()
 
     def _rename_features_in(self, column_rename_map: dict):
         if self.feature_metadata_in is not None:

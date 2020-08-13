@@ -196,4 +196,5 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     def _remove_features_in(self, features):
         super()._remove_features_in(features)
-        self.vectorizer_features = [feature for feature in self.vectorizer_features if feature not in features]
+        if features:
+            self.vectorizer_features = [feature for feature in self.vectorizer_features if feature not in features]
