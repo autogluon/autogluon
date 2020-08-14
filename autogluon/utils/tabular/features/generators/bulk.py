@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
 from ..feature_metadata import FeatureMetadata
@@ -40,6 +40,33 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         Common pre_generator's include AsTypeFeatureGenerator and FillNaFeatureGenerator, which act to prune and clean the data instead of generating entirely new features.
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+
+    Examples
+    --------
+    >>> from autogluon import TabularPrediction as task
+    >>> from autogluon.utils.tabular.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
+    >>>
+    >>> generators = [
+    >>>     [AsTypeFeatureGenerator()],  # Convert all input features to the exact same types as they were during fit.
+    >>>     [FillNaFeatureGenerator()],  # Fill all NA values in the data
+    >>>     [
+    >>>         CategoryFeatureGenerator(),  # Convert object types to category types and minimize their memory usage
+    >>>         IdentityFeatureGenerator(),  # Carry over all features that are not objects and categories (without this, the int features would be dropped).
+    >>>     ],  # CategoryFeatureGenerator and IdentityFeatureGenerator will have their outputs concatenated together before being fed into DropDuplicatesFeatureGenerator
+    >>>     [DropDuplicatesFeatureGenerator()]  # Drops any features which are duplicates of each-other
+    >>> ]
+    >>> feature_generator = BulkFeatureGenerator(generators=generators, verbosity=3)
+    >>>
+    >>> label_column = 'class'
+    >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
+    >>> X_train = train_data.drop(labels=[label_column], axis=1)
+    >>> y_train = train_data[label_column]
+    >>>
+    >>> X_train_transformed = feature_generator.fit_transform(X=X_train, y=y_train)
+    >>>
+    >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+    >>>
+    >>> X_test_transformed = feature_generator.transform(test_data)
     """
     def __init__(self, generators: List[List[AbstractFeatureGenerator]], pre_generators: List[AbstractFeatureGenerator] = None, **kwargs):
         super().__init__(**kwargs)
@@ -59,6 +86,11 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         else:
             post_generators = []
         self.generators: List[List[AbstractFeatureGenerator]] = pre_generators + generators + post_generators
+
+        for generator_group in self.generators:
+            for generator in generator_group:
+                if not isinstance(generator, AbstractFeatureGenerator):
+                    raise AssertionError(f'generators contains an object which is not an instance of AbstractFeatureGenerator. Invalid generator: {generator}')
 
         self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
 
