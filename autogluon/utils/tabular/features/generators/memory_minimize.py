@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from pandas import DataFrame
 
-from .abstract import AbstractFeatureGenerator
+from . import AbstractFeatureGenerator
 from ..utils import clip_and_astype
 
 logger = logging.getLogger(__name__)

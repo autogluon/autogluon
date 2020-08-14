@@ -1,14 +1,12 @@
 import logging
 
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add inplace parameter
 class IdentityFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)

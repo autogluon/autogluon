@@ -1,11 +1,7 @@
 import logging
 
 from .abstract_pipeline_feature_generator import AbstractPipelineFeatureGenerator
-from .generators.category import CategoryFeatureGenerator
-from .generators.text_special import TextSpecialFeatureGenerator
-from .generators.identity import IdentityFeatureGenerator
-from .generators.datetime import DatetimeFeatureGenerator
-from .generators.text_ngram import TextNgramFeatureGenerator
+from .generators import CategoryFeatureGenerator, DatetimeFeatureGenerator, IdentityFeatureGenerator, TextNgramFeatureGenerator, TextSpecialFeatureGenerator
 
 logger = logging.getLogger(__name__)
 

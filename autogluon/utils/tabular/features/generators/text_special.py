@@ -6,7 +6,6 @@ from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
-from ..feature_metadata import FeatureMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,6 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
-            # binned=list(X_out.columns),  # TODO: Add binning component?
             text_special=list(X_out.columns)
         )
         return X_out, type_family_groups_special

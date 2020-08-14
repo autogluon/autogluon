@@ -2,13 +2,10 @@ import copy
 import logging
 
 import psutil
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 from .feature_metadata import FeatureMetadata
-from .generators.dummy import DummyFeatureGenerator
-from .generators.bulk import BulkFeatureGenerator
-from .generators.fillna import FillNaFeatureGenerator
-from .generators.drop_unique import DropUniqueFeatureGenerator
+from .generators import BulkFeatureGenerator, DummyFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator
 from .types import get_type_map_real
 from ..data.utils import get_approximate_df_mem_usage
 

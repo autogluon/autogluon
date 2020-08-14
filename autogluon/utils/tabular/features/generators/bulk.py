@@ -12,6 +12,35 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add parameter to add prefix to each generator to guarantee no name collisions: 'G1_', 'G2_', etc.
 class BulkFeatureGenerator(AbstractFeatureGenerator):
+    """
+    BulkFeatureGenerator is used for complex feature generation pipelines where multiple generators are required, with some generators requiring the output of other generators as input (multi-stage generation).
+    For ML problems, it is expected that the user uses a feature generator that is an instance of or is inheriting from BulkFeatureGenerator, as single feature generators typically will not satisfy the feature generation needs of all input data types.
+
+    Parameters
+    ----------
+    generators : List[List[AbstractFeatureGenerator]]
+        generators is a list of lists of generators.
+        Feature generators within generators[i] are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
+        generators[i+1] are then fit on the output of generators[i].
+        The last generator group's output is the output of _fit_transform and _transform methods.
+        Due to the flexibility of generators, at the time of initialization, generators will prepend pre_generators and append post_generators if they are not None.
+            In this case:
+                pre_generators = [[pre_generator] for pre_generator in pre_generators]
+                post_generators = [[post_generator] for post_generator in self._post_generators]
+                self.generators: List[List[AbstractFeatureGenerator]] = pre_generators + generators + post_generators
+                self._post_generators = []
+            This means that self._post_generators will be empty as post_generators will be incorporated into self.generators instead.
+        Note that if generators within a generator group produce a feature with the same name, an AssertionError will be raised as features with the same name cannot be present within a valid DataFrame output.
+            If both features are desired, specify a name_prefix parameter in one of the generators to prevent name collisions.
+            If experimenting with different generator groups, it is encouraged to fit the data frequently during experimentation outside of the ML model training to ensure validity and avoid name collisions.
+    pre_generators: List[AbstractFeatureGenerator], optional
+        pre_generators are generators which are sequentially fit prior to generators.
+        Functions identically to post_generators argument, but pre_generators are called before generators, while post_generators are called after generators.
+        Provided for convenience to classes inheriting from BulkFeatureGenerator.
+        Common pre_generator's include AsTypeFeatureGenerator and FillNaFeatureGenerator, which act to prune and clean the data instead of generating entirely new features.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+    """
     def __init__(self, generators: List[List[AbstractFeatureGenerator]], pre_generators: List[AbstractFeatureGenerator] = None, **kwargs):
         super().__init__(**kwargs)
         if not isinstance(generators, list):
@@ -19,7 +48,6 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         elif len(generators) == 0:
             raise AssertionError('generators must contain at least one AbstractFeatureGenerator.')
         generators = [generator_group if isinstance(generator_group, list) else [generator_group] for generator_group in generators]
-        self.generators: List[List[AbstractFeatureGenerator]] = generators
         if pre_generators is None:
             pre_generators = []
         elif not isinstance(pre_generators, list):
@@ -30,7 +58,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             self._post_generators = []
         else:
             post_generators = []
-        self.generators = pre_generators + self.generators + post_generators
+        self.generators: List[List[AbstractFeatureGenerator]] = pre_generators + generators + post_generators
 
         self._feature_metadata_in_unused: FeatureMetadata = None  # FeatureMetadata object based on the original input features that were unused by any feature generator.
 
