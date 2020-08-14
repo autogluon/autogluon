@@ -294,6 +294,7 @@ class AbstractModel:
             return self.model.predict(X)
 
         y_pred_proba = self.model.predict_proba(X)
+        print("proba", self, y_pred_proba)
         if self.problem_type == BINARY:
             if len(y_pred_proba.shape) == 1:
                 return y_pred_proba

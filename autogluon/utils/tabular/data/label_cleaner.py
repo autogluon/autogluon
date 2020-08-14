@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 from pandas import DataFrame, Series
 
-from ..ml.constants import BINARY, MULTICLASS, REGRESSION
+from ..ml.constants import BINARY, MULTICLASS, REGRESSION, FORECAST
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class LabelCleaner:
                 return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
             return LabelCleanerDummy(problem_type=problem_type)
+        elif problem_type == FORECAST:
+            return LabelCleanerForecast()
         else:
             raise NotImplementedError
 
@@ -64,6 +66,23 @@ class LabelCleaner:
             y = Series(y)
         elif isinstance(y, Series) and y.dtype.name == 'category':
             y = y.astype('object')
+        return y
+
+# TODO: What should we implement for forecast problem type?
+class LabelCleanerForecast(LabelCleaner):
+    def __init__(self):
+        pass
+
+    def transform(self, y: Series) -> Series:
+        raise NotImplementedError
+
+    def inverse_transform(self, y: Series) -> Series:
+        raise NotImplementedError
+
+    def transform_proba(self, y):
+        return y
+
+    def inverse_transform_proba(self, y):
         return y
 
 class LabelCleanerMulticlass(LabelCleaner):

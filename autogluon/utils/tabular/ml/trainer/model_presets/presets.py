@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from ...constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
+from ...constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION, FORECAST
 from ...models.abstract.abstract_model import AbstractModel
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lr.lr_model import LinearModel
@@ -14,6 +14,7 @@ from ...models.rf.rf_model import RFModel
 from ...models.knn.knn_model import KNNModel
 from ...models.catboost.catboost_model import CatboostModel
 from ...models.xt.xt_model import XTModel
+from ...models.mqcnn.mqcnn_model import MQCNNModel
 from ....metrics import soft_log_loss, mean_squared_error
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ DEFAULT_SOFTCLASS_PRIORITY = dict(
 DEFAULT_CUSTOM_MODEL_PRIORITY = 0
 
 MODEL_TYPES = dict(
+    MQCNN=MQCNNModel,
     RF=RFModel,
     XT=XTModel,
     KNN=KNNModel,
@@ -95,7 +97,8 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
                       level='default', extra_ag_args_fit=None, name_suffix='', default_priorities=DEFAULT_MODEL_PRIORITY):
-    if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
+    print(problem_type)
+    if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, FORECAST]:
         raise NotImplementedError
 
     if level in hyperparameters.keys():
@@ -154,7 +157,7 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
 
     for model in models:
         model.rename(model.name + name_suffix)
-
+    print("get_model results:", models)
     return models
 
 

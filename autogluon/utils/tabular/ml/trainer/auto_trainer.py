@@ -4,7 +4,7 @@ import pandas as pd
 from .abstract_trainer import AbstractTrainer
 from .model_presets.presets import get_preset_models
 from ..utils import generate_train_test_split
-
+from ..constants import BINARY, MULTICLASS, REGRESSION, FORECAST
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +28,11 @@ class AutoTrainer(AbstractTrainer):
             X_val = None
             y_val = None
         else:
-            if (y_val is None) or (X_val is None):
-                X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
+            if self.problem_type == FORECAST:
+                if X_val is None:
+                    # TODO: do split here
+                    pass
+            else:
+                if (y_val is None) or (X_val is None):
+                    X_train, X_val, y_train, y_val = generate_train_test_split(X_train, y_train, problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
         self.train_multi_and_ensemble(X_train, y_train, X_val, y_val, models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune)

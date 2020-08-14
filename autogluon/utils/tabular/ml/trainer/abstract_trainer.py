@@ -248,6 +248,7 @@ class AbstractTrainer:
     def train_and_save(self, X_train, y_train, X_val, y_val, model: AbstractModel, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         fit_start_time = time.time()
         model_names_trained = []
+        print("train_and_save", model)
         try:
             if time_limit is not None:
                 if time_limit <= 0:
@@ -455,7 +456,7 @@ class AbstractTrainer:
             model_name_trained_lst = self.train_single_full(X_train, y_train, X_val, y_val, model, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, stack_name=stack_name,
                                                             kfolds=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end,
                                                             n_repeats=n_repeats, n_repeat_start=n_repeat_start, level=level, time_limit=time_left)
-
+            print("train_multi_fold:", model_name_trained_lst)
             if self.low_memory:
                 del model
             models_valid += model_name_trained_lst

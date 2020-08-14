@@ -8,7 +8,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from .abstract_learner import AbstractLearner
-from ..constants import BINARY, MULTICLASS, REGRESSION
+from ..constants import BINARY, MULTICLASS, REGRESSION, FORECAST
 from ..trainer.auto_trainer import AutoTrainer
 from ..utils import augment_rare_classes
 from ...data.cleaner import Cleaner
@@ -28,7 +28,7 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
@@ -75,7 +75,7 @@ class DefaultLearner(AbstractLearner):
 
         trainer = self.trainer_type(
             path=self.model_context,
-            problem_type=self.label_cleaner.problem_type_transform,
+            problem_type=self.trainer_problem_type,
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
@@ -99,6 +99,7 @@ class DefaultLearner(AbstractLearner):
             self.stopping_metric = trainer.stopping_metric
 
         self.save()
+        print("before train", self.problem_type)
         trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
         self.save_trainer(trainer=trainer)
@@ -123,54 +124,83 @@ class DefaultLearner(AbstractLearner):
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(X[self.label])
 
-        if X_val is not None and self.label in X_val.columns:
-            # TODO: This is not an ideal solution, instead check if bagging and X_val exists with label, then merge them prior to entering general data processing.
-            #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
-        else:
-            self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
-
-        if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
-            X = augment_rare_classes(X, self.label, self.threshold)
-
-        # Gets labels prior to removal of infrequent classes
-        y_uncleaned = X[self.label].copy()
-
-        self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
-        # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
-        X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
-        X, y = self.extract_label(X)
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
-        y = self.label_cleaner.transform(y)
-
-        if self.label_cleaner.num_classes is not None:
-            logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
-
-        if X_val is not None and self.label in X_val.columns:
-            X_val = self.cleaner.transform(X_val)
-            if len(X_val) == 0:
-                logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
-                X_val = None
-                y_val = None
+        if self.problem_type in [MULTICLASS, REGRESSION, BINARY]:
+            if X_val is not None and self.label in X_val.columns:
+                # TODO: This is not an ideal solution, instead check if bagging and X_val exists with label, then merge them prior to entering general data processing.
+                #  This solution should handle virtually all cases correctly, only downside is it might cut more classes than it needs to.
+                self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=1, num_bagging_folds=num_bagging_folds)
             else:
-                X_val, y_val = self.extract_label(X_val)
-                y_val = self.label_cleaner.transform(y_val)
-        else:
-            y_val = None
+                self.threshold, holdout_frac, num_bagging_folds = self.adjust_threshold_if_necessary(X[self.label], threshold=self.threshold, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds)
 
-        # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        if X_val is not None:
-            # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
-            logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
-            X_super = pd.concat([X, X_val], ignore_index=True)
-            X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
-            X = X_super.head(len(X)).set_index(X.index)
-            X_val = X_super.tail(len(X_val)).set_index(X_val.index)
-            del X_super
-        else:
-            X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
+            if (self.eval_metric is not None) and (self.eval_metric.name in ['log_loss', 'pac_score']) and (self.problem_type == MULTICLASS):
+                X = augment_rare_classes(X, self.label, self.threshold)
 
-        return X, y, X_val, y_val, holdout_frac, num_bagging_folds
+            # Gets labels prior to removal of infrequent classes
+            y_uncleaned = X[self.label].copy()
+
+            self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
+            # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
+            X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
+            X, y = self.extract_label(X)
+            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
+            y = self.label_cleaner.transform(y)
+
+            if self.label_cleaner.num_classes is not None:
+                logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
+
+            if X_val is not None and self.label in X_val.columns:
+                X_val = self.cleaner.transform(X_val)
+                if len(X_val) == 0:
+                    logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
+                    X_val = None
+                    y_val = None
+                else:
+                    X_val, y_val = self.extract_label(X_val)
+                    y_val = self.label_cleaner.transform(y_val)
+            else:
+                y_val = None
+
+            # TODO: Move this up to top of data before removing data, this way our feature generator is better
+            if X_val is not None:
+                # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
+                logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
+                X_super = pd.concat([X, X_val], ignore_index=True)
+                X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
+                X = X_super.head(len(X)).set_index(X.index)
+                X_val = X_super.tail(len(X_val)).set_index(X_val.index)
+                del X_super
+            else:
+                X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
+
+            return X, y, X_val, y_val, holdout_frac, num_bagging_folds
+        elif self.problem_type == FORECAST:
+            # TODO: transform dataframe into a time series in a row
+            # TODO: avoid using specific column name
+            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label])
+            self.trainer_problem_type = self.problem_type
+            index_column = self.submission_columns[0]
+            indices = list(set(X[index_column]))
+            date_list = sorted(list(set(X["date"])))
+
+            def transform_dataframe(df):
+                data_dic = {"index": list(set(df["index"]))}
+
+                for date in date_list:
+                    tmp = df[df["date"] == date][["index", "date", "target"]]
+                    tmp = tmp.pivot(index="index", columns="date", values="target")
+                    tmp_values = tmp[date].values
+                    data_dic[date] = tmp_values
+                return pd.DataFrame(data_dic)
+            X = transform_dataframe(X)
+            # print(X.iloc[:, -10:])
+            # TODO:
+            if X_val is None:
+                n_rows = len(X)
+                X_val = X.iloc[:, -int(holdout_frac * n_rows):]
+                X_val["index"] = X["index"].values
+            return X, None, X_val, None, holdout_frac, num_bagging_folds
+        else:
+            raise NotImplemented
 
     def adjust_threshold_if_necessary(self, y, threshold, holdout_frac, num_bagging_folds):
         new_threshold, new_holdout_frac, new_num_bagging_folds = self._adjust_threshold_if_necessary(y, threshold, holdout_frac, num_bagging_folds)

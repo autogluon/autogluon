@@ -9,7 +9,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
 
-from .constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS
+from .constants import BINARY, REGRESSION, MULTICLASS, SOFTCLASS, FORECAST
 from ..metrics import accuracy, root_mean_squared_error, Scorer
 
 logger = logging.getLogger(__name__)
@@ -47,24 +47,27 @@ def generate_kfold(X, y=None, n_splits=5, random_state=0, stratified=False, n_re
 def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_size: float = 0.1, random_state=0) -> (DataFrame, DataFrame, Series, Series):
     if (test_size <= 0.0) or (test_size >= 1.0):
         raise ValueError("fraction of data to hold-out must be specified between 0 and 1")
-
-    if problem_type in [REGRESSION, SOFTCLASS]:
-        stratify = None
+    if problem_type == FORECAST:
+    # TODO: implement train-test split for forecasting problem
+        pass
     else:
-        stratify = y
+        if problem_type in [REGRESSION, SOFTCLASS]:
+            stratify = None
+        else:
+            stratify = y
 
-    # TODO: Enable stratified split when y class would result in 0 samples in test.
-    #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
-    #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
-    #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
-    X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
-    if problem_type != SOFTCLASS:
-        y_train = pd.Series(y_train, index=X_train.index)
-        y_test = pd.Series(y_test, index=X_test.index)
-    else:
-        y_train = pd.DataFrame(y_train, index=X_train.index)
-        y_test = pd.DataFrame(y_test, index=X_test.index)
-    return X_train, X_test, y_train, y_test
+        # TODO: Enable stratified split when y class would result in 0 samples in test.
+        #  One approach: extract low frequency classes from X/y, add back (1-test_size)% to X_train, y_train, rest to X_test
+        #  Essentially stratify the high frequency classes, random the low frequency (While ensuring at least 1 example stays for each low frequency in train!)
+        #  Alternatively, don't test low frequency at all, trust it to work in train set. Risky, but highest quality for predictions.
+        X_train, X_test, y_train, y_test = train_test_split(X, y.values, test_size=test_size, shuffle=True, random_state=random_state, stratify=stratify)
+        if problem_type != SOFTCLASS:
+            y_train = pd.Series(y_train, index=X_train.index)
+            y_test = pd.Series(y_test, index=X_test.index)
+        else:
+            y_train = pd.DataFrame(y_train, index=X_train.index)
+            y_test = pd.DataFrame(y_test, index=X_test.index)
+        return X_train, X_test, y_train, y_test
 
 
 def convert_categorical_to_int(X):

@@ -10,7 +10,7 @@ from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ...constants import MULTICLASS
 from ....features.feature_types_metadata import FeatureTypesMetadata
-
+from ...constants import BINARY, REGRESSION, FORECAST
 logger = logging.getLogger(__name__)
 
 
@@ -74,31 +74,35 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             self._set_default_param_value(param, val)
 
     def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None):
-        if self.stack_column_prefix_lst:
-            if infer:
-                if set(self.stack_columns).issubset(set(list(X.columns))):
-                    compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
-            if compute_base_preds:
-                X_stacker = []
-                for stack_column_prefix in self.stack_column_prefix_lst:
-                    base_model_name = self.stack_column_prefix_to_model_map[stack_column_prefix]
-                    if fit:
-                        base_model_type = self.base_model_types_dict[base_model_name]
-                        base_model_path = self.base_model_paths_dict[base_model_name]
-                        y_pred_proba = base_model_type.load_oof(path=base_model_path)
-                    elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
-                        y_pred_proba = model_pred_proba_dict[base_model_name]
+        if self.problem_type == FORECAST:
+            pass
+        else:
+            if self.stack_column_prefix_lst:
+                if infer:
+                    if set(self.stack_columns).issubset(set(list(X.columns))):
+                        compute_base_preds = False  # TODO: Consider removing, this can be dangerous but the code to make this work otherwise is complex (must rewrite predict_proba)
+                if compute_base_preds:
+                    X_stacker = []
+                    for stack_column_prefix in self.stack_column_prefix_lst:
+                        base_model_name = self.stack_column_prefix_to_model_map[stack_column_prefix]
+                        if fit:
+                            base_model_type = self.base_model_types_dict[base_model_name]
+                            base_model_path = self.base_model_paths_dict[base_model_name]
+                            y_pred_proba = base_model_type.load_oof(path=base_model_path)
+                        elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
+                            y_pred_proba = model_pred_proba_dict[base_model_name]
+                        else:
+                            base_model = self.load_base_model(base_model_name)
+                            print("before predict proba", base_model)
+                            y_pred_proba = base_model.predict_proba(X)
+                        X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
+                    X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
+                    if self.use_orig_features:
+                        X = pd.concat([X_stacker, X], axis=1)
                     else:
-                        base_model = self.load_base_model(base_model_name)
-                        y_pred_proba = base_model.predict_proba(X)
-                    X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
-                X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
-                if self.use_orig_features:
-                    X = pd.concat([X_stacker, X], axis=1)
-                else:
-                    X = X_stacker
-            elif not self.use_orig_features:
-                X = X[self.stack_columns]
+                        X = X_stacker
+                elif not self.use_orig_features:
+                    X = X[self.stack_columns]
         if preprocess:
             X = super().preprocess(X, model=model)
         return X
