@@ -50,7 +50,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         try:
             X_out = self._generate_ngrams(X=X)
         except Exception:
-            logger.exception('Error: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
+            self.log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
             raise
         return X_out
 
@@ -83,7 +83,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                 vectorizer_fit, _ = self._train_vectorizer(text_list, vectorizer_raw)  # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
                 self.log(20, f'{vectorizer_fit.__class__.__name__} fit with vocabulary size = {len(vectorizer_fit.vocabulary_)}', self.log_prefix+'\t')
             except ValueError:
-                self.log(30, f"Removing 'text_ngram' feature due to error: {nlp_feature}")
+                self.log(30, f"Removing text_ngram feature due to error: '{nlp_feature}'", self.log_prefix+'\t')
                 if nlp_feature == '__nlp__':
                     self.vectorizer_features = []
                     features_nlp_to_remove = self.features_in
@@ -118,13 +118,13 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                         skip_nlp = True
 
                 if skip_nlp:
-                    self.log(15, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.')
+                    self.log(30, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix+'\t')
                     self.log(10, str(err))
                     self.vectorizers = []
                     self.features_in = []
                     keep_trying_nlp = False
                 else:
-                    self.log(15, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.')
+                    self.log(20, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix+'\t')
                     self.log(10, str(err))
                     downsample_ratio = 0.25
         if X_text_ngram is None:

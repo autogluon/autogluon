@@ -58,11 +58,11 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
             X_out = dummy_generator.fit_transform(X=X_out)
             type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
             self.generators = [dummy_generator]
-            self.post_generators = []
+            self._post_generators = []
         return X_out, type_group_map_special
 
-    def _infer_features_in_full(self, X: DataFrame, y: Series = None, feature_metadata_in: FeatureMetadata = None):
-        super()._infer_features_in_full(X=X, y=y, feature_metadata_in=feature_metadata_in)
+    def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
+        super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
         self._feature_metadata_in_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.type_group_map_raw)
 

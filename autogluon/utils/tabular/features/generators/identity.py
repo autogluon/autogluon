@@ -15,7 +15,7 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
         return X_out, self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X):
-        return self._generate_features_identity(X)
+        return X
 
     def _infer_features_in(self, X, y=None) -> list:
         identity_features = []
@@ -26,6 +26,3 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
             if feature_type_raw not in invalid_raw_types:
                 identity_features.append(feature)
         return identity_features
-
-    def _generate_features_identity(self, X: DataFrame):
-        return X[self.features_in]

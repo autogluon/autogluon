@@ -19,7 +19,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         self.symbols = symbols  # Symbols to generate count and ratio features for.
         if bin_features:
-            self.post_generators = [BinnedFeatureGenerator(inplace=True)] + self.post_generators
+            self._post_generators = [BinnedFeatureGenerator(inplace=True)] + self._post_generators
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
