@@ -35,7 +35,7 @@ dataset_train = task.Dataset(data_root, classes=('motorbike',))
 ```
 
 ## Fit Models by AutoGluon
-In this section, we demonstrate how to apply AutoGluon to fit our detection models. We use mobilenet as the backbone for the YOLO3 model. Two different learning rates are used to fine-tune the network. The best model is the one that obtains the best performance on the validation dataset. You can also try using more networks and hyperparameters to create a larger searching space. 
+In this section, we demonstrate how to apply AutoGluon to fit our detection models. We use mobilenet as the backbone for the YOLOv3 model. Two different learning rates are used to fine-tune the network. The best model is the one that obtains the best performance on the validation dataset. You can also try using more networks and hyperparameters to create a larger searching space. 
 
 We `fit` a classifier using AutoGluon as follows. In each experiment (one trial in our searching space), we train the model for 30 epochs. 
 
