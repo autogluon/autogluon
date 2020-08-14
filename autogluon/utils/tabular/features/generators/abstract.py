@@ -155,7 +155,7 @@ class AbstractFeatureGenerator:
         X_out : DataFrame object which is the transformed version of the input data X.
 
         """
-        self.log(20, f'Fitting {self.__class__.__name__}...')
+        self._log(20, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
         if y is not None and isinstance(y, Series):
@@ -312,14 +312,28 @@ class AbstractFeatureGenerator:
         """
         raise NotImplementedError
 
-    # TODO: Add documentation
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
+        """
+        Infers all input related feature information of X.
+        This can be extended when additional input information is desired beyond feature_metadata_in and features_in.
+            For example, AsTypeFeatureGenerator extends this method to also compute the exact raw feature types of the input for later use.
+        After this method returns, self.features_in and self.feature_metadata_in will be set to proper values.
+        This method is called by fit_transform prior to calling _fit_transform.
+
+        Parameters
+        ----------
+        X : DataFrame
+            Input data used to fit the generator.
+        feature_metadata_in : FeatureMetadata, optional
+            If passed, then self.feature_metadata_in will be set to feature_metadata_in assuming self.feature_metadata_in was None prior.
+            If both are None, then self.feature_metadata_in is inferred through _infer_feature_metadata_in(X)
+        """
         if self.feature_metadata_in is None:
             self.feature_metadata_in = feature_metadata_in
         elif feature_metadata_in is not None:
-            self.log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
+            self._log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
         if self.feature_metadata_in is None:
-            self.log(20, f'\tfeature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
+            self._log(20, f'\tfeature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X)
@@ -454,7 +468,7 @@ class AbstractFeatureGenerator:
     def set_verbosity(self, verbosity: int):
         self.verbosity = verbosity
 
-    def log(self, level, msg, log_prefix=None, verb_min=None):
+    def _log(self, level, msg, log_prefix=None, verb_min=None):
         if self.verbosity == 0:
             return
         if verb_min is None or self.verbosity >= verb_min:
@@ -471,12 +485,12 @@ class AbstractFeatureGenerator:
         log_level : int, default 20
             Log level of the logging statements.
         """
-        self.log(log_level, '\tOriginal Features (raw dtype, special dtypes):')
+        self._log(log_level, '\tOriginal Features (raw dtype, special dtypes):')
         self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
         if self.feature_metadata_real:
-            self.log(log_level, '\tProcessed Features (exact raw dtype, raw dtype):')
+            self._log(log_level, '\tProcessed Features (exact raw dtype, raw dtype):')
             self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
-        self.log(log_level, '\tProcessed Features (raw dtype, special dtypes):')
+        self._log(log_level, '\tProcessed Features (raw dtype, special dtypes):')
         self.feature_metadata.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
 
     def save(self, path: str):

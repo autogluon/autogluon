@@ -50,7 +50,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         try:
             X_out = self._generate_ngrams(X=X)
         except Exception:
-            self.log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
+            self._log(40, '\tError: OOM error during NLP feature transform, unrecoverable. Increase memory allocation or reduce data size to avoid this error.')
             raise
         return X_out
 
@@ -70,8 +70,8 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             self.vectorizer_features = ['__nlp__'] + copy.deepcopy(self.features_in)
         else:
             raise ValueError(f"vectorizer_strategy must be one of {['combined', 'separate', 'both']}, but value is: {self.vectorizer_features}")
-        self.log(20, f'Fitting {self.vectorizer_default_raw.__class__.__name__} for text features: ' + str(self.features_in), self.log_prefix+'\t')
-        self.log(15, f'{self.vectorizer_default_raw}', self.log_prefix+'\t\t')
+        self._log(20, f'Fitting {self.vectorizer_default_raw.__class__.__name__} for text features: ' + str(self.features_in), self.log_prefix + '\t')
+        self._log(15, f'{self.vectorizer_default_raw}', self.log_prefix + '\t\t')
         for nlp_feature in self.vectorizer_features:
             # TODO: Preprocess text?
             if nlp_feature == '__nlp__':  # Combine Text Fields
@@ -81,9 +81,9 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
             vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
             try:
                 vectorizer_fit, _ = self._train_vectorizer(text_list, vectorizer_raw)  # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
-                self.log(20, f'{vectorizer_fit.__class__.__name__} fit with vocabulary size = {len(vectorizer_fit.vocabulary_)}', self.log_prefix+'\t')
+                self._log(20, f'{vectorizer_fit.__class__.__name__} fit with vocabulary size = {len(vectorizer_fit.vocabulary_)}', self.log_prefix + '\t')
             except ValueError:
-                self.log(30, f"Removing text_ngram feature due to error: '{nlp_feature}'", self.log_prefix+'\t')
+                self._log(30, f"Removing text_ngram feature due to error: '{nlp_feature}'", self.log_prefix + '\t')
                 if nlp_feature == '__nlp__':
                     self.vectorizer_features = []
                     features_nlp_to_remove = self.features_in
@@ -118,14 +118,14 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
                         skip_nlp = True
 
                 if skip_nlp:
-                    self.log(30, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix+'\t')
-                    self.log(10, str(err))
+                    self._log(30, 'Warning: ngrams generation resulted in OOM error, removing ngrams features. If you want to use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
+                    self._log(10, str(err))
                     self.vectorizers = []
                     self.features_in = []
                     keep_trying_nlp = False
                 else:
-                    self.log(20, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix+'\t')
-                    self.log(10, str(err))
+                    self._log(20, 'Warning: ngrams generation resulted in OOM error, attempting to reduce ngram feature count. If you want to optimally use ngrams for this problem, increase memory allocation for AutoGluon.', self.log_prefix + '\t')
+                    self._log(10, str(err))
                     downsample_ratio = 0.25
         if X_text_ngram is None:
             X_text_ngram = DataFrame(index=X.index)
@@ -172,14 +172,14 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         if downsample_ratio is None:
             if predicted_percentage > self.max_memory_ratio:
                 downsample_ratio = self.max_memory_ratio / predicted_percentage
-                self.log(30, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
+                self._log(30, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
 
         if downsample_ratio is not None:
             if (downsample_ratio >= 1) or (downsample_ratio <= 0):
                 raise ValueError(f'downsample_ratio must be >0 and <1, but downsample_ratio is {downsample_ratio}')
             vocab_size = len(vectorizer_fit.vocabulary_)
             downsampled_vocab_size = int(np.floor(vocab_size * downsample_ratio))
-            self.log(20, f'Reducing Vectorizer vocab size from {vocab_size} to {downsampled_vocab_size} to avoid OOM error')
+            self._log(20, f'Reducing Vectorizer vocab size from {vocab_size} to {downsampled_vocab_size} to avoid OOM error')
             ngram_freq = get_ngram_freq(vectorizer=vectorizer_fit, transform_matrix=transform_matrix)
             downscale_vectorizer(vectorizer=vectorizer_fit, ngram_freq=ngram_freq, vocab_size=downsampled_vocab_size)
             # TODO: This doesn't have to be done twice, can update transform matrix based on new vocab instead of calling .transform
