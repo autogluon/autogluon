@@ -65,10 +65,10 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 # Here we assume CUDA 10.0 is installed.  You should change the number 
-                 # according to your own CUDA version (e.g. mxnet_cu101 for CUDA 10.1).
+                 # Here we assume CUDA 10.1 is installed.  You should change the number
+                 # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
                  # You may refer to https://sxjscience.github.io/KDD2020/ for more details.
-                 pip install -U --pre "mxnet_cu100>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
                  pip install autogluon
 
         .. container:: source
@@ -85,9 +85,9 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 # Here we assume CUDA 10.0 is installed.  You should change the number 
-                 # according to your own CUDA version (e.g. mxnet_cu101 for CUDA 10.1).
-                 pip install -U --pre "mxnet_cu100>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 # Here we assume CUDA 10.1 is installed.  You should change the number
+                 # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
+                 pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python setup.py develop
 
