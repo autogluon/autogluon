@@ -36,68 +36,6 @@ def make_dummy_datasets(ts_n=1, ts_length=100, freq="D", prediction_length=5):
 train_data = make_dummy_datasets(ts_length=200)
 test_data = make_dummy_datasets(ts_length=10)
 
-# def make_dummy_datasets_with_features(
-#     num_ts: int = 5,
-#     start: str = "2018-01-01",
-#     freq: str = "D",
-#     min_length: int = 5,
-#     max_length: int = 10,
-#     prediction_length: int = 3,
-#     cardinality: List[int] = [],
-#     num_feat_dynamic_real: int = 0,
-#     num_past_feat_dynamic_real: int = 0,
-# ) -> Tuple[ListDataset, ListDataset]:
-#
-#     data_iter_train = []
-#     data_iter_test = []
-#
-#     for k in range(num_ts):
-#         ts_length = randint(min_length, max_length)
-#         data_entry_train = {
-#             FieldName.START: start,
-#             FieldName.TARGET: [0.0] * ts_length,
-#         }
-#         if len(cardinality) > 0:
-#             data_entry_train[FieldName.FEAT_STATIC_CAT] = [
-#                 randint(0, c) for c in cardinality
-#             ]
-#         # Since used directly in predict and not in make_evaluate_predictions,
-#         # where the test target would be chopped, test and train target have the same lengths
-#         data_entry_test = data_entry_train.copy()
-#         if num_feat_dynamic_real > 0:
-#             data_entry_train[FieldName.FEAT_DYNAMIC_REAL] = [
-#                 [float(1 + k)] * ts_length
-#                 for k in range(num_feat_dynamic_real)
-#             ]
-#             data_entry_test[FieldName.FEAT_DYNAMIC_REAL] = [
-#                 [float(1 + k)] * (ts_length + prediction_length)
-#                 for k in range(num_feat_dynamic_real)
-#             ]
-#         data_iter_train.append(data_entry_train)
-#         data_iter_test.append(data_entry_test)
-#
-#     return (
-#         ListDataset(data_iter=data_iter_train, freq=freq),
-#         ListDataset(data_iter=data_iter_test, freq=freq),
-#     )
-#
-# hps = {
-#         "seed": 42,
-#         "freq": "D",
-#         "context_length": 5,
-#         "prediction_length": 3,
-#         "quantiles": [0.5, 0.1],
-#         "epochs": 3,
-#         "num_batches_per_epoch": 3,
-#     }
-#
-# train_data, test_data = make_dummy_datasets_with_features(
-#     cardinality=[3, 10],
-#     num_feat_dynamic_real=2,
-#     num_past_feat_dynamic_real=4,
-#     freq=hps["freq"],
-#     prediction_length=hps["prediction_length"],
-# )
 print(train_data)
 hyperparams = {'MQCNN': {'context_length': ag.Int(10, 20)} }
 savedir = 'ag_models/'
