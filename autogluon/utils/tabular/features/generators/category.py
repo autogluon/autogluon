@@ -15,6 +15,35 @@ logger = logging.getLogger(__name__)
 # TODO: Have a concept of a 1:1 mapping, so you can safely remove features from features_in and features_out
 #  Have a method remove_features() where each generator implements custom logic, default is just to only remove from features_out, but Category could remove from features_in + inner generators + category_map.
 class CategoryFeatureGenerator(IdentityFeatureGenerator):
+    """
+    CategoryFeatureGenerator is used to convert object types to category types, as well as remove rare categories and optimize memory usage.
+
+    Parameters
+    ----------
+    stateful_categories : bool, default True
+        If True, categories from training are applied to transformed data, and any unknown categories from input data will be treated as missing values.
+        It is recommended to keep this value as True to avoid strange downstream behaviour.
+    minimize_memory : bool, default True
+        If True, minimizes category memory usage by converting all category values to sequential integers.
+        This replaces any string data present in the categories but does not alter the behavior of models when using the category as a feature so long as the original string values are not required downstream.
+        It is recommended to keep this value as True to dramatically reduce memory usage with no cost to accuracy.
+    cat_order : str, default 'original'
+        Determines the order in which categories are stored.
+        This is important when minimize_memory is True, as the order will determine which categories are converted to which integer values.
+        Valid values:
+            'original' : Keep the original order. If the feature was originally an object, this is equivalent to 'alphanumeric'.
+            'alphanumeric' : Sort the categories alphanumerically.
+            'count' : Sort the categories by frequency (Least frequent in front with code of 0)
+    minimum_cat_count : int, default None
+        The minimum number of occurrences a category must have in the training data to avoid being considered a rare category.
+        Rare categories are removed and treated as missing values.
+        If None, no minimum count is required. This includes categories that never occur in the data but are present in the category object as possible categories.
+    maximum_num_cat : int, default None
+        The maximum amount of categories that can be considered non-rare.
+        Sorted by occurrence count, up to the N highest count categories will be kept if maximum_num_cat=N. All others will be considered rare categories.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+    """
     def __init__(self, stateful_categories=True, minimize_memory=True, cat_order='original', minimum_cat_count: int = None, maximum_num_cat: int = None, **kwargs):
         super().__init__(**kwargs)
         self._stateful_categories = stateful_categories
@@ -50,8 +79,6 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
         object_features = [feature for feature in object_features if feature not in datetime_as_object_features]
         return object_features
 
-    # TODO: Add stateful categorical generator, merge rare cases to an unknown value
-    # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:
             X_category = X.astype('category')
@@ -84,10 +111,12 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
                         elif self.cat_order == 'alphanumeric':
                             category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))  # TODO: Remove columns if all NaN after this?
+                    X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 elif self.cat_order == 'alphanumeric':
                     category_list = list(X_category[column].cat.categories)
                     category_list.sort()
                     X_category[column] = X_category[column].astype(CategoricalDtype(categories=category_list))
+                    X_category[column] = X_category[column].cat.reorder_categories(category_list)
                 category_map[column] = copy.deepcopy(X_category[column].cat.categories)
             return X_category, category_map
         else:

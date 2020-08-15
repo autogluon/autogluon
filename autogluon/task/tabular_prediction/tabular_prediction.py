@@ -11,7 +11,7 @@ from .presets_configs import set_presets, unpack
 from ..base import BaseTask, compile_scheduler_options
 from ..base.base_task import schedulers
 from ...utils import verbosity2loglevel
-from ...utils.tabular.features.auto_ml_pipeline_feature_generator import AutoMLPipelineFeatureGenerator
+from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
 from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer

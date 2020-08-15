@@ -4,17 +4,21 @@ import logging
 import psutil
 from pandas import DataFrame
 
-from .feature_metadata import FeatureMetadata
-from .generators import BulkFeatureGenerator, DummyFeatureGenerator, DropUniqueFeatureGenerator, FillNaFeatureGenerator
-from .types import get_type_map_real
-from ..data.utils import get_approximate_df_mem_usage
+from .bulk import BulkFeatureGenerator
+from .dummy import DummyFeatureGenerator
+from .drop_unique import DropUniqueFeatureGenerator
+from .fillna import FillNaFeatureGenerator
+from ..feature_metadata import FeatureMetadata
+from ..types import get_type_map_real
+from ...data.utils import get_approximate_df_mem_usage
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Use code from problem type detection for column types. Ints/Floats could be Categorical through this method. Maybe try both?
-class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
+# TODO: Documentation
+class PipelineFeatureGenerator(BulkFeatureGenerator):
     def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, verbosity=3, **kwargs):
         if pre_generators is None:
             pre_generators = [FillNaFeatureGenerator(inplace=True)]
@@ -41,7 +45,6 @@ class AbstractPipelineFeatureGenerator(BulkFeatureGenerator):
 
         return X_out
 
-    # TODO: Save this to disk and remove from memory if large categoricals!
     def _fit_transform(self, X: DataFrame, y=None, **kwargs):
         X_out, type_group_map_special = super()._fit_transform(X=X, y=y)
         X_out, type_group_map_special = self._fit_transform_custom(X_out=X_out, type_group_map_special=type_group_map_special, y=y)

@@ -12,3 +12,6 @@ from .identity import IdentityFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator, NumericMemoryMinimizeFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
+
+from .pipeline import PipelineFeatureGenerator
+from .auto_ml_pipeline import AutoMLPipelineFeatureGenerator
