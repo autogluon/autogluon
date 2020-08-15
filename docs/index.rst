@@ -61,12 +61,6 @@ Tutorials
       How to solve NLP problems that involves predicting categorical or numerical
       labels from raw text.
 
-   .. card::
-      :title: Text Classification
-      :link: tutorials/text_classification/index.html
-
-      How to make predictions based on text data.
-
 
 Advanced Topics
 ~~~~~~~~~~~~~~~
