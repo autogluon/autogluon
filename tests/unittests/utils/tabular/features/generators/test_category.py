@@ -1,17 +1,13 @@
-import copy
 
 import numpy as np
-import pytest
-from pandas import DataFrame
 
 from autogluon.utils.tabular.features.generators import CategoryFeatureGenerator
 
 
-def test_category_feature_generator():
+def test_category_feature_generator(generator_helper, data_helper):
     # Given
-    input_data = DataFrame(['a', 'b', 'a', 'd', 'd', 'd', 'c', np.nan, np.nan], columns=['col'])
-    original_input_data = copy.deepcopy(input_data)
-    category_input_data = input_data.astype('category')
+    input_data = data_helper.generate_multi_feature()
+    category_input_data = input_data[['obj', 'cat']].astype('category')
 
     generator_1 = CategoryFeatureGenerator()
     generator_2 = CategoryFeatureGenerator(maximum_num_cat=2)
@@ -19,8 +15,13 @@ def test_category_feature_generator():
     generator_4 = CategoryFeatureGenerator(cat_order='count')
     generator_5 = CategoryFeatureGenerator(minimize_memory=False)
 
-    expected_feature_metadata_in_full = {('object', ()): ['col']}
-    expected_feature_metadata_full = {('category', ()): ['col']}
+    expected_feature_metadata_in_full = {
+        ('object', ()): ['obj'],
+        ('category', ()): ['cat'],
+    }
+    expected_feature_metadata_full = {
+        ('category', ()): ['obj', 'cat']
+    }
 
     expected_cat_categories_lst = [
         [0, 1, 2, 3],
@@ -46,41 +47,22 @@ def test_category_feature_generator():
     # When
     output_datas = []
     for generator in [generator_1, generator_2, generator_3, generator_4, generator_5]:
-        # Raise exception
-        with pytest.raises(AssertionError):
-            # Can't call transform before fit_transform
-            generator.transform(input_data)
-
-        assert not generator.is_fit()
-        output_data = generator.fit_transform(input_data)
-        assert generator.is_fit()
-        with pytest.raises(AssertionError):
-            # Can't call fit_transform after fit
-            generator.fit_transform(input_data)
-
-        # Ensure input_data is not altered inplace
-        assert input_data.equals(original_input_data)
-        output_data_transform = generator.transform(input_data)
-
-        # Ensure transform and fit_transform output are the same for training data
-        assert output_data.equals(output_data_transform)
+        output_data = generator_helper.fit_transform_assert(
+            input_data=input_data,
+            generator=generator,
+            expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+            expected_feature_metadata_full=expected_feature_metadata_full,
+        )
         output_datas.append(output_data)
-        assert len(input_data) == len(output_data)
-
-        # Ensure feature metadata is as expected
-        assert expected_feature_metadata_in_full == generator.feature_metadata_in.get_feature_metadata_full()
-        assert expected_feature_metadata_full == generator.feature_metadata.get_feature_metadata_full()
-
-        assert list(input_data.columns) == list(output_data.columns)
 
     # Therefore
-    assert input_data['col'].dtype.name == 'object'
     assert category_input_data.equals(output_datas[4])
     output_datas = output_datas[:4]
 
     for i in range(len(output_datas)):
         output_data = output_datas[i]
-        assert output_data['col'].dtype.name == 'category'
-        assert list(output_data['col'].cat.categories) == expected_cat_categories_lst[i]
-        assert list(output_data['col']) == expected_cat_values_lst[i]
-        assert list(output_data['col'].cat.codes) == expected_cat_codes_lst[i]
+        for col in ['obj', 'cat']:
+            assert output_data[col].dtype.name == 'category'
+            assert list(output_data[col].cat.categories) == expected_cat_categories_lst[i]
+            assert list(output_data[col]) == expected_cat_values_lst[i]
+            assert list(output_data[col].cat.codes) == expected_cat_codes_lst[i]
