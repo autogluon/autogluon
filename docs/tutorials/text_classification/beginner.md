@@ -49,7 +49,7 @@ precisely, training runs are started as long as `time_limits` is not reached).
 For demo purposes, we specify only small values for `time_limits`, `epochs`:
 
 ```{.python .input}
-predictor = task.fit(dataset, epochs=1, time_limits=30)
+predictor = task.fit(dataset, epochs=1, time_limits=60)
 ```
 
 Within `fit`, the model with the best hyperparameter configuration is selected based on its validation accuracy after being trained on the data in the training split.  
