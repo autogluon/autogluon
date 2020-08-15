@@ -1,8 +1,9 @@
 import copy
 import logging
+from typing import Union
 
 import numpy as np
-from pandas import Series
+from pandas import DataFrame, Series
 
 from ..ml.constants import BINARY, MULTICLASS, REGRESSION
 
@@ -15,9 +16,14 @@ class LabelCleaner:
     inv_map = None
     ordered_class_labels = None
     ordered_class_labels_transformed = None
+    problem_type_transform = None
 
     @staticmethod
-    def construct(problem_type: str, y: Series, y_uncleaned: Series = None):
+    def construct(problem_type: str, y: Union[Series, np.ndarray, list], y_uncleaned: Union[Series, np.ndarray, list] = None):
+        y = LabelCleaner._convert_to_valid_series(y)
+        if y_uncleaned is not None:
+            y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)
+
         if problem_type == BINARY:
             return LabelCleanerBinary(y)
         elif problem_type == MULTICLASS:
@@ -28,25 +34,43 @@ class LabelCleaner:
             else:
                 return LabelCleanerMulticlass(y, y_uncleaned)
         elif problem_type == REGRESSION:
-            return LabelCleanerDummy()
+            return LabelCleanerDummy(problem_type=problem_type)
         else:
             raise NotImplementedError
 
-    def transform(self, y: Series) -> Series:
+    def transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._transform(y)
+
+    def inverse_transform(self, y: Union[Series, np.ndarray, list]) -> Series:
+        y = self._convert_to_valid_series(y)
+        return self._inverse_transform(y)
+
+    def _transform(self, y: Series) -> Series:
         raise NotImplementedError
 
-    def inverse_transform(self, y: Series) -> Series:
+    def _inverse_transform(self, y: Series) -> Series:
         raise NotImplementedError
 
     def transform_proba(self, y):
         return y
 
-    def inverse_transform_proba(self, y):
+    def inverse_transform_proba(self, y, as_pandas=False):
         return y
 
+    @staticmethod
+    def _convert_to_valid_series(y: Union[Series, np.ndarray, list]) -> Series:
+        if isinstance(y, np.ndarray) or isinstance(y, list):
+            y = Series(y)
+        elif isinstance(y, Series) and y.dtype.name == 'category':
+            y = y.astype('object')
+        return y
 
 class LabelCleanerMulticlass(LabelCleaner):
     def __init__(self, y: Series, y_uncleaned: Series):
+        self.problem_type_transform = MULTICLASS
+        y = self._convert_to_valid_series(y)
+        y_uncleaned = self._convert_to_valid_series(y_uncleaned)
         self.cat_mappings_dependent_var: dict = self._generate_categorical_mapping(y)
         self.inv_map: dict = {v: k for k, v in self.cat_mappings_dependent_var.items()}
 
@@ -62,15 +86,11 @@ class LabelCleanerMulticlass(LabelCleaner):
         self.label_index_to_keep = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 0]
         self.label_index_to_remove = [i for i, label in enumerate(self.labels_to_zero_fill) if label == 1]
 
-    def transform(self, y: Series) -> Series:
-        if isinstance(y, np.ndarray):
-            y = Series(y)
+    def _transform(self, y: Series) -> Series:
         y = y.map(self.inv_map)
         return y
 
-    def inverse_transform(self, y: Series) -> Series:
-        if isinstance(y, list):
-            y = Series(y)
+    def _inverse_transform(self, y: Series) -> Series:
         y = y.map(self.cat_mappings_dependent_var)
         return y
 
@@ -82,13 +102,19 @@ class LabelCleanerMulticlass(LabelCleaner):
         else:
             return y
 
-    def inverse_transform_proba(self, y):
+    def inverse_transform_proba(self, y, as_pandas=False):
+        y_index = None
+        if isinstance(y, DataFrame):
+            y_index = y.index
+            y = y.to_numpy()
         if self.invalid_class_count > 0:
-            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)])
+            y_transformed = np.zeros([len(y), len(self.ordered_class_labels)], dtype=np.float64)
             y_transformed[:, self.label_index_to_keep] = y
-            return y_transformed
         else:
-            return y
+            y_transformed = y
+        if as_pandas:
+            y_transformed = DataFrame(data=y_transformed, index=y_index, columns=self.ordered_class_labels, dtype=np.float64)
+        return y_transformed
 
     @staticmethod
     def _generate_categorical_mapping(y: Series) -> dict:
@@ -100,6 +126,8 @@ class LabelCleanerMulticlass(LabelCleaner):
 # TODO: Expand print statement to multiclass as well
 class LabelCleanerBinary(LabelCleaner):
     def __init__(self, y: Series):
+        self.problem_type_transform = BINARY
+        y = self._convert_to_valid_series(y)
         self.num_classes = 2
         self.unique_values = list(y.unique())
         if len(self.unique_values) != 2:
@@ -136,17 +164,13 @@ class LabelCleanerBinary(LabelCleaner):
         logger.log(20, 'Selected class <--> label mapping:  class 1 = %s, class 0 = %s' % (poslabel, neglabel))
         self.cat_mappings_dependent_var: dict = {v: k for k, v in self.inv_map.items()}
         self.ordered_class_labels_transformed = [0, 1]
-        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]
+        self.ordered_class_labels = [self.cat_mappings_dependent_var[label_transformed] for label_transformed in self.ordered_class_labels_transformed]\
 
-    def transform(self, y: Series) -> Series:
-        if isinstance(y, np.ndarray):
-            y = Series(y)
+    def _transform(self, y: Series) -> Series:
         y = y.map(self.inv_map)
         return y
 
-    def inverse_transform(self, y: Series) -> Series:
-        if isinstance(y, list):
-            y = Series(y)
+    def _inverse_transform(self, y: Series) -> Series:
         return y.map(self.cat_mappings_dependent_var)
 
 
@@ -154,29 +178,36 @@ class LabelCleanerMulticlassToBinary(LabelCleanerMulticlass):
     def __init__(self, y: Series, y_uncleaned: Series):
         super().__init__(y=y, y_uncleaned=y_uncleaned)
         self.label_cleaner_binary = LabelCleanerBinary(y=y.map(self.inv_map))
+        self.problem_type_transform = self.label_cleaner_binary.problem_type_transform
 
-    def transform(self, y: Series) -> Series:
-        y = super().transform(y)
+    def _transform(self, y: Series) -> Series:
+        y = super()._transform(y)
         y = self.label_cleaner_binary.transform(y)
         return y
 
-    def inverse_transform_proba(self, y):
-        y = self.convert_binary_proba_to_multiclass_proba(y=y)
-        return super().inverse_transform_proba(y)
+    def inverse_transform_proba(self, y, as_pandas=False):
+        y = self.convert_binary_proba_to_multiclass_proba(y=y, as_pandas=as_pandas)
+        return super().inverse_transform_proba(y, as_pandas=as_pandas)
 
     @staticmethod
-    def convert_binary_proba_to_multiclass_proba(y):
+    def convert_binary_proba_to_multiclass_proba(y, as_pandas=False):
+        y_index = None
+        if as_pandas and isinstance(y, Series):
+            y_index = y.index
         y_transformed = np.zeros([len(y), 2])
         y_transformed[:, 0] = 1 - y
         y_transformed[:, 1] = y
+        if as_pandas:
+            y_transformed = DataFrame(data=y_transformed, index=y_index)
         return y_transformed
 
 
 class LabelCleanerDummy(LabelCleaner):
-    def transform(self, y: Series) -> Series:
-        if isinstance(y, np.ndarray):
-            y = Series(y)
+    def __init__(self, problem_type=REGRESSION):
+        self.problem_type_transform = problem_type
+
+    def _transform(self, y: Series) -> Series:
         return y
 
-    def inverse_transform(self, y: Series) -> Series:
+    def _inverse_transform(self, y: Series) -> Series:
         return y
