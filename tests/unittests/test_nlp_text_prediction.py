@@ -13,7 +13,7 @@ test_hyperparameters = {
 }
 
 
-def verify_sst():
+def test_sst():
     train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
                               'glue/sst/train.parquet')
     dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/'
@@ -31,7 +31,7 @@ def verify_sst():
     dev_pred_prob = predictor.predict_proba(dev_data)
 
 
-def verify_mrpc():
+def test_mrpc():
     train_data = load_pd.load(
         'https://autogluon-text.s3-accelerate.amazonaws.com/glue/mrpc/train.parquet')
     dev_data = load_pd.load(
@@ -49,7 +49,7 @@ def verify_mrpc():
     dev_pred_prob = predictor.predict_proba(dev_data)
 
 
-def verify_sts():
+def test_sts():
     train_data = load_pd.load(
         'https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
     dev_data = load_pd.load(
@@ -64,9 +64,3 @@ def verify_sts():
                          plot_results=False)
     dev_rmse = predictor.evaluate(dev_data, metrics=['rmse'])
     dev_prediction = predictor.predict(dev_data)
-
-
-def test_fit():
-    verify_sst()
-    # verify_sts()
-    # verify_mrpc()
