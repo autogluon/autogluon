@@ -476,6 +476,9 @@ class AbstractFeatureGenerator:
                 log_prefix = self.log_prefix
             logger.log(level, f'{log_prefix}{msg}')
 
+    def is_fit(self):
+        return self._is_fit
+
     def print_feature_metadata_info(self, log_level: int = 20):
         """
         Outputs detailed logs of a fit feature generator including the input and output FeatureMetadata objects' feature types.

@@ -180,7 +180,7 @@ class FeatureMetadata:
             metadata_new = metadata_new.join_metadata(metadata, shared_raw_features=shared_raw_features)
         return metadata_new
 
-    def _get_feature_metadata_full(self):
+    def get_feature_metadata_full(self) -> dict:
         feature_metadata_full = defaultdict(list)
 
         for feature in self.get_features():
@@ -188,10 +188,12 @@ class FeatureMetadata:
             feature_types_special = tuple(self.get_feature_types_special(feature))
             feature_metadata_full[(feature_type_raw, feature_types_special)].append(feature)
 
+        feature_metadata_full = dict(feature_metadata_full)
+
         return feature_metadata_full
 
     def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20):
-        feature_metadata_full = self._get_feature_metadata_full()
+        feature_metadata_full = self.get_feature_metadata_full()
         if not feature_metadata_full:
             return
         keys = list(feature_metadata_full.keys())
