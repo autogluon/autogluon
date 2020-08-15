@@ -2,6 +2,9 @@ import logging
 
 import numpy as np
 import pandas as pd
+from scipy.sparse import coo_matrix
+from sklearn.utils.multiclass import unique_labels
+from sklearn.utils import check_consistent_length
 try:
     from sklearn.metrics._classification import _check_targets, type_of_target
 except:
@@ -254,3 +257,78 @@ def pac_score(solution, prediction):
     score = (pac - base_pac) / np.maximum(eps, (1 - base_pac))
 
     return score
+
+
+def confusion_matrix(solution, prediction, labels=None, weights=None, normalize=None, output_format='numpy_array'):
+    """
+        Computes confusion matrix for a given true and predicted targets
+        Parameters:
+            solution - true targets
+            prediction - predicted targets
+            labels - list of labels for which confusion matrix should be calculated
+            weights - list of weights of each target
+            normalize - should the output be normalized. Can take values {'true', 'pred', 'all'}
+            output_format - output format of the matrix. Can take values {'python_list', 'numpy_array', 'pandas_dataframe'}
+        TODO : Add dedicated confusion_matrix function to AbstractLearner
+    """
+    y_type, solution, prediction = _check_targets(solution, prediction)
+    # Only binary and multiclass data is supported
+    if y_type not in ("binary", "multiclass"):
+        raise ValueError(f'{y_type} dataset is not currently supported')
+
+    if labels is None:
+        labels = unique_labels(solution, prediction)
+    else:
+        # Ensure that label contains only 1-D binary or multi-class array
+        labels_type = type_of_target(labels)
+        if labels_type not in ("binary", "multiclass"):
+            raise ValueError(f'{labels_type} labels are not supported')
+        labels = np.array(labels)
+
+    if weights is None:
+        weights = np.ones(solution.size, dtype=np.int)
+    else:
+        # Ensure that weights contains only 1-D integer or float array
+        weights_type = type_of_target(weights)
+        if weights_type not in ("binary", "multiclass", "continuous"):
+            raise ValueError(f'{weights_type} weights are not supported')
+        weights = np.array(weights)
+
+    n_labels = labels.size
+    if n_labels == 0:
+        raise ValueError("Labels cannot be empty")
+    elif (np.unique(labels)).size != n_labels:
+        raise ValueError("Labels cannot have duplicates")
+
+    if solution.size == 0 or prediction.size == 0:
+        return np.zeros((n_labels, n_labels), dtype=np.int)
+
+    label_to_index = {y: x for x, y in enumerate(labels)}
+
+    check_consistent_length(solution, prediction, weights)
+
+    # Invalidate indexes with target labels outside the accepted set of labels
+    valid_indexes = np.logical_and(np.in1d(solution, labels), np.in1d(prediction, labels))
+    solution = np.array([label_to_index.get(i) for i in solution[valid_indexes]])
+    prediction = np.array([label_to_index.get(i) for i in prediction[valid_indexes]])
+    weights = weights[valid_indexes]
+    # For high precision
+    matrix_dtype = np.int64 if weights.dtype.kind in {'i', 'u', 'b'} else np.float64
+    cm = coo_matrix((weights, (solution, prediction)), shape=(n_labels, n_labels), dtype=matrix_dtype).toarray()
+    with np.errstate(all='ignore'):
+        if normalize == 'true':
+            cm = cm / cm.sum(axis=1, keepdims=True)
+        elif normalize == 'pred':
+            cm = cm / cm.sum(axis=0, keepdims=True)
+        elif normalize == 'all':
+            cm = cm / cm.sum()
+        cm = np.nan_to_num(cm)
+    if output_format == 'python_list':
+        return cm.tolist()
+    elif output_format == 'numpy_array':
+        return cm
+    elif output_format == 'pandas_dataframe':
+        cm_df = pd.DataFrame(data=cm, index=labels, columns=labels)
+        return cm_df
+    else:
+        return cm

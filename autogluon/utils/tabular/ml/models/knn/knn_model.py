@@ -1,8 +1,7 @@
 import logging
-import pickle
-import sys
 import time
 
+import numpy as np
 import psutil
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
@@ -28,9 +27,8 @@ class KNNModel(AbstractModel):
             return KNeighborsClassifier
 
     def preprocess(self, X):
-        cat_columns = X.select_dtypes(['category']).columns
-        X = X.drop(cat_columns, axis=1)  # TODO: Test if crash when all columns are categorical
         X = super().preprocess(X).fillna(0)
+        X = X.to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):
@@ -57,19 +55,20 @@ class KNNModel(AbstractModel):
 
     def _fit(self, X_train, y_train, **kwargs):
         X_train = self.preprocess(X_train)
+        self._validate_fit_memory_usage(X_train=X_train)
+        self.model = self._model_type(**self.params).fit(X_train, y_train)
+
+    def _validate_fit_memory_usage(self, X_train):
         max_memory_usage_ratio = self.params_aux['max_memory_usage_ratio']
-        model_size_bytes = sys.getsizeof(pickle.dumps(X_train, protocol=4))
-        expected_final_model_size_bytes = model_size_bytes * 2.1  # Roughly what can be expected of the final KNN model in memory size
+        model_size_bytes = 4 * X_train.shape[0] * X_train.shape[1]  # Assuming float32 types
+        expected_final_model_size_bytes = model_size_bytes * 3.6  # Roughly what can be expected of the final KNN model in memory size
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem
-            if model_memory_ratio > (0.35 * max_memory_usage_ratio):
+            if model_memory_ratio > (0.30 * max_memory_usage_ratio):
                 logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
-            if model_memory_ratio > (0.45 * max_memory_usage_ratio):
+            if model_memory_ratio > (0.40 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
-
-        model = self._model_type(**self.params)
-        self.model = model.fit(X_train, y_train)
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
         fit_model_args = dict(X_train=X_train, y_train=y_train, **kwargs)

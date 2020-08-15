@@ -134,6 +134,7 @@ class TabularPredictor(BasePredictor):
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+            If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
             Parameters
             ----------
@@ -345,14 +346,15 @@ class TabularPredictor(BasePredictor):
                                 plot_title="Models produced during fit()")
             if hpo_used:
                 for model_type in results['hpo_results']:
-                    plot_summary_of_models(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
-                        plot_title=f"Models produced during {model_type} HPO")
-                    plot_performance_vs_trials(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
-                        plot_title=f"HPO trials for {model_type} models")
+                    if 'trial_info' in results['hpo_results'][model_type]:
+                        plot_summary_of_models(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
+                            plot_title=f"Models produced during {model_type} HPO")
+                        plot_performance_vs_trials(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
+                            plot_title=f"HPO trials for {model_type} models")
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
