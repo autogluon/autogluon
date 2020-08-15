@@ -60,6 +60,10 @@ requirements = [
     'networkx>=2.3,<3.0'
 ]
 
+text_requirements = [
+    'autogluon-contrib-nlp'
+]
+
 test_requirements = [
     'pytest',
     'openml'
@@ -82,7 +86,7 @@ if __name__ == '__main__':
         packages=find_packages(exclude=('docs', 'tests', 'scripts')),
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements + test_requirements,
+        install_requires=requirements + text_requirements + test_requirements,
         python_requires=MIN_PYTHON_VERSION,
         package_data={'autogluon': [
             'LICENSE',
