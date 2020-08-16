@@ -17,10 +17,10 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
 
     def _infer_features_in(self, X, y=None) -> list:
         identity_features = []
-        invalid_raw_types = {'object', 'category', 'datetime'}
+        valid_raw_types = {'int', 'float'}
         features = self.feature_metadata_in.get_features()
         for feature in features:
             feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)
-            if feature_type_raw not in invalid_raw_types:
+            if feature_type_raw in valid_raw_types:
                 identity_features.append(feature)
         return identity_features

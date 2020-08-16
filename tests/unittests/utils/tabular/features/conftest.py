@@ -49,6 +49,20 @@ class GeneratorHelper:
         # Ensure output feature order is correct
         assert generator.features_out == list(output_data.columns)
 
+        if generator.features_out:
+            with pytest.raises(KeyError):
+                # Error if missing input feature
+                generator.transform(input_data.drop(generator.features_out[0]))
+            with pytest.raises(KeyError):
+                # Error if missing all input features
+                generator.transform(pd.DataFrame())
+
+        # Ensure unknown input columns don't affect output
+        input_data_with_extra = copy.deepcopy(input_data)
+        input_data_with_extra['__UNKNOWN_COLUMN__'] = 0
+        output_data_transform = generator.transform(input_data_with_extra)
+        assert output_data.equals(output_data_transform)
+
         # Ensure feature_metadata_in is as expected
         if expected_feature_metadata_in_full is not None:
             assert expected_feature_metadata_in_full == generator.feature_metadata_in.get_feature_metadata_full()
