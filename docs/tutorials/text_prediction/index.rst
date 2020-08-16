@@ -17,12 +17,12 @@ pretrained BERT/ALBERT/ELECTRA model and hyper-parameter optimization.
       Quick start tutorial for text prediction problems.
 
    .. card::
-      :title: Customize the search space and understand HPO
+      :title: Customize Search Space and Try HPO
       :link: customization.html
 
       Define your own search space and try out different HPO algorithms.
 
-    .. card::
+   .. card::
       :title: Text prediction for mixed data types
       :link: heterogeneous.html
 
