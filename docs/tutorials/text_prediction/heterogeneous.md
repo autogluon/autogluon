@@ -1,6 +1,10 @@
 # Text Prediction - Mixed Data Type
 
-In the real-world applications, text data are usually mixed with other common data types like numerical data and categorical data. Here, the `TextPrediction` task in AutoGluon handles the mix of multiple feature types, including text, categorical, and numerical. Next, we will use the Semantic Textual Segmentation dataset that we have used to illustrate this functionality
+For real-world applications, text data are usually mixed with other common data types like 
+numerical data and categorical data. Here, the `TextPrediction` task in AutoGluon 
+handles the mix of multiple feature types, including text, categorical, and numerical. 
+Next, we will use the Semantic Textual Segmentation dataset that we have used to illustrate 
+this functionality.
 
 
 ```{.python .input}
@@ -10,6 +14,7 @@ warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
+## Load Data
 
 ```{.python .input}
 from autogluon.utils.tabular.utils.loaders import load_pd
@@ -19,7 +24,8 @@ dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue
 train_data.head(10)
 ```
 
-We can see that the STS dataset contains two text fields: `sentence1` and `sentence2`, one categorical field: `genre`, and one numerical field `score`. We try to predict the score with `sentence1` + `sentence2` + `genre`.
+We can see that the STS dataset contains two text fields: `sentence1` and `sentence2`, one categorical field: `genre`, and one numerical field `score`. 
+We try to predict the score with `sentence1` + `sentence2` + `genre`.
 
 
 ```{.python .input}

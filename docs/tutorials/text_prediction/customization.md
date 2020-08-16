@@ -1,7 +1,9 @@
 # Text Prediction - Customization and HPO
 
-In this tutorial, we will learn how to customize the `TextPrediction` task in AutoGluon. We will use the "Paraphrasing Identification" for illustration. The goal of the task is to identify whether one sentence is a restatement of the other. In this example, we will use the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398). 
+In this tutorial, we will learn the following:
 
+- How to customize the search space in `TextPrediction`.
+- Try different HPO algorithms
 
 ```{.python .input}
 import numpy as np
@@ -10,8 +12,13 @@ warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
-## Load Data
+## Paraphrasing Identification
 
+We will use the "Paraphrasing Identification" task for illustration. The goal is to predict whether one sentence is a restatement of the other.
+- sentence1, sentence2 --> label
+- binary classification
+
+We use the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398).
 
 ```{.python .input}
 from autogluon.utils.tabular.utils.loaders import load_pd
@@ -26,20 +33,25 @@ train_data.head(10)
 from autogluon_contrib_nlp.data.tokenizers import MosesTokenizer
 tokenizer = MosesTokenizer('en')
 print('Paraphrase:')
-print('Sentence1: ', tokenizer.decode(train_data['sentence1'][5].split()))
-print('Sentence2: ', tokenizer.decode(train_data['sentence2'][5].split()))
+print('Sentence1: ', tokenizer.decode(train_data['sentence1'][2].split()))
+print('Sentence2: ', tokenizer.decode(train_data['sentence2'][2].split()))
 print('Label: ', train_data['label'][2])
 
 print('\nNot Paraphrase:')
-print('Sentence1:', tokenizer.decode(train_data['sentence1'][8].split()))
-print('Sentence2:', tokenizer.decode(train_data['sentence2'][8].split()))
+print('Sentence1:', tokenizer.decode(train_data['sentence1'][3].split()))
+print('Sentence2:', tokenizer.decode(train_data['sentence2'][3].split()))
 print('Label:', train_data['label'][3])
 ```
 
 ## Explore a Custoimzed Search Space with Random Search
 
-Here, we can set the `hyperparameters` argument and specify the search space with `ag.space`. In this example, we search for the `warmup_portion`, `learning_rate`, `data_dropout`, `layerwise_lr_decay`, and `num_layers`.
-
+Here, we can set the `hyperparameters` argument and specify the search space with `ag.space`.
+In this example, we search for
+- warmup
+- learning rate
+- dropout before the first task-specific layer
+- the layerwise decay
+- number of task-specific layers
 
 ```{.python .input}
 import autogluon as ag
@@ -49,25 +61,32 @@ hyperparameters = {
     'models': {
             'BertForTextPredictionBasic': {
                 'search_space': {
-                    'model.network.agg_net.num_layers': ag.space.Categorical(0, 1, 2),
+                    'model.network.agg_net.num_layers': ag.space.Int(0, 3),
                     'model.network.agg_net.data_dropout': ag.space.Categorical(False, True),
                     'optimization.num_train_epochs': 4,
                     'optimization.warmup_portion': ag.space.Real(0.1, 0.2),
                     'optimization.layerwise_lr_decay': ag.space.Real(0.8, 1.0),
                     'optimization.lr': ag.space.Real(1E-5, 1E-4)
                 }
-            }
+            },
     },
     'hpo_params': {
         'scheduler': 'fifo',
         'search_strategy': 'random'
     }
 }
+```
 
-predictor_mrpc = task.fit(train_data, label='label',
+
+
+```{.python .input}
+predictor_mrpc = task.fit(train_data,
+                          label='label',
                           hyperparameters=hyperparameters,
                           num_trials=5,
-                          time_limits=60 * 5, ngpus_per_trial=1, seed=123,
+                          time_limits=60 * 5,
+                          ngpus_per_trial=1,
+                          seed=123,
                           output_directory='./ag_mrpc_random_search')
 ```
 
@@ -82,7 +101,6 @@ print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 
 
 ```{.python .input}
-predictions = predictor_mrpc.predict(dev_data)
 sentence1 = 'It is simple to solve NLP problems with AutoGluon.'
 sentence2 = 'With AutoGluon, it is easy to solve NLP problems.'
 sentence3 = 'AutoGluon gives you a very bad user experience for solving NLP problems.'
@@ -103,7 +121,11 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 
 ## Use Bayesian Optimization
 
-Apart from random search, we can use the scikit-optimize package as the searcher:
+Apart from random search, we can utilize [skopt](https://scikit-optimize.github.io/stable/) as the searcher, 
+which performs a type of Bayesian Optimization. 
+Basically, skopt will train a *surrogate model* to approximate the performance of the hyperparameter configurations. 
+Whenever we observed the performance of a new set of hyperparameter, we update our posterior. 
+In the next trial, we will try the configuration that best balances the exploitation and exploration tradeoffs.
 
 
 ```{.python .input}
@@ -147,9 +169,13 @@ print('Prediction = "{}"'.format(prediction2[0] == 1))
 print('Prob = "{}"'.format(prediction2_prob[0]))
 ```
 
+
 ## Use Hyperband
 
-We can also use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf):
+We can also use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf). 
+Hyperband tackles the HPO with ideas from multi-armed bandit. 
+Basically, hyperband will try multiple configuration simultaneously. 
+It will early stop the bad-performing configurations and only keep training the promising ones.
 
 
 ```{.python .input}
@@ -193,9 +219,4 @@ print('A = "{}"'.format(sentence1))
 print('B = "{}"'.format(sentence3))
 print('Prediction = "{}"'.format(prediction2[0] == 1))
 print('Prob = "{}"'.format(prediction2_prob[0]))
-```
-
-
-```{.python .input}
-
 ```
