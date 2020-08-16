@@ -32,6 +32,7 @@ from .embednet import EmbedNet
 from .tabular_nn_trial import tabular_nn_trial
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
+from ....features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -577,8 +578,8 @@ class TabularNeuralNetModel(AbstractModel):
 
         feature_types = self.feature_metadata.type_group_map_raw
 
-        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:

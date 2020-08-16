@@ -3,7 +3,7 @@ import logging
 from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
+from ..feature_metadata import FeatureMetadata, R_INT
 from ..types import get_type_map_real
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         return X, self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X):
-        int_features = self.feature_metadata_in.type_group_map_raw['int']
+        int_features = self.feature_metadata_in.type_group_map_raw[R_INT]
         if int_features:
             null_count = X[int_features].isnull().sum()
             with_null = null_count[null_count != 0]

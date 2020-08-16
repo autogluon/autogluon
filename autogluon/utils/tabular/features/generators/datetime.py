@@ -4,11 +4,11 @@ import pandas as pd
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
+from ..feature_metadata import R_DATETIME, S_DATETIME_AS_OBJECT
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add verbose descriptions of each special dtype this generator can create.
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
@@ -21,7 +21,7 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return self._generate_features_datetime(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        datetime_features = self.feature_metadata_in.type_group_map_special['datetime_as_object'] + self.feature_metadata_in.type_group_map_raw['datetime']
+        datetime_features = self.feature_metadata_in.type_group_map_special[S_DATETIME_AS_OBJECT] + self.feature_metadata_in.type_group_map_raw[R_DATETIME]
         return datetime_features
 
     # TODO: Improve handling of missing datetimes

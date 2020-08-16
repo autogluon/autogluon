@@ -6,6 +6,7 @@ from pandas.api.types import CategoricalDtype
 
 from .identity import IdentityFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
+from ..feature_metadata import R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
 
 logger = logging.getLogger(__name__)
 
@@ -66,16 +67,16 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
             X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
         if 'text' in feature_metadata_out_type_group_map_special:
-            text_features = feature_metadata_out_type_group_map_special.pop('text')
-            feature_metadata_out_type_group_map_special['text_as_category'] += [feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special['text_as_category']]
+            text_features = feature_metadata_out_type_group_map_special.pop(S_TEXT)
+            feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]]
         return X_out, feature_metadata_out_type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_category(X)
 
     def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
-        object_features = self.feature_metadata_in.type_group_map_raw['object'] + self.feature_metadata_in.type_group_map_raw['category']
-        datetime_as_object_features = self.feature_metadata_in.type_group_map_special['datetime_as_object']
+        object_features = self.feature_metadata_in.type_group_map_raw[R_OBJECT] + self.feature_metadata_in.type_group_map_raw[R_CATEGORY]
+        datetime_as_object_features = self.feature_metadata_in.type_group_map_special[S_DATETIME_AS_OBJECT]
         object_features = [feature for feature in object_features if feature not in datetime_as_object_features]
         return object_features
 

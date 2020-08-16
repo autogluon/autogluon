@@ -4,6 +4,7 @@ from collections import defaultdict
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
+from ..feature_metadata import R_INT, R_FLOAT
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
     # TODO: optimize categorical/object handling
     def _drop_duplicate_features(self, X: DataFrame) -> list:
         feature_sum_map = defaultdict(list)
-        for feature in self.feature_metadata_in.type_group_map_raw['int'] + self.feature_metadata_in.type_group_map_raw['float']:
+        for feature in self.feature_metadata_in.type_group_map_raw[R_INT] + self.feature_metadata_in.type_group_map_raw[R_FLOAT]:
             feature_sum_map[round(X[feature].sum(), 2)].append(feature)
 
         features_to_keep = []

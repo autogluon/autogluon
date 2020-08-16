@@ -13,6 +13,7 @@ from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator, NumericDataPreprocessor
 from ...constants import BINARY, REGRESSION
 from ....ml.models.abstract.abstract_model import AbstractModel
+from ....features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,8 @@ class LinearModel(AbstractModel):
 
         feature_types = self.feature_metadata.type_group_map_raw
 
-        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = []  # TODO: Disabled currently, have to pass raw text data features here to function properly
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:

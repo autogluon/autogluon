@@ -10,6 +10,7 @@ from ..abstract import model_trial
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError
+from ....features.feature_metadata import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ class KNNModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_type_group_special=['text_ngram', 'text_special', 'datetime_as_int'],
-            ignored_type_group_raw=['category', 'object'],  # TODO: Eventually use category features
+            ignored_type_group_raw=[R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)

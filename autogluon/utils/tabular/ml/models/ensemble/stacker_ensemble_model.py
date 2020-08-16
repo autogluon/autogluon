@@ -9,7 +9,7 @@ from ...utils import generate_kfold
 from ..abstract.abstract_model import AbstractModel
 from .bagged_ensemble_model import BaggedEnsembleModel
 from ...constants import MULTICLASS
-from ....features.feature_metadata import FeatureMetadata
+from ....features.feature_metadata import FeatureMetadata, R_FLOAT, S_STACK
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +119,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         if time_limit is not None:
             time_limit = time_limit - (time.time() - start_time)
         if len(self.models) == 0:
-            type_map_raw = {column: 'float' for column in self.stack_columns}
-            type_group_map_special = {'stack': self.stack_columns}
+            type_map_raw = {column: R_FLOAT for column in self.stack_columns}
+            type_group_map_special = {S_STACK: self.stack_columns}
             stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
             if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
                 self.feature_metadata = stacker_feature_metadata
@@ -150,8 +150,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             raise ValueError('self.models must be empty to call hyperparameter_tune, value: %s' % self.models)
 
         if len(self.models) == 0:
-            type_map_raw = {column: 'float' for column in self.stack_columns}
-            type_group_map_special = {'stack': self.stack_columns}
+            type_map_raw = {column: R_FLOAT for column in self.stack_columns}
+            type_group_map_special = {S_STACK: self.stack_columns}
             stacker_feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
             if self.feature_metadata is None:  # TODO: This is probably not the best way to do this
                 self.feature_metadata = stacker_feature_metadata

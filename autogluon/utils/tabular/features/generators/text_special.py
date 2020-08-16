@@ -6,6 +6,7 @@ from pandas import DataFrame, Series
 
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
+from ..feature_metadata import S_TEXT, S_TEXT_SPECIAL
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +23,16 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
-        type_family_groups_special = dict(
-            text_special=list(X_out.columns)
-        )
+        type_family_groups_special = {
+            S_TEXT_SPECIAL: list(X_out.columns)
+        }
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_special(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        text_features = self.feature_metadata_in.type_group_map_special['text']
+        text_features = self.feature_metadata_in.type_group_map_special[S_TEXT]
         return text_features
 
     def _generate_features_text_special(self, X: DataFrame) -> DataFrame:

@@ -9,6 +9,7 @@ from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
 from ..vectorizers import get_ngram_freq, downscale_vectorizer, vectorizer_auto_ml_default
+from ..feature_metadata import S_TEXT, S_TEXT_NGRAM
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,9 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._fit_transform_ngrams(X)
-        type_family_groups_special = dict(
-            text_ngram=list(X_out.columns)
-        )
+        type_family_groups_special = {
+            S_TEXT_NGRAM: list(X_out.columns)
+        }
         return X_out, type_family_groups_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
@@ -55,7 +56,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         return X_out
 
     def _infer_features_in(self, X, y=None) -> list:
-        text_features = self.feature_metadata_in.type_group_map_special['text']
+        text_features = self.feature_metadata_in.type_group_map_special[S_TEXT]
         return text_features
 
     def _fit_transform_ngrams(self, X):

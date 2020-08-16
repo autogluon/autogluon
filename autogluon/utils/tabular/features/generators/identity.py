@@ -3,6 +3,7 @@ import logging
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
+from ..feature_metadata import R_INT, R_FLOAT
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
 
     def _infer_features_in(self, X, y=None) -> list:
         identity_features = []
-        valid_raw_types = {'int', 'float'}
+        valid_raw_types = {R_INT, R_FLOAT}
         features = self.feature_metadata_in.get_features()
         for feature in features:
             feature_type_raw = self.feature_metadata_in.get_feature_type_raw(feature)

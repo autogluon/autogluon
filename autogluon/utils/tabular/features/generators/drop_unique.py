@@ -3,7 +3,7 @@ import logging
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
-from ..feature_metadata import FeatureMetadata
+from ..feature_metadata import FeatureMetadata, R_CATEGORY, R_OBJECT
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,6 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
             unique_value_count = len(X[column].unique())
             if unique_value_count == 1:
                 features_to_drop.append(column)
-            elif feature_metadata.get_feature_type_raw(column) in ['category', 'object'] and (unique_value_count > max_unique_value_count):
+            elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
                 features_to_drop.append(column)
         return features_to_drop

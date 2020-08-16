@@ -6,6 +6,7 @@ from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
 from .. import binning
+from ..feature_metadata import R_INT, R_FLOAT, S_BINNED
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,14 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
         self._bin_map = self._get_bin_map(X=X)
         X_out = self._transform(X)
         type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
-        type_group_map_special['binned'] += list(X_out.columns)
+        type_group_map_special[S_BINNED] += list(X_out.columns)
         return X_out, type_group_map_special
 
     def _transform(self, X):
         return self._transform_bin(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        features_to_bin = self.feature_metadata_in.type_group_map_raw['int'] + self.feature_metadata_in.type_group_map_raw['float']
+        features_to_bin = self.feature_metadata_in.type_group_map_raw[R_INT] + self.feature_metadata_in.type_group_map_raw[R_FLOAT]
         return features_to_bin
 
     def _get_bin_map(self, X: DataFrame) -> dict:

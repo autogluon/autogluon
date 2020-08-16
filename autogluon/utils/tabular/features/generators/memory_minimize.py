@@ -5,6 +5,7 @@ from pandas import DataFrame
 
 from . import AbstractFeatureGenerator
 from ..utils import clip_and_astype
+from ..feature_metadata import R_CATEGORY, R_INT
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         return self._minimize_categorical_memory_usage(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        category_features = self.feature_metadata_in.type_group_map_raw['category']
+        category_features = self.feature_metadata_in.type_group_map_raw[R_CATEGORY]
         return category_features
 
     def _get_category_map(self, X: DataFrame) -> dict:
@@ -67,7 +68,7 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         return dtype_info.dtype, dtype_info.min, dtype_info.max
 
     def _infer_features_in(self, X, y=None) -> list:
-        numeric_features = [feature for feature in self.feature_metadata_in.get_features() if self.feature_metadata_in.get_feature_type_raw(feature) in ['int']]  # TODO: floats?
+        numeric_features = [feature for feature in self.feature_metadata_in.get_features() if self.feature_metadata_in.get_feature_type_raw(feature) in [R_INT]]  # TODO: floats?
         return numeric_features
 
     def _minimize_numeric_memory_usage(self, X: DataFrame):
