@@ -93,7 +93,6 @@ Advanced Topics
    tutorials/image_classification/index
    tutorials/object_detection/index
    tutorials/text_prediction/index
-   tutorials/text_classification/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
