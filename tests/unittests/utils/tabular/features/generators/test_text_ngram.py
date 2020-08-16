@@ -11,7 +11,8 @@ def test_text_ngram_feature_generator(generator_helper, data_helper):
 
     toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
 
-    generator = TextNgramFeatureGenerator(vectorizer=toy_vectorizer)
+    # max_memory_ratio=None in test to avoid CI reducing ngrams non-deterministically.
+    generator = TextNgramFeatureGenerator(max_memory_ratio=None, vectorizer=toy_vectorizer)
 
     expected_feature_metadata_in_full = {
         ('object', ('text',)): ['text'],

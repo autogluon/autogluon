@@ -170,7 +170,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         predicted_rss = mem_rss + predicted_ngrams_memory_usage_bytes
         predicted_percentage = predicted_rss / mem_avail
         if downsample_ratio is None:
-            if predicted_percentage > self.max_memory_ratio:
+            if self.max_memory_ratio is not None and predicted_percentage > self.max_memory_ratio:
                 downsample_ratio = self.max_memory_ratio / predicted_percentage
                 self._log(30, 'Warning: Due to memory constraints, ngram feature count is being reduced. Allocate more memory to maximize model quality.')
 

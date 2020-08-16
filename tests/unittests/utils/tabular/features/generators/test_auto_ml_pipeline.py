@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
+from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
 
 
 def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
@@ -17,6 +17,12 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         AutoMLPipelineFeatureGenerator(generators=[], vectorizer=toy_vectorizer)
 
     generator = AutoMLPipelineFeatureGenerator(vectorizer=toy_vectorizer)
+
+    for generator_stage in generator.generators:
+        for generator_inner in generator_stage:
+            if isinstance(generator_inner, TextNgramFeatureGenerator):
+                # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+                generator_inner.max_memory_ratio = None
 
     expected_feature_metadata_in_full = {
         ('category', ()): ['cat'],
