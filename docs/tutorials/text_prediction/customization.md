@@ -1,4 +1,5 @@
 # Text Prediction - Customization and HPO
+:label:`sec_textprediction_customization`
 
 In this tutorial, we will learn the following:
 

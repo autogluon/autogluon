@@ -1,4 +1,5 @@
 # Text Prediction - Mixed Data Type
+:label:`sec_textprediction_heterogeneous`
 
 For real-world applications, text data are usually mixed with other common data types like 
 numerical data and categorical data. Here, the `TextPrediction` task in AutoGluon 
