@@ -55,6 +55,8 @@ class FeatureMetadata:
         return self.type_map_raw[feature]
 
     def get_feature_types_special(self, feature: str) -> list:
+        if feature not in self.type_map_raw:
+            raise KeyError(f'{feature} does not exist in {self.__class__.__name__}.')
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     # TODO: Can remove, this is same output as self.type_map_raw
@@ -105,7 +107,11 @@ class FeatureMetadata:
             metadata = self
         else:
             metadata = copy.deepcopy(self)
+        before_len = len(metadata.type_map_raw.keys())
         metadata.type_map_raw = {rename_map.get(key, key): val for key, val in metadata.type_map_raw.items()}
+        after_len = len(metadata.type_map_raw.keys())
+        if before_len != after_len:
+            raise AssertionError(f'key names conflicted during renaming. Do not rename features to exist feature names.')
         metadata.type_group_map_raw = metadata.get_type_group_map_raw_from_flattened(type_map_raw=metadata.type_map_raw)
         for type in metadata.type_group_map_special:
             metadata.type_group_map_special[type] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[type]]
