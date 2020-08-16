@@ -182,6 +182,7 @@ def infer_eval_stop_log_metrics(problem_type,
 
 @use_np
 class TextPrediction(BaseTask):
+    """AutoGluon Task for predicting labels based on text data."""
     Dataset = tabular_prediction.TabularDataset
 
     @classmethod
