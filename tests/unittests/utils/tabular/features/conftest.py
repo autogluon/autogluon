@@ -49,10 +49,10 @@ class GeneratorHelper:
         # Ensure output feature order is correct
         assert generator.features_out == list(output_data.columns)
 
-        if generator.features_out:
+        if generator.features_in:
             with pytest.raises(KeyError):
                 # Error if missing input feature
-                generator.transform(input_data.drop(generator.features_out[0]))
+                generator.transform(input_data.drop(generator.features_in[0]))
             with pytest.raises(KeyError):
                 # Error if missing all input features
                 generator.transform(pd.DataFrame())
