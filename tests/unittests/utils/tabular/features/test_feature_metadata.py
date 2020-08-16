@@ -1,3 +1,4 @@
+import itertools
 import pytest
 
 from autogluon.utils.tabular.features.feature_metadata import FeatureMetadata
@@ -107,3 +108,71 @@ def test_feature_metadata(data_helper):
     assert feature_metadata_recombined.get_feature_metadata_full() == feature_metadata.get_feature_metadata_full()
     assert feature_metadata_recombined_alternate.get_feature_metadata_full() == feature_metadata.get_feature_metadata_full()
     assert feature_metadata_recombined_full.get_feature_metadata_full() == expected_feature_metadata_recombined_full_full
+
+
+def test_feature_metadata_get_features():
+    type_map_raw = dict(
+        a='1',
+        b='2',
+        c='3',
+        d='1',
+        e='1',
+        f='4',
+    )
+
+    type_group_map_special = {
+        's1': ['a', 'b', 'd'],
+        's2': ['a', 'e'],
+        's3': ['a', 'b'],
+        's4': ['f']
+    }
+
+    expected_get_features = ['a', 'b', 'c', 'd', 'e', 'f']
+
+    feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    assert feature_metadata.get_features() == expected_get_features
+
+    assert feature_metadata.get_features(valid_raw_types=['1']) == ['a', 'd', 'e']
+    assert feature_metadata.get_features(valid_raw_types=['1', '3']) == ['a', 'c', 'd', 'e']
+    assert feature_metadata.get_features(valid_raw_types=['UNKNOWN']) == []
+
+    assert feature_metadata.get_features(valid_special_types=['s2', 's3']) == ['a', 'b', 'c', 'e']
+    assert feature_metadata.get_features(valid_special_types=['s4']) == ['c', 'f']
+    assert feature_metadata.get_features(valid_special_types=[]) == ['c']
+    assert feature_metadata.get_features(valid_special_types=['UNKNOWN']) == ['c']
+
+    assert feature_metadata.get_features(invalid_raw_types=[]) == expected_get_features
+    assert feature_metadata.get_features(invalid_raw_types=['1', '3']) == ['b', 'f']
+    assert feature_metadata.get_features(invalid_raw_types=['UNKNOWN']) == expected_get_features
+
+    assert feature_metadata.get_features(invalid_special_types=['UNKNOWN']) == expected_get_features
+    assert feature_metadata.get_features(invalid_special_types=[]) == expected_get_features
+    assert feature_metadata.get_features(invalid_special_types=['s2', 's4']) == ['b', 'c', 'd']
+
+    assert feature_metadata.get_features(required_special_types=['s2']) == ['a', 'e']
+    assert feature_metadata.get_features(required_special_types=['s2', 's3']) == ['a']
+    assert feature_metadata.get_features(required_special_types=['s2', 's4']) == []
+    assert feature_metadata.get_features(required_special_types=['UNKNOWN']) == []
+
+    assert feature_metadata.get_features(required_special_types=['s2'], required_exact=True) == ['e']
+    assert feature_metadata.get_features(required_special_types=['s1', 's2', 's3'], required_exact=True) == ['a']
+
+    assert feature_metadata.get_features(required_at_least_one_special=True) == ['a', 'b', 'd', 'e', 'f']
+
+    # Assert that valid_raw_types is the opposite of invalid_raw_types through all combinations
+    raw_types_to_check = ['1', '2', '3', '4', 'UNKNOWN']
+    for L in range(0, len(raw_types_to_check) + 1):
+        for subset in itertools.combinations(raw_types_to_check, L):
+            valid_raw_types = list(subset)
+            invalid_raw_types = [raw_type for raw_type in raw_types_to_check if raw_type not in valid_raw_types]
+            assert feature_metadata.get_features(valid_raw_types=valid_raw_types) == feature_metadata.get_features(invalid_raw_types=invalid_raw_types)
+
+    # Combined arguments
+    assert feature_metadata.get_features(invalid_special_types=['s2', 's3'], required_special_types=['s1']) == ['d']
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], valid_special_types=['s1']) == ['b', 'c']
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], valid_special_types=['s1'], required_at_least_one_special=True) == ['b']
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], required_special_types=['s1']) == ['b']
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], required_special_types=['s1'], required_exact=True) == []
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], required_special_types=['s1', 's3']) == ['b']
+    assert feature_metadata.get_features(valid_raw_types=['2', '3'], required_special_types=['s1', 's3'], required_exact=True) == ['b']

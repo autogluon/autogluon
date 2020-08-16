@@ -1,5 +1,6 @@
 import copy
 import logging
+from typing import Dict, List
 from collections import defaultdict
 
 from .types import get_type_map_raw, get_type_group_map_special
@@ -53,7 +54,7 @@ class FeatureMetadata:
         As an example, type_group_map_special might contain a key 'text_ngram' indicating that the list of values are all features which were generated from a nlp vectorizer and represent ngrams.
         A downstream model such as a K-Nearest-Neighbor model could then check if 'text_ngram' is present in type_group_map_special and drop those features if present, to speed up training and inference time.
     """
-    def __init__(self, type_map_raw: dict, type_group_map_special: dict = None):
+    def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None):
         if type_group_map_special is None:
             type_group_map_special = defaultdict(list)
         if not isinstance(type_group_map_special, defaultdict):
@@ -84,8 +85,65 @@ class FeatureMetadata:
         if features_invalid:
             raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_group_map_raw. Invalid features: {features_invalid}")
 
-    def get_features(self):
-        return list(self.type_map_raw.keys())
+    # Note: This is not optimized for speed. Do not rely on this function during inference.
+    def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None,
+                     invalid_special_types: list = None, required_special_types: list = None, required_exact=False, required_at_least_one_special=False):
+        """
+        Returns a list of features held within the feature metadata object after being pruned through the available parameters.
+
+         Parameters
+        ----------
+        valid_raw_types : list, default None
+            If a feature's raw type is not in this list, it is pruned.
+            If None, then no features are pruned through this logic.
+        valid_special_types : list, default None
+            If a feature has a special type not in this list, it is pruned.
+            Features without special types are never pruned through this logic.
+            If None, then no features are pruned through this logic.
+        invalid_raw_types : list, default None
+            If a feature's raw type is in this list, it is pruned.
+            If None, then no features are pruned through this logic.
+        invalid_special_types : list, default None
+            If a feature has a special type in this list, it is pruned.
+            Features without special types are never pruned through this logic.
+            If None, then no features are pruned through this logic.
+        required_special_types : list, default None
+            If a feature does not have all of the special types in this list, it is pruned.
+            Features without special types are pruned through this logic.
+            If None, then no features are pruned through this logic.
+        required_exact : bool, default False
+            If True, then if a feature does not have the exact same special types (with no extra special types) as required_special_types, it is pruned.
+            Has no effect if required_special_types is None.
+        required_at_least_one_special : bool, default False
+            If True, then if a feature has zero special types, it is pruned.
+
+        Returns
+        -------
+        features : list of feature names in feature metadata that satisfy all checks dictated by the parameters.
+
+        """
+        features = list(self.type_map_raw.keys())
+
+        if valid_raw_types is not None:
+            features = [feature for feature in features if self.get_feature_type_raw(feature) in valid_raw_types]
+        if valid_special_types is not None:
+            valid_special_types_set = set(valid_special_types)
+            features = [feature for feature in features if not valid_special_types_set.isdisjoint(self.get_feature_types_special(feature)) or not self.get_feature_types_special(feature)]
+        if invalid_raw_types is not None:
+            features = [feature for feature in features if self.get_feature_type_raw(feature) not in invalid_raw_types]
+        if invalid_special_types is not None:
+            invalid_special_types_set = set(invalid_special_types)
+            features = [feature for feature in features if invalid_special_types_set.isdisjoint(self.get_feature_types_special(feature))]
+        if required_special_types is not None:
+            required_special_types_set = set(required_special_types)
+            if required_exact:
+                features = [feature for feature in features if required_special_types_set == set(self.get_feature_types_special(feature))]
+            else:
+                features = [feature for feature in features if required_special_types_set.issubset(self.get_feature_types_special(feature))]
+        if required_at_least_one_special:
+            features = [feature for feature in features if self.get_feature_types_special(feature)]
+
+        return features
 
     def get_feature_type_raw(self, feature: str) -> str:
         return self.type_map_raw[feature]
@@ -94,10 +152,6 @@ class FeatureMetadata:
         if feature not in self.type_map_raw:
             raise KeyError(f'{feature} does not exist in {self.__class__.__name__}.')
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
-
-    # TODO: Can remove, this is same output as self.type_map_raw
-    def get_type_group_map_raw_flattened(self) -> dict:
-        return {feature: type_family for type_family, features in self.type_group_map_raw.items() for feature in features}
 
     @staticmethod
     def get_type_group_map_raw_from_flattened(type_map_raw):
