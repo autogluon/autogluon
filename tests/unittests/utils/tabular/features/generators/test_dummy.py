@@ -6,7 +6,7 @@ from autogluon.utils.tabular.features.generators import DummyFeatureGenerator
 
 def test_dummy_feature_generator(generator_helper, data_helper):
     # Given
-    input_data = data_helper.generate_multi_feature()
+    input_data = data_helper.generate_multi_feature_full()
 
     generator = DummyFeatureGenerator()
 

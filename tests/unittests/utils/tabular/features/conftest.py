@@ -77,17 +77,77 @@ class DataHelper:
         return Series([12, 0, np.nan, 3, -0.2, 2.3, 2.3, 0.1, 5])
 
     @staticmethod
-    def generate_multi_feature() -> DataFrame:
+    def generate_text_feature() -> Series:
+        return Series(
+            [
+                'hello world',
+                'sentence breaks.',
+                '',
+                'unique words',
+                'the end of the sentence',
+                'goodbye world',
+                'the end is not the end is not the end is not the end is not the end',
+                'the end of the world',
+                'sentence. breaks. sentence. breaks. sentence. breaks. sentence. breaks.',
+            ]
+        )
+
+    @staticmethod
+    def generate_datetime_as_object_feature() -> Series:
+        return Series(
+            [
+                '8/1/2018 16:27',
+                '',
+                np.nan,
+                '4/20/2018 15:37',
+                '4/20/2018 15:37',
+                '1/01/1800 00:00',
+                '12/31/2200 23:59',
+                '8/15/2020 7:12',
+                '12/18/2020 2:12',
+            ]
+        )
+
+    @staticmethod
+    def generate_datetime_feature() -> Series:
+        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature())
+
+    @staticmethod
+    def generate_multi_feature_standard() -> DataFrame:
         df = pd.concat(
             [
                 DataHelper.generate_int_feature(),
                 DataHelper.generate_float_feature(),
                 DataHelper.generate_obj_feature(),
                 DataHelper.generate_cat_feature(),
+                DataHelper.generate_datetime_feature(),
             ],
             axis=1,
         )
-        df.columns = ['int', 'float', 'obj', 'cat']
+        df.columns = ['int', 'float', 'obj', 'cat', 'datetime']
+        return df
+
+    @staticmethod
+    def generate_multi_feature_special() -> DataFrame:
+        df = pd.concat(
+            [
+                DataHelper.generate_text_feature(),
+                DataHelper.generate_datetime_as_object_feature(),
+            ],
+            axis=1,
+        )
+        df.columns = ['text', 'datetime_as_object']
+        return df
+
+    @staticmethod
+    def generate_multi_feature_full() -> DataFrame:
+        df = pd.concat(
+            [
+                DataHelper.generate_multi_feature_standard(),
+                DataHelper.generate_multi_feature_special(),
+            ],
+            axis=1,
+        )
         return df
 
 

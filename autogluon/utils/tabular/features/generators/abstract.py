@@ -1,5 +1,6 @@
 import copy
 import logging
+import time
 
 from pandas import DataFrame, Series
 
@@ -116,6 +117,8 @@ class AbstractFeatureGenerator:
         self.log_prefix = log_prefix
         self.verbosity = verbosity
 
+        self.fit_time = None
+
     def fit(self, X: DataFrame, **kwargs):
         """
         Fit generator to the provided data.
@@ -155,6 +158,7 @@ class AbstractFeatureGenerator:
         X_out : DataFrame object which is the transformed version of the input data X.
 
         """
+        start_time = time.time()
         self._log(20, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
@@ -213,9 +217,13 @@ class AbstractFeatureGenerator:
         if self.reset_index:
             X_out.index = X_index
         self._is_fit = True
+        end_time = time.time()
+        self.fit_time = end_time - start_time
         if self.verbosity >= 3:
+            self.print_generator_info(log_level=20)
             self.print_feature_metadata_info(log_level=20)
         elif self.verbosity == 2:
+            self.print_generator_info(log_level=20)
             self.print_feature_metadata_info(log_level=15)
         return X_out
 
@@ -478,6 +486,18 @@ class AbstractFeatureGenerator:
 
     def is_fit(self):
         return self._is_fit
+
+    def print_generator_info(self, log_level: int = 20):
+        """
+        Outputs detailed logs of the generator, such as the fit runtime.
+
+        Parameters
+        ----------
+        log_level : int, default 20
+            Log level of the logging statements.
+        """
+        if self.fit_time:
+            self._log(log_level, f'\t{round(self.fit_time, 3)}s\t= Fit runtime')
 
     def print_feature_metadata_info(self, log_level: int = 20):
         """

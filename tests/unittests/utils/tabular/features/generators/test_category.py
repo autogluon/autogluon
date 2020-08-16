@@ -6,7 +6,7 @@ from autogluon.utils.tabular.features.generators import CategoryFeatureGenerator
 
 def test_category_feature_generator(generator_helper, data_helper):
     # Given
-    input_data = data_helper.generate_multi_feature()
+    input_data = data_helper.generate_multi_feature_standard()
     category_input_data = input_data[['obj', 'cat']].astype('category')
 
     generator_1 = CategoryFeatureGenerator()

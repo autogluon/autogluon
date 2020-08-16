@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add verbose descriptions of each special dtype this generator can create.
 class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, symbols=None, bin_features=True, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, symbols=None, bin_features=True, post_drop_duplicates=True, **kwargs):
+        super().__init__(post_drop_duplicates=post_drop_duplicates, **kwargs)
         if symbols is None:
             symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
         self.symbols = symbols  # Symbols to generate count and ratio features for.
