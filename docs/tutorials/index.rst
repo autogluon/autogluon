@@ -69,14 +69,14 @@ Text Prediction
 
       10 min tutorial on fitting prediction models with text in the dataset.
 
-.. card::
+    .. card::
       :title:
       :link: text_prediction/customization.html
 
       In-depth tutorial on learning how to customize the search space and try different
       HPO algorithms.
 
-.. card::
+    .. card::
       :title:
       :link: text_prediction/heterogeneous.html
 

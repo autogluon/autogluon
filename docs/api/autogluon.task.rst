@@ -114,7 +114,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-Additional Tabular Prediction APIs
+Additional Tabular Prediction APIs
 ----------------------------------
 
 .. automodule:: autogluon.task.tabular_prediction
