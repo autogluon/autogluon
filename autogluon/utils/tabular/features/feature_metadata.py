@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from collections import defaultdict
 
 from .types import get_type_map_raw, get_type_group_map_special
@@ -86,8 +86,8 @@ class FeatureMetadata:
             raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_group_map_raw. Invalid features: {features_invalid}")
 
     # Note: This is not optimized for speed. Do not rely on this function during inference.
-    def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None,
-                     invalid_special_types: list = None, required_special_types: list = None, required_exact=False, required_at_least_one_special=False):
+    def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None, invalid_special_types: list = None,
+                     required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, List[str]]] = None, required_exact=False, required_at_least_one_special=False):
         """
         Returns a list of features held within the feature metadata object after being pruned through the available parameters.
 
@@ -111,9 +111,15 @@ class FeatureMetadata:
             If a feature does not have all of the special types in this list, it is pruned.
             Features without special types are pruned through this logic.
             If None, then no features are pruned through this logic.
+        required_raw_special_pairs : List[Tuple[str, List[str]]], default None
+            If a feature does not satisfy the (raw_type, special_types) requirement of at least one of the elements in this list, it is pruned.
+            Identical to getting the union of calling get_features(valid_raw_types=[raw_type], required_special_types=special_types) for every element of (raw_type, special_types) in required_raw_special_pairs
+            If raw_type is None, then any feature will satisfy the raw type requirement.
+            If special_types is None, then any feature will satisfy the special type requirement (including those with no special types).
         required_exact : bool, default False
             If True, then if a feature does not have the exact same special types (with no extra special types) as required_special_types, it is pruned.
-            Has no effect if required_special_types is None.
+            This also applied to required_raw_special_pairs if specified.
+            Has no effect if required_special_types and required_raw_special_pairs are None.
         required_at_least_one_special : bool, default False
             If True, then if a feature has zero special types, it is pruned.
 
@@ -142,6 +148,27 @@ class FeatureMetadata:
                 features = [feature for feature in features if required_special_types_set.issubset(self.get_feature_types_special(feature))]
         if required_at_least_one_special:
             features = [feature for feature in features if self.get_feature_types_special(feature)]
+        if required_raw_special_pairs is not None:
+            features_og = copy.deepcopy(features)
+            features_to_keep = []
+            for valid_raw, valid_special in required_raw_special_pairs:
+                if valid_special is not None:
+                    valid_special = set(valid_special)
+                features_to_keep_inner = []
+                for feature in features:
+                    feature_type_raw = self.get_feature_type_raw(feature)
+                    feature_types_special = set(self.get_feature_types_special(feature))
+                    if valid_raw is None or feature_type_raw == valid_raw:
+                        if valid_special is None:
+                            features_to_keep_inner.append(feature)
+                        elif required_exact:
+                            if valid_special == feature_types_special:
+                                features_to_keep_inner.append(feature)
+                        elif valid_special.issubset(feature_types_special):
+                            features_to_keep_inner.append(feature)
+                features = [feature for feature in features if feature not in features_to_keep_inner]
+                features_to_keep += features_to_keep_inner
+            features = [feature for feature in features_og if feature in features_to_keep]
 
         return features
 
@@ -174,7 +201,7 @@ class FeatureMetadata:
         return metadata
 
     def keep_features(self, features: list, inplace=False):
-        '''Removes all features except for those in `features`'''
+        """Removes all features except for those in `features`"""
         features_invalid = [feature for feature in features if feature not in self.get_features()]
         if features_invalid:
             raise KeyError(f'keep_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}')
@@ -241,12 +268,12 @@ class FeatureMetadata:
                     raise AssertionError(f"Metadata objects to join share raw features but do not agree on raw dtypes, and `shared_raw_features='error_if_diff'`. Shared conflicting features: {shared_features_diff_types}")
         type_map_raw.update({key: val for key, val in metadata.type_map_raw.items() if key not in shared_features})
 
-        type_group_map_special = self.add_type_group_map_special([self.type_group_map_special, metadata.type_group_map_special])
+        type_group_map_special = self._add_type_group_map_special([self.type_group_map_special, metadata.type_group_map_special])
 
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
 
     @staticmethod
-    def add_type_group_map_special(type_group_map_special_lst: list):
+    def _add_type_group_map_special(type_group_map_special_lst: List[dict]) -> dict:
         if not type_group_map_special_lst:
             return defaultdict(list)
         type_group_map_special_combined = copy.deepcopy(type_group_map_special_lst[0])

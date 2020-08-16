@@ -21,8 +21,10 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         return self._generate_features_datetime(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        datetime_features = self.feature_metadata_in.type_group_map_special[S_DATETIME_AS_OBJECT] + self.feature_metadata_in.type_group_map_raw[R_DATETIME]
-        return datetime_features
+        return self.feature_metadata_in.get_features(required_raw_special_pairs=[
+            (R_DATETIME, None),
+            (None, [S_DATETIME_AS_OBJECT])
+        ])
 
     # TODO: Improve handling of missing datetimes
     def _generate_features_datetime(self, X: DataFrame) -> DataFrame:

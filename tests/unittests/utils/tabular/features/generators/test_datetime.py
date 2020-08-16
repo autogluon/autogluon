@@ -14,8 +14,8 @@ def test_datetime_feature_generator(generator_helper, data_helper):
     }
 
     expected_feature_metadata_full = {('int', ('datetime_as_int',)): [
-        'datetime_as_object',
         'datetime',
+        'datetime_as_object',
     ]}
 
     expected_output_data_feat_datetime = [

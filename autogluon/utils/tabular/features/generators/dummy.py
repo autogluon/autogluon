@@ -16,7 +16,7 @@ class DummyFeatureGenerator(IdentityFeatureGenerator):
             feature_metadata_in = FeatureMetadata(type_map_raw={})
         super().__init__(features_in=features_in, feature_metadata_in=feature_metadata_in, **kwargs)
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_dummy(X)
 
     @staticmethod

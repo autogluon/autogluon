@@ -20,7 +20,7 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
         X_out = X[self.features_in]
         return X_out, self.feature_metadata_in.type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return X
 
     # TODO: Consider NaN?

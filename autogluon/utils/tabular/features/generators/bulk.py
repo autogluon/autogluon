@@ -132,7 +132,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
         return X_out, feature_metadata.type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         for generator_group in self.generators:
             feature_df_list = []
             for generator in generator_group:

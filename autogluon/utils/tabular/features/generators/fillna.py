@@ -30,7 +30,7 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
                                f', If the feature could be coerced to {type(self._fillna_feature_map[feature])}, it will be if NaN values are present, which may cause defective behavior. Please set the fill value to a string value to prevent this behavior.')
         return self._transform(X), self.feature_metadata_in.type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         null_count = X.isnull().sum()
         with_null = null_count[null_count != 0]
         with_null_features = list(with_null.index)

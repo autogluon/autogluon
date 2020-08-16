@@ -56,8 +56,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         return X_out
 
     def _infer_features_in(self, X, y=None) -> list:
-        text_features = self.feature_metadata_in.type_group_map_special[S_TEXT]
-        return text_features
+        return self.feature_metadata_in.get_features(required_special_types=[S_TEXT])
 
     def _fit_transform_ngrams(self, X):
         if not self.features_in:

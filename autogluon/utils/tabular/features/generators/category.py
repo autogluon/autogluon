@@ -66,7 +66,7 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
         else:
             X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
-        if 'text' in feature_metadata_out_type_group_map_special:
+        if S_TEXT in feature_metadata_out_type_group_map_special:
             text_features = feature_metadata_out_type_group_map_special.pop(S_TEXT)
             feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY] += [feature for feature in text_features if feature not in feature_metadata_out_type_group_map_special[S_TEXT_AS_CATEGORY]]
         return X_out, feature_metadata_out_type_group_map_special
@@ -75,10 +75,7 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
         return self._generate_features_category(X)
 
     def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
-        object_features = self.feature_metadata_in.type_group_map_raw[R_OBJECT] + self.feature_metadata_in.type_group_map_raw[R_CATEGORY]
-        datetime_as_object_features = self.feature_metadata_in.type_group_map_special[S_DATETIME_AS_OBJECT]
-        object_features = [feature for feature in object_features if feature not in datetime_as_object_features]
-        return object_features
+        return self.feature_metadata_in.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY], invalid_special_types=[S_DATETIME_AS_OBJECT])
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:

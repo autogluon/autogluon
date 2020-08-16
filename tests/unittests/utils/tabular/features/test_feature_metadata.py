@@ -160,6 +160,23 @@ def test_feature_metadata_get_features():
 
     assert feature_metadata.get_features(required_at_least_one_special=True) == ['a', 'b', 'd', 'e', 'f']
 
+    assert feature_metadata.get_features(required_raw_special_pairs=[
+        ('1', ['s2']),
+    ]) == ['a', 'e']
+    assert feature_metadata.get_features(required_raw_special_pairs=[
+        ('1', None),
+    ]) == ['a', 'd', 'e']
+    assert feature_metadata.get_features(required_raw_special_pairs=[
+        ('1', ['s2']),
+        (None, ['s4']),
+        ('3', None),
+    ]) == ['a', 'c', 'e', 'f']
+    assert feature_metadata.get_features(required_raw_special_pairs=[
+        ('1', ['s2']),
+        (None, ['s4']),
+        ('3', None),
+    ], required_exact=True) == ['c', 'e', 'f']
+
     # Assert that valid_raw_types is the opposite of invalid_raw_types through all combinations
     raw_types_to_check = ['1', '2', '3', '4', 'UNKNOWN']
     for L in range(0, len(raw_types_to_check) + 1):

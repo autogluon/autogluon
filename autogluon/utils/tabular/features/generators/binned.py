@@ -24,11 +24,11 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
         type_group_map_special[S_BINNED] += list(X_out.columns)
         return X_out, type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return self._transform_bin(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        features_to_bin = self.feature_metadata_in.type_group_map_raw[R_INT] + self.feature_metadata_in.type_group_map_raw[R_FLOAT]
+        features_to_bin = self.feature_metadata_in.get_features(valid_raw_types=[R_INT, R_FLOAT])
         return features_to_bin
 
     def _get_bin_map(self, X: DataFrame) -> dict:

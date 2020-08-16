@@ -20,7 +20,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         return X, self.feature_metadata_in.type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         int_features = self.feature_metadata_in.type_group_map_raw[R_INT]
         if int_features:
             null_count = X[int_features].isnull().sum()

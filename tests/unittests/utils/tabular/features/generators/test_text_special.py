@@ -2,7 +2,7 @@
 from autogluon.utils.tabular.features.generators import TextSpecialFeatureGenerator
 
 
-def test_text_ngram_feature_generator(generator_helper, data_helper):
+def test_text_special_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
 
@@ -14,10 +14,10 @@ def test_text_ngram_feature_generator(generator_helper, data_helper):
     expected_feature_metadata_full = {('int', ('binned', 'text_special')): [
         'text.char_count',
         'text.word_count',
-        'text.symbol_count.!',
-        'text.symbol_count..',
+        'text.capital_ratio',
         'text.lower_ratio',
-        'text.symbol_ratio. ',
+        'text.special_ratio',
+        'text.symbol_ratio. '
     ]}
 
     expected_output_data_feat_lower_ratio = [3, 2, 0, 3, 3, 3, 3, 3, 1]

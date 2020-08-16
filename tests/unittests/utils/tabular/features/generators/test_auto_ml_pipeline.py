@@ -41,11 +41,14 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
         ('int', ('binned', 'text_special')): [
             'text.char_count',
             'text.word_count',
-            'text.symbol_count..',
             'text.lower_ratio',
+            'text.special_ratio',
             'text.symbol_ratio. '
         ],
-        ('int', ('datetime_as_int',)): ['datetime_as_object', 'datetime'],
+        ('int', ('datetime_as_int',)): [
+            'datetime',
+            'datetime_as_object'
+        ],
         ('int', ('text_ngram',)): [
             '__nlp__.breaks',
             '__nlp__.end',

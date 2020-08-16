@@ -21,7 +21,7 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         X_out = self._transform(X)
         return X_out, self.feature_metadata_in.type_group_map_special
 
-    def _transform(self, X):
+    def _transform(self, X: DataFrame) -> DataFrame:
         return self._minimize_categorical_memory_usage(X)
 
     def _infer_features_in(self, X, y=None) -> list:
@@ -68,8 +68,7 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         return dtype_info.dtype, dtype_info.min, dtype_info.max
 
     def _infer_features_in(self, X, y=None) -> list:
-        numeric_features = [feature for feature in self.feature_metadata_in.get_features() if self.feature_metadata_in.get_feature_type_raw(feature) in [R_INT]]  # TODO: floats?
-        return numeric_features
+        return self.feature_metadata_in.get_features(valid_raw_types=[R_INT])  # TODO: R_FLOAT?
 
     def _minimize_numeric_memory_usage(self, X: DataFrame):
         return clip_and_astype(df=X, clip_min=self._clip_min, clip_max=self._clip_max, dtype=self.dtype_out)

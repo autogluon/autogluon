@@ -32,8 +32,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
         return self._generate_features_text_special(X)
 
     def _infer_features_in(self, X, y=None) -> list:
-        text_features = self.feature_metadata_in.type_group_map_special[S_TEXT]
-        return text_features
+        return self.feature_metadata_in.get_features(required_special_types=[S_TEXT])
 
     def _generate_features_text_special(self, X: DataFrame) -> DataFrame:
         if self.features_in:
