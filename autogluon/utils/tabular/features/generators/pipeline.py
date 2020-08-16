@@ -37,6 +37,7 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         self.post_memory_usage_per_row = None
 
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
+        self._ensure_no_duplicate_column_names(X=X)  # TODO: Remove this, move pre_memory_usage and post_memory_usage into super().
         self._compute_pre_memory_usage(X)
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
         self._compute_post_memory_usage(X_out)

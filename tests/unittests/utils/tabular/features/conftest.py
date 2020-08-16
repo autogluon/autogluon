@@ -18,7 +18,14 @@ class GeneratorHelper:
         with pytest.raises(AssertionError):
             # Can't call transform before fit_transform
             generator.transform(input_data)
-    
+
+        if len(input_data.columns) > 0:
+            # Raise exception
+            with pytest.raises(AssertionError):
+                input_data_with_duplicate_columns = pd.concat([input_data, input_data], axis=1)
+                # Can't call fit_transform with duplicate column names
+                generator.fit_transform(input_data_with_duplicate_columns)
+
         assert not generator.is_fit()
         output_data = generator.fit_transform(input_data)
         assert generator.is_fit()

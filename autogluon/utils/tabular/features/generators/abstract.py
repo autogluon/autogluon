@@ -1,6 +1,7 @@
 import copy
 import logging
 import time
+from collections import defaultdict
 
 from pandas import DataFrame, Series
 
@@ -184,6 +185,7 @@ class AbstractFeatureGenerator:
                 self._rename_features_in(rename_map)
             else:
                 self.column_names_as_str = False  # Columns were already string, so don't do conversion. Better to error if they change types at inference.
+        self._ensure_no_duplicate_column_names(X=X)
         self._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         if self.pre_drop_useless:
             self._useless_features_in = self._get_useless_features(X)
@@ -458,6 +460,17 @@ class AbstractFeatureGenerator:
         """
         pass
 
+    def _ensure_no_duplicate_column_names(self, X: DataFrame):
+        if len(X.columns) != len(set(X.columns)):
+            count_dict = defaultdict(int)
+            invalid_columns = []
+            for column in list(X.columns):
+                count_dict[column] += 1
+            for column in count_dict:
+                if count_dict[column] > 1:
+                    invalid_columns.append(column)
+            raise AssertionError(f'Columns appear multiple times in X. Columns must be unique. Invalid columns: {invalid_columns}')
+
     # TODO: Move to a generator
     @staticmethod
     def _get_useless_features(X: DataFrame) -> list:
@@ -467,6 +480,7 @@ class AbstractFeatureGenerator:
                 useless_features.append(column)
         return useless_features
 
+    # TODO: Consider adding _log and verbosity methods to mixin
     def set_log_prefix(self, log_prefix, prepend=False):
         if prepend:
             self.log_prefix = log_prefix + self.log_prefix
