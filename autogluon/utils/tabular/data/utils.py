@@ -4,6 +4,7 @@ import math
 from pandas import DataFrame
 
 from ..features.types import get_type_map_raw
+from ..features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY
 
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,9 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         num_rows = len(df)
         num_rows_sample = math.ceil(sample_ratio * num_rows)
         sample_ratio = num_rows_sample / num_rows
-        exact_dtypes = ['int', 'float']
-        category_dtypes = ['category']
         dtypes_raw = get_type_map_raw(df)
-        columns_category = [column for column in df if dtypes_raw[column] in category_dtypes]
-        columns_inexact = [column for column in df if dtypes_raw[column] not in exact_dtypes + category_dtypes]
+        columns_category = [column for column in df if dtypes_raw[column] == R_CATEGORY]
+        columns_inexact = [column for column in df if dtypes_raw[column] not in [R_INT, R_FLOAT, R_CATEGORY]]
         memory_usage = df.memory_usage()
         if columns_category:
             for column in columns_category:

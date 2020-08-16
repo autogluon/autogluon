@@ -87,17 +87,19 @@ def get_type_group_map_special(df: DataFrame) -> defaultdict:
 
 
 # TODO: Expand to int64 -> date features (milli from epoch etc)
+# TODO: This takes a surprisingly long time to run, ~30 seconds a laptop for 50,000 rows of datetime_as_object for a single column. Try to optimize.
 def check_if_datetime_as_object_feature(X: Series) -> bool:
     type_family = get_type_family_raw(X.dtype)
     # TODO: Check if low numeric numbers, could be categorical encoding!
     # TODO: If low numeric, potentially it is just numeric instead of date
     if X.isnull().all():
         return False
-    # if type_family == 'datetime':
-    #     return True
     if type_family != 'object':  # TODO: seconds from epoch support
         return False
     try:
+        # TODO: pd.Series(['20170204','20170205','20170206']) is incorrectly not detected as datetime_as_object
+        #  But we don't want pd.Series(['184','822828','20170206']) to be detected as datetime_as_object
+        #  Need some smart logic (check min/max values?, check last 2 values don't go >31?)
         X.apply(pd.to_numeric)
     except:
         try:
@@ -119,7 +121,7 @@ def check_if_nlp_feature(X: Series) -> bool:
     unique_ratio = num_unique / num_rows
     if unique_ratio <= 0.01:
         return False
-    avg_words = np.mean([len(re.sub(' +', ' ', value).split(' ')) if isinstance(value, str) else 0 for value in X_unique])
+    avg_words = Series(X_unique).str.split().str.len().mean()
     if avg_words < 3:
         return False
 

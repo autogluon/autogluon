@@ -40,22 +40,15 @@ def generate_bins(X_features: DataFrame, features_to_bin):
             bins = X_features[column].sort_values(ascending=True)
             interval_index = get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
 
+        # TODO: max_desired_bins and min_desired_bins are currently equivalent, but in future they will be parameterized to allow for flexibility.
         max_desired_bins = min(ideal_cats, max_bins)
         min_desired_bins = min(ideal_cats, max_bins)
 
-        if (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins):
-            is_satisfied = True
-        else:
-            is_satisfied = False
+        is_satisfied = (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins)
 
         num_cats_current = num_cats_initial
-        # print(column, min_desired_bins, max_desired_bins)
         cur_iteration = 0
         while not is_satisfied:
-            if len(interval_index) > max_desired_bins:
-                pass
-            elif len(interval_index) < min_desired_bins:
-                pass
             ratio_reduction = max_desired_bins / len(interval_index)
             num_cats_current = int(np.floor(num_cats_current * ratio_reduction))
             bin_index = [np.floor(cur_len * (num + 1) / num_cats_current) for num in range(num_cats_current - 1)]
@@ -74,6 +67,7 @@ def generate_bins(X_features: DataFrame, features_to_bin):
 
 
 # TODO: Clean code
+# TODO: Consider re-using bins variable instead of making bins_2-7 variables
 # bins is a sorted int/float series, ascending=True
 def get_bins(bins: Series, bin_index: list, bin_epsilon: float) -> IntervalIndex:
     max_val = bins.max()
