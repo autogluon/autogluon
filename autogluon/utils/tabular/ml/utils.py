@@ -79,7 +79,14 @@ def setup_outputdir(output_directory):
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
         output_directory = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
-        os.makedirs(output_directory)
+        for i in range(1, 1000):
+            try:
+                os.makedirs(output_directory, exist_ok=False)
+                break
+            except FileExistsError as e:
+                output_directory = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
+        else:
+            raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f"No output_directory specified. Models will be saved in: {output_directory}")
     output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists
     if output_directory[-1] != os.path.sep:
