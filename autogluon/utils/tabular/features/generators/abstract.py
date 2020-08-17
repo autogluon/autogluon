@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add features_in_special_types, features_in_raw_types, features_in_type_pairs, banned_features_in_type_pairs/special_types/raw_types
 # TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
-# TODO: Add documentation
-# TODO: Add unit tests
 class AbstractFeatureGenerator:
     """
     Abstract feature generator implementation from which all AutoGluon feature generators inherit.

@@ -21,7 +21,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         return X, self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        int_features = self.feature_metadata_in.type_group_map_raw[R_INT]
+        int_features = self.feature_metadata_in.get_features(valid_raw_types=[R_INT])
         if int_features:
             null_count = X[int_features].isnull().sum()
             with_null = null_count[null_count != 0]

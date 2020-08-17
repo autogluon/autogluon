@@ -46,13 +46,27 @@ S_STACK = 'stack'
 
 class FeatureMetadata:
     """
-    Contains feature type metadata information such as type family groups (type_group_map_raw) and special feature type groups (type_group_map_special)
+    Feature metadata contains information about features that are not directly apparent in the raw data itself.
+    This enables feature generators to properly process features, and allows downstream models to properly handle features during training and inference.
 
-    # TODO: rewrite
-    type_group_map_raw is the dictionary computed as output to :function:`autogluon.utils.tabular.features.utils.get_type_group_map_raw`
-    type_group_map_special is an optional dictionary to communicate special properties of features to downstream models that have special handling functionality for those feature types.
-        As an example, type_group_map_special might contain a key 'text_ngram' indicating that the list of values are all features which were generated from a nlp vectorizer and represent ngrams.
-        A downstream model such as a K-Nearest-Neighbor model could then check if 'text_ngram' is present in type_group_map_special and drop those features if present, to speed up training and inference time.
+    Parameters
+    ----------
+    type_map_raw : Dict[str, str]
+        Dictionary of feature names to raw types.
+        The values can be anything, but it is generally recommended they be one of:
+            ['int', 'float', 'object', 'category', 'datetime']
+    type_group_map_special : Dict[str, List[str]], optional
+        Dictionary of special types to lists of feature names.
+        The keys can be anything, but it is generally recommended they be one of:
+            ['binned', 'datetime_as_int', 'datetime_as_object', 'text', 'text_as_category', 'text_special', 'text_ngram', 'stack']
+        Feature names that appear in the value lists must also be keys in type_map_raw.
+        Feature names are not required to have special types.
+
+    Attributes
+    ----------
+    type_group_map_raw : Dict[str, List[str]]
+        Identical structure to type_group_map_special, but with type_map_raw values used.
+        Specifically, type_map_raw unique values are used as keys, and the list of features which contain the raw type are the values.
     """
     def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None):
         if type_group_map_special is None:
@@ -61,7 +75,7 @@ class FeatureMetadata:
             type_group_map_special = defaultdict(list, type_group_map_special)
 
         self.type_map_raw = type_map_raw
-        self.type_group_map_raw = self.get_type_group_map_raw_from_flattened(type_map_raw=self.type_map_raw)  # TODO: Move to after validate
+        self.type_group_map_raw = self._get_type_group_map_raw_from_flattened(type_map_raw=self.type_map_raw)  # TODO: Remove as a variable, make a method to generate.
         self.type_group_map_special = type_group_map_special
 
         self._validate()
@@ -181,13 +195,14 @@ class FeatureMetadata:
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
     @staticmethod
-    def get_type_group_map_raw_from_flattened(type_map_raw):
+    def _get_type_group_map_raw_from_flattened(type_map_raw):
         type_group_map_raw = defaultdict(list)
         for feature, dtype in type_map_raw.items():
             type_group_map_raw[dtype].append(feature)
         return type_group_map_raw
 
     def remove_features(self, features: list, inplace=False):
+        """Removes all features from metadata that are in features"""
         if inplace:
             metadata = self
         else:
@@ -201,7 +216,7 @@ class FeatureMetadata:
         return metadata
 
     def keep_features(self, features: list, inplace=False):
-        """Removes all features except for those in `features`"""
+        """Removes all features from metadata except for those in features"""
         features_invalid = [feature for feature in features if feature not in self.get_features()]
         if features_invalid:
             raise KeyError(f'keep_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}')
@@ -220,6 +235,7 @@ class FeatureMetadata:
                 d.pop(feature)
 
     def rename_features(self, rename_map: dict, inplace=False):
+        """Rename all features from metadata that are keys in rename_map to their values."""
         if inplace:
             metadata = self
         else:
@@ -229,14 +245,14 @@ class FeatureMetadata:
         after_len = len(metadata.type_map_raw.keys())
         if before_len != after_len:
             raise AssertionError(f'key names conflicted during renaming. Do not rename features to exist feature names.')
-        metadata.type_group_map_raw = metadata.get_type_group_map_raw_from_flattened(type_map_raw=metadata.type_map_raw)
+        metadata.type_group_map_raw = metadata._get_type_group_map_raw_from_flattened(type_map_raw=metadata.type_map_raw)
         for type in metadata.type_group_map_special:
             metadata.type_group_map_special[type] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[type]]
         return metadata
 
-    # Joins two metadata objects together, returning a new metadata object
     # TODO: Add documentation on shared_raw_features usage
     def join_metadata(self, metadata, shared_raw_features='error'):
+        """Join two FeatureMetadata objects together, returning a new FeatureMetadata object"""
         if shared_raw_features not in ['error', 'error_if_diff', 'overwrite']:
             raise ValueError(f"shared_raw_features must be one of {['error', 'error_if_diff', 'overwrite']}, but was: '{shared_raw_features}'")
         type_map_raw = copy.deepcopy(self.type_map_raw)
