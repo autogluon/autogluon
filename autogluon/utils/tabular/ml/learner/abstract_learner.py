@@ -358,11 +358,11 @@ class AbstractLearner:
     def _remove_missing_labels(self, y_true, y_pred):
         """Removes missing labels and produces warning if any are found."""
         if self.problem_type == REGRESSION:
-            non_missing_boolean_mask = [(y is not None and not np.isnan(y)) for y in y_true]
+            non_missing_boolean_mask = [y is not None and not pd.isnull(y) for y in y_true]
         else:
-            non_missing_boolean_mask = [(y is not None and not np.isnan(y) and y != '') for y in y_true]
+            non_missing_boolean_mask = [y is not None and not pd.isnull(y) and y != '' for y in y_true]
 
-        n_missing = len([x for x in non_missing_boolean_mask if not x])
+        n_missing = len(non_missing_boolean_mask) - sum(non_missing_boolean_mask)
         if n_missing > 0:
             y_true = y_true[non_missing_boolean_mask]
             y_pred = y_pred[non_missing_boolean_mask]
