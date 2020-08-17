@@ -360,7 +360,7 @@ class AbstractLearner:
         if self.problem_type == REGRESSION:
             non_missing_boolean_mask = [(y is not None and not np.isnan(y)) for y in y_true]
         else:
-            non_missing_boolean_mask = [(y is not None and y != '') for y in y_true]
+            non_missing_boolean_mask = [(y is not None and not np.isnan(y) and y != '') for y in y_true]
 
         n_missing = len([x for x in non_missing_boolean_mask if not x])
         if n_missing > 0:
