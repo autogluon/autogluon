@@ -16,6 +16,7 @@ np.random.seed(123)
 ## Paraphrasing Identification
 
 We will use the "Paraphrasing Identification" task for illustration. The goal is to predict whether one sentence is a restatement of the other.
+
 - sentence1, sentence2 --> label
 - binary classification
 
@@ -48,6 +49,7 @@ print('Label:', train_data['label'][3])
 
 Here, we can set the `hyperparameters` argument and specify the search space with `ag.space`.
 In this example, we search for
+
 - warmup
 - learning rate
 - dropout before the first task-specific layer

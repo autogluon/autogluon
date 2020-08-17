@@ -7,6 +7,7 @@ The `TextPrediction` functionality depends on the [GluonNLP](https://gluon-nlp.m
 Due to the ongoing upgrade of GluonNLP, we are currently using a customized version in [autogluon-contrib-nlp](https://github.com/sxjscience/autogluon-contrib-nlp.git). In a future release, we will switch to use the official GluonNLP.
 
 In this example, we use two examples to show how to use `TextPrediction` to solve different types of NLP tasks, including:
+
 - [Sentiment Analysis](#Sentiment-Analysis)
 - [Sentence Similarity](#Sentence-Similarity)
 
@@ -124,6 +125,7 @@ print('SPEARMANR = {:.4f}'.format(dev_score['spearmanr']))
 ```
 
 Next, we use our trained predictor to calculate the similarity score among these sentences:
+
 - 'The child is riding a horse.'
 - 'The young boy is riding a horse.'
 - 'The young man is riding a horse.'
