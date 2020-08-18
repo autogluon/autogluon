@@ -86,7 +86,7 @@ hyperparameters = {
 predictor_mrpc = task.fit(train_data,
                           label='label',
                           hyperparameters=hyperparameters,
-                          num_trials=5,
+                          num_trials=5,  # Number of different hyper-parameters
                           time_limits=60 * 10,
                           ngpus_per_trial=1,
                           seed=123,
@@ -185,7 +185,7 @@ It will early stop the bad-performing configurations and only keep training the 
 hyperparameters['hpo_params'] = {
     'scheduler': 'hyperband',
     'search_strategy': 'random',
-    'max_t': 40,
+    'max_t': 40,  # Number of epochs
 }
 ```
 

@@ -52,6 +52,7 @@ requirements = [
     'graphviz',
     'scikit-optimize',
     'catboost<0.24',
+    'pyarrow<=1.0.0',
     'boto3',
     'lightgbm>=2.3.0,<3.0',
     'pandas>=0.24.0,<1.0',

@@ -23,7 +23,7 @@ class _TextTokenIdsFieldBatchify:
         batch_segment_ids
             (batch_size, sequence_length)
         batch_token_offsets
-            (batch_size, seq_length, 2)
+            (batch_size, sequence_length, 2)
         """
         batch_token_ids = self._pad_batchify([ele.token_ids for ele in data])
         batch_valid_length = self._stack_batchify([len(ele.token_ids) for ele in data])

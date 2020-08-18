@@ -52,7 +52,6 @@ def test_hyperband_scheduler():
     assert pickle.dumps(scheduler.config_history[best_task_id]) == pickle.dumps(best_config)
 
 
-@pytest.mark.skip('skip')
 def test_rl_scheduler():
     @ag.args(
         lr=ag.space.Categorical(1e-3, 1e-2),

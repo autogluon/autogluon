@@ -46,7 +46,7 @@ def eval_(node):
         raise TypeError(node)
 
 
-def calculate_metric_by_expr(label_metric_scores, label_names, expr):
+def calculate_metric_by_expr(label_metric_scores: dict, label_names: list, expr: str) -> float:
     """Calculate the metric scores based on the given expression.
 
     Parameters
