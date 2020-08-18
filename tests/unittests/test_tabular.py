@@ -83,7 +83,11 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = task.fit(train_data=train_data, label=label, output_directory=savedir)
     leaderboard = predictor.leaderboard(dataset=test_data)
-    assert(set(predictor.get_model_names()) == set(leaderboard['model']))
+    leaderboard_extra = predictor.leaderboard(dataset=test_data, extra_info=True)
+    assert set(predictor.get_model_names()) == set(leaderboard['model'])
+    assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
+    assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
+    assert len(leaderboard) == len(leaderboard_extra)
     num_models = len(predictor.get_model_names())
     feature_importances = predictor.feature_importance(dataset=test_data)
     original_features = set(train_data.columns)
@@ -105,8 +109,9 @@ def test_advanced_functionality():
     assert(len(predictor.get_model_names()) == num_models * 2)
     predictor.predict(dataset=test_data)
     predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
-    assert(len(predictor.get_model_names()) == 0)
-    assert(len(predictor.leaderboard()) == 0)
+    assert len(predictor.get_model_names()) == 0
+    assert len(predictor.leaderboard()) == 0
+    assert len(predictor.leaderboard(extra_info=True)) == 0
     try:
         predictor.predict(dataset=test_data)
     except:

@@ -241,7 +241,7 @@ class AbstractLearner:
         return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, compute_oracle=False, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -274,7 +274,7 @@ class AbstractLearner:
 
         for model_name, pred_proba in model_pred_proba_dict.items():
             if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)  # FIXME: I think this doesn't work correctly, must use original y as well!
             if trainer.eval_metric_expects_y_pred:
                 pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                 scores[model_name] = self.eval_metric(y, pred)
@@ -315,11 +315,10 @@ class AbstractLearner:
             }
         )
 
-        df = df.sort_values(by=['score_test', 'pred_time_test'], ascending=[False, True]).reset_index(drop=True)
-
-        leaderboard_df = self.leaderboard(silent=silent)
+        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
 
         df_merged = pd.merge(df, leaderboard_df, on='model', how='left')
+        df_merged = df_merged.sort_values(by=['score_test', 'pred_time_test', 'score_val', 'pred_time_val', 'model'], ascending=[False, True, False, True, False]).reset_index(drop=True)
         df_columns_lst = df_merged.columns.tolist()
         explicit_order = [
             'model',
@@ -494,12 +493,12 @@ class AbstractLearner:
         y_pred_proba = self.predict_proba(X=X, inverse_transform=False)
         return self.submit_from_preds(X=X, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
 
-    def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, only_pareto_frontier=False, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, silent=True)
         else:
             trainer = self.load_trainer()
-            leaderboard = trainer.leaderboard()
+            leaderboard = trainer.leaderboard(extra_info=extra_info)
         if only_pareto_frontier:
             if 'score_test' in leaderboard.columns and 'pred_time_test' in leaderboard.columns:
                 score_col = 'score_test'
