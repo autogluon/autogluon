@@ -23,3 +23,13 @@ def test_calculate_metric_by_expr():
                                      label_names=label_names,
                                      expr='acc')
     assert score == (0.9 + 0.8) / 2
+    metrics2 = {'label1': {'acc': 0.9}, 'label2': {'acc': 0.8}}
+    score = calculate_metric_by_expr(label_metric_scores=metrics2,
+                                     label_names=label_names,
+                                     expr='acc')
+    assert score == (0.9 + 0.8) / 2
+    metrics2 = {'label1': {'acc': 0.9}, 'label2': {'acc': 0.8}}
+    score = calculate_metric_by_expr(label_metric_scores=metrics2,
+                                     label_names=label_names,
+                                     expr='2.0 / (1 / label1.acc + 1 / label2.acc)')
+    assert score == 2.0 / (1 / 0.9 + 1 / 0.8)

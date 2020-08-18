@@ -2,31 +2,13 @@ import collections
 import numpy as np
 import pandas as pd
 import json
+from ...utils.tabular.utils.loaders import load_pd
 from . import constants as _C
 from .column_property import CategoricalColumnProperty, EntityColumnProperty,\
                              TextColumnProperty, NumericalColumnProperty,\
     get_column_properties_from_metadata
 from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple
-
-
-def load_pandas_df(data: Union[str, pd.DataFrame]):
-    if isinstance(data, pd.DataFrame):
-        return data
-    loading_error = dict()
-    df = None
-    for loader, fmt in [(pd.read_pickle, 'pickle'),
-                        (pd.read_parquet, 'parquet'),
-                        (pd.read_csv, 'csv')]:
-        try:
-            df = loader(data)
-            break
-        except Exception as err:
-            loading_error[fmt] = err
-    if df is not None:
-        return df
-    else:
-        raise Exception(loading_error)
 
 
 def random_split_train_val(df, valid_ratio=0.15,
@@ -78,7 +60,7 @@ def random_split_train_val(df, valid_ratio=0.15,
                 out.append((df.iloc[train_indices], df.iloc[valid_indices]))
             return out
     else:
-        raise NotImplementedError
+        raise NotImplementedError('Currently, stratified sampling is not supported.')
 
 
 def is_categorical_column(data: pd.Series,
@@ -314,7 +296,10 @@ class TabularDataset:
             Whether to handle missing value in categorical columns by default
         """
         super().__init__()
-        df = load_pandas_df(path_or_df)
+        if not isinstance(path_or_df, pd.DataFrame):
+            df = path_or_df
+        else:
+            df = load_pd.load(path_or_df)
         if columns is not None:
             if not isinstance(columns, list):
                 columns = [columns]
