@@ -45,7 +45,7 @@ print('Sentence2:', tokenizer.decode(train_data['sentence2'][3].split()))
 print('Label:', train_data['label'][3])
 ```
 
-## Explore a Custoimzed Search Space with Random Search
+## Explore a Customized Search Space with Random Search
 
 Here, we can set the `hyperparameters` argument and specify the search space with `ag.space`.
 In this example, we search for
