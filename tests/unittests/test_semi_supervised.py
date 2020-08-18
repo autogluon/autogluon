@@ -1,7 +1,6 @@
 """ Runs autogluon.tabular on multiple benchmark datasets.
-    Run this benchmark with fast_benchmark=False to assess whether major chances make autogluon better or worse overall.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-    Classification performance = error-rate, Regression performance = 1 - R^2
+    Classification performance = error-rate
 
     # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
@@ -16,7 +15,6 @@
     - high-dimensional features + low-sample size
     - high levels of missingness in test data only, no missingness in train data
     - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
 """
 import warnings, shutil, os
@@ -27,8 +25,11 @@ from random import seed
 import pytest
 
 import autogluon as ag
+
+breakpoint()
 from autogluon import TabularPrediction as task
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
+
 
 
 def test_tabular():
@@ -40,16 +41,12 @@ def test_tabular():
     verbosity = 2 # how much output to print
     hyperparameters = None
     time_limits = None
-    fast_benchmark = True # False
     # If True, run a faster benchmark (subsample training sets, less epochs, etc),
     # otherwise we run full benchmark with default AutoGluon settings.
-    # performance_value warnings are disabled when fast_benchmark = True.
 
-    #### If fast_benchmark = True, can control model training time here. Only used if fast_benchmark=True ####
-    if fast_benchmark:
-        subsample_size = 100
-        unlabeled_subsample_size = 20000
-        time_limits = 60*60
+    subsample_size = 59
+    unlabeled_subsample_size = 50000
+    time_limits = 60*60
 
     fit_args = {
         'hyperparameter_tune': hyperparameter_tune,
@@ -60,8 +57,7 @@ def test_tabular():
     if time_limits is not None:
         fit_args['time_limits'] = time_limits
     ###################################################################
-    run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, unlabeled_subsample_size=unlabeled_subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
-    #run_tabular_benchmark_toy(fit_args=fit_args)
+    run_tabular_benchmarks(subsample_size=subsample_size, unlabeled_subsample_size=unlabeled_subsample_size, perf_threshold=perf_threshold, seed_val=seed_val, fit_args=fit_args)
 
 
 def load_data(directory_prefix, train_file, test_file, name, url=None):
@@ -82,38 +78,7 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
     return train_data, test_data
 
 
-def run_tabular_benchmark_toy(fit_args):
-    dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyClassification.zip',
-                          'name': 'toyClassification',
-                          'problem_type': MULTICLASS,
-                          'label_column': 'y',
-                          'performance_val': 0.436}
-    # 2-D toy noisy, imbalanced 4-class classification task with: feature missingness, out-of-vocabulary feature categories in test data, out-of-vocabulary labels in test data, training column missing from test data, extra distraction columns in test data
-    # toyclassif_dataset should produce 1 warning and 1 error during inference:
-    # Warning: Ignoring 181 (out of 1000) training examples for which the label value in column 'y' is missing
-    # ValueError: Required columns are missing from the provided dataset. Missing columns: ['lostcolumn']
-
-    # Additional warning that would have occurred if ValueError was not triggered:
-    # UserWarning: These columns from this dataset were not present in the training dataset (AutoGluon will ignore them):  ['distractioncolumn1', 'distractioncolumn2']
-
-    directory_prefix = './datasets/'
-    train_file = 'train_data.csv'
-    test_file = 'test_data.csv'
-    train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=train_file, test_file=test_file, name=dataset['name'], url=dataset['url'])
-    print(f"Evaluating Benchmark Dataset {dataset['name']}")
-    directory = directory_prefix + dataset['name'] + "/"
-    savedir = directory + 'AutogluonOutput/'
-    shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
-    predictor = task.fit(train_data=train_data, label=dataset['label_column'], output_directory=savedir, **fit_args)
-    try:
-        predictor.predict(test_data)
-    except ValueError:  # ValueError should be raised because test_data has missing column 'lostcolumn'
-        pass
-    else:
-        raise AssertionError(f'{dataset["name"]} should raise an exception.')
-
-
-def run_tabular_benchmarks(fast_benchmark, subsample_size, unlabeled_subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False):
+def run_tabular_benchmarks(subsample_size, unlabeled_subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False):
     print("Running fit with args:")
     print(fit_args)
     # Each train/test dataset must be located in single directory with the given names.
@@ -135,21 +100,8 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, unlabeled_subsample_s
                       'label_column': 'Cover_Type',
                       'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
-    regression_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/AmesHousingPriceRegression.zip',
-                       'name': 'AmesHousingPriceRegression',
-                      'problem_type': REGRESSION,
-                      'label_column': 'SalePrice',
-                      'performance_val': 0.076} # Regression with mixed feature-types, skewed Y-values.
-
-    toyregres_dataset = {'url': 'https://autogluon.s3.amazonaws.com/datasets/toyRegression.zip',
-                         'name': 'toyRegression',
-                         'problem_type': REGRESSION,
-                        'label_column': 'y',
-                        'performance_val': 0.183}
-    # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
-
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = [binary_dataset] #regression_dataset] #binary_dataset] #, multi_dataset] #toyregres_dataset, regression_dataset, multi_dataset]
+    datasets = [multi_dataset] #multi_dataset]
     if dataset_indices is not None: # only run some datasets
         datasets = [datasets[i] for i in dataset_indices]
 
@@ -179,11 +131,11 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, unlabeled_subsample_s
             label_column = dataset['label_column']
             y_test = test_data[label_column]
             test_data = test_data.drop(labels=[label_column], axis=1)
-            if fast_benchmark:
-                if subsample_size is None:
-                    raise ValueError("fast_benchmark specified without subsample_size")
-                train_data = data.head(subsample_size) # subsample for fast_benchmark
-                unlabeled_data = data.head(unlabeled_subsample_size).drop(columns=[label_column])
+        
+            if subsample_size is None:
+                raise ValueError("subsample_size not specified")
+            train_data = data.head(subsample_size) 
+            unlabeled_data = data.head(unlabeled_subsample_size).drop(columns=[label_column])
 
 
             custom_hyperparameters = {"Transf": {}}
@@ -196,10 +148,8 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, unlabeled_subsample_s
             predictor = task.load(savedir)  # Test loading previously-trained predictor from file
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
-            if dataset['problem_type'] != REGRESSION:
-                perf = 1.0 - perf_dict['accuracy_score'] # convert accuracy to error-rate
-            else:
-                perf = 1.0 - perf_dict['r2_score'] # unexplained variance score.
+
+            perf = 1.0 - perf_dict['accuracy_score'] # unexplained variance score.
             sup_performance_vals[idx] = perf
             print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], sup_performance_vals[idx], dataset['performance_val']))
 
@@ -215,10 +165,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, unlabeled_subsample_s
             predictor = task.load(savedir)  # Test loading previously-trained predictor from file
             y_pred = predictor.predict(test_data)
             perf_dict = predictor.evaluate_predictions(y_true=y_test, y_pred=y_pred, auxiliary_metrics=True)
-            if dataset['problem_type'] != REGRESSION:
-                perf = 1.0 - perf_dict['accuracy_score'] # convert accuracy to error-rate
-            else:
-                perf = 1.0 - perf_dict['r2_score'] # unexplained variance score.
+
+            
+            perf = 1.0 - perf_dict['accuracy_score'] # unexplained variance score.
+
             semi_sup_performance_vals[idx] = perf
             print("Performance on dataset %s: %s   (previous perf=%s)" % (dataset['name'], semi_sup_performance_vals[idx], dataset['performance_val']))
 
