@@ -137,7 +137,10 @@ class LGBModel(AbstractModel):
         try_import_lightgbm()
         import lightgbm as lgb
         self.model = lgb.train(**train_params)
-        self.params_trained['num_boost_round'] = self.model.best_iteration
+        if dataset_val is not None:
+            self.params_trained['num_boost_round'] = self.model.best_iteration
+        else:
+            self.params_trained['num_boost_round'] = self.model.current_iteration()
 
     def _predict_proba(self, X, preprocess=True):
         if preprocess:

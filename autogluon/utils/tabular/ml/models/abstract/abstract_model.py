@@ -640,6 +640,9 @@ class AbstractModel:
             hyperparameters=self.params,
             hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             hyperparameters_nondefault=self.nondefault_params,
+            AG_args_fit=self.params_aux,
+            num_features=len(self.features) if self.features else None,
+            features=self.features,
             # disk_size=self.get_disk_size(),
             memory_size=self.get_memory_size(),  # Memory usage of model in bytes
         )
