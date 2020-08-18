@@ -296,7 +296,7 @@ class TabularDataset:
             Whether to handle missing value in categorical columns by default
         """
         super().__init__()
-        if not isinstance(path_or_df, pd.DataFrame):
+        if isinstance(path_or_df, pd.DataFrame):
             df = path_or_df
         else:
             df = load_pd.load(path_or_df)
