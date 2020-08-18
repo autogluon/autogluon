@@ -3,6 +3,12 @@ import copy
 import numpy as np
 import pandas as pd
 import warnings
+from packaging import version
+import mxnet
+# Ensure the MXNet version
+if version.parse(mxnet.__version__) < version.parse('1.7.0')\
+        or version.parse(mxnet.__version__) >= version.parse('2.0.0'):
+    raise ImportError('You will need to ensure that you have mxnet>=1.7.0, <2.0.0.')
 from mxnet.util import use_np
 from .. import tabular_prediction
 from . import constants as _C
