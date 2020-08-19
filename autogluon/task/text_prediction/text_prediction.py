@@ -368,9 +368,8 @@ class TextPrediction(BaseTask):
                                                    logger=logger)
                 model_candidates.append(model)
             else:
-                raise NotImplementedError('model_type = "{}" is not supported. You can try to use '
-                                          'model_type = "BertForTextPredictionBasic"'
-                                          .format(model_type))
+                raise ValueError('model_type = "{}" is not supported. You can try to use '
+                                 'model_type = "BertForTextPredictionBasic"'.format(model_type))
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         recommended_resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
                                                         ngpus_per_trial=ngpus_per_trial)
