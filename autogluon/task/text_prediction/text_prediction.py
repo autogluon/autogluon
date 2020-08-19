@@ -23,6 +23,7 @@ from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
 from ...utils import in_ipynb
 from ...utils.tabular.utils.loaders import load_pd
+from ...utils.tabular.ml.utils import default_holdout_frac
 from ...utils.miscs import verbosity2loglevel
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
@@ -200,7 +201,7 @@ class TextPrediction(BaseTask):
             time_limits=None,
             output_directory='./ag_text',
             feature_columns=None,
-            holdout_frac=0.15,
+            holdout_frac=None,
             eval_metric=None,
             stopping_metric=None,
             nthreads_per_trial=None,
@@ -208,7 +209,6 @@ class TextPrediction(BaseTask):
             dist_ip_addrs=None,
             scheduler=None,
             num_trials=None,
-            reduction_factor=None,
             search_strategy=None,
             search_options=None,
             hyperparameters=None,
@@ -233,7 +233,9 @@ class TextPrediction(BaseTask):
         feature_columns
             The feature columns
         holdout_frac
-            Ratio of the training data that will be held out as the tuning data / or dev data.
+            Ratio of the training data that will be held out as the tuning data.
+            By default, we will choose the appropriate holdout_frac based on the number of
+            training samples.
         eval_metric
             The evaluation metric, i.e., how you will finally evaluate the model.
         stopping_metric
@@ -250,8 +252,6 @@ class TextPrediction(BaseTask):
             The scheduler of HPO
         num_trials
             The number of trials in the HPO search
-        reduction_factor
-            The reduction factor in hyper-band scheduler
         search_strategy
             The search strategy
         search_options
@@ -317,6 +317,8 @@ class TextPrediction(BaseTask):
             all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
+            if holdout_frac is None:
+                holdout_frac = default_holdout_frac(len(train_data), True)
             train_data, tuning_data = random_split_train_val(train_data,
                                                              valid_ratio=holdout_frac)
         else:
@@ -390,8 +392,9 @@ class TextPrediction(BaseTask):
                                      .format(time_limits))
         if num_trials is None:
             num_trials = hyperparameters['hpo_params']['num_trials']
-        if reduction_factor is None:
-            reduction_factor = hyperparameters['hpo_params']['reduction_factor']
+
+        # Setting the HPO-specific parameters.
+        reduction_factor = hyperparameters['hpo_params']['reduction_factor']
         grace_period = hyperparameters['hpo_params']['grace_period']
         max_t = hyperparameters['hpo_params']['max_t']
         if recommended_resource['num_gpus'] == 0:
