@@ -127,8 +127,10 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 Apart from random search, we can utilize [skopt](https://scikit-optimize.github.io/stable/) as the searcher, 
 which performs a type of Bayesian Optimization. 
 Basically, skopt will train a *surrogate model* to approximate the performance of the hyperparameter configurations. 
-Whenever we observed the performance of a new set of hyperparameter, we update our posterior. 
-In the next trial, we will try the configuration that best balances the exploitation and exploration tradeoffs.
+Whenever the search observed the performance of a new set of hyperparameter, it updates the posterior. 
+In the next trial, the searcher will try the configuration that best balances the exploitation and exploration tradeoffs.
+
+Here, we use a maximal of 5 trails by setting `num_trails` to 5. 
 
 
 ```{.python .input}
