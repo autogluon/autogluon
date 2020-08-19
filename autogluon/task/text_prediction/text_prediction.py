@@ -2,6 +2,7 @@ import logging
 import copy
 import warnings
 from packaging import version
+
 import numpy as np
 import pandas as pd
 import mxnet
@@ -12,6 +13,7 @@ if version.parse(mxnet.__version__) < version.parse('1.7.0')\
 from mxnet.util import use_np
 from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
+
 from . import constants as _C
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
