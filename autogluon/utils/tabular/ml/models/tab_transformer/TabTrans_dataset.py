@@ -1,4 +1,6 @@
-#merging tabular and text dataset
+#Code in this script based on code from Milan Cvitkovic, 
+#Xin Huang, Ashish Khetan and Zohar Karnin.
+
 import os
 from data_code.utils import get_ds_info
 from data_code import data_encoders
@@ -103,8 +105,6 @@ class TabTransDataset(Dataset):
 			self.cont_feat_origin = []
 			cont_features = []
 			for c in self.columns:
-				#ignore=['product_description','bullet_point','department','gl_product_group_type','item_type_keyword'] #,'product_description','bullet_point']
-				#if c['name'] not in ignore:
 					enc = feature_encoders[c['name']]
 					col = self.raw_data[c['name']]
 					cat_feats = enc.enc_cat(col)
@@ -125,24 +125,11 @@ class TabTransDataset(Dataset):
 			else:
 				self.cont_data = None
 
-	def collate_fn(self, batch):
-
-		max_len = self.kwargs['max_len']
-		input, label = zip(*batch)
-
-		cat_list = [ input[i].unsqueeze(0) for i in range(len(input))]
-		batch = torch.cat(cat_list)
-
-		try:
-			label = torch.cat([l.unsqueeze(0) for l in label]) 
-		except:
-			label = []
-		return (batch,[]), label
 
 	def build_loader(self):
 		loader = DataLoader(self, batch_size=self.kwargs['batch_size'], 
 							shuffle=False, num_workers=16, 
-							pin_memory=True,collate_fn=self.collate_fn) 
+							pin_memory=True) 
 		return loader
 
 	def __len__(self):

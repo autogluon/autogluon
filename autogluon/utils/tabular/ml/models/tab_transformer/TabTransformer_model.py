@@ -26,7 +26,6 @@ class TabNet(nn.Module):
                 self.kwargs=kwargs
                 self.kwargs['cat_feat_origin_cards']=cat_feat_origin_cards
         
-              
                 if self.kwargs['fix_attention'] is True:
                     self.embed=TabTransformer_fix_attention(**self.kwargs['tab_kwargs'], **self.kwargs)
                 else:
@@ -53,17 +52,19 @@ class TabNet(nn.Module):
 
                 pretext_tasks=pretexts.__dict__
                 optimizers=[]
+                lr=self.kwargs['tab_kwargs']['lr']
+                weight_decay=self.kwargs['tab_kwargs']['weight_decay']
                 if state==None:
-                    optimizers = [optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-6)]
+                    optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
                     pretext=pretext_tasks['SUPERVISED_pretext'](self.kwargs)
-
                 elif state=='pretrain':
-                    optimizers = [optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-6)]
+                    optimizers = [optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)]
                     pretext=pretext_tasks['BERT_pretext'](self.kwargs)
                 elif state=='finetune':
-                    optimizer_fc    = optim.Adam(self.fc.parameters(), lr=1e-3, weight_decay=1e-6) 
-                    optimizer_embeds = optim.Adam(self.embed.parameters(), lr=1e-3, weight_decay=1e-6) 
-                    scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=0.95)
+                    base_exp_decay=self.kwargs['tab_kwargs']['base_exp_decay']
+                    optimizer_fc    = optim.Adam(self.fc.parameters(), lr=lr, weight_decay=weight_decay) 
+                    optimizer_embeds = optim.Adam(self.embed.parameters(), lr=lr, weight_decay=weight_decay) 
+                    scheduler = optim.lr_scheduler.ExponentialLR(optimizer_embeds,gamma=base_exp_decay)
                     optimizers.append(optimizer_fc)
                     optimizers.append(optimizer_embeds)
 
@@ -149,7 +150,7 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type=='binary':
             self.num_class=2
         elif self.problem_type=='multiclass':
-            self.num_class=train_dataset.num_classes
+            self.num_class=y_train.nunique()
 
         device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
 
@@ -214,11 +215,17 @@ class TabTransformerModel(AbstractModel):
         self.cat_feat_origin_cards=trainloader.cat_feat_origin_cards
        
         self.get_model()
+
         if X_unlabeled is not None:
-            self.model.fit(unlabloader, valloader, state='pretrain')
+            self.model.fit(unlabloader, valloader, state='pretrain') 
             self.model.fit(trainloader, valloader, state='finetune')
         else:
-            self.model.fit(trainloader, valloader) #X_train, y_train)
+            self.model.fit(trainloader, valloader)
+
+        """
+        #TODO: If no X_train is passed, but X_unlabeled is, assume that the user wants to 
+        pretrain and save a base model. (see todo list at bottom of script for more info)
+        """
          
 
     def predict_proba(self, X, preprocess=False):
@@ -232,7 +239,6 @@ class TabTransformerModel(AbstractModel):
             X=X
      
         self.model.eval()
-
         softmax=nn.Softmax(dim=1)
         with torch.no_grad():
             out, _ = self.model(X.cat_data)
@@ -285,13 +291,22 @@ class TabTransformerModel(AbstractModel):
         return obj
 
         """
-        list of features to add / lmitations: 
-            doesn't properly work for regression problems yet
+        ################# list of features to add / known limitations #################
+
+            - doesn't properly work for regression problems yet - due to discretization datapreprocessing TabTransformers
+                                                                may inherantly be unsuitable for regression problems.
             
-            training of TabTransformer currently saves intermediate model simply to 'tab_trans_temp.pth'
+            - Allowing for saving of pretrained model for later use. Currently pretrainig and finetuning happen automatically 
+            immidiately after one another.
+
+            - training of TabTransformer currently saves intermediate model simply to 'tab_trans_temp.pth'
             Should move this to be saved in the directory corresponding to the specific training job.
 
-            Not connected to HPO functionaity yet.
+            - Not connected to HPO functionaity yet. Hyperparameters are all hardcoded in the file hyperparameters/kwargs.py
+        
+            - although custom save and load methods are defined for this class that use torch.save, sometimes there is still 
+            a warning that pickle is being used to save the model! 
+
         """
 
 

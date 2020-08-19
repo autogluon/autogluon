@@ -15,7 +15,10 @@ def get_kwargs(**kw):
                                'orig_emb_resid': False,
                                'one_hot_embeddings': False,
                                'drop_whole_embeddings': False,
-                               'max_emb_dim': 8},
+                               'max_emb_dim': 8,
+                               'lr': 1e-3,
+                               'weight_decay': 1e-6,
+                               'base_exp_decay': 0.95},
                 'encoders':  {'CATEGORICAL': 'CategoricalOrdinalEnc',
                               'DATETIME'   : 'DatetimeOrdinalEnc',
                               'LATLONG'    : 'LatLongQuantileOrdinalEnc',
@@ -23,11 +26,11 @@ def get_kwargs(**kw):
                               'TEXT'       : 'TextSummaryScalarEnc'},
                 'pretext':    'BERT_pretext',
                 'n_cont_features': 8,
-                'fix_attention': True,
+                'fix_attention': False,
                 'freq': 1,
                 'pretrain_freq': 100,
                 'feature_dim': 64,
-                'epochs': 20,
+                'epochs': 50,
                 'pretrain_epochs': 200}
       
 

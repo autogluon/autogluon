@@ -1,3 +1,6 @@
+#Code in this script based on work by Milan Cvitkovic, 
+#Xin Huang, Ashish Khetan and Zohar Karnin.
+
 import torch
 from torch import nn
 import copy
@@ -261,7 +264,6 @@ class TabTransformer_fix_attention(TabModelBase):
 
         elif self.readout == 'all_feat_embs':
             out = feat_embs
-
         elif self.readout == 'mean_feat_embs':
             out = feat_embs.mean(dim=0)
         elif self.readout == 'none':

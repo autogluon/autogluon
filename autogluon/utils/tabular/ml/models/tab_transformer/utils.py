@@ -1,10 +1,7 @@
 from tqdm import tqdm
-import os
 from torch.utils.data import Dataset, DataLoader
 from autogluon.utils.tabular.ml.models.tab_transformer.TabTransormerEncoder import WontEncodeError, NullEnc
 import torch
-import pandas as pd
-import numpy as np
 from autogluon.utils.tabular.ml.models.tab_transformer import TabTransormerEncoder
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 

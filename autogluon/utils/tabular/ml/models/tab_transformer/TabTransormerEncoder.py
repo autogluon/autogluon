@@ -1,3 +1,7 @@
+
+#Credits for code in this script to Milan Cvitkovic, 
+#Xin Huang, Ashish Khetan and Zohar Karnin
+
 import calendar
 import datetime
 import re
