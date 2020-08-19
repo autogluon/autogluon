@@ -209,8 +209,6 @@ class TextPrediction(BaseTask):
             scheduler=None,
             num_trials=None,
             reduction_factor=None,
-            grace_period=None,
-            max_t=None,
             search_strategy=None,
             search_options=None,
             hyperparameters=None,
@@ -394,10 +392,8 @@ class TextPrediction(BaseTask):
             num_trials = hyperparameters['hpo_params']['num_trials']
         if reduction_factor is None:
             reduction_factor = hyperparameters['hpo_params']['reduction_factor']
-        if grace_period is None:
-            grace_period = hyperparameters['hpo_params']['grace_period']
-        if max_t is None:
-            max_t = hyperparameters['hpo_params']['max_t']
+        grace_period = hyperparameters['hpo_params']['grace_period']
+        max_t = hyperparameters['hpo_params']['max_t']
         if recommended_resource['num_gpus'] == 0:
             warnings.warn('Recommend to use GPU to run the TextPrediction task!')
         model = model_candidates[0]
