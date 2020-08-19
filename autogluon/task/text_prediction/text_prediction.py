@@ -1,27 +1,27 @@
 import logging
 import copy
-import numpy as np
-import pandas as pd
 import warnings
 from packaging import version
+import numpy as np
+import pandas as pd
 import mxnet
 # Ensure the MXNet version
 if version.parse(mxnet.__version__) < version.parse('1.7.0')\
         or version.parse(mxnet.__version__) >= version.parse('2.0.0'):
     raise ImportError('You will need to ensure that you have mxnet>=1.7.0, <2.0.0.')
 from mxnet.util import use_np
-from .. import tabular_prediction
+from autogluon_contrib_nlp.utils.registry import Registry
+from autogluon_contrib_nlp.utils.misc import logging_config
 from . import constants as _C
+from .dataset import random_split_train_val, TabularDataset, infer_problem_type
+from .models.basic_v1 import BertForTextPredictionBasic
+from .. import tabular_prediction
 from ..base import BaseTask
 from ...scheduler.resource import get_cpu_count, get_gpu_count
 from ...core import space
 from ...utils import in_ipynb
-from autogluon_contrib_nlp.utils.registry import Registry
-from autogluon_contrib_nlp.utils.misc import logging_config
 from ...utils.tabular.utils.loaders import load_pd
 from ...utils.miscs import verbosity2loglevel
-from .dataset import random_split_train_val, TabularDataset, infer_problem_type
-from .models.basic_v1 import BertForTextPredictionBasic
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 
