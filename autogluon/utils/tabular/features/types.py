@@ -121,7 +121,10 @@ def check_if_nlp_feature(X: Series) -> bool:
     unique_ratio = num_unique / num_rows
     if unique_ratio <= 0.01:
         return False
-    avg_words = Series(X_unique).str.split().str.len().mean()
+    try:
+        avg_words = Series(X_unique).str.split().str.len().mean()
+    except AttributeError:
+        return False
     if avg_words < 3:
         return False
 

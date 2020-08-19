@@ -31,17 +31,8 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
         return self._transform(X), self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
-        null_count = X.isnull().sum()
-        with_null = null_count[null_count != 0]
-        with_null_features = list(with_null.index)
-        if with_null_features:
-            fillna_feature_map = {feature: self._fillna_feature_map[feature] for feature in with_null_features}
-            # TODO: WARNING: .fillna() will convert an object type of integers to int64 type if it could be converted to int after fillna.
-            #  This is why fillna_feature_map must be used instead of self._fillna_feature_map.
-            #  Furthermore, if a user specifies a fillna_map which sets integer/float values to nan's of objects, it could still convert it to int/float even with this protection.
-            #  One solution is to keep track of original types and do .astype post-fillna, but this may have a significant performance hit.
-            if self.inplace:
-                X.fillna(fillna_feature_map, inplace=True)
-            else:
-                X = X.fillna(fillna_feature_map, inplace=False)
+        if self.inplace:
+            X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
+        else:
+            X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
         return X
