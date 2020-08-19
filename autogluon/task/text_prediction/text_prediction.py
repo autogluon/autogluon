@@ -174,7 +174,7 @@ def infer_eval_stop_log_metrics(problem_type,
             eval_metric = 'mse'
         log_metrics = ['mse', 'rmse', 'mae']
     else:
-        raise NotImplementedError
+        raise NotImplementedError('The problem type is not supported yet!')
     for other_log_metric in [stopping_metric, eval_metric]:
         if isinstance(other_log_metric, str) and other_log_metric not in log_metrics:
             log_metrics.append(other_log_metric)
@@ -368,7 +368,9 @@ class TextPrediction(BaseTask):
                                                    logger=logger)
                 model_candidates.append(model)
             else:
-                raise NotImplementedError
+                raise NotImplementedError('model_type = "{}" is not supported. You can try to use '
+                                          'model_type = "BertForTextPredictionBasic"'
+                                          .format(model_type))
         assert len(model_candidates) == 1, 'Only one model is supported currently'
         recommended_resource = get_recommended_resource(nthreads_per_trial=nthreads_per_trial,
                                                         ngpus_per_trial=ngpus_per_trial)
