@@ -26,7 +26,7 @@ import pytest
 import autogluon as ag
 
 from autogluon import TabularPrediction as task
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
+from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 supervised=True
 semi_supervised=True
