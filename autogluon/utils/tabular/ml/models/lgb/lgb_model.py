@@ -318,12 +318,14 @@ class LGBModel(AbstractModel):
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
     # TODO: Consider adding _internal_feature_map functionality to abstract_model
-    def compute_feature_importance(self, **kwargs):
-        permutation_importance = super().compute_feature_importance(**kwargs)
+    def compute_feature_importance(self, **kwargs) -> pd.Series:
+        feature_importances = super().compute_feature_importance(**kwargs)
         if self._internal_feature_map is not None:
             inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
-            permutation_importance = {inverse_internal_feature_map[i]: importance for i, importance in permutation_importance.items()}
-        return permutation_importance
+            feature_importances = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances.items()}
+            feature_importances = pd.Series(data=feature_importances)
+            feature_importances = feature_importances.sort_values(ascending=False)
+        return feature_importances
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:

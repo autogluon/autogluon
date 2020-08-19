@@ -262,7 +262,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs):
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs) -> pd.Series:
         feature_importance_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
@@ -278,7 +278,7 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent)
+                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent, **kwargs)
                 feature_importance_fold_list.append(feature_importance_fold)
                 fold_weights.append(len(test_index))
             model_index += k

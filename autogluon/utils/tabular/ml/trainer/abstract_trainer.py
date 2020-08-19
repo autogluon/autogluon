@@ -1108,6 +1108,10 @@ class AbstractTrainer:
             logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
 
         if (subsample_size is not None) and (len(X) > subsample_size):
+            # Reset index to avoid error if duplicated indices.
+            X = X.reset_index(drop=True)
+            y = y.reset_index(drop=True)
+
             X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
 
