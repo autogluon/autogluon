@@ -304,6 +304,11 @@ class TabTransformerModel(AbstractModel):
 
             - Not connected to HPO functionaity yet. Hyperparameters are all hardcoded in the file hyperparameters/kwargs.py
         
+            - Improve robustness of unlabeled data argument in task.fit API. Specifically, the current code EXACTLY REQUIRES that unlabeled_data 
+            is a dataframe with exactly the exam columns as train_data, except that the label column is not there. Improved robustness could
+            include allowing for the user to pass and unlabeled dataframe that includes the label column but filled with NaNs etc. Even more
+            advanced, allow the user to pass and unlabeled dataframe that shares only some of the same columns with train_data. 
+
             - although custom save and load methods are defined for this class that use torch.save, sometimes there is still 
             a warning that pickle is being used to save the model! 
 
