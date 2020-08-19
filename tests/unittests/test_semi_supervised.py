@@ -1,6 +1,6 @@
 """ Runs autogluon.tabular on multiple benchmark datasets.
     Lower performance-values = better, normalized to [0,1] for each dataset to enable cross-dataset comparisons.
-    Classification performance = error-rate, Regression performance = 1 - R^2
+    Classification performance = error-rate
 
     # TODO: assess that Autogluon correctly inferred the type of each feature (continuous vs categorical vs text)
 
@@ -15,7 +15,6 @@
     - high-dimensional features + low-sample size
     - high levels of missingness in test data only, no missingness in train data
     - classification w severe class imbalance
-    - regression with severely skewed Y-values (eg. predicting count data)
     - text features in dataset
 """
 import warnings, shutil, os
@@ -25,6 +24,7 @@ from random import seed
 
 import pytest
 import autogluon as ag
+
 from autogluon import TabularPrediction as task
 from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
 
@@ -40,9 +40,9 @@ def test_tabular():
     verbosity = 2 # how much output to print
     hyperparameters = None
 
-
     subsample_size = 50 #50
     unlabeled_subsample_size = 50000
+
 
     fit_args = {
         'hyperparameter_tune': hyperparameter_tune,
@@ -96,10 +96,10 @@ def run_tabular_benchmarks(subsample_size, unlabeled_subsample_size, perf_thresh
                       'label_column': 'Cover_Type',
                       'performance_val': 0.032} # big dataset with 7 classes, all features are numeric. Runs SLOW.
 
-    # 1-D toy deterministic regression task with: heavy label+feature missingness, extra distraction column in test data
 
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = [multi_dataset] #regression_dataset] #binary_dataset] #, multi_dataset] #toyregres_dataset, regression_dataset, multi_dataset]
+    datasets = [multi_dataset] #multi_dataset]
+
     if dataset_indices is not None: # only run some datasets
         datasets = [datasets[i] for i in dataset_indices]
 
@@ -131,10 +131,13 @@ def run_tabular_benchmarks(subsample_size, unlabeled_subsample_size, perf_thresh
             test_data = test_data.sample(frac=1).head(10000)
             y_test = test_data[label_column]
             test_data = test_data.drop(labels=[label_column], axis=1)
-      
+
+        
+            if subsample_size is None:
+                raise ValueError("subsample_size not specified")
             train_data = data.head(subsample_size) 
             unlabeled_data = data.head(unlabeled_subsample_size).drop(columns=[label_column])
-            
+
 
             custom_hyperparameters = {"Transf": {}}
             

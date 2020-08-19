@@ -384,7 +384,7 @@ class TabularNeuralNetModel(AbstractModel):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
-        self.params_trained['num_epochs'] = best_val_epoch
+        self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 
     def _predict_proba(self, X, preprocess=True):

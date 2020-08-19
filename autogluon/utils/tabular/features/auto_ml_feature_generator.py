@@ -1,11 +1,12 @@
 import copy
 import logging
+import re
 import traceback
 
 import numpy as np
 import pandas as pd
 import psutil
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 from .abstract_feature_generator import AbstractFeatureGenerator
 from .vectorizers import get_ngram_freq, downscale_vectorizer
@@ -67,13 +68,6 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             else:
                 X[column].fillna(np.nan, inplace=True)
 
-        X_text_features_combined = []
-        if self.feature_transformations['text_special']:
-            for nlp_feature in self.feature_transformations['text_special']:
-                X_text_features = self.generate_text_features(X[nlp_feature], nlp_feature)
-                X_text_features_combined.append(X_text_features)
-            X_text_features_combined = pd.concat(X_text_features_combined, axis=1)
-
         X = self.preprocess(X)
 
         if self.feature_transformations['raw']:
@@ -83,22 +77,29 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_categoricals = X[self.feature_transformations['category']]
             # TODO: Add stateful categorical generator, merge rare cases to an unknown value
             # TODO: What happens when training set has no unknown/rare values but test set does? What models can handle this?
-            if 'text' in self.feature_type_family:
-                self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
+            if not self.fit:
+                if 'text' in self.feature_type_family:
+                    self.feature_type_family_generated['text_as_category'] += self.feature_type_family['text']
             X_categoricals = X_categoricals.astype('category')
             X_features = X_features.join(X_categoricals)
 
         if self.feature_transformations['text_special']:
+            X_text_special_combined = []
+            for nlp_feature in self.feature_transformations['text_special']:
+                X_text_special = self.generate_text_special(X[nlp_feature], nlp_feature)
+                X_text_special_combined.append(X_text_special)
+            X_text_special_combined = pd.concat(X_text_special_combined, axis=1)
             if not self.fit:
-                self.features_binned += list(X_text_features_combined.columns)
-                self.feature_type_family_generated['text_special'] += list(X_text_features_combined.columns)
-            X_features = X_features.join(X_text_features_combined)
+                self.features_binned += list(X_text_special_combined.columns)
+                self.feature_type_family_generated['text_special'] += list(X_text_special_combined.columns)
+            X_features = X_features.join(X_text_special_combined)
 
         if self.feature_transformations['datetime']:
             for datetime_feature in self.feature_transformations['datetime']:
                 X_features[datetime_feature] = pd.to_datetime(X[datetime_feature])
                 X_features[datetime_feature] = pd.to_numeric(X_features[datetime_feature])  # TODO: Use actual date info
-                self.feature_type_family_generated['datetime'].append(datetime_feature)
+                if not self.fit:
+                    self.feature_type_family_generated['datetime'].append(datetime_feature)
                 # TODO: Add fastai date features
 
         if self.feature_transformations['text_ngram']:
@@ -222,3 +223,71 @@ class AutoMLFeatureGenerator(AbstractFeatureGenerator):
             X_nlp_features_combined = pd.concat(X_nlp_features_combined, axis=1)
 
         return X_nlp_features_combined
+
+    def generate_text_special(self, X: Series, feature: str) -> DataFrame:
+        X_text_special: DataFrame = DataFrame(index=X.index)
+        X_text_special[feature + '.char_count'] = [self.char_count(value) for value in X]
+        X_text_special[feature + '.word_count'] = [self.word_count(value) for value in X]
+        X_text_special[feature + '.capital_ratio'] = [self.capital_ratio(value) for value in X]
+        X_text_special[feature + '.lower_ratio'] = [self.lower_ratio(value) for value in X]
+        X_text_special[feature + '.digit_ratio'] = [self.digit_ratio(value) for value in X]
+        X_text_special[feature + '.special_ratio'] = [self.special_ratio(value) for value in X]
+
+        symbols = ['!', '?', '@', '%', '$', '*', '&', '#', '^', '.', ':', ' ', '/', ';', '-', '=']
+        for symbol in symbols:
+            X_text_special[feature + '.symbol_count.' + symbol] = [self.symbol_in_string_count(value, symbol) for value in X]
+            X_text_special[feature + '.symbol_ratio.' + symbol] = X_text_special[feature + '.symbol_count.' + symbol] / X_text_special[feature + '.char_count']
+            X_text_special[feature + '.symbol_ratio.' + symbol].fillna(0, inplace=True)
+
+        return X_text_special
+
+    @staticmethod
+    def word_count(string):
+        return len(string.split())
+
+    @staticmethod
+    def char_count(string):
+        return len(string)
+
+    @staticmethod
+    def special_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        new_str = re.sub(r'[\w]+', '', string)
+        return len(new_str) / len(string)
+
+    @staticmethod
+    def digit_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(c.isdigit() for c in string) / len(string)
+
+    @staticmethod
+    def lower_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(c.islower() for c in string) / len(string)
+
+    @staticmethod
+    def capital_ratio(string):
+        string = string.replace(' ', '')
+        if not string:
+            return 0
+        return sum(1 for c in string if c.isupper()) / len(string)
+
+    @staticmethod
+    def symbol_in_string_count(string, character):
+        if not string:
+            return 0
+        return sum(1 for c in string if c == character)
+
+    @staticmethod
+    def train_vectorizer(text_list, vectorizer):
+        logger.log(15, 'Fitting vectorizer...')
+        transform_matrix = vectorizer.fit_transform(text_list)  # TODO: Consider upgrading to pandas 0.25.0 to benefit from sparse attribute improvements / bug fixes! https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.25.0.html
+        vectorizer.stop_words_ = None  # Reduces object size by 100x+ on large datasets, no effect on usability
+        logger.log(15, f'Vectorizer fit with vocabulary size = {len(vectorizer.vocabulary_)}')
+        return vectorizer, transform_matrix

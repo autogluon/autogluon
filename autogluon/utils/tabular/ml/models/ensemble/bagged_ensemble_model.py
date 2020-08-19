@@ -128,7 +128,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X))
+            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
             self._n_repeats = 1
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
@@ -148,12 +148,12 @@ class BaggedEnsembleModel(AbstractModel):
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
         elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape)
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
         else:
             oof_pred_proba = np.zeros(shape=len(X))
-        oof_pred_model_repeats = np.zeros(shape=len(X))
+        oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
 
         models = []
         folds_to_fit = fold_end - fold_start
@@ -322,11 +322,12 @@ class BaggedEnsembleModel(AbstractModel):
         model_compressed.set_contexts(self.path_root + model_compressed.name + os.path.sep)
         return model_compressed
 
-    def _get_compressed_params(self):
-        model_params_list = [
-            self.load_child(child).get_trained_params()
-            for child in self.models
-        ]
+    def _get_compressed_params(self, model_params_list=None):
+        if model_params_list is None:
+            model_params_list = [
+                self.load_child(child).get_trained_params()
+                for child in self.models
+            ]
 
         model_params_compressed = dict()
         for param in model_params_list[0].keys():
@@ -346,6 +347,13 @@ class BaggedEnsembleModel(AbstractModel):
                     compressed_val = model_param_vals[0]
             model_params_compressed[param] = compressed_val
         return model_params_compressed
+
+    def _get_compressed_params_trained(self):
+        model_params_list = [
+            self.load_child(child).params_trained
+            for child in self.models
+        ]
+        return self._get_compressed_params(model_params_list=model_params_list)
 
     def _get_model_base(self):
         if self.model_base is None:
@@ -493,7 +501,7 @@ class BaggedEnsembleModel(AbstractModel):
             min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
 
         bagged_info = dict(
-            child_type=self._child_type.__name__,
+            child_model_type=self._child_type.__name__,
             num_child_models=len(self.models),
             child_model_names=self._get_model_names(),
             _n_repeats=self._n_repeats,
@@ -506,9 +514,16 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_mode=self.bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
+            child_hyperparameters=self._get_model_base().params,
+            child_hyperparameters_fit = self._get_compressed_params_trained(),
+            child_AG_args_fit = self._get_model_base().params_aux,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info
+
+        child_features_full = list(set().union(*[child['features'] for child in children_info.values()]))
+        info['features'] = child_features_full
+        info['num_features'] = len(child_features_full)
 
         return info
 

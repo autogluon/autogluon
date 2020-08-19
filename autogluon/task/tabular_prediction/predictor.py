@@ -134,6 +134,7 @@ class TabularPredictor(BasePredictor):
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+            If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
             Parameters
             ----------
@@ -215,7 +216,7 @@ class TabularPredictor(BasePredictor):
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, dataset=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, dataset=None, extra_info=False, only_pareto_frontier=False, silent=False):
         """
             Output summary of information about models produced during fit() as a pandas DataFrame.
             Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -231,6 +232,9 @@ class TabularPredictor(BasePredictor):
                 'fit_time_marginal': The fit time required to train the model (Ignoring base models).
                 'stack_level': The stack level of the model.
                     A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
+                'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
+                    `can_infer` is often False when `save_bagged_folds=False` was specified in initial `task.fit`.
+                'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
 
             Parameters
             ----------
@@ -243,12 +247,60 @@ class TabularPredictor(BasePredictor):
                     'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
                         Note that this ignores the time required to load the model into memory when bagging is disabled.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
-            only_pareto_frontier : bool (optional)
+            extra_info : bool, default = False
+                If `True`, will return extra columns with advanced info.
+                This requires additional computation as advanced info data is calculated on demand.
+                Additional output columns when `extra_info=True` include:
+                    'num_features': Number of input features used by the model.
+                    'num_models': Number of models that actually make up this "model" object.
+                        For non-bagged models, this is 1. For bagged models, this is equal to the number of child models (models trained on bagged folds) the bagged ensemble contains.
+                    'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors.
+                    'memory_size': The amount of memory in bytes the model requires when persisted in memory. This is not equivalent to the amount of memory the model may use during inference.
+                        For bagged models, this is the sum of the 'memory_size' of all child models.
+                    'memory_size_w_ancestors': Equivalent to the sum of 'memory_size' values for the model and its' ancestors.
+                        This is the amount of memory required to avoid loading any models in-between inference calls to get predictions from this model.
+                        For online-inference, this is critical. It is important that the machine performing online inference has memory more than twice this value to avoid loading models for every call to inference by persisting models in memory.
+                    'memory_size_min': The amount of memory in bytes the model minimally requires to perform inference.
+                        For non-bagged models, this is equivalent to 'memory_size'.
+                        For bagged models, this is equivalent to the largest child model's 'memory_size_min'.
+                        To minimize memory usage, child models can be loaded and un-persisted one by one to infer. This is the default behavior if a bagged model was not already persisted in memory prior to inference.
+                    'memory_size_min_w_ancestors': Equivalent to the max of the 'memory_size_min' values for the model and its' ancestors.
+                        This is the minimum required memory to infer with the model by only loading one model at a time, as each of its ancestors will also have to be loaded into memory.
+                        For offline-inference where latency is not a concern, this should be used to determine the required memory for a machine if 'memory_size_w_ancestors' is too large.
+                    'num_ancestors': Number of ancestor models for the given model.
+                    'num_descendants': Number of descendant models for the given model.
+                    'model_type': The model type. If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
+                    'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
+                        child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
+                        For 10-fold bagging, the bagged ensemble model would have 10 child models.
+                        For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
+                        Note that child models are distinct from ancestors and descendants.
+                    'hyperparameters': The input hyperparameters to the model.
+                    'hyperparameters_fit': The hyperparameters set by the model during fit. This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
+                        This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
+                        In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
+                        For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
+                    'AG_args_fit': Special AutoGluon arguments that influence model fit. See the documentation of the `hyperparameters` argument in `task.fit` for more information.
+                    'features': List of feature names used by the model.
+                    'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
+                    'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
+                    'child_AG_args_fit': Equivalent to 'AG_args_fit', but for the model's children.
+                    'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
+                        If A is an ancestor of B, then B is a descendant of A.
+                        If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.
+                        A model can only have ancestor models whose 'stack_level' are lower than itself.
+                        'stack_level'=0 models have no ancestors.
+                    'descendants': The model's descendants. Descendant models are the models which require this model to make predictions during the construction of their input features.
+                        If A is a descendant of B, then B is an ancestor of A.
+                        If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
+                        A model can only have descendant models whose 'stack_level' are higher than itself.
+
+            only_pareto_frontier : bool, default = False
                 If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
                 At minimum this will include the model with the highest score and the model with the lowest inference time.
                 This is useful when deciding which model to use during inference if inference time is a consideration.
                 Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
-            silent : bool (optional)
+            silent : bool, default = False
                 Should leaderboard DataFrame be printed?
 
             Returns
@@ -256,7 +308,7 @@ class TabularPredictor(BasePredictor):
             Pandas `pandas.DataFrame` of model performance summary information.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.leaderboard(X=dataset, only_pareto_frontier=only_pareto_frontier, silent=silent)
+        return self._learner.leaderboard(X=dataset, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
@@ -345,14 +397,15 @@ class TabularPredictor(BasePredictor):
                                 plot_title="Models produced during fit()")
             if hpo_used:
                 for model_type in results['hpo_results']:
-                    plot_summary_of_models(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
-                        plot_title=f"Models produced during {model_type} HPO")
-                    plot_performance_vs_trials(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
-                        plot_title=f"HPO trials for {model_type} models")
+                    if 'trial_info' in results['hpo_results'][model_type]:
+                        plot_summary_of_models(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
+                            plot_title=f"Models produced during {model_type} HPO")
+                        plot_performance_vs_trials(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
+                            plot_title=f"HPO trials for {model_type} models")
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']

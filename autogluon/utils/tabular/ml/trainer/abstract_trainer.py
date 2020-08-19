@@ -1157,16 +1157,33 @@ class AbstractTrainer:
 
     # Sums the attribute value across all models that the provided model depends on, including itself.
     # For instance, this function can return the expected total predict_time of a model.
-    # attribute is the name of the desired attribute to be summed.
-    def get_model_attribute_full(self, model, attribute):
+    # attribute is the name of the desired attribute to be summed, or a dictionary of model name -> attribute value if the attribute is not present in the graph.
+    def get_model_attribute_full(self, model, attribute, func=sum):
         base_model_set = self.get_minimum_model_set(model)
+        if isinstance(attribute, dict):
+            is_dict = True
+        else:
+            is_dict = False
         if len(base_model_set) == 1:
-            return self.model_graph.nodes[base_model_set[0]][attribute]
-        attribute_full = 0
+            if is_dict:
+                return attribute[model]
+            else:
+                return self.model_graph.nodes[base_model_set[0]][attribute]
+        # attribute_full = 0
+        attribute_lst = []
         for base_model in base_model_set:
-            if self.model_graph.nodes[base_model][attribute] is None:
+            if is_dict:
+                attribute_base_model = attribute[base_model]
+            else:
+                attribute_base_model = self.model_graph.nodes[base_model][attribute]
+            if attribute_base_model is None:
                 return None
-            attribute_full += self.model_graph.nodes[base_model][attribute]
+            attribute_lst.append(attribute_base_model)
+            # attribute_full += attribute_base_model
+        if attribute_lst:
+            attribute_full = func(attribute_lst)
+        else:
+            attribute_full = 0
         return attribute_full
 
     # Returns dictionary of model name -> attribute value for the provided attribute
@@ -1180,7 +1197,7 @@ class AbstractTrainer:
             model = model.name
         return list(nx.bfs_tree(self.model_graph, model, reverse=True))
 
-    def leaderboard(self):
+    def leaderboard(self, extra_info=False):
         model_names = self.get_model_names_all()
         score_val = []
         fit_time_marginal = []
@@ -1189,6 +1206,7 @@ class AbstractTrainer:
         fit_time = []
         pred_time_val = []
         can_infer = []
+        fit_order = list(range(1,len(model_names)+1))
         score_val_dict = self.get_model_attributes_dict('val_score')
         fit_time_marginal_dict = self.get_model_attributes_dict('fit_time')
         predict_time_marginal_dict = self.get_model_attributes_dict('predict_time')
@@ -1200,6 +1218,56 @@ class AbstractTrainer:
             pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
             can_infer.append(self.model_graph.nodes[model_name]['can_infer'])
+
+        model_info_dict = defaultdict(list)
+        if extra_info:
+            # TODO: feature_metadata
+            # TODO: disk size
+            # TODO: load time
+            # TODO: Add persist_if_mem_safe() function to persist in memory all models if reasonable memory size (or a specific model+ancestors)
+            # TODO: Add is_persisted() function to check which models are persisted in memory
+            # TODO: package_dependencies, package_dependencies_full
+
+            info = self.get_info(include_model_info=True)
+            model_info = info['model_info']
+            custom_model_info = {}
+            for model_name in model_info:
+                custom_info = {}
+                bagged_info = model_info[model_name].get('bagged_info', {})
+                custom_info['num_models'] = bagged_info.get('num_child_models', 1)
+                custom_info['memory_size'] = bagged_info.get('max_memory_size', model_info[model_name]['memory_size'])
+                custom_info['memory_size_min'] = bagged_info.get('min_memory_size', model_info[model_name]['memory_size'])
+                custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
+                custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
+                custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
+                custom_info['child_AG_args_fit'] = bagged_info.get('child_AG_args_fit', None)
+                custom_model_info[model_name] = custom_info
+
+            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'AG_args_fit', 'features']
+            model_info_sum_keys = []
+            for key in model_info_keys:
+                model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
+                if key in model_info_sum_keys:
+                    key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
+                    model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
+
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_AG_args_fit']
+            model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
+            for key in model_info_keys:
+                model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]
+                if key in model_info_full_keys:
+                    key_dict = {model_name: custom_model_info[model_name][key] for model_name in model_names}
+                    for column_name, func in model_info_full_keys[key]:
+                        model_info_dict[column_name] = [self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func) for model_name in model_names]
+
+            ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
+            descendants = [list(nx.dag.descendants(self.model_graph, model_name)) for model_name in model_names]
+
+            model_info_dict['num_ancestors'] = [len(ancestor_lst) for ancestor_lst in ancestors]
+            model_info_dict['num_descendants'] = [len(descendant_lst) for descendant_lst in descendants]
+            model_info_dict['ancestors'] = ancestors
+            model_info_dict['descendants'] = descendants
+
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
@@ -1209,8 +1277,39 @@ class AbstractTrainer:
             'fit_time_marginal': fit_time_marginal,
             'stack_level': stack_level,
             'can_infer': can_infer,
+            'fit_order': fit_order,
+            **model_info_dict,
         })
         df_sorted = df.sort_values(by=['score_val', 'pred_time_val', 'model'], ascending=[False, True, False]).reset_index(drop=True)
+
+        df_columns_lst = df_sorted.columns.tolist()
+        explicit_order = [
+            'model',
+            'score_val',
+            'pred_time_val',
+            'fit_time',
+            'pred_time_val_marginal',
+            'fit_time_marginal',
+            'stack_level',
+            'can_infer',
+            'fit_order',
+            'num_features',
+            'num_models',
+            'num_models_w_ancestors',
+            'memory_size',
+            'memory_size_w_ancestors',
+            'memory_size_min',
+            'memory_size_min_w_ancestors',
+            'num_ancestors',
+            'num_descendants',
+            'model_type',
+            'child_model_type'
+        ]
+        explicit_order = [column for column in explicit_order if column in df_columns_lst]
+        df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
+        df_columns_new = explicit_order + df_columns_other
+        df_sorted = df_sorted[df_columns_new]
+
         return df_sorted
 
     def get_info(self, include_model_info=False):
@@ -1218,13 +1317,21 @@ class AbstractTrainer:
         if self.model_best is not None:
             best_model = self.model_best
         else:
-            best_model = self.get_model_best()
-        best_model_score_val = self.model_performance.get(best_model)
+            try:
+                best_model = self.get_model_best()
+            except AssertionError:
+                best_model = None
+        if best_model is not None:
+            best_model_score_val = self.model_performance.get(best_model)
+            best_model_stack_level = self.get_model_level(best_model)
+        else:
+            best_model_score_val = None
+            best_model_stack_level = None
         # fit_time = None
         num_bagging_folds = self.kfolds
         max_core_stack_level = self.get_max_level('core')
         max_stack_level = self.get_max_level_all()
-        best_model_stack_level = self.get_model_level(best_model)
+
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
         stopping_metric = self.stopping_metric.name

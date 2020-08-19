@@ -1,4 +1,4 @@
-# Image Classification - Search Space and HPO
+# Image Classification - Search Space and Hyperparameter Optimization (HPO)
 :label:`sec_imgadvanced`
 
 While the :ref:`sec_imgquick` introduced basic usage of AutoGluon `fit`, `evaluate`, `predict` with default configurations, this tutorial dives into the various options that you can specify for more advanced control over the fitting process.
@@ -12,7 +12,7 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We begin by letting AutoGluon know that [`ImageClassification`](/api/autogluon.task.html#autogluon.task.ImageClassification) is the task of interest: 
+We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.task.ImageClassification) is the task of interest: 
 
 ```{.python .input}
 import autogluon as ag

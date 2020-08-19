@@ -79,7 +79,14 @@ def setup_outputdir(output_directory):
         utcnow = datetime.utcnow()
         timestamp = utcnow.strftime("%Y%m%d_%H%M%S")
         output_directory = f"AutogluonModels/ag-{timestamp}{os.path.sep}"
-        os.makedirs(output_directory)
+        for i in range(1, 1000):
+            try:
+                os.makedirs(output_directory, exist_ok=False)
+                break
+            except FileExistsError as e:
+                output_directory = f"AutogluonModels/ag-{timestamp}-{i:03d}{os.path.sep}"
+        else:
+            raise RuntimeError("more than 1000 jobs launched in the same second")
         logger.log(25, f"No output_directory specified. Models will be saved in: {output_directory}")
     output_directory = os.path.expanduser(output_directory)  # replace ~ with absolute path if it exists
     if output_directory[-1] != os.path.sep:
@@ -230,10 +237,10 @@ def infer_problem_type(y: Series):
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
-    elif unique_values.dtype == 'object':
+    elif y.dtype.name in ['object', 'category']:
         problem_type = MULTICLASS
-        reason = "dtype of label-column == object"
-    elif np.issubdtype(unique_values.dtype, np.floating):
+        reason = f"dtype of label-column == {y.dtype.name}"
+    elif np.issubdtype(y.dtype, np.floating):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
             try:
@@ -250,7 +257,7 @@ def infer_problem_type(y: Series):
         else:
             problem_type = REGRESSION
             reason = "dtype of label-column == float and many unique label-values observed"
-    elif np.issubdtype(unique_values.dtype, np.integer):
+    elif np.issubdtype(y.dtype, np.integer):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= REGRESS_THRESHOLD) and (unique_count <= MULTICLASS_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression
@@ -259,7 +266,7 @@ def infer_problem_type(y: Series):
             problem_type = REGRESSION
             reason = "dtype of label-column == int and many unique label-values observed"
     else:
-        raise NotImplementedError('label dtype', unique_values.dtype, 'not supported!')
+        raise NotImplementedError(f'label dtype {y.dtype} not supported!')
     logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
     logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
                    f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})\n")
