@@ -49,7 +49,7 @@ requirements = [
     'distributed>=2.6.0',
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0,<1.0',
-    'graphviz',
+    'graphviz<0.9.0,>=0.8.1',
     'fastparquet==0.4.1',
     'scikit-optimize',
     'catboost<0.24',
