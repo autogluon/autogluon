@@ -1,4 +1,4 @@
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from .....ml.constants import BINARY, MULTICLASS, REGRESSION
 
 
 def get_param_baseline(problem_type, num_classes=None):
@@ -27,8 +27,8 @@ def get_param_multiclass_baseline():
         'metric': 'accuracy',
 
         # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
-        'early.stopping.min_delta': 0.001,
-        'early.stopping.patience': 7,
+        'early.stopping.min_delta': 0.0001,
+        'early.stopping.patience': 10,
 
         # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
         # otherwise use default loss function for this type of problem

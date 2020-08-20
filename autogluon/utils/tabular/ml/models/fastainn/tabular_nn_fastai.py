@@ -16,12 +16,12 @@ from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_abs
 from fastai.tabular import FillMissing, Categorify, Normalize, TabularList, tabular_learner
 from fastai.utils.mod_display import progress_disabled_ctx
 
-from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.parameters import get_param_baseline
-from autogluon.utils.tabular.contrib.tabular_nn_pytorch.hyperparameters.searchspaces import get_default_searchspace
-from autogluon.utils.tabular.ml.constants import REGRESSION, BINARY, MULTICLASS
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.utils.tabular.utils.loaders import load_pkl
-from autogluon.utils.tabular.utils.savers import save_pkl
+from .hyperparameters.parameters import get_param_baseline
+from .hyperparameters.searchspaces import get_default_searchspace
+from ..abstract.abstract_model import AbstractModel
+from ...constants import REGRESSION, BINARY, MULTICLASS
+from ....utils.loaders import load_pkl
+from ....utils.savers import save_pkl
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -32,6 +32,8 @@ from autogluon.utils.tabular.utils.savers import save_pkl
 # Slowdown bug not experienced on Linux if 'torch.multiprocessing.set_sharing_strategy('file_system')' commented out
 # NOTE: If below line is commented out, Torch uses many file descriptors. If issues arise, increase ulimit through 'ulimit -n 2048' or larger. Default on Linux is 1024.
 # torch.multiprocessing.set_sharing_strategy('file_system')
+
+# MacOS issue: torchvision==0.7.0 + torch==1.6.0 can cause segfaults; use torch==1.2.0 torchvision==0.4.0
 
 LABEL = '__label__'
 

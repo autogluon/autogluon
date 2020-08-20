@@ -1,5 +1,5 @@
-from ....ml.constants import BINARY, MULTICLASS, REGRESSION
-from ......core import Categorical, Real, Int
+from .....ml.constants import BINARY, MULTICLASS, REGRESSION
+from .......core import Categorical, Real, Int
 
 
 def get_default_searchspace(problem_type, num_classes=None):
