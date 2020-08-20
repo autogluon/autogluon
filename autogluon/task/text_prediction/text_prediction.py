@@ -328,6 +328,7 @@ class TextPrediction(BaseTask):
                                     columns=all_columns,
                                     label_columns=label_columns)
         tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
+
         logger.info('Train Dataset:')
         logger.info(train_data)
         logger.info('Tuning Dataset:')
