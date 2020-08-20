@@ -130,7 +130,7 @@ Basically, skopt will train a *surrogate model* to approximate the performance o
 Whenever the search observed the performance of a new set of hyperparameter, it updates the posterior. 
 In the next trial, the searcher will try the configuration that best balances the exploitation and exploration tradeoffs.
 
-Here, we use a maximal of 5 trails by setting `num_trails` to 5. 
+Here, we use a maximal of 5 trails by setting `num_trials` to 5. 
 
 
 ```{.python .input}
