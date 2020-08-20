@@ -60,15 +60,16 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
         return self._minimize_numeric_memory_usage(X)
 
     @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(valid_raw_types=[R_INT])
+
+    @staticmethod
     def _get_dtype_clip_args(dtype) -> (np.dtype, int, int):
         try:
             dtype_info = np.iinfo(dtype)
         except ValueError:
             dtype_info = np.finfo(dtype)
         return dtype_info.dtype, dtype_info.min, dtype_info.max
-
-    def _infer_features_in(self, X, y=None) -> list:
-        return self.feature_metadata_in.get_features(valid_raw_types=[R_INT])  # TODO: R_FLOAT?
 
     def _minimize_numeric_memory_usage(self, X: DataFrame):
         return clip_and_astype(df=X, clip_min=self._clip_min, clip_max=self._clip_max, dtype=self.dtype_out)
