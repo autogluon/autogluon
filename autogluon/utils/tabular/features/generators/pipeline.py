@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add feature of # of observation counts to high cardinality categorical features
-# TODO: Use code from problem type detection for column types. Ints/Floats could be Categorical through this method. Maybe try both?
 # TODO: Documentation
 class PipelineFeatureGenerator(BulkFeatureGenerator):
     def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, verbosity=3, **kwargs):

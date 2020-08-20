@@ -27,9 +27,9 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._transform_bin(X)
 
-    def _infer_features_in(self, X, y=None) -> list:
-        features_to_bin = self.feature_metadata_in.get_features(valid_raw_types=[R_INT, R_FLOAT])
-        return features_to_bin
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(valid_raw_types=[R_INT, R_FLOAT])
 
     def _get_bin_map(self, X: DataFrame) -> dict:
         return binning.generate_bins(X, list(X.columns))

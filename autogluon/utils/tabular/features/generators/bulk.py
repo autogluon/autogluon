@@ -147,3 +147,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         X_out = X
 
         return X_out
+
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()

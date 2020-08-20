@@ -36,3 +36,7 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
         else:
             X = X.fillna(self._fillna_feature_map, inplace=False, downcast=False)
         return X
+
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()

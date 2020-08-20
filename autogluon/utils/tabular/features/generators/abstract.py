@@ -13,7 +13,6 @@ from ...utils.savers import save_pkl
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add features_in_special_types, features_in_raw_types, features_in_type_pairs, banned_features_in_type_pairs/special_types/raw_types
 # TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
 class AbstractFeatureGenerator:
     """
@@ -59,6 +58,18 @@ class AbstractFeatureGenerator:
         Name prefix to add to all output feature names.
     name_suffix : str, default None
         Name suffix to add to all output feature names.
+    infer_features_in_args : dict, default None
+        Used as the kwargs input to FeatureMetadata.get_features(**kwargs) when inferring self.features_in.
+        This is merged with the output dictionary of self.get_default_infer_features_in_args() depending on the value of infer_features_in_args_strategy.
+        Only used when features_in is None.
+        If None, then self.get_default_infer_features_in_args() is used directly.
+        Refer to FeatureMetadata.get_features documentation for a full description of valid keys.
+        Note: This is advanced functionality that is not necessary for most situations.
+    infer_features_in_args_strategy : str, default 'overwrite'
+        Determines how infer_features_in_args and self.get_default_infer_features_in_args() are combined to result in self._infer_features_in_args which dictates the features_in inference logic.
+        If 'overwrite': infer_features_in_args is used exclusively and self.get_default_infer_features_in_args() is ignored.
+        If 'update': self.get_default_infer_features_in_args() is dictionary updated by infer_features_in_args.
+        If infer_features_in_args is None, this is ignored.
     log_prefix : str, default ''
         Prefix string added to all logging statements made by the generator.
     verbosity : int, default 2
@@ -82,8 +93,8 @@ class AbstractFeatureGenerator:
         The FeatureMetadata of data post-transformation consisting of the exact dtypes as opposed to the grouped raw dtypes found in feature_metadata_in, with grouped raw dtypes substituting for the special dtypes.
         This is only used in the print_feature_metadata_info method and is intended for introspection. It can be safely set to None to reduce memory and disk usage post-fit.
     """
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None,  pre_enforce_types=False, pre_drop_useless=False,
-                 post_drop_duplicates=False, reset_index=False, column_names_as_str=True, name_prefix: str = None, name_suffix: str = None, log_prefix='', verbosity=2):
+    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, pre_enforce_types=False, pre_drop_useless=False,
+                 post_drop_duplicates=False, reset_index=False, column_names_as_str=True, name_prefix: str = None, name_suffix: str = None, infer_features_in_args: dict = None, infer_features_in_args_strategy='overwrite', log_prefix='', verbosity=2):
         self._is_fit = False  # Whether the feature generator has been fit
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
@@ -92,6 +103,14 @@ class AbstractFeatureGenerator:
         # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes, and special dtypes all at once.
         self.feature_metadata_real: FeatureMetadata = None  # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.). Pass to models to enable advanced functionality.
         self._features_out_internal = None  # Final list of features after transformation, before the feature renaming from self._get_renamed_features() is applied
+        self._infer_features_in_args = self.get_default_infer_features_in_args()
+        if infer_features_in_args is not None:
+            if infer_features_in_args_strategy == 'overwrite':
+                self._infer_features_in_args = copy.deepcopy(infer_features_in_args)
+            elif infer_features_in_args_strategy == 'update':
+                self._infer_features_in_args.update(infer_features_in_args)
+            else:
+                raise ValueError(f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'")
         self._name_prefix = name_prefix  # Prefix added to all output feature names
         self._name_suffix = name_suffix  # Suffix added to all output feature names
 
@@ -344,7 +363,8 @@ class AbstractFeatureGenerator:
             self._log(20, f'\tfeature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
-            self.features_in = self._infer_features_in(X)
+            self.features_in = self._infer_features_in(X=X)
+            self.features_in = [feature for feature in self.features_in if feature in X.columns]
         self.feature_metadata_in = self.feature_metadata_in.keep_features(features=self.features_in)
 
     # TODO: Find way to increase flexibility here, possibly through init args
@@ -364,10 +384,9 @@ class AbstractFeatureGenerator:
         -------
         feature_in : list of str feature names inferred from X.
         """
-        feature_metadata_in_features = self.feature_metadata_in.get_features()
-        features_in = [feature for feature in X.columns if feature in feature_metadata_in_features]
-        return features_in
+        return self.feature_metadata_in.get_features(**self._infer_features_in_args)
 
+    # TODO: Use code from problem type detection for column types. Ints/Floats could be Categorical through this method. Maybe try both?
     @staticmethod
     def _infer_feature_metadata_in(X: DataFrame) -> FeatureMetadata:
         """
@@ -387,6 +406,10 @@ class AbstractFeatureGenerator:
         type_map_raw = get_type_map_raw(X)
         type_group_map_special = get_type_group_map_special(X)
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        raise NotImplementedError
 
     def _fit_generators(self, X, y, feature_metadata, generators: list, **kwargs) -> (DataFrame, FeatureMetadata, list):
         """

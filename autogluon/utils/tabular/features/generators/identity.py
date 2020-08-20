@@ -16,5 +16,6 @@ class IdentityFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return X
 
-    def _infer_features_in(self, X, y=None) -> list:
-        return self.feature_metadata_in.get_features(valid_raw_types=[R_INT, R_FLOAT])
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(valid_raw_types=[R_INT, R_FLOAT])

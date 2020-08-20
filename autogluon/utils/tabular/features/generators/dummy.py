@@ -20,6 +20,10 @@ class DummyFeatureGenerator(IdentityFeatureGenerator):
         return self._generate_features_dummy(X)
 
     @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(valid_raw_types=[])
+
+    @staticmethod
     def _generate_features_dummy(X: DataFrame):
         X_out = DataFrame(index=X.index)
         X_out['__dummy__'] = 0

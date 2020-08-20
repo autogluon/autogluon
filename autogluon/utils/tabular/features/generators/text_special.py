@@ -31,8 +31,9 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_text_special(X)
 
-    def _infer_features_in(self, X, y=None) -> list:
-        return self.feature_metadata_in.get_features(required_special_types=[S_TEXT])
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(required_special_types=[S_TEXT])
 
     def _generate_features_text_special(self, X: DataFrame) -> DataFrame:
         if self.features_in:

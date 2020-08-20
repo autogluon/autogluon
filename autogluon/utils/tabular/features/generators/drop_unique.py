@@ -23,6 +23,10 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return X
 
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()
+
     # TODO: Consider NaN?
     @staticmethod
     def _drop_unique_features(X: DataFrame, feature_metadata: FeatureMetadata, max_unique_ratio) -> list:

@@ -24,8 +24,9 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._minimize_categorical_memory_usage(X)
 
-    def _infer_features_in(self, X, y=None) -> list:
-        return self.feature_metadata_in.get_features(valid_raw_types=[R_CATEGORY])
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(valid_raw_types=[R_CATEGORY])
 
     def _get_category_map(self, X: DataFrame) -> dict:
         category_maps = {}

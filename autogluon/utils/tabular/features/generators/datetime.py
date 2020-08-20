@@ -20,8 +20,9 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_datetime(X)
 
-    def _infer_features_in(self, X, y=None) -> list:
-        return self.feature_metadata_in.get_features(required_raw_special_pairs=[
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(required_raw_special_pairs=[
             (R_DATETIME, None),
             (None, [S_DATETIME_AS_OBJECT])
         ])

@@ -4,7 +4,7 @@ import logging
 from pandas import DataFrame, Series
 from pandas.api.types import CategoricalDtype
 
-from .identity import IdentityFeatureGenerator
+from .abstract import AbstractFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator
 from ..feature_metadata import R_CATEGORY, R_OBJECT, S_DATETIME_AS_OBJECT, S_TEXT, S_TEXT_AS_CATEGORY
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # TODO: Retroactively prune mappings if feature was removed downstream
 # TODO: Have a concept of a 1:1 mapping, so you can safely remove features from features_in and features_out
 #  Have a method remove_features() where each generator implements custom logic, default is just to only remove from features_out, but Category could remove from features_in + inner generators + category_map.
-class CategoryFeatureGenerator(IdentityFeatureGenerator):
+class CategoryFeatureGenerator(AbstractFeatureGenerator):
     """
     CategoryFeatureGenerator is used to convert object types to category types, as well as remove rare categories and optimize memory usage.
 
@@ -74,8 +74,12 @@ class CategoryFeatureGenerator(IdentityFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return self._generate_features_category(X)
 
-    def _infer_features_in(self, X: DataFrame, y: Series = None) -> list:
-        return self.feature_metadata_in.get_features(valid_raw_types=[R_OBJECT, R_CATEGORY], invalid_special_types=[S_DATETIME_AS_OBJECT])
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict(
+            valid_raw_types=[R_OBJECT, R_CATEGORY],
+            invalid_special_types=[S_DATETIME_AS_OBJECT]
+        )
 
     def _generate_features_category(self, X: DataFrame) -> DataFrame:
         if self.features_in:

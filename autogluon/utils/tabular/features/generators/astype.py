@@ -38,6 +38,10 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             X = X.astype(self._feature_metadata_in_real.type_map_raw)
         return X
 
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()
+
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
         type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])

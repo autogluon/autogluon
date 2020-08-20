@@ -22,6 +22,10 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         return X
 
+    @staticmethod
+    def get_default_infer_features_in_args() -> dict:
+        return dict()
+
     # TODO: optimize categorical/object handling
     def _drop_duplicate_features(self, X: DataFrame) -> list:
         feature_sum_map = defaultdict(list)
