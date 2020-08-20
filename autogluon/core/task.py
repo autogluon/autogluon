@@ -24,6 +24,7 @@ class Task(object):
     """
     TASK_ID = mp.Value('i', 0)
     LOCK = mp.Lock()
+
     def __init__(self, fn, args, resources):
         self.fn = fn
         self.args = copy.deepcopy(args)
@@ -41,7 +42,8 @@ class Task(object):
     @classmethod
     def set_id(cls, taskid):
         logger.info('Setting TASK ID: {}'.format(taskid))
-        cls.TASK_ID.value = taskid
+        with Task.LOCK:
+            cls.TASK_ID.value = taskid
 
     def __repr__(self):
         reprstr = self.__class__.__name__ +  \
@@ -51,6 +53,6 @@ class Task(object):
         for k, v in self.args.items():
             data = str(v)
             info = (data[:100] + '..') if len(data) > 100 else data
-            reprstr +=  '{}'.format(k) + ': ' + info + ', '
-        reprstr +=  '},\n\tresource: ' + str(self.resources) + ')\n'
+            reprstr += '{}'.format(k) + ': ' + info + ', '
+        reprstr += '},\n\tresource: ' + str(self.resources) + ')\n'
         return reprstr

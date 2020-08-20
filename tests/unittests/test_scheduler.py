@@ -1,29 +1,20 @@
 import numpy as np
 import pickle
 import time
+import pytest
 import autogluon as ag
 
 
-@ag.args(
-    lr=ag.space.Real(1e-3, 1e-2, log=True),
-    wd=ag.space.Real(1e-3, 1e-2),
-    epochs=10)
-def train_fn(args, reporter):
-    for e in range(args.epochs):
-        dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
-
-@ag.args(
-    lr=ag.space.Categorical(1e-3, 1e-2),
-    wd=ag.space.Categorical(1e-3, 1e-2),
-    epochs=10)
-def rl_train_fn(args, reporter):
-    for e in range(args.epochs):
-        dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2*e))
-        reporter(epoch=e+1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
-
-
 def test_fifo_scheduler():
+    @ag.args(
+        lr=ag.space.Real(1e-3, 1e-2, log=True),
+        wd=ag.space.Real(1e-3, 1e-2),
+        epochs=10)
+    def train_fn(args, reporter):
+        for e in range(args.epochs):
+            dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
+            reporter(epoch=e + 1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+
     scheduler = ag.scheduler.FIFOScheduler(train_fn,
                                            resource={'num_cpus': 4, 'num_gpus': 0},
                                            num_trials=10,
@@ -38,6 +29,15 @@ def test_fifo_scheduler():
 
 
 def test_hyperband_scheduler():
+    @ag.args(
+        lr=ag.space.Real(1e-3, 1e-2, log=True),
+        wd=ag.space.Real(1e-3, 1e-2),
+        epochs=10)
+    def train_fn(args, reporter):
+        for e in range(args.epochs):
+            dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
+            reporter(epoch=e + 1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
+
     scheduler = ag.scheduler.HyperbandScheduler(train_fn,
                                                 resource={'num_cpus': 4, 'num_gpus': 0},
                                                 num_trials=10,
@@ -53,6 +53,14 @@ def test_hyperband_scheduler():
 
 
 def test_rl_scheduler():
+    @ag.args(
+        lr=ag.space.Categorical(1e-3, 1e-2),
+        wd=ag.space.Categorical(1e-3, 1e-2),
+        epochs=10)
+    def rl_train_fn(args, reporter):
+        for e in range(args.epochs):
+            dummy_accuracy = 1 - np.power(1.8, -np.random.uniform(e, 2 * e))
+            reporter(epoch=e + 1, accuracy=dummy_accuracy, lr=args.lr, wd=args.wd)
     scheduler = ag.scheduler.RLScheduler(rl_train_fn,
                                          resource={'num_cpus': 4, 'num_gpus': 0},
                                          num_trials=10,
@@ -83,4 +91,4 @@ def test_timeout_scheduler():
                                            time_out=3,
                                            checkpoint=None)
     scheduler.run()
-    best_config = scheduler.join_jobs(timeout=3)
+    scheduler.join_jobs(timeout=3)

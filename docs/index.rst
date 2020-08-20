@@ -55,10 +55,11 @@ Tutorials
       How to detect objects and their location in images.
 
    .. card::
-      :title: Text Classification
-      :link: tutorials/text_classification/index.html
+      :title: Text Prediction
+      :link: tutorials/text_prediction/index.html
 
-      How to make predictions based on text data.
+      How to solve NLP problems that involves predicting categorical or numerical
+      labels from raw text.
 
 
 Advanced Topics
@@ -91,7 +92,7 @@ Advanced Topics
    tutorials/tabular_prediction/index
    tutorials/image_classification/index
    tutorials/object_detection/index
-   tutorials/text_classification/index
+   tutorials/text_prediction/index
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
