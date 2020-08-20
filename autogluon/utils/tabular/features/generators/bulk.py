@@ -45,13 +45,14 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     --------
     >>> from autogluon import TabularPrediction as task
     >>> from autogluon.utils.tabular.features.generators import AsTypeFeatureGenerator, BulkFeatureGenerator, CategoryFeatureGenerator, DropDuplicatesFeatureGenerator, FillNaFeatureGenerator, IdentityFeatureGenerator
+    >>> from autogluon.utils.tabular.features.feature_metadata import R_INT, R_FLOAT
     >>>
     >>> generators = [
     >>>     [AsTypeFeatureGenerator()],  # Convert all input features to the exact same types as they were during fit.
     >>>     [FillNaFeatureGenerator()],  # Fill all NA values in the data
     >>>     [
     >>>         CategoryFeatureGenerator(),  # Convert object types to category types and minimize their memory usage
-    >>>         IdentityFeatureGenerator(),  # Carry over all features that are not objects and categories (without this, the int features would be dropped).
+    >>>         IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])),  # Carry over all features that are not objects and categories (without this, the int features would be dropped).
     >>>     ],  # CategoryFeatureGenerator and IdentityFeatureGenerator will have their outputs concatenated together before being fed into DropDuplicatesFeatureGenerator
     >>>     [DropDuplicatesFeatureGenerator()]  # Drops any features which are duplicates of each-other
     >>> ]

@@ -14,7 +14,6 @@ from ..feature_metadata import S_TEXT, S_TEXT_NGRAM
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add verbose descriptions of each special dtype this generator can create.
 # TODO: Add argument to define the text preprocessing logic
 # TODO: Add argument to output ngrams as a sparse matrix
 # TODO: Add HashingVectorizer support

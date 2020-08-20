@@ -1,7 +1,12 @@
 import logging
 
-from autogluon.utils.tabular.features.generators.pipeline import PipelineFeatureGenerator
-from autogluon.utils.tabular.features.generators import CategoryFeatureGenerator, DatetimeFeatureGenerator, IdentityFeatureGenerator, TextNgramFeatureGenerator, TextSpecialFeatureGenerator
+from .pipeline import PipelineFeatureGenerator
+from .category import CategoryFeatureGenerator
+from .datetime import DatetimeFeatureGenerator
+from .identity import IdentityFeatureGenerator
+from .text_ngram import TextNgramFeatureGenerator
+from .text_special import TextSpecialFeatureGenerator
+from ..feature_metadata import R_INT, R_FLOAT
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +72,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
         if self.enable_raw_features:
-            generator_group.append(IdentityFeatureGenerator())
+            generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
         if self.enable_datetime_features:

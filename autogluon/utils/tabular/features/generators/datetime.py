@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
+    """Transforms datetime features into numeric features."""
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         type_family_groups_special = dict(
