@@ -50,6 +50,7 @@ requirements = [
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0,<1.0',
     'graphviz',
+    'fastparquet==0.4.1',
     'scikit-optimize',
     'catboost<0.24',
     'pyarrow<=1.0.0',
