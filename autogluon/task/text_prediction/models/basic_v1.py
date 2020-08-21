@@ -541,7 +541,7 @@ class BertForTextPredictionBasic:
     def __init__(self, column_properties, label_columns, feature_columns,
                  label_shapes, problem_types, stopping_metric, log_metrics,
                  output_directory=None, logger=None, base_config=None, search_space=None):
-        """
+        """A model that is returned by `TextPrediction.fit()`. Used for making predictions on new data.
 
         Parameters
         ----------
@@ -797,17 +797,17 @@ class BertForTextPredictionBasic:
         return test_predictions
 
     def predict_proba(self, test_data):
-        """Predict with probability
+        """Predict class probabilities instead of class labels (for classification tasks).
 
         Parameters
         ----------
         test_data
-            The test data. Can be a pandas DataFrame or a file containing a pandas dataframe
+            The test data to get predictions for. Can be a pandas DataFrame or a file that can be loaded into a pandas dataframe.
 
         Returns
         -------
         probabilities
-            The probabilities. Shape (#Samples, num_class)
+            The predicted class probabilities for each sample. Shape (#Samples, num_class)
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
@@ -815,33 +815,32 @@ class BertForTextPredictionBasic:
                                       get_probabilities=True)
 
     def predict(self, test_data, get_original_labels=True):
-        """Get the prediction results
+        """Make predictions on new data.
 
         Parameters
         ----------
         test_data
-            tabular dataset
+            The test data to get predictions for. Can be a pandas DataFrame or a file that can be loaded into a pandas dataframe.
         get_original_labels
-            Whether to get the original labels.
-            For example, the labels can be "entailment", "not_entailment" and whether
-            to get the original string labels or get the int values.
+            Whether or not predictions should be formatted in terms of the original labels.
+            For example, the labels might be "entailment" or "not_entailment" and predictions could either be of this form (if `True`) or integer-indices corresponding to these classes (if `False`).
 
         Returns
         -------
         predictions
-            The predictions. Shape (#Samples,)
+            The predictions for each sample. Shape (#Samples,)
         """
         return self._internal_predict(test_data,
                                       get_original_labels=get_original_labels,
                                       get_probabilities=False)
 
     def save(self, dir_path):
-        """Save the trained model to a directory
+        """Save the trained model to disk.
 
         Parameters
         ----------
         dir_path
-            The destination directory
+            Directory where the model should be saved.
         """
         os.makedirs(dir_path, exist_ok=True)
         self.net.save_parameters(os.path.join(dir_path, 'net.params'))
@@ -861,16 +860,16 @@ class BertForTextPredictionBasic:
 
     @classmethod
     def load(cls, dir_path):
-        """Load the trained model from a directory
+        """Load the trained model from disk.
 
         Parameters
         ----------
         dir_path
-            The directory path
+            Directory where the model was previously saved.
 
         Returns
         -------
-        model
+        model (see `autogluon.task.text_prediction.models`)
         """
         loaded_config = cls.default_config().clone_merge(os.path.join(dir_path, 'cfg.yml'))
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:
