@@ -238,9 +238,7 @@ class TextPrediction(BaseTask):
             If None (by default), all columns of table are considered predictive features.
         holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
-            If None, default value is selected based on the number of rows in the training data.
-            If None (by default), an appropriate `holdout_frac` is chosen based on the number of
-            training samples.
+            If None, default value is selected based on the number of training examples.
         eval_metric : str, default = None
             The evaluation metric that will be used to evaluate the model's predictive performance.
             If None, an appropriate default metric will be selected (accuracy for classification, mean-squared-error for regression).
