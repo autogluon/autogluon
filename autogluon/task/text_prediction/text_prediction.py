@@ -288,7 +288,7 @@ class TextPrediction(BaseTask):
         Returns
         -------
         model
-            A model object
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         assert dist_ip_addrs is None, 'Training on remote machine is currently not supported.'
         if verbosity < 0:
@@ -436,16 +436,17 @@ class TextPrediction(BaseTask):
 
     @staticmethod
     def load(dir_path):
-        """Load model from the directory
+        """Load a model object previously produced by `fit()` from disk and return this object.
 
         Parameters
         ----------
-        dir_path
+        dir_path : str
+            Path to directory where this model was previously saved.
 
 
         Returns
         -------
         model
-            The loaded model
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         return BertForTextPredictionBasic.load(dir_path)
