@@ -58,8 +58,7 @@ Tutorials
       :title: Text Prediction
       :link: tutorials/text_prediction/index.html
 
-      How to solve NLP problems that involves predicting categorical or numerical
-      labels from raw text.
+      How to solve NLP problems via supervised learning from raw text.
 
 
 Advanced Topics
