@@ -835,11 +835,11 @@ class BertForTextPredictionBasic:
                                       get_probabilities=False)
 
     def save(self, dir_path):
-        """Save the trained model to disk.
+        """Save this model to disk.
 
         Parameters
         ----------
-        dir_path
+        dir_path : str
             Directory where the model should be saved.
         """
         os.makedirs(dir_path, exist_ok=True)
@@ -860,16 +860,19 @@ class BertForTextPredictionBasic:
 
     @classmethod
     def load(cls, dir_path):
-        """Load the trained model from disk.
+        """Load a model object previously produced by `fit()` from disk and return this object.
+           It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+
 
         Parameters
         ----------
-        dir_path
-            Directory where the model was previously saved.
+        dir_path : str
+            Path to directory where this model was previously saved.
 
         Returns
         -------
-        model (see `autogluon.task.text_prediction.models`)
+        model
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         loaded_config = cls.default_config().clone_merge(os.path.join(dir_path, 'cfg.yml'))
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:
