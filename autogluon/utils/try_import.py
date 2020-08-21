@@ -82,3 +82,10 @@ def try_import_faiss():
         raise ImportError(
             "Unable to import dependency faiss"
             "A quick tip is to install via `pip install faiss-cpu`. ")
+
+def try_import_torch():
+    try:
+        import torch
+    except ValueError as e:
+        raise ImportError("Import torch failed.")
+

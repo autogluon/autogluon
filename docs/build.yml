@@ -12,3 +12,5 @@ dependencies:
   - docutils
   - mu-notedown
   - flake8
+  - torch
+  - neotime
