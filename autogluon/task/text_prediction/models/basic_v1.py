@@ -760,8 +760,9 @@ class BertForTextPredictionBasic:
             valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
                 This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
                 If str is passed, `valid_data` will be loaded using the str value as the file path.
-            metrics : List<str>
-                A list of names of metrics to report. 
+            metrics : List[str]
+                A list of names of metrics to report.
+ 
             Returns
             -------
             Dict mapping metric -> score calculated over the given dataset.
@@ -885,7 +886,7 @@ class BertForTextPredictionBasic:
         ----------
         dir_path : str
             Path to directory where this model was previously saved.
-
+ 
         Returns
         -------
         model
