@@ -26,7 +26,7 @@ performance = predictor.evaluate(test_data)
 
 ## Resources
 
-See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for instructions on:
+See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documentation](https://autogluon.mxnet.io/api/index.html) and instructions on:
 - [Installing AutoGluon](http://autogluon.mxnet.io/index.html#installation)
 - [Learning with tabular data](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
   - [Tips to maximize accuracy](https://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-indepth.html#maximizing-predictive-performance)
