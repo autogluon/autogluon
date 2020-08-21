@@ -801,13 +801,13 @@ class BertForTextPredictionBasic:
 
         Parameters
         ----------
-        test_data
-            The test data to get predictions for. Can be a pandas DataFrame or a file that can be loaded into a pandas dataframe.
+        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
 
         Returns
         -------
-        probabilities
-            The predicted class probabilities for each sample. Shape (#Samples, num_class)
+        probabilities : array
+            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
@@ -819,16 +819,16 @@ class BertForTextPredictionBasic:
 
         Parameters
         ----------
-        test_data
-            The test data to get predictions for. Can be a pandas DataFrame or a file that can be loaded into a pandas dataframe.
-        get_original_labels
+        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
+        get_original_labels : bool, default = True
             Whether or not predictions should be formatted in terms of the original labels.
             For example, the labels might be "entailment" or "not_entailment" and predictions could either be of this form (if `True`) or integer-indices corresponding to these classes (if `False`).
 
         Returns
         -------
-        predictions
-            The predictions for each sample. Shape (#Samples,)
+        predictions : array
+            The predictions for each sample. Shape of this array is (#Samples,).
         """
         return self._internal_predict(test_data,
                                       get_original_labels=get_original_labels,
