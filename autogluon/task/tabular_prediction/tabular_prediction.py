@@ -277,9 +277,9 @@ class TabularPrediction(BaseTask):
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
 
-        holdout_frac : float
+        holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
-            Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
             Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
             Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
@@ -288,7 +288,7 @@ class TabularPrediction(BaseTask):
             Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting.
             Values > 10 may produce diminishing returns, and can even harm overall results due to overfitting.
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
-        num_bagging_sets : int
+        num_bagging_sets : int, default = None
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
             Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
@@ -296,26 +296,26 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
-        num_trials : int
+        num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
-        scheduler_options : dict
+        scheduler_options : dict, default = None
             Extra arguments passed to __init__ of scheduler, to configure the orchestration of training jobs during hyperparameter-tuning.
             Ignored if `hyperparameter_tune=False`.
-        search_strategy : str
+        search_strategy : str, default = 'random'
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
-        search_options : dict
+        search_options : dict, default = None
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
-        nthreads_per_trial : int
+        nthreads_per_trial : int, default = None
             How many CPUs to use in each training run of an individual model.
             This is automatically determined by AutoGluon when left as None (based on available compute).
-        ngpus_per_trial : int
+        ngpus_per_trial : int, default = None
             How many GPUs to use in each trial (ie. single training run of a model).
             This is automatically determined by AutoGluon when left as None.
-        dist_ip_addrs : list
+        dist_ip_addrs : list, default = None
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        visualizer : str
+        visualizer : str, default = 'none'
             How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
