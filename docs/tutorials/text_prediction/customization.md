@@ -1,10 +1,10 @@
-# Text Prediction - Customization and HPO
+# Text Prediction - Customized Hyperparameter Search
 :label:`sec_textprediction_customization`
 
-In this tutorial, we will learn the following:
+This tutorial teaches you how to control the hyperparameter tuning process in `TextPrediction` by specifying:
 
-- How to customize the search space in `TextPrediction`.
-- Try different HPO algorithms
+- A custom search space of candidate hyperparameter values to consider.
+- Which hyperparameter optimization algorithm should be used to actually search through this space.
 
 ```{.python .input}
 import numpy as np
@@ -13,14 +13,9 @@ warnings.filterwarnings('ignore')
 np.random.seed(123)
 ```
 
-## Paraphrasing Identification
+## Paraphrase Identification
 
-We will use the "Paraphrasing Identification" task for illustration. The goal is to predict whether one sentence is a restatement of the other.
-
-- sentence1, sentence2 --> label
-- binary classification
-
-We use the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398).
+We consider a Paraphrase Identification task for illustration. Given a pair of sentences, the goal is to predict whether or not one sentence is a restatement of the other (a binary classification task). Here we train models on the [Microsoft Research Paraphrase Corpus](https://www.microsoft.com/en-us/download/details.aspx?id=52398) dataset.
 
 ```{.python .input}
 from autogluon.utils.tabular.utils.loaders import load_pd
@@ -33,27 +28,31 @@ train_data.head(10)
 
 ```{.python .input}
 from autogluon_contrib_nlp.data.tokenizers import MosesTokenizer
-tokenizer = MosesTokenizer('en')
-print('Paraphrase:')
-print('Sentence1: ', tokenizer.decode(train_data['sentence1'][2].split()))
-print('Sentence2: ', tokenizer.decode(train_data['sentence2'][2].split()))
-print('Label: ', train_data['label'][2])
+tokenizer = MosesTokenizer('en')  # just used to display sentences
+row_index = 2
+print('Paraphrase example:')
+print('Sentence1: ', tokenizer.decode(train_data['sentence1'][row_index].split()))
+print('Sentence2: ', tokenizer.decode(train_data['sentence2'][row_index].split()))
+print('Label: ', train_data['label'][row_index])
 
-print('\nNot Paraphrase:')
-print('Sentence1:', tokenizer.decode(train_data['sentence1'][3].split()))
-print('Sentence2:', tokenizer.decode(train_data['sentence2'][3].split()))
-print('Label:', train_data['label'][3])
+row_index = 3
+print('\nNot Paraphrase example:')
+print('Sentence1:', tokenizer.decode(train_data['sentence1'][row_index].split()))
+print('Sentence2:', tokenizer.decode(train_data['sentence2'][row_index].split()))
+print('Label:', train_data['label'][row_index])
 ```
 
-## Explore a Customized Search Space with Random Search
+## Perform HPO over a Customized Search Space with Random Search
 
-Here, we can set the `hyperparameters` argument and specify the search space with `ag.space`.
-In this example, we search for
+To control which hyperparameter values are considered during `fit()`, we specify the `hyperparameters` argument.
+Rather than specifying a particular fixed value for a hyperparameter, we can specify a space of values to search over via `ag.space`.
+We can also specify which HPO algorithm to use for the search via `search_strategy` (a simple [random search](https://www.jmlr.org/papers/volume13/bergstra12a/bergstra12a.pdf) is specified below).
+In this example, we search for good values of the following hyperparameters:
 
 - warmup
 - learning rate
 - dropout before the first task-specific layer
-- the layerwise decay
+- layer-wise learning rate decay
 - number of task-specific layers
 
 ```{.python .input}
@@ -74,25 +73,27 @@ hyperparameters = {
             },
     },
     'hpo_params': {
-        'scheduler': 'fifo',
-        'search_strategy': 'random'
+        'scheduler': 'fifo',  # schedule training jobs in a sequential first-in first-out fashion during HPO
+        'search_strategy': 'random'  # perform HPO via simple random search
     }
 }
 ```
 
-
+We can now call `fit()` with hyperparameter-tuning over our custom search space. 
+Below `num_trials` controls the maximal number of different hyperparameter configurations for which AutoGluon will train models (5 models are trained under different hyperparameter configurations in this case). To achieve good performance in your applications, you should use larger values of `num_trials`, which may identify superior hyperparameter values but will require longer runtimes.
 
 ```{.python .input}
 predictor_mrpc = task.fit(train_data,
                           label='label',
                           hyperparameters=hyperparameters,
-                          num_trials=5,  # Number of different hyper-parameters
+                          num_trials=5,  # increase this to achieve good performance in your applications
                           time_limits=60 * 10,
                           ngpus_per_trial=1,
                           seed=123,
                           output_directory='./ag_mrpc_random_search')
 ```
 
+We can again evaluate our model's performance on separate test data.
 
 ```{.python .input}
 dev_score = predictor_mrpc.evaluate(dev_data, metrics=['acc', 'f1'])
@@ -102,6 +103,7 @@ print('Accuracy = {:.2f}%'.format(dev_score['acc'] * 100))
 print('F1 = {:.2f}%'.format(dev_score['f1'] * 100))
 ```
 
+And also use the model to predict whether new sentence pairs are paraphrases of each other or not.
 
 ```{.python .input}
 sentence1 = 'It is simple to solve NLP problems with AutoGluon.'
@@ -124,13 +126,8 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 
 ## Use Bayesian Optimization
 
-Apart from random search, we can utilize [skopt](https://scikit-optimize.github.io/stable/) as the searcher, 
-which performs a type of Bayesian Optimization. 
-Basically, skopt will train a *surrogate model* to approximate the performance of the hyperparameter configurations. 
-Whenever the search observed the performance of a new set of hyperparameter, it updates the posterior. 
-In the next trial, the searcher will try the configuration that best balances the exploitation and exploration tradeoffs.
-
-Here, we use a maximal of 5 trials by setting `num_trials` to 5. 
+Instead of random search, we can perform HPO via [Bayesian Optimization](https://distill.pub/2020/bayesian-optimization/).
+Here we specify **skopt** as the searcher, which uses a BayesOpt implementation from the [scikit-optimize](https://scikit-optimize.github.io/stable/) library. 
 
 
 ```{.python .input}
@@ -142,7 +139,7 @@ hyperparameters['hpo_params'] = {
 predictor_mrpc_skopt = task.fit(train_data, label='label',
                                 hyperparameters=hyperparameters,
                                 time_limits=60 * 10,
-                                num_trials=5,
+                                num_trials=5,  # increase this to get good performance in your applications
                                 ngpus_per_trial=1, seed=123,
                                 output_directory='./ag_mrpc_custom_space_fifo_skopt')
 ```
@@ -177,17 +174,15 @@ print('Prob = "{}"'.format(prediction2_prob[0]))
 
 ## Use Hyperband
 
-We can also use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf). 
-Hyperband tackles the HPO with ideas from multi-armed bandit. 
-Basically, hyperband will try multiple configuration simultaneously. 
-It will early stop the bad-performing configurations and only keep training the promising ones.
+Alternatively, we can instead use the [Hyperband algorithm](https://arxiv.org/pdf/1603.06560.pdf) for HPO.
+Hyperband will try multiple hyperparameter configurations simultaneously and will early stop training under poor configurations to free compute resources for exploring new hyperparameter configurations. It may be able to identify good hyperparameter values more quickly than other search strategies in your applications.
 
 
 ```{.python .input}
 hyperparameters['hpo_params'] = {
     'scheduler': 'hyperband',
     'search_strategy': 'random',
-    'max_t': 40,  # Number of epochs
+    'max_t': 40,  # Number of epochs per training run of one neural network
 }
 ```
 
