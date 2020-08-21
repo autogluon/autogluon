@@ -271,21 +271,21 @@ Additional Object Detection APIs
 Additional Text Prediction APIs
 -----------------------------------
 
-.. automodule:: autogluon.task.text_prediction
+.. automodule:: autogluon.task.text_prediction.models.basic_v1
 
-:hidden:`models.basic_v1.BertForTextPredictionBasic`
+:hidden:`BertForTextPredictionBasic`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: models.basic_v1.BertForTextPredictionBasic
+.. autoclass:: BertForTextPredictionBasic
    :members: predict, predict_proba, evaluate
 
     .. rubric:: Methods
 
-    .. autoautosummary:: models.basic_v1.BertForTextPredictionBasic
+    .. autoautosummary:: BertForTextPredictionBasic
         :methods:
 
     .. rubric:: Attributes
 
-    .. autoautosummary:: models.basic_v1.BertForTextPredictionBasic
+    .. autoautosummary:: BertForTextPredictionBasic
         :attributes:
 
