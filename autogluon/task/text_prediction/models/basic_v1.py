@@ -749,6 +749,19 @@ class BertForTextPredictionBasic:
         mx.npx.waitall()
 
     def evaluate(self, valid_data, metrics):
+        """ Report the predictive performance evaluated for a given dataset.
+            
+            Parameters
+            ----------
+            valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
+                This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+                If str is passed, `valid_data` will be loaded using the str value as the file path.
+            metrics : List<str>
+                A list of names of metrics to report. 
+            Returns
+            -------
+            Dict mapping metric -> score calculated over the given dataset.
+        """
         assert self.net is not None
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
