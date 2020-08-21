@@ -277,7 +277,7 @@ Additional Text Prediction APIs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: BertForTextPredictionBasic
-   :members: predict, predict_proba, evaluate
+   :members: predict, predict_proba, evaluate, save, load
 
     .. rubric:: Methods
 
