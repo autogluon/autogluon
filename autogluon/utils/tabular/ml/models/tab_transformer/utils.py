@@ -6,7 +6,7 @@ from autogluon.utils.tabular.ml.models.tab_transformer import TabTransormerEncod
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 
 
-def augmentation(data, target, mask_prob=0.4, num_augs=4):
+def augmentation(data, target, mask_prob=0.4, num_augs=1):
     shape=data.shape
     cat_data=torch.cat([data for _ in range(num_augs)])
     target=torch.cat([target for _ in range(num_augs)]).view(-1)
@@ -17,10 +17,14 @@ def augmentation(data, target, mask_prob=0.4, num_augs=4):
 
 
 
-def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs):
+def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, aug_kwargs=None):    
     is_train = (optimizers is not None)
     net.train() if is_train else net.eval()
     total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(data_loader)
+
+    if aug_kwargs is None:
+        aug_kwargs={'mask_prob': 0.4,
+                    'num_augs': 1}
 
 
     with (torch.enable_grad() if is_train else torch.no_grad()):
@@ -28,7 +32,7 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
             data, target = pretext.get(data, target)
         
             if state in [None, 'finetune']:
-                data, target = augmentation(data,target)
+                data, target = augmentation(data,target, **aug_kwargs)
                 out, _    = net(data)
               
             elif state=='pretrain':

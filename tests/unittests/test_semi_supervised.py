@@ -26,7 +26,7 @@ import pytest
 import autogluon as ag
 
 from autogluon import TabularPrediction as task
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS
+from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 
 supervised=True
 semi_supervised=True
@@ -98,7 +98,7 @@ def run_tabular_benchmarks(subsample_size, unlabeled_subsample_size, perf_thresh
 
 
     # List containing dicts for each dataset to include in benchmark (try to order based on runtimes)
-    datasets = [multi_dataset] #multi_dataset]
+    datasets = [binary_dataset] #multi_dataset]
 
     if dataset_indices is not None: # only run some datasets
         datasets = [datasets[i] for i in dataset_indices]
@@ -137,7 +137,6 @@ def run_tabular_benchmarks(subsample_size, unlabeled_subsample_size, perf_thresh
                 raise ValueError("subsample_size not specified")
             train_data = data.head(subsample_size) 
             unlabeled_data = data.head(unlabeled_subsample_size).drop(columns=[label_column])
-
 
             custom_hyperparameters = {"Transf": {}}
             
