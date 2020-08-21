@@ -85,12 +85,12 @@ class TabNet(nn.Module):
    
                 for e in range(1,epochs+1):
                     _ = utils.epoch(self, trainloader, optimizers, loss_criterion=loss_criterion, \
-                                        pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs) #returns train_loss, train_acc@1, train_acc@5 
+                                        pretext=pretext, state=state, scheduler=None, epoch=e, epochs=epochs, aug_kwargs=self.kwargs['augmentation']) #returns train_loss, train_acc@1, train_acc@5 
                     
                     if valloader is not None:
                         if e % freq == 0:
                             _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
-                                loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1)                       
+                                loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])                       
                             if val_accuracy>old_val_accuracy:
                                 torch.save(self,'tab_trans_temp.pth')
                 if valloader is not None:
@@ -233,7 +233,7 @@ class TabTransformerModel(AbstractModel):
         X (torch.tensor or pd.dataframe): data for model to give prediction probabilities
         returns: np.array of k-probabilities for each of the k classes. If k=2 we drop the second probability.
         """
-        if preprocess or isinstance(X,pd.DataFrame):
+        if preprocess or isinstance(X, pd.DataFrame):
             X, _, _ =self.preprocess(X, fe=self.fe)
         else:
             X=X
