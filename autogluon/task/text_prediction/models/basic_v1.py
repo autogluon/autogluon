@@ -35,7 +35,6 @@ def get_optimizer(cfg, updates_per_epoch):
     max_update = int(updates_per_epoch * cfg.num_train_epochs)
     warmup_steps = int(updates_per_epoch * cfg.num_train_epochs * cfg.warmup_portion)
     if cfg.lr_scheduler == 'triangular':
-        assert warmup_steps < max_update
         lr_scheduler = PolyScheduler(max_update=max_update,
                                      base_lr=cfg.lr,
                                      warmup_begin_lr=cfg.begin_lr,
