@@ -233,7 +233,7 @@ class TextPrediction(BaseTask):
             If not specified, `fit()` will run until all models to try by default have completed training.
         output_directory : str, default = './ag_text'
             Path to directory where models and intermediate outputs should be saved.
-        feature_columns : List<str>, default = None
+        feature_columns : List[str], default = None
             Which columns of table to consider as predictive features (other columns will be ignored, except for label-column).
             If None (by default), all columns of table are considered predictive features.
         holdout_frac : float, default = None
