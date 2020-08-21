@@ -24,7 +24,7 @@ pretrained BERT/ALBERT/ELECTRA model (transfer learning) and hyperparameter opti
       :title: Heterogeneous data types
       :link: heterogeneous.html
 
-      Train neural networks that can operate on 
+      Train neural networks that jointly operate on 
       a mix of text, numerical, or categorical features.
 
 .. toctree::
