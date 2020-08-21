@@ -4,8 +4,8 @@
 Here we introduce the `TextPrediction` task, which helps you automatically train and deploy models for various Natural Language Processing (NLP) problems.
 This tutorial presents two examples to demonstrate how `TextPrediction` can be used for different NLP tasks including:
 
-- [Sentiment Analysis](#Sentiment-Analysis)
-- [Sentence Similarity](#Sentence-Similarity)
+- [Sentiment Analysis](https://en.wikipedia.org/wiki/Sentiment_analysis)
+- [Sentence Similarity](https://arxiv.org/abs/1910.03940)
 
 The general usage is similar to AutoGluon's `TabularPrediction` module. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
 Here, the labels can be discrete categories (classification) or numerical values (regression).
