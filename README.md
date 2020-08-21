@@ -31,7 +31,7 @@ See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for instructio
 - [Learning with tabular data](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
   - [Tips to maximize accuracy](https://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-indepth.html#maximizing-predictive-performance)
 - [Learning with image data](http://autogluon.mxnet.io/tutorials/image_classification/beginner.html)
-- [Learning with text data](http://autogluon.mxnet.io/tutorials/text_classification/beginner.html)
+- [Learning with text data](http://autogluon.mxnet.io/tutorials/text_prediction/beginner.html)
 - More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io/tutorials/nas/index.html)
 
 ### Scientific Publications
