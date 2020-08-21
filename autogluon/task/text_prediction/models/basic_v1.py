@@ -538,17 +538,21 @@ def train_function(args, reporter, train_data, tuning_data,
 
 @use_np
 class BertForTextPredictionBasic:
+    """A model object returned by `fit()` in TextPrediction tasks. 
+       Use for making predictions on new data and viewing information about models trained during `fit()`.
+    """
+    
     def __init__(self, column_properties, label_columns, feature_columns,
                  label_shapes, problem_types, stopping_metric, log_metrics,
                  output_directory=None, logger=None, base_config=None, search_space=None):
-        """A model that is returned by `TextPrediction.fit()`. Used for making predictions on new data.
+        """Creates model object.
 
         Parameters
         ----------
         column_properties
-            The column properties
+            The column properties.
         label_columns
-            Label columns
+            Label columns.
         feature_columns
         label_shapes
         problem_types
@@ -557,9 +561,9 @@ class BertForTextPredictionBasic:
         output_directory
         logger
         base_config
-            The basic configuration that the search space will be based upon
+            The basic configuration that the search space will be based upon.
         search_space
-            The search space
+            The hyperparameter search space.
         """
         super(BertForTextPredictionBasic, self).__init__()
         if base_config is None:
