@@ -54,7 +54,6 @@ def get_optimizer(cfg, updates_per_epoch):
         max_update = int(updates_per_epoch * cfg.num_train_epochs)
         warmup_steps = int(updates_per_epoch * cfg.num_train_epochs
                            * cfg.warmup_portion)
-        assert warmup_steps < max_update
         lr_scheduler = CosineScheduler(max_update=max_update,
                                        base_lr=cfg.lr,
                                        final_lr=cfg.final_lr,
