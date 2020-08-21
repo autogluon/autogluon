@@ -69,8 +69,8 @@ And you can easily obtain predictions from these models.
 sentence1 = "it's a charming and often affecting journey." 
 sentence2 = "It's slow, very, very, very slow."
 predictions = predictor.predict({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Sentiment":', predictions[0])
-print('"Sentence":', sentence2, '"Sentiment":', predictions[1])
+print('"Sentence":', sentence1, '"Predicted Sentiment":', predictions[0])
+print('"Sentence":', sentence2, '"Predicted Sentiment":', predictions[1])
 
 ```
 
@@ -79,8 +79,8 @@ For classification tasks, you can ask for predicted class-probabilities instead 
 
 ```{.python .input}
 probs = predictor.predict_proba({'sentence': [sentence1, sentence2]})
-print('"Sentence":', sentence1, '"Sentiment":', probs[0])
-print('"Sentence":', sentence2, '"Sentiment":', probs[1])
+print('"Sentence":', sentence1, '"Predicted Class-Probabilities":', probs[0])
+print('"Sentence":', sentence2, '"Predicted Class-Probabilities":', probs[1])
 
 ```
 
