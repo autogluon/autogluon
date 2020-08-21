@@ -437,11 +437,12 @@ class TextPrediction(BaseTask):
     @staticmethod
     def load(dir_path):
         """Load a model object previously produced by `fit()` from disk and return this object.
+           It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
 
         Parameters
         ----------
         dir_path : str
-            Path to directory where this model was previously saved.
+            Path to directory where this model was previously saved (i.e. `output_directory` specified in previous call to `fit`).
 
 
         Returns
