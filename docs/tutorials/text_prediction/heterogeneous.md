@@ -44,7 +44,7 @@ score = predictor_score.evaluate(dev_data, metrics='spearmanr')
 print('Spearman Correlation=', score['spearmanr'])
 ```
 
-We can also train a model that predicts the **genre** treating the other columns as features.
+We can also train a model that predicts the **genre** using the other columns as features.
 
 
 ```{.python .input}
