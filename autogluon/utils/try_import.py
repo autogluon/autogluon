@@ -44,7 +44,7 @@ def try_import_mxnet():
                 "mxnet>={} is required. You can use pip to upgrade mxnet "
                 "`pip install mxnet --upgrade` "
                 "or `pip install mxnet_cu101 --upgrade`").format(mx.__version__, mx_version)
-            raise ImportError(msg)
+            raise ValueError(msg)
     except ImportError:
         raise ImportError(
             "Unable to import dependency mxnet. "
