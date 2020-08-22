@@ -35,7 +35,6 @@ def get_optimizer(cfg, updates_per_epoch):
     max_update = int(updates_per_epoch * cfg.num_train_epochs)
     warmup_steps = int(updates_per_epoch * cfg.num_train_epochs * cfg.warmup_portion)
     if cfg.lr_scheduler == 'triangular':
-        assert warmup_steps < max_update
         lr_scheduler = PolyScheduler(max_update=max_update,
                                      base_lr=cfg.lr,
                                      warmup_begin_lr=cfg.begin_lr,
@@ -55,7 +54,6 @@ def get_optimizer(cfg, updates_per_epoch):
         max_update = int(updates_per_epoch * cfg.num_train_epochs)
         warmup_steps = int(updates_per_epoch * cfg.num_train_epochs
                            * cfg.warmup_portion)
-        assert warmup_steps < max_update
         lr_scheduler = CosineScheduler(max_update=max_update,
                                        base_lr=cfg.lr,
                                        final_lr=cfg.final_lr,
@@ -538,17 +536,21 @@ def train_function(args, reporter, train_data, tuning_data,
 
 @use_np
 class BertForTextPredictionBasic:
+    """A model object returned by `fit()` in TextPrediction tasks. 
+       Use for making predictions on new data and viewing information about models trained during `fit()`.
+    """
+    
     def __init__(self, column_properties, label_columns, feature_columns,
                  label_shapes, problem_types, stopping_metric, log_metrics,
                  output_directory=None, logger=None, base_config=None, search_space=None):
-        """
+        """Creates model object.
 
         Parameters
         ----------
         column_properties
-            The column properties
+            The column properties.
         label_columns
-            Label columns
+            Label columns.
         feature_columns
         label_shapes
         problem_types
@@ -557,9 +559,9 @@ class BertForTextPredictionBasic:
         output_directory
         logger
         base_config
-            The basic configuration that the search space will be based upon
+            The basic configuration that the search space will be based upon.
         search_space
-            The search space
+            The hyperparameter search space.
         """
         super(BertForTextPredictionBasic, self).__init__()
         if base_config is None:
@@ -749,6 +751,20 @@ class BertForTextPredictionBasic:
         mx.npx.waitall()
 
     def evaluate(self, valid_data, metrics):
+        """ Report the predictive performance evaluated for a given dataset.
+            
+            Parameters
+            ----------
+            valid_data : str or :class:`TabularDataset` or `pandas.DataFrame`
+                This Dataset must also contain the label-column with the same column-name as specified during `fit()`.
+                If str is passed, `valid_data` will be loaded using the str value as the file path.
+            metrics : List[str]
+                A list of names of metrics to report.
+ 
+            Returns
+            -------
+            Dict mapping metric -> score calculated over the given dataset.
+        """
         assert self.net is not None
         if not isinstance(valid_data, TabularDataset):
             valid_data = TabularDataset(valid_data,
@@ -797,17 +813,17 @@ class BertForTextPredictionBasic:
         return test_predictions
 
     def predict_proba(self, test_data):
-        """Predict with probability
+        """Predict class probabilities instead of class labels (for classification tasks).
 
         Parameters
         ----------
-        test_data
-            The test data. Can be a pandas DataFrame or a file containing a pandas dataframe
+        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
 
         Returns
         -------
-        probabilities
-            The probabilities. Shape (#Samples, num_class)
+        probabilities : array
+            The predicted class probabilities for each sample. Shape of this array is (#Samples, num_class).
         """
         assert self.problem_types[0] == _C.CLASSIFICATION
         return self._internal_predict(test_data,
@@ -815,33 +831,32 @@ class BertForTextPredictionBasic:
                                       get_probabilities=True)
 
     def predict(self, test_data, get_original_labels=True):
-        """Get the prediction results
+        """Make predictions on new data.
 
         Parameters
         ----------
-        test_data
-            tabular dataset
-        get_original_labels
-            Whether to get the original labels.
-            For example, the labels can be "entailment", "not_entailment" and whether
-            to get the original string labels or get the int values.
+        test_data : `pandas.DataFrame`, `TabularPrediction.Dataset`, or str
+            The test data to get predictions for. Can be DataFrame/Dataset or a file that can be loaded into DataFrame/Dataset.
+        get_original_labels : bool, default = True
+            Whether or not predictions should be formatted in terms of the original labels.
+            For example, the labels might be "entailment" or "not_entailment" and predictions could either be of this form (if `True`) or integer-indices corresponding to these classes (if `False`).
 
         Returns
         -------
-        predictions
-            The predictions. Shape (#Samples,)
+        predictions : array
+            The predictions for each sample. Shape of this array is (#Samples,).
         """
         return self._internal_predict(test_data,
                                       get_original_labels=get_original_labels,
                                       get_probabilities=False)
 
     def save(self, dir_path):
-        """Save the trained model to a directory
+        """Save this model to disk.
 
         Parameters
         ----------
-        dir_path
-            The destination directory
+        dir_path : str
+            Directory where the model should be saved.
         """
         os.makedirs(dir_path, exist_ok=True)
         self.net.save_parameters(os.path.join(dir_path, 'net.params'))
@@ -861,16 +876,19 @@ class BertForTextPredictionBasic:
 
     @classmethod
     def load(cls, dir_path):
-        """Load the trained model from a directory
+        """Load a model object previously produced by `fit()` from disk and return this object.
+           It is highly recommended the predictor be loaded with the exact AutoGluon version it was fit with.
+
 
         Parameters
         ----------
-        dir_path
-            The directory path
-
+        dir_path : str
+            Path to directory where this model was previously saved.
+ 
         Returns
         -------
         model
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         loaded_config = cls.default_config().clone_merge(os.path.join(dir_path, 'cfg.yml'))
         with open(os.path.join(dir_path, 'assets.json'), 'r') as f:

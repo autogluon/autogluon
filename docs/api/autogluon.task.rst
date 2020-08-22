@@ -40,7 +40,6 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    TabularPrediction
    ImageClassification
    ObjectDetection
-   TextClassification
    TextPrediction
 
 
@@ -83,20 +82,6 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
     .. rubric:: Methods
 
     .. autoautosummary:: ObjectDetection
-        :methods:
-
-
-:hidden:`TextClassification`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autoclass:: TextClassification
-   :members:
-   :inherited-members:
-   :exclude-members: run_fit
-
-    .. rubric:: Methods
-
-    .. autoautosummary:: TextClassification
         :methods:
 
 
@@ -283,29 +268,24 @@ Additional Object Detection APIs
         :attributes:
 
 
-Additional Text Classification APIs
+Additional Text Prediction APIs
 -----------------------------------
 
-.. automodule:: autogluon.task.text_classification
+.. automodule:: autogluon.task.text_prediction.models.basic_v1
 
-:hidden:`TextClassificationPredictor`
+:hidden:`BertForTextPredictionBasic`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TextClassificationPredictor
-   :members: predict, predict_proba, evaluate
+.. autoclass:: BertForTextPredictionBasic
+   :members: predict, predict_proba, evaluate, save, load
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TextClassificationPredictor
+    .. autoautosummary:: BertForTextPredictionBasic
         :methods:
 
     .. rubric:: Attributes
 
-    .. autoautosummary:: TextClassificationPredictor
+    .. autoautosummary:: BertForTextPredictionBasic
         :attributes:
 
-:hidden:`get_dataset`
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction::
-   get_dataset

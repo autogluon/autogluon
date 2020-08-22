@@ -1,12 +1,10 @@
 Text Prediction
 ===============
 
-For predicting the label (either categorical or numerical) of the text data, AutoGluon provides
-a simple `fit()` function that  automatically produces high quality text prediction models based
-on pretrained networks. Here, the text data may contain sentences, short paragraphs, or multiple sentences.
+For supervised learning with text data, AutoGluon provides a simple `fit()` function that automatically produces high quality text prediction models. In the data, each training example may be a sentence, short paragraph, or be comprised of multiple text fields (e.g. predicting how similar two sentences are). The target values (labels) to predict may be continuous values (regression) or discrete categories (classification).  
 A single call to `fit()` will train highly accurate neural networks on your provided text dataset,
-automatically leveraging accuracy-boosting techniques such as using a
-pretrained BERT/ALBERT/ELECTRA model and hyper-parameter optimization.
+automatically leveraging accuracy-boosting techniques such as fine-tuning a
+pretrained BERT/ALBERT/ELECTRA model (transfer learning) and hyperparameter optimization.
 
 .. container:: cards
 
@@ -14,20 +12,20 @@ pretrained BERT/ALBERT/ELECTRA model and hyper-parameter optimization.
       :title: Quick Start Using FIT
       :link: beginner.html
 
-      Quick start tutorial for text prediction problems.
+      Quickly get started with text prediction problems.
 
    .. card::
-      :title: Customize Search Space and Try HPO
+      :title: Customized Hyperparameter Search
       :link: customization.html
 
-      Define your own search space and try out different HPO algorithms.
+      How to control the hyperparameter-tuning process.
 
    .. card::
-      :title: Text prediction for mixed data types
+      :title: Heterogeneous data types
       :link: heterogeneous.html
 
-      A quick tutorial on how to use TextPrediction to solve problems that have a mix of
-      text, numerical, or categorical features.
+      Train neural networks that jointly operate on 
+      a mix of text, numerical, or categorical features.
 
 .. toctree::
    :maxdepth: 1

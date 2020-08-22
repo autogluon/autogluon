@@ -1,10 +1,10 @@
-# Text Prediction - Mixed Data Type
+# Text Prediction - Heterogeneous Data Types
 :label:`sec_textprediction_heterogeneous`
 
-For real-world applications, text data are usually mixed with other common data types like 
-numerical data and categorical data. Here, the `TextPrediction` task in AutoGluon 
-handles the mix of multiple feature types, including text, categorical, and numerical. 
-Next, we will use the Semantic Textual Segmentation dataset that we have used to illustrate 
+In your applications, your text data may be mixed with other common data types like 
+numerical data and categorical data (which are commonly found in tabular data). The `TextPrediction` task in AutoGluon 
+can train a single neural network that jointly operates on multiple feature types, including text, categorical, and numerical columns. 
+Here we'll again use the [Semantic Textual Similarity](http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark) dataset to illustrate 
 this functionality.
 
 
@@ -25,8 +25,8 @@ dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue
 train_data.head(10)
 ```
 
-We can see that the STS dataset contains two text fields: `sentence1` and `sentence2`, one categorical field: `genre`, and one numerical field `score`. 
-We try to predict the score with `sentence1` + `sentence2` + `genre`.
+Note the STS dataset contains two text fields: `sentence1` and `sentence2`, one categorical field: `genre`, and one numerical field `score`. 
+Let's try to predict the **score** based on the other features: `sentence1`, `sentence2`, `genre`.
 
 
 ```{.python .input}
@@ -44,7 +44,7 @@ score = predictor_score.evaluate(dev_data, metrics='spearmanr')
 print('Spearman Correlation=', score['spearmanr'])
 ```
 
-In addition, we can also train a model that predicts the `genre` with the other columns
+We can also train a model that predicts the **genre** using the other columns as features.
 
 
 ```{.python .input}
@@ -56,5 +56,5 @@ predictor_genre = task.fit(train_data, label='genre',
 
 ```{.python .input}
 score = predictor_genre.evaluate(dev_data, metrics='acc')
-print('Genre Accuracy = {}%'.format(score['acc'] * 100))
+print('Genre-prediction Accuracy = {}%'.format(score['acc'] * 100))
 ```

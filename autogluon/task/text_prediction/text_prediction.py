@@ -35,7 +35,7 @@ ag_text_prediction_params = Registry('ag_text_prediction_params')
 
 @ag_text_prediction_params.register()
 def default() -> dict:
-    """The default hyper-parameters
+    """The default hyperparameters.
 
     It will have a version key and a list of candidate models.
     Each model has its own search space inside.
@@ -135,7 +135,7 @@ def infer_eval_stop_log_metrics(problem_type,
                                 label_shape,
                                 eval_metric=None,
                                 stopping_metric=None):
-    """Infer the evaluate, stopping and logging metrics
+    """Decide default evaluation, stopping, and logging metrics (based on type of prediction problem).
 
     Parameters
     ----------
@@ -191,7 +191,7 @@ def infer_eval_stop_log_metrics(problem_type,
 
 @use_np
 class TextPrediction(BaseTask):
-    """AutoGluon Task for predicting labels based on text data."""
+    """AutoGluon Task for classification/regression with text data."""
     Dataset = tabular_prediction.TabularDataset
 
     @classmethod
@@ -215,54 +215,65 @@ class TextPrediction(BaseTask):
             plot_results=None,
             seed=None,
             verbosity=2):
-        """
+        """Fit models to make predictions based on text inputs.
 
         Parameters
         ----------
-        train_data
-            Training dataset
-        label
+        train_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`
+            Training dataset where rows = individual training examples, columns = features.
+        label : str
             Name of the label column. It can be a stringBy default, we will search for a column named
-        tuning_data
-            The tuning dataset. We will tune the model
-        time_limits
-            The time limits. By default, there won't be any time limit and we will try to
-            find the best model.
-        output_directory
-            The output directory
-        feature_columns
-            The feature columns
-        holdout_frac
-            Ratio of the training data that will be held out as the tuning data.
-            By default, we will choose the appropriate holdout_frac based on the number of
-            training samples.
-        eval_metric
-            The evaluation metric, i.e., how you will finally evaluate the model.
-        stopping_metric
-            The intrinsic metric used for early stopping.
-            By default, we will select the best metric that
-        nthreads_per_trial
-            The number of threads per trial. By default, we will use all available CPUs.
-        ngpus_per_trial
-            The number of GPUs to use for the fit job. By default, we decide the usage
-            based on the total number of GPUs available.
-        dist_ip_addrs
-            The distributed IP address
-        scheduler
-            The scheduler of HPO
-        num_trials
+        tuning_data : :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+            Another dataset containing validation data reserved for hyperparameter tuning (in same format as training data).
+            If `tuning_data = None`, `fit()` will automatically hold out random examples from `train_data` for validation.
+        time_limits : int or str, default = None
+            Approximately how long `fit()` should run for (wallclock time in seconds if int).
+            String values may instead be used to specify time in different units such as: '1min' or '1hour'.
+            Longer `time_limits` will usually improve predictive accuracy.
+            If not specified, `fit()` will run until all models to try by default have completed training.
+        output_directory : str, default = './ag_text'
+            Path to directory where models and intermediate outputs should be saved.
+        feature_columns : List[str], default = None
+            Which columns of table to consider as predictive features (other columns will be ignored, except for label-column).
+            If None (by default), all columns of table are considered predictive features.
+        holdout_frac : float, default = None
+            Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`).
+            If None, default value is selected based on the number of training examples.
+        eval_metric : str, default = None
+            The evaluation metric that will be used to evaluate the model's predictive performance.
+            If None, an appropriate default metric will be selected (accuracy for classification, mean-squared-error for regression).
+            Options for classification include: 'acc' (accuracy), 'nll' (negative log-likelihood).
+            Additional options for binary classification include: 'f1' (F1 score), 'mcc' (Matthews coefficient), 'auc' (area under ROC curve).
+            Options for regression include: 'mse' (mean squared error), 'rmse' (root mean squared error), 'mae' (mean absolute error).
+        stopping_metric, default = None
+            Metric which iteratively-trained models use to early stop to avoid overfitting.
+            Defaults to `eval_metric` value (if None).
+            Options are identical to options for `eval_metric`.
+        nthreads_per_trial, default = None
+            The number of threads per individual model training run. By default, all available CPUs are used.
+        ngpus_per_trial, default = None
+            The number of GPUs to use per individual model training run. If unspecified, a default value is chosen based on total number of GPUs available.
+        dist_ip_addrs, default = None
+            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+        scheduler : str, default = None
+            Controls scheduling of model training runs during HPO.
+            Options include: 'fifo' (first in first out) or 'hyperband'.
+            If unspecified, the default is 'fifo'.
+        num_trials : , default = None
             The number of trials in the HPO search
-        search_strategy
+        search_strategy : str, default = None
             The search strategy
-        search_options
-            The search options
-        hyperparameters
-            The hyper-parameters of the search-space.
-        plot_results
-            Whether to plot the fitting results
-        seed
-            The seed of the random state
-        verbosity
+        search_options : , default = None
+            Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
+            Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
+        hyperparameters : dict, default = None
+            Determines the hyperparameters used by the models. Each hyperparameter may be either fixed value or search space of many values.
+            For example of default hyperparameters, see: `autogluon.task.text_prediction.text_prediction.default()`
+        plot_results : bool, default = None
+            Whether or not to plot intermediate training results during `fit()`.
+        seed : int, default = None
+            Seed value for random state used inside `fit()`. 
+        verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed
             during fit().
             Higher levels correspond to more detailed print statements
@@ -275,7 +286,7 @@ class TextPrediction(BaseTask):
         Returns
         -------
         model
-            A model object
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         assert dist_ip_addrs is None, 'Training on remote machine is currently not supported.'
         if verbosity < 0:
@@ -423,16 +434,18 @@ class TextPrediction(BaseTask):
 
     @staticmethod
     def load(dir_path):
-        """Load model from the directory
+        """Load a model object previously produced by `fit()` from disk and return this object.
+           It is highly recommended the model be loaded with the exact AutoGluon version it was previously fit with.
 
         Parameters
         ----------
-        dir_path
+        dir_path : str
+            Path to directory where this model was previously saved (i.e. `output_directory` specified in previous call to `fit`).
 
 
         Returns
         -------
         model
-            The loaded model
+            A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         return BertForTextPredictionBasic.load(dir_path)
