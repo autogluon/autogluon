@@ -6,10 +6,6 @@ from packaging import version
 import numpy as np
 import pandas as pd
 import mxnet
-# Ensure the MXNet version
-if version.parse(mxnet.__version__) < version.parse('1.7.0')\
-        or version.parse(mxnet.__version__) >= version.parse('2.0.0'):
-    raise ImportError('You will need to ensure that you have mxnet>=1.7.0, <2.0.0.')
 from mxnet.util import use_np
 from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
@@ -289,6 +285,13 @@ class TextPrediction(BaseTask):
             A `BertForTextPredictionBasic` object that can be used for making predictions on new data.
         """
         assert dist_ip_addrs is None, 'Training on remote machine is currently not supported.'
+        # Version check of MXNet
+        if version.parse(mxnet.__version__) < version.parse('1.7.0') \
+                or version.parse(mxnet.__version__) >= version.parse('2.0.0'):
+            raise ImportError('You will need to ensure that you have mxnet>=1.7.0, <2.0.0. '
+                              'For more information about how to install mxnet, you can refer to '
+                              'https://sxjscience.github.io/KDD2020/ .')
+
         if verbosity < 0:
             verbosity = 0
         elif verbosity > 4:
