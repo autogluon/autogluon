@@ -1,4 +1,5 @@
 import copy
+import gc
 import logging
 import math
 import os
@@ -611,6 +612,7 @@ class AbstractModel:
     #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
     #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
     def get_memory_size(self):
+        gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     # Removes non-essential objects from the model to reduce memory and disk footprint.
