@@ -1,24 +1,27 @@
 import copy
 import logging
 
-import numpy as np
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
 from .. import binning
 from ..feature_metadata import R_INT, R_FLOAT, S_BINNED
+from ..utils import get_smallest_valid_dtype_int
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add more parameters (#bins, possibly pass in binning function as an argument for full control)
+# TODO: Add more parameters (possibly pass in binning function as an argument for full control)
 class BinnedFeatureGenerator(AbstractFeatureGenerator):
-    def __init__(self, inplace=False, **kwargs):
+    """BinnedFeatureGenerator bins incoming int and float features to num_bins values."""
+    def __init__(self, num_bins=10, inplace=False, **kwargs):
         super().__init__(**kwargs)
+        self.num_bins = num_bins
         self.inplace = inplace
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._bin_map = self._get_bin_map(X=X)
+        self._astype_map = {feature: get_smallest_valid_dtype_int(min_val=0, max_val=len(bin_index)) for feature, bin_index in self._bin_map.items()}
         X_out = self._transform(X)
         type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)
         type_group_map_special[S_BINNED] += list(X_out.columns)
@@ -32,7 +35,7 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
         return dict(valid_raw_types=[R_INT, R_FLOAT])
 
     def _get_bin_map(self, X: DataFrame) -> dict:
-        return binning.generate_bins(X, list(X.columns))
+        return binning.generate_bins(X, list(X.columns), ideal_bins=self.num_bins)
 
     def _transform_bin(self, X: DataFrame):
         if self._bin_map:
@@ -40,5 +43,5 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
                 X = X.copy(deep=True)
             for column in self._bin_map:
                 X[column] = binning.bin_column(series=X[column], mapping=self._bin_map[column])
-            X = X.astype(np.uint8)  # TODO: output dtype based on #bins
+            X = X.astype(self._astype_map)
         return X

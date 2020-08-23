@@ -9,17 +9,19 @@ import psutil
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from ..abstract import model_trial
-from ..abstract.abstract_model import SKLearnModel
+from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION
+from ....features.generators import LabelEncoderFeatureGenerator
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
 
 
-class RFModel(SKLearnModel):
+class RFModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_type = self._get_model_type()
+        self._feature_generator = None
 
     def _get_model_type(self):
         if self.problem_type == REGRESSION:
@@ -29,8 +31,14 @@ class RFModel(SKLearnModel):
 
     # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
-        X = super().preprocess(X).fillna(0)
-        X = X.to_numpy(dtype=np.float32)
+        X = super().preprocess(X)
+        if self._feature_generator is None:
+            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator.fit(X=X)
+        if self._feature_generator.features_in:
+            X = X.copy()
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = X.fillna(0).to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):

@@ -15,7 +15,7 @@ import psutil
 from .model_trial import model_trial
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas, infer_eval_metric
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, normalize_pred_probas, infer_eval_metric
 from .... import metrics
 from ....features.feature_metadata import FeatureMetadata
 from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
@@ -673,11 +673,3 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
-
-
-class SKLearnModel(AbstractModel):
-    """Abstract model for all Sklearn models."""
-
-    def preprocess(self, X):
-        X = convert_categorical_to_int(X)
-        return super().preprocess(X)

@@ -39,3 +39,15 @@ def clip_and_astype(df: DataFrame, columns: list = None, clip_min=0, clip_max=25
 def is_useless_feature(X: Series) -> bool:
     """If a feature has the same value for every row, it carries no useful information"""
     return len(X.unique()) <= 1
+
+
+def get_smallest_valid_dtype_int(min_val: int, max_val: int):
+    """Based on the minimum and maximum values of a feature, returns the smallest valid dtype to represent the feature."""
+    if min_val < 0:
+        dtypes_to_check = [np.int8, np.int16, np.int32, np.int64]
+    else:
+        dtypes_to_check = [np.uint8, np.uint16, np.uint32, np.uint64]
+    for dtype in [np.uint8, np.uint16, np.uint32, np.uint64]:
+        if max_val <= np.iinfo(dtype).max and min_val >= np.iinfo(dtype).min:
+            return dtype
+    raise ValueError(f'Value is not able to be represented by {dtypes_to_check[-1].__name__}. (min_val, max_val): ({min_val}, {max_val})')

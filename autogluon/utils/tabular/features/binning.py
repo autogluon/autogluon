@@ -16,9 +16,8 @@ def bin_column(series: Series, mapping):
 
 
 # TODO: Rewrite with normalized value counts as binning technique, will be more performant and optimal
-def generate_bins(X_features: DataFrame, features_to_bin):
+def generate_bins(X_features: DataFrame, features_to_bin: list, ideal_bins: int = 10):
     X_len = len(X_features)
-    ideal_cats = 10
     starting_cats = 1000
     bin_index_starting = [np.floor(X_len * (num + 1) / starting_cats) for num in range(starting_cats - 1)]
     bin_epsilon = 0.000000001
@@ -29,7 +28,7 @@ def generate_bins(X_features: DataFrame, features_to_bin):
         bins_value_counts = X_features[column].value_counts(ascending=False, normalize=True)
         max_bins = len(bins_value_counts)
 
-        if max_bins <= ideal_cats:
+        if max_bins <= ideal_bins:
             bins = pd.Series(data=sorted(X_features[column].unique()))
             num_cats_initial = max_bins
             cur_len = max_bins
@@ -41,8 +40,8 @@ def generate_bins(X_features: DataFrame, features_to_bin):
             interval_index = get_bins(bins=bins, bin_index=bin_index_starting, bin_epsilon=bin_epsilon)
 
         # TODO: max_desired_bins and min_desired_bins are currently equivalent, but in future they will be parameterized to allow for flexibility.
-        max_desired_bins = min(ideal_cats, max_bins)
-        min_desired_bins = min(ideal_cats, max_bins)
+        max_desired_bins = min(ideal_bins, max_bins)
+        min_desired_bins = min(ideal_bins, max_bins)
 
         is_satisfied = (len(interval_index) >= min_desired_bins) and (len(interval_index) <= max_desired_bins)
 

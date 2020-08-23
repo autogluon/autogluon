@@ -93,8 +93,23 @@ class AbstractFeatureGenerator:
         The FeatureMetadata of data post-transformation consisting of the exact dtypes as opposed to the grouped raw dtypes found in feature_metadata_in, with grouped raw dtypes substituting for the special dtypes.
         This is only used in the print_feature_metadata_info method and is intended for introspection. It can be safely set to None to reduce memory and disk usage post-fit.
     """
-    def __init__(self, features_in: list = None, feature_metadata_in: FeatureMetadata = None, post_generators: list = None, pre_enforce_types=False, pre_drop_useless=False,
-                 post_drop_duplicates=False, reset_index=False, column_names_as_str=True, name_prefix: str = None, name_suffix: str = None, infer_features_in_args: dict = None, infer_features_in_args_strategy='overwrite', log_prefix='', verbosity=2):
+    def __init__(
+        self,
+        features_in: list = None,
+        feature_metadata_in: FeatureMetadata = None,
+        post_generators: list = None,
+        pre_enforce_types=False,
+        pre_drop_useless=False,
+        post_drop_duplicates=False,
+        reset_index=False,
+        column_names_as_str=True,
+        name_prefix: str = None,
+        name_suffix: str = None,
+        infer_features_in_args: dict = None,
+        infer_features_in_args_strategy='overwrite',
+        log_prefix='',
+        verbosity=2
+    ):
         self._is_fit = False  # Whether the feature generator has been fit
         self.features_in = features_in  # Original features to use as input to feature generation
         self.features_out = None  # Final list of features after transformation
