@@ -9,7 +9,7 @@ This tutorial presents two examples to demonstrate how `TextPrediction` can be u
 
 The general usage is similar to AutoGluon's `TabularPrediction` module. We treat NLP datasets as tables where certain columns contain text fields and a special column contains the labels to predict. 
 Here, the labels can be discrete categories (classification) or numerical values (regression).
-`TextPrediction` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
+`TextPrediction` fits neural networks to your data via transfer learning from pretrained NLP models like: [BERT](https://arxiv.org/pdf/1810.04805.pdf),
 [ALBERT](https://arxiv.org/pdf/1909.11942.pdf), and [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB).
 `TextPrediction` also trains multiple models with different hyperparameters and returns the best model, a process called Hyperparameter Optimization (HPO).
 

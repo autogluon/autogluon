@@ -2,6 +2,7 @@
 
   AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6 or 3.7.
   Linux is the only operating system fully supported for now (complete Mac OSX and Windows versions will be available soon).
+  For troubleshooting the installation process, you can check the `Installation FAQ <install.html#installation-faq>`_.
 
 
 Select your preferences below and run the corresponding install commands:
@@ -58,8 +59,8 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
-                 pip install autogluon
+                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install autogluon
 
            .. container:: gpu
 
@@ -68,8 +69,8 @@ Select your preferences below and run the corresponding install commands:
                  # Here we assume CUDA 10.1 is installed.  You should change the number
                  # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
                  # You may refer to https://sxjscience.github.io/KDD2020/ for more details.
-                 pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
-                 pip install autogluon
+                 python3 -m pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install autogluon
 
         .. container:: source
 
@@ -77,19 +78,19 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py develop
+                 cd autogluon && python3 setup.py develop
 
            .. container:: gpu
 
               .. code-block:: bash
 
                  # Here we assume CUDA 10.1 is installed.  You should change the number
-                 # according to your own CUDA version (e.g. mxnet_cu100 for CUDA 10.0).
-                 pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 # according to your own CUDA version (e.g. mxnet_cu102 for CUDA 10.2).
+                 python3 -m pip install -U --pre "mxnet_cu101>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py develop
+                 cd autogluon && python3 setup.py develop
 
      .. container:: mac
 
@@ -109,8 +110,8 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
-                 pip install autogluon
+                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install autogluon
 
               .. note::
               
@@ -138,13 +139,14 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
                  git clone https://github.com/awslabs/autogluon
-                 cd autogluon && python setup.py develop
+                 cd autogluon && python3 setup.py develop
 
               .. note::
               
-                 AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.  However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
+                 AutoGluon is not yet fully functional on Mac OSX. If you encounter MXNet system errors, please use Linux instead.
+                 However, you can currently use AutoGluon for less compute-intensive TabularPrediction tasks on your Mac laptop (but only with hyperparameter_tune = False).
 
            .. container:: gpu
 

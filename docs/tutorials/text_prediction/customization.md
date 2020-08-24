@@ -87,7 +87,7 @@ predictor_mrpc = task.fit(train_data,
                           label='label',
                           hyperparameters=hyperparameters,
                           num_trials=5,  # increase this to achieve good performance in your applications
-                          time_limits=60 * 10,
+                          time_limits=60 * 6,
                           ngpus_per_trial=1,
                           seed=123,
                           output_directory='./ag_mrpc_random_search')
@@ -138,7 +138,7 @@ hyperparameters['hpo_params'] = {
 
 predictor_mrpc_skopt = task.fit(train_data, label='label',
                                 hyperparameters=hyperparameters,
-                                time_limits=60 * 10,
+                                time_limits=60 * 6,
                                 num_trials=5,  # increase this to get good performance in your applications
                                 ngpus_per_trial=1, seed=123,
                                 output_directory='./ag_mrpc_custom_space_fifo_skopt')
@@ -190,7 +190,7 @@ hyperparameters['hpo_params'] = {
 ```{.python .input}
 predictor_mrpc_hyperband = task.fit(train_data, label='label',
                                     hyperparameters=hyperparameters,
-                                    time_limits=60 * 10, ngpus_per_trial=1, seed=123,
+                                    time_limits=60 * 6, ngpus_per_trial=1, seed=123,
                                     output_directory='./ag_mrpc_custom_space_hyperband')
 ```
 
