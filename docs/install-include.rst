@@ -2,7 +2,7 @@
 
   AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6 or 3.7.
   Linux is the only operating system fully supported for now (complete Mac OSX and Windows versions will be available soon).
-  In case you met with any issues in the installation. You may check the `Install Page <install.html>`_ for trouble shooting.
+  For troubleshooting the installation process, you can check the `Installation FAQ <install.html#installation-faq>`_.
 
 
 Select your preferences below and run the corresponding install commands:

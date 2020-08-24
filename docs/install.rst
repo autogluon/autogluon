@@ -8,8 +8,8 @@ Installation
    <style>.disabled { display: none; }</style>
    <script type="text/javascript" src='../_static/install-options.js'></script>
 
-Installation Trouble Shooting
------------------------------
+Installation FAQ
+----------------
 
 .. include:: install-faq.rst
 
