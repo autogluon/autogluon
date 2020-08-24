@@ -2,17 +2,7 @@
 
   AutoGluon requires `Python <https://www.python.org/downloads/release/python-370/>`_ version 3.6 or 3.7.
   Linux is the only operating system fully supported for now (complete Mac OSX and Windows versions will be available soon).
-
-  In addition, if you met issues in installing MXNet, e.g., you see the following error message:
-
-  `ERROR: Could not find a version that satisfies the requirement mxnet<2.0.0,>=1.7.0b20200713`
-
-  You can try to upgrade your pip package to a version larger than 20.0.0 and try again:
-
-  `python3 -m pip install --upgrade pip --user`
-
-  For more details, you may refer to https://sxjscience.github.io/KDD2020/ to see how to solve common
-  installation issues.
+  In case you met with any issues in the installation. You may check the `Install Page <install.html>`_ for trouble shooting.
 
 
 Select your preferences below and run the corresponding install commands:
