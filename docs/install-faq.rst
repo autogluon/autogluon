@@ -29,7 +29,5 @@ You should choose the **conda_python3** kernel and then install the MXNet via
 
 * While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
 
-.. code-block::
-
   You may have the wrong version of MXNet installed for your CUDA version.
   Match the CUDA version carefully when following the installation instructions.
