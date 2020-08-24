@@ -65,9 +65,9 @@ class KNNModel(AbstractModel):
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem
-            if model_memory_ratio > (0.30 * max_memory_usage_ratio):
-                logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
-            if model_memory_ratio > (0.40 * max_memory_usage_ratio):
+            if model_memory_ratio > (0.20 * max_memory_usage_ratio):
+                logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
+            if model_memory_ratio > (0.25 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):
