@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add parameter to add prefix to each generator to guarantee no name collisions: 'G1_', 'G2_', etc.
+# TODO: Add argument keep_unused, which creates an identity feature generator at each stage to pipe unused input features into the next stage instead of dropping them.
 class BulkFeatureGenerator(AbstractFeatureGenerator):
     """
     BulkFeatureGenerator is used for complex feature generation pipelines where multiple generators are required, with some generators requiring the output of other generators as input (multi-stage generation).

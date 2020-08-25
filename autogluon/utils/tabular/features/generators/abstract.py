@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
+# TODO: Add ability to track which input features created which output features.
 class AbstractFeatureGenerator:
     """
     Abstract feature generator implementation from which all AutoGluon feature generators inherit.
@@ -463,6 +464,21 @@ class AbstractFeatureGenerator:
         if features:
             self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
             self.features_in = self.feature_metadata_in.get_features()
+
+    # TODO: Use this to prune features post-fit
+    def _remove_features_out(self, features: list):
+        """
+        Removes features from all relevant objects which represent the content of the output data.
+
+        Parameters
+        ----------
+        features : list of str
+            List of feature names to remove from the output of self.transform().
+        """
+        if features:
+            self.feature_metadata = self.feature_metadata.remove_features(features=features)
+            self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
+            self.features_out = self.feature_metadata.get_features()
 
     def _rename_features_in(self, column_rename_map: dict):
         if self.feature_metadata_in is not None:
