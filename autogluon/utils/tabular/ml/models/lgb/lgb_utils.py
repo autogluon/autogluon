@@ -3,9 +3,8 @@ import os
 import numpy as np
 from pandas import DataFrame, Series
 
-from autogluon import try_import_lightgbm
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-
+from ...... import try_import_lightgbm
 
 # Mapping to specialized LightGBM metrics that are much faster than the standard metric computation
 _ag_to_lgbm_metric_dict = {

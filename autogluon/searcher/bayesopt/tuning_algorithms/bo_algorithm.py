@@ -3,20 +3,13 @@ import logging
 import numpy as np
 import itertools
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate, \
-    candidate_for_print
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.utils.duplicate_detector import \
-    DuplicateDetector
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    NextCandidatesAlgorithm, CandidateGenerator, ScoringFunction, \
-    LocalOptimizer, PendingCandidateStateTransformer, SurrogateModel
-from autogluon.searcher.bayesopt.tuning_algorithms.common import \
-    generate_unique_candidates
-from autogluon.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
-    LBFGSOptimizeAcquisition    
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from .base_classes import NextCandidatesAlgorithm, CandidateGenerator, ScoringFunction, LocalOptimizer, PendingCandidateStateTransformer, SurrogateModel
+from .bo_algorithm_components import LBFGSOptimizeAcquisition
+from .common import generate_unique_candidates
+from ..autogluon.debug_log import DebugLogPrinter
+from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from ..datatypes.common import Candidate, candidate_for_print
+from ..utils.duplicate_detector import DuplicateDetector
 
 logger = logging.getLogger(__name__)
 

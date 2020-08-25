@@ -2,8 +2,7 @@ from typing import NamedTuple
 import time
 import logging
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
+from ..datatypes.tuning_job_state import TuningJobState
 
 logger = logging.getLogger(__name__)
 

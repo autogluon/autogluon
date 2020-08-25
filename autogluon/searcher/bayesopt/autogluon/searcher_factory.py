@@ -1,37 +1,22 @@
 from typing import Set
 
-from autogluon.searcher.bayesopt.autogluon.model_factories import \
-    resource_kernel_factory
-from autogluon.searcher.bayesopt.autogluon.gp_fifo_searcher import \
-    GPFIFOSearcher, map_reward, MapReward, DEFAULT_INITIAL_SCORING, \
-    SUPPORTED_INITIAL_SCORING
-from autogluon.searcher.bayesopt.autogluon.gp_multifidelity_searcher import \
-    GPMultiFidelitySearcher, resource_for_acquisition_bohb, \
-    resource_for_acquisition_first_milestone
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.models.gpmxnet_skipopt import \
-    SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.constants import OptimizationConfig, \
-    DEFAULT_OPTIMIZATION_CONFIG
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
-    GaussianProcessRegression
-from autogluon.searcher.bayesopt.models.gpmxnet_transformers import \
-    GPMXNetModelArgs
-from autogluon.searcher.bayesopt.models.nphead_acqfunc import \
-    EIAcquisitionFunction
-from autogluon.utils.default_arguments import Integer, Categorical, Boolean
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import HyperparameterRanges  # DEBUG!
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    DEFAULT_METRIC
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
-from autogluon.searcher.bayesopt.gpmxnet.debug_gp_regression import \
-    DebugGPRegression
+from .debug_log import DebugLogPrinter
+from .gp_fifo_searcher import GPFIFOSearcher, map_reward, MapReward, DEFAULT_INITIAL_SCORING, SUPPORTED_INITIAL_SCORING
+from .gp_multifidelity_searcher import GPMultiFidelitySearcher, resource_for_acquisition_bohb, resource_for_acquisition_first_milestone
+from .gp_profiling import GPMXNetSimpleProfiler
+from .hp_ranges import HyperparameterRanges_CS
+from .model_factories import resource_kernel_factory
+from ..datatypes.hp_ranges import HyperparameterRanges
+from ..gpmxnet.constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
+from ..gpmxnet.debug_gp_regression import DebugGPRegression
+from ..gpmxnet.gp_regression import GaussianProcessRegression
+from ..gpmxnet.kernel import Matern52
+from ..gpmxnet.mean import ScalarMeanFunction
+from ..models.gpmxnet_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicallyPredicate
+from ..models.gpmxnet_transformers import GPMXNetModelArgs
+from ..models.nphead_acqfunc import EIAcquisitionFunction
+from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ....utils.default_arguments import Integer, Categorical, Boolean
 
 __all__ = ['gp_fifo_searcher_factory',
            'gp_multifidelity_searcher_factory',

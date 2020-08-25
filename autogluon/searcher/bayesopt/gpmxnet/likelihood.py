@@ -1,19 +1,13 @@
 import mxnet as mx
 from mxnet import gluon
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction, \
-    MeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE, \
-    INITIAL_NOISE_VARIANCE, NOISE_VARIANCE_LOWER_BOUND, \
-    NOISE_VARIANCE_UPPER_BOUND, DEFAULT_ENCODING
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding, \
-    register_parameter
-from autogluon.searcher.bayesopt.gpmxnet.distribution import Gamma
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter
+from .constants import DATA_TYPE, INITIAL_NOISE_VARIANCE, NOISE_VARIANCE_LOWER_BOUND, NOISE_VARIANCE_UPPER_BOUND, DEFAULT_ENCODING
+from .distribution import Gamma
+from .gluon_blocks_helpers import encode_unwrap_parameter
+from .kernel import KernelFunction
+from .mean import ScalarMeanFunction, MeanFunction
+from .posterior_state import GaussProcPosteriorState
+from .utils import create_encoding, register_parameter
 
 
 class MarginalLikelihood(gluon.HybridBlock):

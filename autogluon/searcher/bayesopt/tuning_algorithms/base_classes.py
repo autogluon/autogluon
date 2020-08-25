@@ -4,9 +4,8 @@ import mxnet as mx
 import numpy as np
 from mxnet.ndarray import NDArray
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
+from ..datatypes.common import Candidate
+from ..datatypes.tuning_job_state import TuningJobState
 
 
 class NextCandidatesAlgorithm:

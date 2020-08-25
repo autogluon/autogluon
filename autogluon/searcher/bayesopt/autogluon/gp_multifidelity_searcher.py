@@ -4,38 +4,21 @@ import ConfigSpace as CS
 from collections import Counter
 import logging
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import \
-    CandidateEvaluation, PendingEvaluation, candidate_for_print
-from autogluon.searcher.bayesopt.models.gpmxnet import GPModel
-from autogluon.searcher.bayesopt.models.gpmxnet_transformers import \
-    GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
-from autogluon.searcher.bayesopt.models.gpmxnet_skipopt import \
-    SkipOptimizationPredicate
-from autogluon.searcher.bayesopt.tuning_algorithms.common import \
-    RandomStatefulCandidateGenerator, compute_blacklisted_candidates
-from autogluon.searcher.bayesopt.tuning_algorithms.bo_algorithm import \
-    BayesianOptimizationAlgorithm
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    dictionarize_objective, DEFAULT_METRIC, \
-    DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, \
-    DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    LocalOptimizer, AcquisitionFunction
-from autogluon.searcher.bayesopt.utils.duplicate_detector import \
-    DuplicateDetectorIdentical
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.autogluon.gp_fifo_searcher import \
-    GET_CONFIG_RANDOM_RETRIES, accumulate_profiling_record, MapReward, \
-    check_initial_candidates_scorer, create_initial_candidates_scorer, \
-    encode_state, decode_state
-from autogluon.searcher.bayesopt.autogluon.config_ext import \
-    ExtendedConfiguration
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from .config_ext import ExtendedConfiguration
+from .debug_log import DebugLogPrinter
+from .gp_fifo_searcher import GET_CONFIG_RANDOM_RETRIES, accumulate_profiling_record, MapReward, check_initial_candidates_scorer, create_initial_candidates_scorer, encode_state, decode_state
+from .gp_profiling import GPMXNetSimpleProfiler
+from .hp_ranges import HyperparameterRanges_CS
+from ..datatypes.common import CandidateEvaluation, PendingEvaluation, candidate_for_print
+from ..datatypes.tuning_job_state import TuningJobState
+from ..models.gpmxnet import GPModel
+from ..models.gpmxnet_skipopt import SkipOptimizationPredicate
+from ..models.gpmxnet_transformers import GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
+from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction
+from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
+from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
+from ..tuning_algorithms.default_algorithm import dictionarize_objective, DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..utils.duplicate_detector import DuplicateDetectorIdentical
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,8 @@
 import mxnet as mx
 from mxnet import gluon
 
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    LogarithmScalarEncoding, PositiveScalarEncoding, encode_unwrap_parameter
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
+from .constants import DATA_TYPE
+from .gluon_blocks_helpers import LogarithmScalarEncoding, PositiveScalarEncoding, encode_unwrap_parameter
 
 
 def param_to_pretty_string(gluon_param, encoding):

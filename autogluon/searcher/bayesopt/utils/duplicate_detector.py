@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Set
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
-    HyperparameterRanges
+from ..datatypes.common import Candidate
+from ..datatypes.hp_ranges import HyperparameterRanges
 
 
 class DuplicateDetector(ABC):

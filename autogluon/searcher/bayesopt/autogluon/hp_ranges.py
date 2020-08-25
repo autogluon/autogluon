@@ -2,8 +2,8 @@ import numpy as np
 import ConfigSpace as CS
 from typing import List, Tuple
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import HyperparameterRanges
+from ..datatypes.common import Candidate
+from ..datatypes.hp_ranges import HyperparameterRanges
 
 
 class HyperparameterRanges_CS(HyperparameterRanges):

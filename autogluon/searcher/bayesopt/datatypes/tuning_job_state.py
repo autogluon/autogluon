@@ -1,9 +1,7 @@
 from typing import NamedTuple, List
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate, \
-    CandidateEvaluation, PendingEvaluation
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
-    HyperparameterRanges
+from .common import Candidate, CandidateEvaluation, PendingEvaluation
+from .hp_ranges import HyperparameterRanges
 
 
 class TuningJobState(NamedTuple):

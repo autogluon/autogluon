@@ -3,7 +3,7 @@ import numpy as np
 from scipy.special import gammaln
 import numbers
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import MIN_POSTERIOR_VARIANCE
+from .constants import MIN_POSTERIOR_VARIANCE
 
 __all__ = ['Distribution',
            'Gamma',
