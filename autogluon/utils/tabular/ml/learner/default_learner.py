@@ -168,12 +168,23 @@ class DefaultLearner(AbstractLearner):
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
             X_super = pd.concat([X, X_val], ignore_index=True)
-            X_super = self.feature_generator.fit_transform(X_super)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X_super = self.feature_generator.transform(X_super)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X_super = self.feature_generator.fit_transform(X_super)
             X = X_super.head(len(X)).set_index(X.index)
             X_val = X_super.tail(len(X_val)).set_index(X_val.index)
             del X_super
         else:
-            X = self.feature_generator.fit_transform(X)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X = self.feature_generator.transform(X)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X = self.feature_generator.fit_transform(X)
+
 
         return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 
