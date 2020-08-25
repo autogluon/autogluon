@@ -14,6 +14,7 @@ import requests
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 predictor = task.fit(train_data=train_data.sample(n=100, random_state=0), label='class', hyperparameters={'GBM': {}})
 
+# Get the test dataset, if you are working with local data then cut this the next two lines
 r = requests.get('https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv', allow_redirects=True)
 open('test.csv', 'wb').write(r.content)
 reader = pd.read_csv('test.csv', chunksize=1024)
