@@ -3,9 +3,9 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
 
-This tutorial describes how you can exert greater control when using AutoGluon's `fit()` by specifying the appropriate arguments. Using the same census data table as :ref:`sec_tabularquick`, we will try to predict the `occupation` of an individual - a multi-class classification problem.
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` by specifying the appropriate arguments. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
 
-Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
+Using the same census data table as :ref:`sec_tabularquick`, we will try to predict the `occupation` of an individual - a multi-class classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
 import autogluon as ag
@@ -31,13 +31,13 @@ val_data = val_data[:5000]
 metric = 'accuracy' # we specify eval-metric just for demo (unnecessary as it's the default)
 ```
 
- To demonstrate how you can provide your own validation dataset against which AutoGluon tunes hyperparameters, we'll use some of the test data from the previous tutorial as validation data.
+We first demonstrate hyperparameter-tuning and how you can provide your own validation dataset that AutoGluon internally relies on to: tune hyperparameters, early-stop iterative training, and construct model ensembles. One reason you may specify validation data is when future test data will stem from a different distribution than training data (and your specified validation data is more representative of the future data that will likely be encountered).
 
- If you don't have a strong reason to provide your own validation dataset, we recommend you omit the `tuning_data` argument. This lets AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation. One reason you may specify validation data is when future test data will stem from a different distribution than training data (and your specified validation data is more representative of the future data that will likely be encountered).
+ If you don't have a strong reason to provide your own validation dataset, we recommend you omit the `tuning_data` argument. This lets AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation.
 
 **Caution:** Since AutoGluon tunes internal knobs based on this validation data, performance estimates reported on this data may be over-optimistic. For unbiased performance estimates, you should always call `predict()` on a separate dataset (that was never passed to `fit()`), as we did in the previous **Quick-Start** tutorial. We also emphasize that most options specified in this tutorial are chosen to minimize runtime for the purposes of demonstration and you should select more reasonable values in order to obtain high-quality models.
 
-`fit()` trains neural networks and various types of tree ensembles by default. You can specify various hyperparameter values for each type of model. For each hyperparameter, you can either specify a single fixed value, or a search space of values to consider during the hyperparameter optimization. Hyperparameters which you do not specify are left at default settings chosen automatically by AutoGluon, which may be fixed values or search spaces.
+`fit()` trains neural networks and various types of tree ensembles by default. You can specify various hyperparameter values for each type of model. For each hyperparameter, you can either specify a single fixed value, or a search space of values to consider during hyperparameter optimization. Hyperparameters which you do not specify are left at default settings chosen automatically by AutoGluon, which may be fixed values or search spaces.
 
 ```{.python .input}
 hp_tune = True  # whether or not to do hyperparameter optimization
@@ -108,6 +108,7 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
                      auto_stack=True, output_directory=output_directory,
                      hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}}, time_limits = 30) # last 2 arguments are for quick demo, omit them in real applications
 ```
+
 Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques.
 
 
@@ -178,6 +179,17 @@ predictor.evaluate(test_data)
 ```
 
 which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
+
+### Interpretability via feature importance scoring
+
+To better understand our trained predictor, we can estimate the overall importance of each feature:
+
+```{.python .input}
+importance_scores = predictor.feature_importance(test_data)
+print(importance_scores)
+```
+
+Computed via [*permutation-shuffling*](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy (at least not on an individual basis, these features may still provide useful predictive signal through interaction-effects with other features). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
 
 
 ## Accelerating inference
@@ -257,10 +269,10 @@ predictor_light = task.fit(train_data=train_data, label=label_column, eval_metri
                            excluded_model_types=excluded_model_types, time_limits=30)
 ```
 
-If you encounter memory issues: try setting `excluded_model_types = ['KNN','RF','XT']`, and add `'ignore_text'` to your `presets` list if there happen to be text fields in your data.
+If you encounter memory issues: try setting `excluded_model_types = ['KNN','XT','RF']` (or some subset of these models), and add `'ignore_text'` to your `presets` list if there happen to be text fields in your data.
+
 If you encounter disk space issues, make sure to delete all `output_directory` folders from previous previous runs! These can eat up your free space if you call `fit()` many times. If you didn't specify `output_directory`, AutoGluon still automatically saved its models to a folder called: "AutogluonModels/ag-[TIMESTAMP]", where TIMESTAMP records when `fit()` was called, so make sure to also delete these folders if you run low on free space.
 
+**References:** The following paper describes how AutoGluon internally operates on tabular data:
 
-
-
-
+Erickson et al. [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/abs/2003.06505). *Arxiv*, 2020.

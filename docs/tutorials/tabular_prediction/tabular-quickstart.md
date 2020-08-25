@@ -10,7 +10,7 @@ import autogluon as ag
 from autogluon import TabularPrediction as task
 ```
 
-Load training data from a CSV file into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
+Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
 
 ```{.python .input}
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -19,7 +19,7 @@ train_data = train_data.head(subsample_size)
 print(train_data.head())
 ```
 
-Note that we loaded data from a CSV file stored in the cloud (AWS s3 bucket), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using `wget`).
+Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [`wget`](https://www.gnu.org/software/wget/)).
 Each row in the table `train_data` corresponds to a single training example. In this particular dataset, each row corresponds to an individual person, and the columns contain various characteristics reported during a census.
 
 Let's first use these features to predict whether the person's income exceeds $50,000 or not, which is recorded in the `class` column of this table.
@@ -62,6 +62,7 @@ As long as they're stored in a popular format like CSV, you should be able to ac
 from autogluon import TabularPrediction as task
 predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
 ```
+**Note:** This simple call to `fit()` is intended for your first prototype model. In a [subsequent section below](), we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
 
 
 ## Description of fit():
@@ -159,3 +160,5 @@ performance = predictor_age.evaluate(test_data)
 ```
 
 Note that we didn't need to tell AutoGluon this is a regression problem, it automatically inferred this from the data and reported the appropriate performance metric (RMSE by default). To specify a particular evaluation metric other than the default, set the `eval_metric` argument of `fit()` and AutoGluon will tailor its models to optimize your metric (e.g. `eval_metric = 'mean_absolute_error'`). For evaluation metrics where higher values are worse (like RMSE), AutoGluon may sometimes flips their sign and print them as negative values during training (as it internally assumes higher values are better).
+
+**Data Formats:** AutoGluon can currently operate on data tables already loaded into Python as pandas DataFrames, or those stored in files of [CSV format](https://en.wikipedia.org/wiki/Comma-separated_values) or [Parquet format](https://databricks.com/glossary/what-is-parquet). If your data live in multiple tables, you will first need to join them into a single table whose rows correspond to statistically independent observations (datapoints) and columns correspond to different features (aka. variables/covariates).
