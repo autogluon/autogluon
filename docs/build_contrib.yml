@@ -14,4 +14,3 @@ dependencies:
   - torchvision
   - bokeh
   - openml
-  - ipykernel

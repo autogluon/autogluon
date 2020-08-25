@@ -42,6 +42,7 @@ stage("Build Docs") {
         export AG_DOCS=1
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+	python3 -m pip install --upgrade --force-reinstall ipykernel
         python3 -m pip install --upgrade --force-reinstall -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
