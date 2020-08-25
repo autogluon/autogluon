@@ -31,6 +31,8 @@ val_data = val_data[:5000]
 metric = 'accuracy' # we specify eval-metric just for demo (unnecessary as it's the default)
 ```
 
+## Specifying hyperparameters and tuning them
+
 We first demonstrate hyperparameter-tuning and how you can provide your own validation dataset that AutoGluon internally relies on to: tune hyperparameters, early-stop iterative training, and construct model ensembles. One reason you may specify validation data is when future test data will stem from a different distribution than training data (and your specified validation data is more representative of the future data that will likely be encountered).
 
  If you don't have a strong reason to provide your own validation dataset, we recommend you omit the `tuning_data` argument. This lets AutoGluon automatically select validation data from your provided training set (it uses smart strategies such as stratified sampling).  For greater control, you can specify the `holdout_frac` argument to tell AutoGluon what fraction of the provided training data to hold out for validation.
@@ -112,7 +114,7 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
 Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques.
 
 
-## Getting predictions (inference-time options)
+## Getting predictions (inference options)
 
 Even if you've started a new Python session (possibly on a new machine) since last calling `fit()`, you can still load a previously trained predictor from disk:
 
@@ -180,7 +182,7 @@ predictor.evaluate(test_data)
 
 which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
 
-### Interpretability via feature importance scoring
+## Interpretability (feature importance)
 
 To better understand our trained predictor, we can estimate the overall importance of each feature:
 
@@ -226,7 +228,7 @@ print("Name of each refit-full model corresponding to a previous bagged ensemble
 print(refit_model_map)
 predictor.leaderboard(test_data)
 ```
-This adds the refit-full models to the leaderboard and we can opt to use any of them for prediction just like any other model. Note `pred_time_test` and `pred_time_val` list the time taken to produce predictions with each model (in seconds) on the test/validation data. Since the refit-full models were trained using all of the data, there is no internal validation score (`score_val`) available for them.
+This adds the refit-full models to the leaderboard and we can opt to use any of them for prediction just like any other model. Note `pred_time_test` and `pred_time_val` list the time taken to produce predictions with each model (in seconds) on the test/validation data. Since the refit-full models were trained using all of the data, there is no internal validation score (`score_val`) available for them. You can also call `refit_full()` with non-bagged models to refit the same models to your full dataset (there won't be memory/latency gains in this case but test accuracy may improve).
 
 ### Model distillation
 
@@ -273,6 +275,8 @@ If you encounter memory issues: try setting `excluded_model_types = ['KNN','XT',
 
 If you encounter disk space issues, make sure to delete all `output_directory` folders from previous previous runs! These can eat up your free space if you call `fit()` many times. If you didn't specify `output_directory`, AutoGluon still automatically saved its models to a folder called: "AutogluonModels/ag-[TIMESTAMP]", where TIMESTAMP records when `fit()` was called, so make sure to also delete these folders if you run low on free space.
 
-**References:** The following paper describes how AutoGluon internally operates on tabular data:
+## References
+
+The following paper describes how AutoGluon internally operates on tabular data:
 
 Erickson et al. [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/abs/2003.06505). *Arxiv*, 2020.
