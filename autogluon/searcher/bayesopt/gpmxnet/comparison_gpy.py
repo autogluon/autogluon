@@ -4,15 +4,11 @@ from scipy.linalg import solve_triangular
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 
-from autogluon.searcher.bayesopt.models.gpmxnet import \
-    get_internal_candidate_evaluations
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
-from autogluon.searcher.bayesopt.datatypes.common import CandidateEvaluation
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    dictionarize_objective, DEFAULT_METRIC
+from ..autogluon.hp_ranges import HyperparameterRanges_CS
+from ..datatypes.common import CandidateEvaluation
+from ..datatypes.tuning_job_state import TuningJobState
+from ..models.gpmxnet import get_internal_candidate_evaluations
+from ..tuning_algorithms.default_algorithm import dictionarize_objective, DEFAULT_METRIC
 
 
 class ThreeHumpCamel(object):

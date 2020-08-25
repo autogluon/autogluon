@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 import ConfigSpace as CS
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
+from ..datatypes.common import Candidate
+from ..datatypes.tuning_job_state import TuningJobState
 
 
 class SkipOptimizationPredicate(ABC):

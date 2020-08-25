@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
+from .constants import DATA_TYPE
+from .posterior_state import GaussProcPosteriorState
 
 
 class GaussianProcessModel(ABC):

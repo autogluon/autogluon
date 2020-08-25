@@ -7,16 +7,11 @@ Object definitions that are used for testing.
 from typing import Iterator
 import numpy as np
 
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    CandidateGenerator
-from autogluon.searcher.bayesopt.datatypes.common import StateIdAndCandidate
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
-    HyperparameterRanges_Impl, HyperparameterRangeContinuous, \
-    HyperparameterRangeInteger, HyperparameterRangeCategorical
-from autogluon.searcher.bayesopt.datatypes.scaling import LogScaling, \
-    LinearScaling
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    dictionarize_objective
+from ..datatypes.common import StateIdAndCandidate
+from ..datatypes.hp_ranges import HyperparameterRanges_Impl, HyperparameterRangeContinuous, HyperparameterRangeInteger, HyperparameterRangeCategorical
+from ..datatypes.scaling import LogScaling, LinearScaling
+from ..tuning_algorithms.base_classes import CandidateGenerator
+from ..tuning_algorithms.default_algorithm import dictionarize_objective
 
 
 class RepeatedCandidateGenerator(CandidateGenerator):

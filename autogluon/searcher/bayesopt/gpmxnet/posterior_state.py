@@ -1,12 +1,9 @@
 from typing import Tuple, Optional
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.mean import MeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.posterior_utils import Tensor, \
-    mxnet_F, cholesky_computations, predict_posterior_marginals, \
-    sample_posterior_marginals, sample_posterior_joint, cholesky_update, \
-    negative_log_marginal_likelihood, mxnet_is_ndarray
+from .kernel import KernelFunction
+from .mean import MeanFunction
+from .posterior_utils import Tensor, mxnet_F, cholesky_computations, predict_posterior_marginals, sample_posterior_marginals, sample_posterior_joint, cholesky_update, negative_log_marginal_likelihood, mxnet_is_ndarray
 
 
 class GaussProcPosteriorState(object):

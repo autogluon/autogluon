@@ -3,9 +3,8 @@ import mxnet as mx
 from mxnet import gluon
 import numbers
 
-from autogluon.searcher.bayesopt.gpmxnet.posterior_utils import \
-    mxnet_is_ndarray
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
+from .constants import DATA_TYPE
+from .posterior_utils import mxnet_is_ndarray
 
 __all__ = ['ConstantPositiveVector',
            'PositiveScalarEncoding',

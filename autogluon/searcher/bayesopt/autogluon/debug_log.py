@@ -5,10 +5,8 @@ import ConfigSpace as CS
 import json
 from collections import OrderedDict
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.autogluon.config_ext import \
-    ExtendedConfiguration
+from .config_ext import ExtendedConfiguration
+from ..datatypes.tuning_job_state import TuningJobState
 
 logger = logging.getLogger(__name__)
 

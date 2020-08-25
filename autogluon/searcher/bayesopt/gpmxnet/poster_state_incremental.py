@@ -1,12 +1,10 @@
 import mxnet as mx
 from mxnet.ndarray import NDArray
 
-from autogluon.searcher.bayesopt.gpmxnet.posterior_utils import \
-    sample_and_cholesky_update
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.mean import MeanFunction
+from .kernel import KernelFunction
+from .mean import MeanFunction
+from .posterior_utils import sample_and_cholesky_update
+from .posterior_state import GaussProcPosteriorState
 
 
 class GPPosteriorStateIncrementalUpdater(object):

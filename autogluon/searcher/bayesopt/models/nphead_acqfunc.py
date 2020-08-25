@@ -5,9 +5,8 @@ from mxnet.ndarray import NDArray
 from abc import ABC, abstractmethod
 from typing import Tuple, List, NamedTuple, Optional
 
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    SurrogateModel, AcquisitionFunction
-from autogluon.searcher.bayesopt.utils.density import get_quantiles
+from ..tuning_algorithms.base_classes import SurrogateModel, AcquisitionFunction
+from ..utils.density import get_quantiles
 
 
 class NumPyHeadResult(NamedTuple):

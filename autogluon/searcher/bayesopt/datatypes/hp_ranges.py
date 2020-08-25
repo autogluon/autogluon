@@ -3,10 +3,8 @@ from math import floor
 from typing import Tuple, List, Iterable, Dict
 import numpy as np
 
-from autogluon.searcher.bayesopt.datatypes.common import Hyperparameter, \
-    Candidate
-from autogluon.searcher.bayesopt.datatypes.scaling import Scaling
-
+from .common import Hyperparameter, Candidate
+from .scaling import Scaling
 
 # Epsilon margin to account for numerical errors
 EPS = 1e-8

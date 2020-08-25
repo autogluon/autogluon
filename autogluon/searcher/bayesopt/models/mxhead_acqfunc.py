@@ -5,10 +5,8 @@ from mxnet.ndarray import NDArray
 from abc import ABC, abstractmethod
 from typing import Tuple, Optional
 
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    SurrogateModel, AcquisitionFunction
-from autogluon.searcher.bayesopt.models.nphead_acqfunc import \
-    _reshape_predictions
+from .nphead_acqfunc import _reshape_predictions
+from ..tuning_algorithms.base_classes import SurrogateModel, AcquisitionFunction
 
 
 class MXNetHeadAcquisitionFunction(AcquisitionFunction, ABC):

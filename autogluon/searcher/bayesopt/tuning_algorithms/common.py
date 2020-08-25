@@ -2,13 +2,10 @@ from typing import Iterator, Set, List
 import numpy as np
 import logging
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    CandidateGenerator
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
-    HyperparameterRanges
+from .base_classes import CandidateGenerator
+from ..datatypes.common import Candidate
+from ..datatypes.hp_ranges import HyperparameterRanges
+from ..datatypes.tuning_job_state import TuningJobState
 
 logger = logging.getLogger(__name__)
 
