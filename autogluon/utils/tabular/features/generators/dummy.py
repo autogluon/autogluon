@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class DummyFeatureGenerator(IdentityFeatureGenerator):
+    """
+    Ignores all input features and returns a single int feature with all 0 values.
+    Useful for testing purposes or to avoid crashes if no features were given.
+    """
     def __init__(self, features_in='empty', feature_metadata_in='empty', **kwargs):
         if features_in == 'empty':
             features_in = []

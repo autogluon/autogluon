@@ -100,6 +100,7 @@ class FeatureMetadata:
             raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_group_map_raw. Invalid features: {features_invalid}")
 
     # Note: This is not optimized for speed. Do not rely on this function during inference.
+    # TODO: Add valid_names, invalid_names arguments which override all other arguments for the features listed?
     def get_features(self, valid_raw_types: list = None, valid_special_types: list = None, invalid_raw_types: list = None, invalid_special_types: list = None,
                      required_special_types: list = None, required_raw_special_pairs: List[Tuple[str, List[str]]] = None, required_exact=False, required_at_least_one_special=False):
         """

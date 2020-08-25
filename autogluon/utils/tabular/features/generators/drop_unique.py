@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Not necessary to exist after fitting, can just update outer context feature_out/feature_in and then delete this
 class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
+    """Drops features which only have 1 unique value or which have nearly no repeated values (based on max_unique_ratio) and are of category or object type."""
     def __init__(self, max_unique_ratio=0.99, **kwargs):
         super().__init__(**kwargs)
         self.max_unique_ratio = max_unique_ratio

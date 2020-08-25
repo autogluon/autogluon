@@ -15,9 +15,14 @@ from ...data.utils import get_approximate_df_mem_usage
 logger = logging.getLogger(__name__)
 
 
-# TODO: Add feature of # of observation counts to high cardinality categorical features
 # TODO: Documentation
 class PipelineFeatureGenerator(BulkFeatureGenerator):
+    """
+    PipelineFeatureGenerator is an implementation of BulkFeatureGenerator with various smart defaults and edge case handling functionality to enable robust data handling.
+    It is recommended that users base any custom feature generators meant for end-to-end data transformation from PipelineFeatureGenerator.
+        Reference AutoMLPipelineFeatureGenerator for an example of extending PipelineFeatureGenerator.
+    It is not recommended that PipelineFeatureGenerator be used as a generator within any other generator's pre or post generators.
+    """
     def __init__(self, pre_generators=None, post_generators=None, pre_drop_useless=True, pre_enforce_types=True, reset_index=True, verbosity=3, **kwargs):
         if pre_generators is None:
             pre_generators = [FillNaFeatureGenerator(inplace=True)]

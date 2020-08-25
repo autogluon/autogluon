@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Not necessary to exist after fitting, can just update outer context feature_out/feature_in and then delete this
 class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
+    """Drops features which are exact duplicates of other features, leaving only one instance of the data."""
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         features_to_drop = self._drop_duplicate_features(X)
         self._remove_features_in(features_to_drop)

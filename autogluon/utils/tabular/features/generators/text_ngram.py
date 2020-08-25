@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add argument to output ngrams as a sparse matrix
 # TODO: Add HashingVectorizer support
 # TODO: Add TFIDF support
+# TODO: Documentation
 class TextNgramFeatureGenerator(AbstractFeatureGenerator):
     def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, **kwargs):
         super().__init__(**kwargs)

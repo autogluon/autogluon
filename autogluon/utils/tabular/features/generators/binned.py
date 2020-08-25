@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add more parameters (possibly pass in binning function as an argument for full control)
 class BinnedFeatureGenerator(AbstractFeatureGenerator):
-    """BinnedFeatureGenerator bins incoming int and float features to num_bins values."""
+    """BinnedFeatureGenerator bins incoming int and float features to num_bins unique int values, maintaining relative rank order."""
     def __init__(self, num_bins=10, inplace=False, **kwargs):
         super().__init__(**kwargs)
         self.num_bins = num_bins

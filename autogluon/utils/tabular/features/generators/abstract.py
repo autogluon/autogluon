@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add option to minimize memory usage of feature names by making them integers / strings of integers
 # TODO: Add ability to track which input features created which output features.
+# TODO: Add log of # of observation counts to high cardinality categorical features
 class AbstractFeatureGenerator:
     """
     Abstract feature generator implementation from which all AutoGluon feature generators inherit.
