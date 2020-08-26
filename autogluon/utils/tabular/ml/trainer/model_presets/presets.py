@@ -7,7 +7,6 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 
 from ...constants import AG_ARGS, AG_ARGS_FIT, BINARY, MULTICLASS, REGRESSION, SOFTCLASS, PROBLEM_TYPES_CLASSIFICATION
 from ...models.abstract.abstract_model import AbstractModel
-from ...models.fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from ...models.lgb.lgb_model import LGBModel
 from ...models.lr.lr_model import LinearModel
 from ...models.tabular_nn.tabular_nn_model import TabularNeuralNetModel
@@ -49,7 +48,6 @@ MODEL_TYPES = dict(
     CAT=CatboostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
-    FASTAINN=NNFastAiTabularModel,
 )
 
 DEFAULT_MODEL_NAMES = {
@@ -60,7 +58,6 @@ DEFAULT_MODEL_NAMES = {
     CatboostModel: 'Catboost',
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
-    NNFastAiTabularModel: 'FastAINeuralNet',
 }
 
 
