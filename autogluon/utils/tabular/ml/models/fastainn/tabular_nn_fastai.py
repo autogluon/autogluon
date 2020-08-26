@@ -51,11 +51,40 @@ def make_temp_directory():
         shutil.rmtree(temp_dir)
 
 
-# TODO: Add to contrib
-
-# TODO: On regression problems, can sometimes give insane predictions on unseen data. Cap the y valuees between min and max seen, else this can give REALLY bad results to test data.
-# TODO: Takes extremely long (infinite?) time prior to training start if many (10000) continuous features from ngrams, debug
+# TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
 class NNFastAiTabularModel(AbstractModel):
+    """ Class for fastai v1 neural network models that operate on tabular data.
+
+        Attributes:
+            y_scaler: on a regression problems, the model can give unreasonable predictions on unseen data.
+            This attribute allows to pass a scaler for y values to address this problem. Please note that intermediate
+            iteration metrics will be affected by this transform and as a result intermediate iteration scores will be
+            different from the final ones (these will be correct).
+            https://scikit-learn.org/stable/modules/classes.html#module-sklearn.preprocessing
+
+        Hyperparameters:
+            'layers': list of hidden layers sizes; None - use model's heuristics; default is None
+
+            'emb_drop': embedding layers dropout; defaut is 0.1
+
+            'ps': linear layers dropout - list of values applied to every layer in `layers`; default is [0.1]
+
+            'bs': batch size; default is 256
+
+            'lr': maximum learning rate for one cycle policy; default is 1e-2;
+            see also https://fastai1.fast.ai/train.html#fit_one_cycle, One-cycle policy paper: https://arxiv.org/abs/1803.09820
+
+            'epochs': number of epochs; default is 30
+
+            # Early stopping settings. See more details here: https://fastai1.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
+            'early.stopping.min_delta': 0.0001,
+            'early.stopping.patience': 10,
+
+            'smoothing': If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
+            otherwise use default loss function for this type of problem; default is 0.0.
+            See: https://docs.fast.ai/layers.html#LabelSmoothingCrossEntropy
+    """
+
     model_internals_file_name = 'model-internals.pkl'
     unique_category_str = '!missing!'
     metrics_map = {
