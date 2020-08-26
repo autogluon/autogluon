@@ -3,9 +3,9 @@
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_tabularquick` to learn the basics of the AutoGluon API.
 
-This tutorial describes how you can exert greater control when using AutoGluon's `fit()` by specifying the appropriate arguments. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
+This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
 
-Using the same census data table as :ref:`sec_tabularquick`, we will try to predict the `occupation` of an individual - a multi-class classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
+Using the same census data table as before, we'll now predict the `occupation` of an individual - a multi-class classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
 import autogluon as ag
@@ -114,16 +114,15 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
 Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques.
 
 
-## Getting predictions (inference options)
+## Prediction options (inference)
 
-Even if you've started a new Python session (possibly on a new machine) since last calling `fit()`, you can still load a previously trained predictor from disk:
+Even if you've started a new Python session since last calling `fit()`, you can still load a previously trained predictor from disk:
 
 ```{.python .input}
 predictor = task.load(output_directory)
 ```
 
-Here, `output_directory` is the same folder previously passed to `fit()`, in which all the trained models have been saved.
-You can train easily models on one machine and deploy them on another. Simply copy the `output_directory` folder to the new machine and specify its new path in `task.load()`.
+Above `output_directory` is the same folder previously passed to `fit()`, in which all the trained models have been saved. You can train easily models on one machine and deploy them on another. Simply copy the `output_directory` folder to the new machine and specify its new path in `task.load()`.
 
 We can make a prediction on an individual example rather than a full dataset:
 
@@ -198,7 +197,7 @@ Computed via [*permutation-shuffling*](https://explained.ai/rf-importance/), the
 
 We describe multiple ways to reduce the time it takes for AutoGluon to produce predictions.
 
-### Retaining all models in memory
+### Keeping models in memory
 
 By default, AutoGluon loads models into memory one at a time and only when they are needed for prediction. This strategy is robust for large stacked/bagged ensembles, but leads to slower prediction times. If you plan to repeatedly make predictions (e.g. on new datapoints one at a time rather than one large test dataset), you can first specify that all models should be loaded into memory as follows:
 
@@ -218,7 +217,7 @@ print("Predictions: ", preds)
 predictor = task.load(output_directory) # reset predictor
 ```
 
-### Collapsing bagged ensembles via refit_full()
+### Collapsing bagged ensembles via refit_full
 
 For a ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements. Below we refit such models for every model-type but you can alternatively do this for just a particular model-type by specifying the `model` argument of `refit_full()`.
 
@@ -242,7 +241,7 @@ print(f"predictions from {student_models[0]}:", preds_student)
 predictor.leaderboard(test_data)
 ```
 
-### Specifying presets or hyperparameters
+### Faster presets or hyperparameters
 
 Instead of trying to speed up a cumbersome trained model at prediction time, if you know inference latency or memory will be an issue at the outset, then you can adjust the training process accordingly to ensure `fit()` does not produce unwieldy models.
 
