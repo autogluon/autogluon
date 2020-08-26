@@ -2,13 +2,15 @@ import contextlib
 import logging
 import shutil
 import tempfile
+import time
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from fastai.basic_data import DatasetType
-from fastai.basic_train import load_learner
+from fastai.basic_train import load_learner, Learner
 from fastai.callbacks import EarlyStoppingCallback, SaveModelCallback
 from fastai.data_block import FloatList
 from fastai.layers import LabelSmoothingCrossEntropy
@@ -139,7 +141,9 @@ class NNFastAiTabularModel(AbstractModel):
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+        start_time = time.time()
+
         logger.log(0, f'Fitting Neural Network with parameters {self.params}...')
         data = self.preprocess_train(X_train, y_train, X_val, y_val)
 
@@ -158,9 +162,6 @@ class NNFastAiTabularModel(AbstractModel):
             base_size = max(len(data.classes) * 2, 100)
             layers = [base_size * 2, base_size]
 
-        early_stopping_fn = partial(EarlyStoppingCallback, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
-                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'])
-
         loss_func = None
         if self.problem_type in [BINARY, MULTICLASS] and self.params.get('smoothing', 0.0) > 0.0:
             loss_func = LabelSmoothingCrossEntropy(self.params['smoothing'])
@@ -168,6 +169,15 @@ class NNFastAiTabularModel(AbstractModel):
         ps = self.params['ps']
         if type(ps) != list:
             ps = [ps]
+
+        if time_limit:
+            time_elapsed = time.time() - start_time
+            time_left = time_limit - time_elapsed
+        else:
+            time_left = None
+
+        early_stopping_fn = partial(EarlyStoppingCallbackWithTimeLimit, monitor=objective_func_name_to_monitor, mode=objective_optim_mode,
+                                    min_delta=self.params['early.stopping.min_delta'], patience=self.params['early.stopping.patience'], time_limit=time_left)
 
         self.model = tabular_learner(
             data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
@@ -281,3 +291,20 @@ class NNFastAiTabularModel(AbstractModel):
         hpo_models = {self.name: self.path}
 
         return hpo_models, hpo_model_performances, hpo_results
+
+
+class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
+
+    def __init__(self, learn: Learner, time_limit=None, **kwargs):
+        super().__init__(learn, **kwargs)
+        self.time_limit = time_limit
+        self.start_time = time.time()
+
+    def on_epoch_end(self, epoch, **kwargs: Any):
+        if self.time_limit:
+            time_elapsed = time.time() - self.start_time
+            time_left = self.time_limit - time_elapsed
+            if time_left <= 0:
+                logger.log(20, "\tRan out of time, stopping training early.")
+                return {'stop_training': True}
+        return super().on_epoch_end(epoch, **kwargs)
