@@ -63,6 +63,25 @@ BibTeX entry:
 }
 ```
 
+## AutoGluon for Hyperparameter and Neural Architecture Search (HNAS)
+
+AutoGluon also provides state-of-the-art tools for neural hyperparameter and architecture search, such as for example ASHA, Hyperband, Bayesian Optimization and BOHB. To get started, checkout the following resources
+
+- [General introduction into HNAS](https://www.youtube.com/watch?v=pB1LmZWK_N8&feature=youtu.be)
+- [Introduction into HNAS with AutoGluon](https://www.youtube.com/watch?v=GJVwUyVWZas)
+- [Example notebook](https://github.com/zhanghang1989/HPO2NAS-Tutorial-CVPR-ECCV2020/blob/master/mlp.ipynb)
+
+Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
+
+```bibtex
+@article{abohb,
+  title={Model-based Asynchronous Hyperparameter and Neural Architecture Search},
+  author={Klein, Aaron and Tiao, Louis and Lienart, Thibaut and Archambeau, Cedric and Seeger, Matthias} 
+  journal={arXiv preprint arXiv:2003.10865},
+  year={2020}
+}
+```
+
 ## License
 
 This library is licensed under the Apache 2.0 License.
