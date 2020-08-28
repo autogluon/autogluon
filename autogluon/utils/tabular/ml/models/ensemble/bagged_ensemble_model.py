@@ -527,6 +527,13 @@ class BaggedEnsembleModel(AbstractModel):
 
         return info
 
+    def get_memory_size(self):
+        models = self.models
+        self.models = None
+        memory_size = super().get_memory_size()
+        self.models = models
+        return memory_size
+
     def _get_child_info(self):
         child_info_dict = dict()
         for model in self.models:

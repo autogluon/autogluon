@@ -1011,6 +1011,10 @@ class AbstractTrainer:
         if max_memory is not None:
             info = self.get_models_info(model_names)
             model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
+            for model in model_mem_size_map:
+                if 'children_info' in info[model]:
+                    for child in info[model]['children_info'].values():
+                        model_mem_size_map[model] += child['memory_size']
             total_mem_required = sum(model_mem_size_map.values())
             available_mem = psutil.virtual_memory().available
             memory_proportion = total_mem_required / available_mem
@@ -1028,11 +1032,6 @@ class AbstractTrainer:
             models.append(model)
 
         for model in models:
-            if isinstance(model, StackerEnsembleModel):
-                for base_model_name in model.base_model_names:
-                    if base_model_name not in model.base_models_dict.keys():
-                        if base_model_name in self.models.keys():
-                            model.base_models_dict[base_model_name] = self.models[base_model_name]
             # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
