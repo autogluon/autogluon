@@ -48,7 +48,8 @@ See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documenta
 
 ### Train/Deploy AutoGluon in the Cloud
 - [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism)
-- [Notebook: Running AutoGluon-Tabular on Amazon SageMaker](https://github.com/awslabs/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular/AutoGluon_Tabular_SageMaker.ipynb)
+- [Running AutoGluon-Tabular on Amazon SageMaker](https://github.com/awslabs/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular/AutoGluon_Tabular_SageMaker.ipynb)
+- [Running AutoGluon Image Classification on Amazon Sagemaker](https://github.com/zhanghang1989/AutoGluon-Docker)
 
 ## Citing AutoGluon
 
