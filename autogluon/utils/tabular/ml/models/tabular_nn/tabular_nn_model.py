@@ -262,6 +262,7 @@ class TabularNeuralNetModel(AbstractModel):
         best_val_metric = -np.inf  # higher = better
         val_metric = None
         best_val_epoch = 0
+        val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
         num_epochs = params['num_epochs']
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
@@ -334,11 +335,12 @@ class TabularNeuralNetModel(AbstractModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                # val_metric = self.evaluate_metric(test_dataset)  # Evaluate after each epoch
                 val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if val_dataset is not None:
                     if not np.isnan(val_metric):
+                        if val_metric > best_val_metric:
+                            val_improve_epoch = e
                         best_val_metric = val_metric
                 best_val_epoch = e
                 # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
@@ -361,8 +363,8 @@ class TabularNeuralNetModel(AbstractModel):
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
                     reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
-            if e - best_val_epoch > epochs_wo_improve:
-                break
+            if e - val_improve_epoch > epochs_wo_improve:
+                break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
             if time_limit:
                 time_elapsed = time.time() - start_time
                 time_left = time_limit - time_elapsed
