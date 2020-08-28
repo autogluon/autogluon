@@ -571,7 +571,14 @@ class AbstractLearner:
         return infer_problem_type(y=y)
 
     def save(self):
+        trainer = None
+        if self.trainer is not None:
+            if not self.is_trainer_present:
+                self.trainer.save()
+                trainer = self.trainer
+                self.trainer = None
         save_pkl.save(path=self.save_path, object=self)
+        self.trainer = trainer
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
@@ -599,21 +606,20 @@ class AbstractLearner:
             trainer.save()
 
     def load_trainer(self) -> AbstractTrainer:
-        if self.is_trainer_present:
+        if self.trainer is not None:
             return self.trainer
         else:
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
 
-    # TODO: Add to predictor
-    # TODO: Make this safe in large ensemble situations that would result in OOM
-    # Loads all models in memory so that they don't have to loaded during predictions
-    def persist_trainer(self, low_memory=False):
+    # Loads models in memory so that they don't have to loaded during predictions
+    def persist_trainer(self, low_memory=False, models=None, with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
-        self.is_trainer_present = True
         if not low_memory:
-            self.trainer.load_models_into_memory()
+            return self.trainer.persist_models(models, with_ancestors=with_ancestors, max_memory=max_memory)
             # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
             #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown
+        else:
+            return []
 
     @classmethod
     def load_info(cls, path, reset_paths=True, load_model_if_required=True):

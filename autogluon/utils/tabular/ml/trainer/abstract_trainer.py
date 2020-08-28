@@ -4,6 +4,7 @@ from typing import List
 import networkx as nx
 import numpy as np
 import pandas as pd
+import psutil
 from pandas import DataFrame, Series
 from collections import defaultdict
 
@@ -983,11 +984,43 @@ class AbstractTrainer:
             self.models[model.name] = model
 
     def save(self):
+        models = self.models
+        if self.low_memory:
+            self.models = {}
         save_pkl.save(path=self.path + self.trainer_file_name, object=self)
+        if self.low_memory:
+            self.models = models
 
-    def load_models_into_memory(self, model_names=None):
+    def persist_models(self, model_names: list = None, with_ancestors=False, max_memory=None) -> list:
         if model_names is None:
             model_names = self.get_model_names_all()
+        elif model_names is 'best':
+            if self.model_best is not None:
+                model_names = [self.model_best]
+            else:
+                model_names = [self.get_model_best(can_infer=True)]
+        if with_ancestors:
+            model_names = self.get_minimum_models_set(model_names)
+        model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
+        if model_names_already_persisted:
+            logger.log(30, f'The following {len(model_names_already_persisted)} models were already persisted and will be ignored in the model loading process: {model_names_already_persisted}')
+        model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
+        if not model_names:
+            logger.log(30, f'No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.')
+            return []
+        if max_memory is not None:
+            info = self.get_models_info(model_names)
+            model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
+            total_mem_required = sum(model_mem_size_map.values())
+            available_mem = psutil.virtual_memory().available
+            memory_proportion = total_mem_required / available_mem
+            if memory_proportion > max_memory:
+                logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
+                logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+                return []
+            else:
+                logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
+
         models = []
         for model_name in model_names:
             model = self.load_model(model_name)
@@ -1000,10 +1033,12 @@ class AbstractTrainer:
                     if base_model_name not in model.base_models_dict.keys():
                         if base_model_name in self.models.keys():
                             model.base_models_dict[base_model_name] = self.models[base_model_name]
+            # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
+        return model_names
 
     # TODO: model_name change to model in params
     def load_model(self, model_name: str, path: str = None, model_type=None) -> AbstractModel:
@@ -1017,6 +1052,20 @@ class AbstractTrainer:
             if model_type is None:
                 model_type = self.model_types[model_name]
             return model_type.load(path=path, reset_paths=self.reset_paths)
+
+    def unpersist_models(self, model_names: list = None) -> list:
+        if model_names is None:
+            model_names = list(self.models.keys())
+        unpersisted_models = []
+        for model in model_names:
+            if model in self.models:
+                self.models.pop(model)
+                unpersisted_models.append(model)
+        if unpersisted_models:
+            logger.log(20, f'Unpersisted {len(unpersisted_models)} models: {unpersisted_models}')
+        else:
+            logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
+        return unpersisted_models
 
     def _get_dummy_stacker(self, level, model_levels=None, use_orig_features=True):
         if model_levels is None:
@@ -1195,10 +1244,18 @@ class AbstractTrainer:
 
     # Gets the minimum set of models that the provided model depends on, including itself
     # Returns a list of model names
-    def get_minimum_model_set(self, model):
+    def get_minimum_model_set(self, model) -> list:
         if not isinstance(model, str):
             model = model.name
         return list(nx.bfs_tree(self.model_graph, model, reverse=True))
+
+    # Gets the minimum set of models that the provided models depend on, including themselves
+    # Returns a list of model names
+    def get_minimum_models_set(self, models: list) -> list:
+        models_set = set()
+        for model in models:
+            models_set = models_set.union(self.get_minimum_model_set(model))
+        return list(models_set)
 
     def leaderboard(self, extra_info=False):
         model_names = self.get_model_names_all()

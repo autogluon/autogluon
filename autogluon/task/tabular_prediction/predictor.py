@@ -622,6 +622,49 @@ class TabularPredictor(BasePredictor):
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
 
+    def persist_models(self, models=None, with_ancestors=True, max_memory=0.1) -> list:
+        """
+        Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
+        If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+
+        Parameters
+        ----------
+        models : list of str or str, default = None
+            Model names of models to persist.
+            If None then all models are persisted.
+            If 'best' then the model with the highest validation score is persisted.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be persisted.
+        max_memory : float, default = 0.1
+            Proportion of total available memory to allow for the persisted models to use.
+            If the models' summed memory usage requires a larger proportion of memory than max_memory, they are not persisted. In this case, the output will be an empty list.
+            If None, then models are persisted regardless of estimated memory usage. This can cause out-of-memory errors.
+
+        Returns
+        -------
+        List of persisted model names.
+        """
+        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+
+    def unpersist_models(self, models=None) -> list:
+        """
+        Unpersist models in memory for reduced memory usage.
+        If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+
+        Parameters
+        ----------
+        models : list of str, default = None
+            Model names of models to unpersist.
+            If None then all models are unpersisted.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names_persisted()`.
+
+        Returns
+        -------
+        List of unpersisted model names.
+        """
+        return self._learner.load_trainer().unpersist_models(model_names=models)
+
     def refit_full(self, model='all'):
         """
         Retrain model on all of the data (training + validation).
@@ -954,6 +997,10 @@ class TabularPredictor(BasePredictor):
     def get_model_names(self):
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
+
+    def get_model_names_persisted(self):
+        """Returns the list of model names which are persisted in memory."""
+        return list(self._learner.load_trainer().models.keys())
 
     def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limits=None, hyperparameters=None, holdout_frac=None,
                 teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}, models_name_suffix=None, verbosity=None):
