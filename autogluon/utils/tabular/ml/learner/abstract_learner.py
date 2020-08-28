@@ -611,7 +611,7 @@ class AbstractLearner:
         else:
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
 
-    # Loads models in memory so that they don't have to loaded during predictions
+    # Loads models in memory so that they don't have to be loaded during predictions
     def persist_trainer(self, low_memory=False, models=None, with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
         if not low_memory:
