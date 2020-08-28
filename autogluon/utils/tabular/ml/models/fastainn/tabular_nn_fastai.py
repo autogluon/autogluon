@@ -5,19 +5,11 @@ import tempfile
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
-from fastai.basic_data import DatasetType
-from fastai.basic_train import load_learner, Learner
-from fastai.callbacks import EarlyStoppingCallback, SaveModelCallback
-from fastai.data_block import FloatList
-from fastai.layers import LabelSmoothingCrossEntropy
-from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_absolute_error, accuracy, FBeta, AUROC, Precision, Recall, r2_score
-from fastai.tabular import FillMissing, Categorify, Normalize, TabularList, tabular_learner
-from fastai.utils.mod_display import progress_disabled_ctx
 
+from autogluon.utils.try_import import try_import_fastai_v1
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
@@ -87,42 +79,11 @@ class NNFastAiTabularModel(AbstractModel):
 
     model_internals_file_name = 'model-internals.pkl'
     unique_category_str = '!missing!'
-    metrics_map = {
-        # Regression
-        'root_mean_squared_error': root_mean_squared_error,
-        'mean_squared_error': mean_squared_error,
-        'mean_absolute_error': mean_absolute_error,
-        'r2': r2_score,
-        # Not supported: median_absolute_error
-
-        # Classification
-        'accuracy': accuracy,
-
-        'f1': FBeta(beta=1),
-        'f1_macro': FBeta(beta=1, average='macro'),
-        'f1_micro': FBeta(beta=1, average='micro'),
-        'f1_weighted': FBeta(beta=1, average='weigthed'),  # this one has some issues
-
-        'roc_auc': AUROC(),
-
-        'precision': Precision(),
-        'precision_macro': Precision(average='macro'),
-        'precision_micro': Precision(average='micro'),
-        'precision_weigthed': Precision(average='weigthed'),
-
-        'recall': Recall(),
-        'recall_macro': Recall(average='macro'),
-        'recall_micro': Recall(average='micro'),
-        'recall_weigthed': Recall(average='weigthed'),
-        # Not supported: pac_score
-
-    }
 
     def __init__(self, path: str, name: str, problem_type: str, eval_metric=None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None,
                  features=None, feature_types_metadata=None, debug=0, y_scaler=None, **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, num_classes=num_classes, stopping_metric=stopping_metric,
                          hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
-        self.procs = [FillMissing, Categorify, Normalize]
         self.cat_columns = []
         self.cont_columns = []
         self.col_after_transformer = None
@@ -138,6 +99,10 @@ class NNFastAiTabularModel(AbstractModel):
         return X
 
     def preprocess_train(self, X_train, Y_train, X_test, Y_test, **kwargs):
+        from fastai.data_block import FloatList
+        from fastai.tabular import TabularList
+        from fastai.tabular import FillMissing, Categorify, Normalize
+
         self.cat_columns = X_train.select_dtypes(['category', 'object']).columns.values.tolist()
         self.cont_columns = X_train.select_dtypes(['float', 'int', 'datetime']).columns.values.tolist()
         if self.problem_type == REGRESSION and self.y_scaler is not None:
@@ -164,13 +129,21 @@ class NNFastAiTabularModel(AbstractModel):
             X_test = self.fold_preprocess(X_test)
         df_train, train_idx, val_idx = self._generate_datasets(X_train, Y_train_norm, X_test, Y_test_norm)
         label_class = FloatList if self.problem_type == REGRESSION else None
-        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=self.procs)
+        procs = [FillMissing, Categorify, Normalize]
+        data = (TabularList.from_df(df_train, path=self.path, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs)
                 .split_by_idxs(train_idx, val_idx)
                 .label_from_df(cols=LABEL, label_cls=label_class)
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+        try_import_fastai_v1()
+        from fastai.callbacks import SaveModelCallback
+        from fastai.layers import LabelSmoothingCrossEntropy
+        from fastai.tabular import tabular_learner
+        from fastai.utils.mod_display import progress_disabled_ctx
+        from .callbacks import EarlyStoppingCallbackWithTimeLimit
+
         start_time = time.time()
 
         logger.log(0, f'Fitting Neural Network with parameters {self.params}...')
@@ -240,12 +213,44 @@ class NNFastAiTabularModel(AbstractModel):
         return df_train, train_idx, val_idx
 
     def __get_objective_func_name(self):
+        from fastai.metrics import root_mean_squared_error, mean_squared_error, mean_absolute_error, accuracy, FBeta, AUROC, Precision, Recall, r2_score
+
+        metrics_map = {
+            # Regression
+            'root_mean_squared_error': root_mean_squared_error,
+            'mean_squared_error': mean_squared_error,
+            'mean_absolute_error': mean_absolute_error,
+            'r2': r2_score,
+            # Not supported: median_absolute_error
+
+            # Classification
+            'accuracy': accuracy,
+
+            'f1': FBeta(beta=1),
+            'f1_macro': FBeta(beta=1, average='macro'),
+            'f1_micro': FBeta(beta=1, average='micro'),
+            'f1_weighted': FBeta(beta=1, average='weigthed'),  # this one has some issues
+
+            'roc_auc': AUROC(),
+
+            'precision': Precision(),
+            'precision_macro': Precision(average='macro'),
+            'precision_micro': Precision(average='micro'),
+            'precision_weigthed': Precision(average='weigthed'),
+
+            'recall': Recall(),
+            'recall_macro': Recall(average='macro'),
+            'recall_micro': Recall(average='micro'),
+            'recall_weigthed': Recall(average='weigthed'),
+            # Not supported: pac_score
+        }
+
         objective_func_name = self.eval_metric.name
-        if objective_func_name in self.metrics_map.keys():
-            nn_metric = self.metrics_map[objective_func_name]
+        if objective_func_name in metrics_map.keys():
+            nn_metric = metrics_map[objective_func_name]
         elif objective_func_name is None:
             objective_func_name = self.params['metric']
-            nn_metric = self.metrics_map[self.params['metric']]
+            nn_metric = metrics_map[self.params['metric']]
         else:
             nn_metric = None
         return nn_metric, objective_func_name
@@ -274,9 +279,15 @@ class NNFastAiTabularModel(AbstractModel):
         return objective_func_name_to_monitor
 
     def predict_proba(self, X, preprocess=True):
+        from fastai.basic_data import DatasetType
+        from fastai.tabular import TabularList
+        from fastai.utils.mod_display import progress_disabled_ctx
+        from fastai.tabular import FillMissing, Categorify, Normalize
+
         if preprocess:
             X = self.preprocess(X)
-        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=self.procs))
+        procs = [FillMissing, Categorify, Normalize]
+        self.model.data.add_test(TabularList.from_df(X, cat_names=self.cat_columns, cont_names=self.cont_columns, procs=procs))
         with progress_disabled_ctx(self.model) as model:
             preds, _ = model.get_preds(ds_type=DatasetType.Test)
         if self.problem_type == REGRESSION:
@@ -297,6 +308,7 @@ class NNFastAiTabularModel(AbstractModel):
 
     @classmethod
     def load(cls, path: str, file_prefix='', reset_paths=False, verbose=True):
+        from fastai.basic_train import load_learner
         obj = super().load(path, file_prefix=file_prefix, reset_paths=reset_paths, verbose=verbose)
         obj.model = load_pkl.load_with_fn(f'{obj.path}{obj.model_internals_file_name}', lambda p: load_learner(obj.path, p), verbose=verbose)
         return obj
@@ -320,20 +332,3 @@ class NNFastAiTabularModel(AbstractModel):
         hpo_models = {self.name: self.path}
 
         return hpo_models, hpo_model_performances, hpo_results
-
-
-class EarlyStoppingCallbackWithTimeLimit(EarlyStoppingCallback):
-
-    def __init__(self, learn: Learner, time_limit=None, **kwargs):
-        super().__init__(learn, **kwargs)
-        self.time_limit = time_limit
-        self.start_time = time.time()
-
-    def on_epoch_end(self, epoch, **kwargs: Any):
-        if self.time_limit:
-            time_elapsed = time.time() - self.start_time
-            time_left = self.time_limit - time_elapsed
-            if time_left <= 0:
-                logger.log(20, "\tRan out of time, stopping training early.")
-                return {'stop_training': True}
-        return super().on_epoch_end(epoch, **kwargs)
