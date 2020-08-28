@@ -1,6 +1,6 @@
 from .....ml.constants import BINARY, MULTICLASS, REGRESSION
 
-# TODO this method is generalizable method and potentially should be moved out into framework
+# TODO this method is generalizable and potentially should be moved out into framework
 def get_param_baseline(problem_type, num_classes=None):
     if problem_type == BINARY:
         return get_param_binary_baseline()
