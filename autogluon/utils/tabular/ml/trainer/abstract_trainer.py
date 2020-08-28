@@ -569,7 +569,7 @@ class AbstractTrainer:
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
 
-    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix='', save_bagged_folds=None, check_if_best=True, child_hyperparameters=None):
+    def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name=None, name_suffix='', save_bagged_folds=None, check_if_best=True, child_hyperparameters=None):
         if save_bagged_folds is None:
             save_bagged_folds = self.save_bagged_folds
         if base_model_names is None:
@@ -583,7 +583,13 @@ class AbstractTrainer:
             extra_params = {'_tmp_greedy_hyperparameters': child_hyperparameters}
         else:
             extra_params = {}
-        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
+
+        if name is None:
+            name = 'weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level)
+        else:
+            name = name + name_suffix
+
+        weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name=name, base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
                                                         eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, **extra_params)
 
@@ -864,12 +870,13 @@ class AbstractTrainer:
                 # TODO: Do it for all models in the level at once to avoid repeated processing of data?
                 stacker_type = type(model)
                 if issubclass(stacker_type, WeightedEnsembleModel):
+                    base_models = list(model.stack_column_prefix_to_model_map.values())
                     # TODO: Technically we don't need to re-train the weighted ensemble, we could just copy the original and re-use the weights.
                     if self.bagged_mode:
-                        X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=True)
+                        X_train_stack_preds = self.get_inputs_to_stacker_v2(X, base_models=base_models, fit=True, use_orig_features=False)
                         y_input = y
                     else:
-                        X_train_stack_preds = self.get_inputs_to_stacker(X_val, level_start=0, level_end=level, fit=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
+                        X_train_stack_preds = self.get_inputs_to_stacker_v2(X, base_models=base_models, fit=False, use_orig_features=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
                         y_input = y_val
 
                     # TODO: Remove child_hyperparameters, make this cleaner
@@ -877,7 +884,7 @@ class AbstractTrainer:
                     child_hyperparameters = copy.deepcopy(model_full.params)
                     child_hyperparameters[AG_ARGS_FIT] = copy.deepcopy(model_full.params_aux)
                     # TODO: stack_name=REFIT_FULL_NAME_AUX?
-                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=list(model.stack_column_prefix_to_model_map.values()), name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
+                    models_trained = self.generate_weighted_ensemble(X=X_train_stack_preds, y=y_input, level=level, stack_name=REFIT_FULL_NAME, kfolds=0, n_repeats=1, base_model_names=base_models, name=model_name, name_suffix=REFIT_FULL_SUFFIX, save_bagged_folds=True, check_if_best=False, child_hyperparameters=child_hyperparameters)
                     # TODO: Do the below more elegantly, ideally as a parameter to the trainer train function to disable recording scores/pred time.
                     for model_weighted_ensemble in models_trained:
                         model_loaded = self.load_model(model_weighted_ensemble)

@@ -339,6 +339,12 @@ class TabularPrediction(BaseTask):
             label_count_threshold : int, default = 10
                 For multi-class classification problems, this is the minimum number of times a label must appear in dataset in order to be considered an output class.
                 AutoGluon will ignore any classes whose labels do not appear at least this many times in the dataset (i.e. will never predict them).
+            fit_weighted_ensemble_multi_level : bool, default = True
+                If True, then a custom weighted ensemble is fit as the final model that is allowed to have weights from any model at any stack level.
+                This differs from the standard weighted ensembles which only have weights from models in a single stack level.
+                This model can often obtain higher accuracy than the standard weighted ensembles.
+                This is equivalent to calling `predictor.fit_weighted_ensemble()` directly after `fit()`.
+                This model is only trained if `stack_ensemble_levels>0`.
             save_bagged_folds : bool, default = True
                 If True, bagged models will save their fold models (the models from each individual fold of bagging). This is required to use bagged models for prediction after `fit()`.
                 If False, bagged models will not save their fold models. This means that bagged models will not be valid models during inference.
@@ -470,6 +476,7 @@ class TabularPrediction(BaseTask):
             'excluded_model_types',
             'label_count_threshold',
             'id_columns',
+            'fit_weighted_ensemble_multi_level',
             'set_best_to_refit_full',
             'save_bagged_folds',
             'keep_only_best',
@@ -617,6 +624,14 @@ class TabularPrediction(BaseTask):
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
+
+        fit_weighted_ensemble_multi_level = kwargs.get('fit_weighted_ensemble_multi_level', True)
+        if fit_weighted_ensemble_multi_level and stack_ensemble_levels >= 1:
+            if time_limits is not None:
+                time_limits_weighted_ensemble = max(3, time_limits/20)
+            else:
+                time_limits_weighted_ensemble = None
+            predictor.fit_weighted_ensemble(time_limits=time_limits_weighted_ensemble)
 
         keep_only_best = kwargs.get('keep_only_best', False)
         if refit_full is True:
