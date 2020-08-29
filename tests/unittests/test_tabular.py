@@ -24,6 +24,7 @@ import numpy as np
 import mxnet as mx
 from random import seed
 
+from networkx.exception import NetworkXError
 import pytest
 
 import autogluon as ag
@@ -100,14 +101,23 @@ def test_advanced_functionality():
 
     assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
     assert predictor.unpersist_models() == []  # Assert that no models were unpersisted
-    persisted_models = predictor.persist_models(max_memory=None)
+
+    persisted_models = predictor.persist_models(models='all', max_memory=None)
     assert set(predictor.get_model_names_persisted()) == set(persisted_models)  # Ensure all models are persisted
-    assert predictor.persist_models(max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
+    assert predictor.persist_models(models='all', max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
     unpersised_models = predictor.unpersist_models()
     assert set(unpersised_models) == set(persisted_models)
     assert predictor.get_model_names_persisted() == []  # Assert that all models were unpersisted
 
-    predictor.persist_models(max_memory=None)
+    # Raise exception
+    with pytest.raises(NetworkXError):
+        predictor.persist_models(models=['UNKNOWN_MODEL_1', 'UNKNOWN_MODEL_2'])
+
+    assert predictor.get_model_names_persisted() == []
+
+    assert predictor.unpersist_models(models=['UNKNOWN_MODEL_1', 'UNKNOWN_MODEL_2']) == []
+
+    predictor.persist_models(models='all', max_memory=None)
     predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
     predictor_loaded = TabularPredictor.load(output_directory=predictor.output_directory)  # Assert that predictor loading works
     leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)

@@ -622,20 +622,22 @@ class TabularPredictor(BasePredictor):
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
 
-    def persist_models(self, models=None, with_ancestors=True, max_memory=0.1) -> list:
+    def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
         """
         Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
 
         Parameters
         ----------
-        models : list of str or str, default = None
+        models : list of str or str, default = 'best'
             Model names of models to persist.
-            If None then all models are persisted.
-            If 'best' then the model with the highest validation score is persisted.
+            If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
+            If 'all' then all models are persisted.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
         with_ancestors : bool, default = True
             If True, all ancestor models of the provided models will also be persisted.
+            If False, stacker models will not have the models they depend on persisted unless those models were specified in `models`. This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
+            Only relevant for stacker models.
         max_memory : float, default = 0.1
             Proportion of total available memory to allow for the persisted models to use.
             If the models' summed memory usage requires a larger proportion of memory than max_memory, they are not persisted. In this case, the output will be an empty list.
@@ -647,16 +649,17 @@ class TabularPredictor(BasePredictor):
         """
         return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
 
-    def unpersist_models(self, models=None) -> list:
+    def unpersist_models(self, models='all') -> list:
         """
         Unpersist models in memory for reduced memory usage.
         If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+        Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk via `predictor = TabularPredictor.load(predictor.output_directory)`.
 
         Parameters
         ----------
-        models : list of str, default = None
+        models : list of str or str, default = 'all'
             Model names of models to unpersist.
-            If None then all models are unpersisted.
+            If 'all' then all models are unpersisted.
             Valid models are listed in this `predictor` by calling `predictor.get_model_names_persisted()`.
 
         Returns

@@ -991,14 +991,16 @@ class AbstractTrainer:
         if self.low_memory:
             self.models = models
 
-    def persist_models(self, model_names: list = None, with_ancestors=False, max_memory=None) -> list:
-        if model_names is None:
+    def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> list:
+        if model_names is 'all':
             model_names = self.get_model_names_all()
         elif model_names is 'best':
             if self.model_best is not None:
                 model_names = [self.model_best]
             else:
                 model_names = [self.get_model_best(can_infer=True)]
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
         if with_ancestors:
             model_names = self.get_minimum_models_set(model_names)
         model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
@@ -1052,9 +1054,11 @@ class AbstractTrainer:
                 model_type = self.model_types[model_name]
             return model_type.load(path=path, reset_paths=self.reset_paths)
 
-    def unpersist_models(self, model_names: list = None) -> list:
-        if model_names is None:
+    def unpersist_models(self, model_names='all') -> list:
+        if model_names is 'all':
             model_names = list(self.models.keys())
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
         unpersisted_models = []
         for model in model_names:
             if model in self.models:
