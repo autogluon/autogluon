@@ -365,10 +365,10 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time += model.predict_time
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, load_oof=False, verbose=True):
+    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, load_oof=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
         path = path + file_prefix
         load_path = path + cls.model_file_name
-        obj = load_pkl.load(path=load_path, verbose=verbose)
+        obj = load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         if reset_paths:
             obj.set_contexts(path)
         if not low_memory:
@@ -411,7 +411,8 @@ class BaggedEnsembleModel(AbstractModel):
     def save_model_base(self, model_base):
         save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, save_oof=True, verbose=True, save_children=False):
+    def save(self, file_prefix="", directory=None, return_filename=False, save_oof=True, verbose=True, save_children=False,
+             compression_fn=None, compression_fn_kwargs=None):
         if directory is None:
             directory = self.path
         directory = directory + file_prefix
@@ -431,10 +432,11 @@ class BaggedEnsembleModel(AbstractModel):
             save_pkl.save(path=self.path + 'utils' + os.path.sep + self._oof_filename, object={
                     '_oof_pred_proba': self._oof_pred_proba,
                     '_oof_pred_model_repeats': self._oof_pred_model_repeats,
-            })
+            }, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
-        save_pkl.save(path=file_name, object=self, verbose=verbose)
+        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_fn=compression_fn,
+                      compression_fn_kwargs=compression_fn_kwargs)
         if return_filename:
             return file_name
 

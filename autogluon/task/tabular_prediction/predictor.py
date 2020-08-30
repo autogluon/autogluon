@@ -85,6 +85,8 @@ class TabularPredictor(BasePredictor):
         self._learner.persist_trainer(low_memory=True)
         self._trainer: AbstractTrainer = self._learner.load_trainer()  # Trainer object
         self.output_directory = self._learner.path
+        self.compression_fn = self._learner.compression_fn
+        self.compression_fn_kwargs = self._learner.compression_fn_kwargs
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label

@@ -73,7 +73,8 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None):
+    def preprocess(self, X, preprocess=True, fit=False, compute_base_preds=True, infer=True, model=None, model_pred_proba_dict=None,
+                   compression_fn=None, compression_fn_kwargs=None):
         if self.stack_column_prefix_lst:
             if infer:
                 if set(self.stack_columns).issubset(set(list(X.columns))):
@@ -89,7 +90,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
                         y_pred_proba = model_pred_proba_dict[base_model_name]
                     else:
-                        base_model = self.load_base_model(base_model_name)
+                        base_model = self.load_base_model(base_model_name, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
                         y_pred_proba = base_model.predict_proba(X)
                     X_stacker.append(y_pred_proba)  # TODO: This could get very large on a high class count problem. Consider capping to top N most frequent classes and merging least frequent
                 X_stacker = self.pred_probas_to_df(X_stacker, index=X.index)
@@ -224,13 +225,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
 
-    def load_base_model(self, model_name):
+    def load_base_model(self, model_name, compression_fn=None, compression_fn_kwargs=None):
         if model_name in self.base_models_dict.keys():
             model = self.base_models_dict[model_name]
         else:
             model_type = self.base_model_types_dict[model_name]
             model_path = self.base_model_paths_dict[model_name]
-            model = model_type.load(model_path)
+            model = model_type.load(model_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         return model
 
     def get_info(self):

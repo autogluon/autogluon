@@ -694,7 +694,8 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
+    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_fn=None,
+             compression_fn_kwargs=None):
         """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
             directory (str): if unspecified, use self.path as directory
             return_filename (bool): return the file-name corresponding to this save
@@ -714,7 +715,8 @@ class TabularNeuralNetModel(AbstractModel):
         temp_sw = self.summary_writer
         self.model = None
         self.summary_writer = None
-        modelobj_filepath = super().save(file_prefix=file_prefix, directory=directory, return_filename=True, verbose=verbose)
+        modelobj_filepath = super().save(file_prefix=file_prefix, directory=directory, return_filename=True, verbose=verbose, compression_fn=compression_fn,
+             compression_fn_kwargs=compression_fn_kwargs)
         self.model = temp_model
         self.summary_writer = temp_sw
         self._architecture_desc = None
@@ -722,12 +724,12 @@ class TabularNeuralNetModel(AbstractModel):
             return modelobj_filepath
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
         """ file_prefix (str): Appended to beginning of file-name.
             If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
         """
         path = path + file_prefix
-        obj: TabularNeuralNetModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose)
+        obj: TabularNeuralNetModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         if reset_paths:
             obj.set_contexts(path)
         if obj._architecture_desc is not None:

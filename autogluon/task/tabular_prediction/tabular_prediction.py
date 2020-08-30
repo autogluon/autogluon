@@ -80,7 +80,6 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=None,
             visualizer='none',
             verbosity=2,
-            compression_level=0,
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -323,11 +322,6 @@ class TabularPrediction(BaseTask):
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
             If using logging, you can alternatively control amount of information printed via `logger.setLevel(L)`,
             where `L` ranges from 0 to 50 (Note: higher values of `L` correspond to fewer print statements, opposite of verbosity levels)
-        compression_level : int, default = 0
-            compression_level ranges from 0 to 9 and controls the gzip compression level of pickle files being saved to
-            disk. 0 is the default value and corresponds to no compression.  1 is the lowest level with compression and
-            will result in the fastest save/load times.  9 is the highest level of compression, with the smallest files
-            and slowest load/save times.
 
         Kwargs can include additional arguments for advanced users:
             AG_args_fit : dict, default={}
@@ -425,6 +419,18 @@ class TabularPrediction(BaseTask):
                     The seed used for stack level L is equal to `seed+L`.
                     This means `random_seed=1` will have the same split indices at L=0 as `random_seed=0` will have at L=1.
                 If `random_seed=None`, a random integer is used.
+            compression_fn : str, default = None
+                Compression algorithm used to compress pickle files saved/loaded on disk.
+                valid values are: 'gzip', 'bz2' and 'lzma'.  'gzip' corresponds to the gzip format and will result in pickle files with extension *.gz, 'bz2' corresponds to the bzip2 compression algorithm and
+                will store files with extension *.bz2, 'lzma' corresponds to LZMA compression algorithm and will create pickle files with extension *.lzma.
+            compression_fn_kwargs : dict, default = None
+                Keyword arguments to be passed into compression_fn open operation. A common argument is 'compresslevel'
+                that ranges from 0 to 9 and controls the compression level of pickle files being saved to
+                disk. 0 is the default value and corresponds to no compression.  1 is the lowest level with compression and
+                will result in the fastest save/load times.  9 is the highest level of compression, with the smallest files
+                and slowest load/save times. For descriptions and supported arguments for each compression function,
+                see https://docs.python.org/3/library/gzip.html#gzip.open for gzip, https://docs.python.org/3/library/lzma.html#lzma.open
+                for lzma, and https://docs.python.org/3/library/bz2.html#bz2.open for bz2.
 
         Returns
         -------
@@ -456,11 +462,6 @@ class TabularPrediction(BaseTask):
         elif verbosity > 4:
             verbosity = 4
 
-        if compression_level < 0:
-            compression_level = 0
-        elif compression_level > 9:
-            compression_level = 9
-
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
             'feature_generator_type',
@@ -477,7 +478,9 @@ class TabularPrediction(BaseTask):
             'cache_data',
             'refit_full',
             'random_seed',
-            'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
+            'enable_fit_continuation',  # TODO: Remove on 0.1.0 release
+            'compression_fn',
+            'compression_fn_kwargs'
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
@@ -532,6 +535,9 @@ class TabularPrediction(BaseTask):
             hyperparameters = 'default'
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
+
+        compression_fn = kwargs.get('compression_fn', '')
+        compression_fn_kwargs = kwargs.get('compression_fn_kwargs', {})
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
@@ -604,12 +610,13 @@ class TabularPrediction(BaseTask):
         scheduler_options = (scheduler_cls, scheduler_options)  # wrap into tuple
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
+                          label_count_threshold=label_count_threshold, random_seed=random_seed, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig,
-                    save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, compression_level=compression_level)
+                    save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, compression_fn=compression_fn,
+                    compression_fn_kwargs=compression_fn_kwargs)
 
         predictor = TabularPredictor(learner=learner)
 

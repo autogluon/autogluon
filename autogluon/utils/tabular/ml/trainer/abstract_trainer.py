@@ -41,14 +41,15 @@ class AbstractTrainer:
     def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
                  num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2,
-                 compression_level=0):
+                 compression_fn=None, compression_fn_kwargs=None):
         self.path = path
         self.problem_type = problem_type
         self.feature_types_metadata = feature_types_metadata
         self.save_data = save_data
         self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
-        self.compression_level = compression_level
+        self.compression_fn = compression_fn
+        self.compression_fn_kwargs = compression_fn_kwargs
         if eval_metric is not None:
             self.eval_metric = eval_metric
         else:
@@ -161,19 +162,23 @@ class AbstractTrainer:
 
     def save_X_train(self, X, verbose=True):
         path = self.path_data + 'X_train.pkl'
-        save_pkl.save(path=path, object=X, verbose=verbose, compression_level=self.compression_level)
+        save_pkl.save(path=path, object=X, verbose=verbose, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def save_X_val(self, X, verbose=True):
         path = self.path_data + 'X_val.pkl'
-        save_pkl.save(path=path, object=X, verbose=verbose, compression_level=self.compression_level)
+        save_pkl.save(path=path, object=X, verbose=verbose, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def save_y_train(self, y, verbose=True):
         path = self.path_data + 'y_train.pkl'
-        save_pkl.save(path=path, object=y, verbose=verbose, compression_level=self.compression_level)
+        save_pkl.save(path=path, object=y, verbose=verbose, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def save_y_val(self, y, verbose=True):
         path = self.path_data + 'y_val.pkl'
-        save_pkl.save(path=path, object=y, verbose=verbose, compression_level=self.compression_level)
+        save_pkl.save(path=path, object=y, verbose=verbose, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def get_model_names_all(self, can_infer=None):
         model_names_all = list(self.model_graph.nodes)
@@ -586,7 +591,7 @@ class AbstractTrainer:
             extra_params = {}
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        eval_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, **extra_params)
+                                                        eval_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs, **extra_params)
 
         self.train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
@@ -813,7 +818,8 @@ class AbstractTrainer:
                     cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
-                X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True)
+                X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True,
+                                                       compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
                 if len(cols_to_drop) > 0:
                     X = X.drop(cols_to_drop, axis=1)
         return X
@@ -980,12 +986,13 @@ class AbstractTrainer:
         if reduce_memory:
             model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if self.low_memory:
-            model.save(compression_level=self.compression_level)
+            model.save(compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
         else:
             self.models[model.name] = model
 
     def save(self):
-        save_pkl.save(path=self.path + self.trainer_file_name, object=self, compression_level=self.compression_level)
+        save_pkl.save(path=self.path + self.trainer_file_name, object=self, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def load_models_into_memory(self, model_names=None):
         if model_names is None:
@@ -1018,7 +1025,7 @@ class AbstractTrainer:
                 path = self.model_paths[model_name]
             if model_type is None:
                 model_type = self.model_types[model_name]
-            return model_type.load(path=path, reset_paths=self.reset_paths)
+            return model_type.load(path=path, reset_paths=self.reset_paths, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
 
     def _get_dummy_stacker(self, level, model_levels=None, use_orig_features=True):
         if model_levels is None:
@@ -1379,12 +1386,12 @@ class AbstractTrainer:
                 model.delete_from_disk()
 
     @classmethod
-    def load(cls, path, reset_paths=False):
+    def load(cls, path, reset_paths=False, compression_fn=None, compression_fn_kwargs=None):
         load_path = path + cls.trainer_file_name
         if not reset_paths:
-            return load_pkl.load(path=load_path)
+            return load_pkl.load(path=load_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         else:
-            obj = load_pkl.load(path=load_path)
+            obj = load_pkl.load(path=load_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
             obj.set_contexts(path)
             obj.reset_paths = reset_paths
             return obj

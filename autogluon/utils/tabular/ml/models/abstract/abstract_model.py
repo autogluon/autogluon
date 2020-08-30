@@ -327,21 +327,23 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_level=0):
+    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_fn=None,
+             compression_fn_kwargs=None):
         if directory is None:
             directory = self.path
         file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_level=compression_level)
+        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_fn=compression_fn,
+                      compression_fn_kwargs=compression_fn_kwargs)
         if return_filename:
             return file_name
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
+    def load(cls, path, file_prefix="", reset_paths=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
         load_path = path + file_prefix + cls.model_file_name
         if not reset_paths:
-            return load_pkl.load(path=load_path, verbose=verbose)
+            return load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         else:
-            obj = load_pkl.load(path=load_path, verbose=verbose)
+            obj = load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
             obj.set_contexts(path)
             return obj
 

@@ -36,7 +36,7 @@ class AbstractLearner:
     learner_info_json_name = 'info.json'
 
     def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: AbstractFeatureGenerator, label_count_threshold=10,
-                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
+                 problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0, compression_fn=None, compression_fn_kwargs=None):
         self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
         self.label = label
         self.submission_columns = id_columns
@@ -49,6 +49,8 @@ class AbstractLearner:
         if random_seed is None:
             random_seed = random.randint(0, 1000000)
         self.random_seed = random_seed
+        self.compression_fn = compression_fn
+        self.compression_fn_kwargs = compression_fn_kwargs
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: AbstractFeatureGenerator = feature_generator
@@ -86,7 +88,8 @@ class AbstractLearner:
         return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
-            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2, compression_level=0):
+            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2, compression_fn=None,
+            compression_fn_kwargs=None):
         raise NotImplementedError
 
     # TODO: Add pred_proba_cache functionality as in predict()
@@ -563,8 +566,9 @@ class AbstractLearner:
     def infer_problem_type(y: Series):
         return infer_problem_type(y=y)
 
-    def save(self, compression_level=0):
-        save_pkl.save(path=self.save_path, object=self, compression_level=compression_level)
+    def save(self, compression_fn=None, compression_fn_kwargs=None):
+        save_pkl.save(path=self.save_path, object=self, compression_fn=compression_fn,
+                      compression_fn_kwargs=compression_fn_kwargs)
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
@@ -595,7 +599,8 @@ class AbstractLearner:
         if self.is_trainer_present:
             return self.trainer
         else:
-            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths)
+            return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths,
+                                          compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
 
     # TODO: Add to predictor
     # TODO: Make this safe in large ensemble situations that would result in OOM

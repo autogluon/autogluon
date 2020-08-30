@@ -2,10 +2,12 @@ import io, logging, pickle, boto3, gzip
 
 from . import load_pointer
 from .. import s3_utils
+from ...utils.savers import save_pkl
 
 logger = logging.getLogger(__name__)
 
-def load(path, format=None, verbose=True):
+
+def load(path, format=None, verbose=True, compression_fn=None, compression_fn_kwargs=None):
     if path.endswith('.pointer'):
         format = 'pointer'
     elif s3_utils.is_s3_url(path):
@@ -22,12 +24,20 @@ def load(path, format=None, verbose=True):
         return pickle.loads(s3.Bucket(s3_bucket).Object(s3_prefix).get()['Body'].read())
 
     if verbose: logger.log(15, 'Loading: %s' % path)
-    # TODO: refactor/remove - temp testing
-    # TODO: checking path/gzip logic
-    # with open(path, 'rb') as fin:
-    #     object = pickle.load(fin)
-    with gzip.open(path, 'rb') as fin:
-        object = pickle.load(fin)
+
+    # TODO: extract to compression helper
+    compression_fn_map = save_pkl.get_compression_map()
+    validated_path = save_pkl.get_validated_path(path, compression_fn=compression_fn)
+
+    if compression_fn_kwargs is None:
+        compression_fn_kwargs = {}
+
+    if compression_fn in compression_fn_map:
+        with compression_fn_map[compression_fn]['open'](validated_path, 'rb', **compression_fn_kwargs) as fin:
+            object = pickle.load(fin)
+    else:
+        raise ValueError(f'compression_fn={compression_fn} is not a valid compression_fn. Valid values: {compression_fn_map.keys()}')
+
     return object
 
 

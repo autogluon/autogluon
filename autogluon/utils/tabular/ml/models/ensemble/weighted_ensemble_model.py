@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 # TODO: Optimize predict speed when fit on kfold, can simply sum weights
 class WeightedEnsembleModel(StackerEnsembleModel):
     def __init__(self, base_model_names, base_model_paths_dict, base_model_types_dict, **kwargs):
-        model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False)
+        compression_fn = kwargs.get('compression_fn', '')
+        compression_fn_kwargs = kwargs.get('compression_fn_kwargs', {})
+        model_0 = base_model_types_dict[base_model_names[0]].load(path=base_model_paths_dict[base_model_names[0]], verbose=False, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         super().__init__(model_base=model_0, base_model_names=base_model_names, base_model_paths_dict=base_model_paths_dict, base_model_types_dict=base_model_types_dict, use_orig_features=False, **kwargs)
         child_hyperparameters = kwargs.get('_tmp_greedy_hyperparameters', None)  # TODO: Rework to avoid this hack
         self.model_base = GreedyWeightedEnsembleModel(path='', name='greedy_ensemble', num_classes=self.num_classes, base_model_names=self.stack_column_prefix_lst, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric, hyperparameters=child_hyperparameters)
