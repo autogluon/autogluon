@@ -103,7 +103,7 @@ class TabularPredictor(BasePredictor):
         logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
         return self._trainer.model_performance
 
-    def predict(self, dataset, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
             Parameters
@@ -117,12 +117,6 @@ class TabularPredictor(BasePredictor):
                 Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
-            use_pred_cache : bool (optional)
-                Whether to used previously-cached predictions for table rows we have already predicted on before
-                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them).
-            add_to_pred_cache : bool (optional)
-                Whether these predictions should be cached for reuse in future `predict()` calls on the same table rows
-                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them).
 
             Returns
             -------
@@ -130,7 +124,7 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas)
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
