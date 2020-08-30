@@ -63,7 +63,7 @@ def list_bucket_prefix_suffix_contains_s3(bucket, prefix, suffix=None, banned_su
         for banned_suffix in banned_suffixes:
             if banned_suffix in suffix_full:
                 is_banned = True
-        if (not is_banned) and ((suffix is None) or (suffix in suffix_full)) and contains in suffix_full:
+        if (not is_banned) and ((suffix is None) or (suffix in suffix_full)) and (contains is None or contains in suffix_full):
             files.append(object_summary.key)
 
     return files

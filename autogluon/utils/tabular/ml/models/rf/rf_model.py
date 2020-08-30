@@ -106,7 +106,7 @@ class RFModel(SKLearnModel):
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
-                ideal_memory_ratio = 0.18 * max_memory_usage_ratio
+                ideal_memory_ratio = 0.15 * max_memory_usage_ratio
                 n_estimators_ideal = min(n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
 
                 if n_estimators_final > n_estimators_ideal:
