@@ -77,10 +77,7 @@ def spunge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=1
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
     continuous_types = ['float', 'int']
-    continuous_featnames = [] # these features will have shuffled values with added noise
-    for contype in continuous_types:
-        if contype in feature_metadata.type_group_map_raw:
-            continuous_featnames += feature_metadata.type_group_map_raw[contype]
+    continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
 
     for i in range(num_augmented_samples): # hot-deck sample some features per datapoint
         og_ind = i % len(X)
@@ -139,10 +136,7 @@ def munge_augment(X, feature_metadata: FeatureMetadata, num_augmented_samples=10
     X_aug = pd.concat([X.iloc[[0]].copy()]*num_augmented_samples)
     X_aug.reset_index(drop=True, inplace=True)
     continuous_types = ['float', 'int']
-    continuous_featnames = [] # these features will have shuffled values with added noise
-    for contype in continuous_types:
-        if contype in feature_metadata.type_group_map_raw:
-            continuous_featnames += feature_metadata.type_group_map_raw[contype]
+    continuous_featnames = feature_metadata.get_features(valid_raw_types=continuous_types)  # these features will have shuffled values with added noise
     for col in continuous_featnames:
         X_aug[col] = X_aug[col].astype(float)
         X[col] = X[col].astype(float)

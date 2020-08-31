@@ -72,10 +72,10 @@ class GeneratorHelper:
 
         # Ensure feature_metadata_in is as expected
         if expected_feature_metadata_in_full is not None:
-            assert expected_feature_metadata_in_full == generator.feature_metadata_in.get_feature_metadata_full()
+            assert expected_feature_metadata_in_full == generator.feature_metadata_in.to_dict(inverse=True)
         # Ensure feature_metadata is as expected
         if expected_feature_metadata_full is not None:
-            assert expected_feature_metadata_full == generator.feature_metadata.get_feature_metadata_full()
+            assert expected_feature_metadata_full == generator.feature_metadata.to_dict(inverse=True)
     
         return output_data
 

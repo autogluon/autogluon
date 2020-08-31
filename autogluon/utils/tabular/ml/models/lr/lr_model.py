@@ -42,7 +42,7 @@ class LinearModel(AbstractModel):
         if self.types_of_features is not None:
             logger.warning("Attempting to _get_types_of_features for LRModel, but previously already did this.")
 
-        feature_types = self.feature_metadata.type_group_map_raw
+        feature_types = self.feature_metadata.get_type_group_map_raw()
 
         categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
         continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')

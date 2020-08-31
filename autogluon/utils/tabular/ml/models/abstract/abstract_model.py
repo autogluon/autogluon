@@ -227,18 +227,13 @@ class AbstractModel:
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
             ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
-            if ignored_type_group_raw:
-                for ignored_feature_type in ignored_type_group_raw:
-                    self.features = [feature for feature in self.features if feature not in self.feature_metadata.type_group_map_raw[ignored_feature_type]]
             ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
-            if ignored_type_group_special:
-                for ignored_feature_type in ignored_type_group_special:
-                    self.features = [feature for feature in self.features if feature not in self.feature_metadata.type_group_map_special[ignored_feature_type]]
+            valid_features = self.feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
-            if ignored_type_group_raw or ignored_type_group_special:
-                if list(X.columns) != self.features:
-                    X = X[self.features]
+            if list(X.columns) != self.features:
+                X = X[self.features]
         return X
 
     def _preprocess_fit_args(self, **kwargs):

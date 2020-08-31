@@ -92,7 +92,7 @@ def test_feature_metadata(data_helper):
         # Error because feature_metadata_remove and feature_metadata_custom share a raw feature
         FeatureMetadata.join_metadatas(metadata_list=[feature_metadata_keep, feature_metadata_remove, feature_metadata_custom])
 
-    assert feature_metadata.get_feature_metadata_full() == expected_feature_metadata_full
+    assert feature_metadata.to_dict(inverse=True) == expected_feature_metadata_full
     assert feature_metadata.get_features() == expected_feature_metadata_get_features
     assert feature_metadata.type_map_raw == expected_type_map_raw
     assert dict(feature_metadata.type_group_map_special) == expected_type_group_map_special
@@ -104,10 +104,10 @@ def test_feature_metadata(data_helper):
     assert feature_metadata_recombined_full.get_feature_types_special('int') == ['custom_special_type']
     assert feature_metadata_recombined_full.get_feature_type_raw('new_feature') == 'custom_raw_type'
 
-    assert feature_metadata_renamed.get_feature_metadata_full() == expected_feature_metadata_renamed_full
-    assert feature_metadata_recombined.get_feature_metadata_full() == feature_metadata.get_feature_metadata_full()
-    assert feature_metadata_recombined_alternate.get_feature_metadata_full() == feature_metadata.get_feature_metadata_full()
-    assert feature_metadata_recombined_full.get_feature_metadata_full() == expected_feature_metadata_recombined_full_full
+    assert feature_metadata_renamed.to_dict(inverse=True) == expected_feature_metadata_renamed_full
+    assert feature_metadata_recombined.to_dict() == feature_metadata.to_dict()
+    assert feature_metadata_recombined_alternate.to_dict() == feature_metadata.to_dict()
+    assert feature_metadata_recombined_full.to_dict(inverse=True) == expected_feature_metadata_recombined_full_full
 
 
 def test_feature_metadata_get_features():

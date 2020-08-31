@@ -242,7 +242,7 @@ class AbstractFeatureGenerator:
             self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
-        self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.type_group_map_raw)
+        self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.get_type_group_map_raw())
 
         self._post_fit_cleanup()
         self._features_out_internal = self.features_out.copy()

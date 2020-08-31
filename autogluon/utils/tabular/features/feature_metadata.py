@@ -61,12 +61,6 @@ class FeatureMetadata:
             ['binned', 'datetime_as_int', 'datetime_as_object', 'text', 'text_as_category', 'text_special', 'text_ngram', 'stack']
         Feature names that appear in the value lists must also be keys in type_map_raw.
         Feature names are not required to have special types.
-
-    Attributes
-    ----------
-    type_group_map_raw : Dict[str, List[str]]
-        Identical structure to type_group_map_special, but with type_map_raw values used.
-        Specifically, type_map_raw unique values are used as keys, and the list of features which contain the raw type are the values.
     """
     def __init__(self, type_map_raw: Dict[str, str], type_group_map_special: Dict[str, List[str]] = None):
         if type_group_map_special is None:
@@ -75,29 +69,23 @@ class FeatureMetadata:
             type_group_map_special = defaultdict(list, type_group_map_special)
 
         self.type_map_raw = type_map_raw
-        self.type_group_map_raw = self._get_type_group_map_raw_from_flattened(type_map_raw=self.type_map_raw)  # TODO: Remove as a variable, make a method to generate.
         self.type_group_map_special = type_group_map_special
 
         self._validate()
 
     # Confirms if inputs are valid
     def _validate(self):
-        type_group_map_raw_expanded = []
-        for key in self.type_group_map_raw:
-            type_group_map_raw_expanded += self.type_group_map_raw[key]
         type_group_map_special_expanded = []
         for key in self.type_group_map_special:
             type_group_map_special_expanded += self.type_group_map_special[key]
-        type_group_map_raw_expanded_set = set(type_group_map_raw_expanded)
-        if len(type_group_map_raw_expanded) != len(type_group_map_raw_expanded_set):
-            raise AssertionError('type_group_map_raw contains features that appear multiple times.')
 
         features_invalid = []
+        type_map_raw_keys = self.type_map_raw.keys()
         for feature in type_group_map_special_expanded:
-            if feature not in type_group_map_raw_expanded:
+            if feature not in type_map_raw_keys:
                 features_invalid.append(feature)
         if features_invalid:
-            raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_group_map_raw. Invalid features: {features_invalid}")
+            raise AssertionError(f"{len(features_invalid)} features are present in type_group_map_special but not in type_map_raw. Invalid features: {features_invalid}")
 
     # Note: This is not optimized for speed. Do not rely on this function during inference.
     # TODO: Add valid_names, invalid_names arguments which override all other arguments for the features listed?
@@ -195,10 +183,9 @@ class FeatureMetadata:
             raise KeyError(f'{feature} does not exist in {self.__class__.__name__}.')
         return self._get_feature_types(feature=feature, feature_types_dict=self.type_group_map_special)
 
-    @staticmethod
-    def _get_type_group_map_raw_from_flattened(type_map_raw):
+    def get_type_group_map_raw(self):
         type_group_map_raw = defaultdict(list)
-        for feature, dtype in type_map_raw.items():
+        for feature, dtype in self.type_map_raw.items():
             type_group_map_raw[dtype].append(feature)
         return type_group_map_raw
 
@@ -212,7 +199,6 @@ class FeatureMetadata:
         if features_invalid:
             raise KeyError(f'remove_features was called with a feature that does not exist in feature metadata. Invalid Features: {features_invalid}')
         metadata._remove_features_from_type_map(d=metadata.type_map_raw, features=features)
-        metadata._remove_features_from_type_group_map(d=metadata.type_group_map_raw, features=features)
         metadata._remove_features_from_type_group_map(d=metadata.type_group_map_special, features=features)
         return metadata
 
@@ -246,9 +232,8 @@ class FeatureMetadata:
         after_len = len(metadata.type_map_raw.keys())
         if before_len != after_len:
             raise AssertionError(f'key names conflicted during renaming. Do not rename features to exist feature names.')
-        metadata.type_group_map_raw = metadata._get_type_group_map_raw_from_flattened(type_map_raw=metadata.type_map_raw)
-        for type in metadata.type_group_map_special:
-            metadata.type_group_map_special[type] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[type]]
+        for dtype in metadata.type_group_map_special:
+            metadata.type_group_map_special[dtype] = [rename_map.get(feature, feature) for feature in metadata.type_group_map_special[dtype]]
         return metadata
 
     # TODO: Add documentation on shared_raw_features usage
@@ -320,25 +305,36 @@ class FeatureMetadata:
             metadata_new = metadata_new.join_metadata(metadata, shared_raw_features=shared_raw_features)
         return metadata_new
 
-    def get_feature_metadata_full(self) -> dict:
-        feature_metadata_full = defaultdict(list)
+    def to_dict(self, inverse=False) -> dict:
+        if not inverse:
+            feature_metadata_dict = dict()
+        else:
+            feature_metadata_dict = defaultdict(list)
 
         for feature in self.get_features():
             feature_type_raw = self.type_map_raw[feature]
             feature_types_special = tuple(self.get_feature_types_special(feature))
-            feature_metadata_full[(feature_type_raw, feature_types_special)].append(feature)
+            if not inverse:
+                feature_metadata_dict[feature] = (feature_type_raw, feature_types_special)
+            else:
+                feature_metadata_dict[(feature_type_raw, feature_types_special)].append(feature)
 
-        feature_metadata_full = dict(feature_metadata_full)
+        if inverse:
+            feature_metadata_dict = dict(feature_metadata_dict)
 
-        return feature_metadata_full
+        return feature_metadata_dict
 
-    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20):
-        feature_metadata_full = self.get_feature_metadata_full()
-        if not feature_metadata_full:
-            return
-        keys = list(feature_metadata_full.keys())
+    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20, max_list_len=3, return_str=False):
+        feature_metadata_dict = self.to_dict(inverse=True)
+        if not feature_metadata_dict:
+            if return_str:
+                return ''
+            else:
+                return
+        keys = list(feature_metadata_dict.keys())
         keys = sorted(keys)
-        output = [((key[0], list(key[1])), feature_metadata_full[key]) for key in keys]
+        output = [((key[0], list(key[1])), feature_metadata_dict[key]) for key in keys]
+        output_str = ''
         if print_only_one_special:
             for i, ((raw, special), features) in enumerate(output):
                 if len(special) == 1:
@@ -355,14 +351,28 @@ class FeatureMetadata:
             val_len = len(str(len(val)))
             max_key_minus_cur = max(max_key_len - key_len, 0)
             max_val_minus_cur = max(max_val_len - val_len, 0)
-            features = str(val[:3])
-            if len(val) > 3:
-                features = features[:-1] + ', ...]'
+            if max_list_len is not None:
+                features = str(val[:max_list_len])
+                if len(val) > max_list_len:
+                    features = features[:-1] + ', ...]'
+            else:
+                features = str(val)
             if val:
-                logger.log(log_level, f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}')
+                message = f'{log_prefix}{key}{" " * max_key_minus_cur} : {" " * max_val_minus_cur}{len(val)} | {features}'
+                if return_str:
+                    output_str += message + '\n'
+                else:
+                    logger.log(log_level, message)
+        if return_str:
+            if output_str[-1] == '\n':
+                output_str = output_str[:-1]
+            return output_str
 
     @classmethod
     def from_df(cls, df):
         type_map_raw = get_type_map_raw(df)
         type_group_map_special = get_type_group_map_special(df)
         return cls(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    def __str__(self):
+        return self.print_feature_metadata_full(return_str=True)

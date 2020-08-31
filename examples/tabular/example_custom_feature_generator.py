@@ -162,7 +162,7 @@ predictor = task.fit(train_data=train_data, label='class', hyperparameters=examp
 X_test_transform_2 = predictor.transform_features(X_test)  # This is the same as calling auto_ml_pipeline_feature_generator.transform(X_test)
 assert(X_test_transform.equals(X_test_transform_2))
 # The feature metadata of the feature generator is also preserved. All downstream models will get this feature metadata information to make decisions on how they use the data.
-assert(predictor.feature_metadata.get_feature_metadata_full() == auto_ml_pipeline_feature_generator.feature_metadata.get_feature_metadata_full())
+assert(predictor.feature_metadata.to_dict() == auto_ml_pipeline_feature_generator.feature_metadata.to_dict())
 predictor.leaderboard(test_data)
 
 # We can train multiple predictors with the same pre-fit feature generator. This can save a lot of time during experimentation if the fitting of the generator is expensive.
