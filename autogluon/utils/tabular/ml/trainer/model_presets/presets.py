@@ -49,7 +49,7 @@ MODEL_TYPES = dict(
     CAT=CatboostModel,
     NN=TabularNeuralNetModel,
     LR=LinearModel,
-    FASTAINN=NNFastAiTabularModel,
+    FASTAI=NNFastAiTabularModel,
 )
 
 DEFAULT_MODEL_NAMES = {

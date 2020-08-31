@@ -90,6 +90,6 @@ def try_import_fastai_v1():
         import fastai
         fastai_version = parse_version(fastai.__version__)
         assert parse_version('1.0.61') <= fastai_version < parse_version('2.0.0'), 'Currently, we only support 1.0.61<=fastai<2.0.0'
-    except OSError as e:
+    except ModuleNotFoundError as e:
         raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==1.*`. "
-                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.2.0`.")
+                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")

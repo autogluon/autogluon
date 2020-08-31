@@ -13,6 +13,7 @@ def get_param_baseline(problem_type, num_classes=None):
 
 
 def get_param_multiclass_baseline():
+    # TODO: explore/add other hyperparameters like weight decay, use of batch-norm, activation-function choice, etc.
     params = {
         # See docs: https://docs.fast.ai/tabular.models.html
         'layers': None,  # layers configuration; None - use model's heuristics
@@ -23,12 +24,11 @@ def get_param_multiclass_baseline():
         # maximum learning rate for one cycle policy https://docs.fast.ai/train.html#fit_one_cycle
         # One-cycle policy paper: https://arxiv.org/abs/1803.09820
         'lr': 1e-2,
-        'epochs': 30,  # number of epochs
-        'metric': 'accuracy',
+        'epochs': 30,  # maximum number of epochs
 
         # Early stopping settings. See more details here: https://docs.fast.ai/callbacks.tracker.html#EarlyStoppingCallback
         'early.stopping.min_delta': 0.0001,
-        'early.stopping.patience': 10,
+        'early.stopping.patience': 20,
 
         # If > 0, then use LabelSmoothingCrossEntropy loss function for binary/multi-class classification;
         # otherwise use default loss function for this type of problem

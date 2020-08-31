@@ -44,6 +44,7 @@ def make_temp_directory():
 
 
 # TODO: Takes extremely long time prior to training start if many (10000) continuous features from ngrams, debug - explore TruncateSVD option to reduce input dimensionality
+# TODO: currently fastai automatically detect and use CUDA if available - add code to honor autogluon settings
 class NNFastAiTabularModel(AbstractModel):
     """ Class for fastai v1 neural network models that operate on tabular data.
 
@@ -229,19 +230,19 @@ class NNFastAiTabularModel(AbstractModel):
             'f1': FBeta(beta=1),
             'f1_macro': FBeta(beta=1, average='macro'),
             'f1_micro': FBeta(beta=1, average='micro'),
-            'f1_weighted': FBeta(beta=1, average='weigthed'),  # this one has some issues
+            'f1_weighted': FBeta(beta=1, average='weighted'),  # this one has some issues
 
             'roc_auc': AUROC(),
 
             'precision': Precision(),
             'precision_macro': Precision(average='macro'),
             'precision_micro': Precision(average='micro'),
-            'precision_weigthed': Precision(average='weigthed'),
+            'precision_weighted': Precision(average='weighted'),
 
             'recall': Recall(),
             'recall_macro': Recall(average='macro'),
             'recall_micro': Recall(average='micro'),
-            'recall_weigthed': Recall(average='weigthed'),
+            'recall_weighted': Recall(average='weighted'),
             # Not supported: pac_score
         }
 
@@ -266,11 +267,11 @@ class NNFastAiTabularModel(AbstractModel):
 
             'precision_macro': 'precision',
             'precision_micro': 'precision',
-            'precision_weigthed': 'precision',
+            'precision_weighted': 'precision',
 
             'recall_macro': 'recall',
             'recall_micro': 'recall',
-            'recall_weigthed': 'recall',
+            'recall_weighted': 'recall',
             'log_loss': 'valid_loss',
         }
         objective_func_name_to_monitor = objective_func_name
