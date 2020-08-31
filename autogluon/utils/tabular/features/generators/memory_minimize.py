@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
+    """
+    Minimizes memory usage of category features by converting the category values to monotonically increasing int values.
+    This is important for category features with string values which can take up significant memory despite the string information not being used downstream.
+    """
     def __init__(self, inplace=False, **kwargs):
         super().__init__(**kwargs)
         self.inplace = inplace
@@ -48,6 +52,15 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
 
 # TODO: What about nulls / unknowns?
 class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
+    """
+    Clips and converts dtype of int features to minimize memory usage.
+
+    dtype_out : np.dtype, default np.uint8
+        dtype to clip and convert features to.
+        Clipping will automatically use the correct min and max values for the dtype provided.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+    """
     def __init__(self, dtype_out=np.uint8, **kwargs):
         super().__init__(**kwargs)
         self.dtype_out, self._clip_min, self._clip_max = self._get_dtype_clip_args(dtype_out)

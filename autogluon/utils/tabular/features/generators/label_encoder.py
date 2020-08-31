@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: LabelEncoderTransformer
 class LabelEncoderFeatureGenerator(AbstractFeatureGenerator):
+    """Converts category features to int features by mapping to the category codes."""
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         X_out = self._transform(X)
         feature_metadata_out_type_group_map_special = copy.deepcopy(self.feature_metadata_in.type_group_map_special)

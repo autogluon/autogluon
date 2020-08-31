@@ -103,5 +103,3 @@ def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):
 
     # text_ngram checks
     assert expected_output_data_feat_total == list(output_data['__nlp__._total_'].values)
-
-

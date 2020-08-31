@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 # TODO: Add int fillna input value options: 0, set value, mean, mode, median
 class AsTypeFeatureGenerator(AbstractFeatureGenerator):
+    """
+    Enforces type conversion on the data to match the types seen during fitting.
+    If a feature cannot be converted to the correct type, an exception will be raised.
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._feature_metadata_in_real: FeatureMetadata = None  # FeatureMetadata object based on the original input features real dtypes (will contain dtypes such as 'int16' and 'float32' instead of 'int' and 'float').

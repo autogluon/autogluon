@@ -28,6 +28,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         return dict()
 
     # TODO: optimize categorical/object handling
+    # TODO: Potentially use subsamples?
     def _drop_duplicate_features(self, X: DataFrame) -> list:
         feature_sum_map = defaultdict(list)
         for feature in self.feature_metadata_in.get_features(valid_raw_types=[R_INT, R_FLOAT]):

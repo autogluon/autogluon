@@ -5,6 +5,7 @@ import numpy as np
 from autogluon.utils.tabular.features.generators import FillNaFeatureGenerator
 
 
+# TODO: Consider adding test of loading from csv
 def test_fillna_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()

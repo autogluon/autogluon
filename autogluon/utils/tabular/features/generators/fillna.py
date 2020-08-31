@@ -13,6 +13,24 @@ logger = logging.getLogger(__name__)
 # TODO: Add options to specify mean/median/mode for int/float
 # TODO: Add fillna_features for feature specific fill values
 class FillNaFeatureGenerator(AbstractFeatureGenerator):
+    """
+    Fills missing values in the data.
+
+    Parameters
+    ----------
+    fillna_map : dict, default {'object': ''}
+        Map which dictates the fill values of NaNs.
+        Keys are the raw types of the features as in self.feature_metadata_in.type_map_raw.
+        If a feature's raw type is not present in fillna_map, its NaN values are filled to fillna_default.
+    fillna_default, default np.nan
+        The default fillna value if the feature's raw type is not present in fillna_map.
+        Be careful about setting this to anything other than np.nan, as not all raw types can handle int, float, or string values.
+    inplace : bool, default False
+        If True, then the NaN values are filled inplace without copying the input data.
+        This will alter the input data outside of the scope of this function.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+    """
     def __init__(self, fillna_map=None, fillna_default=np.nan, inplace=False, **kwargs):
         super().__init__(**kwargs)
         if fillna_map is None:
@@ -24,10 +42,6 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         self._fillna_feature_map = {feature: self.fillna_map.get(self.feature_metadata_in.get_feature_type_raw(feature), self.fillna_default) for feature in self.feature_metadata_in.get_features()}
-        for feature in self._fillna_feature_map:
-            if self.feature_metadata_in.get_feature_type_raw(feature) == R_OBJECT and (isinstance(self._fillna_feature_map[feature], int) or isinstance(self._fillna_feature_map[feature], float)):
-                logger.warning(f'Warning: Feature {feature} has raw type of object but has {type(self._fillna_feature_map[feature])} fillna value of {self._fillna_feature_map[feature]}'
-                               f', If the feature could be coerced to {type(self._fillna_feature_map[feature])}, it will be if NaN values are present, which may cause defective behavior. Please set the fill value to a string value to prevent this behavior.')
         return self._transform(X), self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:

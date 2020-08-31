@@ -59,8 +59,12 @@ from pandas import DataFrame
 from autogluon.utils.tabular.features.generators import AbstractFeatureGenerator
 
 
-# Feature generator to add 1 to all values of integer features.
-class PlusOneFeatureGenerator(AbstractFeatureGenerator):
+# Feature generator to add k to all values of integer features.
+class PlusKFeatureGenerator(AbstractFeatureGenerator):
+    def __init__(self, k, **kwargs):
+        super().__init__(**kwargs)
+        self.k = k
+
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         # Here we can specify any logic we want to make a stateful feature generator based on the data.
         # Just call _transform since this isn't a stateful feature generator.
@@ -70,8 +74,8 @@ class PlusOneFeatureGenerator(AbstractFeatureGenerator):
 
     def _transform(self, X: DataFrame) -> DataFrame:
         # Here we can specify the logic taken to convert input data to output data post-fit. Here we can reference any variables created during fit if the generator is stateful.
-        # Because this feature generator is not stateful, we simply add 1 to all features.
-        return X + 1
+        # Because this feature generator is not stateful, we simply add k to all features.
+        return X + self.k
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:
@@ -82,8 +86,8 @@ class PlusOneFeatureGenerator(AbstractFeatureGenerator):
 # Fit custom feature generator #
 ################################
 
-plus_one_feature_generator = PlusOneFeatureGenerator(verbosity=3)
-X_transform = plus_one_feature_generator.fit_transform(X=X)
+plus_three_feature_generator = PlusKFeatureGenerator(k=3, verbosity=3)
+X_transform = plus_three_feature_generator.fit_transform(X=X)
 print(X_transform.head(5))
 
 ##################################
@@ -97,8 +101,8 @@ bulk_feature_generator = BulkFeatureGenerator(
     generators=[
         [AsTypeFeatureGenerator()],  # Stage 1: Convert feature types to be the same as during fit.
         [FillNaFeatureGenerator()],  # Stage 2: Fill NaN values of data
-        [  # Stage 3: Add 1 to all int features and convert all object features to category features. Concatenate the outputs of each.
-            PlusOneFeatureGenerator(),
+        [  # Stage 3: Add 5 to all int features and convert all object features to category features. Concatenate the outputs of each.
+            PlusKFeatureGenerator(k=5),
             CategoryFeatureGenerator(),
         ],
         [DropUniqueFeatureGenerator()],  # Stage 4: Drop any features which are always the same value (useless).
@@ -117,8 +121,8 @@ pipeline_feature_generator = PipelineFeatureGenerator(
     generators=[
         # Stage 1: Convert feature types to be the same as during fit. Does not need to be specified.
         # Stage 2: Fill NaN values of data. Does not need to be specified.
-        [  # Stage 3: Add 1 to all int features and convert all object features to category features. Concatenate the outputs of each.
-            PlusOneFeatureGenerator(),
+        [  # Stage 3: Add 5 to all int features and convert all object features to category features. Concatenate the outputs of each.
+            PlusKFeatureGenerator(k=5),
             CategoryFeatureGenerator(),
         ],
         # Stage 4: Drop any features which are always the same value (useless). Does not need to be specified.
@@ -166,5 +170,5 @@ predictor_2 = task.fit(train_data=train_data, label='class', hyperparameters=exa
 predictor_2.leaderboard(test_data)
 
 # We can even specify our custom generator too (although it needs to do a bit more to actually improve the scores, in most situations just use AutoMLPipelineFeatureGenerator)
-predictor_3 = task.fit(train_data=train_data, label='class', hyperparameters=example_models, feature_generator=plus_one_feature_generator)
+predictor_3 = task.fit(train_data=train_data, label='class', hyperparameters=example_models, feature_generator=plus_three_feature_generator)
 predictor_3.leaderboard(test_data)

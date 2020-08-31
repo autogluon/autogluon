@@ -70,7 +70,7 @@ class AbstractModel:
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
                 eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime.
+                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name
         self.path_root = path

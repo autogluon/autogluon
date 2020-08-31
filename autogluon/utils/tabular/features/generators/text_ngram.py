@@ -20,6 +20,28 @@ logger = logging.getLogger(__name__)
 # TODO: Add TFIDF support
 # TODO: Documentation
 class TextNgramFeatureGenerator(AbstractFeatureGenerator):
+    """
+    Generates ngram features from text features.
+
+    Parameters
+    ----------
+    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+        sklearn CountVectorizer which is used to generate the ngrams given the text data.
+    vectorizer_strategy : str, default 'combined'
+        If 'combined', all text features are concatenated together to fit the vectorizer. Features generated in this way have their names prepended with '__nlp__.'.
+        If 'separate', all text features are fit separately with their own copy of the vectorizer. Their ngram features are then concatenated together to form the output.
+        If 'both', the outputs of 'combined' and 'separate' are concatenated together to form the output.
+        It is generally recommended to keep vectorizer_strategy as 'combined' unless the text features are not associated with each-other, as fitting separate vectorizers could increase memory usage and model training time.
+        Valid values: ['combined', 'separate', 'both']
+    max_memory_ratio : float, default 0.15
+        Safety measure to avoid out-of-memory errors downstream in model training.
+        The number of ngrams generated will be capped to take at most max_memory_ratio proportion of total available memory, treating the ngrams as float32 values.
+        ngram features will be removed in least frequent to most frequent order.
+        Note: For vectorizer_strategy values other than 'combined', the resulting ngrams may use more than this value.
+        It is recommended to only increase this value above 0.15 if confident that higher values will not result in out-of-memory errors.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
+    """
     def __init__(self, vectorizer=None, vectorizer_strategy='combined', max_memory_ratio=0.15, **kwargs):
         super().__init__(**kwargs)
 

@@ -35,10 +35,13 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     enable_text_ngram_features : bool, default True
         Enables 'object' features identified as 'text' features to generate 'text_ngram' features.
         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
-    vectorizer : CountVectorizer, default None
+    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
-        If None, then the default CountVectorizer is used.
+    **kwargs :
+        Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
 
+    Examples
+    --------
     >>> from autogluon import TabularPrediction as task
     >>> from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
     >>>

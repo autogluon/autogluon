@@ -396,7 +396,7 @@ class TabularPrediction(BaseTask):
             feature_generator : `autogluon.utils.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = `autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator()`
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
-                Valid :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AutoMLFeatureGenerator` kwargs:
+                To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
                     enable_raw_features : bool, default True
                         Enables raw feature types to be kept.
                         This is typically any feature which is not of the types ['object', 'category', 'datetime'].
@@ -413,9 +413,8 @@ class TabularPrediction(BaseTask):
                     enable_text_ngram_features : bool, default True
                         Enables 'object' features identified as 'text' features to generate 'text_ngram' features.
                         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
-                    vectorizer : CountVectorizer, default None
+                    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
-                        If None, then the default CountVectorizer is used.
             trainer_type : `Trainer` class, default=`AutoTrainer`
                 A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
