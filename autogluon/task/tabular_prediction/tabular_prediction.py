@@ -397,24 +397,27 @@ class TabularPrediction(BaseTask):
                 The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
                 It is generally recommended to keep the default feature generator unless handling an advanced use-case.
                 To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
-                    enable_raw_features : bool, default True
-                        Enables raw feature types to be kept.
-                        This is typically any feature which is not of the types ['object', 'category', 'datetime'].
-                        Appends IdentityFeatureGenerator() to the generator group.
+                    enable_numeric_features : bool, default True
+                        Whether to keep features of 'int' and 'float' raw types.
+                        These features are passed without alteration to the models.
+                        Appends IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=['int', 'float']))) to the generator group.
                     enable_categorical_features : bool, default True
-                        Enables 'object' and 'category' feature types to be kept and processed into memory optimized category features.
+                        Whether to keep features of 'object' and 'category' raw types.
+                        These features are processed into memory optimized 'category' features.
                         Appends CategoryFeatureGenerator() to the generator group.
                     enable_datetime_features : bool, default True
-                        Enables 'datetime' features and 'object' features identified as 'datetime_as_object' features to be processed as integers.
+                        Whether to keep features of 'datetime' raw type and 'object' features identified as 'datetime_as_object' features.
+                        These features will be converted to 'int' features representing milliseconds since epoch.
                         Appends DatetimeFeatureGenerator() to the generator group.
                     enable_text_special_features : bool, default True
-                        Enables 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
+                        Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
                         Appends TextSpecialFeatureGenerator() to the generator group.
                     enable_text_ngram_features : bool, default True
-                        Enables 'object' features identified as 'text' features to generate 'text_ngram' features.
+                        Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
                         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
                     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
                         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
+                        Only used if `enable_text_ngram_features=True`.
             trainer_type : `Trainer` class, default=`AutoTrainer`
                 A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.

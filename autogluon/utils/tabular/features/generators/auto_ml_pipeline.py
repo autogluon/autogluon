@@ -19,24 +19,27 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
     Parameters
     ----------
-    enable_raw_features : bool, default True
-        Enables raw feature types to be kept.
-        This is typically any feature which is not of the types ['object', 'category', 'datetime'].
-        Appends IdentityFeatureGenerator() to the generator group.
+    enable_numeric_features : bool, default True
+        Whether to keep features of 'int' and 'float' raw types.
+        These features are passed without alteration to the models.
+        Appends IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=['int', 'float']))) to the generator group.
     enable_categorical_features : bool, default True
-        Enables 'object' and 'category' feature types to be kept and processed into memory optimized category features.
+        Whether to keep features of 'object' and 'category' raw types.
+        These features are processed into memory optimized 'category' features.
         Appends CategoryFeatureGenerator() to the generator group.
     enable_datetime_features : bool, default True
-        Enables 'datetime' features and 'object' features identified as 'datetime_as_object' features to be processed as integers.
+        Whether to keep features of 'datetime' raw type and 'object' features identified as 'datetime_as_object' features.
+        These features will be converted to 'int' features representing milliseconds since epoch.
         Appends DatetimeFeatureGenerator() to the generator group.
     enable_text_special_features : bool, default True
-        Enables 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
+        Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
         Appends TextSpecialFeatureGenerator() to the generator group.
     enable_text_ngram_features : bool, default True
-        Enables 'object' features identified as 'text' features to generate 'text_ngram' features.
+        Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
         Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
     vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
         sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
+        Only used if `enable_text_ngram_features=True`.
     **kwargs :
         Refer to AbstractFeatureGenerator documentation for details on valid key word arguments.
 
@@ -58,12 +61,15 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     >>>
     >>> X_test_transformed = feature_generator.transform(test_data)
     """
-    def __init__(self, enable_raw_features=True, enable_categorical_features=True, enable_datetime_features=True,
+    def __init__(self, enable_numeric_features=True, enable_categorical_features=True, enable_datetime_features=True,
                  enable_text_special_features=True, enable_text_ngram_features=True, vectorizer=None, **kwargs):
         if 'generators' in kwargs:
             raise KeyError(f'generators is not a valid parameter to {self.__class__.__name__}. Use {PipelineFeatureGenerator.__name__} to specify custom generators.')
+        if 'enable_raw_features' in kwargs:
+            enable_numeric_features = kwargs.pop('enable_raw_features')
+            logger.warning(f"'enable_raw_features is a deprecated parameter, use 'enable_numeric_features' instead. Specifying 'enable_raw_features' will raise an exception starting in 0.1.0")
 
-        self.enable_raw_features = enable_raw_features
+        self.enable_numeric_features = enable_numeric_features
         self.enable_categorical_features = enable_categorical_features
         self.enable_datetime_features = enable_datetime_features
         self.enable_text_special_features = enable_text_special_features
@@ -74,7 +80,7 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
     def _get_default_generators(self, vectorizer=None):
         generator_group = []
-        if self.enable_raw_features:
+        if self.enable_numeric_features:
             generator_group.append(IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])))
         if self.enable_categorical_features:
             generator_group.append(CategoryFeatureGenerator())
