@@ -69,7 +69,7 @@ class MQCNNModel(AbstractModel):
         processed_X = ListDataset([
             {
                 FieldName.TARGET: target,
-                FieldName.START: pd.Timestamp("2020-01-01", freq="1D"),
+                FieldName.START: pd.Timestamp("2020-01-22", freq="1D"),
             }
             for (target, ) in zip(target_values,)
         ], freq="1D")
@@ -86,13 +86,20 @@ class MQCNNModel(AbstractModel):
         )
         return list(tqdm(forecast_it, total=len(X))), list(tqdm(ts_it, total=len(X))), len(X)
 
-    def score(self, X, y=None, quantiles=[0.5, 0.9], eval_metric=None, metric_needs_y_pred=None, preprocess=True, index_column="index", date_column="date", target_column="target"):
+    def score(self, X, y=None, quantiles=[0.9], eval_metric=None, metric_needs_y_pred=None, preprocess=True, index_column="index", date_column="date", target_column="target"):
         from gluonts.evaluation import Evaluator
         evaluator = Evaluator(quantiles=quantiles)
         forecasts, tss, num_series = self.predict(X, index_column=index_column, date_column=date_column, target_column=target_column)
-        agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
-        print(json.dumps(agg_metrics, indent=4))
-        return agg_metrics["mean_wQuantileLoss"]
+        prediction_length = self.model.prediction_length
+        diff = 0
+        for idx in range(len(forecasts)):
+            forecast = np.mean(forecasts[idx].forecast_array, axis=0)
+            true_values = np.array(tss[idx][-prediction_length:])
+            diff += np.sum((forecast - true_values) ** 2)
+        return diff / len(forecasts)
+        # agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
+        # print(json.dumps(agg_metrics, indent=4))
+        # return agg_metrics["mean_wQuantileLoss"]
 
 
 
@@ -101,11 +108,12 @@ class MQCNNModel(AbstractModel):
 # test_data = make_dummy_datasets(ts_length=10)
 train_data = pd.read_csv("./COV19/processed_train.csv")
 test_data = pd.read_csv("./COV19/processed_test.csv")
-
 mqcnn_model = MQCNNModel(path='AutogluonModels/', name='CustomMQCNN', problem_type=FORECAST)
 mqcnn_model.fit(X_train=train_data, y_train=None, index_column="name", date_column="Date", target_column="ConfirmedCases")
 
 test_pred = mqcnn_model.predict(test_data, index_column="name", date_column="Date", target_column="ConfirmedCases")
-
+print(np.mean(test_pred[0][0].forecast_array, axis=0))
+print(test_pred[1][0])
 score = mqcnn_model.score(test_data, index_column="name", date_column="Date", target_column="ConfirmedCases")
+print(score)
 

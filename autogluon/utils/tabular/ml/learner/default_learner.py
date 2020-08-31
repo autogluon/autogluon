@@ -75,7 +75,7 @@ class DefaultLearner(AbstractLearner):
 
         trainer = self.trainer_type(
             path=self.model_context,
-            problem_type=self.trainer_problem_type,
+            problem_type=self.problem_type,
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
