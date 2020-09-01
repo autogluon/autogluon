@@ -84,11 +84,10 @@ class NNFastAiTabularModel(AbstractModel):
     def __init__(self, path: str, name: str, problem_type: str, eval_metric=None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None,
                  features=None, feature_types_metadata=None, debug=0, y_scaler=None, **kwargs):
         super().__init__(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, num_classes=num_classes, stopping_metric=stopping_metric,
-                         hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug)
+                         hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug, **kwargs)
         self.cat_columns = []
         self.cont_columns = []
         self.col_after_transformer = None
-        self.max_unique_categorical_values = hyperparameters.get('max_unique_categorical_values', 10000)
         self.y_scaler = y_scaler
 
     def fold_preprocess(self, X, fit=False):
@@ -115,7 +114,7 @@ class NNFastAiTabularModel(AbstractModel):
             Y_test_norm = Y_test
         try:
             X_train_stats = X_train.describe(include='all').T.reset_index()
-            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.max_unique_categorical_values) | (X_train_stats['unique'].isna())]['index'].values
+            cat_cols_to_drop = X_train_stats[(X_train_stats['unique'] > self.params.get('max_unique_categorical_values', 10000)) | (X_train_stats['unique'].isna())]['index'].values
         except:
             cat_cols_to_drop = []
         cat_cols_to_keep = [col for col in X_train.columns.values if (col not in cat_cols_to_drop)]
@@ -137,7 +136,7 @@ class NNFastAiTabularModel(AbstractModel):
                 .databunch(bs=self.params['bs'] if len(X_train) > self.params['bs'] else 32))
         return data
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val, y_val, time_limit=None, **kwargs):
         try_import_fastai_v1()
         from fastai.callbacks import SaveModelCallback
         from fastai.layers import LabelSmoothingCrossEntropy
@@ -147,7 +146,7 @@ class NNFastAiTabularModel(AbstractModel):
 
         start_time = time.time()
 
-        logger.log(0, f'Fitting Neural Network with parameters {self.params}...')
+        logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
         data = self.preprocess_train(X_train, y_train, X_val, y_val)
 
         nn_metric, objective_func_name = self.__get_objective_func_name()
@@ -186,7 +185,7 @@ class NNFastAiTabularModel(AbstractModel):
             data, layers=layers, ps=ps, emb_drop=self.params['emb_drop'], metrics=nn_metric,
             loss_func=loss_func, callback_fns=[early_stopping_fn]
         )
-        logger.log(0, self.model.model)
+        logger.log(15, self.model.model)
 
         with make_temp_directory() as temp_dir:
             save_callback = SaveModelCallback(self.model, monitor=objective_func_name_to_monitor, mode=objective_optim_mode, name=self.name)
@@ -203,7 +202,7 @@ class NNFastAiTabularModel(AbstractModel):
                 else:
                     self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
 
-                logger.log(0, f'Model validation metrics: {self.eval_result}')
+                logger.log(15, f'Model validation metrics: {self.eval_result}')
                 model.path = original_path
 
     def _generate_datasets(self, X_train, Y_train, X_val, Y_val):
@@ -248,13 +247,13 @@ class NNFastAiTabularModel(AbstractModel):
         }
 
         # Unsupported metrics will be replaced by defaults for a given problem type
-        objective_func_name = self.eval_metric.name
+        objective_func_name = self.stopping_metric.name
         if objective_func_name not in metrics_map.keys():
             if self.problem_type == REGRESSION:
                 objective_func_name = 'mean_squared_error'
             else:
                 objective_func_name = 'log_loss'
-            logger.warning(f'Metric {self.eval_metric.name} is not supported by this model - using {objective_func_name} instead')
+            logger.warning(f'Metric {self.stopping_metric.name} is not supported by this model - using {objective_func_name} instead')
 
         if objective_func_name in metrics_map.keys():
             nn_metric = metrics_map[objective_func_name]
@@ -309,9 +308,12 @@ class NNFastAiTabularModel(AbstractModel):
 
     def save(self, file_prefix='', directory=None, return_filename=False, verbose=True):
         # Export model
-        save_pkl.save_with_fn(f'{self.path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer, destroy=True), verbose=verbose)
+        save_pkl.save_with_fn(f'{self.path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+        __model = self.model
         self.model = {}
-        return super().save(file_prefix=file_prefix, directory=directory, return_filename=return_filename, verbose=verbose)
+        file_name = super().save(file_prefix=file_prefix, directory=directory, return_filename=return_filename, verbose=verbose)
+        self.model = __model
+        return file_name
 
     @classmethod
     def load(cls, path: str, file_prefix='', reset_paths=False, verbose=True):
