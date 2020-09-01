@@ -1,4 +1,19 @@
-""" Example script for defining and using feature generators in AutoGluon Tabular """
+"""
+Example script for defining and using FeatureGenerators in AutoGluon Tabular.
+FeatureGenerators act to clean and prepare the data to maximize predictive accuracy in downstream models.
+FeatureGenerators are stateful data preprocessors which take input data (pandas DataFrame) and output transformed data (pandas DataFrame).
+FeatureGenerators are first fit on training data through the .fit_transform() function, and then transform new data through the .transform() function.
+These generators can do anything from filling NaN values (FillNaFeatureGenerator), dropping duplicate features (DropDuplicatesFeatureGenerator), generating ngram features from text (TextNgramFeatureGenerator), and much more.
+In AutoGluon's TabularPrediction task, the input data is transformed via a FeatureGenerator before entering a machine learning model. Some models use this transformed input directly and others perform further transformations before making predictions.
+
+This example is intended for advanced users that have a strong understanding of feature engineering and data preparation.
+Most users can get strong performance without specifying custom feature generators due to the generic and powerful default feature generator used by AutoGluon.
+An advanced user may wish to create a custom feature generator to:
+    1. Experiment with different preprocessing pipelines to improve model quality.
+    2. Have full control over what data is being sent to downstream models.
+    3. Migrate existing pipelines into AutoGluon for ease of use and deployment.
+    4. Contribute new feature generators to AutoGluon.
+"""
 
 ################
 # Loading Data #
