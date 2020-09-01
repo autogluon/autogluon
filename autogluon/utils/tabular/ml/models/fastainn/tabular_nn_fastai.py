@@ -243,15 +243,21 @@ class NNFastAiTabularModel(AbstractModel):
             'recall_macro': Recall(average='macro'),
             'recall_micro': Recall(average='micro'),
             'recall_weighted': Recall(average='weighted'),
+            'log_loss': None,
             # Not supported: pac_score
         }
 
+        # Unsupported metrics will be replaced by defaults for a given problem type
         objective_func_name = self.eval_metric.name
+        if objective_func_name not in metrics_map.keys():
+            if self.problem_type == REGRESSION:
+                objective_func_name = 'mean_squared_error'
+            else:
+                objective_func_name = 'log_loss'
+            logger.warning(f'Metric {self.eval_metric.name} is not supported by this model - using {objective_func_name} instead')
+
         if objective_func_name in metrics_map.keys():
             nn_metric = metrics_map[objective_func_name]
-        elif objective_func_name is None:
-            objective_func_name = self.params['metric']
-            nn_metric = metrics_map[self.params['metric']]
         else:
             nn_metric = None
         return nn_metric, objective_func_name
