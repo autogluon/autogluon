@@ -186,6 +186,7 @@ class AbstractLearner:
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
     def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
+        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -258,8 +259,6 @@ class AbstractLearner:
                 'pred_time_test_marginal': [pred_time_test_marginal[model] for model in model_names_final],
             }
         )
-
-        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
 
         df_merged = pd.merge(df, leaderboard_df, on='model', how='left')
         df_merged = df_merged.sort_values(by=['score_test', 'pred_time_test', 'score_val', 'pred_time_val', 'model'], ascending=[False, True, False, True, False]).reset_index(drop=True)
