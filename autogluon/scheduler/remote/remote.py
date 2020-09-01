@@ -6,7 +6,7 @@ import weakref
 import logging
 import subprocess
 import concurrent
-from threading import Thread 
+from threading import Thread
 import multiprocessing as mp
 from distributed import Client
 
