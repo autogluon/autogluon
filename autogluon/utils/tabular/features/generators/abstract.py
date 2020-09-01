@@ -197,9 +197,7 @@ class AbstractFeatureGenerator:
         self._log(20, f'Fitting {self.__class__.__name__}...')
         if self._is_fit:
             raise AssertionError(f'{self.__class__.__name__} is already fit.')
-        if y is not None and isinstance(y, Series):
-            if list(y.index) != list(X.index):
-                raise AssertionError(f'y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ.')
+        self._pre_fit_validate(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
 
         if self.reset_index:
             X_index = copy.deepcopy(X.index)
@@ -259,7 +257,7 @@ class AbstractFeatureGenerator:
             self.print_generator_info(log_level=20)
             self.print_feature_metadata_info(log_level=20)
         elif self.verbosity == 2:
-            self.print_generator_info(log_level=20)
+            self.print_generator_info(log_level=15)
             self.print_feature_metadata_info(log_level=15)
         return X_out
 
@@ -506,9 +504,17 @@ class AbstractFeatureGenerator:
         column_rename_map = {orig: new for orig, new in zip(X_columns_orig, X_columns_new)}
         return column_rename_map, is_updated_name
 
+    def _pre_fit_validate(self, X: DataFrame, y: Series, **kwargs):
+        """
+        Any data validation checks prior to fitting the data should be done here.
+        """
+        if y is not None and isinstance(y, Series):
+            if list(y.index) != list(X.index):
+                raise AssertionError(f'y.index and X.index must be equal when fitting {self.__class__.__name__}, but they differ.')
+
     def _post_fit_cleanup(self):
         """
-        Any cleanup operations after all metadata objects have been constructed, but prior to feature renaming, should be done here
+        Any cleanup operations after all metadata objects have been constructed, but prior to feature renaming, should be done here.
         This includes removing keys from internal lists and dictionaries of features which have been removed, and deletion of any temp variables.
         """
         pass

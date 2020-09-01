@@ -67,7 +67,7 @@ class DefaultLearner(AbstractLearner):
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, f'\tData preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
+        logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
         if time_limit:
             time_limit_trainer = time_limit - self.time_fit_preprocessing
         else:
@@ -158,10 +158,11 @@ class DefaultLearner(AbstractLearner):
         else:
             y_val = None
 
-        if self.submission_columns:
-            X = X.drop(self.submission_columns, axis=1, errors='ignore')
+        if self.id_columns:
+            logger.log(20, f'Dropping ID columns: {self.id_columns}')
+            X = X.drop(self.id_columns, axis=1, errors='ignore')
             if X_val is not None:
-                X_val = X_val.drop(self.submission_columns, axis=1, errors='ignore')
+                X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
 
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
         if X_val is not None:

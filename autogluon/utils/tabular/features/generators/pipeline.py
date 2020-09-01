@@ -41,11 +41,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         self.post_memory_usage_per_row = None
 
     def fit_transform(self, X: DataFrame, y=None, feature_metadata_in: FeatureMetadata = None, **kwargs) -> DataFrame:
-        self._ensure_no_duplicate_column_names(X=X)  # TODO: Remove this, move pre_memory_usage and post_memory_usage into super().
-        self._compute_pre_memory_usage(X)
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
         self._compute_post_memory_usage(X_out)
-
+        # TODO: Consider adding final check of validity/that features are reasonable.
         self._log(20, f'\t{self.__class__.__name__} processed %s data points with %s features' % (len(X_out), len(self.features_out)))
 
         return X_out
@@ -75,6 +73,11 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         super()._remove_features_in(features)
         if features:
             self._feature_metadata_in_real = self._feature_metadata_in_real.remove_features(features=features)
+
+    def _pre_fit_validate(self, X: DataFrame, **kwargs):
+        super()._pre_fit_validate(X=X, **kwargs)
+        self._ensure_no_duplicate_column_names(X=X)  # TODO: Remove this, move pre_memory_usage and post_memory_usage into super().
+        self._compute_pre_memory_usage(X)
 
     def _compute_pre_memory_usage(self, X: DataFrame):
         X_len = len(X)

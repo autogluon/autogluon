@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class CategoryFeatureGenerator(AbstractFeatureGenerator):
     """
     CategoryFeatureGenerator is used to convert object types to category types, as well as remove rare categories and optimize memory usage.
+    After fitting, previously unseen categories during transform are treated as missing values.
 
     Parameters
     ----------

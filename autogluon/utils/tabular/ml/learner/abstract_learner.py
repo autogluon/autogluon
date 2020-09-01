@@ -41,7 +41,7 @@ class AbstractLearner:
                  problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0):
         self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
-        self.submission_columns = id_columns
+        self.id_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
         self.eval_metric = eval_metric

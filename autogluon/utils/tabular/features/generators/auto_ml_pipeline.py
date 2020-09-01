@@ -11,6 +11,7 @@ from ..feature_metadata import R_INT, R_FLOAT
 logger = logging.getLogger(__name__)
 
 
+# TODO: write out in English the full set of transformations that are applied (and eventually host page on website). Also explicitly write out all of the feature-generator "hyperparameters" that might affect the results from the AutoML FeatureGenerator
 class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
     """
     Pipeline feature generator with simplified arguments to handle most Tabular data including text and dates adequately.

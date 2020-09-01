@@ -21,8 +21,8 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
     Parameters
     ----------
     generators : List[List[AbstractFeatureGenerator]]
-        generators is a list of lists of generators.
-        Feature generators within generators[i] are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
+        generators is a list of generator groups, where a generator group is a list of generators.
+        Feature generators within generators[i] (generator group) are all fit on the same data, and their outputs are then concatenated to form the output of generators[i].
         generators[i+1] are then fit on the output of generators[i].
         The last generator group's output is the output of _fit_transform and _transform methods.
         Due to the flexibility of generators, at the time of initialization, generators will prepend pre_generators and append post_generators if they are not None.
@@ -82,7 +82,12 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             pre_generators = []
         elif not isinstance(pre_generators, list):
             pre_generators = [pre_generators]
+        if self.pre_enforce_types:
+            from .astype import AsTypeFeatureGenerator
+            pre_generators = [AsTypeFeatureGenerator()] + pre_generators
+            self.pre_enforce_types = False
         pre_generators = [[pre_generator] for pre_generator in pre_generators]
+
         if self._post_generators is not None:
             post_generators = [[post_generator] for post_generator in self._post_generators]
             self._post_generators = []
