@@ -60,8 +60,8 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
             dummy_generator = DummyFeatureGenerator()
             X_out = dummy_generator.fit_transform(X=X_out)
             type_group_map_special = copy.deepcopy(dummy_generator.feature_metadata.type_group_map_special)
-            self.generators = [dummy_generator]
-            self._post_generators = []
+            self.generators = [[dummy_generator]]
+            self._remove_features_in(features=self.features_in)
         return X_out, type_group_map_special
 
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):

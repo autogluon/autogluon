@@ -82,6 +82,10 @@ class GeneratorHelper:
 
 class DataHelper:
     @staticmethod
+    def generate_empty() -> DataFrame:
+        return DataFrame(index=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+
+    @staticmethod
     def generate_obj_feature() -> Series:
         return Series(['a', 'b', 'a', 'd', 'd', 'd', 'c', np.nan, np.nan])
 
