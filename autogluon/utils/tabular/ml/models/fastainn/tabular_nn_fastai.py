@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import logging
 import shutil
 import tempfile
@@ -48,14 +49,13 @@ def make_temp_directory():
 class NNFastAiTabularModel(AbstractModel):
     """ Class for fastai v1 neural network models that operate on tabular data.
 
-        Attributes:
+        Hyperparameters:
             y_scaler: on a regression problems, the model can give unreasonable predictions on unseen data.
             This attribute allows to pass a scaler for y values to address this problem. Please note that intermediate
             iteration metrics will be affected by this transform and as a result intermediate iteration scores will be
             different from the final ones (these will be correct).
             https://scikit-learn.org/stable/modules/classes.html#module-sklearn.preprocessing
 
-        Hyperparameters:
             'layers': list of hidden layers sizes; None - use model's heuristics; default is None
 
             'emb_drop': embedding layers dropout; defaut is 0.1
@@ -81,14 +81,12 @@ class NNFastAiTabularModel(AbstractModel):
     model_internals_file_name = 'model-internals.pkl'
     unique_category_str = '!missing!'
 
-    def __init__(self, path: str, name: str, problem_type: str, eval_metric=None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None,
-                 features=None, feature_types_metadata=None, debug=0, y_scaler=None, **kwargs):
-        super().__init__(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, num_classes=num_classes, stopping_metric=stopping_metric,
-                         hyperparameters=hyperparameters, features=features, feature_types_metadata=feature_types_metadata, debug=debug, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.cat_columns = []
         self.cont_columns = []
         self.col_after_transformer = None
-        self.y_scaler = y_scaler
+        self.y_scaler = None
 
     def fold_preprocess(self, X, fit=False):
         if fit:
@@ -145,6 +143,10 @@ class NNFastAiTabularModel(AbstractModel):
         from .callbacks import EarlyStoppingCallbackWithTimeLimit
 
         start_time = time.time()
+
+        self.y_scaler = self.params.get('y_scaler', None)
+        if self.y_scaler is not None:
+            self.y_scaler = copy.copy(self.y_scaler)
 
         logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
         data = self.preprocess_train(X_train, y_train, X_val, y_val)
