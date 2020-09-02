@@ -15,10 +15,10 @@ from .remote import DaskRemoteService
 )
 @click.option(
     "--port",
-    default=8786,
+    default=0,
     show_default=True,
     type=int,
-    help="Specify the port number.",
+    help="Specify the port number, 0 means random port.",
 )
 def main(address, port):
     service = DaskRemoteService(address, port)

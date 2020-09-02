@@ -80,7 +80,7 @@ class RemoteManager(object):
                 cls.NODES[node_ip] = remote
             remotes.append(remote)
         return remotes
-    
+
     @classmethod
     def shutdown(cls):
         for node in cls.NODES.values():

@@ -8,7 +8,7 @@ import subprocess
 import concurrent
 from threading import Thread
 import multiprocessing as mp
-from distributed import Client
+from distributed import Client, SSHCluster
 
 from .ssh_helper import start_scheduler, start_worker
 
@@ -66,12 +66,15 @@ class Remote(Client):
         if local:
             super().__init__(processes=False)
         else:
-            remote_addr = (remote_ip + ':{}'.format(port))
-            self.service = start_service(remote_ip, port)
-            _set_global_remote_service(self.service)
-            import time
-            time.sleep(10)
-            super().__init__(remote_addr)
+            import logging
+            from . import cli_utils  # monkey patch a dask issue for no-nanny worker
+            logging.getLogger("asyncssh").setLevel(logging.WARN)
+            # use SSHCluster to setup remote worker which supports await and random port
+            ssh_cluster = SSHCluster(hosts=[remote_ip, remote_ip],
+                                     connect_options={'port': ssh_port},
+                                     worker_options={'nanny': '--no'},
+                                     scheduler_options={"port": 0, "dashboard_address": ":8787"})
+            super().__init__(ssh_cluster)
         with Remote.LOCK:
             self.remote_id = Remote.REMOTE_ID.value
             Remote.REMOTE_ID.value += 1
