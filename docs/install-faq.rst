@@ -24,7 +24,7 @@
      python3 -m pip install mxnet
 
      # For GPU users, CUDA 101
-     python3 -m pip install mxnet-cu101
+     python3 -m pip install mxnet_cu101
 
 * While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
 
