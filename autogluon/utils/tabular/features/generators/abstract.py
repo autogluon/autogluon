@@ -375,7 +375,7 @@ class AbstractFeatureGenerator:
         elif feature_metadata_in is not None:
             self._log(30, '\tWarning: feature_metadata_in passed as input to fit_transform, but self.feature_metadata_in was already set. Ignoring feature_metadata_in.')
         if self.feature_metadata_in is None:
-            self._log(20, f'\tfeature_metadata_in was not set in {self.__class__.__name__}, inferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
+            self._log(20, f'\tInferring feature_metadata_in based on data. Specify feature_metadata_in to control the special dtypes of the input data.')
             self.feature_metadata_in = self._infer_feature_metadata_in(X=X)
         if self.features_in is None:
             self.features_in = self._infer_features_in(X=X)
