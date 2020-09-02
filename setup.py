@@ -9,8 +9,8 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 
 version = '0.0.14'
 """
-To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
-a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
+To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish
+a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml .
 You need to increase the version number after stable release, so that the nightly pypi can work properly.
 """
 try:
@@ -59,7 +59,8 @@ requirements = [
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.23',
-    'networkx>=2.3,<3.0'
+    'networkx>=2.3,<3.0',
+    'asyncssh'
 ]
 
 text_requirements = [
