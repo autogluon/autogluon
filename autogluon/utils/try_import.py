@@ -1,5 +1,5 @@
 __all__ = ['try_import_catboost', 'try_import_lightgbm', 'try_import_mxboard', 'try_import_mxnet',
-           'try_import_cv2', 'try_import_gluonnlp']
+           'try_import_cv2', 'try_import_gluonnlp', 'try_import_fastai_v1']
 
 def try_import_catboost():
     try:

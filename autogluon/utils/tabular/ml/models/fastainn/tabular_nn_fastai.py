@@ -10,13 +10,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from autogluon.utils.try_import import try_import_fastai_v1
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION, BINARY, MULTICLASS
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl
+from ......utils.try_import import try_import_fastai_v1
 
 # FIXME: Has a leak somewhere, training additional models in a single python script will slow down training for each additional model. Gets very slow after 20+ models (10x+ slowdown)
 #  Slowdown does not appear to impact Mac OS
@@ -136,17 +136,16 @@ class NNFastAiTabularModel(AbstractModel):
 
     def _fit(self, X_train, y_train, X_val, y_val, time_limit=None, **kwargs):
         try_import_fastai_v1()
-        from fastai.callbacks import SaveModelCallback
         from fastai.layers import LabelSmoothingCrossEntropy
         from fastai.tabular import tabular_learner
         from fastai.utils.mod_display import progress_disabled_ctx
-        from .callbacks import EarlyStoppingCallbackWithTimeLimit
+        from .callbacks import EarlyStoppingCallbackWithTimeLimit, SaveModelCallback
 
         start_time = time.time()
 
         self.y_scaler = self.params.get('y_scaler', None)
         if self.y_scaler is not None:
-            self.y_scaler = copy.copy(self.y_scaler)
+            self.y_scaler = copy.deepcopy(self.y_scaler)
 
         logger.log(15, f'Fitting Neural Network with parameters {self.params}...')
         data = self.preprocess_train(X_train, y_train, X_val, y_val)
@@ -200,11 +199,11 @@ class NNFastAiTabularModel(AbstractModel):
                 model.load(self.name)
 
                 if objective_func_name == 'log_loss':
-                    self.eval_result = model.validate()[0]
+                    eval_result = model.validate()[0]
                 else:
-                    self.eval_result = model.validate()[1].numpy().reshape(-1)[0]
+                    eval_result = model.validate()[1].numpy().reshape(-1)[0]
 
-                logger.log(15, f'Model validation metrics: {self.eval_result}')
+                logger.log(15, f'Model validation metrics: {eval_result}')
                 model.path = original_path
 
     def _generate_datasets(self, X_train, Y_train, X_val, Y_val):

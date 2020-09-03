@@ -38,11 +38,8 @@ def get_param_multiclass_baseline():
 
 
 def get_param_binary_baseline():
-    params = get_param_multiclass_baseline()
-    return params
+    return get_param_multiclass_baseline()
 
 
 def get_param_regression_baseline():
-    params = get_param_multiclass_baseline()
-    params['metric'] = 'root_mean_squared_error'
-    return params
+    return get_param_multiclass_baseline()
