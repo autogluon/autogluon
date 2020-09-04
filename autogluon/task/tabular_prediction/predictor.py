@@ -384,6 +384,9 @@ class TabularPredictor(BasePredictor):
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
             print("User-specified hyperparameters:")
             print(results['hyperparameters_userspecified'])
+            print("Feature Metadata (Processed):")
+            print("(raw dtype, special dtypes):")
+            print(self.feature_metadata)
         if verbosity > 1:  # create plots
             plot_tabular_models(results, output_directory=self.output_directory,
                                 save_file="SummaryOfModels.html",
