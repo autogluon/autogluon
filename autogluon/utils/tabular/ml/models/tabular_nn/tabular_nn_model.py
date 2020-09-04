@@ -32,6 +32,7 @@ from .embednet import EmbedNet
 from .tabular_nn_trial import tabular_nn_trial
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
+from ....features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_feature_types_special=['text_ngram', 'text_as_category'],
+            ignored_type_group_special=['text_ngram', 'text_as_category'],
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -176,8 +177,8 @@ class TabularNeuralNetModel(AbstractModel):
         params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         # print('features: ', self.features)
         if 'num_cpus' in kwargs:
             self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
@@ -575,10 +576,10 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
 
-        feature_types = self.feature_types_metadata.feature_types_raw
+        feature_types = self.feature_metadata.get_type_group_map_raw()
 
-        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
@@ -746,8 +747,8 @@ class TabularNeuralNetModel(AbstractModel):
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
         self._set_default_searchspace() # changes non-specified default hyperparams from fixed values to search-spaces.
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         scheduler_func = scheduler_options[0]
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:

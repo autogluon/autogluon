@@ -15,9 +15,9 @@ import psutil
 from .model_trial import model_trial
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas, infer_eval_metric
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, normalize_pred_probas, infer_eval_metric
 from .... import metrics
-from ....features.feature_types_metadata import FeatureTypesMetadata
+from ....features.feature_metadata import FeatureMetadata
 from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
@@ -62,7 +62,7 @@ class AbstractModel:
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_metadata: FeatureMetadata = None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs.
@@ -70,7 +70,7 @@ class AbstractModel:
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
                 eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_types_metadata (autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime.
+                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name
         self.path_root = path
@@ -110,7 +110,7 @@ class AbstractModel:
         else:
             self.stopping_metric_needs_y_pred = True
 
-        self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
+        self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
         self.debug = debug
 
@@ -165,8 +165,8 @@ class AbstractModel:
             # max_early_stopping_rounds=None,
             # use_orig_features=True,  # TODO: Only for stackers
             # TODO: add option for only top-k ngrams
-            ignored_feature_types_special=[],  # List, drops any features in `self.feature_types_metadata.feature_types_special[type]` for type in `ignored_feature_types_special`. | Currently undocumented in task.
-            ignored_feature_types_raw=[],  # List, drops any features in `self.feature_types_metadata.feature_types_raw[type]` for type in `ignored_feature_types_raw`. | Currently undocumented in task.
+            ignored_type_group_special=[],  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
+            ignored_type_group_raw=[],  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -226,19 +226,14 @@ class AbstractModel:
                 return X[self.features]
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
-            ignored_feature_types_raw = self.params_aux.get('ignored_feature_types_raw', [])
-            if ignored_feature_types_raw:
-                for ignored_feature_type in ignored_feature_types_raw:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_raw[ignored_feature_type]]
-            ignored_feature_types_special = self.params_aux.get('ignored_feature_types_special', [])
-            if ignored_feature_types_special:
-                for ignored_feature_type in ignored_feature_types_special:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_special[ignored_feature_type]]
+            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
+            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
+            valid_features = self.feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
-            if ignored_feature_types_raw or ignored_feature_types_special:
-                if list(X.columns) != self.features:
-                    X = X[self.features]
+            if list(X.columns) != self.features:
+                X = X[self.features]
         return X
 
     def _preprocess_fit_args(self, **kwargs):
@@ -673,11 +668,3 @@ class AbstractModel:
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
-
-
-class SKLearnModel(AbstractModel):
-    """Abstract model for all Sklearn models."""
-
-    def preprocess(self, X):
-        X = convert_categorical_to_int(X)
-        return super().preprocess(X)

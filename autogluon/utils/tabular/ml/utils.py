@@ -67,13 +67,6 @@ def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_s
     return X_train, X_test, y_train, y_test
 
 
-def convert_categorical_to_int(X):
-    X = X.copy()
-    cat_columns = X.select_dtypes(include=['category']).columns
-    X[cat_columns] = X[cat_columns].apply(lambda x: x.cat.codes)
-    return X
-
-
 def setup_outputdir(output_directory):
     if output_directory is None:
         utcnow = datetime.utcnow()

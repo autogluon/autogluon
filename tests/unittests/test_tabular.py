@@ -190,9 +190,12 @@ def run_tabular_benchmark_toy(fit_args):
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = task.fit(train_data=train_data, label=dataset['label_column'], output_directory=savedir, **fit_args)
+    print(predictor.feature_metadata)
+    print(predictor.feature_metadata.type_map_raw)
+    print(predictor.feature_metadata.type_group_map_special)
     try:
         predictor.predict(test_data)
-    except ValueError:  # ValueError should be raised because test_data has missing column 'lostcolumn'
+    except KeyError:  # KeyError should be raised because test_data has missing column 'lostcolumn'
         pass
     else:
         raise AssertionError(f'{dataset["name"]} should raise an exception.')

@@ -38,14 +38,14 @@ class BaggedEnsembleModel(AbstractModel):
         self.save_bagged_folds = save_bagged_folds
 
         try:
-            feature_types_metadata = self.model_base.feature_types_metadata
+            feature_metadata = self.model_base.feature_metadata
         except:
-            feature_types_metadata = None
+            feature_metadata = None
 
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
         stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
 
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
@@ -113,7 +113,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_base = self._get_model_base()
         if self.features is not None:
             model_base.features = self.features
-        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+        model_base.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
 
         if self.model_base is not None:
             self.save_model_base(self.model_base)
@@ -316,7 +316,7 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_refitfull_template(self):
         compressed_params = self._get_compressed_params()
         model_compressed = copy.deepcopy(self._get_model_base())
-        model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+        model_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
         model_compressed.params = compressed_params
         model_compressed.name = model_compressed.name + REFIT_FULL_SUFFIX
         model_compressed.set_contexts(self.path_root + model_compressed.name + os.path.sep)
