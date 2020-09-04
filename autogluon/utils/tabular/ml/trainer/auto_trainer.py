@@ -10,15 +10,24 @@ logger = logging.getLogger(__name__)
 
 # This Trainer handles model training details
 class AutoTrainer(AbstractTrainer):
+    def __init__(self, index_column="index", date_column="date", target_column="target", **kwargs):
+
+        super().__init__(**kwargs)
+        self.index_column = index_column
+        self.date_column = date_column
+        self.target_column = target_column
+
     def get_models(self, hyperparameters, hyperparameter_tune=False, level='default', extra_ag_args_fit=None, **kwargs):
         return get_preset_models(path=self.path, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
-                                 num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level, extra_ag_args_fit=extra_ag_args_fit)
+                                 num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level, extra_ag_args_fit=extra_ag_args_fit,
+                                 index_column=self.index_column, date_column=self.date_column, target_column=self.target_column)
 
     def train(self, X_train, y_train, X_val=None, y_val=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, **kwargs):
         if hyperparameters is None:
             hyperparameters = {}
         self.hyperparameters = self._process_hyperparameters(hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
-        models = self.get_models(hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, level=0)
+        models = self.get_models(hyperparameters=self.hyperparameters, hyperparameter_tune=hyperparameter_tune, level=0,
+                                 index_column=self.index_column, date_column=self.date_column, target_column=self.target_column)
         if self.bagged_mode:
             if (y_val is not None) and (X_val is not None):
                 # TODO: User could be intending to blend instead. Perhaps switch from OOF preds to X_val preds while still bagging? Doubt a user would want this.

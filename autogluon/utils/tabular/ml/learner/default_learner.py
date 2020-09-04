@@ -23,9 +23,12 @@ logger = logging.getLogger(__name__)
 # TODO: Add cv / OOF generator option, so that AutoGluon can be used as a base model in an ensemble stacker
 # Learner encompasses full problem, loading initial data, feature generation, model training, model prediction
 class DefaultLearner(AbstractLearner):
-    def __init__(self, trainer_type=AutoTrainer, **kwargs):
+    def __init__(self, trainer_type=AutoTrainer, index_column="index", date_column="date", target_column="target", **kwargs):
         super().__init__(**kwargs)
         self.trainer_type = trainer_type
+        self.index_column = index_column
+        self.date_column = date_column
+        self.target_column = target_column
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
     def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
@@ -89,7 +92,10 @@ class DefaultLearner(AbstractLearner):
             save_data=save_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
-            verbosity=verbosity
+            verbosity=verbosity,
+            index_column=self.index_column,
+            date_column=self.date_column,
+            target_column=self.target_column
         )
 
         self.trainer_path = trainer.path
@@ -101,7 +107,7 @@ class DefaultLearner(AbstractLearner):
         self.save()
         print("before train", self.problem_type)
         trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
-                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
+                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, )
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self.time_fit_training = time_end - time_preprocessing_end
@@ -116,10 +122,11 @@ class DefaultLearner(AbstractLearner):
         #     X[self.label] = X[self.label].fillna('')
 
         # Remove all examples with missing labels from this dataset:
-        missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
-        if len(missinglabel_inds) > 0:
-            logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
-            X = X.drop(missinglabel_inds, axis=0)
+        if self.label in X.columns:
+            missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
+            if len(missinglabel_inds) > 0:
+                logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
+                X = X.drop(missinglabel_inds, axis=0)
 
         if self.problem_type is None:
             self.problem_type = self.infer_problem_type(X[self.label])
@@ -176,28 +183,28 @@ class DefaultLearner(AbstractLearner):
         elif self.problem_type == FORECAST:
             # TODO: transform dataframe into a time series in a row
             # TODO: avoid using specific column name
-            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label])
+            self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=None)
             self.trainer_problem_type = self.problem_type
-            index_column = self.submission_columns[0]
-            indices = list(set(X[index_column]))
-            date_list = sorted(list(set(X["date"])))
-
-            def transform_dataframe(df):
-                data_dic = {"index": list(set(df["index"]))}
-
-                for date in date_list:
-                    tmp = df[df["date"] == date][["index", "date", "target"]]
-                    tmp = tmp.pivot(index="index", columns="date", values="target")
-                    tmp_values = tmp[date].values
-                    data_dic[date] = tmp_values
-                return pd.DataFrame(data_dic)
-            X = transform_dataframe(X)
-            # print(X.iloc[:, -10:])
-            # TODO:
-            if X_val is None:
-                n_rows = len(X)
-                X_val = X.iloc[:, -int(holdout_frac * n_rows):]
-                X_val["index"] = X["index"].values
+            # index_column = self.submission_columns[0]
+            # indices = list(set(X[index_column]))
+            # date_list = sorted(list(set(X["date"])))
+            #
+            # def transform_dataframe(df):
+            #     data_dic = {"index": list(set(df["index"]))}
+            #
+            #     for date in date_list:
+            #         tmp = df[df["date"] == date][["index", "date", "target"]]
+            #         tmp = tmp.pivot(index="index", columns="date", values="target")
+            #         tmp_values = tmp[date].values
+            #         data_dic[date] = tmp_values
+            #     return pd.DataFrame(data_dic)
+            # X = transform_dataframe(X)
+            # # print(X.iloc[:, -10:])
+            # # TODO:
+            # if X_val is None:
+            #     n_rows = len(X)
+            #     X_val = X.iloc[:, -int(holdout_frac * n_rows):]
+            #     X_val["index"] = X["index"].values
             return X, None, X_val, None, holdout_frac, num_bagging_folds
         else:
             raise NotImplemented

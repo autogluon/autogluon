@@ -19,7 +19,7 @@ class LabelCleaner:
     problem_type_transform = None
 
     @staticmethod
-    def construct(problem_type: str, y: Union[Series, np.ndarray, list], y_uncleaned: Union[Series, np.ndarray, list] = None):
+    def construct(problem_type: str, y: Union[Series, np.ndarray, list, None], y_uncleaned: Union[Series, np.ndarray, list] = None):
         y = LabelCleaner._convert_to_valid_series(y)
         if y_uncleaned is not None:
             y_uncleaned = LabelCleaner._convert_to_valid_series(y_uncleaned)

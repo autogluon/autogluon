@@ -80,6 +80,9 @@ class TabularPrediction(BaseTask):
             dist_ip_addrs=None,
             visualizer='none',
             verbosity=2,
+            index_column="index",
+            date_column="date",
+            target_column="target",
             **kwargs):
         """
         Fit models to predict a column of data table based on the other columns.
@@ -594,7 +597,7 @@ class TabularPrediction(BaseTask):
         print("before learner")
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
-                          label_count_threshold=label_count_threshold, random_seed=random_seed)
+                          label_count_threshold=label_count_threshold, random_seed=random_seed, index_column=index_column, date_column=date_column, target_column=target_column)
         learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,

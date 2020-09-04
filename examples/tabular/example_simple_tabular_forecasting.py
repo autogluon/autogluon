@@ -33,13 +33,15 @@ def make_dummy_datasets(ts_n=1, ts_length=100, freq="D", prediction_length=5):
     return pd.DataFrame({"index": ts_index,"date": date, "target": targets, "freq": [freq for i in range(n)], "prediction_length": [prediction_length for i in range(n)]})
 
 
-train_data = make_dummy_datasets(ts_length=200)
-test_data = make_dummy_datasets(ts_length=10)
+# train_data = make_dummy_datasets(ts_length=200)
+# test_data = make_dummy_datasets(ts_length=10)
+train_data = pd.read_csv("./COV19/processed_train.csv")
+test_data = pd.read_csv("./COV19/processed_test.csv")
 
 print(train_data)
 hyperparams = {'MQCNN': {'context_length': ag.Int(10, 20)} }
 savedir = 'ag_models/'
-predictor = task.fit(train_data=train_data, hyperparameters=hyperparams, output_directory=savedir, label="target", problem_type=FORECAST, id_columns=["index"])
+predictor = task.fit(train_data=train_data, tuning_data=test_data, hyperparameters=hyperparams, output_directory=savedir, label="", problem_type=FORECAST, index_column="name", date_column="Date", target_column="ConfirmedCases")
 # NOTE: Default settings above are intended to ensure reasonable runtime at the cost of accuracy. To maximize predictive accuracy, do this instead:  predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, presets='best_quality', eval_metric=YOUR_METRIC_NAME)
 results = predictor.fit_summary()
 

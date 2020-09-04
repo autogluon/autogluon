@@ -95,7 +95,7 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add banned_model_types arg
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
-def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
+def get_preset_models(path, problem_type, eval_metric, hyperparameters, index_column="index", date_column="date", target_column="target", stopping_metric=None, num_classes=None, hyperparameter_tune=False,
                       level='default', extra_ag_args_fit=None, name_suffix='', default_priorities=DEFAULT_MODEL_PRIORITY):
     print(problem_type)
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS, FORECAST]:
@@ -152,7 +152,16 @@ def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping
             if AG_ARGS_FIT not in model_params:
                 model_params[AG_ARGS_FIT] = {}
             model_params[AG_ARGS_FIT].update(extra_ag_args_fit.copy())  # TODO: Consider case of overwriting user specified extra args.
-        model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, num_classes=num_classes, hyperparameters=model_params)
+        if model_type is MQCNNModel:
+            model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
+                                    stopping_metric=stopping_metric, num_classes=num_classes,
+                                    hyperparameters=model_params,
+                                    index_column=index_column, date_column=date_column, target_column=target_column)
+        else:
+            model_init = model_type(path=path, name=name, problem_type=problem_type, eval_metric=eval_metric,
+                                    stopping_metric=stopping_metric, num_classes=num_classes,
+                                    hyperparameters=model_params)
+        print(model_init, model_type)
         models.append(model_init)
 
     for model in models:

@@ -36,36 +36,40 @@ def make_dummy_datasets(ts_n=1, ts_length=100, freq="D", prediction_length=5):
 
 
 class MQCNNModel(AbstractModel):
-    def __init__(self, **kwargs):
+
+    def __init__(self, index_column="index", date_column="date", target_column="target", **kwargs):
         super().__init__(**kwargs)
+        self.index_column = index_column
+        self.date_column = date_column
+        self.target_column = target_column
         self.params = get_default_parameters()
 
-    def fit(self, index_column="index", date_column="date", target_column="target", **kwargs):
+    def fit(self, **kwargs):
         kwargs = self._preprocess_fit_args(**kwargs)
-        self._fit(index_column=index_column, date_column=date_column, target_column=target_column, **kwargs)
+        self._fit(**kwargs)
 
-    def _fit(self, X_train, y_train, index_column="index", date_column="date", target_column="target", X_val=None, y_val=None, time_limit=None, **kwargs):
-        X_train = self.preprocess(X_train, index_column=index_column, date_column=date_column, target_column=target_column)
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+        X_train = self.preprocess(X_train)
         estimator = MQCNNEstimator.from_hyperparameters(**self.params)
         print(estimator)
         self.model = estimator.train(X_train)
 
-    def preprocess(self, X, index_column="index", date_column="date", target_column="target"):
-        date_list = sorted(list(set(X[date_column])))
+    def preprocess(self, X):
+        date_list = sorted(list(set(X[self.date_column])))
 
         def transform_dataframe(df):
-            data_dic = {index_column: list(set(df[index_column]))}
+            data_dic = {self.index_column: list(set(df[self.index_column]))}
 
             for date in date_list:
-                tmp = df[df[date_column] == date][[index_column, date_column, target_column]]
-                tmp = tmp.pivot(index=index_column, columns=date_column, values=target_column)
+                tmp = df[df[self.date_column] == date][[self.index_column, self.date_column, self.target_column]]
+                tmp = tmp.pivot(index=self.index_column, columns=self.date_column, values=self.target_column)
                 tmp_values = tmp[date].values
                 data_dic[date] = tmp_values
             return pd.DataFrame(data_dic)
 
         X = transform_dataframe(X)
 
-        target_values = X.drop(index_column, axis=1).values
+        target_values = X.drop(self.index_column, axis=1).values
         processed_X = ListDataset([
             {
                 FieldName.TARGET: target,
@@ -75,27 +79,29 @@ class MQCNNModel(AbstractModel):
         ], freq="1D")
         return processed_X
 
-    def predict(self, X, index_column="index", date_column="date", target_column="target", preprocess=True):
+    def predict(self, X, preprocess=True):
         if preprocess:
-            X = self.preprocess(X=X, index_column=index_column, date_column=date_column, target_column=target_column)
+            X = self.preprocess(X=X)
 
         forecast_it, ts_it = make_evaluation_predictions(
             dataset=X,
             predictor=self.model,
             num_samples=100
         )
-        return list(tqdm(forecast_it, total=len(X))), list(tqdm(ts_it, total=len(X))), len(X)
+        return [forecast.forecast_array for forecast in list(tqdm(forecast_it, total=len(X)))]
 
     def score(self, X, y=None, quantiles=[0.9], eval_metric=None, metric_needs_y_pred=None, preprocess=True, index_column="index", date_column="date", target_column="target"):
         from gluonts.evaluation import Evaluator
-        evaluator = Evaluator(quantiles=quantiles)
-        forecasts, tss, num_series = self.predict(X, index_column=index_column, date_column=date_column, target_column=target_column)
+        # evaluator = Evaluator(quantiles=quantiles)
+        processed_X = self.preprocess(X=X)
+        tss = processed_X.list_data
+        forecasts = self.predict(processed_X, preprocess=False)
         prediction_length = self.model.prediction_length
         diff = 0
         for idx in range(len(forecasts)):
-            forecast = np.mean(forecasts[idx].forecast_array, axis=0)
-            true_values = np.array(tss[idx][-prediction_length:])
-            diff += np.sum((forecast - true_values) ** 2)
+            forecast = np.mean(forecasts[idx], axis=0)
+            true_values = np.array(tss[idx]["target"][-prediction_length:])
+            diff += (np.sum((forecast - true_values) ** 2) / prediction_length) ** 0.5
         return diff / len(forecasts)
         # agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         # print(json.dumps(agg_metrics, indent=4))
@@ -108,12 +114,11 @@ class MQCNNModel(AbstractModel):
 # test_data = make_dummy_datasets(ts_length=10)
 train_data = pd.read_csv("./COV19/processed_train.csv")
 test_data = pd.read_csv("./COV19/processed_test.csv")
-mqcnn_model = MQCNNModel(path='AutogluonModels/', name='CustomMQCNN', problem_type=FORECAST)
-mqcnn_model.fit(X_train=train_data, y_train=None, index_column="name", date_column="Date", target_column="ConfirmedCases")
+mqcnn_model = MQCNNModel(path='AutogluonModels/', name='CustomMQCNN', problem_type=FORECAST, index_column="name", date_column="Date", target_column="ConfirmedCases")
+mqcnn_model.fit(X_train=train_data, y_train=None)
 
-test_pred = mqcnn_model.predict(test_data, index_column="name", date_column="Date", target_column="ConfirmedCases")
-print(np.mean(test_pred[0][0].forecast_array, axis=0))
-print(test_pred[1][0])
+test_pred = mqcnn_model.predict(test_data)
+print(test_pred[0])
 score = mqcnn_model.score(test_data, index_column="name", date_column="Date", target_column="ConfirmedCases")
 print(score)
 
