@@ -167,7 +167,9 @@ class DefaultLearner(AbstractLearner):
             X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
             X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
             X = X_super.head(len(X)).set_index(X.index)
-            X_val = X_super.tail(len(X_val)).set_index(X_val.index)
+            
+            X_val = X_super.head(len(X)+len(X_val))*.tail(len(X_val)).set_index(X_val.index)
+            
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
