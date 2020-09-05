@@ -51,11 +51,11 @@ class MQCNNModel(AbstractModel):
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         X_train = self.preprocess(X_train)
         estimator = MQCNNEstimator.from_hyperparameters(**self.params)
-        print(estimator)
         self.model = estimator.train(X_train)
 
     def preprocess(self, X):
         date_list = sorted(list(set(X[self.date_column])))
+        freq = pd.infer_freq(date_list)
 
         def transform_dataframe(df):
             data_dic = {self.index_column: list(set(df[self.index_column]))}
@@ -73,10 +73,10 @@ class MQCNNModel(AbstractModel):
         processed_X = ListDataset([
             {
                 FieldName.TARGET: target,
-                FieldName.START: pd.Timestamp("2020-01-22", freq="1D"),
+                FieldName.START: pd.Timestamp("2020-01-22", freq=freq),
             }
             for (target, ) in zip(target_values,)
-        ], freq="1D")
+        ], freq=freq)
         return processed_X
 
     def predict(self, X, preprocess=True):
@@ -106,7 +106,6 @@ class MQCNNModel(AbstractModel):
         # agg_metrics, item_metrics = evaluator(iter(tss), iter(forecasts), num_series=num_series)
         # print(json.dumps(agg_metrics, indent=4))
         # return agg_metrics["mean_wQuantileLoss"]
-
 
 
 # dummy data
