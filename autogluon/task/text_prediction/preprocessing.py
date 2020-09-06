@@ -365,16 +365,14 @@ class TabularBasicBERTPreprocessor:
             for col_name in self.categorical_columns:
                 if col_name in self.label_columns:
                     continue
-                info_l.extend([(_C.CATEGORICAL,
-                                {'prop': self.column_properties[col_name]})
-                               for col_name in self.categorical_columns])
+                info_l.append((_C.CATEGORICAL,
+                               {'prop': self.column_properties[col_name]}))
         if len(self.numerical_columns) > 0:
             for col_name in self.numerical_columns:
                 if col_name in self.label_columns:
                     continue
-                info_l.extend([(_C.NUMERICAL,
-                                {'prop': self.column_properties[col_name]})
-                               for col_name in self.numerical_columns])
+                info_l.append((_C.NUMERICAL,
+                               {'prop': self.column_properties[col_name]}))
         return info_l
 
     def label_field_info(self):
