@@ -134,34 +134,36 @@ def test_mixed_column_type():
     # Add more columns as feature
     train_data = pd.DataFrame({'sentence1': train_data['sentence1'],
                                'sentence2': train_data['sentence2'],
+                               'sentence3': train_data['sentence2'],
                                'categorical0': train_data['genre'],
                                'numerical0': train_data['score'],
                                'genre': train_data['genre'],
                                'score': train_data['score']})
     dev_data = pd.DataFrame({'sentence1': dev_data['sentence1'],
                              'sentence2': dev_data['sentence2'],
+                             'sentence3': train_data['sentence2'],
                              'categorical0': dev_data['genre'],
                              'numerical0': dev_data['score'],
                              'genre': dev_data['genre'],
                              'score': dev_data['score']})
     # Train Regression
     predictor1 = task.fit(train_data,
-                         hyperparameters=test_hyperparameters,
-                         label='score', num_trials=1,
-                         verbosity=4,
-                         ngpus_per_trial=1,
-                         output_directory='./sts_score',
-                         plot_results=False)
+                          hyperparameters=test_hyperparameters,
+                          label='score', num_trials=1,
+                          verbosity=4,
+                          ngpus_per_trial=1,
+                          output_directory='./sts_score',
+                          plot_results=False)
     dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
     dev_prediction = predictor1.predict(dev_data)
 
     # Tran Classification
     predictor2 = task.fit(train_data,
-                         hyperparameters=test_hyperparameters,
-                         label='genre', num_trials=1,
-                         verbosity=4,
-                         ngpus_per_trial=1,
-                         output_directory='./sts_genre',
-                         plot_results=False)
+                          hyperparameters=test_hyperparameters,
+                          label='genre', num_trials=1,
+                          verbosity=4,
+                          ngpus_per_trial=1,
+                          output_directory='./sts_genre',
+                          plot_results=False)
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor2.predict(dev_data)

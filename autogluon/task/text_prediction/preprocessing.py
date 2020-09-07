@@ -154,9 +154,9 @@ def process_text_entity_features(
             sentence_start_in_merged[col_name] = shift
             sentence_slice_stat[col_name] = (0, slice_length)
             encoded_token_ids.append(text_token_ids[col_name][:slice_length])
-            segment_ids.append(np.full((slice_length,), idx))
+            segment_ids.append(np.full((slice_length,), idx % 2))
             encoded_token_ids.append(np.array([tokenizer.vocab.sep_id]))
-            segment_ids.append(np.array([idx]))
+            segment_ids.append(np.array([idx % 2]))
             encoded_token_offsets.append(text_token_offsets[col_name][:slice_length])
             encoded_token_offsets.append(np.array([[-1, -1]]))
             shift += slice_length + 1
