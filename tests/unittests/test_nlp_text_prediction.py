@@ -167,3 +167,15 @@ def test_mixed_column_type():
                           plot_results=False)
     dev_rmse = predictor2.evaluate(dev_data, metrics=['acc'])
     dev_prediction = predictor2.predict(dev_data)
+
+    # Specify the feature column
+    predictor3 = task.fit(train_data,
+                          hyperparameters=test_hyperparameters,
+                          feature_columns=['sentence1', 'sentence3', 'categorical0'],
+                          label='score', num_trials=1,
+                          verbosity=4,
+                          ngpus_per_trial=1,
+                          output_directory='./sts_score',
+                          plot_results=False)
+    dev_rmse = predictor1.evaluate(dev_data, metrics=['rmse'])
+    dev_prediction = predictor1.predict(dev_data)
