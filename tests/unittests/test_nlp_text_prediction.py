@@ -94,10 +94,10 @@ def test_emoji():
         data.append(('😁' * (i + 1), 'grin'))
 
     for i in range(30):
-        data.append(('😁' * (i + 1), 'smile'))
+        data.append(('😃' * (i + 1), 'smile'))
 
     for i in range(20):
-        data.append(('😁' * (i + 1), 'wink'))
+        data.append(('😉' * (i + 1), 'wink'))
     df = pd.DataFrame(data, columns=['data', 'label'])
 
     predictor = task.fit(df, label='label',
