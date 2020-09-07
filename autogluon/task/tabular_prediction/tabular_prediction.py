@@ -536,8 +536,8 @@ class TabularPrediction(BaseTask):
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        compression_fn = kwargs.get('compression_fn', '')
-        compression_fn_kwargs = kwargs.get('compression_fn_kwargs', {})
+        compression_fn = kwargs.get('compression_fn', None)
+        compression_fn_kwargs = kwargs.get('compression_fn_kwargs', None)
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
