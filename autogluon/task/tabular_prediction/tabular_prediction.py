@@ -424,13 +424,9 @@ class TabularPrediction(BaseTask):
                 valid values are: 'gzip', 'bz2' and 'lzma'.  'gzip' corresponds to the gzip format and will result in pickle files with extension *.gz, 'bz2' corresponds to the bzip2 compression algorithm and
                 will store files with extension *.bz2, 'lzma' corresponds to LZMA compression algorithm and will create pickle files with extension *.lzma.
             compression_fn_kwargs : dict, default = None
-                Keyword arguments to be passed into compression_fn open operation. A common argument is 'compresslevel'
-                that ranges from 0 to 9 and controls the compression level of pickle files being saved to
-                disk. 0 is the default value and corresponds to no compression.  1 is the lowest level with compression and
-                will result in the fastest save/load times.  9 is the highest level of compression, with the smallest files
-                and slowest load/save times. For descriptions and supported arguments for each compression function,
-                see https://docs.python.org/3/library/gzip.html#gzip.open for gzip, https://docs.python.org/3/library/lzma.html#lzma.open
-                for lzma, and https://docs.python.org/3/library/bz2.html#bz2.open for bz2.
+                Keyword arguments to be passed into specified compression_fn open operation. For descriptions and
+                supported arguments for each compression function, see https://docs.python.org/3/library/gzip.html#gzip.open for gzip,
+                https://docs.python.org/3/library/lzma.html#lzma.open for lzma, and https://docs.python.org/3/library/bz2.html#bz2.open for bz2.
 
         Returns
         -------

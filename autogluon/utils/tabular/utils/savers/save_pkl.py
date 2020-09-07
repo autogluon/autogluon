@@ -1,37 +1,17 @@
 # TODO: Standardize / unify this code with ag.save()
-import os, pickle, tempfile, logging, boto3, math
-import gzip
-import bz2
-import lzma
+import os, pickle, tempfile, logging, boto3
 
 from .. import s3_utils
+from .. import compression_utils
 
 logger = logging.getLogger(__name__)
 
-# TODO: extract to compression helper
-compression_fn_map = {
-    None: {
-        'open': open,
-        'extension': 'pkl',
-    },
-    'gzip': {
-        'open': gzip.open,
-        'extension': 'gz',
-    },
-    'bz2': {
-        'open': bz2.open,
-        'extension': 'bz2',
-    },
-    'lzma': {
-        'open': lzma.open,
-        'extension': 'lzma',
-    },
-}
+compression_fn_map = compression_utils.get_compression_map()
 
 
 def save(path, object, format=None, verbose=True, compression_fn=None, compression_fn_kwargs=None):
     if compression_fn in compression_fn_map:
-        validated_path = get_validated_path(path, compression_fn)
+        validated_path = compression_utils.get_validated_path(path, compression_fn)
     else:
         raise ValueError(f'compression_fn={compression_fn} is not a valid compression_fn. Valid values: {compression_fn_map.keys()}')
 
@@ -73,30 +53,3 @@ def save_s3(path: str, obj, pickle_fn, verbose=True):
         except:
             logger.exception('Failed to save object to s3')
             raise
-
-
-# TODO: extract to compression helper
-def get_compression_map():
-    return compression_fn_map
-
-
-# TODO: extract to compression helper
-def get_validated_path(filename, compression_fn=None):
-    if compression_fn is not None:
-        filename_root = os.path.splitext(filename)[0]
-        validated_path = f"{filename_root}.{compression_fn_map[compression_fn]['extension']}"
-    else:
-        validated_path = filename
-    return validated_path
-
-
-# TODO: extract to compression helper OR remove
-def _get_hr_filesize(path):
-    size_bytes = os.path.getsize(path)
-    if size_bytes == 0:
-        return "0B"
-    size_name = ("B", "KB", "MB", "GB", "TB", "PB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    return "%s %s" % (s, size_name[i])

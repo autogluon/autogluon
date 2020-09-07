@@ -1,8 +1,8 @@
-import io, logging, pickle, boto3, gzip
+import io, logging, pickle, boto3
 
 from . import load_pointer
 from .. import s3_utils
-from ...utils.savers import save_pkl
+from .. import compression_utils
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,8 @@ def load(path, format=None, verbose=True, compression_fn=None, compression_fn_kw
 
     if verbose: logger.log(15, 'Loading: %s' % path)
 
-    # TODO: extract to compression helper
-    compression_fn_map = save_pkl.get_compression_map()
-    validated_path = save_pkl.get_validated_path(path, compression_fn=compression_fn)
+    compression_fn_map = compression_utils.get_compression_map()
+    validated_path = compression_utils.get_validated_path(path, compression_fn=compression_fn)
 
     if compression_fn_kwargs is None:
         compression_fn_kwargs = {}
