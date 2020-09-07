@@ -339,6 +339,8 @@ class TextPrediction(BaseTask):
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
+        train_data = train_data[all_columns]
+        tuning_data = tuning_data[all_columns]
         column_properties = get_column_properties(
             pd.concat([train_data, tuning_data]),
             metadata=None,
