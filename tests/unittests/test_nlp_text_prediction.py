@@ -141,7 +141,7 @@ def test_mixed_column_type():
                                'score': train_data['score']})
     dev_data = pd.DataFrame({'sentence1': dev_data['sentence1'],
                              'sentence2': dev_data['sentence2'],
-                             'sentence3': train_data['sentence2'],
+                             'sentence3': dev_data['sentence2'],
                              'categorical0': dev_data['genre'],
                              'numerical0': dev_data['score'],
                              'genre': dev_data['genre'],
