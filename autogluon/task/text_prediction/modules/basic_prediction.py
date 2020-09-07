@@ -321,13 +321,10 @@ class BERTForTabularBasicV1(HybridBlock):
             self.feature_field_info = feature_field_info
             self.categorical_fields = []
             self.numerical_fields = []
-            self.agg_layer = FeatureAggregator(num_fields=len(feature_field_info),
-                                               out_shape=out_shape,
-                                               in_units=feature_units,
-                                               cfg=cfg.agg_net)
             self.categorical_networks = None
             self.numerical_network = None
             numerical_elements = None
+            num_features = 1
             for i, (field_type_code, field_attrs) in enumerate(self.feature_field_info):
                 if field_type_code == _C.CATEGORICAL:
                     if self.categorical_networks is None:
@@ -337,6 +334,7 @@ class BERTForTabularBasicV1(HybridBlock):
                             CategoricalFeatureNet(num_class=field_attrs['prop'].num_class,
                                                   out_units=feature_units,
                                                   cfg=cfg.categorical_net))
+                        num_features += 1
                 elif field_type_code == _C.NUMERICAL:
                     if numerical_elements is None:
                         numerical_elements = int(np.prod(field_attrs['prop'].shape))
@@ -346,8 +344,13 @@ class BERTForTabularBasicV1(HybridBlock):
                 self.numerical_network = NumericalFeatureNet(input_shape=(numerical_elements,),
                                                              out_units=feature_units,
                                                              cfg=cfg.numerical_net)
+                num_features += 1
             else:
                 self.numerical_network = None
+            self.agg_layer = FeatureAggregator(num_fields=num_features,
+                                               out_shape=out_shape,
+                                               in_units=feature_units,
+                                               cfg=cfg.agg_net)
 
     @staticmethod
     def get_cfg(key=None):

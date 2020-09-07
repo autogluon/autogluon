@@ -710,7 +710,17 @@ class BertForTextPredictionBasic:
             raise NotImplementedError
         scheduler.run()
         scheduler.join_jobs()
-        self._logger.info('Best_config={}'.format(scheduler.get_best_config()))
+        if len(scheduler.config_history) == 0:
+            raise RuntimeError('No training job has been completed! '
+                               'There are two possibilities: '
+                               '1) The time_limits is too small, '
+                               'or 2) There are some internal errors in AutoGluon. '
+                               'For the first case, you can increase the time_limits or set it to '
+                               'None, e.g., setting "TextPrediction.fit(..., time_limits=None). To '
+                               'further investigate the root cause, you can also try to train with '
+                               '"verbosity=3", i.e., TextPrediction.fit(..., verbosity=3).')
+        best_config = scheduler.get_best_config()
+        self._logger.info('Best_config={}'.format(best_config))
         best_task_id = scheduler.get_best_task_id()
         best_model_saved_dir_path = os.path.join(self._output_directory,
                                                  'task{}'.format(best_task_id))

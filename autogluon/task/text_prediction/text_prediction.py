@@ -11,7 +11,8 @@ from autogluon_contrib_nlp.utils.registry import Registry
 from autogluon_contrib_nlp.utils.misc import logging_config
 
 from . import constants as _C
-from .dataset import random_split_train_val, TabularDataset, infer_problem_type
+from .dataset import random_split_train_val, TabularDataset, infer_problem_type,\
+    get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
 from .. import tabular_prediction
 from ..base import BaseTask
@@ -338,10 +339,18 @@ class TextPrediction(BaseTask):
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
+        column_properties = get_column_properties(
+            pd.concat([train_data, tuning_data]),
+            metadata=None,
+            label_columns=label_columns,
+            provided_column_properties=None,
+            categorical_default_handle_missing_value=True)
         train_data = TabularDataset(train_data,
-                                    columns=all_columns,
+                                    column_properties=column_properties,
                                     label_columns=label_columns)
-        tuning_data = TabularDataset(tuning_data, column_properties=train_data.column_properties)
+        tuning_data = TabularDataset(tuning_data,
+                                     column_properties=train_data.column_properties,
+                                     label_columns=label_columns)
 
         logger.info('Train Dataset:')
         logger.info(train_data)
@@ -349,8 +358,17 @@ class TextPrediction(BaseTask):
         logger.info(tuning_data)
         logger.debug('Hyperparameters:')
         logger.debug(hyperparameters)
-        column_properties = train_data.column_properties
-
+        has_text_column = False
+        for k, v in column_properties.items():
+            if v.type == _C.TEXT:
+                has_text_column = True
+                break
+        if not has_text_column:
+            raise NotImplementedError('No Text Column is found! This is currently not supported by '
+                                      'the TextPrediction task. You may try to use '
+                                      'TabularPrediction.fit().\n' \
+                                      'The inferred column properties of the training data is {}'
+                                      .format(train_data))
         problem_types = []
         label_shapes = []
         for label_col_name in label_columns:
