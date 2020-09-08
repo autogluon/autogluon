@@ -329,6 +329,9 @@ class TextPrediction(BaseTask):
                 feature_columns = [feature_columns]
             for col in feature_columns:
                 assert col not in label_columns, 'Feature columns and label columns cannot overlap.'
+                assert col in train_data.columns,\
+                    'Feature columns must be in the pandas dataframe! Received col = "{}", ' \
+                    'all columns = "{}"'.format(col, train_data.columns)
             all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
@@ -339,6 +342,8 @@ class TextPrediction(BaseTask):
         else:
             if not isinstance(tuning_data, pd.DataFrame):
                 tuning_data = load_pd.load(tuning_data)
+        train_data = train_data[all_columns]
+        tuning_data = tuning_data[all_columns]
         column_properties = get_column_properties(
             pd.concat([train_data, tuning_data]),
             metadata=None,
@@ -376,8 +381,9 @@ class TextPrediction(BaseTask):
                                                            label_col_name=label_col_name)
             problem_types.append(problem_type)
             label_shapes.append(label_shape)
-        logging.info('Label columns={}, Problem types={}, Label shapes={}'.format(
-            label_columns, problem_types, label_shapes))
+        logging.info('Label columns={}, Feature columns={}, Problem types={}, Label shapes={}'
+            .format(label_columns, feature_columns,
+                    problem_types, label_shapes))
         eval_metric, stopping_metric, log_metrics =\
             infer_eval_stop_log_metrics(problem_types[0],
                                         label_shapes[0],
