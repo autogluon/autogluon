@@ -329,6 +329,9 @@ class TextPrediction(BaseTask):
                 feature_columns = [feature_columns]
             for col in feature_columns:
                 assert col not in label_columns, 'Feature columns and label columns cannot overlap.'
+                assert col in train_data.columns,\
+                    'Feature columns must be in the pandas dataframe! Received col = "{}", ' \
+                    'all columns = "{}"'.format(col, train_data.columns)
             all_columns = feature_columns + label_columns
             all_columns = [ele for ele in train_data.columns if ele in all_columns]
         if tuning_data is None:
