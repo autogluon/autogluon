@@ -152,10 +152,7 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type=='multiclass':
             self.num_class=y_train.nunique()
 
-        # TODO: It likely is necessary to figure out which device, but I'm not sure where to grab device_num from. Setting to 0 as a default.
-        #device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
-        #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        device = torch.device("cuda:0")
+        device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
 
         #gets default kwargs for TabTransformer model.
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
