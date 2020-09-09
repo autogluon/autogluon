@@ -4,7 +4,7 @@
 import torch
 from torch import nn
 import copy
-from autogluon.utils.tabular.ml.models.tab_transformer.TabTransormerEncoder import EmbeddingInitializer
+from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import EmbeddingInitializer
 from autogluon.utils.tabular.ml.models.tab_transformer.TabModelBase import TabModelBase
 from autogluon.utils.tabular.ml.models.tab_transformer.modified_transformer import TransformerEncoderLayer_modified
 class TabTransformer(TabModelBase):

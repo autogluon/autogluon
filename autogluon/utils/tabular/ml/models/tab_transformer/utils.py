@@ -1,8 +1,8 @@
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
-from autogluon.utils.tabular.ml.models.tab_transformer.TabTransormerEncoder import WontEncodeError, NullEnc
+from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import WontEncodeError, NullEnc
 import torch
-from autogluon.utils.tabular.ml.models.tab_transformer import TabTransormerEncoder
+from autogluon.utils.tabular.ml.models.tab_transformer import TabTransformerEncoder
 from autogluon.utils.tabular.ml.models.tab_transformer import pretexts
 
 
@@ -122,11 +122,11 @@ class TabTransformerDataset(Dataset):
             self.feature_encoders = {}
             for c in self.columns:
                 col = self.raw_data[c['name']]
-                enc = TabTransormerEncoder.__dict__[self.encoders[c['type']]]()
+                enc = TabTransformerEncoder.__dict__[self.encoders[c['type']]]()
 
                 if c['type'] == 'SCALAR' and col.nunique() < 32:
                     print(f"Column {c['name']} shouldn't be encoded as SCALAR. Switching to CATEGORICAL.")
-                    enc = TabTransormerEncoder.__dict__[self.encoders['CATEGORICAL']]()
+                    enc = TabTransformerEncoder.__dict__[self.encoders['CATEGORICAL']]()
                 try:
                     enc.fit(col)
                 except WontEncodeError as e:
