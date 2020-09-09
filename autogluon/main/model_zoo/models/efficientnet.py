@@ -3,7 +3,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.block import HybridBlock
 
-from ...utils import EasyDict
+from autogluon.core.utils import EasyDict
 from .mbconv import *
 from .utils import *
 

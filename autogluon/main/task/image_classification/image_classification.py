@@ -9,11 +9,11 @@ from .nets import *
 from .pipeline import train_image_classification
 from .utils import *
 from ..base import BaseTask, compile_scheduler_options, create_scheduler
-from ...core import *
-from ...core.loss import *
-from ...core.optimizer import *
-from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ...utils import update_params
+from autogluon.core import *
+from autogluon.core.loss import *
+from autogluon.core.optimizer import *
+from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon.core.utils import update_params
 
 __all__ = ['ImageClassification']
 

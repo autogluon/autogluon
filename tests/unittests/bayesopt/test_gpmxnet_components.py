@@ -1,23 +1,23 @@
 import numpy as np
 import mxnet as mx
 
-from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.main.searcher.bayesopt.gpmxnet.warping import WarpedKernel
-from autogluon.main.searcher.bayesopt.models.gpmxnet import \
+from autogluon.core.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.core.searcher.bayesopt.gpmxnet.warping import WarpedKernel
+from autogluon.core.searcher.bayesopt.models.gpmxnet import \
     get_internal_candidate_evaluations, build_kernel, \
     dimensionality_and_warping_ranges
-from autogluon.main.searcher.bayesopt.datatypes.tuning_job_state import \
+from autogluon.core.searcher.bayesopt.datatypes.tuning_job_state import \
     TuningJobState, CandidateEvaluation
-from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRangeCategorical, HyperparameterRangeInteger, \
     HyperparameterRangeContinuous, HyperparameterRanges_Impl
-from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling, \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling, \
     LogScaling
-from autogluon.main.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     dictionarize_objective, DEFAULT_METRIC
-from autogluon.main.searcher.bayesopt.models.mxnet_base import \
+from autogluon.core.searcher.bayesopt.models.mxnet_base import \
     _compute_mean_across_samples
-from autogluon.main.searcher.bayesopt.models.nphead_acqfunc import \
+from autogluon.core.searcher.bayesopt.models.nphead_acqfunc import \
     _reshape_predictions
 
 

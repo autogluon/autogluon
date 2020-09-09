@@ -10,7 +10,7 @@ try:
 except ImportError:
     import xml.etree.ElementTree as ET
 
-from ....core import *
+from autogluon.core import *
 
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric

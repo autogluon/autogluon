@@ -7,7 +7,7 @@ from mxnet.gluon import nn
 import autogluon.main as ag
 import pytest
 
-from autogluon.main.utils import load_and_split_openml_data
+from autogluon.core.utils import load_and_split_openml_data
 
 
 OPENML_TASK_ID = 6                # describes the problem we will tackle

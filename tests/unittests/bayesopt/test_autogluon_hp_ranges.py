@@ -6,12 +6,12 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 from numpy.testing import assert_allclose
 
-from autogluon.main.searcher.bayesopt.autogluon.hp_ranges import \
+from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
     HyperparameterRanges_CS
-from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeCategorical, \
     HyperparameterRangeContinuous, HyperparameterRangeInteger
-from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling, \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling, \
     LogScaling
 
 

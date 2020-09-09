@@ -22,8 +22,8 @@ from autogluon_contrib_nlp.utils.misc import set_seed, logging_config, parse_ctx
 from autogluon_contrib_nlp.utils.parameter import move_to_ctx, clip_grad_global_norm
 from ..metrics import calculate_metric_by_expr
 from .. import constants as _C
-from ....core import args, space
-from ....scheduler import FIFOScheduler, HyperbandScheduler
+from autogluon.core import args, space
+from autogluon.core.scheduler import FIFOScheduler, HyperbandScheduler
 from ..column_property import get_column_property_metadata, get_column_properties_from_metadata
 from ..preprocessing import TabularBasicBERTPreprocessor
 from ..modules.basic_prediction import BERTForTabularBasicV1

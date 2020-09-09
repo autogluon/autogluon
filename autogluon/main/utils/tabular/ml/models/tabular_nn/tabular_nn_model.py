@@ -20,8 +20,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
-from ......core import Space
-from ......utils import try_import_mxboard
+from autogluon.core import Space
+from autogluon.core.utils import try_import_mxboard
 from ....utils.loaders import load_pkl
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS

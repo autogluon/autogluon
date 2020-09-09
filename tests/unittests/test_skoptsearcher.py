@@ -2,8 +2,8 @@ import logging
 import random
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-from autogluon.main.searcher import RandomSearcher
-from autogluon.main.searcher import SKoptSearcher
+from autogluon.core.searcher import RandomSearcher
+from autogluon.core.searcher import SKoptSearcher
 
 # Suppress known UserWarnings:
 import warnings

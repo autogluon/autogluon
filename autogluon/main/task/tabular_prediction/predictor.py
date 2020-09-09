@@ -6,7 +6,7 @@ import pandas as pd
 from .dataset import TabularDataset
 from .hyperparameter_configs import get_hyperparameter_config
 from ..base.base_predictor import BasePredictor
-from ...utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models, verbosity2loglevel
 from ...utils.tabular.ml.constants import REGRESSION
 from ...utils.tabular.ml.learner.abstract_learner import AbstractLearner as Learner  # TODO: Keep track of true type of learner for loading
 from ...utils.tabular.ml.trainer.abstract_trainer import AbstractTrainer  # TODO: Keep track of true type of trainer for loading

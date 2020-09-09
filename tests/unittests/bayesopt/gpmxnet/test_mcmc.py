@@ -2,16 +2,16 @@ import numpy as np
 import mxnet as mx
 import pytest
 
-from autogluon.main.searcher.bayesopt.gpmxnet import SliceException
-from autogluon.main.searcher.bayesopt.gpmxnet.slice import SliceSampler, \
+from autogluon.core.searcher.bayesopt.gpmxnet import SliceException
+from autogluon.core.searcher.bayesopt.gpmxnet.slice import SliceSampler, \
     slice_sampler_step_out, slice_sampler_step_in
-from autogluon.main.searcher.bayesopt.gpmxnet.distribution import Normal, \
+from autogluon.core.searcher.bayesopt.gpmxnet.distribution import Normal, \
     LogNormal, Horseshoe, Uniform
-from autogluon.main.searcher.bayesopt.gpmxnet.warping import Warping, WarpedKernel
-from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.main.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
-from autogluon.main.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
-from autogluon.main.searcher.bayesopt.gpmxnet.gpr_mcmc import GPRegressionMCMC, \
+from autogluon.core.searcher.bayesopt.gpmxnet.warping import Warping, WarpedKernel
+from autogluon.core.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.core.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
+from autogluon.core.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
+from autogluon.core.searcher.bayesopt.gpmxnet.gpr_mcmc import GPRegressionMCMC, \
     _get_gp_hps, _set_gp_hps, _create_likelihood
 
 

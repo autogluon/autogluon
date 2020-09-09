@@ -21,8 +21,8 @@ from ....features.feature_metadata import FeatureMetadata
 from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
-from ......core import Space, Categorical, List, NestedSpace
-from ......scheduler.fifo import FIFOScheduler
+from autogluon.core import Space, Categorical, List, NestedSpace
+from autogluon.core.scheduler.fifo import FIFOScheduler
 from ......task.base import BasePredictor
 
 logger = logging.getLogger(__name__)

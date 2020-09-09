@@ -1,21 +1,21 @@
 from typing import List
 import numpy as np
 
-from autogluon.main.searcher.bayesopt.datatypes.common import CandidateEvaluation
-from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.common import CandidateEvaluation
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeContinuous
-from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling
-from autogluon.main.searcher.bayesopt.datatypes.tuning_job_state import \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling
+from autogluon.core.searcher.bayesopt.datatypes.tuning_job_state import \
     TuningJobState
-from autogluon.main.searcher.bayesopt.models.nphead_acqfunc import \
+from autogluon.core.searcher.bayesopt.models.nphead_acqfunc import \
     EIAcquisitionFunction
-from autogluon.main.searcher.bayesopt.models.gpmxnet import GPMXNetModel, \
+from autogluon.core.searcher.bayesopt.models.gpmxnet import GPMXNetModel, \
     default_gpmodel, default_gpmodel_mcmc
-from autogluon.main.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
     LBFGSOptimizeAcquisition
-from autogluon.main.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     dictionarize_objective, DEFAULT_METRIC
-from autogluon.main.searcher.bayesopt.gpmxnet.constants import DEFAULT_MCMC_CONFIG, \
+from autogluon.core.searcher.bayesopt.gpmxnet.constants import DEFAULT_MCMC_CONFIG, \
     DEFAULT_OPTIMIZATION_CONFIG
 
 

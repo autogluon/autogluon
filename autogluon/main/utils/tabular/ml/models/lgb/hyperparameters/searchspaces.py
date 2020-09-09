@@ -1,5 +1,5 @@
 """ Default hyperparameter search spaces used in Gradient Boosting model """
-from .......core import Real, Int
+from autogluon.core import Real, Int
 from ....constants import BINARY, MULTICLASS, REGRESSION
 
 DEFAULT_NUM_BOOST_ROUND = 10000  # default for HPO

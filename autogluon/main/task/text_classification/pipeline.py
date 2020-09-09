@@ -1,24 +1,19 @@
-import os
-import io
 import time
 import logging
 import multiprocessing
 import random
-import warnings
-import numpy as np
+import time
 
 import mxnet as mx
-from mxnet import gluon, init, autograd, nd
-from mxnet.gluon import nn
-from ...utils.try_import import try_import_gluonnlp
+import numpy as np
+from mxnet import gluon, autograd
 
-
+from autogluon.core import *
+from autogluon.core.utils import tqdm
+from autogluon.core.utils.mxutils import collect_params
+from autogluon.core.utils.try_import import try_import_gluonnlp
 from .network import get_network
-from .dataset import *
 from .transforms import BERTDatasetTransform
-from ...core import *
-from ...utils import tqdm
-from ...utils.mxutils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
 

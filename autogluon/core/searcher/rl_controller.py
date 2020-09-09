@@ -5,7 +5,7 @@ import mxnet.ndarray as F
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 
-from ..core.space import *
+from ..space import *
 from .searcher import BaseSearcher
 from ..utils import keydefaultdict, update_params
 from collections import OrderedDict

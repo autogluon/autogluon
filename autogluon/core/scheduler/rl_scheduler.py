@@ -11,8 +11,8 @@ import mxnet as mx
 
 from .resource import DistributedResource
 from ..utils import (save, load, mkdir, try_import_mxboard, tqdm)
-from ..core import Task
-from ..core.decorator import _autogluon_method
+from ...core import Task
+from ...core.decorator import _autogluon_method
 from ..searcher import RLSearcher
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter

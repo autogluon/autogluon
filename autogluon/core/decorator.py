@@ -9,8 +9,8 @@ import ConfigSpace as CS
 
 from .space import *
 from .space import _add_hp, _add_cs, _rm_hp, _strip_config_space, SPLITTER
-from ..utils import EasyDict as ezdict
-from ..utils.deprecate import make_deprecate
+from .utils import EasyDict as ezdict
+from .utils.deprecate import make_deprecate
 
 __all__ = ['args', 'obj', 'func', 'sample_config',
            'autogluon_register_args', 'autogluon_object', 'autogluon_function',
@@ -52,7 +52,7 @@ class _autogluon_method(object):
         new_config = copy.deepcopy(config)
         self._rand_seed()
         args = sample_config(args, new_config)
-        from ..scheduler.reporter import FakeReporter
+        from .scheduler.reporter import FakeReporter
         if 'reporter' not in kwargs:
             logger.debug('Creating FakeReporter for test purpose.')
             kwargs['reporter'] = FakeReporter()

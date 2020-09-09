@@ -6,7 +6,7 @@ import numpy as np
 import autogluon.main as ag
 import mxnet as mx
 import mxnet.gluon.nn as nn
-from autogluon.main.contrib.enas import *
+from autogluon.core.contrib.enas import *
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):

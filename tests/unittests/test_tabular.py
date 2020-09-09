@@ -27,7 +27,8 @@ from random import seed
 from networkx.exception import NetworkXError
 import pytest
 
-import autogluon.main as ag
+import autogluon.core as ag
+from autogluon.core.utils import download, unzip
 from autogluon.main import TabularPrediction as task
 from autogluon.main.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.main.task.tabular_prediction.predictor import TabularPredictor
@@ -158,8 +159,8 @@ def load_data(directory_prefix, train_file, test_file, name, url=None):
     if (not os.path.exists(train_file_path)) or (not os.path.exists(test_file_path)):
         # fetch files from s3:
         print("%s data not found locally, so fetching from %s" % (name, url))
-        zip_name = ag.download(url, directory_prefix)
-        ag.unzip(zip_name, directory_prefix)
+        zip_name = download(url, directory_prefix)
+        unzip(zip_name, directory_prefix)
         os.remove(zip_name)
 
     train_data = task.Dataset(file_path=train_file_path)

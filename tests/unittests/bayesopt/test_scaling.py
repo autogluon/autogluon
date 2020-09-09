@@ -4,7 +4,7 @@
 import pytest
 from numpy.testing import assert_almost_equal
 
-from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling, \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling, \
     LogScaling, ReverseLogScaling
 
 

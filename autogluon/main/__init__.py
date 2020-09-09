@@ -14,12 +14,12 @@ logger.setLevel(logging.ERROR)
 logger = logging.getLogger("distributed.worker")
 logger.setLevel(logging.ERROR)
 
-from .utils.try_import import *
+from autogluon.core.utils.try_import import *
 try_import_mxnet()
 
-from . import scheduler, searcher, utils
-from .scheduler import get_cpu_count, get_gpu_count
+from autogluon.core import scheduler, searcher, utils
+from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 
 from .utils import *
-from .core import *
+from ..core import *
 from .task import *

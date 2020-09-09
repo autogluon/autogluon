@@ -14,8 +14,8 @@ from tqdm.auto import tqdm
 from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
 from .scheduler import TaskScheduler
-from ..core import Task
-from ..core.decorator import _autogluon_method
+from ...core import Task
+from ...core.decorator import _autogluon_method
 from ..searcher import BaseSearcher
 from ..searcher.searcher_factory import searcher_factory
 from ..utils import save, load, mkdir, try_import_mxboard

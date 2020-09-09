@@ -22,8 +22,8 @@ from .utils import get_lr_scheduler, get_yolo3_metrics, get_faster_rcnn_metrics,
     rcnn_split_and_load
 # TODO: move it to general util.py
 from ..image_classification.utils import _train_val_split
-from ...core import args
-from ...utils.mxutils import collect_params
+from autogluon.core import args
+from autogluon.core.utils.mxutils import collect_params
 
 
 def get_dataloader(net, train_dataset, val_dataset, data_shape, batch_size, num_workers, args):

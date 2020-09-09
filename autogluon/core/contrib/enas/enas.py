@@ -2,7 +2,7 @@ import json
 import collections
 import mxnet as mx
 from mxnet import gluon
-from ...core.space import Categorical, Space, _strip_config_space
+from autogluon.core.space import Categorical, Space, _strip_config_space
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)

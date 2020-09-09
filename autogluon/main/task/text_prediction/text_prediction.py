@@ -15,12 +15,12 @@ from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
 from .. import tabular_prediction
 from ..base import BaseTask
-from ...scheduler.resource import get_cpu_count, get_gpu_count
-from ...core import space
-from ...utils import in_ipynb
+from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
+from autogluon.core import space
+from autogluon.core.utils import in_ipynb
 from ...utils.tabular.utils.loaders import load_pd
 from ...utils.tabular.ml.utils import default_holdout_frac
-from ...utils.miscs import verbosity2loglevel
+from autogluon.core.utils.miscs import verbosity2loglevel
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']
 

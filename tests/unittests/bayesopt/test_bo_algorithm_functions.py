@@ -1,17 +1,17 @@
 from typing import Iterable, List, Optional
 import pytest
 
-from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.core.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRanges_Impl, HyperparameterRangeContinuous
-from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling
-from autogluon.main.searcher.bayesopt.tuning_algorithms.base_classes import \
+from autogluon.core.searcher.bayesopt.datatypes.scaling import LinearScaling
+from autogluon.core.searcher.bayesopt.tuning_algorithms.base_classes import \
     ScoringFunction, SurrogateModel
-from autogluon.main.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
     NoOptimization
-from autogluon.main.searcher.bayesopt.tuning_algorithms.bo_algorithm import \
+from autogluon.core.searcher.bayesopt.tuning_algorithms.bo_algorithm import \
     _pick_from_locally_optimized, _lazily_locally_optimize, _order_candidates
-from autogluon.main.searcher.bayesopt.datatypes.common import StateIdAndCandidate
-from autogluon.main.searcher.bayesopt.utils.duplicate_detector import \
+from autogluon.core.searcher.bayesopt.datatypes.common import StateIdAndCandidate
+from autogluon.core.searcher.bayesopt.utils.duplicate_detector import \
     DuplicateDetectorIdentical, DuplicateDetectorEpsilon
 
 

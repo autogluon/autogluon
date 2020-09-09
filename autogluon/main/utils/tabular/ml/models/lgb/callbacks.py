@@ -2,7 +2,7 @@ import collections, warnings, time, os, psutil, logging
 from operator import gt, lt
 
 from ....utils.savers import save_pkl, save_pointer
-from .....try_import import try_import_lightgbm
+from autogluon.core.utils.try_import import try_import_lightgbm
 
 logger = logging.getLogger(__name__)
 

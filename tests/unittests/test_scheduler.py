@@ -2,7 +2,8 @@ import numpy as np
 import pickle
 import time
 import pytest
-import autogluon.main as ag
+import autogluon.core as ag
+import autogluon.core.scheduler
 
 
 def test_fifo_scheduler():

@@ -1,14 +1,14 @@
 import numpy as np
 import mxnet as mx
 
-from autogluon.main.searcher.bayesopt.gpmxnet.warping import OneDimensionalWarping, \
+from autogluon.core.searcher.bayesopt.gpmxnet.warping import OneDimensionalWarping, \
     Warping, WarpedKernel
-from autogluon.main.searcher.bayesopt.gpmxnet.constants import DATA_TYPE, \
+from autogluon.core.searcher.bayesopt.gpmxnet.constants import DATA_TYPE, \
     NUMERICAL_JITTER
-from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.main.searcher.bayesopt.gpmxnet.gp_regression import \
+from autogluon.core.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.core.searcher.bayesopt.gpmxnet.gp_regression import \
     GaussianProcessRegression
-from autogluon.main.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
+from autogluon.core.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
     LogarithmScalarEncoding, PositiveScalarEncoding
 
 
