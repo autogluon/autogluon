@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 
-from setuptools import setup, find_namespace_packages
+from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,7 +25,7 @@ except Exception:
 def create_version_file():
     global version, cwd
     print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'autogluon', 'main', 'version.py')
+    version_path = os.path.join(cwd, 'src', 'autogluon', 'main', 'version.py')
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
@@ -59,7 +59,8 @@ requirements = [
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.23',
-    'networkx>=2.3,<3.0'
+    'networkx>=2.3,<3.0',
+    'autogluon.core'
 ]
 
 text_requirements = [
@@ -85,8 +86,9 @@ if __name__ == '__main__':
         license='Apache',
 
         # Package info
-        namespace_packages=['autogluon'],
-        packages=find_namespace_packages(include=['autogluon.*']),
+        packages=find_packages('src'),
+        package_dir={'': 'src'},
+        namespace_packages=["autogluon"],
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + text_requirements + test_requirements,
