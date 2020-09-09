@@ -1,4 +1,4 @@
-import autogluon as ag
+import autogluon.main as ag
 
 
 def test_search_space():

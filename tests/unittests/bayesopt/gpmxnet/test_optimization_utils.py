@@ -2,7 +2,7 @@ import mxnet as mx
 import numpy as np
 from mxnet import autograd
 
-from autogluon.searcher.bayesopt.gpmxnet.optimization_utils import \
+from autogluon.main.searcher.bayesopt.gpmxnet.optimization_utils import \
     apply_lbfgs_with_multiple_starts, apply_lbfgs
 
 

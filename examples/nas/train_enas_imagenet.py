@@ -1,8 +1,8 @@
 import mxnet as mx
 from mxnet import gluon
 
-import autogluon as ag
-from autogluon.contrib.enas import *
+import autogluon.main as ag
+from autogluon.main.contrib.enas import *
 
 net = ENAS_MBNet()
 

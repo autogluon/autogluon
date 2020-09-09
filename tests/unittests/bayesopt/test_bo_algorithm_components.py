@@ -1,12 +1,12 @@
 import pytest
 
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRangeContinuous, HyperparameterRangeInteger, \
     HyperparameterRangeCategorical, HyperparameterRanges_Impl
-from autogluon.searcher.bayesopt.datatypes.scaling import LinearScaling
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
+from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling
+from autogluon.main.searcher.bayesopt.datatypes.tuning_job_state import \
     TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import CandidateEvaluation
+from autogluon.main.searcher.bayesopt.datatypes.common import CandidateEvaluation
 
 
 @pytest.fixture(scope='function')

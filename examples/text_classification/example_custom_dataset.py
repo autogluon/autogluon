@@ -4,7 +4,7 @@
 
 # Step 2: run the following example script
 
-from autogluon import TextClassification as task
+from autogluon.main import TextClassification as task
 
 dataset = task.Dataset(filepath='./data/nlp-getting-started/train.csv', usecols=['text', 'target'])
 predictor = task.fit(dataset, epochs=1)

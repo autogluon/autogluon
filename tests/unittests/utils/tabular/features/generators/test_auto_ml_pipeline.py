@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
+from autogluon.main.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator, TextNgramFeatureGenerator
 
 
 def test_auto_ml_pipeline_feature_generator(generator_helper, data_helper):

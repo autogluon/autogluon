@@ -1,5 +1,4 @@
-import autogluon as ag
-from autogluon import ImageClassification as task
+from autogluon.main import ImageClassification as task
 
 
 def test_ensemble():

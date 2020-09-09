@@ -3,10 +3,10 @@ import os
 import pytest
 import numpy as np
 
-import autogluon as ag
+import autogluon.main as ag
 import mxnet as mx
 import mxnet.gluon.nn as nn
-from autogluon.contrib.enas import *
+from autogluon.main.contrib.enas import *
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):

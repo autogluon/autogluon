@@ -1,11 +1,11 @@
 import numpy as np
 import pickle
 
-from autogluon.searcher.bayesopt.autogluon.searcher_factory import \
+from autogluon.main.searcher.bayesopt.autogluon.searcher_factory import \
     gp_fifo_searcher_factory, gp_fifo_searcher_defaults
-from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
+from autogluon.main.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
     sample_data, assert_equal_candidates, assert_equal_randomstate
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.main.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_METRIC
 
 

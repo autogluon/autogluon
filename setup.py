@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,7 +25,7 @@ except Exception:
 def create_version_file():
     global version, cwd
     print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'autogluon', 'version.py')
+    version_path = os.path.join(cwd, 'autogluon', 'main', 'version.py')
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
@@ -85,7 +85,7 @@ if __name__ == '__main__':
         license='Apache',
 
         # Package info
-        packages=find_packages(exclude=('docs', 'tests', 'scripts')),
+        packages=find_namespace_packages(include=['autogluon.*']),
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + text_requirements + test_requirements,

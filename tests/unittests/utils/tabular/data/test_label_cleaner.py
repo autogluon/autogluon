@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.utils.tabular.data.label_cleaner import LabelCleaner, LabelCleanerBinary, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary, LabelCleanerDummy
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from autogluon.main.utils.tabular.data.label_cleaner import LabelCleaner, LabelCleanerBinary, LabelCleanerMulticlass, LabelCleanerMulticlassToBinary, LabelCleanerDummy
+from autogluon.main.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 
 
 def test_label_cleaner_binary():

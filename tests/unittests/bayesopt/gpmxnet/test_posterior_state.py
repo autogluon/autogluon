@@ -1,11 +1,11 @@
 import numpy as np
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
+from autogluon.main.searcher.bayesopt.gpmxnet.posterior_state import \
     IncrementalUpdateGPPosteriorState, GaussProcPosteriorState
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
+from autogluon.main.searcher.bayesopt.gpmxnet.gp_regression import \
     GaussianProcessRegression
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
 
 
 def to_nd(x, dtype=np.float64):

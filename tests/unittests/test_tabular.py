@@ -27,10 +27,10 @@ from random import seed
 from networkx.exception import NetworkXError
 import pytest
 
-import autogluon as ag
-from autogluon import TabularPrediction as task
-from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
-from autogluon.task.tabular_prediction.predictor import TabularPredictor
+import autogluon.main as ag
+from autogluon.main import TabularPrediction as task
+from autogluon.main.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.main.task.tabular_prediction.predictor import TabularPredictor
 
 
 def test_tabular():

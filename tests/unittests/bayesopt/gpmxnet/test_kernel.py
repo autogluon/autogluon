@@ -2,11 +2,11 @@ import numpy as np
 import mxnet as mx
 import pytest
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52, \
+from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52, \
     FabolasKernelFunction, ProductKernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.kernel.base import SquaredDistance
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
+from autogluon.main.searcher.bayesopt.gpmxnet.kernel.base import SquaredDistance
+from autogluon.main.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
+from autogluon.main.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
     LogarithmScalarEncoding, PositiveScalarEncoding
 
 

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
-from autogluon.utils.tabular.features.generators import AbstractFeatureGenerator
+from autogluon.main.utils.tabular.features.generators import AbstractFeatureGenerator
 
 
 class GeneratorHelper:

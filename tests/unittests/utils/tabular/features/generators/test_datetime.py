@@ -1,5 +1,5 @@
 
-from autogluon.utils.tabular.features.generators import DatetimeFeatureGenerator
+from autogluon.main.utils.tabular.features.generators import DatetimeFeatureGenerator
 
 
 def test_datetime_feature_generator(generator_helper, data_helper):

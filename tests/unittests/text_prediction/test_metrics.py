@@ -1,5 +1,5 @@
 import pytest
-from autogluon.task.text_prediction.metrics import calculate_metric_by_expr
+from autogluon.main.task.text_prediction.metrics import calculate_metric_by_expr
 
 
 def test_calculate_metric_by_expr():

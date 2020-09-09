@@ -4,22 +4,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
+from autogluon.main.searcher.bayesopt.tuning_algorithms.default_algorithm import \
     DEFAULT_METRIC
-from autogluon.searcher.bayesopt.models.gpmxnet import GPMXNetModel
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
+from autogluon.main.searcher.bayesopt.models.gpmxnet import GPMXNetModel
+from autogluon.main.searcher.bayesopt.gpmxnet.gp_regression import \
     GaussianProcessRegression
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.searcher.bayesopt.gpmxnet.mean import ZeroMeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
+from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.main.searcher.bayesopt.gpmxnet.mean import ZeroMeanFunction
+from autogluon.main.searcher.bayesopt.gpmxnet.constants import \
     INITIAL_COVARIANCE_SCALE, INITIAL_INVERSE_BANDWIDTHS, \
     INVERSE_BANDWIDTHS_LOWER_BOUND, INVERSE_BANDWIDTHS_UPPER_BOUND, \
     COVARIANCE_SCALE_LOWER_BOUND, COVARIANCE_SCALE_UPPER_BOUND, \
     INITIAL_NOISE_VARIANCE, NOISE_VARIANCE_LOWER_BOUND, \
     NOISE_VARIANCE_UPPER_BOUND, OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
-#from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import Branin, \
+#from autogluon.main.searcher.bayesopt.gpmxnet.comparison_gpy import Branin, \
 #    ThreeHumpCamel, Ackley, sample_data, compare_gpy_predict_posterior_marginals
-from autogluon.utils.files import download
+from autogluon.main.utils.files import download
 
 
 # Note: At present, the surrogate model is fixed

@@ -1,5 +1,5 @@
-import autogluon as ag
-from autogluon import TextClassification as task
+import autogluon.main as ag
+from autogluon.main import TextClassification as task
 
 dataset = task.Dataset(name='SST')
 predictor = task.fit(dataset, epochs=5, warmup_ratio=0.1, log_interval=400, seed=2, num_trials=100, dev_batch_size=8,

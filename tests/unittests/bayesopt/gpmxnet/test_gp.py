@@ -1,14 +1,14 @@
 import numpy as np
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52
-from autogluon.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
+from autogluon.main.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
+from autogluon.main.searcher.bayesopt.gpmxnet.kernel import Matern52
+from autogluon.main.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
+from autogluon.main.searcher.bayesopt.gpmxnet.gp_regression import \
     GaussianProcessRegression
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
+from autogluon.main.searcher.bayesopt.gpmxnet.constants import \
     NOISE_VARIANCE_LOWER_BOUND, INVERSE_BANDWIDTHS_LOWER_BOUND
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
+from autogluon.main.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
     LogarithmScalarEncoding, PositiveScalarEncoding
 
 

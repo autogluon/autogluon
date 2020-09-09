@@ -1,8 +1,8 @@
 """ Example: distilling AutoGluon's ensemble-predictor into a single model for regression. """
 
 import shutil, os
-from autogluon import TabularPrediction as task
-from autogluon.utils.tabular.ml.constants import REGRESSION
+from autogluon.main import TabularPrediction as task
+from autogluon.main.utils.tabular.ml.constants import REGRESSION
 
 subsample_size = 500
 time_limits = 60

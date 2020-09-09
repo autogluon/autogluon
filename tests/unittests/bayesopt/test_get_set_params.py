@@ -1,8 +1,8 @@
 import numpy as np
 
-from autogluon.searcher.bayesopt.autogluon.searcher_factory import \
+from autogluon.main.searcher.bayesopt.autogluon.searcher_factory import \
     gp_multifidelity_searcher_factory, gp_multifidelity_searcher_defaults
-from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
+from autogluon.main.searcher.bayesopt.gpmxnet.comparison_gpy import Ackley, \
     sample_data
 
 

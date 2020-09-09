@@ -1,7 +1,7 @@
 
 from pandas import DataFrame
 
-from autogluon.utils.tabular.features.generators import DummyFeatureGenerator
+from autogluon.main.utils.tabular.features.generators import DummyFeatureGenerator
 
 
 def test_dummy_feature_generator(generator_helper, data_helper):

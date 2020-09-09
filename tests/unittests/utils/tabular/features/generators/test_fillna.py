@@ -2,7 +2,7 @@ import copy
 
 import numpy as np
 
-from autogluon.utils.tabular.features.generators import FillNaFeatureGenerator
+from autogluon.main.utils.tabular.features.generators import FillNaFeatureGenerator
 
 
 # TODO: Consider adding test of loading from csv

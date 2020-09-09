@@ -1,6 +1,6 @@
 
-from autogluon.utils.tabular.features.generators import IdentityFeatureGenerator
-from autogluon.utils.tabular.features.feature_metadata import R_INT, R_FLOAT
+from autogluon.main.utils.tabular.features.generators import IdentityFeatureGenerator
+from autogluon.main.utils.tabular.features.feature_metadata import R_INT, R_FLOAT
 
 
 def test_identity_feature_generator(generator_helper, data_helper):

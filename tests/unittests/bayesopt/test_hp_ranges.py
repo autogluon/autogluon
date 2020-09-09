@@ -7,10 +7,10 @@ import pytest
 from numpy.testing import assert_allclose, assert_almost_equal
 from pytest import approx
 
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
+from autogluon.main.searcher.bayesopt.datatypes.hp_ranges import \
     HyperparameterRangeContinuous, HyperparameterRangeInteger, \
     HyperparameterRangeCategorical, HyperparameterRanges_Impl
-from autogluon.searcher.bayesopt.datatypes.scaling import LinearScaling, \
+from autogluon.main.searcher.bayesopt.datatypes.scaling import LinearScaling, \
     LogScaling, ReverseLogScaling
 
 

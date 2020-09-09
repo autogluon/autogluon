@@ -4,10 +4,10 @@ import pandas as pd
 import mxnet as mx
 from mxnet import gluon, autograd
 from mxnet.gluon import nn
-import autogluon as ag
+import autogluon.main as ag
 import pytest
 
-from autogluon.utils import load_and_split_openml_data
+from autogluon.main.utils import load_and_split_openml_data
 
 
 OPENML_TASK_ID = 6                # describes the problem we will tackle

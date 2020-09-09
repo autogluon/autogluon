@@ -1,13 +1,13 @@
-import autogluon as ag
+import autogluon.main as ag
 import logging
 import numpy as np
 import time
 
-from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import Branin
-from autogluon.searcher.gp_searcher import _to_config_cs
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
+from autogluon.main.searcher.bayesopt.gpmxnet.comparison_gpy import Branin
+from autogluon.main.searcher.gp_searcher import _to_config_cs
+from autogluon.main.searcher.bayesopt.autogluon.hp_ranges import \
     HyperparameterRanges_CS
-from autogluon.core import Task
+from autogluon.main.core import Task
 
 logger = logging.getLogger(__name__)
 

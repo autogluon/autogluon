@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-import autogluon as ag
-from autogluon import ImageClassification as task
+import autogluon.main as ag
+from autogluon.main import ImageClassification as task
 from mxnet import optimizer as optim
 
 tricks_combination = [

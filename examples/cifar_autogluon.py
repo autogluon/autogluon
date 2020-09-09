@@ -10,7 +10,7 @@ from gluoncv.model_zoo import get_model
 from gluoncv.utils import makedirs, LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
-import autogluon as ag
+import autogluon.main as ag
 
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH

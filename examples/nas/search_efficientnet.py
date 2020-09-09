@@ -1,6 +1,6 @@
 import math
-import autogluon as ag
-from autogluon import ImageClassification as task
+import autogluon.main as ag
+from autogluon.main import ImageClassification as task
 
 @ag.obj(
     width_coefficient=ag.space.Categorical(1.1, 1.2),
