@@ -1,8 +1,6 @@
-import mxnet as mx
-from mxnet import gluon
 import gluoncv as gcv
+from mxnet import gluon
 
-from ...scheduler.resource import get_gpu_count
 
 def default_reward_fn(metric, net):
     reward = metric * ((net.avg_latency / net.latency) ** 0.07)

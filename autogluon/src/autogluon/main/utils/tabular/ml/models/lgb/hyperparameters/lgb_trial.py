@@ -3,7 +3,7 @@ import logging
 from ...abstract import model_trial
 from .....utils.loaders import load_pkl
 from .....utils.exceptions import TimeLimitExceeded
-from autogluon.core.utils.try_import import try_import_lightgbm
+from .......utils.try_import import try_import_lightgbm
 from autogluon.core import args
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
 
-from .files import download
+from autogluon.core.utils.files import download
 
 __all__ = ['load_and_split_openml_data']
 

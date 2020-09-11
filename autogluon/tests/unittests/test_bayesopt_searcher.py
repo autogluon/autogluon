@@ -7,8 +7,7 @@ from mxnet.gluon import nn
 import autogluon.main as ag
 import pytest
 
-from autogluon.core.utils import load_and_split_openml_data
-
+from autogluon.main import load_and_split_openml_data
 
 OPENML_TASK_ID = 6                # describes the problem we will tackle
 RATIO_TRAIN_VALID = 0.33          # split of the training data used for validation

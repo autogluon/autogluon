@@ -19,7 +19,7 @@ from .lgb_utils import construct_dataset
 from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....utils.savers import save_pkl
-from autogluon.core.utils.try_import import try_import_lightgbm
+from ......utils.try_import import try_import_lightgbm
 from autogluon.core import Int, Space
 
 

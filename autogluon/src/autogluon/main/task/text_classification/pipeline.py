@@ -11,7 +11,7 @@ from mxnet import gluon, autograd
 from autogluon.core import *
 from autogluon.core.utils import tqdm
 from autogluon.core.utils.mxutils import collect_params
-from autogluon.core.utils.try_import import try_import_gluonnlp
+from ...utils.try_import import try_import_gluonnlp
 from .network import get_network
 from .transforms import BERTDatasetTransform
 

@@ -1,8 +1,8 @@
-import mxnet as mx
 from mxnet import gluon
-from autogluon.main.model_zoo.models.utils import *
-from autogluon.main.model_zoo.models.mbconv import MBConvBlock
+
 from autogluon.core.space import *
+from autogluon.main.model_zoo.models.mbconv import MBConvBlock
+from autogluon.main.model_zoo.models.utils import *
 from .enas import enas_unit, ENAS_Sequential
 
 __all__ = ['ENAS_MbBlock', 'ENAS_MBNet']

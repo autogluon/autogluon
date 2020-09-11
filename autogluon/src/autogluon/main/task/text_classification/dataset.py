@@ -5,8 +5,8 @@ from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
 
 from autogluon.core import *
-from autogluon.core.utils.dataset import get_split_samplers, SampledDataset
-from autogluon.core.utils.try_import import try_import_gluonnlp
+from ...utils.dataset import get_split_samplers, SampledDataset
+from ...utils.try_import import try_import_gluonnlp
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',
            'WNLITask', 'SSTTask', 'AbstractGlueTask', 'get_dataset', 'AbstractCustomTask']
