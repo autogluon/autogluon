@@ -152,7 +152,7 @@ Before deciding which model to use, let's evaluate all of the models AutoGluon h
 predictor.leaderboard(test_data, silent=True)
 ```
 
-The leaderboard shows each model's predictive performance on the test data (`score_test`) and validation data (`score_val`), as well as the time required to: produce predictions for the test data (`pred_time_val`), produce predictions on the validation data (`pred_time_val`), and train only this model (`fit_time`). Below, we show that a leaderboard can be produced without new data (using just the data previously reserved for validation inside `fit`) and can display extra information about each model:
+The leaderboard shows each model's predictive performance on the test data (`score_test`) and validation data (`score_val`), as well as the time required to: produce predictions for the test data (`pred_time_val`), produce predictions on the validation data (`pred_time_val`), and train only this model (`fit_time`). Below, we show that a leaderboard can be produced without new data (just uses the data previously reserved for validation inside `fit`) and can display extra information about each model:
 
 ```{.python .input}
 predictor.leaderboard(extra_info=True, silent=True)

@@ -19,7 +19,7 @@ train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 ```
 
-Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [`wget`](https://www.gnu.org/software/wget/)).
+Note that we loaded data from a CSV file stored in the cloud ([AWS s3 bucket](https://aws.amazon.com/s3/)), but you can you specify a local file-path instead if you have already downloaded the CSV file to your own machine (e.g., using [wget](https://www.gnu.org/software/wget/)).
 Each row in the table `train_data` corresponds to a single training example. In this particular dataset, each row corresponds to an individual person, and the columns contain various characteristics reported during a census.
 
 Let's first use these features to predict whether the person's income exceeds $50,000 or not, which is recorded in the `class` column of this table.

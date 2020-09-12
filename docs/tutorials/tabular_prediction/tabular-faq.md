@@ -113,6 +113,14 @@ Here we split the test data into chunks of up to 1024 rows each, but you may sel
 [Further Reading](https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#io-chunking)
 
 
+### How can I skip some particular models?
+
+To avoid training certain models, specify these in the `excluded_model_types` argument. For example, here's how to call `fit()` without training K Nearest Neighbor (KNN), Random Forest (RF), or ExtraTrees (XT) models:
+
+```
+task.fit(..., excluded_model_types=['KNN','RF','XT'])
+```
+
 ### How can I add my own custom model to the set of models that AutoGluon trains, tunes, and ensembles?
 
 See this example in the source code: [examples/tabular/example_custom_model_tabular.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_model_tabular.py)
