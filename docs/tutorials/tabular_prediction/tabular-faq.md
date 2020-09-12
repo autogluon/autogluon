@@ -59,9 +59,11 @@ positive_class = [label for label in predictor.class_labels if predictor.class_l
 ```
 
 Or for multiclass classification:
+
 ```
 predictor.class_labels
 ```
+
 is a list of classes whose order corresponds to columns of `predict_proba()` output when it is a Numpy array.
 
 
