@@ -101,8 +101,16 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import TabularList
         from fastai.tabular import FillMissing, Categorify, Normalize
 
-        self.cat_columns = X_train.select_dtypes(['category', 'object']).columns.values.tolist()
-        self.cont_columns = X_train.select_dtypes(['float', 'int', 'datetime']).columns.values.tolist()
+        self.cat_columns = X_train.select_dtypes([
+            'category', 'object', 'bool', 'bool_', 'str', 'string_', 'unicode_'
+        ]).columns.values.tolist()
+
+        self.cont_columns = X_train.select_dtypes([
+            'float', 'float_', 'float16', 'float32', 'float64',
+            'int', 'int_', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
+            'datetime'
+        ]).columns.values.tolist()
+
         if self.problem_type == REGRESSION and self.y_scaler is not None:
             Y_train_norm = pd.Series(self.y_scaler.fit_transform(Y_train.values.reshape(-1, 1)).reshape(-1))
             Y_test_norm = pd.Series(self.y_scaler.transform(Y_test.values.reshape(-1, 1)).reshape(-1)) if Y_test is not None else None
