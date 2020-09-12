@@ -11,7 +11,6 @@ Using the same census data table as before, we'll now predict the `occupation` o
 import autogluon as ag
 from autogluon import TabularPrediction as task
 
-import pandas as pd
 import numpy as np
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -135,8 +134,8 @@ print(predictor.predict(datapoint))
 To output predicted class probabilities instead of predicted classes, you can use:
 
 ```{.python .input}
-class_probs = predictor.predict_proba(datapoint)
-print(pd.DataFrame(class_probs, columns=predictor.class_labels))
+class_probs = predictor.predict_proba(datapoint, as_pandas=True)
+print(class_probs)
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:

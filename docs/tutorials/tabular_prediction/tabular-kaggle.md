@@ -92,6 +92,12 @@ For multiclass classification tasks, you can see which classes AutoGluon's predi
 predictor.class_labels # classes in this list correspond to columns of predict_proba() output
 ```
 
+Alternatively, the following command should clarify which predicted-probability corresponds to which class:
+
+```
+y_predproba = predictor.predict_proba(test_data, as_pandas=True)
+```
+
 Now that we have made a prediction for each row in the test dataset, we can submit these predictions to Kaggle. Most Kaggle competitions provide a sample submission file, in which you can simply overwrite the sample predictions with your own as we do below:
 
 ```
