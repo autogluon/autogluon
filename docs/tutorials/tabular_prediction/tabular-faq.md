@@ -14,12 +14,7 @@ Yes! The only functionality that may not work is `hyperparameter_tune=True` with
 
 ### What machine is best for running TabularPrediction?
 
-As an open-source library, AutoGluon can be run on any machine. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImageClassification/ObjectDetection all do greatly benefit from GPUs). Most issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
-
-
-### How can I reduce the time required for prediction?
-
-See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
+As an open-source library, AutoGluon can be run on any machine including your laptop. Currently the TabularPrediction module does not benefit much from GPUs, so CPU machines are fine (in contrast, TextPrediction/ImageClassification/ObjectDetection do greatly benefit from GPUs). Most TabularPrediction issues arise due to lack of memory, so we recommend running on a machine with as much memory as possible. For example if using AWS instances for TabularPrediction: we recommend [M5 instances](https://aws.amazon.com/ec2/instance-types/m5/), where a **m5.24xlarge** machine should be able to handle most datasets.
 
 
 ### How to resolve memory issues?
@@ -39,6 +34,21 @@ Details are provided in the following paper:
 [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/abs/2003.06505). *Arxiv*, 2020.
 
 
+### How to view more detailed logs of what is happening during fit?
+
+Specify the argument `verbosity = 4` in `fit()`.
+
+
+### How can I reduce the time required for training?
+
+Specify the `time_limits` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`.
+
+
+### How can I reduce the time required for prediction?
+
+See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
+
+
 ### What model is AutoGluon using for prediction?
 
 See ["Prediction options" in the In Depth Tutorial](tabular-indepth.html#prediction-options-inference).
@@ -46,10 +56,10 @@ See ["Prediction options" in the In Depth Tutorial](tabular-indepth.html#predict
 
 ### Which classes do predicted probabilities correspond to?
 
-This should become obvious if you ask for predictions like this:
+This should become obvious if you specify the `as_pandas` argument like this:
 
 ```
-predictor.predict_proba(test_data, as_pandas = True)
+predictor.predict_proba(test_data, as_pandas=True)
 ```
 
 Alternatively, you can see which class AutoGluon treats as the positive class in binary classification via:
@@ -101,3 +111,21 @@ predictor.evaluate_predictions(y_true=y_true, y_pred=y_pred)
 
 Here we split the test data into chunks of up to 1024 rows each, but you may select a larger size as long as it fits into your system's memory.
 [Further Reading](https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#io-chunking)
+
+
+### How can I add my own custom model to the set of models that AutoGluon trains, tunes, and ensembles?
+
+See this example in the source code: [examples/tabular/example_custom_model_tabular.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_model_tabular.py)
+
+
+### How can I add my own custom data preprocessing or feature engineering?
+
+Note that the `TabularDataset` object is essentially a [pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/frame.html) and you can transform your training data however you wish before calling `fit()`. Note that any transformations you perform yourself must also be applied to all future test data before calling `predict()`, and AutoGluon will still perform its default processing on your transformed data inside `fit()`.
+
+To solely use custom data preprocessing and automatically apply your custom transformations to both the train data and all future data encountered during inference, you should instead create a custom FeatureGenerator. Follow this example in the source code: [examples/tabular/example_custom_feature_generator.py](https://github.com/awslabs/autogluon/blob/master/examples/tabular/example_custom_feature_generator.py)
+
+
+### Issues not addressed here
+
+First search to see if your issue is addressed in the other [tutorials](index.html)/[documentation](../../api/autogluon.task.html), or the [Github issues](https://github.com/awslabs/autogluon/issues). If it is not there,
+please open a [new Github Issue](https://github.com/awslabs/autogluon/issues/new) and clearly state your issue. If you have a bug, please include: your code (call `fit(..., verbosity=4)` which will print more details), the output printed during the code execution, and information about your operating system, Python version, and installed packages (output of `pip freeze`).

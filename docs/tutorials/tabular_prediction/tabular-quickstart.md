@@ -105,7 +105,7 @@ AutoGluon correctly recognized our prediction problem to be a **binary classific
 
 We can evaluate the performance of each individual trained model on our (labeled) test data:
 ```{.python .input}
-model_perf = predictor.leaderboard(test_data)
+predictor.leaderboard(test_data, silent=True)
 ```
 
 When we call `predict()`, AutoGluon automatically predicts with the model that displayed the best performance on validation data (i.e. the weighted-ensemble). We can instead specify which model to use for predictions like this:

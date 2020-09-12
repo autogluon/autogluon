@@ -134,15 +134,13 @@ print(predictor.predict(datapoint))
 To output predicted class probabilities instead of predicted classes, you can use:
 
 ```{.python .input}
-class_probs = predictor.predict_proba(datapoint, as_pandas=True)
-print(class_probs)
+predictor.predict_proba(datapoint, as_pandas=True) # as_pandas shows which probability corresponds to which class
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:
 
 ```{.python .input}
-best_model = predictor.get_model_best()
-print(best_model)
+predictor.get_model_best()
 ```
 
 We can instead specify a particular model to use for predictions (e.g. to reduce inference latency). Note that a 'model' in AutoGluon may refer to for example a single Neural Network, a bagged ensemble of many Neural Network copies trained on different training/validation splits, a weighted ensemble that aggregates the predictions of many other models, or a stacker model that operates on predictions output by other models. This is akin to viewing a Random Forest as one 'model' when it is in fact an ensemble of many decision trees.
@@ -151,17 +149,17 @@ We can instead specify a particular model to use for predictions (e.g. to reduce
 Before deciding which model to use, let's evaluate all of the models AutoGluon has previously trained on our test data:
 
 ```{.python .input}
-results = predictor.leaderboard(test_data)
+predictor.leaderboard(test_data, silent=True)
 ```
 
-The leaderboard shows each model's predictive performance on the test data (`score_test`) and validation data (`score_val`), as well as the time required to: produce predictions for the test data (`pred_time_val`), produce predictions on the validation data (`pred_time_val`), and train only this model (`fit_time`). Below, we also request extra information about each model:
+The leaderboard shows each model's predictive performance on the test data (`score_test`) and validation data (`score_val`), as well as the time required to: produce predictions for the test data (`pred_time_val`), produce predictions on the validation data (`pred_time_val`), and train only this model (`fit_time`). Below, we show that a leaderboard can be produced without new data (using just the data previously reserved for validation inside `fit`) and can display extra information about each model:
 
 ```{.python .input}
-results = predictor.leaderboard(test_data, extra_info=True)
+predictor.leaderboard(extra_info=True, silent=True)
 ```
 
 The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`),
-how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [`leaderboard` documentation](https://autogluon.mxnet.io/api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
+how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
 
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
@@ -174,7 +172,8 @@ print("Prediction from %s model: %s" % (model_to_use, model_pred))
 
 We can easily access various information about the trained predictor or a particular model:
 ```{.python .input}
-model_to_use = predictor.model_names[i]
+all_models = predictor.get_model_names()
+model_to_use = all_models[i]
 specific_model = predictor._trainer.load_model(model_to_use)
 
 # Objects defined below are dicts of various information (not printed here as they are quite large):
@@ -193,7 +192,7 @@ However, you must be careful here as certain metrics require predicted probabili
 Since the label columns remains in the `test_data` DataFrame, we can instead use the shorthand:
 
 ```{.python .input}
-predictor.evaluate(test_data)
+perf = predictor.evaluate(test_data)
 ```
 
 which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
@@ -208,7 +207,7 @@ importance_scores = predictor.feature_importance(test_data)
 print(importance_scores)
 ```
 
-Computed via [*permutation-shuffling*](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy, or may even be actively harmful to include in the data (consider removing these features from your data and calling `fit` again). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
+Computed via [permutation-shuffling](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy, or may even be actively harmful to include in the data (consider removing these features from your data and calling `fit` again). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
 
 
 ## Accelerating inference
@@ -245,7 +244,7 @@ For a ensemble predictor trained with bagging (as done above), recall there ~10 
 refit_model_map = predictor.refit_full()
 print("Name of each refit-full model corresponding to a previous bagged ensemble:")
 print(refit_model_map)
-predictor.leaderboard(test_data)
+predictor.leaderboard(test_data, silent=True)
 ```
 This adds the refit-full models to the leaderboard and we can opt to use any of them for prediction just like any other model. Note `pred_time_test` and `pred_time_val` list the time taken to produce predictions with each model (in seconds) on the test/validation data. Since the refit-full models were trained using all of the data, there is no internal validation score (`score_val`) available for them. You can also call `refit_full()` with non-bagged models to refit the same models to your full dataset (there won't be memory/latency gains in this case but test accuracy may improve).
 
@@ -303,7 +302,11 @@ To reduce memory usage, you may try each of the following strategies individuall
 
 - In `fit()`, set `hyperparameters = ‘light’` or `hyperparameters = 'very_light'`.
 
-- If there happen to be text fields in your data, then in `fit()` you can either: (1) add `'ignore_text'` to your `presets` list (to ignore the text entirely), or specify: `feature_generator = autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))` where `MAX_NGRAM = 1000` say (try various values under 10000) and [`CountVectorizer`](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text` (to reduce the number of N-grams used to represent each text field).
+- Text fields in your table require substantial memory for N-gram featurization. To mitigate this in `fit()`, you can either: (1) add `'ignore_text'` to your `presets` list (to ignore text features), or specify:
+
+`feature_generator = autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))`
+
+where `MAX_NGRAM = 1000` say (try various values under 10000) and [CountVectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text` (to reduce the number of N-grams used to represent each text field).
 
 - To reduce memory required in inference, call `predictor.refit_full()` and use one of the refit-full models for prediction.
 
