@@ -5,7 +5,7 @@
 
 This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
 
-Using the same census data table as before, we'll now predict the `occupation` of an individual - a multi-class classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
+Using the same census data table as before, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
 import autogluon as ag
@@ -16,7 +16,7 @@ import numpy as np
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500 # subsample subset of data for faster demo, try setting this to much larger values
-train_data = train_data.head(subsample_size)
+train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 
 label_column = 'occupation'
@@ -98,7 +98,7 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 ```{.python .input}
 predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
                      num_bagging_folds=5, stack_ensemble_levels=1,
-                     hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}}) # last 2 arguments are for quick demo, omit them in real applications
+                     hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}}) # last  argument is just for quick demo here, omit it in real applications
 ```
 
 You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
@@ -127,7 +127,7 @@ Above `output_directory` is the same folder previously passed to `fit()`, in whi
 We can make a prediction on an individual example rather than a full dataset:
 
 ```{.python .input}
-datapoint = test_data_nolabel.iloc[[0]]  # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
+datapoint = test_data_nolabel.iloc[[0]] # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
 print(datapoint)
 print(predictor.predict(datapoint))
 ```
@@ -139,12 +139,30 @@ class_probs = predictor.predict_proba(datapoint)
 print(pd.DataFrame(class_probs, columns=predictor.class_labels))
 ```
 
-By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models.
-We can instead specify a particular model to use for predictions (e.g. to reduce inference latency).  Before deciding which model to use, let's evaluate all of the models AutoGluon has previously trained using our test data:
+By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:
+
+```{.python .input}
+best_model = predictor.get_model_best()
+print(best_model)
+```
+
+We can instead specify a particular model to use for predictions (e.g. to reduce inference latency). Note that a 'model' in AutoGluon may refer to for example a single Neural Network, a bagged ensemble of many Neural Network copies trained on different training/validation splits, a weighted ensemble that aggregates the predictions of many other models, or a stacker model that operates on predictions output by other models. This is akin to viewing a Random Forest as one 'model' when it is in fact an ensemble of many decision trees.
+
+
+Before deciding which model to use, let's evaluate all of the models AutoGluon has previously trained on our test data:
 
 ```{.python .input}
 results = predictor.leaderboard(test_data)
 ```
+
+The leaderboard shows each model's predictive performance on the test data (`score_test`) and validation data (`score_val`), as well as the time required to: produce predictions for the test data (`pred_time_val`), produce predictions on the validation data (`pred_time_val`), and train only this model (`fit_time`). Below, we also request extra information about each model:
+
+```{.python .input}
+results = predictor.leaderboard(test_data, extra_info=True)
+```
+
+The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`),
+how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [`leaderboard` documentation](https://autogluon.mxnet.io/api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
 
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
@@ -181,6 +199,7 @@ predictor.evaluate(test_data)
 
 which will correctly select between `predict()` or `predict_proba()` depending on the evaluation metric.
 
+
 ## Interpretability (feature importance)
 
 To better understand our trained predictor, we can estimate the overall importance of each feature:
@@ -190,7 +209,7 @@ importance_scores = predictor.feature_importance(test_data)
 print(importance_scores)
 ```
 
-Computed via [*permutation-shuffling*](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy (at least not on an individual basis, these features may still provide useful predictive signal through interaction-effects with other features). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
+Computed via [*permutation-shuffling*](https://explained.ai/rf-importance/), these feature importance scores quantify the drop in predictive performance (of the already trained predictor) when one column's values are randomly shuffled across rows. The top features in this list contribute most to AutoGluon's accuracy (for predicting when/if a patient will be readmitted to the hospital). Features with non-positive importance score hardly contribute to the predictor's accuracy, or may even be actively harmful to include in the data (consider removing these features from your data and calling `fit` again). These scores facilitate interpretability of the predictor's global behavior (which features it relies on for *all* predictions) rather than [local explanations](https://christophm.github.io/interpretable-ml-book/taxonomy-of-interpretability-methods.html) that only rationalize one particular prediction.
 
 
 ## Accelerating inference
@@ -199,10 +218,10 @@ We describe multiple ways to reduce the time it takes for AutoGluon to produce p
 
 ### Keeping models in memory
 
-By default, AutoGluon loads models into memory one at a time and only when they are needed for prediction. This strategy is robust for large stacked/bagged ensembles, but leads to slower prediction times. If you plan to repeatedly make predictions (e.g. on new datapoints one at a time rather than one large test dataset), you can first specify that all models should be loaded into memory as follows:
+By default, AutoGluon loads models into memory one at a time and only when they are needed for prediction. This strategy is robust for large stacked/bagged ensembles, but leads to slower prediction times. If you plan to repeatedly make predictions (e.g. on new datapoints one at a time rather than one large test dataset), you can first specify that all models required for inference should be loaded into memory as follows:
 
 ```{.python .input}
-predictor._learner.persist_trainer() # load models into memory (still experimental, may fail for big ensembles)
+predictor.persist_models()
 
 num_test = 20
 preds = np.array(['']*num_test, dtype='object')
@@ -214,12 +233,14 @@ for i in range(num_test):
 perf = predictor.evaluate_predictions(y_test[:num_test], preds, auxiliary_metrics=True)
 print("Predictions: ", preds)
 
-predictor = task.load(output_directory) # reset predictor
+predictor.unpersist_models() # free memory by clearing models, future predict() calls will load models from disk
 ```
+
+You can alternatively specify a particular model to persist via the `models` argument of `persist_models()`, or simply set `models='all'` to simultaneously load every single model that was trained during `fit`.
 
 ### Collapsing bagged ensembles via refit_full
 
-For a ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements. Below we refit such models for every model-type but you can alternatively do this for just a particular model-type by specifying the `model` argument of `refit_full()`.
+For a ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements (but may also reduce accuracy). Below we refit such a model for each original model but you can alternatively do this for just a particular model by specifying the `model` argument of `refit_full()`.
 
 ```{.python .input}
 refit_model_map = predictor.refit_full()
@@ -231,7 +252,7 @@ This adds the refit-full models to the leaderboard and we can opt to use any of 
 
 ### Model distillation
 
-While computationally-favorable, single individual models will usually have lower accuracy than weighted/stacked/bagged ensembles. [Model Distillation](https://arxiv.org/abs/2006.14284) offers one way the retain the computational benefits of a single model, while enjoying some of the accuracy-boost that comes with ensembling. The idea is to train the individual model (which we can call the student) to mimic the predictions of the full stack ensemble (the teacher). Like `refit_full()`, the `distill()` function will produce additional models we can opt to use for prediction.
+While computationally-favorable, single individual models will usually have lower accuracy than weighted/stacked/bagged ensembles. [Model Distillation](https://arxiv.org/abs/2006.14284) offers one way to retain the computational benefits of a single model, while enjoying some of the accuracy-boost that comes with ensembling. The idea is to train the individual model (which we can call the student) to mimic the predictions of the full stack ensemble (the teacher). Like `refit_full()`, the `distill()` function will produce additional models we can opt to use for prediction.
 
 ```{.python .input}
 student_models = predictor.distill(time_limits=30) # specify much longer time-limits in real applications
@@ -270,9 +291,38 @@ predictor_light = task.fit(train_data=train_data, label=label_column, eval_metri
                            excluded_model_types=excluded_model_types, time_limits=30)
 ```
 
-If you encounter memory issues: try setting `excluded_model_types = ['KNN','XT','RF']` (or some subset of these models), and add `'ignore_text'` to your `presets` list if there happen to be text fields in your data.
 
-If you encounter disk space issues, make sure to delete all `output_directory` folders from previous previous runs! These can eat up your free space if you call `fit()` many times. If you didn't specify `output_directory`, AutoGluon still automatically saved its models to a folder called: "AutogluonModels/ag-[TIMESTAMP]", where TIMESTAMP records when `fit()` was called, so make sure to also delete these folders if you run low on free space.
+## If you encounter memory issues
+
+To reduce memory usage, you may try each of the following strategies individually or combinations of them (these may harm accuracy):
+
+- In `fit()`, set `num_bagging_sets = 1` (can also try values greater than 1 to harm accuracy less).
+
+- In `fit()`, set `excluded_model_types = ['KNN','XT','RF']` (or some subset of these models).
+
+- Try different `presets` in `fit()`.
+
+- In `fit()`, set `hyperparameters = ‘light’` or `hyperparameters = 'very_light'`.
+
+- If there happen to be text fields in your data, then in `fit()` you can either: (1) add `'ignore_text'` to your `presets` list (to ignore the text entirely), or specify: `feature_generator = autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))` where `MAX_NGRAM = 1000` say (try various values under 10000) and [`CountVectorizer`](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text` (to reduce the number of N-grams used to represent each text field).
+
+- To reduce memory required in inference, call `predictor.refit_full()` and use one of the refit-full models for prediction.
+
+
+## If you encounter disk space issues
+
+To reduce disk usage, you may try each of the following strategies individually or combinations of them:
+
+- Make sure to delete all `output_directory` folders from previous `fit()` runs! These can eat up your free space if you call `fit()` many times. If you didn't specify `output_directory`, AutoGluon still automatically saved its models to a folder called: "AutogluonModels/ag-[TIMESTAMP]", where TIMESTAMP records when `fit()` was called, so make sure to also delete these folders if you run low on free space.
+
+- Call `predictor.save_space()` to delete auxiliary files produced during `fit()`.
+
+- Call `predictor.delete_models(models_to_keep='best', dry_run=False)` if you only intend to use this predictor for inference going forward (will delete files required for non-prediction-related functionality like `fit_summary`).
+
+- In `fit()`, you can add `'optimize_for_deployment'` to the `presets` list, which will automatically invoke the previous two strategies after training.
+
+- Most of the above strategies to reduce memory usage will also reduce disk usage (but may harm accuracy).
+
 
 ## References
 

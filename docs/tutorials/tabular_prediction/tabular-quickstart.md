@@ -15,7 +15,7 @@ Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separat
 ```{.python .input}
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 subsample_size = 500 # subsample subset of data for faster demo, try setting this to much larger values
-train_data = train_data.head(subsample_size)
+train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 ```
 
@@ -62,7 +62,8 @@ As long as they're stored in a popular format like CSV, you should be able to ac
 from autogluon import TabularPrediction as task
 predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
 ```
-**Note:** This simple call to `fit()` is intended for your first prototype model. In a [subsequent section below](), we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
+
+**Note:** This simple call to `fit()` is intended for your first prototype model. In a subsequent section, we'll demonstrate how to maximize predictive performance by additionally specifying two `fit()` arguments: `presets` and `eval_metric`.
 
 
 ## Description of fit():
@@ -82,8 +83,8 @@ For tabular problems, `fit()` returns a `Predictor` object. For classification, 
 
 ```{.python .input}
 pred_probs = predictor.predict_proba(test_data_nolab)
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1] # which label is considered 'positive' class
-print(f"Predicted probabilities of class {positive_class}:", pred_probs)
+positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0] # which label is considered 'positive' class
+print(f"Predicted probabilities of class '{positive_class}':", pred_probs)
 ```
 
 Besides inference, this object can also summarize what happened during fit.
@@ -96,18 +97,15 @@ From this summary, we can see that AutoGluon trained many different types of mod
 
 ```{.python .input}
 print("AutoGluon infers problem type is: ", predictor.problem_type)
-print("AutoGluon categorized the features as: ", predictor.feature_types.feature_types_raw)
-special_types = predictor.feature_types.feature_types_special
-if len(special_types) > 0:
-    print("AutoGluon also identified the following special feature types:")
+print("AutoGluon identified the following types of features:")
+print(predictor.feature_metadata)
 ```
 
-AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects.
+AutoGluon correctly recognized our prediction problem to be a **binary classification** task and decided that variables such as `age` should be represented as integers, whereas variables such as `workclass` should be represented as categorical objects. The `feature_metadata` attribute allows you to see the inferred data type of each predictive variable after preprocessing (this is it's *raw* dtype; some features may also be associated with additional *special* dtypes if produced via feature-engineering, e.g. numerical representations of a datetime/text column).
 
 We can evaluate the performance of each individual trained model on our (labeled) test data:
 ```{.python .input}
-model_perf = predictor.leaderboard(test_data, silent=True)
-print(model_perf)
+model_perf = predictor.leaderboard(test_data)
 ```
 
 When we call `predict()`, AutoGluon automatically predicts with the model that displayed the best performance on validation data (i.e. the weighted-ensemble). We can instead specify which model to use for predictions like this:
@@ -122,9 +120,9 @@ Above the scores of predictive performance were based on a default evaluation me
 To get the best predictive accuracy with AutoGluon, you should generally use it like this:
 
 ```{.python .input}
-long_time = 60 # for quick demonstration only, you should set this to longest time you are willing to wait
-metric = "balanced_accuracy" # specify your metric here
-predictor = task.fit(train_data=train_data, label=label_column, time_limits=long_time,
+time_limits = 60 # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
+metric = "roc_auc" # specify your metric here
+predictor = task.fit(train_data=train_data, label=label_column, time_limits=time_limits,
                      eval_metric=metric, presets='best_quality')
 ```
 
