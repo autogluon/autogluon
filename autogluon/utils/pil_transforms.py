@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import mxnet as mx
 from PIL import Image, ImageEnhance
-import collections
+import collections.abc
 
 __all__ = ['Compose', 'RandomResizedCrop', 'RandomHorizontalFlip', 'ColorJitter',
            'Resize', 'CenterCrop', 'ToTensor', 'RandomCrop', 'ToNDArray', 'ToPIL']
@@ -374,7 +374,7 @@ class Resize(object):
     """
 
     def __init__(self, size, interpolation=Image.BILINEAR):
-        assert isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)
+        assert isinstance(size, int) or (isinstance(size, collections.abc.Iterable) and len(size) == 2)
         self.size = size
         self.interpolation = interpolation
 
@@ -432,7 +432,7 @@ def crop(img, top, left, height, width):
     return img.crop((left, top, left + width, top + height))
 
 def resize(img, size, interpolation=Image.BILINEAR):
-    if not (isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)):
+    if not (isinstance(size, int) or (isinstance(size, collections.abc.Iterable) and len(size) == 2)):
         raise TypeError('Got inappropriate size arg: {}'.format(size))
 
     if isinstance(size, int):
