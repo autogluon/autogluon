@@ -267,7 +267,7 @@ class TabularPredictor(BasePredictor):
 
                     'num_descendants': Number of descendant models for the given model.
 
-                    'model_type': The model type.
+                    'model_type': The type of the given model.
                         If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
                     'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
                         child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
@@ -275,8 +275,9 @@ class TabularPredictor(BasePredictor):
                         For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
                         Note that child models are distinct from ancestors and descendants.
                     'hyperparameters': The hyperparameter values specified for the model.
-
-                    'hyperparameters_fit': The hyperparameters set by the model during fit. This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
+                        All hyperparameters that do not appear in this dict remained at their default values.
+                    'hyperparameters_fit': The hyperparameters set by the model during fit.
+                        This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
                         This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
                         In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
                         For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.

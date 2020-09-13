@@ -5,24 +5,24 @@ autogluon.task
 ===============
 
 .. admonition:: Example (image classification task):
-   
+
    Tell AutoGluon that task is image classification:
-   
+
    >>> import autogluon as ag
    >>> from autogluon import ImageClassification as task
-   
+
    Load a toy image dataset:
-   
+
    >>> filename = ag.download('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
-   
+
    Fit classification models:
-   
+
    >>> classifier = task.fit(dataset, epochs=2)
-   
+
    Evaluate predictions on test data:
-   
+
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
 
@@ -274,7 +274,7 @@ Additional Text Prediction APIs
 .. automodule:: autogluon.task.text_prediction.models.basic_v1
 
 :hidden:`BertForTextPredictionBasic`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: BertForTextPredictionBasic
    :members: predict, predict_proba, evaluate, save, load
