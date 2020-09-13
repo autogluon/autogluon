@@ -8,10 +8,10 @@ from pandas import DataFrame, IntervalIndex, Series
 logger = logging.getLogger(__name__)
 
 
-def bin_column(series: Series, mapping):
+def bin_column(series: Series, mapping, dtype):
     mapping_dict = {k: v for v, k in enumerate(list(mapping))}
     series_out = pd.cut(series, mapping)
-    series_out_int = [mapping_dict[val] for val in series_out]
+    series_out_int = np.array([mapping_dict[val] for val in series_out], dtype=dtype)
     return series_out_int
 
 

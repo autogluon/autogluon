@@ -1,7 +1,7 @@
 import copy
 import logging
 
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from pandas.api.types import CategoricalDtype
 
 from .abstract import AbstractFeatureGenerator
@@ -124,3 +124,13 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             return X_category, category_map
         else:
             return DataFrame(index=X.index), None
+
+    def _remove_features_in(self, features: list):
+        super()._remove_features_in(features)
+        if self.category_map:
+            for feature in features:
+                if feature in self.category_map:
+                    self.category_map.pop(feature)
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

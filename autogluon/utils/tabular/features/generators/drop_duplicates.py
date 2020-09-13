@@ -53,3 +53,6 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
             features_to_remove += [column for column in columns_orig if column not in columns_new]
 
         return features_to_remove
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

@@ -11,6 +11,7 @@ from .fillna import FillNaFeatureGenerator
 from .identity import IdentityFeatureGenerator
 from .label_encoder import LabelEncoderFeatureGenerator
 from .memory_minimize import CategoryMemoryMinimizeFeatureGenerator, NumericMemoryMinimizeFeatureGenerator
+from .rename import RenameFeatureGenerator
 from .text_ngram import TextNgramFeatureGenerator
 from .text_special import TextSpecialFeatureGenerator
 

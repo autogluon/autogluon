@@ -41,3 +41,6 @@ class DropUniqueFeatureGenerator(AbstractFeatureGenerator):
             elif feature_metadata.get_feature_type_raw(column) in [R_CATEGORY, R_OBJECT] and (unique_value_count > max_unique_value_count):
                 features_to_drop.append(column)
         return features_to_drop
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

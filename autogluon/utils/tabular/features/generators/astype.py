@@ -60,3 +60,6 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         self._log(log_level, '\tOriginal Features (exact raw dtype, raw dtype):')
         self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
         super().print_feature_metadata_info(log_level=log_level)
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

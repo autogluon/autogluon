@@ -1,7 +1,9 @@
 import copy
+import inspect
 import logging
 import time
 from collections import defaultdict
+from typing import Dict, List
 
 from pandas import DataFrame, Series
 
@@ -119,7 +121,7 @@ class AbstractFeatureGenerator:
         self.feature_metadata: FeatureMetadata = None  # FeatureMetadata object based on the processed features. Pass to models to enable advanced functionality.
         # TODO: Consider merging feature_metadata and feature_metadata_real, have FeatureMetadata contain exact dtypes, grouped raw dtypes, and special dtypes all at once.
         self.feature_metadata_real: FeatureMetadata = None  # FeatureMetadata object based on the processed features, containing the true raw dtype information (such as int32, float64, etc.). Pass to models to enable advanced functionality.
-        self._features_out_internal = None  # Final list of features after transformation, before the feature renaming from self._get_renamed_features() is applied
+        self._feature_metadata_before_post = None  # FeatureMetadata directly prior to applying self._post_generators.
         self._infer_features_in_args = self.get_default_infer_features_in_args()
         if infer_features_in_args is not None:
             if infer_features_in_args_strategy == 'overwrite':
@@ -128,21 +130,26 @@ class AbstractFeatureGenerator:
                 self._infer_features_in_args.update(infer_features_in_args)
             else:
                 raise ValueError(f"infer_features_in_args_strategy must be one of: {['overwrite', 'update']}, but was: '{infer_features_in_args_strategy}'")
-        self._name_prefix = name_prefix  # Prefix added to all output feature names
-        self._name_suffix = name_suffix  # Suffix added to all output feature names
 
         if post_generators is None:
             post_generators = []
         elif not isinstance(post_generators, list):
             post_generators = [post_generators]
-        self._post_generators: list = post_generators  # TODO: Description
+        self._post_generators: list = post_generators
         if post_drop_duplicates:
             from .drop_duplicates import DropDuplicatesFeatureGenerator
             self._post_generators.append(DropDuplicatesFeatureGenerator(post_drop_duplicates=False))
+        if name_prefix or name_suffix:
+            from .rename import RenameFeatureGenerator
+            self._post_generators.append(RenameFeatureGenerator(name_prefix=name_prefix, name_suffix=name_suffix, inplace=True))
+
+        if self._post_generators:
+            if not self.get_tags().get('allow_post_generators', True):
+                raise AssertionError(f'{self.__class__.__name__} is not allowed to have post_generators, but found: {[generator.__class__.__name__ for generator in self._post_generators]}')
 
         self.pre_enforce_types = pre_enforce_types
         self._pre_astype_generator = None
-        self.pre_drop_useless = pre_drop_useless  # TODO: Description
+        self.pre_drop_useless = pre_drop_useless
         self.reset_index = reset_index
         self.column_names_as_str = column_names_as_str
         self._useless_features_in: list = None
@@ -233,21 +240,16 @@ class AbstractFeatureGenerator:
         X_out, type_family_groups_special = self._fit_transform(X[self.features_in], y=y, **kwargs)
 
         type_map_raw = get_type_map_raw(X_out)
+        self._feature_metadata_before_post = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
         if self._post_generators:
-            feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
-            X_out, self.feature_metadata, self._post_generators = self._fit_generators(X=X_out, y=y, feature_metadata=feature_metadata, generators=self._post_generators, **kwargs)
+            X_out, self.feature_metadata, self._post_generators = self._fit_generators(X=X_out, y=y, feature_metadata=self._feature_metadata_before_post, generators=self._post_generators, **kwargs)
         else:
-            self.feature_metadata = FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_family_groups_special)
+            self.feature_metadata = self._feature_metadata_before_post
         type_map_real = get_type_map_real(X_out)
         self.features_out = list(X_out.columns)
         self.feature_metadata_real = FeatureMetadata(type_map_raw=type_map_real, type_group_map_special=self.feature_metadata.get_type_group_map_raw())
 
         self._post_fit_cleanup()
-        self._features_out_internal = self.features_out.copy()
-        column_rename_map, self._is_updated_name = self._get_renamed_features(X_out)
-        if self._is_updated_name:
-            X_out.columns = [column_rename_map.get(col, col) for col in X_out.columns]
-            self._rename_features_out(column_rename_map=column_rename_map)
         if self.reset_index:
             X_out.index = X_index
         self._is_fit = True
@@ -299,8 +301,6 @@ class AbstractFeatureGenerator:
         X_out = self._transform(X)
         if self._post_generators:
             X_out = self._transform_generators(X=X_out, generators=self._post_generators)
-        if self._is_updated_name:
-            X_out.columns = self.features_out
         if self.reset_index:
             X_out.index = X_index
         return X_out
@@ -461,11 +461,21 @@ class AbstractFeatureGenerator:
             List of feature names to remove from the expected input.
         """
         if features:
+            if self._feature_metadata_before_post:
+                feature_links_chain = self.get_feature_links_chain()
+                for feature in features:
+                    feature_links_chain[0].pop(feature)
+                features_to_keep = set()
+                for features_out in feature_links_chain[0].values():
+                    features_to_keep = features_to_keep.union(features_out)
+                self._feature_metadata_before_post = self._feature_metadata_before_post.keep_features(features_to_keep)
+
             self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
             self.features_in = self.feature_metadata_in.get_features()
+            if self._pre_astype_generator:
+                self._pre_astype_generator.remove_features_out(features)
 
-    # TODO: Use this to prune features post-fit
-    def _remove_features_out(self, features: list):
+    def remove_features_out(self, features: list):
         """
         Removes features from all relevant objects which represent the content of the output data.
 
@@ -474,35 +484,32 @@ class AbstractFeatureGenerator:
         features : list of str
             List of feature names to remove from the output of self.transform().
         """
+        feature_links_chain = self.get_feature_links_chain()
         if features:
             self.feature_metadata = self.feature_metadata.remove_features(features=features)
             self.feature_metadata_real = self.feature_metadata_real.remove_features(features=features)
             self.features_out = self.feature_metadata.get_features()
+            feature_links_chain[-1] = {feature_in: [feature_out for feature_out in features_out if feature_out not in features] for feature_in, features_out in feature_links_chain[-1].items()}
+        self._remove_unused_features(feature_links_chain=feature_links_chain)
+
+    def _remove_unused_features(self, feature_links_chain):
+        unused_features = self._get_unused_features(feature_links_chain=feature_links_chain)
+        self._remove_features_in(features=unused_features[0])
+        for i, generator in enumerate(self._post_generators):
+            for feature in unused_features[i + 1]:
+                if feature in feature_links_chain[i + 1]:
+                    feature_links_chain[i + 1].pop(feature)
+            generated_features = set()
+            for feature_in in feature_links_chain[i + 1]:
+                generated_features = generated_features.union(feature_links_chain[i + 1][feature_in])
+            features_out_to_remove = [feature for feature in generator.features_out if feature not in generated_features]
+            generator.remove_features_out(features_out_to_remove)
 
     def _rename_features_in(self, column_rename_map: dict):
         if self.feature_metadata_in is not None:
             self.feature_metadata_in = self.feature_metadata_in.rename_features(column_rename_map)
         if self.features_in is not None:
             self.features_in = [column_rename_map.get(col, col) for col in self.features_in]
-
-    def _rename_features_out(self, column_rename_map: dict):
-        self.feature_metadata = self.feature_metadata.rename_features(column_rename_map)
-        self.feature_metadata_real = self.feature_metadata_real.rename_features(column_rename_map)
-        self.features_out = [column_rename_map.get(col, col) for col in self.features_out]
-
-    def _get_renamed_features(self, X: DataFrame) -> (DataFrame, dict):
-        X_columns_orig = list(X.columns)
-        X_columns_new = list(X.columns)
-        if self._name_prefix:
-            X_columns_new = [self._name_prefix + column for column in X_columns_new]
-        if self._name_suffix:
-            X_columns_new = [column + self._name_suffix for column in X_columns_new]
-        if X_columns_orig != X_columns_new:
-            is_updated_name = True
-        else:
-            is_updated_name = False
-        column_rename_map = {orig: new for orig, new in zip(X_columns_orig, X_columns_new)}
-        return column_rename_map, is_updated_name
 
     def _pre_fit_validate(self, X: DataFrame, y: Series, **kwargs):
         """
@@ -560,6 +567,97 @@ class AbstractFeatureGenerator:
     def is_fit(self):
         return self._is_fit
 
+    def is_valid_metadata_in(self, feature_metadata_in: FeatureMetadata):
+        """True if input data with feature metadata of feature_metadata_in could result in non-empty output."""
+        features_in = feature_metadata_in.get_features(**self._infer_features_in_args)
+        if features_in:
+            return True
+        else:
+            return False
+
+    def get_feature_links(self) -> Dict[str, List[str]]:
+        """Returns feature links including all pre and post generators."""
+        return self._get_feature_links_from_chain(self.get_feature_links_chain())
+
+    def _get_feature_links(self, features_in: List[str], features_out: List[str]) -> Dict[str, List[str]]:
+        """Returns feature links ignoring all pre and post generators."""
+        feature_links = {}
+        if self.get_tags().get('feature_interactions', True):
+            for feature_in in features_in:
+                feature_links[feature_in] = features_out
+        else:
+            for feat_old, feat_new in zip(features_in, features_out):
+                feature_links[feat_old] = feature_links.get(feat_old, []) + [feat_new]
+        return feature_links
+
+    def get_feature_links_chain(self) -> List[Dict[str, List[str]]]:
+        """Get the feature dependence chain between this generator and all of its post generators."""
+        features_out_internal = self._feature_metadata_before_post.get_features()
+
+        generators = [self] + self._post_generators
+        features_in_list = [self.features_in] + [generator.features_in for generator in self._post_generators]
+        features_out_list = [features_out_internal] + [generator.features_out for generator in self._post_generators]
+
+        feature_links_chain = []
+        for i in range(len(features_in_list)):
+            generator = generators[i]
+            features_in = features_in_list[i]
+            features_out = features_out_list[i]
+            feature_chain = generator._get_feature_links(features_in=features_in, features_out=features_out)
+            feature_links_chain.append(feature_chain)
+        return feature_links_chain
+
+    @staticmethod
+    def _get_feature_links_from_chain(feature_links_chain: List[Dict[str, List[str]]]) -> Dict[str, List[str]]:
+        """Get the final input and output feature links by travelling the feature link chain"""
+        features_out = []
+        for val in feature_links_chain[-1].values():
+            if val not in features_out:
+                features_out.append(val)
+        features_in = list(feature_links_chain[0].keys())
+        feature_links = feature_links_chain[0]
+        for i in range(1, len(feature_links_chain)):
+            feature_links_new = {}
+            for feature in features_in:
+                feature_links_new[feature] = set()
+                for feature_out in feature_links[feature]:
+                    feature_links_new[feature] = feature_links_new[feature].union(feature_links_chain[i].get(feature_out, []))
+                feature_links_new[feature] = list(feature_links_new[feature])
+            feature_links = feature_links_new
+        return feature_links
+
+    def _get_unused_features(self, feature_links_chain: List[Dict[str, List[str]]]):
+        features_in_list = [self.features_in]
+        if self._post_generators:
+            for i in range(len(self._post_generators)):
+                if i == 0:
+                    features_in = self._feature_metadata_before_post.get_features()
+                else:
+                    features_in = self._post_generators[i-1].features_out
+                features_in_list.append(features_in)
+        return self._get_unused_features_generic(feature_links_chain=feature_links_chain, features_in_list=features_in_list)
+
+    # TODO: Unit test this
+    @staticmethod
+    def _get_unused_features_generic(feature_links_chain: List[Dict[str, List[str]]], features_in_list: List[List[str]]) -> List[List[str]]:
+        unused_features = []
+        unused_features_by_stage = []
+        for i, chain in enumerate(reversed(feature_links_chain)):
+            stage = len(feature_links_chain) - i
+            used_features = set()
+            for key in chain.keys():
+                new_val = [val for val in chain[key] if val not in unused_features]
+                if new_val:
+                    used_features.add(key)
+            features_in = features_in_list[stage - 1]
+            unused_features = []
+            for feature in features_in:
+                if feature not in used_features:
+                    unused_features.append(feature)
+            unused_features_by_stage.append(unused_features)
+        unused_features_by_stage = list(reversed(unused_features_by_stage))
+        return unused_features_by_stage
+
     def print_generator_info(self, log_level: int = 20):
         """
         Outputs detailed logs of the generator, such as the fit runtime.
@@ -571,6 +669,7 @@ class AbstractFeatureGenerator:
         """
         if self.fit_time:
             self._log(log_level, f'\t{round(self.fit_time, 3)}s\t= Fit runtime')
+            self._log(log_level, f'\t({len(self.features_in)}, {len(self.features_out)}) = (input feature count, output feature count)')
 
     def print_feature_metadata_info(self, log_level: int = 20):
         """
@@ -591,3 +690,31 @@ class AbstractFeatureGenerator:
 
     def save(self, path: str):
         save_pkl.save(path=path, object=self)
+
+    def _more_tags(self) -> dict:
+        """
+        Special values to enable advanced functionality.
+
+        Tags
+        ----
+        feature_interactions : bool, default True
+            If True, then treat all features_out as if they depend on all features_in.
+            If False, then treat each features_out as if it was generated by a 1:1 mapping (no feature interactions).
+                This enables advanced functionality regarding automated feature pruning, but is only valid for generators which only transform each feature and do not perform interactions.
+        allow_post_generators : bool, default True
+            If False, will raise an AssertionError if post_generators is specified during init.
+                This is reserved for very simple generators where including post_generators would not be sensible, such as in RenameFeatureGenerator.
+        """
+        return {}
+
+    def get_tags(self) -> dict:
+        """Gets the tags for this generator."""
+        collected_tags = {}
+        for base_class in reversed(inspect.getmro(self.__class__)):
+            if hasattr(base_class, '_more_tags'):
+                # need the if because mixins might not have _more_tags
+                # but might do redundant work in estimators
+                # (i.e. calling more tags on BaseEstimator multiple times)
+                more_tags = base_class._more_tags(self)
+                collected_tags.update(more_tags)
+        return collected_tags

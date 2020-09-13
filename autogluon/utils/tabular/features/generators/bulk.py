@@ -104,26 +104,28 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: DataFrame, **kwargs) -> (DataFrame, dict):
         feature_metadata = self.feature_metadata_in
-        for i, generator_group in enumerate(self.generators):
+        for i in range(len(self.generators)):
             self._log(20, f'\tStage {i + 1} Generators:')
             feature_df_list = []
-            for generator in generator_group:
-                generator.set_log_prefix(log_prefix=self.log_prefix + '\t\t', prepend=True)
-                feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))
+            generator_group_valid = []
+            for generator in self.generators[i]:
+                if generator.is_valid_metadata_in(feature_metadata):
+                    if generator.verbosity > self.verbosity:
+                        generator.verbosity = self.verbosity
+                    generator.set_log_prefix(log_prefix=self.log_prefix + '\t\t', prepend=True)
+                    feature_df_list.append(generator.fit_transform(X, feature_metadata_in=feature_metadata, **kwargs))
+                    generator_group_valid.append(generator)
+                else:
+                    self._log(15, f'\t\tSkipping {generator.__class__.__name__}: No input feature with required dtypes.')
 
-            self.generators[i] = [generator for j, generator in enumerate(generator_group) if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
+            self.generators[i] = generator_group_valid
+
+            self.generators[i] = [generator for j, generator in enumerate(self.generators[i]) if feature_df_list[j] is not None and len(feature_df_list[j].columns) > 0]
             feature_df_list = [feature_df for feature_df in feature_df_list if feature_df is not None and len(feature_df.columns) > 0]
 
             if self.generators[i]:
-                feature_metadata_in_generators = FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators[i]], shared_raw_features='error_if_diff')
-            else:
-                feature_metadata_in_generators = FeatureMetadata(type_map_raw=dict())
-
-            if i == 0:  # TODO: Improve this
-                used_features_in = feature_metadata_in_generators.get_features()
-                unused_features_in = [feature for feature in self.feature_metadata_in.get_features() if feature not in used_features_in]
-                self._feature_metadata_in_unused = self.feature_metadata_in.keep_features(features=unused_features_in)
-                self._remove_features_in(features=unused_features_in)
+                # Raise an exception if generators expect different raw input types for the same feature.
+                FeatureMetadata.join_metadatas([generator.feature_metadata_in for generator in self.generators[i]], shared_raw_features='error_if_diff')
 
             if self.generators[i]:
                 feature_metadata = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[i]], shared_raw_features='error')
@@ -136,9 +138,18 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
                 X = feature_df_list[0]
             else:
                 X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
-        X_out = X
 
-        return X_out, feature_metadata.type_group_map_special
+        self.remove_features_out(features=[])
+        # Remove useless generators
+        # TODO: consider moving to self.remove_features_out
+        for i in range(len(self.generators)):
+            generator_group_valid = []
+            for j in range(len(self.generators[i])):
+                if self.generators[i][j].features_out:
+                    generator_group_valid.append(self.generators[i][j])
+            self.generators[i] = generator_group_valid
+
+        return X, feature_metadata.type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
         for generator_group in self.generators:
@@ -155,6 +166,53 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
         X_out = X
 
         return X_out
+
+    def get_feature_links_chain(self):
+        feature_links_chain = []
+        for i in range(len(self.generators)):
+            feature_links_group = {}
+            for generator in self.generators[i]:
+                feature_links = generator.get_feature_links()
+                for feature_in, features_out in feature_links.items():
+                    if feature_in in feature_links_group:
+                        feature_links_group[feature_in] += features_out
+                    else:
+                        feature_links_group[feature_in] = features_out
+            feature_links_chain.append(feature_links_group)
+        return feature_links_chain
+
+    def _remove_unused_features(self, feature_links_chain):
+        unused_features_by_stage = self._get_unused_features(feature_links_chain)
+        if unused_features_by_stage:
+            unused_features_in = [feature for feature in self.feature_metadata_in.get_features() if feature in unused_features_by_stage[0]]
+            feature_metadata_in_unused = self.feature_metadata_in.keep_features(features=unused_features_in)
+            if self._feature_metadata_in_unused:
+                self._feature_metadata_in_unused = self._feature_metadata_in_unused.join_metadata(feature_metadata_in_unused)
+            else:
+                self._feature_metadata_in_unused = feature_metadata_in_unused
+            self._remove_features_in(features=unused_features_in)
+
+        for i, generator_group in enumerate(self.generators):
+            unused_features_in_stage = unused_features_by_stage[i]
+            unused_features_out_stage = [feature_links_chain[i][feature_in] for feature_in in unused_features_in_stage if feature_in in feature_links_chain[i]]
+            unused_features_out_stage = list(set([feature for sublist in unused_features_out_stage for feature in sublist]))
+            for generator in generator_group:
+                unused_features_out_generator = [feature for feature in generator.features_out if feature in unused_features_out_stage]
+                generator.remove_features_out(features=unused_features_out_generator)
+
+    def _get_unused_features(self, feature_links_chain):
+        features_in_list = []
+        for i in range(len(self.generators)):
+            stage = i + 1
+            if stage > 1:
+                if self.generators[stage - 2]:
+                    features_in = FeatureMetadata.join_metadatas([generator.feature_metadata for generator in self.generators[stage - 2]], shared_raw_features='error').get_features()
+                else:
+                    features_in = []
+            else:
+                features_in = self.features_in
+            features_in_list.append(features_in)
+        return self._get_unused_features_generic(feature_links_chain=feature_links_chain, features_in_list=features_in_list)
 
     @staticmethod
     def get_default_infer_features_in_args() -> dict:

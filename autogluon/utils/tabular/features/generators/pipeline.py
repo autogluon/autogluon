@@ -108,9 +108,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
             self._log(log_level, f'\t\tThese features do not need to be present at inference time for this FeatureGenerator.')
         if self._feature_metadata_in_unused.get_features():
             self._log(log_level, f'\tUnused Original Features (Count: {len(self._feature_metadata_in_unused.get_features())}): {self._feature_metadata_in_unused.get_features()}')
-            self._log(log_level, f'\t\tThese features were not valid input to any of the feature generators. Add a feature generator compatible with these features to utilize them.')
+            self._log(log_level, f'\t\tThese features were not used to generate any of the output features. Add a feature generator compatible with these features to utilize them.')
             self._log(log_level, f'\t\tThese features do not need to be present at inference time for this FeatureGenerator.')
-            self._feature_metadata_in_unused.print_feature_metadata_full(self.log_prefix + '\t', log_level=log_level)
+            self._feature_metadata_in_unused.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
         self._log(20, '\tOriginal Features (exact raw dtype, raw dtype):')
         self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
         super().print_feature_metadata_info(log_level=log_level)
