@@ -136,7 +136,11 @@ class LGBModel(AbstractModel):
         # Train LightGBM model:
         try_import_lightgbm()
         import lightgbm as lgb
-        self.model = lgb.train(**train_params)
+        with warnings.catch_warnings():
+            # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+            warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+            warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+            self.model = lgb.train(**train_params)
         if dataset_val is not None:
             self.params_trained['num_boost_round'] = self.model.best_iteration
         else:

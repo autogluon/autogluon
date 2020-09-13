@@ -6,6 +6,7 @@ from pandas import DataFrame, Series
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ...... import try_import_lightgbm
 
+
 # Mapping to specialized LightGBM metrics that are much faster than the standard metric computation
 _ag_to_lgbm_metric_dict = {
     BINARY: dict(
@@ -27,7 +28,6 @@ _ag_to_lgbm_metric_dict = {
 
 def convert_ag_metric_to_lgbm(ag_metric_name, problem_type):
     return _ag_to_lgbm_metric_dict.get(problem_type, dict()).get(ag_metric_name, None)
-
 
 
 def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
@@ -62,6 +62,7 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type):
                 return metric.name, metric(y_true, y_hat), is_higher_better
     return function_template
 
+
 def softclass_lgbobj(preds, train_data):
     """ Custom LightGBM loss function for soft (probabilistic, vector-valued) class-labels only,
         which have been appended to lgb.Dataset (train_data) as additional ".softlabels" attribute (2D numpy array).
@@ -74,6 +75,7 @@ def softclass_lgbobj(preds, train_data):
     grad = (preds - softlabels)
     hess = 2.0 * preds * (1.0-preds)
     return grad.flatten('F'), hess.flatten('F')
+
 
 def construct_dataset(x: DataFrame, y: Series, location=None, reference=None, params=None, save=False, weight=None):
     try_import_lightgbm()
