@@ -905,10 +905,10 @@ class AbstractTrainer:
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
     def refit_ensemble_full(self, model='all'):
-        if model is 'all':
+        if model == 'all':
             ensemble_set = self.get_model_names_all()
         else:
-            if model is 'best':
+            if model == 'best':
                 model = self.get_model_best()
             ensemble_set = self.get_minimum_model_set(model)
         models_trained_full = self.refit_single_full(models=ensemble_set)
@@ -992,9 +992,9 @@ class AbstractTrainer:
             self.models = models
 
     def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> list:
-        if model_names is 'all':
+        if model_names == 'all':
             model_names = self.get_model_names_all()
-        elif model_names is 'best':
+        elif model_names == 'best':
             if self.model_best is not None:
                 model_names = [self.model_best]
             else:
@@ -1055,7 +1055,7 @@ class AbstractTrainer:
             return model_type.load(path=path, reset_paths=self.reset_paths)
 
     def unpersist_models(self, model_names='all') -> list:
-        if model_names is 'all':
+        if model_names == 'all':
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
             raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')

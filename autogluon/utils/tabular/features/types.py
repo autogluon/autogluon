@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def get_type_family_raw(dtype) -> str:
     """From dtype, gets the dtype family."""
     try:
-        if dtype.name is 'category':
+        if dtype.name == 'category':
             return 'category'
         if 'datetime' in dtype.name:
             return 'datetime'
