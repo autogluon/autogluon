@@ -23,7 +23,7 @@ class RLSearcher(BaseSearcher):
 
     Examples
     --------
-    >>> import autogluon.main as ag
+    >>> import autogluon.extra as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
     ...     wd=ag.space.Real(1e-3, 1e-2))

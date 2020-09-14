@@ -1,8 +1,8 @@
 import os
 import argparse
 import logging
-import autogluon.main as ag
-from autogluon.main import ImageClassification as task
+import autogluon.extra as ag
+from autogluon.extra import ImageClassification as task
 from kaggle_configuration import config_choice
 
 def parse_args():

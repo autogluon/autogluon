@@ -1,11 +1,11 @@
 """ Example script for defining and using custom models in AutoGluon Tabular """
 import time
 
-from autogluon.main import TabularPrediction as task
-from autogluon.main.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
-from autogluon.main.utils.tabular.data.label_cleaner import LabelCleaner
-from autogluon.main.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
-from autogluon.main.utils.tabular.ml.utils import infer_problem_type
+from autogluon.extra import TabularPrediction as task
+from autogluon.extra.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
+from autogluon.extra.utils.tabular.data.label_cleaner import LabelCleaner
+from autogluon.extra.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
+from autogluon.extra.utils.tabular.ml.utils import infer_problem_type
 
 #########################
 # Create a custom model #

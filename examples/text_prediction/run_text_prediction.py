@@ -1,7 +1,7 @@
 import os
 import json
 import argparse
-from autogluon.main.task import TextPrediction as task
+from autogluon.extra.task import TextPrediction as task
 
 
 TASKS = \
