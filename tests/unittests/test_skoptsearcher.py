@@ -73,9 +73,9 @@ def test_skoptsearcher():
     logger.debug("best reward from SKopt: %f,  best reward from SKopt w/ RF: %f,  best reward from Random search: %f" % 
           (max(skopt_reward_list), max(skrf_reward_list), max(random_reward_list)))
     # Ensure skopt outperformed random search:
-    assert (max(skopt_reward_list) >= max(random_reward_list)),"SKopt did worse than Random Search"
+    assert (max(skopt_reward_list) + 0.05 >= max(random_reward_list)), "SKopt did significantly worse than Random Search"
     # Ensure skopt found reasonably good config within num_configs_totry:
-    assert (max(skopt_reward_list) >= 0.6),"SKopt performed poorly"
+    assert (max(skopt_reward_list) >= 0.6), "SKopt performed poorly"
     logger.debug('Test Finished.')
 
 
