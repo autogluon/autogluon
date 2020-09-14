@@ -76,7 +76,7 @@ if __name__ == '__main__':
     create_version_file()
     setup(
         # Metadata
-        name='autogluon',
+        name='autogluon.extra',
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',

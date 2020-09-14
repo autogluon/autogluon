@@ -1,20 +1,21 @@
-import autogluon.extra as ag
+import autogluon.core.space as space
 import logging
 import numpy as np
 import time
 
+from autogluon.core.scheduler import HyperbandScheduler
 from autogluon.core.searcher.bayesopt.gpmxnet.comparison_gpy import Branin
 from autogluon.core.searcher.gp_searcher import _to_config_cs
-from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
+from autogluon.core.searcher.bayesopt.autogluon.hp_ranges import HyperparameterRanges_CS
 from autogluon.core import Task
+import autogluon.core as ag
 
 logger = logging.getLogger(__name__)
 
 
 @ag.args(
-    x1=ag.space.Real(-5.0, 10.0),
-    x2=ag.space.Real(0.0, 15.0))
+    x1=space.Real(-5.0, 10.0),
+    x2=space.Real(0.0, 15.0))
 def branin_fn(args, reporter, **kwargs):
     func = Branin()
     accuracy = -func.evaluate(args.x1, args.x2)
@@ -27,8 +28,8 @@ def branin_fn(args, reporter, **kwargs):
 # seed for this is generated from the input in a way that if two inputs are
 # very close, they map to the same seed.
 @ag.args(
-    x1=ag.space.Real(-5.0, 10.0),
-    x2=ag.space.Real(0.0, 15.0),
+    x1=space.Real(-5.0, 10.0),
+    x2=space.Real(0.0, 15.0),
     epochs=9)
 def branin_epochs_fn(args, reporter, **kwargs):
     func = Branin()
@@ -187,7 +188,7 @@ def test_resume_hyperband_random():
         checkpoint_fname = 'tests/unittests/checkpoint_{}.ag'.format(exper_type)
         # First experiment: Two phases, with resume
         task_id = Task.TASK_ID.value
-        scheduler1 = ag.scheduler.HyperbandScheduler(
+        scheduler1 = HyperbandScheduler(
             branin_epochs_fn,
             searcher='random',
             search_options=search_options,

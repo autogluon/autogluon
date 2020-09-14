@@ -48,14 +48,11 @@ requirements = [
     'cryptography>=2.8',
     'distributed>=2.6.0',
     'ConfigSpace<=0.4.10',
-    'gluoncv>=0.5.0,<1.0',
     'graphviz<0.9.0,>=0.8.1',
     'fastparquet==0.4.1',
     'scikit-optimize',
-    'catboost<0.24',
     'pyarrow<=1.0.0',
     'boto3',
-    'lightgbm>=2.3.0,<3.0',
     'pandas>=0.24.0,<1.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.23',
@@ -87,7 +84,6 @@ if __name__ == '__main__':
         # Package info
         packages=find_packages('src'),
         package_dir={'': 'src'},
-        namespace_packages=["autogluon"],
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + text_requirements + test_requirements,

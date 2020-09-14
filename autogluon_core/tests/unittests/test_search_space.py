@@ -1,35 +1,37 @@
-import autogluon.extra as ag
+import autogluon.core as ag
+import autogluon.core.space as space
+from autogluon.core.scheduler import FIFOScheduler
 
 
 def test_search_space():
     @ag.obj(
-        name=ag.space.Categorical('auto', 'gluon'),
+        name=space.Categorical('auto', 'gluon'),
     )
     class myobj:
         def __init__(self, name):
             self.name = name
 
     @ag.func(
-        framework=ag.space.Categorical('mxnet', 'pytorch'),
+        framework=space.Categorical('mxnet', 'pytorch'),
     )
     def myfunc(framework):
         return framework
 
     @ag.args(
-        a=ag.space.Real(1e-3, 1e-2, log=True),
-        b=ag.space.Real(1e-3, 1e-2),
-        c=ag.space.Int(1, 10),
-        d=ag.space.Categorical('a', 'b', 'c', 'd'),
-        e=ag.space.Bool(),
-        f=ag.space.List(
-            ag.space.Int(1, 2),
-            ag.space.Categorical(4, 5),
+        a=space.Real(1e-3, 1e-2, log=True),
+        b=space.Real(1e-3, 1e-2),
+        c=space.Int(1, 10),
+        d=space.Categorical('a', 'b', 'c', 'd'),
+        e=space.Bool(),
+        f=space.List(
+            space.Int(1, 2),
+            space.Categorical(4, 5),
         ),
-        g=ag.space.Dict(
+        g=space.Dict(
             a=ag.Real(0, 10),
             obj=myobj(),
         ),
-        h=ag.space.Categorical('test', myobj()),
+        h=space.Categorical('test', myobj()),
         i=myfunc(),
     )
     def train_fn(args, reporter):
@@ -47,23 +49,24 @@ def test_search_space():
         assert hasattr(h, 'name') or h == 'test'
         assert i in ['mxnet', 'pytorch']
         reporter(epoch=1, accuracy=0)
-    scheduler = ag.scheduler.FIFOScheduler(train_fn,
-                                           resource={'num_cpus': 4, 'num_gpus': 0},
-                                           num_trials=10,
-                                           reward_attr='accuracy',
-                                           time_attr='epoch',
-                                           checkpoint=None)
+
+    scheduler = FIFOScheduler(train_fn,
+                              resource={'num_cpus': 4, 'num_gpus': 0},
+                              num_trials=10,
+                              reward_attr='accuracy',
+                              time_attr='epoch',
+                              checkpoint=None)
     scheduler.run()
     scheduler.join_jobs()
 
 
 def test_search_space_dot_key():
     @ag.args(
-        **{'model.name': ag.space.Categorical('mxnet', 'pytorch')}
+        **{'model.name': space.Categorical('mxnet', 'pytorch')}
     )
     def train_fn(args, reporter):
         assert args['model.name'] == 'mxnet' or args['model.name'] == 'pytorch'
 
-    scheduler = ag.scheduler.FIFOScheduler(train_fn, num_trials=2)
+    scheduler = FIFOScheduler(train_fn, num_trials=2)
     scheduler.run()
     scheduler.join_jobs()
