@@ -102,7 +102,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
 
         self.cat_columns = X_train.select_dtypes([
-            'category', 'object', 'bool', 'bool_', 'str', 'string_', 'unicode_'
+            'category', 'object', 'bool', 'bool_'
         ]).columns.values.tolist()
 
         self.cont_columns = X_train.select_dtypes([
