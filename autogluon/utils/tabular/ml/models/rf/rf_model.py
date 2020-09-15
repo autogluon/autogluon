@@ -45,6 +45,7 @@ class RFModel(AbstractModel):
         default_params = {
             'n_estimators': 300,
             'n_jobs': -1,
+            'random_state': 0,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)

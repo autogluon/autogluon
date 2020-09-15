@@ -52,7 +52,7 @@ requirements = [
     'graphviz<0.9.0,>=0.8.1',
     'fastparquet==0.4.1',
     'scikit-optimize',
-    'catboost<0.24',
+    'catboost>=0.23.0,<0.25',
     'pyarrow<=1.0.0',
     'boto3',
     'lightgbm>=3.0,<4.0',
