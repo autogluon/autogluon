@@ -63,13 +63,8 @@ requirements = [
     'autogluon.core'
 ]
 
-text_requirements = [
-    'autogluon-contrib-nlp'
-]
-
 test_requirements = [
-    'pytest',
-    'openml'
+    'pytest'
 ]
 
 if __name__ == '__main__':
@@ -91,14 +86,11 @@ if __name__ == '__main__':
         namespace_packages=["autogluon"],
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements + text_requirements + test_requirements,
+        install_requires=requirements + test_requirements,
         python_requires=MIN_PYTHON_VERSION,
         package_data={'autogluon': [
             'LICENSE',
         ]},
         entry_points={
-            'console_scripts': [
-                'agremote = autogluon.scheduler.remote.cli:main',
-            ]
         },
     )

@@ -4,9 +4,12 @@ import numpy as np
 from autogluon.core import AutoGluonObject
 from autogluon.core.utils import *
 from .dataset import *
-from ..image_classification.classifier import Classifier
+from autogluon.extra.task.image_classification.classifier import Classifier
 
 __all__ = ['TextClassificationPredictor']
+
+from ... import try_import_gluonnlp
+
 
 class TextClassificationPredictor(Classifier):
     """Trained Text Classifier returned by `fit()` that can be used to make predictions on new text data.
