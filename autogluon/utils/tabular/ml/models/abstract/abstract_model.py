@@ -28,35 +28,6 @@ from ......task.base import BasePredictor
 logger = logging.getLogger(__name__)
 
 
-# Methods useful for all models:
-def fixedvals_from_searchspaces(params):
-    """ Converts any search space hyperparams in params dict into fixed default values. """
-    if any(isinstance(params[hyperparam], Space) for hyperparam in params):
-        logger.warning("Attempting to fit model without HPO, but search space is provided. fit() will only consider default hyperparameter values from search space.")
-        bad_keys = [hyperparam for hyperparam in params if isinstance(params[hyperparam], Space)][:]  # delete all keys which are of type autogluon Space
-        params = params.copy()
-        for hyperparam in bad_keys:
-            params[hyperparam] = hp_default_value(params[hyperparam])
-        return params
-    else:
-        return params
-
-
-def hp_default_value(hp_value):
-    """ Extracts default fixed value from hyperparameter search space hp_value to use a fixed value instead of a search space.
-    """
-    if not isinstance(hp_value, Space):
-        return hp_value
-    if isinstance(hp_value, Categorical):
-        return hp_value[0]
-    elif isinstance(hp_value, List):
-        return [z[0] for z in hp_value]
-    elif isinstance(hp_value, NestedSpace):
-        raise ValueError("Cannot extract default value from NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
-    else:
-        return hp_value.get_hp('dummy_name').default_value
-
-
 class AbstractModel:
     model_file_name = 'model.pkl'
     model_info_name = 'info.pkl'
@@ -135,15 +106,15 @@ class AbstractModel:
         self.params_trained = dict()
 
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return self.is_fit()
 
     # Checks if model is capable of inference on new data
-    def can_infer(self):
+    def can_infer(self) -> bool:
         return self.is_valid()
 
     # Checks if a model has been fit
-    def is_fit(self):
+    def is_fit(self) -> bool:
         return self.model is not None
 
     def _set_default_params(self):
@@ -212,7 +183,8 @@ class AbstractModel:
         path = path_context
         return path
 
-    def rename(self, name):
+    def rename(self, name: str):
+        """Renames the model and updates self.path to reflect the updated name."""
         self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
         self.name = name
 
@@ -325,23 +297,60 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
-        if directory is None:
-            directory = self.path
-        file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self, verbose=verbose)
-        if return_filename:
-            return file_name
+    def save(self, path: str = None, verbose=True) -> str:
+        """
+        Saves the model to disk.
+
+        Parameters
+        ----------
+        path : str, default None
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            If None, self.path is used.
+            The final model file is typically saved to path + self.model_file_name.
+        verbose : bool, default True
+            Whether to log the location of the saved file.
+
+        Returns
+        -------
+        path : str
+            Path to the saved model, minus the file name.
+            Use this value to load the model from disk via cls.load(path), cls being the class of the model object, such as model = RFModel.load(path)
+        """
+        if path is None:
+            path = self.path
+        file_path = path + self.model_file_name
+        save_pkl.save(path=file_path, object=self, verbose=verbose)
+        return path
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True):
-        load_path = path + file_prefix + cls.model_file_name
-        if not reset_paths:
-            return load_pkl.load(path=load_path, verbose=verbose)
-        else:
-            obj = load_pkl.load(path=load_path, verbose=verbose)
-            obj.set_contexts(path)
-            return obj
+    def load(cls, path: str, reset_paths=True, verbose=True):
+        """
+        Loads the model from disk to memory.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in path + cls.model_file_name.
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
+        file_path = path + cls.model_file_name
+        model = load_pkl.load(path=file_path, verbose=verbose)
+        if reset_paths:
+            model.set_contexts(path)
+        return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
     def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
@@ -465,7 +474,7 @@ class AbstractModel:
         return dict()
 
     # Hyperparameters of trained model
-    def get_trained_params(self):
+    def get_trained_params(self) -> dict:
         trained_params = self.params.copy()
         trained_params.update(self.params_trained)
         return trained_params
@@ -595,7 +604,7 @@ class AbstractModel:
     #  Has not been tested on Windows
     #  Does not work if model is located in S3
     #  Does not work if called before model was saved to disk (Will output 0)
-    def get_disk_size(self):
+    def get_disk_size(self) -> int:
         # Taken from https://stackoverflow.com/a/1392549
         from pathlib import Path
         model_path = Path(self.path)
@@ -606,7 +615,7 @@ class AbstractModel:
     #  If the model takes ~40%+ of memory, this may result in an OOM error.
     #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
     #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
-    def get_memory_size(self):
+    def get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
@@ -628,7 +637,7 @@ class AbstractModel:
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
-    def get_info(self):
+    def get_info(self) -> dict:
         info = dict(
             name=self.name,
             model_type=type(self).__name__,
@@ -650,7 +659,7 @@ class AbstractModel:
         return info
 
     @classmethod
-    def load_info(cls, path, load_model_if_required=True):
+    def load_info(cls, path, load_model_if_required=True) -> dict:
         load_path = path + cls.model_info_name
         try:
             return load_pkl.load(path=load_path)
@@ -661,7 +670,7 @@ class AbstractModel:
             else:
                 raise
 
-    def save_info(self):
+    def save_info(self) -> dict:
         info = self.get_info()
 
         save_pkl.save(path=self.path + self.model_info_name, object=info)
