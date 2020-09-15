@@ -324,3 +324,12 @@ def augment_rare_classes(X, label, threshold):
         raise RuntimeError("augment_rare_classes failed to produce enough data from rare classes")
     logger.log(15, "Replicated some data from rare classes in training set because eval_metric requires all classes")
     return X
+
+
+def check_features_match(df1, df2=None, label=None):
+    if df2 is not None:
+        features1 = np.array([column for column in df1.columns if column != label])
+        features2 = np.array([column for column in df2.columns if column != label])
+        if (len(features1) != len(features2)) or np.any(features1 != features2):
+            return False
+    return True

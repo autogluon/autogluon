@@ -91,6 +91,7 @@ class TabularPredictor(BasePredictor):
         self.class_labels = self._learner.class_labels
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
+        self.fit_transductively = self._learner.fit_transductively
 
     @property
     def model_names(self):
@@ -1006,7 +1007,7 @@ class TabularPredictor(BasePredictor):
         """
         Distill AutoGluon's most accurate ensemble-predictor into single models which are simpler/faster and require less memory/compute.
         Distillation can produce a model that is more accurate than the same model fit directly on the original training data.
-        After calling `distill()`, there will be more models available in this Predictor, which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
+        After calling `distill()`, there will be more models available in this Predictor (with suffix '_DSTL' in their names), which can be evaluated using `predictor.leaderboard(test_data)` and deployed with: `predictor.predict(test_data, model=MODEL_NAME)`.
         This will raise an exception if `cache_data=False` was previously set in `task.fit()`.
 
         NOTE: Until catboost v0.24 is released, `distill()` with CatBoost students in multiclass classification requires you to first install catboost-dev: `pip install catboost-dev`

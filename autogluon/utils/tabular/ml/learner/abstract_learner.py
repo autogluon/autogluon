@@ -54,6 +54,7 @@ class AbstractLearner:
         self.label_cleaner: LabelCleaner = None
         self.feature_generator: PipelineFeatureGenerator = feature_generator
         self.feature_generators = [self.feature_generator]
+        self.fit_transductively = False
 
         self.trainer: AbstractTrainer = None
         self.trainer_type = None

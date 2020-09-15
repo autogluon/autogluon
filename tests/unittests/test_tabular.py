@@ -201,7 +201,7 @@ def run_tabular_benchmark_toy(fit_args):
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
 
 
-def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False):
+def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_val, fit_args, dataset_indices=None, run_distill=False, run_transductive=False):
     print("Running fit with args:")
     print(fit_args)
     # Each train/test dataset must be located in single directory with the given names.
@@ -287,6 +287,10 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
             if run_distill:
                 predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
+
+            if run_transductive:
+                transductive_predictor = task.fit(train_data=train_data, unlabeled_test_data=test_data.head(50), label=label_column, output_directory=savedir, **fit_args)
+
     # Summarize:
     avg_perf = np.mean(performance_vals)
     median_perf = np.median(performance_vals)
@@ -308,6 +312,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
 
     print("Ran fit with args:")
     print(fit_args)
+
     # List all warnings again to make sure they are seen:
     print("\n\n WARNINGS:")
     for w in caught_warnings:
@@ -556,5 +561,5 @@ def test_tabular_bagstack():
         fit_args['num_bagging_sets'] = 2
     ###################################################################
     run_tabular_benchmarks(fast_benchmark=fast_benchmark, subsample_size=subsample_size, perf_threshold=perf_threshold,
-                           seed_val=seed_val, fit_args=fit_args, run_distill=True)
+                           seed_val=seed_val, fit_args=fit_args, run_distill=True, run_transductive=True)
 

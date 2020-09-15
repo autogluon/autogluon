@@ -28,12 +28,13 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, X_test_unlabeled: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+                X_test_unlabeled (DataFrame): unlabeled test data used for transductive learning.
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
@@ -64,6 +65,15 @@ class DefaultLearner(AbstractLearner):
             logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
+        if X_test_unlabeled is not None:
+            joint_feature_generator = copy.deepcopy(self.feature_generator)
+            # TODO: consider caching original data to file to save memory.
+            X_og = X.copy()
+            if X_val is not None:
+                X_val_og = X_val.copy()
+            else:
+                X_val_og = None
+
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
@@ -105,7 +115,108 @@ class DefaultLearner(AbstractLearner):
         time_end = time.time()
         self.time_fit_training = time_end - time_preprocessing_end
         self.time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
+        if X_test_unlabeled is not None:
+            logger.log(20, f'Initial training (without test data) complete after {round(self.time_fit_total, 2)}s ...')
+            if time_limit:
+                remaining_time = self.time_limit - self.time_fit_total
+            else:
+                remaining_time = None
+            self.transductive_fit(X=X_og, X_val=X_val_og, X_test_unlabeled=X_test_unlabeled, scheduler_options=scheduler_options, hyperparameter_tune=hyperparameter_tune,
+                                  feature_prune=feature_prune, holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
+                                  hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=remaining_time,
+                                  save_data=save_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, feature_generator=joint_feature_generator)
+        else:
+            logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
+
+    def transductive_fit(self, X: DataFrame, X_val: DataFrame, X_test_unlabeled: DataFrame,
+                         scheduler_options, hyperparameter_tune, feature_prune, holdout_frac, num_bagging_folds, num_bagging_sets, stack_ensemble_levels,
+                         hyperparameters, ag_args_fit, excluded_model_types, time_limit, save_data, save_bagged_folds, verbosity,
+                         feature_generator, pseudolabel=True, detect_shift=False):
+        """ After initial fit, transductive_fit will continue training additional models using additional unlabeled test data (X_test_unlabeled).
+            Arguments are the same as Learner.fit().
+            Additional arguments:
+                pseudolabel (bool): whether to utilize pseudolabeling
+                detect_shift (bool): whether to correct for distribution-shift between training/test data distributions.
+
+            TODO: add hyperparameter to only retain confident pseudolabels.
+            TODO: add hyperparameter to control how much of each validation set is comprised of pseudolabeled vs real data.
+            TODO: Currently does not support detect_shift.
+        """
+        MIN_TIME = 10
+        NOT_ENOUGH_TIME_WARNING = "Warning: Not enough time remaining for training models (transductively) with unlabeled test data, please increase time_limits to utilize unlabeled test data."
+        TRANSDUCTIVE_SUFFIX = "_TRANS"
+        time_pseudolabeling = 0
+        time_detect_shift = 0
+        time_start = time.time()
+        if time_limit is not None and time_limit < MIN_TIME:
+            logger.warning(NOT_ENOUGH_TIME_WARNING)
+            return None
+
+        if detect_shift:
+            raise NotImplementedError("detect_shift is not yet implemented.")
+        if (not pseudolabel) and (not detect_shift):
+            raise ValueError("One of the arguments: {pseudolabel, detect_shift} must = True")
+
+        if pseudolabel:
+            logger.log(20, f"Pseudolabeling the test data ...")
+            test_pseudolabels = self.predict(X=X_test_unlabeled)
+            X_test_unlabeled[self.label] = test_pseudolabels
+            X = pd.concat([X, X_test_unlabeled], ignore_index=True)
+            time_pseudolabeling_end = time.time()
+            time_pseudolabeling = time_pseudolabeling_end - time_start
+            logger.log(15, f"Pseudolabeling runtime = {round(time_pseudolabeling, 2)}s")
+            if time_limit is not None:
+                time_limit -= time_pseudolabeling
+                if time_limit < MIN_TIME:
+                    logger.warning(NOT_ENOUGH_TIME_WARNING)
+                    return None
+
+        logger.log(20, "Preprocessing train data together with test data ...")
+        feature_generator_og = self.feature_generator
+        self.feature_generator = feature_generator
+        X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
+        time_preprocessing_end = time.time()
+        time_preprocessing = time_preprocessing_end - time_pseudolabeling_end
+        logger.log(15, f"Preprocessing train data together with test data runtime = {round(time_preprocessing, 2)}s")
+        if time_limit is not None:
+            time_limit -= time_preprocessing
+            if time_limit < MIN_TIME:
+                logger.warning(NOT_ENOUGH_TIME_WARNING)
+                self.feature_generator = feature_generator_og  # reset
+                return None
+
+        logger.log(20, "Training models (transductively) with unlabeled test data ...")
+        # Store transductively-trained models in separate trainer so they aren't ensembled with other models:
+        trainer = self.trainer_type(
+            path=self.model_context+TRANSDUCTIVE_SUFFIX,
+            problem_type=self.label_cleaner.problem_type_transform,
+            eval_metric=self.eval_metric,
+            stopping_metric=self.stopping_metric,
+            num_classes=self.label_cleaner.num_classes,
+            feature_metadata=self.feature_generator.feature_metadata,
+            low_memory=True,
+            kfolds=num_bagging_folds,
+            n_repeats=num_bagging_sets,
+            stack_ensemble_levels=stack_ensemble_levels,
+            scheduler_options=scheduler_options,
+            time_limit=time_limit,
+            save_data=save_data,
+            save_bagged_folds=save_bagged_folds,
+            random_seed=self.random_seed,
+            verbosity=verbosity
+        )
+        self.inductive_trainer_path = self.trainer_path
+        self.trainer_path = trainer.path
+        trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
+                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, name_suffix=TRANSDUCTIVE_SUFFIX)
+        self.save_trainer(trainer=trainer)
+        time_end = time.time()
+        self.time_transductive_training = time_end - time_preprocessing_end
+        self.time_fit_total += (time_end - time_start)
+        self.fit_transductively = True
+        self.feature_generators = [self.feature_generator]
+        # TODO: may want to add: self.save()
+        logger.log(20, f"AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s (transductive training runtime = {round(self.time_transductive_training, 2)}s)...")
 
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """

@@ -15,7 +15,7 @@ from ...utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
 from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
-from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac
+from ...utils.tabular.ml.utils import setup_outputdir, setup_compute, setup_trial_limits, default_holdout_frac, check_features_match
 
 __all__ = ['TabularPrediction']
 
@@ -57,6 +57,7 @@ class TabularPrediction(BaseTask):
     def fit(train_data,
             label,
             tuning_data=None,
+            unlabeled_test_data=None,
             time_limits=None,
             output_directory=None,
             presets=None,
@@ -97,6 +98,13 @@ class TabularPrediction(BaseTask):
             Note: final model returned may be fit on this tuning_data as well as train_data. Do not provide your evaluation test data here!
             In particular, when `num_bagging_folds` > 0 or `stack_ensemble_levels` > 0, models will be trained on both `tuning_data` and `train_data`.
             If `tuning_data = None`, `fit()` will automatically hold out some random validation examples from `train_data`.
+        unlabeled_test_data : str or :class:`autogluon.task.tabular_prediction.TabularDataset` or `pandas.DataFrame`, default = None
+            Table of unlabeled test data which contains the examples you want predictions for (same format as training data, except without label column).
+            Should only be specified if this is the only test data you'll want to produce predictions for after training (transductive learning rather than inductive learning).
+            For example, `unlabeled_test_data` may boost accuracy if using AutoGluon in a prediction competition where the particular test dataset has been provided.
+            Provide large time_limits to utilize transductive training, as it will only begin after a standard `fit()` run that does not utilize the test data.
+            Models that have been trained transductively will have suffix '_TRAN' in their names (these models are biased to perform better on your test data than other new data, unlike the other models).
+            If you didn't specify `tuning_data`, transductive models may display overly optimistic validation-scores (some of their validation labels may be synthetic and thus easily predicted).
         time_limits : int, default = None
             Approximately how long `fit()` should run for (wallclock time in seconds).
             If not specified, `fit()` will run until all models have completed training, but will not repeatedly bag models unless `num_bagging_sets` or `auto_stack` is specified.
@@ -433,6 +441,7 @@ class TabularPrediction(BaseTask):
         Returns
         -------
         :class:`autogluon.task.tabular_prediction.TabularPredictor` object which can make predictions on new data and summarize what happened during `fit()`.
+        By default, the model used for prediction will be the model (or ensemble of multiple models) that performed best on validation data (`tuning_data` if specified, or internally held-out subset of `train_data`).
 
         Examples
         --------
@@ -451,7 +460,7 @@ class TabularPrediction(BaseTask):
 
         >>> eval_metric = 'roc_auc'  # set this to the metric you ultimately care about
         >>> time_limits = 360  # set as long as you are willing to wait (in sec)
-        >>> predictor = task.fit(train_data=train_data, label=label_column, eval_metric=eval_metric, auto_stack=True, time_limits=time_limits)
+        >>> predictor = task.fit(train_data=train_data, label=label_column, presets='best_quality', eval_metric=eval_metric, time_limits=time_limits)
         """
         assert search_strategy != 'bayesopt_hyperband', \
             "search_strategy == 'bayesopt_hyperband' not yet supported"
@@ -487,14 +496,20 @@ class TabularPrediction(BaseTask):
             train_data = TabularDataset(file_path=train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
             tuning_data = TabularDataset(file_path=tuning_data)
+        if unlabeled_test_data is not None:
+            if isinstance(unlabeled_test_data, str):
+                unlabeled_test_data = TabularDataset(file_path=unlabeled_test_data)
+            else:
+                unlabeled_test_data = copy.deepcopy(unlabeled_test_data)
 
         if len(set(train_data.columns)) < len(train_data.columns):
             raise ValueError("Column names are not unique, please change duplicated column names (in pandas: train_data.rename(columns={'current_name':'new_name'})")
-        if tuning_data is not None:
-            train_features = np.array([column for column in train_data.columns if column != label])
-            tuning_features = np.array([column for column in tuning_data.columns if column != label])
-            if np.any(train_features != tuning_features):
-                raise ValueError("Column names must match between training and tuning data")
+        if not check_features_match(train_data, tuning_data, label):
+            raise ValueError("Column names must match between training and tuning data")
+        if not check_features_match(train_data, unlabeled_test_data, label):
+            raise ValueError("Column names (except for label) must match between train_data and unlabeled_test_data")
+        if (unlabeled_test_data is not None) and (label in unlabeled_test_data.columns):
+            raise ValueError("Do not pass labeled data as unlabeled_test_data, pass as tuning_data instead.")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
@@ -610,8 +625,8 @@ class TabularPrediction(BaseTask):
         learner = Learner(path_context=output_directory, label=label, problem_type=problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric,
                           id_columns=id_columns, feature_generator=feature_generator, trainer_type=trainer_type,
                           label_count_threshold=label_count_threshold, random_seed=random_seed)
-        learner.fit(X=train_data, X_val=tuning_data, scheduler_options=scheduler_options,
-                    hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
+        learner.fit(X=train_data, X_val=tuning_data, X_test_unlabeled=unlabeled_test_data,
+                    scheduler_options=scheduler_options, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig, save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 

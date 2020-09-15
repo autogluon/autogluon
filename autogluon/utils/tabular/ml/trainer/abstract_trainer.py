@@ -91,7 +91,7 @@ class AbstractTrainer:
         # self.models_level_all['aux1'][1] # Stacker level 1 aux models, such as weighted_ensemble
         # self.models_level_all['core'][2] # Stacker level 2
         self.models_level = defaultdict(dd_list)
-
+        self.model_name_suffix = ''
         self.model_best = None
 
         self.model_performance = {}  # TODO: Remove in future, use networkx.
@@ -567,7 +567,7 @@ class AbstractTrainer:
     def stack_new_level_aux(self, X, y, level, fit=True, time_limit=None):
         stack_name = 'aux1'
         X_train_stack_preds = self.get_inputs_to_stacker(X, level_start=0, level_end=level, fit=fit)
-        return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
+        return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=self.model_name_suffix)
 
     def generate_weighted_ensemble(self, X, y, level, kfolds=0, n_repeats=1, stack_name=None, hyperparameters=None, time_limit=None, base_model_names=None, name_suffix='', save_bagged_folds=None, check_if_best=True, child_hyperparameters=None):
         if save_bagged_folds is None:
