@@ -8,7 +8,7 @@ from .dataset import get_dataset
 from .nets import *
 from .pipeline import train_image_classification
 from .utils import *
-from ..base import BaseTask, compile_scheduler_options, create_scheduler
+from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
 from autogluon.core import *
 from autogluon.core.loss import *
 from autogluon.core.optimizer import *

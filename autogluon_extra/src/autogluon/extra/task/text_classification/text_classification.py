@@ -7,7 +7,7 @@ import copy
 
 from autogluon.core import *
 from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
-from ..base import BaseTask, compile_scheduler_options
+from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.utils import update_params
 
 from .network import get_network

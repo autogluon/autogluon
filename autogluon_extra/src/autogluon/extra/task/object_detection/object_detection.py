@@ -8,7 +8,7 @@ from .dataset import get_dataset
 from .detector import Detector
 from .pipeline import train_object_detection
 from .utils import get_network
-from ..base import BaseTask, compile_scheduler_options
+from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.decorator import sample_config
 from autogluon.core.space import Categorical
 from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count

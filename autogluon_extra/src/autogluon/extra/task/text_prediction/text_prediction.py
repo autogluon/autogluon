@@ -13,13 +13,13 @@ from autogluon_contrib_nlp.utils.misc import logging_config
 from . import constants as _C
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type
 from .models.basic_v1 import BertForTextPredictionBasic
-from .. import tabular_prediction
-from ..base import BaseTask
+from autogluon.tabular.task import tabular_prediction
+from autogluon.core.task.base import BaseTask
 from autogluon.core.scheduler.resource import get_cpu_count, get_gpu_count
 from autogluon.core import space
 from autogluon.core.utils import in_ipynb
-from ...utils.tabular.utils.loaders import load_pd
-from ...utils.tabular.ml.utils import default_holdout_frac
+from autogluon.core.utils.loaders import load_pd
+from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
 
 __all__ = ['TextPrediction', 'ag_text_prediction_params']

@@ -84,6 +84,7 @@ if __name__ == '__main__':
         # Package info
         packages=find_packages('src'),
         package_dir={'': 'src'},
+        namespace_packages=["autogluon"],
         zip_safe=True,
         include_package_data=True,
         install_requires=requirements + text_requirements + test_requirements,

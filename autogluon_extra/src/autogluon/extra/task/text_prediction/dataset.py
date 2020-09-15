@@ -2,10 +2,10 @@ import collections
 import numpy as np
 import pandas as pd
 import json
-from ...utils.tabular.utils.loaders import load_pd
+from autogluon.core.utils.loaders import load_pd
 from . import constants as _C
-from .column_property import CategoricalColumnProperty, EntityColumnProperty,\
-                             TextColumnProperty, NumericalColumnProperty,\
+from .column_property import CategoricalColumnProperty, EntityColumnProperty, \
+    TextColumnProperty, NumericalColumnProperty, \
     get_column_properties_from_metadata
 from autogluon_contrib_nlp.base import INT_TYPES, FLOAT_TYPES, BOOL_TYPES
 from typing import List, Optional, Union, Dict, Tuple

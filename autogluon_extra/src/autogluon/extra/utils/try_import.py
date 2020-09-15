@@ -1,28 +1,5 @@
-__all__ = ['try_import_catboost', 'try_import_lightgbm', 'try_import_mxnet',
-           'try_import_cv2', 'try_import_gluonnlp', 'try_import_fastai_v1']
+__all__ = ['try_import_mxnet', 'try_import_cv2', 'try_import_gluonnlp']
 
-def try_import_catboost():
-    try:
-        import catboost
-    except ValueError as e:
-        raise ImportError("Import catboost failed. Numpy version may be outdated, "
-                          "Please ensure numpy version >=1.16.0. If it is not, please try 'pip uninstall numpy; pip install numpy>=1.17.0' Detailed info: {}".format(str(e)))
-
-def try_import_catboostdev():  # TODO: remove once Catboost 0.24 is released.
-    try:
-        import catboost  # Need to first import catboost before catboost_dev and not vice-versa
-        import catboost_dev
-    except (ValueError, ImportError) as e:
-        raise ImportError("Import catboost_dev failed (needed for distillation with CatBoost models). "
-                          "Make sure you can import catboost and then run: 'pip install catboost-dev'."
-                          "Detailed info: {}".format(str(e)))
-
-def try_import_lightgbm():
-    try:
-        import lightgbm
-    except OSError as e:
-        raise ImportError("Import lightgbm failed. If you are using Mac OSX, "
-                          "Please try 'brew install libomp'. Detailed info: {}".format(str(e)))
 
 def try_import_mxnet():
     mx_version = '1.6.0'
@@ -67,21 +44,3 @@ def try_import_gluonnlp():
             "without installing gluonnlp. "
             "A quick tip is to install via `pip install gluonnlp==0.8.1`. ")
     return gluonnlp
-
-def try_import_faiss():
-    try:
-        import faiss
-    except ImportError:
-        raise ImportError(
-            "Unable to import dependency faiss"
-            "A quick tip is to install via `pip install faiss-cpu`. ")
-
-def try_import_fastai_v1():
-    try:
-        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
-        import fastai
-        fastai_version = parse_version(fastai.__version__)
-        assert parse_version('1.0.61') <= fastai_version < parse_version('2.0.0'), 'Currently, we only support 1.0.61<=fastai<2.0.0'
-    except ModuleNotFoundError as e:
-        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==1.*`. "
-                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")

@@ -13,7 +13,7 @@ from mxnet.gluon.data.vision import transforms
 from .metrics import get_metric_instance
 from .nets import get_network
 from .utils import *
-from ..base.base_predictor import BasePredictor
+from autogluon.core.task.base.base_predictor import BasePredictor
 from autogluon.core import AutoGluonObject
 from autogluon.core.utils import save, load, tqdm, collect_params, update_params
 
