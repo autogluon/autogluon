@@ -239,15 +239,15 @@ class BaggedEnsembleModel(AbstractModel):
 
     # FIXME: Defective if model does not apply same preprocessing in all bags!
     #  No model currently violates this rule, but in future it could happen
-    def predict_proba(self, X, preprocess=True):
+    def predict_proba(self, X, preprocess=True, normalize=None):
         model = self.load_child(self.models[0])
         if preprocess:
             X = self.preprocess(X, model=model)
 
-        pred_proba = model.predict_proba(X=X, preprocess=False)
+        pred_proba = model.predict_proba(X=X, preprocess=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
-            pred_proba += model.predict_proba(X=X, preprocess=False)
+            pred_proba += model.predict_proba(X=X, preprocess=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
@@ -373,17 +373,13 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time += model.predict_time
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, load_oof=False, verbose=True):
-        path = path + file_prefix
-        load_path = path + cls.model_file_name
-        obj = load_pkl.load(path=load_path, verbose=verbose)
-        if reset_paths:
-            obj.set_contexts(path)
+    def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
         if not low_memory:
-            obj.persist_child_models(reset_paths=reset_paths)
+            model.persist_child_models(reset_paths=reset_paths)
         if load_oof:
-            obj._load_oof()
-        return obj
+            model._load_oof()
+        return model
 
     @classmethod
     def load_oof(cls, path, verbose=True):
@@ -419,32 +415,28 @@ class BaggedEnsembleModel(AbstractModel):
     def save_model_base(self, model_base):
         save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, save_oof=True, verbose=True, save_children=False):
-        if directory is None:
-            directory = self.path
-        directory = directory + file_prefix
+    def save(self, path=None, verbose=True, save_oof=True, save_children=False) -> str:
+        if path is None:
+            path = self.path
 
         if save_children:
             model_names = []
             for child in self.models:
                 child = self.load_child(child)
-                child.set_contexts(self.path + child.name + os.path.sep)
+                child.set_contexts(path + child.name + os.path.sep)
                 child.save(verbose=False)
                 model_names.append(child.name)
             self.models = model_names
 
-        file_name = directory + self.model_file_name
-
         if save_oof and self._oof_pred_proba is not None:
-            save_pkl.save(path=self.path + 'utils' + os.path.sep + self._oof_filename, object={
+            save_pkl.save(path=path + 'utils' + os.path.sep + self._oof_filename, object={
                     '_oof_pred_proba': self._oof_pred_proba,
                     '_oof_pred_model_repeats': self._oof_pred_model_repeats,
             })
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
-        save_pkl.save(path=file_name, object=self, verbose=verbose)
-        if return_filename:
-            return file_name
+
+        return super().save(path=path, verbose=verbose)
 
     # If `remove_fit_stack=True`, variables will be removed that are required to fit more folds and to fit new stacker models which use this model as a base model.
     #  This includes OOF variables.
