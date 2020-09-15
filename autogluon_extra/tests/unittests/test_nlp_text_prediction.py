@@ -1,5 +1,5 @@
 from autogluon.extra import TextPrediction as task
-from autogluon.extra.utils.tabular.utils.loaders import load_pd
+from autogluon.core.utils.loaders import load_pd
 
 
 test_hyperparameters = {
