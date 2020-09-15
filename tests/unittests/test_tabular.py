@@ -286,10 +286,13 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 warnings.warn("Performance on dataset %s is %s times worse than previous performance." %
                               (dataset['name'], performance_vals[idx]/(EPS+dataset['performance_val'])))
             if run_distill:
+                print("running distillation ...")
                 predictor.distill(time_limits=60, augment_args={'size_factor':0.5})
 
             if run_transductive:
-                transductive_predictor = task.fit(train_data=train_data, unlabeled_test_data=test_data.head(50), label=label_column, output_directory=savedir, **fit_args)
+                print("running transductive fit ...")
+                unlabeled_test_data = test_data[[column for column in test_data.columns if column in train_data.columns]].head(50)  # ensure no extra columns
+                transductive_predictor = task.fit(train_data=train_data, unlabeled_test_data=unlabeled_test_data, label=label_column, output_directory=savedir, **fit_args)
 
     # Summarize:
     avg_perf = np.mean(performance_vals)
