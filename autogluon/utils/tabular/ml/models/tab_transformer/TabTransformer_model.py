@@ -118,10 +118,16 @@ class TabTransformerModel(AbstractModel):
 
         feature_types = self.feature_types_metadata.feature_types_raw
 
+
         categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
         continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
+
+        # TODO: Making an assumption that "feature_types_raw" above isn't used elsewhere, since feature_types_raw will
+        # still have features with periods (".") in them.
+        valid_features = [feat.replace(".", "\#/") for feat in valid_features]
+
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
 
@@ -152,7 +158,10 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type=='multiclass':
             self.num_class=y_train.nunique()
 
-        device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
+#        device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
+
+        #device = torch.device("cuda")
+        device = torch.device("cpu")
 
         #gets default kwargs for TabTransformer model.
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
@@ -163,6 +172,22 @@ class TabTransformerModel(AbstractModel):
 
     def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
         #X = X.select_dtypes(['category', 'object'])
+
+        # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
+        # that hopefully doesn't collide with other column names.
+        rename_columns = dict()
+        for col in X.columns:
+            if '.' in col:
+                new_col_name = col.replace(".", "\#/")
+                rename_columns[col] = new_col_name
+
+        X = X.rename(columns = rename_columns)
+
+        if X_val is not None:
+            X_val = X_val.rename(columns = rename_columns)
+        if X_unlabeled is not None:
+            X_unlabeled = X_unlabeled.rename(columns = rename_columns)
+
         self._get_types_of_features(X)
         
         data = utils.TabTransformerDataset(X, col_info=self.types_of_features, **self.kwargs)
