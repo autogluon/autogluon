@@ -126,7 +126,7 @@ class TabTransformerModel(AbstractModel):
 
         # TODO: Making an assumption that "feature_types_raw" above isn't used elsewhere, since feature_types_raw will
         # still have features with periods (".") in them.
-        valid_features = [feat.replace(".", "\#/") for feat in valid_features]
+        valid_features = [feat.replace(".", "/-#") for feat in valid_features]
 
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
             unknown_features = [feature for feature in df.columns if feature not in valid_features]
@@ -143,9 +143,7 @@ class TabTransformerModel(AbstractModel):
             elif feature in language_featnames:
                 type='TEXT'
   
-            self.types_of_features.append({"name": feature, "type": type})
-
-               
+            self.types_of_features.append({"name": feature, "type": type})               
     
 
     def set_default_params(self, y_train):
@@ -169,24 +167,26 @@ class TabTransformerModel(AbstractModel):
     def get_model(self):
         self.model=TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
 
-
-    def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
-        #X = X.select_dtypes(['category', 'object'])
-
+    def _get_no_period_columns(self, X): 
         # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
         # that hopefully doesn't collide with other column names.
         rename_columns = dict()
         for col in X.columns:
-            if '.' in col:
-                new_col_name = col.replace(".", "\#/")
+            if "." in col:
+                new_col_name = col.replace(".", "/-#")
                 rename_columns[col] = new_col_name
 
-        X = X.rename(columns = rename_columns)
+        return rename_columns
+
+    def preprocess(self, X, X_val=None, X_unlabeled=None, fe=None):
+        #X = X.select_dtypes(['category', 'object'])
+
+        X = X.rename(columns = self._get_no_period_columns(X))
 
         if X_val is not None:
-            X_val = X_val.rename(columns = rename_columns)
+            X_val = X_val.rename(columns = self._get_no_period_columns(X_val))
         if X_unlabeled is not None:
-            X_unlabeled = X_unlabeled.rename(columns = rename_columns)
+            X_unlabeled = X_unlabeled.rename(columns = self._get_no_period_columns(X_unlabeled))
 
         self._get_types_of_features(X)
         
@@ -261,8 +261,9 @@ class TabTransformerModel(AbstractModel):
         if preprocess or isinstance(X, pd.DataFrame):
             X, _, _ =self.preprocess(X, fe=self.fe)
         else:
-            X=X
-     
+            # Need to remove periods on test data columns.
+            X = X.rename(columns = self._get_no_period_columns(X))
+
         self.model.eval()
         softmax=nn.Softmax(dim=1)
         with torch.no_grad():
