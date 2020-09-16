@@ -10,7 +10,9 @@ from pandas import DataFrame
 from .abstract_learner import AbstractLearner
 from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.auto_trainer import AutoTrainer
-from ..utils import augment_rare_classes
+from ..utils import augment_rare_classes, generate_train_test_split
+
+
 from ...data.cleaner import Cleaner
 from ...data.label_cleaner import LabelCleaner
 
@@ -116,7 +118,7 @@ class DefaultLearner(AbstractLearner):
         self.time_fit_training = time_end - time_preprocessing_end
         self.time_fit_total = time_end - time_preprocessing_start
         if X_test_unlabeled is not None:
-            logger.log(20, f'Initial training (without test data) complete after {round(self.time_fit_total, 2)}s ...')
+            logger.log(20, f'Initial training (without test data) complete after {round(self.time_fit_total, 2)}s')
             if time_limit:
                 remaining_time = self.time_limit - self.time_fit_total
             else:
@@ -126,7 +128,7 @@ class DefaultLearner(AbstractLearner):
                                   hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=remaining_time,
                                   save_data=save_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, feature_generator=joint_feature_generator)
         else:
-            logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
+            logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s')
 
     def transductive_fit(self, X: DataFrame, X_val: DataFrame, X_test_unlabeled: DataFrame,
                          scheduler_options, hyperparameter_tune, feature_prune, holdout_frac, num_bagging_folds, num_bagging_sets, stack_ensemble_levels,
@@ -157,11 +159,17 @@ class DefaultLearner(AbstractLearner):
         if (not pseudolabel) and (not detect_shift):
             raise ValueError("One of the arguments: {pseudolabel, detect_shift} must = True")
 
+        noval_nobag = (X_val is None) and (num_bagging_folds == 0)
         if pseudolabel:
             logger.log(20, f"Pseudolabeling the test data ...")
             test_pseudolabels = self.predict(X=X_test_unlabeled)
             X_test_unlabeled[self.label] = test_pseudolabels
-            X = pd.concat([X, X_test_unlabeled], ignore_index=True)
+            if noval_nobag:
+                holdout_frac_og = holdout_frac
+                X.index = ['train']*len(X)
+                X_test_unlabeled.index = ['test']*len(X_test_unlabeled)
+
+            X = pd.concat([X, X_test_unlabeled], ignore_index=False)
             time_pseudolabeling_end = time.time()
             time_pseudolabeling = time_pseudolabeling_end - time_start
             logger.log(15, f"Pseudolabeling runtime = {round(time_pseudolabeling, 2)}s")
@@ -175,6 +183,12 @@ class DefaultLearner(AbstractLearner):
         feature_generator_og = self.feature_generator
         self.feature_generator = feature_generator
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
+        if noval_nobag:  # split  validation set here and avoid including pseudolabels
+            _, holdout_frac, _ = self.adjust_threshold_if_necessary(y.loc['train'], self.threshold, holdout_frac_og, num_bagging_folds)
+            X_train, X_val, y_train, y_val = generate_train_test_split(X.loc['train'], y.loc['train'], problem_type=self.problem_type, test_size=holdout_frac, random_state=self.random_seed)
+            X = pd.concat([X_train, X.loc['test']], ignore_index=True)
+            y = pd.concat([y_train, y.loc['test']], ignore_index=True)
+
         time_preprocessing_end = time.time()
         time_preprocessing = time_preprocessing_end - time_pseudolabeling_end
         logger.log(15, f"Preprocessing train data together with test data runtime = {round(time_preprocessing, 2)}s")
