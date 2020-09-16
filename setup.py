@@ -56,7 +56,7 @@ requirements = [
     'pyarrow<=1.0.0',
     'boto3',
     'lightgbm>=3.0,<4.0',
-    'pandas>=0.24.0,<1.0',
+    'pandas>=1.0.0,<2.0',
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0'
