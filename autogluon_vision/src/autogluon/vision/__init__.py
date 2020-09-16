@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from .version import __version__
 
 import logging
+
 logger = logging.getLogger("distributed.utils_perf")
 logger.setLevel(logging.ERROR)
 

@@ -15,7 +15,7 @@ from mxnet.gluon.data.vision import ImageRecordDataset, transforms
 
 from autogluon.core import *
 from autogluon.core.utils import get_data_rec
-from ...utils.pil_transforms import *
+from ..utils.pil_transforms import *
 
 _is_osx = platform.system() == "Darwin"
 

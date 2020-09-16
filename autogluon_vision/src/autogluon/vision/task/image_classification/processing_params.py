@@ -1,6 +1,6 @@
 import mxnet as mx
 
-from .nets import get_network
+from autogluon.extra.task.nets import get_network
 
 
 class Sample_params(object):

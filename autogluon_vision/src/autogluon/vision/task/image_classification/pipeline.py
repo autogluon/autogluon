@@ -4,9 +4,9 @@ import mxnet as mx
 from gluoncv.loss import DistillationSoftmaxCrossEntropyLoss
 from mxnet import gluon, nd
 
-from .metrics import get_metric_instance
+from autogluon.extra.task.metrics import get_metric_instance
+from autogluon.extra.task.utils import *
 from .processing_params import Sample_params, Getmodel_kwargs
-from .utils import *
 from autogluon.core import *
 from autogluon.core.utils import tqdm
 from ...utils.learning_rate import LR_params

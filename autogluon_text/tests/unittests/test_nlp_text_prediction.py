@@ -1,4 +1,4 @@
-from autogluon.extra import TextPrediction as task
+from autogluon.text import TextPrediction as task
 from autogluon.core.utils.loaders import load_pd
 
 

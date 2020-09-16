@@ -1,6 +1,6 @@
 import os
 import autogluon.extra as ag
-from autogluon.extra import TextClassification as task
+from autogluon.text import TextClassification as task
 import pytest
 
 

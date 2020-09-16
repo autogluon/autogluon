@@ -3,11 +3,11 @@ import os
 import copy
 import mxnet as mx
 
-from .classifier import Classifier
-from .dataset import get_dataset
-from .nets import *
+from autogluon.extra.task.classifier import Classifier
+from autogluon.extra.task.dataset import get_dataset
+from autogluon.extra.task.nets import *
 from .pipeline import train_image_classification
-from .utils import *
+from autogluon.extra.task.utils import *
 from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
 from autogluon.core import *
 from autogluon.core.loss import *

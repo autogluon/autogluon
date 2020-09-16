@@ -3,7 +3,7 @@ import os
 import pytest
 
 import autogluon.extra as ag
-from autogluon.extra import ImageClassification as task
+from autogluon.vision import ImageClassification as task
 from mxnet import optimizer as optim
 
 tricks_combination = [
