@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 class RenameFeatureGenerator(AbstractFeatureGenerator):
     """
-    RenameFeatureGenerator renames the columns without altering the features.
+    RenameFeatureGenerator renames the columns without altering their values.
+    This can be used to avoid column name collisions when transforming the same feature in multiple ways, or to highlight that a feature was derived from a particular pipeline.
 
     Parameters
     ----------

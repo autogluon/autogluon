@@ -58,10 +58,10 @@ class DefaultLearner(AbstractLearner):
         logger.log(20, f'AutoGluon will save models to {self.path}')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
-        logger.log(20, f'Train Data Columns: {len(X.columns)}')
+        logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:
             logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
-            logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
+            logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)

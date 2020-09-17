@@ -139,9 +139,9 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             else:
                 X = pd.concat(feature_df_list, axis=1, ignore_index=False, copy=False)
 
-        self.remove_features_out(features=[])
+        self._remove_features_out(features=[])
         # Remove useless generators
-        # TODO: consider moving to self.remove_features_out
+        # TODO: consider moving to self._remove_features_out
         for i in range(len(self.generators)):
             generator_group_valid = []
             for j in range(len(self.generators[i])):
@@ -198,7 +198,7 @@ class BulkFeatureGenerator(AbstractFeatureGenerator):
             unused_features_out_stage = list(set([feature for sublist in unused_features_out_stage for feature in sublist]))
             for generator in generator_group:
                 unused_features_out_generator = [feature for feature in generator.features_out if feature in unused_features_out_stage]
-                generator.remove_features_out(features=unused_features_out_generator)
+                generator._remove_features_out(features=unused_features_out_generator)
 
     def _get_unused_features(self, feature_links_chain):
         features_in_list = []

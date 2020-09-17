@@ -256,11 +256,11 @@ class AbstractFeatureGenerator:
         end_time = time.time()
         self.fit_time = end_time - start_time
         if self.verbosity >= 3:
-            self.print_generator_info(log_level=20)
             self.print_feature_metadata_info(log_level=20)
+            self.print_generator_info(log_level=20)
         elif self.verbosity == 2:
-            self.print_generator_info(log_level=15)
             self.print_feature_metadata_info(log_level=15)
+            self.print_generator_info(log_level=15)
         return X_out
 
     def transform(self, X: DataFrame) -> DataFrame:
@@ -473,11 +473,14 @@ class AbstractFeatureGenerator:
             self.feature_metadata_in = self.feature_metadata_in.remove_features(features=features)
             self.features_in = self.feature_metadata_in.get_features()
             if self._pre_astype_generator:
-                self._pre_astype_generator.remove_features_out(features)
+                self._pre_astype_generator._remove_features_out(features)
 
-    def remove_features_out(self, features: list):
+    # TODO: Ensure arbitrary feature removal does not result in inconsistencies (add unit test)
+    def _remove_features_out(self, features: list):
         """
-        Removes features from all relevant objects which represent the content of the output data.
+        Removes features from the output data.
+        This is used for cleaning complex pipelines of unnecessary operations after fitting a sequence of generators.
+        Implementations of AbstractFeatureGenerator should not need to alter this method.
 
         Parameters
         ----------
@@ -503,7 +506,7 @@ class AbstractFeatureGenerator:
             for feature_in in feature_links_chain[i + 1]:
                 generated_features = generated_features.union(feature_links_chain[i + 1][feature_in])
             features_out_to_remove = [feature for feature in generator.features_out if feature not in generated_features]
-            generator.remove_features_out(features_out_to_remove)
+            generator._remove_features_out(features_out_to_remove)
 
     def _rename_features_in(self, column_rename_map: dict):
         if self.feature_metadata_in is not None:
@@ -567,8 +570,15 @@ class AbstractFeatureGenerator:
     def is_fit(self):
         return self._is_fit
 
+    # TODO: Handle cases where self.features_in or self.feature_metadata_in was already set at init.
     def is_valid_metadata_in(self, feature_metadata_in: FeatureMetadata):
-        """True if input data with feature metadata of feature_metadata_in could result in non-empty output."""
+        """
+        True if input data with feature metadata of feature_metadata_in could result in non-empty output.
+            This is dictated by `feature_metadata_in.get_features(**self._infer_features_in_args)` not being empty.
+        False if the features represented in feature_metadata_in do not contain any usable types for the generator.
+            For example, if only numeric features are passed as input to TextSpecialFeatureGenerator which requires text input features, this will return False.
+            However, if both numeric and text features are passed, this will return True since the text features would be valid input (the numeric features would simply be dropped).
+        """
         features_in = feature_metadata_in.get_features(**self._infer_features_in_args)
         if features_in:
             return True
@@ -668,8 +678,8 @@ class AbstractFeatureGenerator:
             Log level of the logging statements.
         """
         if self.fit_time:
-            self._log(log_level, f'\t{round(self.fit_time, 3)}s\t= Fit runtime')
-            self._log(log_level, f'\t({len(self.features_in)}, {len(self.features_out)}) = (input feature count, output feature count)')
+            self._log(log_level, f'\t{round(self.fit_time, 1)}s = Fit runtime')
+            self._log(log_level, f'\t{len(self.features_in)} features in original data used to generate {len(self.features_out)} features in processed data.')
 
     def print_feature_metadata_info(self, log_level: int = 20):
         """
@@ -680,12 +690,12 @@ class AbstractFeatureGenerator:
         log_level : int, default 20
             Log level of the logging statements.
         """
-        self._log(log_level, '\tOriginal Features (raw dtype, special dtypes):')
+        self._log(log_level, '\tTypes of features in original data (raw dtype, special dtypes):')
         self.feature_metadata_in.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
         if self.feature_metadata_real:
-            self._log(log_level, '\tProcessed Features (exact raw dtype, raw dtype):')
-            self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
-        self._log(log_level, '\tProcessed Features (raw dtype, special dtypes):')
+            self._log(log_level-5, '\tTypes of features in processed data (exact raw dtype, raw dtype):')
+            self.feature_metadata_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level-5)
+        self._log(log_level, '\tTypes of features in processed data (raw dtype, special dtypes):')
         self.feature_metadata.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
 
     def save(self, path: str):

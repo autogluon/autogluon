@@ -44,7 +44,6 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         X_out = super().fit_transform(X=X, y=y, feature_metadata_in=feature_metadata_in, **kwargs)
         self._compute_post_memory_usage(X_out)
         # TODO: Consider adding final check of validity/that features are reasonable.
-        self._log(20, f'\t{self.__class__.__name__} processed %s data points with %s features' % (len(X_out), len(self.features_out)))
 
         return X_out
 
@@ -105,12 +104,15 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
         if self._useless_features_in:
             self._log(log_level, f'\tUseless Original Features (Count: {len(self._useless_features_in)}): {list(self._useless_features_in)}')
             self._log(log_level, f'\t\tThese features carry no predictive signal and should be manually investigated.')  # TODO: What about features with 1 unique value but also np.nan?
-            self._log(log_level, f'\t\tThese features do not need to be present at inference time for this FeatureGenerator.')
+            self._log(log_level, f'\t\tThis is typically a feature which has the same value for all rows.')
+            self._log(log_level, f'\t\tThese features do not need to be present at inference time.')
         if self._feature_metadata_in_unused.get_features():
+            # TODO: Consider highlighting why a feature was unused (complex to implement, can check if was valid input to any generator in a generator group through feature chaining)
             self._log(log_level, f'\tUnused Original Features (Count: {len(self._feature_metadata_in_unused.get_features())}): {self._feature_metadata_in_unused.get_features()}')
             self._log(log_level, f'\t\tThese features were not used to generate any of the output features. Add a feature generator compatible with these features to utilize them.')
-            self._log(log_level, f'\t\tThese features do not need to be present at inference time for this FeatureGenerator.')
+            self._log(log_level, f'\t\tFeatures can also be unused if they carry very little information, such as being categorical but having almost entirely unique values or being duplicates of other features.')
+            self._log(log_level, f'\t\tThese features do not need to be present at inference time.')
             self._feature_metadata_in_unused.print_feature_metadata_full(self.log_prefix + '\t\t', log_level=log_level)
-        self._log(20, '\tOriginal Features (exact raw dtype, raw dtype):')
-        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level)
+        self._log(log_level-5, '\tTypes of features in original data (exact raw dtype, raw dtype):')
+        self._feature_metadata_in_real.print_feature_metadata_full(self.log_prefix + '\t\t', print_only_one_special=True, log_level=log_level-5)
         super().print_feature_metadata_info(log_level=log_level)
