@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
-from autogluon.utils.tabular.features.feature_metadata import R_INT, R_FLOAT
+from autogluon.utils.tabular.features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY
 from autogluon.utils.tabular.features.generators import PipelineFeatureGenerator, IdentityFeatureGenerator, CategoryFeatureGenerator, DatetimeFeatureGenerator, TextSpecialFeatureGenerator, TextNgramFeatureGenerator
 
 
@@ -132,3 +132,61 @@ def test_pipeline_feature_generator_dummy(generator_helper, data_helper):
 
     assert list(generator.transform(input_data_transform)['__dummy__'].values) == [0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert list(generator.transform(input_data_transform.head(5))['__dummy__'].values) == [0, 0, 0, 0, 0]
+
+
+def test_pipeline_feature_generator_removal_advanced(generator_helper, data_helper):
+    # Given
+    input_data = data_helper.generate_multi_feature_full()
+
+    toy_vectorizer = CountVectorizer(min_df=2, ngram_range=(1, 3), max_features=10, dtype=np.uint8)
+
+    text_ngram_feature_generator = TextNgramFeatureGenerator(vectorizer=toy_vectorizer)
+    text_ngram_feature_generator.max_memory_ratio = None  # Necessary in test to avoid CI non-deterministically pruning ngram counts.
+
+    generator = PipelineFeatureGenerator(
+        generators=[
+            [
+                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_INT, R_FLOAT])),
+                CategoryFeatureGenerator(),
+                DatetimeFeatureGenerator(),
+                TextSpecialFeatureGenerator(),
+                text_ngram_feature_generator,
+            ],
+            [
+                IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=[R_CATEGORY]))
+            ],
+        ]
+    )
+
+    expected_feature_metadata_in_full = {
+        ('category', ()): ['cat'],
+        ('object', ()): ['obj']
+    }
+
+    expected_feature_metadata_full = {
+        ('category', ()): ['obj', 'cat']
+    }
+
+    expected_feature_metadata_in_unused_full = {
+        'datetime': ('datetime', ()),
+        'datetime_as_object': ('object', ('datetime_as_object',)),
+        'float': ('float', ()),
+        'int': ('int', ()),
+        'text': ('object', ('text',))
+    }
+
+    # When
+    output_data = generator_helper.fit_transform_assert(
+        input_data=input_data,
+        generator=generator,
+        expected_feature_metadata_in_full=expected_feature_metadata_in_full,
+        expected_feature_metadata_full=expected_feature_metadata_full,
+    )
+
+    feature_metadata_in_unused_full = generator._feature_metadata_in_unused.to_dict()
+
+    # object and category checks
+    assert list(output_data['obj'].values) == [1, 2, 1, 4, 4, 4, 3, 0, 0]
+    assert list(output_data['cat'].values) == [0, 1, 0, 3, 3, 3, 2, np.nan, np.nan]
+
+    assert feature_metadata_in_unused_full == expected_feature_metadata_in_unused_full

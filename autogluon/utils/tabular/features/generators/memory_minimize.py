@@ -49,6 +49,16 @@ class CategoryMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
                 X[column].cat.rename_categories(self._category_maps[column], inplace=True)
         return X
 
+    def _remove_features_in(self, features: list):
+        super()._remove_features_in(features)
+        if self._category_maps:
+            for feature in features:
+                if feature in self._category_maps:
+                    self._category_maps.pop(feature)
+
+    def _more_tags(self):
+        return {'feature_interactions': False}
+
 
 # TODO: What about nulls / unknowns?
 class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
@@ -86,3 +96,6 @@ class NumericMemoryMinimizeFeatureGenerator(AbstractFeatureGenerator):
 
     def _minimize_numeric_memory_usage(self, X: DataFrame):
         return clip_and_astype(df=X, clip_min=self._clip_min, clip_max=self._clip_max, dtype=self.dtype_out)
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

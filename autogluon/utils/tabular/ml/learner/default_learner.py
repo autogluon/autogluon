@@ -58,10 +58,10 @@ class DefaultLearner(AbstractLearner):
         logger.log(20, f'AutoGluon will save models to {self.path}')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
-        logger.log(20, f'Train Data Columns: {len(X.columns)}')
+        logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:
             logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
-            logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
+            logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
@@ -143,7 +143,7 @@ class DefaultLearner(AbstractLearner):
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
         y = self.label_cleaner.transform(y)
 
-        if self.label_cleaner.num_classes is not None:
+        if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
         if X_val is not None and self.label in X_val.columns:
@@ -165,6 +165,7 @@ class DefaultLearner(AbstractLearner):
                 X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
 
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
+        logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
@@ -185,7 +186,6 @@ class DefaultLearner(AbstractLearner):
                 self.feature_generator.print_feature_metadata_info()
             else:
                 X = self.feature_generator.fit_transform(X)
-
 
         return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 
