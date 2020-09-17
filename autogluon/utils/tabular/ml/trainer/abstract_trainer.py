@@ -62,12 +62,12 @@ class AbstractTrainer:
             self.stopping_metric = self.eval_metric
 
         self.eval_metric_expects_y_pred = scorer_expects_y_pred(scorer=self.eval_metric)
-        logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.eval_metric.name)
+        logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
         if not self.eval_metric_expects_y_pred:
-            logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
+            logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
-        logger.log(20, "To change this, specify the eval_metric argument of fit()")
-        logger.log(25, "AutoGluon will early stop models using evaluation metric: %s" % self.stopping_metric.name)
+        logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
+        logger.log(25, f"AutoGluon will early stop models using evaluation metric: '{self.stopping_metric.name}'")
         self.num_classes = num_classes
         self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
