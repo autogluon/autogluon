@@ -12,6 +12,7 @@ from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from ..abstract.abstract_model import AbstractModel
 from ...constants import PROBLEM_TYPES_CLASSIFICATION, MULTICLASS, SOFTCLASS
+from ....features.feature_metadata import S_TEXT_NGRAM
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from .....try_import import try_import_catboost, try_import_catboostdev
 
@@ -145,7 +146,10 @@ class CatboostModel(AbstractModel):
         init_model_best_score = None
 
         params = self.params.copy()
-        num_features = len(self.features)
+        if self.feature_metadata is not None:
+            num_features_text_ngram = len(self.feature_metadata.get_features(required_special_types=[S_TEXT_NGRAM]))
+        else:
+            num_features_text_ngram = 0
 
         if params.get('task_type', None) == 'GPU':
             if 'colsample_bylevel' in params:
@@ -155,14 +159,14 @@ class CatboostModel(AbstractModel):
                 params.pop('rsm')
                 logger.log(30, f'\t\'rsm\' is not supported on GPU, using default value (Default = 1).')
 
-        if self.problem_type == MULTICLASS and 'rsm' not in params and 'colsample_bylevel' not in params and num_features > 1000:
+        if self.problem_type == MULTICLASS and 'rsm' not in params and 'colsample_bylevel' not in params and num_features_text_ngram > 1000:
             if time_limit:
                 # Reduce sample iterations to avoid taking unreasonable amounts of time
                 num_sample_iter_max = max(round(num_sample_iter_max/2), 2)
             # Subsample columns to speed up training
             if params.get('task_type', None) != 'GPU':  # RSM does not work on GPU
-                params['colsample_bylevel'] = max(min(1.0, 1000 / num_features), 0.05)
-                logger.log(30, f'\tMany features detected ({num_features}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
+                params['colsample_bylevel'] = max(min(1.0, 1000 / num_features_text_ngram), 0.05)
+                logger.log(30, f'\tMany text_ngram features detected ({num_features_text_ngram}), dynamically setting \'colsample_bylevel\' to {params["colsample_bylevel"]} to speed up training (Default = 1).')
                 logger.log(30, f'\tTo disable this functionality, explicitly specify \'colsample_bylevel\' in the model hyperparameters.')
             else:
                 params['colsample_bylevel'] = 1.0
