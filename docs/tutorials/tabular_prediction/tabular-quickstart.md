@@ -14,7 +14,7 @@ Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separat
 
 ```{.python .input}
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-subsample_size = 500 # subsample subset of data for faster demo, try setting this to much larger values
+subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 ```
@@ -32,7 +32,7 @@ print("Summary of class variable: \n", train_data[label_column].describe())
 Now use AutoGluon to train multiple models:
 
 ```{.python .input}
-dir = 'agModels-predictClass' # specifies folder where to store trained models
+dir = 'agModels-predictClass'  # specifies folder where to store trained models
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=dir)
 ```
 
@@ -41,14 +41,14 @@ Next, load separate test data to demonstrate how to make predictions on new exam
 ```{.python .input}
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 y_test = test_data[label_column]  # values to predict
-test_data_nolab = test_data.drop(labels=[label_column],axis=1) # delete label column to prove we're not cheating
+test_data_nolab = test_data.drop(labels=[label_column],axis=1)  # delete label column to prove we're not cheating
 print(test_data_nolab.head())
 ```
 
 We use our trained models to make predictions on the new data and then evaluate performance:
 
 ```{.python .input}
-predictor = task.load(dir) # unnecessary, just demonstrates how to load previously-trained predictor from file
+predictor = task.load(dir)  # unnecessary, just demonstrates how to load previously-trained predictor from file
 
 y_pred = predictor.predict(test_data_nolab)
 print("Predictions:  ", y_pred)
@@ -83,7 +83,7 @@ For tabular problems, `fit()` returns a `Predictor` object. For classification, 
 
 ```{.python .input}
 pred_probs = predictor.predict_proba(test_data_nolab)
-positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0] # which label is considered 'positive' class
+positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]  # which label is considered 'positive' class
 print(f"Predicted probabilities of class '{positive_class}':", pred_probs)
 ```
 
@@ -121,16 +121,16 @@ To get the best predictive accuracy with AutoGluon, you should generally use it 
 
 ```{.python .input}
 time_limits = 60 # for quick demonstration only, you should set this to longest time you are willing to wait (in seconds)
-metric = "roc_auc" # specify your metric here
+metric = 'roc_auc' # specify your evaluation metric here
 predictor = task.fit(train_data=train_data, label=label_column, time_limits=time_limits,
                      eval_metric=metric, presets='best_quality')
 ```
 
 This command implements the following strategy to maximize accuracy:
 
-- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets`is `'medium_quality_faster_train'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=[‘good_quality_faster_inference_only_refit’, ‘optimize_for_deployment’]`.
+- Specify the argument `presets='best_quality'`, which allows AutoGluon to automatically construct powerful model ensembles based on [stacking/bagging](https://arxiv.org/abs/2003.06505), and will greatly improve the resulting predictions if granted sufficient training time. The default value of `presets` is `'medium_quality_faster_train'`, which produces *less* accurate models but facilitates faster prototyping. With `presets`, you can flexibly prioritize predictive accuracy vs. training/inference speed. For example, if you care less about predictive performance and want to quickly deploy a basic model, consider using: `presets=['good_quality_faster_inference_only_refit', 'optimize_for_deployment']`.
 
-- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `f1` (for binary classification), `roc_auc` (for binary classification), `log_loss` (for classification), `mean_absolute_error` (for regression), `median_absolute_error` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/utils/tabular/metrics/`
+- Provide the `eval_metric` if you know what metric will be used to evaluate predictions in your application. Some other non-default metrics you might use include things like: `'f1'` (for binary classification), `'roc_auc'` (for binary classification), `'log_loss'` (for classification), `'mean_absolute_error'` (for regression), `'median_absolute_error'` (for regression).  You can also define your own custom metric function, see examples in the folder: `autogluon/utils/tabular/metrics/`
 
 - Include all your data in `train_data` and do not provide `tuning_data` (AutoGluon will split the data more intelligently to fit its needs).
 

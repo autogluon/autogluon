@@ -5,7 +5,7 @@
 
 This tutorial describes how you can exert greater control when using AutoGluon's `fit()` or `predict()`. Recall that to maximize predictive performance, you should always first try `fit()` with all default arguments except `eval_metric` and `presets`, before you experiment with other arguments covered in this in-depth tutorial like `hyperparameter_tune`, `hyperparameters`, `stack_ensemble_levels`, `num_bagging_folds`, `num_bagging_sets`, etc.
 
-Using the same census data table as before, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
+Using the same census data table as in the :ref:`sec_tabularquick` tutorial, we'll now predict the `occupation` of an individual - a multiclass classification problem. Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
 import autogluon as ag
@@ -14,18 +14,18 @@ from autogluon import TabularPrediction as task
 import numpy as np
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
-subsample_size = 500 # subsample subset of data for faster demo, try setting this to much larger values
+subsample_size = 500  # subsample subset of data for faster demo, try setting this to much larger values
 train_data = train_data.sample(n=subsample_size, random_state=0)
 print(train_data.head())
 
 label_column = 'occupation'
 print("Summary of occupation column: \n", train_data['occupation'].describe())
 
-val_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
-test_data = val_data[5000:].copy() # this should be separate data in your applications
+new_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
+test_data = new_data[5000:].copy()  # this should be separate data in your applications
 y_test = test_data[label_column]
-test_data_nolabel = test_data.drop(labels=[label_column],axis=1)  # delete label column
-val_data = val_data[:5000]
+test_data_nolabel = test_data.drop(labels=[label_column], axis=1)  # delete label column
+val_data = new_data[:5000]
 
 metric = 'accuracy' # we specify eval-metric just for demo (unnecessary as it's the default)
 ```
@@ -43,24 +43,23 @@ We first demonstrate hyperparameter-tuning and how you can provide your own vali
 ```{.python .input}
 hp_tune = True  # whether or not to do hyperparameter optimization
 
-nn_options = { # specifies non-default hyperparameter values for neural network models
-    'num_epochs': 10, # number of training epochs (controls training time of NN models)
-    'learning_rate': ag.space.Real(1e-4, 1e-2, default=5e-4, log=True), # learning rate used in training (real-valued hyperparameter searched on log-scale)
-    'activation': ag.space.Categorical('relu', 'softrelu', 'tanh'), # activation function used in NN (categorical hyperparameter, default = first entry)
-    'layers': ag.space.Categorical([100],[1000],[200,100],[300,200,100]),
-      # Each choice for categorical hyperparameter 'layers' corresponds to list of sizes for each NN layer to use
-    'dropout_prob': ag.space.Real(0.0, 0.5, default=0.1), # dropout probability (real-valued hyperparameter)
+nn_options = {  # specifies non-default hyperparameter values for neural network models
+    'num_epochs': 10,  # number of training epochs (controls training time of NN models)
+    'learning_rate': ag.space.Real(1e-4, 1e-2, default=5e-4, log=True),  # learning rate used in training (real-valued hyperparameter searched on log-scale)
+    'activation': ag.space.Categorical('relu', 'softrelu', 'tanh'),  # activation function used in NN (categorical hyperparameter, default = first entry)
+    'layers': ag.space.Categorical([100],[1000],[200,100],[300,200,100]),  # each choice for categorical hyperparameter 'layers' corresponds to list of sizes for each NN layer to use
+    'dropout_prob': ag.space.Real(0.0, 0.5, default=0.1),  # dropout probability (real-valued hyperparameter)
 }
 
-gbm_options = { # specifies non-default hyperparameter values for lightGBM gradient boosted trees
-    'num_boost_round': 100, # number of boosting rounds (controls training time of GBM models)
-    'num_leaves': ag.space.Int(lower=26, upper=66, default=36), # number of leaves in trees (integer hyperparameter)
+gbm_options = {  # specifies non-default hyperparameter values for lightGBM gradient boosted trees
+    'num_boost_round': 100,  # number of boosting rounds (controls training time of GBM models)
+    'num_leaves': ag.space.Int(lower=26, upper=66, default=36),  # number of leaves in trees (integer hyperparameter)
 }
 
-hyperparameters = { # hyperparameters of each model type
+hyperparameters = {  # hyperparameters of each model type
                    'GBM': gbm_options,
-                   'NN': nn_options, # NOTE: comment this line out if you get errors on Mac OSX
-                  } # When these keys are missing from hyperparameters dict, no models of that type are trained
+                   'NN': nn_options,  # NOTE: comment this line out if you get errors on Mac OSX
+                  }  # When these keys are missing from hyperparameters dict, no models of that type are trained
 
 time_limits = 2*60  # train various models for ~2 min
 num_trials = 5  # try at most 3 different hyperparameter configurations for each type of model
@@ -97,7 +96,8 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 ```{.python .input}
 predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
                      num_bagging_folds=5, stack_ensemble_levels=1,
-                     hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}}) # last  argument is just for quick demo here, omit it in real applications
+                     hyperparameters = {'NN': {'num_epochs': 5}, 'GBM': {'num_boost_round': 100}}  # last  argument is just for quick demo here, omit it in real applications
+                    )
 ```
 
 You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
@@ -107,7 +107,8 @@ output_directory = 'agModels-predictOccupation'  # folder where to store trained
 
 predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
                      auto_stack=True, output_directory=output_directory,
-                     hyperparameters = {'NN':{'num_epochs':5}, 'GBM':{'num_boost_round':100}}, time_limits = 30) # last 2 arguments are for quick demo, omit them in real applications
+                     hyperparameters={'NN': {'num_epochs': 5}, 'GBM': {'num_boost_round': 100}}, time_limits=30  # last 2 arguments are for quick demo, omit them in real applications
+                    )
 ```
 
 Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques.
@@ -126,7 +127,7 @@ Above `output_directory` is the same folder previously passed to `fit()`, in whi
 We can make a prediction on an individual example rather than a full dataset:
 
 ```{.python .input}
-datapoint = test_data_nolabel.iloc[[0]] # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
+datapoint = test_data_nolabel.iloc[[0]]  # Note: .iloc[0] won't work because it returns pandas Series instead of DataFrame
 print(datapoint)
 print(predictor.predict(datapoint))
 ```
@@ -134,7 +135,7 @@ print(predictor.predict(datapoint))
 To output predicted class probabilities instead of predicted classes, you can use:
 
 ```{.python .input}
-predictor.predict_proba(datapoint, as_pandas=True) # as_pandas shows which probability corresponds to which class
+predictor.predict_proba(datapoint, as_pandas=True)  # as_pandas shows which probability corresponds to which class
 ```
 
 By default, `predict()` and `predict_proba()` will utilize the model that AutoGluon thinks is most accurate, which is usually an ensemble of many individual models. Here's how to see which model this is:
@@ -158,8 +159,7 @@ The leaderboard shows each model's predictive performance on the test data (`sco
 predictor.leaderboard(extra_info=True, silent=True)
 ```
 
-The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`),
-how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
+The expanded leaderboard shows properties like how many features are used by each model (`num_features`), which other models are ancestors whose predictions are required inputs for each model (`ancestors`), and how much memory each model and all its ancestors would occupy if simultaneously persisted (`memory_size_w_ancestors`). See the [leaderboard documentation](../../api/autogluon.task.html#autogluon.task.tabular_prediction.TabularPredictor.leaderboard) for full details.
 
 Here's how to specify a particular model to use for prediction instead of AutoGluon's default model-choice:
 
@@ -231,14 +231,25 @@ for i in range(num_test):
 perf = predictor.evaluate_predictions(y_test[:num_test], preds, auxiliary_metrics=True)
 print("Predictions: ", preds)
 
-predictor.unpersist_models() # free memory by clearing models, future predict() calls will load models from disk
+predictor.unpersist_models()  # free memory by clearing models, future predict() calls will load models from disk
 ```
 
 You can alternatively specify a particular model to persist via the `models` argument of `persist_models()`, or simply set `models='all'` to simultaneously load every single model that was trained during `fit`.
 
+### Using smaller ensemble or faster model for prediction
+
+Without having to retrain any models, one can construct alternative ensembles that aggregate individual models' predictions with different weighting schemes. These ensembles become smaller (and hence faster for prediction) if they assign nonzero weight to less models. You can produce a wide variety of ensembles with different accuracy-speed tradeoffs like this:
+
+```{.python .input}
+predictor.fit_weighted_ensemble(expand_pareto_frontier=True)
+predictor.leaderboard(only_pareto_frontier=True)
+```
+
+The resulting leaderboard will contain the most accurate model for a given inference-latency. You can select whichever model exhibits acceptable latency from the leaderboard and use it for prediction via `predictor.predict(data, model=MODEL_NAME)`.
+
 ### Collapsing bagged ensembles via refit_full
 
-For a ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements (but may also reduce accuracy). Below we refit such a model for each original model but you can alternatively do this for just a particular model by specifying the `model` argument of `refit_full()`.
+For an ensemble predictor trained with bagging (as done above), recall there ~10 bagged copies of each individual model trained on different train/validation folds. We can collapse this bag of ~10 models into a single model that's fit to the full dataset, which can greatly reduce its memory/latency requirements (but may also reduce accuracy). Below we refit such a model for each original model but you can alternatively do this for just a particular model by specifying the `model` argument of `refit_full()`.
 
 ```{.python .input}
 refit_model_map = predictor.refit_full()
@@ -253,7 +264,7 @@ This adds the refit-full models to the leaderboard and we can opt to use any of 
 While computationally-favorable, single individual models will usually have lower accuracy than weighted/stacked/bagged ensembles. [Model Distillation](https://arxiv.org/abs/2006.14284) offers one way to retain the computational benefits of a single model, while enjoying some of the accuracy-boost that comes with ensembling. The idea is to train the individual model (which we can call the student) to mimic the predictions of the full stack ensemble (the teacher). Like `refit_full()`, the `distill()` function will produce additional models we can opt to use for prediction.
 
 ```{.python .input}
-student_models = predictor.distill(time_limits=30) # specify much longer time-limits in real applications
+student_models = predictor.distill(time_limits=30)  # specify much longer time-limits in real applications
 print(student_models)
 preds_student = predictor.predict(test_data_nolabel, model=student_models[0])
 print(f"predictions from {student_models[0]}:", preds_student)
@@ -279,7 +290,7 @@ predictor_light = task.fit(train_data=train_data, label=label_column, eval_metri
                            hyperparameters='very_light', time_limits=30)
 ```
 
-Here you can set `hyperparameters` to 'light','very_light', 'toy' to obtain progressively smaller (but less accurate) models and predictors. Advanced users may instead try manually specifying particular models' hyperparameters in order to make them faster/smaller.
+Here you can set `hyperparameters` to either 'light', 'very_light', or 'toy' to obtain progressively smaller (but less accurate) models and predictors. Advanced users may instead try manually specifying particular models' hyperparameters in order to make them faster/smaller.
 
 Finally, you may also exclude specific unwieldy models from being trained at all. Below we exclude models that tend to be slower (K Nearest Neighbors, Neural Network, models with custom larger-than-default  hyperparameters):
 
@@ -292,7 +303,7 @@ predictor_light = task.fit(train_data=train_data, label=label_column, eval_metri
 
 ## If you encounter memory issues
 
-To reduce memory usage, you may try each of the following strategies individually or combinations of them (these may harm accuracy):
+To reduce memory usage during training, you may try each of the following strategies individually or combinations of them (these may harm accuracy):
 
 - In `fit()`, set `num_bagging_sets = 1` (can also try values greater than 1 to harm accuracy less).
 
@@ -308,7 +319,14 @@ To reduce memory usage, you may try each of the following strategies individuall
 
 where `MAX_NGRAM = 1000` say (try various values under 10000) and [CountVectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text` (to reduce the number of N-grams used to represent each text field).
 
-- To reduce memory required in inference, call `predictor.refit_full()` and use one of the refit-full models for prediction.
+To reduce memory usage during inference:
+
+- If trying to produce predictions for a large test dataset, break the test data into smaller chunks as demonstrated in :ref:`sec_faq`.
+
+- If models have been previously persisted in memory but inference-speed is not a major concern, call `predictor.unpersist_models()`.
+
+- If models have been previously persisted in memory, bagging was used in `fit()`, and inference-speed is a concern: call `predictor.refit_full()` and use one of the refit-full models for prediction (ensure this is the only model persisted in memory).
+
 
 
 ## If you encounter disk space issues
