@@ -25,7 +25,7 @@ except Exception:
 def create_version_file():
     global version, cwd
     print('-- Building version ' + version)
-    version_path = os.path.join(cwd, 'src', 'autogluon', 'vision', 'version.py')
+    version_path = os.path.join(cwd, 'src', 'autogluon', 'mxnet', 'version.py')
     with open(version_path, 'w') as f:
         f.write('"""This is autogluon version file."""\n')
         f.write("__version__ = '{}'\n".format(version))
@@ -60,8 +60,7 @@ requirements = [
     'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
     'scikit-learn>=0.22.0,<0.23',
     'networkx>=2.3,<3.0',
-    'autogluon.core',
-    'autogluon.mxnet',
+    'autogluon.core'
 ]
 
 text_requirements = [
@@ -77,7 +76,7 @@ if __name__ == '__main__':
     create_version_file()
     setup(
         # Metadata
-        name='autogluon.vision',
+        name='autogluon.mxnet',
         version=version,
         author='AutoGluon Community',
         url='https://github.com/awslabs/autogluon',

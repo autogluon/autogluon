@@ -3,7 +3,7 @@ import os
 import pytest
 import numpy as np
 
-import autogluon.extra as ag
+import autogluon.core as ag
 import mxnet as mx
 import mxnet.gluon.nn as nn
 from autogluon.extra.contrib.enas import *

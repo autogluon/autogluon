@@ -1,5 +1,6 @@
 import os
-import autogluon.extra as ag
+
+from autogluon.core import Categorical
 from autogluon.text import TextClassification as task
 import pytest
 
@@ -7,8 +8,8 @@ import pytest
 def test_fit():
     dataset = task.Dataset(name='ToySST')
     predictor = task.fit(dataset,
-                         net=ag.Categorical('bert_12_768_12'),
-                         pretrained_dataset=ag.Categorical('book_corpus_wiki_en_uncased'),
+                         net=Categorical('bert_12_768_12'),
+                         pretrained_dataset=Categorical('book_corpus_wiki_en_uncased'),
                          epochs=1,
                          num_trials=1,
                          batch_size=4,
@@ -26,8 +27,8 @@ def test_custom_dataset_fit():
     os.system('unzip -o demodata.zip')
     dataset = task.Dataset(filepath='./demodata/train.csv', usecols=['text', 'target'])
     predictor = task.fit(dataset,
-                         net=ag.Categorical('bert_12_768_12'),
-                         pretrained_dataset=ag.Categorical('book_corpus_wiki_en_uncased'),
+                         net=Categorical('bert_12_768_12'),
+                         pretrained_dataset=Categorical('book_corpus_wiki_en_uncased'),
                          epochs=1,
                          num_trials=1,
                          batch_size=4,

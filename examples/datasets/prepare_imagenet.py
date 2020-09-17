@@ -6,7 +6,7 @@ import pickle
 import gzip
 import subprocess
 from tqdm import tqdm
-from autogluon.extra.utils import check_sha1, download, mkdir
+from autogluon.mxnet.utils import check_sha1, download, mkdir
 
 _TARGET_DIR = os.path.expanduser('~/.autogluon/datasets/imagenet')
 _TRAIN_TAR = 'ILSVRC2012_img_train.tar'

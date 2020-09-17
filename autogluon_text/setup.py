@@ -58,7 +58,7 @@ requirements = [
     'scikit-learn>=0.22.0,<0.23',
     'networkx>=2.3,<3.0',
     'autogluon.core',
-    'autogluon.extra'
+    'autogluon.mxnet'
 ]
 
 text_requirements = [

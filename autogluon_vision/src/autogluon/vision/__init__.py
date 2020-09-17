@@ -15,7 +15,7 @@ logger.setLevel(logging.ERROR)
 logger = logging.getLogger("distributed.worker")
 logger.setLevel(logging.ERROR)
 
-from autogluon.extra.utils.try_import import try_import_mxnet
+from autogluon.mxnet.utils.try_import import try_import_mxnet
 try_import_mxnet()
 
 from autogluon.core import scheduler, searcher, utils

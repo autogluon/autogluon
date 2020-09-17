@@ -4,7 +4,7 @@ import numpy as np
 from autogluon.core import AutoGluonObject
 from autogluon.core.utils import *
 from .dataset import *
-from autogluon.extra.task.classifier import Classifier
+from autogluon.mxnet.task.classifier import Classifier
 
 __all__ = ['TextClassificationPredictor']
 

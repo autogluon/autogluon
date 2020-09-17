@@ -2,12 +2,14 @@ import os
 
 import pytest
 
-import autogluon.extra as ag
+from autogluon.core import *
+from autogluon.core.utils import download, mkdir, unzip
+
 from autogluon.vision import ImageClassification as task
 from mxnet import optimizer as optim
 
 tricks_combination = [
-    ag.space.Dict(
+    space.Dict(
         last_gamma=True,
         use_pretrained=True,
         use_se=False,
@@ -21,7 +23,7 @@ tricks_combination = [
         hard_weight=0.5,
         batch_norm=False,
         use_gn=False),
-    ag.space.Dict(
+    space.Dict(
         last_gamma=False,
         use_pretrained=False,
         use_se=False,
@@ -39,33 +41,34 @@ tricks_combination = [
 
 def download_shopee(data_dir, dataset):
     if not os.path.exists(os.path.join(data_dir, dataset + '.zip')):
-        filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip', path=data_dir)
-        ag.mkdir(filename[:-4])
-        ag.unzip(filename, root=filename[:-4])
+        filename = download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.zip', path=data_dir)
+        mkdir(filename[:-4])
+        unzip(filename, root=filename[:-4])
     else:
         print(dataset + '.zip already exists.\n')
 
 
 def config_choice(dataset, data_path, tricks):
     dataset_path = os.path.join(data_path, dataset, 'data', 'train')
-    net_shopee = ag.space.Categorical('resnet50_v1')
-    @ag.obj(
-        learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
-        momentum=ag.space.Real(0.85, 0.95),
-        wd=ag.space.Real(1e-6, 1e-2, log=True),
+    net_shopee = space.Categorical('resnet50_v1')
+
+    @obj(
+        learning_rate=space.Real(1e-4, 1e-2, log=True),
+        momentum=space.Real(0.85, 0.95),
+        wd=space.Real(1e-6, 1e-2, log=True),
         multi_precision=False
     )
     class NAG(optim.NAG):
         pass
     optimizer = NAG()
 
-    lr_config = ag.space.Dict(
-        lr_mode=ag.space.Categorical('step', 'cosine'),
-        lr_decay=ag.space.Real(0.1, 0.2),
-        lr_decay_period=ag.space.Int(0,1),
-        lr_decay_epoch=ag.space.Categorical('40,80'),
-        warmup_lr=ag.space.Real(0.0,0.5),
-        warmup_epochs=ag.space.Int(0,5)
+    lr_config = space.Dict(
+        lr_mode=space.Categorical('step', 'cosine'),
+        lr_decay=space.Real(0.1, 0.2),
+        lr_decay_period=space.Int(0,1),
+        lr_decay_epoch=space.Categorical('40,80'),
+        warmup_lr=space.Real(0.0,0.5),
+        warmup_epochs=space.Int(0,5)
     )
 
     kaggle_choice = {'classes': 4, 'net': net_shopee, 'optimizer': optimizer,

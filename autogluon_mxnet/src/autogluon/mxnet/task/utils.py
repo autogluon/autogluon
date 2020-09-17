@@ -4,7 +4,7 @@ from mxnet import gluon, nd
 
 from .dataset import *
 from autogluon.core import AutoGluonObject
-from autogluon.extra.utils import get_split_samplers, SampledDataset, DataLoader
+from autogluon.mxnet.utils import get_split_samplers, SampledDataset, DataLoader
 
 __all__ = ['get_data_loader', 'imagenet_batch_fn',
            'default_batch_fn', 'default_val_fn', 'default_train_fn']
