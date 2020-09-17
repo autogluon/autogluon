@@ -95,12 +95,12 @@ Beyond hyperparameter-tuning with a correctly-specified evaluation metric, two o
 
 ```{.python .input}
 predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metric,
-                     num_bagging_folds=5, stack_ensemble_levels=1,
+                     num_bagging_folds=5, num_bagging_sets=1, stack_ensemble_levels=1,
                      hyperparameters = {'NN': {'num_epochs': 2}, 'GBM': {'num_boost_round': 20}}  # last  argument is just for quick demo here, omit it in real applications
                     )
 ```
 
-You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
+You should not provide `tuning_data` when stacking/bagging, and instead provide all your available data as `train_data` (which AutoGluon will split in more intellgent ways). `num_bagging_sets` controls how many times the k-fold bagging process is repeated to further reduce variance (increasing this may further boost accuracy but will substantially increase training times, inference latency, and memory/disk usage). Rather than manually searching for good bagging/stacking values yourself, AutoGluon will automatically select good values for you if you specify `auto_stack` instead:
 
 ```{.python .input}
 output_directory = 'agModels-predictOccupation'  # folder where to store trained models
@@ -111,7 +111,7 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
                     )
 ```
 
-Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques.
+Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques (specifying `presets='best_quality'` in `fit()` simply sets `auto_stack = True`).
 
 
 ## Prediction options (inference)
