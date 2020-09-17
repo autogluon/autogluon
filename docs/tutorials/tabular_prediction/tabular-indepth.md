@@ -111,7 +111,7 @@ predictor = task.fit(train_data=train_data, label=label_column, eval_metric=metr
                     )
 ```
 
-Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may experiment with combining both techniques (specifying `presets='best_quality'` in `fit()` simply sets `auto_stack = True`).
+Often stacking/bagging will produce superior accuracy than hyperparameter-tuning, but you may try combining both techniques (note: specifying `presets='best_quality'` in `fit()` simply sets `auto_stack = True`).
 
 
 ## Prediction options (inference)
