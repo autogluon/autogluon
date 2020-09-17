@@ -241,11 +241,17 @@ You can alternatively specify a particular model to persist via the `models` arg
 Without having to retrain any models, one can construct alternative ensembles that aggregate individual models' predictions with different weighting schemes. These ensembles become smaller (and hence faster for prediction) if they assign nonzero weight to less models. You can produce a wide variety of ensembles with different accuracy-speed tradeoffs like this:
 
 ```{.python .input}
-predictor.fit_weighted_ensemble(expand_pareto_frontier=True)
-predictor.leaderboard(only_pareto_frontier=True)
+additional_ensembles = predictor.fit_weighted_ensemble(expand_pareto_frontier=True)
+print("Alternative ensembles you can use for prediction:", additional_ensembles)
+
+predictor.leaderboard(only_pareto_frontier=True, silent=True)
+
+model_for_prediction = additional_ensembles[0]
+predictions = predictor.predict(test_data, model=model_for_prediction)
+predictor.delete_models(models_to_delete=additional_ensembles)  # delete these extra models so they don't affect rest of tutorial
 ```
 
-The resulting leaderboard will contain the most accurate model for a given inference-latency. You can select whichever model exhibits acceptable latency from the leaderboard and use it for prediction via `predictor.predict(data, model=MODEL_NAME)`.
+The resulting leaderboard will contain the most accurate model for a given inference-latency. You can select whichever model exhibits acceptable latency from the leaderboard and use it for prediction.
 
 ### Collapsing bagged ensembles via refit_full
 
