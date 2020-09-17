@@ -245,13 +245,15 @@ additional_ensembles = predictor.fit_weighted_ensemble(expand_pareto_frontier=Tr
 print("Alternative ensembles you can use for prediction:", additional_ensembles)
 
 predictor.leaderboard(only_pareto_frontier=True, silent=True)
+```
 
+The resulting leaderboard will contain the most accurate model for a given inference-latency. You can select whichever model exhibits acceptable latency from the leaderboard and use it for prediction.
+
+```{.python .input}
 model_for_prediction = additional_ensembles[0]
 predictions = predictor.predict(test_data, model=model_for_prediction)
 predictor.delete_models(models_to_delete=additional_ensembles, dry_run=False)  # delete these extra models so they don't affect rest of tutorial
 ```
-
-The resulting leaderboard will contain the most accurate model for a given inference-latency. You can select whichever model exhibits acceptable latency from the leaderboard and use it for prediction.
 
 ### Collapsing bagged ensembles via refit_full
 
