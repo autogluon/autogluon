@@ -121,8 +121,6 @@ class TabTransformer(TabModelBase):
 
             out = torch.cat([last_layer, max, mean], dim=1)
 
-
-
         elif self.readout == 'all_feat_embs':
             out = feat_embs
 
@@ -131,8 +129,6 @@ class TabTransformer(TabModelBase):
 
         elif self.readout == 'none':
             out = feat_embs.transpose(1,0)
-
-
 
         return out
 

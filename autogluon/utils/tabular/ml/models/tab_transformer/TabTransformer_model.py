@@ -152,8 +152,8 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type=='multiclass':
             self.num_class=y_train.nunique()
 
-#        device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
-
+        # TODO: This is a work in progress to get TabTransformer working on CUDA inside AutoGluon.
+        #device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
         #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         #device = torch.device("cuda")
         device = torch.device("cpu")

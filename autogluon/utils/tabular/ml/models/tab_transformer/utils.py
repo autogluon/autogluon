@@ -30,7 +30,13 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
     with (torch.enable_grad() if is_train else torch.no_grad()):
         for data, target in data_bar:
             data, target = pretext.get(data, target)
-        
+
+            # TODO: This is a work in progress to get CUDA working for TT inside AutoGluon
+            # if torch.cuda.is_available(): ???
+            #data, target = data.cuda(), target.cuda() # TODO: Similar to .to('cuda:0') except it figures out default GPU device.
+            #data, target = data.to('cuda'), target.to('cuda')
+            #data, target = data.to(device), target.to(device) # TODO: Hard coded device
+
             if state in [None, 'finetune']:
                 data, target = augmentation(data,target, **aug_kwargs)
                 out, _    = net(data)

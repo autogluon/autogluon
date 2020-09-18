@@ -33,10 +33,6 @@ class TabTransDataset(Dataset):
 			del df['marketplace_id']
 			del df['list_price_currency']
 			df = df.rename(columns={'item_name': 'product_name'})
-
-		#del df['department']
-		#del df['gl_product_group_type']
-		#del df['item_type_keyword']
 		
 		self.raw_data = df.iloc[:dataset_size]
 		self.raw_data     = self.raw_data.iloc[self.data_idx]
@@ -101,17 +97,17 @@ class TabTransDataset(Dataset):
 			self.cont_feat_origin = []
 			cont_features = []
 			for c in self.columns:
-					enc = feature_encoders[c['name']]
-					col = self.raw_data[c['name']]
-					cat_feats = enc.enc_cat(col)
-					if cat_feats is not None:
-						self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in
-																						enumerate(enc.cat_cards)]
-						cat_features.append(cat_feats)
-					cont_feats = enc.enc_cont(col)
-					if cont_feats is not None:
-						self.cont_feat_origin += [c['name']] * enc.cont_dim
-						cont_features.append(cont_feats)
+				enc = feature_encoders[c['name']]
+				col = self.raw_data[c['name']]
+				cat_feats = enc.enc_cat(col)
+				if cat_feats is not None:
+					self.cat_feat_origin_cards += [(f'{c["name"]}_{i}_{c["type"]}', card) for i, card in
+																					enumerate(enc.cat_cards)]
+					cat_features.append(cat_feats)
+				cont_feats = enc.enc_cont(col)
+				if cont_feats is not None:
+					self.cont_feat_origin += [c['name']] * enc.cont_dim
+					cont_features.append(cont_feats)
 			if cat_features:
 				self.cat_data = torch.cat(cat_features, dim=1)
 			else:
@@ -122,9 +118,8 @@ class TabTransDataset(Dataset):
 				self.cont_data = None
 
 	def build_loader(self):
-		loader = DataLoader(self, batch_size=self.kwargs['batch_size'], 
-							shuffle=False, num_workers=16, 
-							pin_memory=True) 
+		loader = DataLoader(self, batch_size=self.kwargs['batch_size'], shuffle=False,
+							num_workers=16, pin_memory=True)
 		return loader
 
 	def __len__(self):
