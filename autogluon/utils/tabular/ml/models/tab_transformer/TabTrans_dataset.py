@@ -12,11 +12,7 @@ import pandas as pd
 import numpy as np
 
 class TabTransDataset(Dataset):
-	def __init__(
-	    self,
-	    data_idx=None,
-	    random_state=0,
-	    **kwargs):
+	def __init__(self, data_idx=None, random_state=0, **kwargs):
 		self.ds_name  = kwargs['dataset_name']
 		self.encoders = kwargs['encoders']
 		self.kwargs   = kwargs
@@ -51,7 +47,7 @@ class TabTransDataset(Dataset):
 			if x in ['0', '-1', '0.0', 'no', 'No', 'neg', 'n', 'N', 'False', 'NRB', ' <=50K']:
 				return 0
 			elif x == 'nan':
-				return pd.np.nan
+				return np.nan
 			for i in range(1,self.ds_info['processed']['classes']):
 				if x in [str(i), str(i)+'.0']:
 					return int(i)
@@ -124,7 +120,6 @@ class TabTransDataset(Dataset):
 				self.cont_data = torch.cat(cont_features, dim=1)
 			else:
 				self.cont_data = None
-
 
 	def build_loader(self):
 		loader = DataLoader(self, batch_size=self.kwargs['batch_size'], 
