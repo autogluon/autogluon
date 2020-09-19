@@ -11,3 +11,4 @@ dependencies:
   - docutils
   - mu-notedown
   - flake8
+  - awscli>=1.18.140
