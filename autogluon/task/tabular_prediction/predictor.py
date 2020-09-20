@@ -215,7 +215,9 @@ class TabularPredictor(BasePredictor):
             Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
             Output DataFrame columns include:
                 'model': The name of the model.
+
                 'score_val': The validation score of the model on the 'eval_metric'.
+
                 'pred_time_val': The inference time required to compute predictions on the validation data end-to-end.
                     Equivalent to the sum of all 'pred_time_val_marginal' values for the model and all of its base models.
                 'fit_time': The fit time required to train the model end-to-end (Including base models if the model is a stack ensemble).
@@ -245,9 +247,10 @@ class TabularPredictor(BasePredictor):
                 This requires additional computation as advanced info data is calculated on demand.
                 Additional output columns when `extra_info=True` include:
                     'num_features': Number of input features used by the model.
+                        Some models may ignore certain features in the preprocessed data.
                     'num_models': Number of models that actually make up this "model" object.
                         For non-bagged models, this is 1. For bagged models, this is equal to the number of child models (models trained on bagged folds) the bagged ensemble contains.
-                    'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors.
+                    'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors (see below).
                     'memory_size': The amount of memory in bytes the model requires when persisted in memory. This is not equivalent to the amount of memory the model may use during inference.
                         For bagged models, this is the sum of the 'memory_size' of all child models.
                     'memory_size_w_ancestors': Equivalent to the sum of 'memory_size' values for the model and its' ancestors.
@@ -261,23 +264,33 @@ class TabularPredictor(BasePredictor):
                         This is the minimum required memory to infer with the model by only loading one model at a time, as each of its ancestors will also have to be loaded into memory.
                         For offline-inference where latency is not a concern, this should be used to determine the required memory for a machine if 'memory_size_w_ancestors' is too large.
                     'num_ancestors': Number of ancestor models for the given model.
+
                     'num_descendants': Number of descendant models for the given model.
-                    'model_type': The model type. If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
+
+                    'model_type': The type of the given model.
+                        If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
                     'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
                         child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
                         For 10-fold bagging, the bagged ensemble model would have 10 child models.
                         For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
                         Note that child models are distinct from ancestors and descendants.
-                    'hyperparameters': The input hyperparameters to the model.
-                    'hyperparameters_fit': The hyperparameters set by the model during fit. This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
+                    'hyperparameters': The hyperparameter values specified for the model.
+                        All hyperparameters that do not appear in this dict remained at their default values.
+                    'hyperparameters_fit': The hyperparameters set by the model during fit.
+                        This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
                         This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
                         In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
                         For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
-                    'AG_args_fit': Special AutoGluon arguments that influence model fit. See the documentation of the `hyperparameters` argument in `task.fit` for more information.
+                    'AG_args_fit': Special AutoGluon arguments that influence model fit.
+                        See the documentation of the `hyperparameters` argument in `TabularPrediction.fit()` for more information.
                     'features': List of feature names used by the model.
+
                     'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
+
                     'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
+
                     'child_AG_args_fit': Equivalent to 'AG_args_fit', but for the model's children.
+
                     'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
                         If A is an ancestor of B, then B is a descendant of A.
                         If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.

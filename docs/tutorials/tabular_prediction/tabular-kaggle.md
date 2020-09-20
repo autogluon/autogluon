@@ -42,10 +42,10 @@ import numpy as np
 from autogluon import TabularPrediction as task
 from autogluon.utils.tabular.metrics import roc_auc
 
-directory = '~/IEEEfraud/' # directory where you have downloaded the data CSV files from the competition
-label_column = 'isFraud' # name of target variable to predict in this competition
-eval_metric = 'roc_auc' # Optional: specify that competition evaluation metric is AUC
-output_directory = directory + 'AutoGluonModels/' # where to store trained models
+directory = '~/IEEEfraud/'  # directory where you have downloaded the data CSV files from the competition
+label_column = 'isFraud'  # name of target variable to predict in this competition
+eval_metric = 'roc_auc'  # Optional: specify that competition evaluation metric is AUC
+output_directory = directory + 'AutoGluonModels/'  # where to store trained models
 
 train_identity = pd.read_csv(directory+'train_identity.csv')
 train_transaction = pd.read_csv(directory+'train_transaction.csv')
@@ -59,26 +59,43 @@ train_data = task.Dataset(df = train) # convert to AutoGluon dataset
 del train_identity, train_transaction, train # free unused memory
 ```
 
-Note that a left-join on the `TransactionID` key happened to be most appropriate for this Kaggle competition, but for others involving multiple training data files, you will likely need to use a different join strategy (always consider this very carefully). Now that all our training data resides within a single table, we can apply AutoGluon. Below, we specify the `auto_stack` argument which improves predictive accuracy, but means you should run `fit()` with longer time limits:
-
+Note that a left-join on the `TransactionID` key happened to be most appropriate for this Kaggle competition, but for others involving multiple training data files, you will likely need to use a different join strategy (always consider this very carefully). Now that all our training data resides within a single table, we can apply AutoGluon. Below, we specify the `presets` argument to maximize AutoGluon's predictive accuracy which usually requires that you run `fit()` with longer time limits (3600s below should likely be increased in your run):
 ```
 predictor = task.fit(train_data=train_data, label=label_column, output_directory=output_directory,
-                     eval_metric=eval_metric, verbosity=3, auto_stack=True, time_limits=3600)
+                     eval_metric=eval_metric, presets='best_quality', verbosity=3, time_limits=3600)
 
 results = predictor.fit_summary()
 ```
 
-Now, we use the trained AutoGluon Predictor to make predictions on the competition's test data. It is imperative that multiple test data files are joined together in the exact same manner as the training data. Because this competition is evaluated based on the AUC (Area under the ROC curve) metric, we ask AutoGluon for predicted class-probabilities rather than class predictions (in general, when to use `predict` vs `predict_proba` will depend on the particular competition).
+Now, we use the trained AutoGluon Predictor to make predictions on the competition's test data. It is imperative that multiple test data files are joined together in the exact same manner as the training data. Because this competition is evaluated based on the AUC (Area under the ROC curve) metric, we ask AutoGluon for predicted class-probabilities rather than class predictions. In general, when to use `predict` vs `predict_proba` will depend on the particular competition.
 
 ```
 test_identity = pd.read_csv(directory+'test_identity.csv')
 test_transaction = pd.read_csv(directory+'test_transaction.csv')
-test = pd.merge(test_transaction, test_identity, on='TransactionID', how='left') # same join applied to training files
-test_data = task.Dataset(df = test) # convert to AutoGluon dataset
-del test_identity, test_transaction, test # free unused memory
+test = pd.merge(test_transaction, test_identity, on='TransactionID', how='left')  # same join applied to training files
+test_data = task.Dataset(df = test)  # convert to AutoGluon dataset
+del test_identity, test_transaction, test  # free unused memory
 
 y_predproba = predictor.predict_proba(test_data)
 print(y_predproba[:5]) # some example predicted fraud-probabilities
+```
+
+When submitting predicted probabilities for classification competitions, it is imperative these correspond to the same class expected by Kaggle. For binary classification tasks, you can see which class AutoGluon's predicted probabilities correspond to via:
+
+```
+positive_class = [label for label in predictor.class_labels if predictor.class_labels_internal_map[label]==1][0]
+```
+
+For multiclass classification tasks, you can see which classes AutoGluon's predicted probabilities correspond to via:
+
+```
+predictor.class_labels # classes in this list correspond to columns of predict_proba() output
+```
+
+Alternatively, the following command should clarify which predicted-probability corresponds to which class:
+
+```
+y_predproba = predictor.predict_proba(test_data, as_pandas=True)
 ```
 
 Now that we have made a prediction for each row in the test dataset, we can submit these predictions to Kaggle. Most Kaggle competitions provide a sample submission file, in which you can simply overwrite the sample predictions with your own as we do below:
@@ -103,7 +120,7 @@ You can now play with different `fit()` arguments and feature-engineering techni
 
    - If the training examples are time-based and the competition test examples come from future data, we recommend you reserve the most recently-collected training examples as a separate validation dataset passed to `fit()`. Otherwise, you do not need to specify a validation set yourself and AutoGluon will automatically partition the competition training data into its own training/validation sets.
 
-   - Specify the following `fit()` arguments: `num_bagging_folds`, `stack_ensemble_levels` (we recommend trying values 5-10 for the former, 1-2 for the latter). Note these choices will increase the runtime of `fit()`, and use of bagging/stack-ensembling means models will be trained on your provided validation dataset as well as the training dataset.
+   - Beyond simply specifying `presets = 'best_quality'`, you may play with more advanced `fit()` arguments such as: `num_bagging_folds`, `stack_ensemble_levels`, `num_bagging_sets`, `hyperparameter_tune`, `hyperparameters`, `refit_full`. However we recommend spending most of your time on [feature-engineering](https://www.coursera.org/lecture/competitive-data-science/overview-1Nh5Q) and just specifying `presets = 'best_quality'` inside the call to `fit()`.
 
 
 **Troubleshooting:**
