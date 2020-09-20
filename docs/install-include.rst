@@ -109,7 +109,7 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install --upgrade mxnet
                  python3 -m pip install autogluon
 
               .. note::
@@ -138,7 +138,7 @@ Select your preferences below and run the corresponding install commands:
 
               .. code-block:: bash
 
-                 python3 -m pip install -U --pre "mxnet>=1.7.0b20200713, <2.0.0" -f https://sxjscience.github.io/KDD2020/
+                 python3 -m pip install --upgrade mxnet
                  git clone https://github.com/awslabs/autogluon
                  cd autogluon && python3 setup.py develop
 
