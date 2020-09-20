@@ -25,7 +25,7 @@ filename = ag.download('https://autogluon.s3.amazonaws.com/datasets/shopee-iet.z
 ag.unzip(filename)
 ```
 
-After the dataset is downloaded, we load it into a [`Dataset`](/api/autogluon.task.html#autogluon.task.ImageClassification.Dataset) object: 
+After the dataset is downloaded, we load it into a [Dataset](/api/autogluon.task.html#autogluon.task.ImageClassification.Dataset) object: 
 
 ```{.python .input}
 dataset = task.Dataset('data/train')

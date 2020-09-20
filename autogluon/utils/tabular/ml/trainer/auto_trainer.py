@@ -14,6 +14,7 @@ class AutoTrainer(AbstractTrainer):
         return get_preset_models(path=self.path, problem_type=self.problem_type, eval_metric=self.eval_metric, stopping_metric=self.stopping_metric,
                                  num_classes=self.num_classes, hyperparameters=hyperparameters, hyperparameter_tune=hyperparameter_tune, level=level, extra_ag_args_fit=extra_ag_args_fit)
 
+    # TODO: rename to .fit for 0.1
     def train(self, X_train, y_train, X_val=None, y_val=None, hyperparameter_tune=True, feature_prune=False, holdout_frac=0.1, hyperparameters=None, ag_args_fit=None, excluded_model_types=None, **kwargs):
         if hyperparameters is None:
             hyperparameters = {}

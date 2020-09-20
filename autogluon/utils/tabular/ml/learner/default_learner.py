@@ -28,7 +28,7 @@ class DefaultLearner(AbstractLearner):
         self.trainer_type = trainer_type
 
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
-    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
             hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2,
             compression_fn=None, compression_fn_kwargs=None):
@@ -59,16 +59,16 @@ class DefaultLearner(AbstractLearner):
         logger.log(20, f'AutoGluon will save models to {self.path}')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
-        logger.log(20, f'Train Data Columns: {len(X.columns)}')
+        logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:
             logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
-            logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
+            logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_val, y_val, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
         self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, f'\tData preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
+        logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
         if time_limit:
             time_limit_trainer = time_limit - self.time_fit_preprocessing
         else:
@@ -76,11 +76,11 @@ class DefaultLearner(AbstractLearner):
 
         trainer = self.trainer_type(
             path=self.model_context,
-            problem_type=self.trainer_problem_type,
+            problem_type=self.label_cleaner.problem_type_transform,
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
-            feature_types_metadata=self.feature_generator.feature_types_metadata,
+            feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
             kfolds=num_bagging_folds,
             n_repeats=num_bagging_sets,
@@ -137,27 +137,22 @@ class DefaultLearner(AbstractLearner):
             X = augment_rare_classes(X, self.label, self.threshold)
 
         # Gets labels prior to removal of infrequent classes
-        y_uncleaned = X[self.label].copy()  # .astype('category').cat.categories
+        y_uncleaned = X[self.label].copy()
 
         self.cleaner = Cleaner.construct(problem_type=self.problem_type, label=self.label, threshold=self.threshold)
         # TODO: What if all classes in X are low frequency in multiclass? Currently we would crash. Not certain how many problems actually have this property
         X = self.cleaner.fit_transform(X)  # TODO: Consider merging cleaner into label_cleaner
-        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=X[self.label], y_uncleaned=y_uncleaned)
-        if (self.label_cleaner.num_classes is not None) and (self.label_cleaner.num_classes == 2):
-            self.trainer_problem_type = BINARY
-        else:
-            self.trainer_problem_type = self.problem_type
-
-        if self.label_cleaner.num_classes is not None:
-            logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
-
         X, y = self.extract_label(X)
+        self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
         y = self.label_cleaner.transform(y)
+
+        if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
+            logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
         if X_val is not None and self.label in X_val.columns:
             X_val = self.cleaner.transform(X_val)
             if len(X_val) == 0:
-                logger.debug('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
+                logger.warning('All X_val data contained low frequency classes, ignoring X_val and generating from subset of X')
                 X_val = None
                 y_val = None
             else:
@@ -166,17 +161,34 @@ class DefaultLearner(AbstractLearner):
         else:
             y_val = None
 
+        if self.id_columns:
+            logger.log(20, f'Dropping ID columns: {self.id_columns}')
+            X = X.drop(self.id_columns, axis=1, errors='ignore')
+            if X_val is not None:
+                X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
+
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
+        logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
             X_super = pd.concat([X, X_val], ignore_index=True)
-            X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X_super = self.feature_generator.transform(X_super)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X_super = self.feature_generator.fit_transform(X_super)
             X = X_super.head(len(X)).set_index(X.index)
             X_val = X_super.tail(len(X_val)).set_index(X_val.index)
             del X_super
         else:
-            X = self.feature_generator.fit_transform(X, banned_features=self.submission_columns, drop_duplicates=False)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X = self.feature_generator.transform(X)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X = self.feature_generator.fit_transform(X)
 
         return X, y, X_val, y_val, holdout_frac, num_bagging_folds
 

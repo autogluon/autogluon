@@ -38,14 +38,14 @@ class BaggedEnsembleModel(AbstractModel):
         self.save_bagged_folds = save_bagged_folds
 
         try:
-            feature_types_metadata = self.model_base.feature_types_metadata
+            feature_metadata = self.model_base.feature_metadata
         except:
-            feature_types_metadata = None
+            feature_metadata = None
 
         eval_metric = kwargs.pop('eval_metric', self.model_base.eval_metric)
         stopping_metric = kwargs.pop('stopping_metric', self.model_base.stopping_metric)
 
-        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_types_metadata=feature_types_metadata, **kwargs)
+        super().__init__(problem_type=self.model_base.problem_type, eval_metric=eval_metric, stopping_metric=stopping_metric, feature_metadata=feature_metadata, **kwargs)
 
     def is_valid(self):
         return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
@@ -113,7 +113,7 @@ class BaggedEnsembleModel(AbstractModel):
         model_base = self._get_model_base()
         if self.features is not None:
             model_base.features = self.features
-        model_base.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+        model_base.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
 
         if self.model_base is not None:
             self.save_model_base(self.model_base)
@@ -128,7 +128,7 @@ class BaggedEnsembleModel(AbstractModel):
             model_base.fit_time = time.time() - time_start_fit
             model_base.predict_time = None
             self._oof_pred_proba = model_base.predict_proba(X=X)  # TODO: Cheater value, will be overfit to valid set
-            self._oof_pred_model_repeats = np.ones(shape=len(X))
+            self._oof_pred_model_repeats = np.ones(shape=len(X), dtype=np.uint8)
             self._n_repeats = 1
             self._n_repeats_finished = 1
             self._k_per_n_repeat = [1]
@@ -148,12 +148,12 @@ class BaggedEnsembleModel(AbstractModel):
         kfolds = generate_kfold(X=X, y=y, n_splits=k_fold, stratified=self.is_stratified(), random_state=self._random_state, n_repeats=n_repeats)
 
         if self.problem_type == MULTICLASS:
-            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())))
+            oof_pred_proba = np.zeros(shape=(len(X), len(y.unique())), dtype=np.float32)
         elif self.problem_type == SOFTCLASS:
-            oof_pred_proba = np.zeros(shape=y.shape)
+            oof_pred_proba = np.zeros(shape=y.shape, dtype=np.float32)
         else:
             oof_pred_proba = np.zeros(shape=len(X))
-        oof_pred_model_repeats = np.zeros(shape=len(X))
+        oof_pred_model_repeats = np.zeros(shape=len(X), dtype=np.uint8)
 
         models = []
         folds_to_fit = fold_end - fold_start
@@ -239,15 +239,15 @@ class BaggedEnsembleModel(AbstractModel):
 
     # FIXME: Defective if model does not apply same preprocessing in all bags!
     #  No model currently violates this rule, but in future it could happen
-    def predict_proba(self, X, preprocess=True):
+    def predict_proba(self, X, preprocess=True, normalize=None):
         model = self.load_child(self.models[0])
         if preprocess:
             X = self.preprocess(X, model=model)
 
-        pred_proba = model.predict_proba(X=X, preprocess=False)
+        pred_proba = model.predict_proba(X=X, preprocess=False, normalize=normalize)
         for model in self.models[1:]:
             model = self.load_child(model)
-            pred_proba += model.predict_proba(X=X, preprocess=False)
+            pred_proba += model.predict_proba(X=X, preprocess=False, normalize=normalize)
         pred_proba = pred_proba / len(self.models)
 
         return pred_proba
@@ -262,7 +262,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     # TODO: Augment to generate OOF after shuffling each column in X (Batching), this is the fastest way.
     # Generates OOF predictions from pre-trained bagged models, assuming X and y are in the same row order as used in .fit(X, y)
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs):
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, is_oof=True, silent=False, **kwargs) -> pd.Series:
         feature_importance_fold_list = []
         fold_weights = []
         # TODO: Preprocess data here instead of repeatedly
@@ -278,7 +278,7 @@ class BaggedEnsembleModel(AbstractModel):
             for i, fold in enumerate(cur_kfolds):
                 _, test_index = fold
                 model = self.load_child(self.models[model_index + i])
-                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent)
+                feature_importance_fold = model.compute_feature_importance(X=X.iloc[test_index, :], y=y.iloc[test_index], features_to_use=features_to_use, preprocess=preprocess, silent=silent, **kwargs)
                 feature_importance_fold_list.append(feature_importance_fold)
                 fold_weights.append(len(test_index))
             model_index += k
@@ -316,17 +316,18 @@ class BaggedEnsembleModel(AbstractModel):
     def convert_to_refitfull_template(self):
         compressed_params = self._get_compressed_params()
         model_compressed = copy.deepcopy(self._get_model_base())
-        model_compressed.feature_types_metadata = self.feature_types_metadata  # TODO: Don't pass this here
+        model_compressed.feature_metadata = self.feature_metadata  # TODO: Don't pass this here
         model_compressed.params = compressed_params
         model_compressed.name = model_compressed.name + REFIT_FULL_SUFFIX
         model_compressed.set_contexts(self.path_root + model_compressed.name + os.path.sep)
         return model_compressed
 
-    def _get_compressed_params(self):
-        model_params_list = [
-            self.load_child(child).get_trained_params()
-            for child in self.models
-        ]
+    def _get_compressed_params(self, model_params_list=None):
+        if model_params_list is None:
+            model_params_list = [
+                self.load_child(child).get_trained_params()
+                for child in self.models
+            ]
 
         model_params_compressed = dict()
         for param in model_params_list[0].keys():
@@ -347,6 +348,13 @@ class BaggedEnsembleModel(AbstractModel):
             model_params_compressed[param] = compressed_val
         return model_params_compressed
 
+    def _get_compressed_params_trained(self):
+        model_params_list = [
+            self.load_child(child).params_trained
+            for child in self.models
+        ]
+        return self._get_compressed_params(model_params_list=model_params_list)
+
     def _get_model_base(self):
         if self.model_base is None:
             return self.load_model_base()
@@ -365,17 +373,13 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time += model.predict_time
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=True, low_memory=True, load_oof=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
-        path = path + file_prefix
-        load_path = path + cls.model_file_name
-        obj = load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
-        if reset_paths:
-            obj.set_contexts(path)
+    def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         if not low_memory:
-            obj.persist_child_models(reset_paths=reset_paths)
+            model.persist_child_models(reset_paths=reset_paths)
         if load_oof:
-            obj._load_oof()
-        return obj
+            model._load_oof()
+        return model
 
     @classmethod
     def load_oof(cls, path, verbose=True):
@@ -411,34 +415,28 @@ class BaggedEnsembleModel(AbstractModel):
     def save_model_base(self, model_base):
         save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, save_oof=True, verbose=True, save_children=False,
-             compression_fn=None, compression_fn_kwargs=None):
-        if directory is None:
-            directory = self.path
-        directory = directory + file_prefix
+    def save(self, path=None, verbose=True, save_oof=True, save_children=False, compression_fn=None, compression_fn_kwargs=None) -> str:
+        if path is None:
+            path = self.path
 
         if save_children:
             model_names = []
             for child in self.models:
                 child = self.load_child(child)
-                child.set_contexts(self.path + child.name + os.path.sep)
+                child.set_contexts(path + child.name + os.path.sep)
                 child.save(verbose=False)
                 model_names.append(child.name)
             self.models = model_names
 
-        file_name = directory + self.model_file_name
-
         if save_oof and self._oof_pred_proba is not None:
-            save_pkl.save(path=self.path + 'utils' + os.path.sep + self._oof_filename, object={
+            save_pkl.save(path=path + 'utils' + os.path.sep + self._oof_filename, object={
                     '_oof_pred_proba': self._oof_pred_proba,
                     '_oof_pred_model_repeats': self._oof_pred_model_repeats,
             }, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
-        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_fn=compression_fn,
-                      compression_fn_kwargs=compression_fn_kwargs)
-        if return_filename:
-            return file_name
+
+        return super().save(path=path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
 
     # If `remove_fit_stack=True`, variables will be removed that are required to fit more folds and to fit new stacker models which use this model as a base model.
     #  This includes OOF variables.
@@ -495,7 +493,7 @@ class BaggedEnsembleModel(AbstractModel):
             min_memory_size = info['memory_size'] - sum_memory_size_child + max_memory_size_child
 
         bagged_info = dict(
-            child_type=self._child_type.__name__,
+            child_model_type=self._child_type.__name__,
             num_child_models=len(self.models),
             child_model_names=self._get_model_names(),
             _n_repeats=self._n_repeats,
@@ -508,11 +506,25 @@ class BaggedEnsembleModel(AbstractModel):
             bagged_mode=self.bagged_mode,
             max_memory_size=max_memory_size,  # Memory used when all children are loaded into memory at once.
             min_memory_size=min_memory_size,  # Memory used when only the largest child is loaded into memory.
+            child_hyperparameters=self._get_model_base().params,
+            child_hyperparameters_fit = self._get_compressed_params_trained(),
+            child_AG_args_fit = self._get_model_base().params_aux,
         )
         info['bagged_info'] = bagged_info
         info['children_info'] = children_info
 
+        child_features_full = list(set().union(*[child['features'] for child in children_info.values()]))
+        info['features'] = child_features_full
+        info['num_features'] = len(child_features_full)
+
         return info
+
+    def get_memory_size(self):
+        models = self.models
+        self.models = None
+        memory_size = super().get_memory_size()
+        self.models = models
+        return memory_size
 
     def _get_child_info(self):
         child_info_dict = dict()

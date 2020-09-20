@@ -59,6 +59,30 @@ Tabular Prediction
       Using AutoGluon for Kaggle competitions with tabular data.
 
 
+Text Prediction
+---------------
+.. container:: cards
+
+   .. card::
+      :title: Quick Start Tutorial
+      :link: text_prediction/beginner.html
+
+      10 min tutorial on fitting prediction models with text in the dataset.
+
+   .. card::
+      :title: Customize Search Space and HPO
+      :link: text_prediction/customization.html
+
+      In-depth tutorial on learning how to customize the search space and try different
+      HPO algorithms.
+
+   .. card::
+      :title: Dealing with Mixed Data Types
+      :link: text_prediction/heterogeneous.html
+
+      Learning how to use AutoGluon to handle datasets with mixed data types.
+
+
 Tuning Custom Models
 --------------------
 .. container:: cards
@@ -119,6 +143,7 @@ Neural Architecture Search
    image_classification/index
    object_detection/index
    text_classification/index
+   text_prediction/index
    tabular_prediction/index
    customize/index
    nas/index

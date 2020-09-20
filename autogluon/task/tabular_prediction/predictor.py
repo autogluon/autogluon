@@ -31,13 +31,12 @@ class TabularPredictor(BasePredictor):
             What metric is used to evaluate predictive performance.
         label_column : str
             Name of table column that contains data from the variable to predict (often referred to as: labels, response variable, target variable, dependent variable, Y, etc).
-        feature_types : :class:`autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata`
+        feature_metadata : :class:`autogluon.utils.tabular.features.feature_metadata.FeatureMetadata`
             Inferred data type of each predictive variable after preprocessing transformation (i.e. column of training data table used to predict `label_column`).
-            Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime', 'text', 'text_ngram').
+            Contains both raw dtype and special dtype information. Each feature has exactly 1 raw dtype (such as 'int', 'float', 'category') and zero to many special dtypes (such as 'datetime_as_int', 'text', 'text_ngram').
             Special dtypes are AutoGluon specific feature types that are used to identify features with meaning beyond what the raw dtype can convey.
-                `feature_types.get_feature_types_raw_flattened()`: Dictionary of feature name -> raw dtype mappings.
-                `feature_types.feature_types_raw`: Dictionary of lists of raw feature names, grouped by raw feature dtype.
-                `feature_types.feature_types_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
+                `feature_metadata.type_map_raw`: Dictionary of feature name -> raw dtype mappings.
+                `feature_metadata.type_group_map_special`: Dictionary of lists of special feature names, grouped by special feature dtype.
         class_labels : list
             For multiclass problems, this list contains the class labels in sorted order of `predict_proba()` output.
             For binary problems, this list contains the class labels in sorted order of `predict_proba(as_multiclass=True)` output.
@@ -90,7 +89,7 @@ class TabularPredictor(BasePredictor):
         self.problem_type = self._learner.problem_type
         self.eval_metric = self._learner.eval_metric
         self.label_column = self._learner.label
-        self.feature_types = self._trainer.feature_types_metadata
+        self.feature_metadata = self._trainer.feature_metadata
         self.class_labels = self._learner.class_labels
         self.class_labels_internal = self._learner.label_cleaner.ordered_class_labels_transformed
         self.class_labels_internal_map = self._learner.label_cleaner.inv_map
@@ -105,7 +104,7 @@ class TabularPredictor(BasePredictor):
         logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
         return self._trainer.model_performance
 
-    def predict(self, dataset, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
+    def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
 
             Parameters
@@ -119,12 +118,6 @@ class TabularPredictor(BasePredictor):
                 Valid models are listed in this `predictor` by calling `predictor.get_model_names()`
             as_pandas : bool (optional)
                 Whether to return the output as a pandas Series (True) or numpy array (False)
-            use_pred_cache : bool (optional)
-                Whether to used previously-cached predictions for table rows we have already predicted on before
-                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them).
-            add_to_pred_cache : bool (optional)
-                Whether these predictions should be cached for reuse in future `predict()` calls on the same table rows
-                (can speedup repeated runs of `predict()` on multiple datasets with overlapping rows between them).
 
             Returns
             -------
@@ -132,10 +125,11 @@ class TabularPredictor(BasePredictor):
 
         """
         dataset = self.__get_dataset(dataset)
-        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas, use_pred_cache=use_pred_cache, add_to_pred_cache=add_to_pred_cache)
+        return self._learner.predict(X=dataset, model=model, as_pandas=as_pandas)
 
     def predict_proba(self, dataset, model=None, as_pandas=False, as_multiclass=False):
         """ Use trained models to produce predicted class probabilities rather than class-labels (if task is classification).
+            If `predictor.problem_type` is regression, this functions identically to `predict`, returning the same output.
 
             Parameters
             ----------
@@ -217,7 +211,7 @@ class TabularPredictor(BasePredictor):
         return self._learner.evaluate(y_true=y_true, y_pred=y_pred, silent=silent,
                                       auxiliary_metrics=auxiliary_metrics, detailed_report=detailed_report)
 
-    def leaderboard(self, dataset=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, dataset=None, extra_info=False, only_pareto_frontier=False, silent=False):
         """
             Output summary of information about models produced during fit() as a pandas DataFrame.
             Includes information on test and validation scores for all models, model training times, inference times, and stack levels.
@@ -233,6 +227,9 @@ class TabularPredictor(BasePredictor):
                 'fit_time_marginal': The fit time required to train the model (Ignoring base models).
                 'stack_level': The stack level of the model.
                     A model with stack level N can take any set of models with stack level less than N as input, with stack level 0 models having no model inputs.
+                'can_infer': If model is able to perform inference on new data. If False, then the model either was not saved, was deleted, or an ancestor of the model cannot infer.
+                    `can_infer` is often False when `save_bagged_folds=False` was specified in initial `task.fit`.
+                'fit_order': The order in which models were fit. The first model fit has `fit_order=1`, and the Nth model fit has `fit_order=N`. The order corresponds to the first child model fit in the case of bagged ensembles.
 
             Parameters
             ----------
@@ -245,12 +242,60 @@ class TabularPredictor(BasePredictor):
                     'pred_time_test_marginal': The inference time of the model for the dataset provided, minus the inference time for the model's base models, if it has any.
                         Note that this ignores the time required to load the model into memory when bagging is disabled.
                 If str is passed, `dataset` will be loaded using the str value as the file path.
-            only_pareto_frontier : bool (optional)
+            extra_info : bool, default = False
+                If `True`, will return extra columns with advanced info.
+                This requires additional computation as advanced info data is calculated on demand.
+                Additional output columns when `extra_info=True` include:
+                    'num_features': Number of input features used by the model.
+                    'num_models': Number of models that actually make up this "model" object.
+                        For non-bagged models, this is 1. For bagged models, this is equal to the number of child models (models trained on bagged folds) the bagged ensemble contains.
+                    'num_models_w_ancestors': Equivalent to the sum of 'num_models' values for the model and its' ancestors.
+                    'memory_size': The amount of memory in bytes the model requires when persisted in memory. This is not equivalent to the amount of memory the model may use during inference.
+                        For bagged models, this is the sum of the 'memory_size' of all child models.
+                    'memory_size_w_ancestors': Equivalent to the sum of 'memory_size' values for the model and its' ancestors.
+                        This is the amount of memory required to avoid loading any models in-between inference calls to get predictions from this model.
+                        For online-inference, this is critical. It is important that the machine performing online inference has memory more than twice this value to avoid loading models for every call to inference by persisting models in memory.
+                    'memory_size_min': The amount of memory in bytes the model minimally requires to perform inference.
+                        For non-bagged models, this is equivalent to 'memory_size'.
+                        For bagged models, this is equivalent to the largest child model's 'memory_size_min'.
+                        To minimize memory usage, child models can be loaded and un-persisted one by one to infer. This is the default behavior if a bagged model was not already persisted in memory prior to inference.
+                    'memory_size_min_w_ancestors': Equivalent to the max of the 'memory_size_min' values for the model and its' ancestors.
+                        This is the minimum required memory to infer with the model by only loading one model at a time, as each of its ancestors will also have to be loaded into memory.
+                        For offline-inference where latency is not a concern, this should be used to determine the required memory for a machine if 'memory_size_w_ancestors' is too large.
+                    'num_ancestors': Number of ancestor models for the given model.
+                    'num_descendants': Number of descendant models for the given model.
+                    'model_type': The model type. If the model is an ensemble type, 'child_model_type' will indicate the inner model type. A stack ensemble of bagged LightGBM models would have 'StackerEnsembleModel' as its model type.
+                    'child_model_type': The child model type. None if the model is not an ensemble. A stack ensemble of bagged LightGBM models would have 'LGBModel' as its child type.
+                        child models are models which are used as a group to generate a given bagged ensemble model's predictions. These are the models trained on each fold of a bagged ensemble.
+                        For 10-fold bagging, the bagged ensemble model would have 10 child models.
+                        For 10-fold bagging with 3 repeats, the bagged ensemble model would have 30 child models.
+                        Note that child models are distinct from ancestors and descendants.
+                    'hyperparameters': The input hyperparameters to the model.
+                    'hyperparameters_fit': The hyperparameters set by the model during fit. This overrides the 'hyperparameters' value for a particular key if present in 'hyperparameters_fit' to determine the fit model's final hyperparameters.
+                        This is most commonly set for hyperparameters that indicate model training iterations or epochs, as early stopping can find a different value from what 'hyperparameters' indicated.
+                        In these cases, the provided hyperparameter in 'hyperparameters' is used as a maximum for the model, but the model is still able to early stop at a smaller value during training to achieve a better validation score or to satisfy time constraints.
+                        For example, if a NN model was given `epochs=500` as a hyperparameter, but found during training that `epochs=60` resulted in optimal validation score, it would use `epoch=60` and `hyperparameters_fit={'epoch': 60}` would be set.
+                    'AG_args_fit': Special AutoGluon arguments that influence model fit. See the documentation of the `hyperparameters` argument in `task.fit` for more information.
+                    'features': List of feature names used by the model.
+                    'child_hyperparameters': Equivalent to 'hyperparameters', but for the model's children.
+                    'child_hyperparameters_fit': Equivalent to 'hyperparameters_fit', but for the model's children.
+                    'child_AG_args_fit': Equivalent to 'AG_args_fit', but for the model's children.
+                    'ancestors': The model's ancestors. Ancestor models are the models which are required to make predictions during the construction of the model's input features.
+                        If A is an ancestor of B, then B is a descendant of A.
+                        If a model's ancestor is deleted, the model is no longer able to infer on new data, and its 'can_infer' value will be False.
+                        A model can only have ancestor models whose 'stack_level' are lower than itself.
+                        'stack_level'=0 models have no ancestors.
+                    'descendants': The model's descendants. Descendant models are the models which require this model to make predictions during the construction of their input features.
+                        If A is a descendant of B, then B is an ancestor of A.
+                        If this model is deleted, then all descendant models will no longer be able to infer on new data, and their 'can_infer' values will be False.
+                        A model can only have descendant models whose 'stack_level' are higher than itself.
+
+            only_pareto_frontier : bool, default = False
                 If `True`, only return model information of models in the Pareto frontier of the accuracy/latency trade-off (models which achieve the highest score within their end-to-end inference time).
                 At minimum this will include the model with the highest score and the model with the lowest inference time.
                 This is useful when deciding which model to use during inference if inference time is a consideration.
                 Models filtered out by this process would never be optimal choices for a user that only cares about model inference time and score.
-            silent : bool (optional)
+            silent : bool, default = False
                 Should leaderboard DataFrame be printed?
 
             Returns
@@ -258,7 +303,7 @@ class TabularPredictor(BasePredictor):
             Pandas `pandas.DataFrame` of model performance summary information.
         """
         dataset = self.__get_dataset(dataset) if dataset is not None else dataset
-        return self._learner.leaderboard(X=dataset, only_pareto_frontier=only_pareto_frontier, silent=silent)
+        return self._learner.leaderboard(X=dataset, extra_info=extra_info, only_pareto_frontier=only_pareto_frontier, silent=silent)
 
     def fit_summary(self, verbosity=3):
         """
@@ -341,20 +386,24 @@ class TabularPredictor(BasePredictor):
             # TODO: uncomment once feature_prune is functional:  self._summarize('feature_prune', 'feature-selection used', results)
             print("User-specified hyperparameters:")
             print(results['hyperparameters_userspecified'])
+            print("Feature Metadata (Processed):")
+            print("(raw dtype, special dtypes):")
+            print(self.feature_metadata)
         if verbosity > 1:  # create plots
             plot_tabular_models(results, output_directory=self.output_directory,
                                 save_file="SummaryOfModels.html",
                                 plot_title="Models produced during fit()")
             if hpo_used:
                 for model_type in results['hpo_results']:
-                    plot_summary_of_models(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
-                        plot_title=f"Models produced during {model_type} HPO")
-                    plot_performance_vs_trials(
-                        results['hpo_results'][model_type],
-                        output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
-                        plot_title=f"HPO trials for {model_type} models")
+                    if 'trial_info' in results['hpo_results'][model_type]:
+                        plot_summary_of_models(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOmodelsummary.html",
+                            plot_title=f"Models produced during {model_type} HPO")
+                        plot_performance_vs_trials(
+                            results['hpo_results'][model_type],
+                            output_directory=self.output_directory, save_file=model_type + "_HPOperformanceVStrials.png",
+                            plot_title=f"HPO trials for {model_type} models")
         if verbosity > 2:  # print detailed information
             if hpo_used:
                 hpo_results = results['hpo_results']
@@ -570,6 +619,52 @@ class TabularPredictor(BasePredictor):
             raise AssertionError('No dataset was provided and there is no cached data to load for feature importance calculation. `cache_data=True` must be set in the `TabularPrediction.fit()` call to enable this functionality when dataset is not specified.')
 
         return self._learner.get_feature_importance(model=model, X=dataset, features=features, feature_stage=feature_stage, subsample_size=subsample_size, silent=silent)
+
+    def persist_models(self, models='best', with_ancestors=True, max_memory=0.1) -> list:
+        """
+        Persist models in memory for reduced inference latency. This is particularly important if the models are being used for online-inference where low latency is critical.
+        If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'best'
+            Model names of models to persist.
+            If 'best' then the model with the highest validation score is persisted (this is the model used for prediction by default).
+            If 'all' then all models are persisted.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names()`.
+        with_ancestors : bool, default = True
+            If True, all ancestor models of the provided models will also be persisted.
+            If False, stacker models will not have the models they depend on persisted unless those models were specified in `models`. This will slow down inference as the ancestor models will still need to be loaded from disk for each predict call.
+            Only relevant for stacker models.
+        max_memory : float, default = 0.1
+            Proportion of total available memory to allow for the persisted models to use.
+            If the models' summed memory usage requires a larger proportion of memory than max_memory, they are not persisted. In this case, the output will be an empty list.
+            If None, then models are persisted regardless of estimated memory usage. This can cause out-of-memory errors.
+
+        Returns
+        -------
+        List of persisted model names.
+        """
+        return self._learner.persist_trainer(low_memory=False, models=models, with_ancestors=with_ancestors, max_memory=max_memory)
+
+    def unpersist_models(self, models='all') -> list:
+        """
+        Unpersist models in memory for reduced memory usage.
+        If models are not persisted in memory, they are loaded from disk every time they are asked to make predictions.
+        Note: Another way to reset the predictor and unpersist models is to reload the predictor from disk via `predictor = TabularPredictor.load(predictor.output_directory)`.
+
+        Parameters
+        ----------
+        models : list of str or str, default = 'all'
+            Model names of models to unpersist.
+            If 'all' then all models are unpersisted.
+            Valid models are listed in this `predictor` by calling `predictor.get_model_names_persisted()`.
+
+        Returns
+        -------
+        List of unpersisted model names.
+        """
+        return self._learner.load_trainer().unpersist_models(model_names=models)
 
     def refit_full(self, model='all'):
         """
@@ -903,6 +998,10 @@ class TabularPredictor(BasePredictor):
     def get_model_names(self):
         """Returns the list of model names trained in this `predictor` object."""
         return self._trainer.get_model_names_all()
+
+    def get_model_names_persisted(self):
+        """Returns the list of model names which are persisted in memory."""
+        return list(self._learner.load_trainer().models.keys())
 
     def distill(self, train_data=None, tuning_data=None, augmentation_data=None, time_limits=None, hyperparameters=None, holdout_frac=None,
                 teacher_preds='soft', augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}, models_name_suffix=None, verbosity=None):

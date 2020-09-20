@@ -13,12 +13,11 @@ stage("Unit Test") {
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        pip install --force-reinstall --upgrade gluonnlp==0.8.1
-        pip install --upgrade --force-reinstall -e .
-        pip install pytest
+        python3 -m pip install --upgrade --force-reinstall -e .
+        python3 -m pip install pytest
         python3 -m pytest --junitxml=results.xml --runslow tests
         """
       }
@@ -39,12 +38,11 @@ stage("Build Docs") {
         conda list
         export CUDA_VISIBLE_DEVICES=${VISIBLE_GPU}
         env
-        export LD_LIBRARY_PATH=/usr/local/cuda-10.0/lib64
+        export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export AG_DOCS=1
         git clean -fx
-        pip install git+https://github.com/zhanghang1989/d2l-book
-        pip install --force-reinstall --upgrade gluonnlp==0.8.1
-        pip install --upgrade --force-reinstall -e .
+        python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
+        python3 -m pip install --upgrade --force-reinstall -e .
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200

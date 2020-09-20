@@ -1,9 +1,7 @@
 from mxnet import gluon
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction, \
-    Matern52, ExponentialDecayResourcesKernelFunction, \
-    ExponentialDecayResourcesMeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.warping import WarpedKernel, Warping
+from ..gpmxnet.kernel import KernelFunction, Matern52, ExponentialDecayResourcesKernelFunction, ExponentialDecayResourcesMeanFunction
+from ..gpmxnet.warping import WarpedKernel, Warping
 
 
 def resource_kernel_factory(

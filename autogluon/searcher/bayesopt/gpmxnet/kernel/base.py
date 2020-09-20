@@ -2,16 +2,11 @@ import mxnet as mx
 from mxnet import gluon
 from abc import abstractmethod
 
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding, \
-    register_parameter
-from autogluon.searcher.bayesopt.gpmxnet.distribution import Uniform, LogNormal
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
-    INITIAL_COVARIANCE_SCALE, INITIAL_INVERSE_BANDWIDTHS, DEFAULT_ENCODING, \
-    INVERSE_BANDWIDTHS_LOWER_BOUND, INVERSE_BANDWIDTHS_UPPER_BOUND,\
-    COVARIANCE_SCALE_LOWER_BOUND, COVARIANCE_SCALE_UPPER_BOUND, NUMERICAL_JITTER
-from autogluon.searcher.bayesopt.gpmxnet.mean import MeanFunction
+from ..constants import INITIAL_COVARIANCE_SCALE, INITIAL_INVERSE_BANDWIDTHS, DEFAULT_ENCODING, INVERSE_BANDWIDTHS_LOWER_BOUND, INVERSE_BANDWIDTHS_UPPER_BOUND, COVARIANCE_SCALE_LOWER_BOUND, COVARIANCE_SCALE_UPPER_BOUND, NUMERICAL_JITTER
+from ..distribution import Uniform, LogNormal
+from ..gluon_blocks_helpers import encode_unwrap_parameter
+from ..mean import MeanFunction
+from ..utils import create_encoding, register_parameter
 
 __all__ = ['KernelFunction', 'Matern52']
 

@@ -16,12 +16,12 @@ from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
-from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
+from ..abstract.abstract_model import AbstractModel
+from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....utils.savers import save_pkl
 from .....try_import import try_import_lightgbm
 from ......core import Int, Space
-
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -136,8 +136,15 @@ class LGBModel(AbstractModel):
         # Train LightGBM model:
         try_import_lightgbm()
         import lightgbm as lgb
-        self.model = lgb.train(**train_params)
-        self.params_trained['num_boost_round'] = self.model.best_iteration
+        with warnings.catch_warnings():
+            # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+            warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+            warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+            self.model = lgb.train(**train_params)
+        if dataset_val is not None:
+            self.params_trained['num_boost_round'] = self.model.best_iteration
+        else:
+            self.params_trained['num_boost_round'] = self.model.current_iteration()
 
     def _predict_proba(self, X, preprocess=True):
         if preprocess:
@@ -315,12 +322,14 @@ class LGBModel(AbstractModel):
         return self._get_hpo_results(scheduler=scheduler, scheduler_options=scheduler_options, time_start=time_start)
 
     # TODO: Consider adding _internal_feature_map functionality to abstract_model
-    def compute_feature_importance(self, **kwargs):
-        permutation_importance = super().compute_feature_importance(**kwargs)
+    def compute_feature_importance(self, **kwargs) -> pd.Series:
+        feature_importances = super().compute_feature_importance(**kwargs)
         if self._internal_feature_map is not None:
             inverse_internal_feature_map = {i: feature for feature, i in self._internal_feature_map.items()}
-            permutation_importance = {inverse_internal_feature_map[i]: importance for i, importance in permutation_importance.items()}
-        return permutation_importance
+            feature_importances = {inverse_internal_feature_map[i]: importance for i, importance in feature_importances.items()}
+            feature_importances = pd.Series(data=feature_importances)
+            feature_importances = feature_importances.sort_values(ascending=False)
+        return feature_importances
 
     def _get_train_loss_name(self):
         if self.problem_type == BINARY:

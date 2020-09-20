@@ -5,8 +5,9 @@ import functools
 def unpack(g):
     def _unpack_inner(f):
         @functools.wraps(f)
-        def _call(**kwargs):
-            return f(**g(**kwargs))
+        def _call(*args, **kwargs):
+            gargs, gkwargs = g(*args, **kwargs)
+            return f(*gargs, **gkwargs)
         return _call
     return _unpack_inner
 
@@ -48,7 +49,7 @@ preset_dict = dict(
 )
 
 
-def set_presets(**kwargs):
+def set_presets(*args, **kwargs):
     if 'presets' in kwargs:
         presets = kwargs['presets']
         if presets is None:
@@ -70,4 +71,4 @@ def set_presets(**kwargs):
         for key in preset_kwargs:
             if key not in kwargs:
                 kwargs[key] = preset_kwargs[key]
-    return kwargs
+    return args, kwargs

@@ -20,22 +20,23 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, QuantileTransformer, FunctionTransformer  # PowerTransformer
 
-from ......core import Space
-from ......utils import try_import_mxboard
-from ....utils.loaders import load_pkl
-from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
-from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
-from ....metrics import log_loss, roc_auc
 from .categorical_encoders import OneHotMergeRaresHandleUnknownEncoder, OrdinalMergeRaresHandleUnknownEncoder
-from .tabular_nn_dataset import TabularNNDataset
 from .embednet import EmbedNet
-from .tabular_nn_trial import tabular_nn_trial
 from .hyperparameters.parameters import get_default_param
 from .hyperparameters.searchspaces import get_default_searchspace
+from .tabular_nn_dataset import TabularNNDataset
+from .tabular_nn_trial import tabular_nn_trial
+from ..abstract.abstract_model import AbstractModel
+from ..utils import fixedvals_from_searchspaces
+from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
+from ....features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
+from ....metrics import log_loss, roc_auc
+from ......core import Space
+from ......utils import try_import_mxboard
 
-warnings.filterwarnings("ignore", module='sklearn.preprocessing') # sklearn processing n_quantiles warning
+warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning
 logger = logging.getLogger(__name__)
-EPS = 1e-10 # small number
+EPS = 1e-10  # small number
 
 
 # TODO: Gets stuck after infering feature types near infinitely in nyc-jiashenliu-515k-hotel-reviews-data-in-europe dataset, 70 GB of memory, c5.9xlarge
@@ -104,7 +105,7 @@ class TabularNeuralNetModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_feature_types_special=['text_ngram', 'text_as_category'],
+            ignored_type_group_special=['text_ngram', 'text_as_category'],
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -125,11 +126,11 @@ class TabularNeuralNetModel(AbstractModel):
                 max_y = float(max(y_vals))
                 std_y = np.std(y_vals)
                 y_ext = params['y_range_extend'] * std_y
-                if min_y >= 0: # infer y must be nonnegative
+                if min_y >= 0:  # infer y must be nonnegative
                     min_y = max(0, min_y-y_ext)
                 else:
                     min_y = min_y-y_ext
-                if max_y <= 0: # infer y must be non-positive
+                if max_y <= 0:  # infer y must be non-positive
                     max_y = min(0, max_y+y_ext)
                 else:
                     max_y = max_y+y_ext
@@ -141,9 +142,9 @@ class TabularNeuralNetModel(AbstractModel):
 
         if params['layers'] is None:  # Use default choices for MLP architecture
             if self.problem_type == REGRESSION:
-                default_layer_sizes = [256, 128] # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
+                default_layer_sizes = [256, 128]  # overall network will have 4 layers. Input layer, 256-unit hidden layer, 128-unit hidden layer, output layer.
             else:
-                default_sizes = [256, 128] # will be scaled adaptively
+                default_sizes = [256, 128]  # will be scaled adaptively
                 # base_size = max(1, min(self.num_net_outputs, 20)/2.0) # scale layer width based on number of classes
                 base_size = max(1, min(self.num_net_outputs, 100) / 50)  # TODO: Updated because it improved model quality and made training far faster
                 default_layer_sizes = [defaultsize*base_size for defaultsize in default_sizes]
@@ -158,7 +159,7 @@ class TabularNeuralNetModel(AbstractModel):
         if train_dataset.has_vector_features() and params['numeric_embed_dim'] is None:
             # Use default choices for numeric embedding size
             vector_dim = train_dataset.dataset._data[train_dataset.vectordata_index].shape[1]  # total dimensionality of vector features
-            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features) # Fraction of features that are numeric
+            prop_vector_features = train_dataset.num_vector_features() / float(train_dataset.num_features)  # Fraction of features that are numeric
             min_numeric_embed_dim = 32
             max_numeric_embed_dim = params['max_layer_width']
             params['numeric_embed_dim'] = int(min(max_numeric_embed_dim, max(min_numeric_embed_dim,
@@ -176,8 +177,8 @@ class TabularNeuralNetModel(AbstractModel):
         params = self.params.copy()
         self.verbosity = kwargs.get('verbosity', 2)
         params = fixedvals_from_searchspaces(params)
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         # print('features: ', self.features)
         if 'num_cpus' in kwargs:
             self.num_dataloading_workers = max(1, int(kwargs['num_cpus']/2.0))
@@ -262,6 +263,7 @@ class TabularNeuralNetModel(AbstractModel):
         best_val_metric = -np.inf  # higher = better
         val_metric = None
         best_val_epoch = 0
+        val_improve_epoch = 0  # most recent epoch where validation-score strictly improved
         num_epochs = params['num_epochs']
         if val_dataset is not None:
             y_val = val_dataset.get_labels()
@@ -334,11 +336,12 @@ class TabularNeuralNetModel(AbstractModel):
                 cumulative_loss += loss.sum()
             train_loss = cumulative_loss/float(train_dataset.num_examples)  # training loss this epoch
             if val_dataset is not None:
-                # val_metric = self.evaluate_metric(test_dataset)  # Evaluate after each epoch
                 val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if (val_dataset is None) or (val_metric >= best_val_metric) or (e == 0):  # keep training if score has improved
                 if val_dataset is not None:
                     if not np.isnan(val_metric):
+                        if val_metric > best_val_metric:
+                            val_improve_epoch = e
                         best_val_metric = val_metric
                 best_val_epoch = e
                 # Until functionality is added to restart training from a particular epoch, there is no point in saving params without test_dataset
@@ -361,8 +364,8 @@ class TabularNeuralNetModel(AbstractModel):
                 if val_dataset is not None and (not np.isnan(val_metric)):  # TODO: This might work without the if statement
                     # epoch must be number of epochs done (starting at 1)
                     reporter(epoch=e+1, validation_performance=val_metric, train_loss=float(train_loss.asscalar()))  # Higher val_metric = better
-            if e - best_val_epoch > epochs_wo_improve:
-                break
+            if e - val_improve_epoch > epochs_wo_improve:
+                break  # early-stop if validation-score hasn't strictly improved in `epochs_wo_improve` consecutive epochs
             if time_limit:
                 time_elapsed = time.time() - start_time
                 time_left = time_limit - time_elapsed
@@ -378,13 +381,13 @@ class TabularNeuralNetModel(AbstractModel):
                 pass
         if val_dataset is None:
             logger.log(15, "Best model found in epoch %d" % best_val_epoch)
-        else: # evaluate one final time:
+        else:  # evaluate one final time:
             final_val_metric = self.score(X=val_dataset, y=y_val, eval_metric=self.stopping_metric, metric_needs_y_pred=self.stopping_metric_needs_y_pred)
             if np.isnan(final_val_metric):
                 final_val_metric = -np.inf
             logger.log(15, "Best model found in epoch %d. Val %s: %s" %
                   (best_val_epoch, self.eval_metric_name, final_val_metric))
-        self.params_trained['num_epochs'] = best_val_epoch
+        self.params_trained['num_epochs'] = best_val_epoch + 1
         return
 
     def _predict_proba(self, X, preprocess=True):
@@ -507,15 +510,15 @@ class TabularNeuralNetModel(AbstractModel):
         if len(labels) != len(df):
             raise ValueError("Number of examples in Dataframe does not match number of labels")
 
-        self.types_of_features = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features) # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
+        self.types_of_features = self._get_types_of_features(df, skew_threshold=skew_threshold, embed_min_categories=embed_min_categories, use_ngram_features=use_ngram_features)  # dict with keys: : 'continuous', 'skewed', 'onehot', 'embed', 'language', values = column-names of df
         df = df[self.features]
         logger.log(15, "AutoGluon Neural Network infers features are of the following types:")
         logger.log(15, json.dumps(self.types_of_features, indent=4))
         logger.log(15, "\n")
         self.processor = self._create_preprocessor(impute_strategy=impute_strategy, max_category_levels=max_category_levels)
         df = self.processor.fit_transform(df) # 2D numpy array
-        self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels) # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
-        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map]) # should match number of columns in processed array
+        self.feature_arraycol_map = self._get_feature_arraycol_map(max_category_levels=max_category_levels)  # OrderedDict of feature-name -> list of column-indices in df corresponding to this feature
+        num_array_cols = np.sum([len(self.feature_arraycol_map[key]) for key in self.feature_arraycol_map])  # should match number of columns in processed array
         # print("self.feature_arraycol_map", self.feature_arraycol_map)
         # print("num_array_cols", num_array_cols)
         # print("df.shape",df.shape)
@@ -523,7 +526,7 @@ class TabularNeuralNetModel(AbstractModel):
             raise ValueError("Error during one-hot encoding data processing for neural network. Number of columns in df array does not match feature_arraycol_map.")
 
         # print(self.feature_arraycol_map)
-        self.feature_type_map = self._get_feature_type_map() # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
+        self.feature_type_map = self._get_feature_type_map()  # OrderedDict of feature-name -> feature_type string (options: 'vector', 'embed', 'language')
         # print(self.feature_type_map)
         return TabularNNDataset(df, self.feature_arraycol_map, self.feature_type_map,
                                 batch_size=batch_size, num_dataloading_workers=num_dataloading_workers,
@@ -573,10 +576,10 @@ class TabularNeuralNetModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabularNeuralNetModel, but previously already did this.")
 
-        feature_types = self.feature_types_metadata.feature_types_raw
+        feature_types = self.feature_metadata.get_type_group_map_raw()
 
-        categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
-        continuous_featnames = feature_types['float'] + feature_types['int']  # + self.__get_feature_type_if_present('datetime')
+        categorical_featnames = feature_types[R_CATEGORY] + feature_types[R_OBJECT] + feature_types['bool']
+        continuous_featnames = feature_types[R_FLOAT] + feature_types[R_INT]  # + self.__get_feature_type_if_present('datetime')
         language_featnames = [] # TODO: not implemented. This should fetch text features present in the data
         valid_features = categorical_featnames + continuous_featnames + language_featnames
         if len(categorical_featnames) + len(continuous_featnames) + len(language_featnames) != df.shape[1]:
@@ -591,7 +594,7 @@ class TabularNeuralNetModel(AbstractModel):
         # skewed = features to which we will apply power (ie. log / box-cox) transform before normalization
         # onehot = features to one-hot encode (unknown categories for these features encountered at test-time are encoded as all zeros). We one-hot encode any features encountered that only have two unique values.
         for feature in self.features:
-            feature_data = df[feature] # pd.Series
+            feature_data = df[feature]  # pd.Series
             num_unique_vals = len(feature_data.unique())
             if num_unique_vals == 2:  # will be onehot encoded regardless of proc.embed_min_categories value
                 types_of_features['onehot'].append(feature)
@@ -601,7 +604,7 @@ class TabularNeuralNetModel(AbstractModel):
                 else:
                     types_of_features['continuous'].append(feature)
             elif feature in categorical_featnames:
-                if num_unique_vals >= embed_min_categories: # sufficiently many categories to warrant learned embedding dedicated to this feature
+                if num_unique_vals >= embed_min_categories:  # sufficiently many categories to warrant learned embedding dedicated to this feature
                     types_of_features['embed'].append(feature)
                 else:
                     types_of_features['onehot'].append(feature)
@@ -611,8 +614,8 @@ class TabularNeuralNetModel(AbstractModel):
 
     def _get_feature_arraycol_map(self, max_category_levels):
         """ Returns OrderedDict of feature-name -> list of column-indices in processed data array corresponding to this feature """
-        feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language']) # these transforms do not alter dimensionality of feature
-        feature_arraycol_map = {} # unordered version
+        feature_preserving_transforms = set(['continuous','skewed', 'ordinal', 'language'])  # these transforms do not alter dimensionality of feature
+        feature_arraycol_map = {}  # unordered version
         current_colindex = 0
         for transformer in self.processor.transformers_:
             transformer_name = transformer[0]
@@ -665,7 +668,7 @@ class TabularNeuralNetModel(AbstractModel):
         onehot_features = self.types_of_features['onehot']
         embed_features = self.types_of_features['embed']
         language_features = self.types_of_features['language']
-        transformers = [] # order of various column transformers in this list is important!
+        transformers = []  # order of various column transformers in this list is important!
         if len(continuous_features) > 0:
             continuous_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy=impute_strategy)),
@@ -674,7 +677,7 @@ class TabularNeuralNetModel(AbstractModel):
         if len(skewed_features) > 0:
             power_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy=impute_strategy)),
-                ('quantile', QuantileTransformer(output_distribution='normal')) ]) # Or output_distribution = 'uniform'
+                ('quantile', QuantileTransformer(output_distribution='normal')) ])  # Or output_distribution = 'uniform'
                 # TODO: remove old code: ('power', PowerTransformer(method=self.params['proc.power_transform_method'])) ])
             transformers.append( ('skewed', power_transformer, skewed_features) )
         if len(onehot_features) > 0:
@@ -682,72 +685,57 @@ class TabularNeuralNetModel(AbstractModel):
                 # TODO: Consider avoiding converting to string for improved memory efficiency
                 ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))]) # test-time unknown values will be encoded as all zeros vector
+                ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
             transformers.append( ('onehot', onehot_transformer, onehot_features) )
-        if len(embed_features) > 0: # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
+        if len(embed_features) > 0:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
             ordinal_transformer = Pipeline(steps=[
                 ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
-                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))]) # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
+                ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
             transformers.append( ('ordinal', ordinal_transformer, embed_features) )
         if len(language_features) > 0:
             raise NotImplementedError("language_features cannot be used at the moment")
-        return ColumnTransformer(transformers=transformers) # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
+        return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_fn=None,
-             compression_fn_kwargs=None):
-        """ file_prefix (str): Appended to beginning of file-name (does not affect directory in file-path).
-            directory (str): if unspecified, use self.path as directory
-            return_filename (bool): return the file-name corresponding to this save
-        """
-        if directory is not None:
-            path = directory + file_prefix
-        else:
-            path = self.path + file_prefix
-
-        params_filepath = path + self.params_file_name
-        # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    def save(self, path: str = None, verbose=True, compression_fn=None, compression_fn_kwargs=None) -> str:
         if self.model is not None:
-            self.model.save_parameters(params_filepath)
             self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
         temp_sw = self.summary_writer
         self.model = None
         self.summary_writer = None
-        modelobj_filepath = super().save(file_prefix=file_prefix, directory=directory, return_filename=True, verbose=verbose, compression_fn=compression_fn,
-             compression_fn_kwargs=compression_fn_kwargs)
+        path_final = super().save(path=path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
         self.model = temp_model
         self.summary_writer = temp_sw
         self._architecture_desc = None
-        if return_filename:
-            return modelobj_filepath
+
+        # Export model
+        if self.model is not None:
+            params_filepath = path_final + self.params_file_name
+            # TODO: Don't use os.makedirs here, have save_parameters function in tabular_nn_model that checks if local path or S3 path
+            os.makedirs(os.path.dirname(path_final), exist_ok=True)
+            self.model.save_parameters(params_filepath)
+        return path_final
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
-        """ file_prefix (str): Appended to beginning of file-name.
-            If you want to load files with given prefix, can also pass arg: path = directory+file_prefix
-        """
-        path = path + file_prefix
-        obj: TabularNeuralNetModel = load_pkl.load(path=path + cls.model_file_name, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
-        if reset_paths:
-            obj.set_contexts(path)
-        if obj._architecture_desc is not None:
-            obj.model = EmbedNet(architecture_desc=obj._architecture_desc, ctx=obj.ctx)  # recreate network from architecture description
-            obj._architecture_desc = None
+    def load(cls, path: str, reset_paths=True, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+        model: TabularNeuralNetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+        if model._architecture_desc is not None:
+            model.model = EmbedNet(architecture_desc=model._architecture_desc, ctx=model.ctx)  # recreate network from architecture description
+            model._architecture_desc = None
             # TODO: maybe need to initialize/hybridize??
-            obj.model.load_parameters(path + cls.params_file_name, ctx=obj.ctx)
-            obj.summary_writer = None
-        return obj
+            model.model.load_parameters(model.path + model.params_file_name, ctx=model.ctx)
+            model.summary_writer = None
+        return model
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options, **kwargs):
         time_start = time.time()
         """ Performs HPO and sets self.params to best hyperparameter values """
         self.verbosity = kwargs.get('verbosity', 2)
         logger.log(15, "Beginning hyperparameter tuning for Neural Network...")
-        self._set_default_searchspace() # changes non-specified default hyperparams from fixed values to search-spaces.
-        if self.feature_types_metadata is None:
-            raise ValueError("Trainer class must set feature_types_metadata for this model")
+        self._set_default_searchspace()  # changes non-specified default hyperparams from fixed values to search-spaces.
+        if self.feature_metadata is None:
+            raise ValueError("Trainer class must set feature_metadata for this model")
         scheduler_func = scheduler_options[0]
         scheduler_options = scheduler_options[1]
         if scheduler_func is None or scheduler_options is None:

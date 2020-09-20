@@ -24,11 +24,13 @@ import numpy as np
 import mxnet as mx
 from random import seed
 
+from networkx.exception import NetworkXError
 import pytest
 
 import autogluon as ag
 from autogluon import TabularPrediction as task
 from autogluon.utils.tabular.ml.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.task.tabular_prediction.predictor import TabularPredictor
 
 
 def test_tabular():
@@ -83,7 +85,11 @@ def test_advanced_functionality():
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = task.fit(train_data=train_data, label=label, output_directory=savedir)
     leaderboard = predictor.leaderboard(dataset=test_data)
-    assert(set(predictor.get_model_names()) == set(leaderboard['model']))
+    leaderboard_extra = predictor.leaderboard(dataset=test_data, extra_info=True)
+    assert set(predictor.get_model_names()) == set(leaderboard['model'])
+    assert set(predictor.get_model_names()) == set(leaderboard_extra['model'])
+    assert set(leaderboard_extra.columns).issuperset(set(leaderboard.columns))
+    assert len(leaderboard) == len(leaderboard_extra)
     num_models = len(predictor.get_model_names())
     feature_importances = predictor.feature_importance(dataset=test_data)
     original_features = set(train_data.columns)
@@ -92,6 +98,32 @@ def test_advanced_functionality():
     predictor.transform_features()
     predictor.transform_features(dataset=test_data)
     predictor.info()
+
+    assert predictor.get_model_names_persisted() == []  # Assert that no models were persisted during training
+    assert predictor.unpersist_models() == []  # Assert that no models were unpersisted
+
+    persisted_models = predictor.persist_models(models='all', max_memory=None)
+    assert set(predictor.get_model_names_persisted()) == set(persisted_models)  # Ensure all models are persisted
+    assert predictor.persist_models(models='all', max_memory=None) == []  # Ensure that no additional models are persisted on repeated calls
+    unpersised_models = predictor.unpersist_models()
+    assert set(unpersised_models) == set(persisted_models)
+    assert predictor.get_model_names_persisted() == []  # Assert that all models were unpersisted
+
+    # Raise exception
+    with pytest.raises(NetworkXError):
+        predictor.persist_models(models=['UNKNOWN_MODEL_1', 'UNKNOWN_MODEL_2'])
+
+    assert predictor.get_model_names_persisted() == []
+
+    assert predictor.unpersist_models(models=['UNKNOWN_MODEL_1', 'UNKNOWN_MODEL_2']) == []
+
+    predictor.persist_models(models='all', max_memory=None)
+    predictor.save()  # Save predictor while models are persisted: Intended functionality is that they won't be persisted when loaded.
+    predictor_loaded = TabularPredictor.load(output_directory=predictor.output_directory)  # Assert that predictor loading works
+    leaderboard_loaded = predictor_loaded.leaderboard(dataset=test_data)
+    assert len(leaderboard) == len(leaderboard_loaded)
+    assert predictor_loaded.get_model_names_persisted() == []  # Assert that models were not still persisted after loading predictor
+
     assert(predictor.get_model_full_dict() == dict())
     predictor.refit_full()
     assert(len(predictor.get_model_full_dict()) == num_models)
@@ -105,8 +137,9 @@ def test_advanced_functionality():
     assert(len(predictor.get_model_names()) == num_models * 2)
     predictor.predict(dataset=test_data)
     predictor.delete_models(models_to_keep=[], dry_run=False)  # Test that dry-run deletes models
-    assert(len(predictor.get_model_names()) == 0)
-    assert(len(predictor.leaderboard()) == 0)
+    assert len(predictor.get_model_names()) == 0
+    assert len(predictor.leaderboard()) == 0
+    assert len(predictor.leaderboard(extra_info=True)) == 0
     try:
         predictor.predict(dataset=test_data)
     except:
@@ -157,9 +190,12 @@ def run_tabular_benchmark_toy(fit_args):
     savedir = directory + 'AutogluonOutput/'
     shutil.rmtree(savedir, ignore_errors=True)  # Delete AutoGluon output directory to ensure previous runs' information has been removed.
     predictor = task.fit(train_data=train_data, label=dataset['label_column'], output_directory=savedir, **fit_args)
+    print(predictor.feature_metadata)
+    print(predictor.feature_metadata.type_map_raw)
+    print(predictor.feature_metadata.type_group_map_special)
     try:
         predictor.predict(test_data)
-    except ValueError:  # ValueError should be raised because test_data has missing column 'lostcolumn'
+    except KeyError:  # KeyError should be raised because test_data has missing column 'lostcolumn'
         pass
     else:
         raise AssertionError(f'{dataset["name"]} should raise an exception.')
@@ -234,7 +270,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                     raise ValueError("fast_benchmark specified without subsample_size")
                 train_data = train_data.head(subsample_size) # subsample for fast_benchmark
             predictor = task.fit(train_data=train_data, label=label_column, output_directory=savedir, **fit_args)
-            results = predictor.fit_summary(verbosity=0)
+            results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
             predictor = task.load(savedir)  # Test loading previously-trained predictor from file

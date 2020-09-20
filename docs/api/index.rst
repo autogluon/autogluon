@@ -7,6 +7,12 @@ describing what they are and what they do. The APIs are grouped into the followi
 .. container:: cards
 
    .. card::
+      :title: Prediction Tasks
+      :link: autogluon.task.html
+
+      Automatically train/deploy models with 1 line of code for these prediction tasks.
+
+   .. card::
       :title: Search Space
       :link: autogluon.space.html
 

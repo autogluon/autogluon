@@ -11,7 +11,7 @@ from .presets_configs import set_presets, unpack
 from ..base import BaseTask, compile_scheduler_options
 from ..base.base_task import schedulers
 from ...utils import verbosity2loglevel
-from ...utils.tabular.features.auto_ml_feature_generator import AutoMLFeatureGenerator
+from ...utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
 from ...utils.tabular.metrics import get_metric
 from ...utils.tabular.ml.learner.default_learner import DefaultLearner as Learner
 from ...utils.tabular.ml.trainer.auto_trainer import AutoTrainer
@@ -211,7 +211,7 @@ class TabularPrediction(BaseTask):
             Advanced functionality: Custom stack levels
                 By default, AutoGluon re-uses the same models and model hyperparameters at each level during stack ensembling.
                 To customize this behaviour, create a hyperparameters dictionary separately for each stack level, and then add them as values to a new dictionary, with keys equal to the stack level.
-                    Example: `hyperparameters = {0: {'RF': rf_params1}, 1: {'CAT': [cat_params1, cat_params2], 'NN': {}}}
+                    Example: `hyperparameters = {0: {'RF': rf_params1}, 1: {'CAT': [cat_params1, cat_params2], 'NN': {}}}`
                     This will result in a stack ensemble that has one custom random forest in level 0 followed by two CatBoost models with custom hyperparameters and a default neural network in level 1, for a total of 4 models.
                 If a level is not specified in `hyperparameters`, it will default to using the highest specified level to train models. This can also be explicitly controlled by adding a 'default' key.
 
@@ -277,9 +277,9 @@ class TabularPrediction(BaseTask):
                                 If `min_time_limit >= max_time_limit`, time_limit will be set to min_time_limit.
                                 If `min_time_limit=None`, time_limit will be set to None and the model will have no training time restriction.
 
-        holdout_frac : float
+        holdout_frac : float, default = None
             Fraction of train_data to holdout as tuning data for optimizing hyperparameters (ignored unless `tuning_data = None`, ignored if `num_bagging_folds != 0`).
-            Default value is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
+            Default value (if None) is selected based on the number of rows in the training data. Default values range from 0.2 at 2,500 rows to 0.01 at 250,000 rows.
             Default value is doubled if `hyperparameter_tune = True`, up to a maximum of 0.2.
             Disabled if `num_bagging_folds >= 2`.
         num_bagging_folds : int, default = 0
@@ -288,7 +288,7 @@ class TabularPrediction(BaseTask):
             Increasing num_bagging_folds will result in models with lower bias but that are more prone to overfitting.
             Values > 10 may produce diminishing returns, and can even harm overall results due to overfitting.
             To further improve predictions, avoid increasing num_bagging_folds much beyond 10 and instead increase num_bagging_sets.
-        num_bagging_sets : int
+        num_bagging_sets : int, default = None
             Number of repeats of kfold bagging to perform (values must be >= 1). Total number of models trained during bagging = num_bagging_folds * num_bagging_sets.
             Defaults to 1 if time_limits is not specified, otherwise 20 (always disabled if num_bagging_folds is not specified).
             Values greater than 1 will result in superior predictive performance, especially on smaller problems and with stacking enabled (reduces overall variance).
@@ -296,26 +296,26 @@ class TabularPrediction(BaseTask):
             Number of stacking levels to use in stack ensemble. Roughly increases model training time by factor of `stack_ensemble_levels+1` (set = 0 to disable stack ensembling).
             Disabled by default, but we recommend values between 1-3 to maximize predictive performance.
             To prevent overfitting, this argument is ignored unless you have also set `num_bagging_folds >= 2`.
-        num_trials : int
+        num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
-        scheduler_options : dict
+        scheduler_options : dict, default = None
             Extra arguments passed to __init__ of scheduler, to configure the orchestration of training jobs during hyperparameter-tuning.
             Ignored if `hyperparameter_tune=False`.
-        search_strategy : str
+        search_strategy : str, default = 'random'
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
-        search_options : dict
+        search_options : dict, default = None
             Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
-        nthreads_per_trial : int
+        nthreads_per_trial : int, default = None
             How many CPUs to use in each training run of an individual model.
             This is automatically determined by AutoGluon when left as None (based on available compute).
-        ngpus_per_trial : int
+        ngpus_per_trial : int, default = None
             How many GPUs to use in each trial (ie. single training run of a model).
             This is automatically determined by AutoGluon when left as None.
-        dist_ip_addrs : list
+        dist_ip_addrs : list, default = None
             List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        visualizer : str
+        visualizer : str, default = 'none'
             How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
@@ -393,21 +393,31 @@ class TabularPrediction(BaseTask):
                 If True, will set Trainer.best_model = Trainer.full_model_dict[Trainer.best_model]
                 This will change the default model that Predictor uses for prediction when model is not specified to the refit_full version of the model that previously exhibited the highest validation score.
                 Only valid if `refit_full` is set.
-            feature_generator_type : :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AbstractFeatureGenerator` class, default = :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AutoMLFeatureGenerator`
-                A `FeatureGenerator` class specifying which feature engineering protocol to follow
-                Note: The file containing your `FeatureGenerator` class must be imported into current Python session in order to use a custom class.
-            feature_generator_kwargs : dict, default={}
-                Keyword arguments to pass into the `FeatureGenerator` constructor.
-                Valid :class:`autogluon.utils.tabular.features.auto_ml_feature_generator.AutoMLFeatureGenerator` kwargs:
-                    enable_text_ngram_features : bool, default = True
-                        If True, the vectorizer argument value is used to generate 'text_ngram' features from text features if present.
-                        Try setting this to False if you encounter memory issues running AutoGluon on text data and cannot access a machine with more memory.
-                    enable_text_special_features : bool, default = True
-                        If True, generate 'text_special' features from text features if present.
-                        Examples of 'text_special' features include the number of whitespaces and the average word length in a text feature.
-                    vectorizer : `sklearn.feature_extraction.text.CountVectorizer`, default = `CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)`
-                        Determines the count vectorizer used during feature generation if text features are detected.
-                        If your data contain text fields and you encounter memory issues running AutoGluon (and cannot access a machine with more memory), then consider reducing max_features or setting n_gram_range=(1, 2).
+            feature_generator : `autogluon.utils.tabular.features.generators.abstract.AbstractFeatureGenerator`, default = `autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator()`
+                The feature generator used by AutoGluon to process the input data to the form sent to the models. This often includes automated feature generation and data cleaning.
+                It is generally recommended to keep the default feature generator unless handling an advanced use-case.
+                To control aspects of the default feature generation process, you can pass in an AutoMLPipelineFeatureGenerator object constructed using some of these kwargs:
+                    enable_numeric_features : bool, default True
+                        Whether to keep features of 'int' and 'float' raw types.
+                        These features are passed without alteration to the models.
+                        Appends IdentityFeatureGenerator(infer_features_in_args=dict(valid_raw_types=['int', 'float']))) to the generator group.
+                    enable_categorical_features : bool, default True
+                        Whether to keep features of 'object' and 'category' raw types.
+                        These features are processed into memory optimized 'category' features.
+                        Appends CategoryFeatureGenerator() to the generator group.
+                    enable_datetime_features : bool, default True
+                        Whether to keep features of 'datetime' raw type and 'object' features identified as 'datetime_as_object' features.
+                        These features will be converted to 'int' features representing milliseconds since epoch.
+                        Appends DatetimeFeatureGenerator() to the generator group.
+                    enable_text_special_features : bool, default True
+                        Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count, capital letter ratio, and symbol counts.
+                        Appends TextSpecialFeatureGenerator() to the generator group.
+                    enable_text_ngram_features : bool, default True
+                        Whether to use 'object' features identified as 'text' features to generate 'text_ngram' features.
+                        Appends TextNgramFeatureGenerator(vectorizer=vectorizer) to the generator group.
+                    vectorizer : CountVectorizer, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+                        sklearn CountVectorizer object to use in TextNgramFeatureGenerator.
+                        Only used if `enable_text_ngram_features=True`.
             trainer_type : `Trainer` class, default=`AutoTrainer`
                 A class inheriting from `autogluon.utils.tabular.ml.trainer.abstract_trainer.AbstractTrainer` that controls training/ensembling of many models.
                 Note: In order to use a custom `Trainer` class, you must import the class file that defines it into the current Python session.
@@ -460,8 +470,9 @@ class TabularPrediction(BaseTask):
 
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
-            'feature_generator_type',
-            'feature_generator_kwargs',
+            'feature_generator',
+            'feature_generator_type',  # TODO: Remove on 0.1.0 release
+            'feature_generator_kwargs',  # TODO: Remove on 0.1.0 release
             'trainer_type',
             'AG_args_fit',
             'excluded_model_types',
@@ -537,9 +548,14 @@ class TabularPrediction(BaseTask):
 
         # Process kwargs to create feature generator, trainer, schedulers, searchers for each model:
         output_directory = setup_outputdir(output_directory)  # Format directory name
-        feature_generator_type = kwargs.get('feature_generator_type', AutoMLFeatureGenerator)
-        feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
-        feature_generator = feature_generator_type(**feature_generator_kwargs) # instantiate FeatureGenerator object
+        if 'feature_generator_type' in kwargs or 'feature_generator_kwargs' in kwargs:
+            logger.log(30, 'Warning: `feature_generator_type` and `feature_generator_kwargs` are deprecated arguments. Use `feature_generator` instead. Starting from AutoGluon 0.1.0, specifying these arguments will cause an exception.')
+            feature_generator_type = kwargs.get('feature_generator_type', AutoMLPipelineFeatureGenerator)
+            feature_generator_kwargs = kwargs.get('feature_generator_kwargs', {})
+            feature_generator = feature_generator_type(**feature_generator_kwargs)  # instantiate FeatureGenerator object
+        else:
+            feature_generator = kwargs.get('feature_generator', AutoMLPipelineFeatureGenerator())
+
         id_columns = kwargs.get('id_columns', [])
         trainer_type = kwargs.get('trainer_type', AutoTrainer)
         ag_args_fit = kwargs.get('AG_args_fit', {})
@@ -571,6 +587,7 @@ class TabularPrediction(BaseTask):
 
         if num_bagging_folds >= 2 and (time_limits_hpo is not None):
             time_limits_hpo = time_limits_hpo / (1 + num_bagging_folds * (1 + stack_ensemble_levels))
+        # FIXME: Incorrect if user specifies custom level-based hyperparameter config!
         time_limits_hpo, num_trials = setup_trial_limits(time_limits_hpo, num_trials, hyperparameters)  # TODO: Move HPO time allocation to Trainer
 
         if (num_trials is not None) and hyperparameter_tune and (num_trials == 1):

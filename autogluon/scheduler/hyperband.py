@@ -13,7 +13,7 @@ from ..utils import load
 from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Categorical, filter_by_key
 
-__all__ = ['HyperbandScheduler']
+__all__ = ['HyperbandScheduler', 'HyperbandPromotion_Manager', 'HyperbandStopping_Manager']
 
 logger = logging.getLogger(__name__)
 

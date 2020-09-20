@@ -3,11 +3,9 @@ import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 import logging
 
-from autogluon.searcher.bayesopt.datatypes.common import Candidate
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    SurrogateModel, AcquisitionFunction, ScoringFunction, LocalOptimizer
+from .base_classes import SurrogateModel, AcquisitionFunction, ScoringFunction, LocalOptimizer
+from ..datatypes.common import Candidate
+from ..datatypes.tuning_job_state import TuningJobState
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-import datetime
+import copy
 import json
 import logging
 import os
@@ -19,9 +19,11 @@ from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from ..utils import get_pred_from_proba, get_leaderboard_pareto_frontier, infer_problem_type, augment_rare_classes
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
-from ...features.abstract_feature_generator import AbstractFeatureGenerator
+from ...features.generators import PipelineFeatureGenerator
 from ...utils.loaders import load_pkl, load_pd
 from ...utils.savers import save_pkl, save_pd, save_json
+from ...metrics.classification_metrics import confusion_matrix
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +37,13 @@ class AbstractLearner:
     learner_info_name = 'info.pkl'
     learner_info_json_name = 'info.json'
 
-    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: AbstractFeatureGenerator, label_count_threshold=10,
+    def __init__(self, path_context: str, label: str, id_columns: list, feature_generator: PipelineFeatureGenerator, label_count_threshold=10,
                  problem_type=None, eval_metric=None, stopping_metric=None, is_trainer_present=False, random_seed=0, compression_fn=None, compression_fn_kwargs=None):
-        self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
         self.label = label
-        self.submission_columns = id_columns
+        self.id_columns = id_columns
         self.threshold = label_count_threshold
         self.problem_type = problem_type
-        self.trainer_problem_type = None
         self.eval_metric = eval_metric
         self.stopping_metric = stopping_metric
         self.is_trainer_present = is_trainer_present
@@ -53,7 +54,7 @@ class AbstractLearner:
         self.compression_fn_kwargs = compression_fn_kwargs
         self.cleaner = None
         self.label_cleaner: LabelCleaner = None
-        self.feature_generator: AbstractFeatureGenerator = feature_generator
+        self.feature_generator: PipelineFeatureGenerator = feature_generator
         self.feature_generators = [self.feature_generator]
 
         self.trainer: AbstractTrainer = None
@@ -77,86 +78,58 @@ class AbstractLearner:
         return self.label_cleaner.ordered_class_labels
 
     def set_contexts(self, path_context):
-        self.path, self.model_context, self.latest_model_checkpoint, self.eval_result_path, self.pred_cache_path, self.save_path = self.create_contexts(path_context)
+        self.path, self.model_context, self.save_path = self.create_contexts(path_context)
 
     def create_contexts(self, path_context):
         model_context = path_context + 'models' + os.path.sep
-        latest_model_checkpoint = model_context + 'model_checkpoint_latest.pointer'
-        eval_result_path = model_context + 'eval_result.pkl'
-        predictions_path = path_context + 'predictions.csv'
         save_path = path_context + self.learner_file_name
-        return path_context, model_context, latest_model_checkpoint, eval_result_path, predictions_path, save_path
+        return path_context, model_context, save_path
 
-    def fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=True,
+    def fit(self, X: DataFrame, X_val: DataFrame = None, **kwargs):
+        self._validate_fit_input(X=X, X_val=X_val, **kwargs)
+        return self._fit(X=X, X_val=X_val, **kwargs)
+
+    def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2, compression_fn=None,
             compression_fn_kwargs=None):
         raise NotImplementedError
 
-    # TODO: Add pred_proba_cache functionality as in predict()
     def predict_proba(self, X: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
-        X = self.transform_features(X)
-        y_pred_proba = self.load_trainer().predict_proba(X, model=model)
+        if as_pandas:
+            X_index = copy.deepcopy(X.index)
+        else:
+            X_index = None
+        y_pred_proba = self.load_trainer().predict_proba(self.transform_features(X), model=model)
         if inverse_transform:
             y_pred_proba = self.label_cleaner.inverse_transform_proba(y_pred_proba)
         if as_multiclass and (self.problem_type == BINARY):
             y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
         if as_pandas:
             if self.problem_type == MULTICLASS or (as_multiclass and self.problem_type == BINARY):
-                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels)
+                y_pred_proba = pd.DataFrame(data=y_pred_proba, columns=self.class_labels, index=X_index)
             else:
-                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label)
+                y_pred_proba = pd.Series(data=y_pred_proba, name=self.label, index=X_index)
         return y_pred_proba
 
-    # TODO: Add decorators for cache functionality, return core code to previous state
-    # use_pred_cache to check for a cached prediction of rows, can dramatically speedup repeated runs
-    # add_to_pred_cache will update pred_cache with new predictions
-    def predict(self, X: DataFrame, model=None, as_pandas=False, use_pred_cache=False, add_to_pred_cache=False):
-        pred_cache = None
-        if use_pred_cache or add_to_pred_cache:
-            try:
-                pred_cache = load_pd.load(path=self.pred_cache_path, dtype=X[self.submission_columns].dtypes.to_dict())
-            except Exception:
-                pass
-
-        if use_pred_cache and (pred_cache is not None):
-            X_id = X[self.submission_columns]
-            X_in_cache_with_pred = pd.merge(left=X_id.reset_index(), right=pred_cache, on=self.submission_columns).set_index('index')  # Will break if 'index' == self.label or 'index' in self.submission_columns
-            X_cache_miss = X[~X.index.isin(X_in_cache_with_pred.index)]
-            logger.log(20, f'Using cached predictions for {len(X_in_cache_with_pred)} out of {len(X)} rows, '
-                           f'which have already been predicted previously. To make new predictions, set use_pred_cache=False')
-        else:
-            X_in_cache_with_pred = pd.DataFrame(data=None, columns=self.submission_columns + [self.label])
-            X_cache_miss = X
-
-        if len(X_cache_miss) > 0:
-            y_pred_proba = self.predict_proba(X=X_cache_miss, model=model, inverse_transform=False)
-            problem_type = self.trainer_problem_type or self.problem_type
-            y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
-            y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
-            y_pred.index = X_cache_miss.index
-        else:
-            logger.debug('All rows found in cache, no need to load model')
-            y_pred = X_in_cache_with_pred[self.label].values
-            if as_pandas:
-                y_pred = pd.Series(data=y_pred, name=self.label)
-            return y_pred
-
-        if add_to_pred_cache:
-            X_id_with_y_pred = X_cache_miss[self.submission_columns].copy()
-            X_id_with_y_pred[self.label] = y_pred
-            if pred_cache is None:
-                pred_cache = X_id_with_y_pred.drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
-            else:
-                pred_cache = pd.concat([X_id_with_y_pred, pred_cache]).drop_duplicates(subset=self.submission_columns).reset_index(drop=True)
-            save_pd.save(path=self.pred_cache_path, df=pred_cache)
-
-        if len(X_in_cache_with_pred) > 0:
-            y_pred = pd.concat([y_pred, X_in_cache_with_pred[self.label]]).reindex(X.index)
-
-        y_pred = y_pred.values
+    def predict(self, X: DataFrame, model=None, as_pandas=False):
         if as_pandas:
-            y_pred = pd.Series(data=y_pred, name=self.label)
+            X_index = copy.deepcopy(X.index)
+        else:
+            X_index = None
+        y_pred_proba = self.predict_proba(X=X, model=model, inverse_transform=False)
+        problem_type = self.label_cleaner.problem_type_transform or self.problem_type
+        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=problem_type)
+        y_pred = self.label_cleaner.inverse_transform(pd.Series(y_pred))
+        if as_pandas:
+            y_pred.index = X_index
+            y_pred.name = self.label
+        else:
+            y_pred = y_pred.values
         return y_pred
+
+    def _validate_fit_input(self, X: DataFrame, **kwargs):
+        if self.label not in X.columns:
+            raise KeyError(f"Label column '{self.label}' is missing from training data. Training data columns: {list(X.columns)}")
 
     def get_inputs_to_stacker(self, dataset=None, model=None, base_models: list = None, use_orig_features=True):
         if model is not None or base_models is not None:
@@ -183,26 +156,6 @@ class AbstractLearner:
             # dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
 
         return dataset_preprocessed
-
-    # TODO: Experimental, not integrated with core code, highly subject to change
-    # TODO: Add X, y parameters -> Requires proper preprocessing of train data
-    # X should be X_train from original fit call, if None then load saved X_train in trainer (if save_data=True)
-    # y should be y_train from original fit call, if None then load saved y_train in trainer (if save_data=True)
-    # Compresses bagged ensembles to a single model fit on 100% of the data.
-    # Results in worse model quality (-), but much faster inference times (+++), reduced memory usage (+++), and reduced space usage (+++).
-    # You must have previously called fit() with cache_data=True.
-    def refit_single_full(self, models=None):
-        X = None
-        y = None
-        if X is not None:
-            if y is None:
-                X, y = self.extract_label(X)
-            X = self.transform_features(X)
-            y = self.label_cleaner.transform(y)
-        else:
-            y = None
-        trainer = self.load_trainer()
-        return trainer.refit_single_full(X=X, y=y, models=models)
 
     # Fits _FULL models and links them in the stack so _FULL models only use other _FULL models as input during stacking
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
@@ -235,7 +188,8 @@ class AbstractLearner:
         return trainer.score(X=X, y=y, model=model)
 
     # Scores both learner and all individual models, along with computing the optimal ensemble score + weights (oracle)
-    def score_debug(self, X: DataFrame, y=None, compute_oracle=False, silent=False):
+    def score_debug(self, X: DataFrame, y=None, extra_info=False, compute_oracle=False, silent=False):
+        leaderboard_df = self.leaderboard(extra_info=extra_info, silent=silent)
         if y is None:
             X, y = self.extract_label(X)
         X = self.transform_features(X)
@@ -268,7 +222,7 @@ class AbstractLearner:
 
         for model_name, pred_proba in model_pred_proba_dict.items():
             if (trainer.problem_type == BINARY) and (self.problem_type == MULTICLASS):
-                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)
+                pred_proba = self.label_cleaner.inverse_transform_proba(pred_proba)  # FIXME: I think this doesn't work correctly, must use original y as well!
             if trainer.eval_metric_expects_y_pred:
                 pred = get_pred_from_proba(y_pred_proba=pred_proba, problem_type=self.problem_type)
                 scores[model_name] = self.eval_metric(y, pred)
@@ -309,11 +263,8 @@ class AbstractLearner:
             }
         )
 
-        df = df.sort_values(by=['score_test', 'pred_time_test'], ascending=[False, True]).reset_index(drop=True)
-
-        leaderboard_df = self.leaderboard(silent=silent)
-
         df_merged = pd.merge(df, leaderboard_df, on='model', how='left')
+        df_merged = df_merged.sort_values(by=['score_test', 'pred_time_test', 'score_val', 'pred_time_val', 'model'], ascending=[False, True, False, True, False]).reset_index(drop=True)
         df_columns_lst = df_merged.columns.tolist()
         explicit_order = [
             'model',
@@ -352,11 +303,11 @@ class AbstractLearner:
     def _remove_missing_labels(self, y_true, y_pred):
         """Removes missing labels and produces warning if any are found."""
         if self.problem_type == REGRESSION:
-            non_missing_boolean_mask = [(y is not None and not np.isnan(y)) for y in y_true]
+            non_missing_boolean_mask = [y is not None and not pd.isnull(y) for y in y_true]
         else:
-            non_missing_boolean_mask = [(y is not None and y != '') for y in y_true]
+            non_missing_boolean_mask = [y is not None and not pd.isnull(y) and y != '' for y in y_true]
 
-        n_missing = len([x for x in non_missing_boolean_mask if not x])
+        n_missing = len(non_missing_boolean_mask) - sum(non_missing_boolean_mask)
         if n_missing > 0:
             y_true = y_true[non_missing_boolean_mask]
             y_pred = y_pred[non_missing_boolean_mask]
@@ -365,6 +316,10 @@ class AbstractLearner:
                           f"You should carefully study why there are missing labels in your evaluation data.")
         return y_true, y_pred
 
+    # TODO: Refactor to be less brittle.
+    # TODO: Instead take y_pred_proba as input, convert to y_pred when necessary. Treat y_pred_proba as y_pred for regression.
+    #  This makes this function behave much nicer, currently confusion matrix is only able to be constructed when y_pred is supplied, and crashes when y_pred_proba is supplied.
+    #  Therefore, it is impossible to get confusion matrix when eval_metric is log_loss. This shouldn't be the case.
     def evaluate(self, y_true, y_pred, silent=False, auxiliary_metrics=False, detailed_report=True, high_always_good=False):
         """ Evaluate predictions.
             Args:
@@ -377,33 +332,16 @@ class AbstractLearner:
             Otherwise returns dict where keys = metrics, values = performance along each metric.
         """
         assert isinstance(y_true, (np.ndarray, pd.Series))
-        assert isinstance(y_pred, (np.ndarray, pd.Series))
+        assert isinstance(y_pred, (np.ndarray, pd.Series))  # TODO: Enable DataFrame for y_pred_proba
 
         # TODO: Consider removing _remove_missing_labels, this creates an inconsistency between how .score, .score_debug, and .evaluate compute scores.
         y_true, y_pred = self._remove_missing_labels(y_true, y_pred)
-        trainer = self.load_trainer()
-        if trainer.eval_metric_expects_y_pred:
-            y_pred_cleaned = self.label_cleaner.transform(y_pred)
-            y_true_cleaned = self.label_cleaner.transform(y_true)
-            if self.problem_type == MULTICLASS:
-                y_true_cleaned = y_true_cleaned.fillna(-1)  # map unknown classes to -1
-            performance = self.eval_metric(y_true_cleaned, y_pred_cleaned)
-        else:
-            if self.problem_type == MULTICLASS:
-                y_true_cleaned = self.label_cleaner.transform(y_true)
-                y_true_cleaned = y_true_cleaned.fillna(-1)
-                if (not trainer.eval_metric_expects_y_pred) and (-1 in y_true_cleaned.unique()):
-                    # log_loss / pac_score
-                    raise ValueError(f'Multiclass scoring with eval_metric=\'{self.eval_metric.name}\' does not support unknown classes.')
-                performance = self.eval_metric(y_true_cleaned, y_pred)
-            else:
-                performance = self.eval_metric(y_true, y_pred)
+        performance = self.eval_metric(y_true, y_pred)
 
         metric = self.eval_metric.name
 
         if not high_always_good:
-            sign = self.eval_metric._sign
-            performance = performance * sign  # flip negative once again back to positive (so higher is no longer necessarily better)
+            performance = performance * self.eval_metric._sign  # flip negative once again back to positive (so higher is no longer necessarily better)
 
         if not silent:
             logger.log(20, f"Evaluation: {metric} on test data: {performance}")
@@ -429,15 +367,22 @@ class AbstractLearner:
                 f1micro_score = lambda y_true, y_pred: f1_score(y_true, y_pred, average='micro')
                 f1micro_score.__name__ = f1_score.__name__
                 auxiliary_metrics += [f1micro_score]  # TODO: add auc?
-            elif self.problem_type == MULTICLASS:  # multiclass metrics
-                auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
+            # elif self.problem_type == MULTICLASS:  # multiclass metrics
+            #     auxiliary_metrics += []  # TODO: No multi-class specific metrics for now. Include top-5, top-10 accuracy here.
 
         performance_dict = OrderedDict({metric: performance})
         for metric_function in auxiliary_metrics:
+            if isinstance(metric_function, tuple):
+                metric_function, metric_kwargs = metric_function
+            else:
+                metric_kwargs = None
             metric_name = metric_function.__name__
             if metric_name not in performance_dict:
-                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
-                    performance_dict[metric_name] = metric_function(y_true, y_pred)
+                try:  # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                    if metric_kwargs:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred, **metric_kwargs)
+                    else:
+                        performance_dict[metric_name] = metric_function(y_true, y_pred)
                 except ValueError:
                     pass
 
@@ -446,11 +391,16 @@ class AbstractLearner:
             logger.log(20, json.dumps(performance_dict, indent=4))
 
         if detailed_report and (self.problem_type != REGRESSION):
+            # Construct confusion matrix
+            try:
+                performance_dict['confusion_matrix'] = confusion_matrix(y_true, y_pred, labels=self.label_cleaner.ordered_class_labels, output_format='pandas_dataframe')
+            except ValueError:
+                pass
             # One final set of metrics to report
             cl_metric = lambda y_true, y_pred: classification_report(y_true, y_pred, output_dict=True)
             metric_name = 'classification_report'
             if metric_name not in performance_dict:
-                try: # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
+                try:  # only compute auxiliary metrics which do not error (y_pred = class-probabilities may cause some metrics to error)
                     performance_dict[metric_name] = cl_metric(y_true, y_pred)
                 except ValueError:
                     pass
@@ -466,35 +416,12 @@ class AbstractLearner:
         X = X.drop(self.label, axis=1)
         return X, y
 
-    def submit_from_preds(self, X: DataFrame, y_pred_proba, save=True, save_proba=False):
-        submission = X[self.submission_columns].copy()
-        y_pred = get_pred_from_proba(y_pred_proba=y_pred_proba, problem_type=self.problem_type)
-
-        submission[self.label] = y_pred
-        submission[self.label] = self.label_cleaner.inverse_transform(submission[self.label])
-
-        if save:
-            utcnow = datetime.datetime.utcnow()
-            timestamp_str_now = utcnow.strftime("%Y%m%d_%H%M%S")
-            path_submission = self.model_context + 'submissions' + os.path.sep + 'submission_' + timestamp_str_now + '.csv'
-            path_submission_proba = self.model_context + 'submissions' + os.path.sep + 'submission_proba_' + timestamp_str_now + '.csv'
-            save_pd.save(path=path_submission, df=submission)
-            if save_proba:
-                submission_proba = pd.DataFrame(y_pred_proba)  # TODO: Fix for multiclass
-                save_pd.save(path=path_submission_proba, df=submission_proba)
-
-        return submission
-
-    def predict_and_submit(self, X: DataFrame, save=True, save_proba=False):
-        y_pred_proba = self.predict_proba(X=X, inverse_transform=False)
-        return self.submit_from_preds(X=X, y_pred_proba=y_pred_proba, save=save, save_proba=save_proba)
-
-    def leaderboard(self, X=None, y=None, only_pareto_frontier=False, silent=False):
+    def leaderboard(self, X=None, y=None, extra_info=False, only_pareto_frontier=False, silent=False):
         if X is not None:
-            leaderboard = self.score_debug(X=X, y=y, silent=True)
+            leaderboard = self.score_debug(X=X, y=y, extra_info=extra_info, silent=True)
         else:
             trainer = self.load_trainer()
-            leaderboard = trainer.leaderboard()
+            leaderboard = trainer.leaderboard(extra_info=extra_info)
         if only_pareto_frontier:
             if 'score_test' in leaderboard.columns and 'pred_time_test' in leaderboard.columns:
                 score_col = 'score_test'
@@ -567,8 +494,15 @@ class AbstractLearner:
         return infer_problem_type(y=y)
 
     def save(self, compression_fn=None, compression_fn_kwargs=None):
+        trainer = None
+        if self.trainer is not None:
+            if not self.is_trainer_present:
+                self.trainer.save()
+                trainer = self.trainer
+                self.trainer = None
         save_pkl.save(path=self.save_path, object=self, compression_fn=compression_fn,
                       compression_fn_kwargs=compression_fn_kwargs)
+        self.trainer = trainer
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
@@ -596,22 +530,21 @@ class AbstractLearner:
             trainer.save()
 
     def load_trainer(self) -> AbstractTrainer:
-        if self.is_trainer_present:
+        if self.trainer is not None:
             return self.trainer
         else:
             return self.trainer_type.load(path=self.trainer_path, reset_paths=self.reset_paths,
                                           compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
 
-    # TODO: Add to predictor
-    # TODO: Make this safe in large ensemble situations that would result in OOM
-    # Loads all models in memory so that they don't have to loaded during predictions
-    def persist_trainer(self, low_memory=False):
+    # Loads models in memory so that they don't have to be loaded during predictions
+    def persist_trainer(self, low_memory=False, models='all', with_ancestors=False, max_memory=None) -> list:
         self.trainer = self.load_trainer()
-        self.is_trainer_present = True
         if not low_memory:
-            self.trainer.load_models_into_memory()
+            return self.trainer.persist_models(models, with_ancestors=with_ancestors, max_memory=max_memory)
             # Warning: After calling this, it is not necessarily safe to save learner or trainer anymore
             #  If neural network is persisted and then trainer or learner is saved, there will be an exception thrown
+        else:
+            return []
 
     @classmethod
     def load_info(cls, path, reset_paths=True, load_model_if_required=True):

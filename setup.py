@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.13'
+version = '0.0.14'
 """
 To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
 a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 
@@ -49,15 +49,21 @@ requirements = [
     'distributed>=2.6.0',
     'ConfigSpace<=0.4.10',
     'gluoncv>=0.5.0,<1.0',
-    'graphviz',
+    'graphviz<0.9.0,>=0.8.1',
+    'fastparquet==0.4.1',
     'scikit-optimize',
-    'catboost<0.24',
+    'catboost>=0.23.0,<0.25',
+    'pyarrow<=1.0.0',
     'boto3',
-    'lightgbm>=2.3.0,<3.0',
-    'pandas>=0.24.0,<1.0',
-    'psutil>=5.0.0',
-    'scikit-learn>=0.22.0,<0.23',
+    'lightgbm>=3.0,<4.0',
+    'pandas>=1.0.0,<2.0',
+    'psutil>=5.0.0,<=5.7.0',  # TODO: psutil 5.7.1/5.7.2 has non-deterministic error on CI doc build -  ImportError: cannot import name '_psutil_linux' from 'psutil'
+    'scikit-learn>=0.22.0,<0.24',
     'networkx>=2.3,<3.0'
+]
+
+text_requirements = [
+    'autogluon-contrib-nlp'
 ]
 
 test_requirements = [
@@ -82,7 +88,7 @@ if __name__ == '__main__':
         packages=find_packages(exclude=('docs', 'tests', 'scripts')),
         zip_safe=True,
         include_package_data=True,
-        install_requires=requirements + test_requirements,
+        install_requires=requirements + text_requirements + test_requirements,
         python_requires=MIN_PYTHON_VERSION,
         package_data={'autogluon': [
             'LICENSE',

@@ -2,7 +2,7 @@ import mxnet as mx
 import logging
 import time
 
-from autogluon.searcher.bayesopt.gpmxnet.utils import param_to_pretty_string
+from .utils import param_to_pretty_string
 
 logger = logging.getLogger(__name__)
 

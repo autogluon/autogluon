@@ -20,7 +20,8 @@ __all__ = ['TextClassification']
 logger = logging.getLogger(__name__)
 
 class TextClassification(BaseTask):
-    """AutoGluon Task for classifying text snippets based on their content
+    """AutoGluon Task for classifying text snippets based on their content.
+       Will be deprecated in the future, please use `TextPrediction` module instead.
     """
     @staticmethod
     def Dataset(*args, **kwargs):
@@ -148,10 +149,9 @@ class TextClassification(BaseTask):
         assert search_strategy not in {'bayesopt', 'bayesopt_hyperband'}, \
             "search_strategy == 'bayesopt' or 'bayesopt_hyperband' not yet supported"
 
-        logger.warning('`TextClassification` is in preview mode.'
-                       'Please feel free to request new features in issues '
-                       'if it is not covered in the current implementation. '
-                       'If your dataset is in tabular format, you could also try out our `TabularPrediction` module.')
+        logger.warning('`TextClassification` will soon be deprecated.'
+                       'Please use `TextPrediction` module instead.'
+                       'If your text dataset is in tabular format, you may also try the `TabularPrediction` module.')
 
         if auto_search:
             # The strategies can be injected here, for example: automatic suggest some hps

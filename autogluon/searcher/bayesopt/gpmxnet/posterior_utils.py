@@ -2,12 +2,8 @@ from typing import Union
 import mxnet as mx
 import numpy as np
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
-    NOISE_VARIANCE_LOWER_BOUND, MIN_POSTERIOR_VARIANCE, \
-    MIN_CHOLESKY_DIAGONAL_VALUE
-from autogluon.searcher.bayesopt.gpmxnet.custom_op import AddJitterOp, \
-    AddJitterOpProp
-
+from .constants import NOISE_VARIANCE_LOWER_BOUND, MIN_POSTERIOR_VARIANCE, MIN_CHOLESKY_DIAGONAL_VALUE
+from .custom_op import AddJitterOp, AddJitterOpProp
 
 Tensor = Union[mx.nd.NDArray, mx.sym.Symbol]
 

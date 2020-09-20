@@ -1,4 +1,5 @@
 import copy
+import gc
 import logging
 import math
 import os
@@ -7,15 +8,16 @@ import sys
 import time
 from typing import Union
 
+import numpy as np
 import pandas as pd
 import psutil
 
 from .model_trial import model_trial
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
-from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, convert_categorical_to_int, normalize_pred_probas, infer_eval_metric
+from ...utils import get_pred_from_proba, generate_train_test_split, shuffle_df_rows, normalize_pred_probas, infer_eval_metric
 from .... import metrics
-from ....features.feature_types_metadata import FeatureTypesMetadata
+from ....features.feature_metadata import FeatureMetadata
 from ....utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from ....utils.loaders import load_pkl
 from ....utils.savers import save_pkl, save_json
@@ -26,41 +28,12 @@ from ......task.base import BasePredictor
 logger = logging.getLogger(__name__)
 
 
-# Methods useful for all models:
-def fixedvals_from_searchspaces(params):
-    """ Converts any search space hyperparams in params dict into fixed default values. """
-    if any(isinstance(params[hyperparam], Space) for hyperparam in params):
-        logger.warning("Attempting to fit model without HPO, but search space is provided. fit() will only consider default hyperparameter values from search space.")
-        bad_keys = [hyperparam for hyperparam in params if isinstance(params[hyperparam], Space)][:]  # delete all keys which are of type autogluon Space
-        params = params.copy()
-        for hyperparam in bad_keys:
-            params[hyperparam] = hp_default_value(params[hyperparam])
-        return params
-    else:
-        return params
-
-
-def hp_default_value(hp_value):
-    """ Extracts default fixed value from hyperparameter search space hp_value to use a fixed value instead of a search space.
-    """
-    if not isinstance(hp_value, Space):
-        return hp_value
-    if isinstance(hp_value, Categorical):
-        return hp_value[0]
-    elif isinstance(hp_value, List):
-        return [z[0] for z in hp_value]
-    elif isinstance(hp_value, NestedSpace):
-        raise ValueError("Cannot extract default value from NestedSpace. Please specify fixed value instead of: %s" % str(hp_value))
-    else:
-        return hp_value.get_hp('dummy_name').default_value
-
-
 class AbstractModel:
     model_file_name = 'model.pkl'
     model_info_name = 'info.pkl'
     model_info_json_name = 'info.json'
 
-    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_types_metadata: FeatureTypesMetadata = None, debug=0, **kwargs):
+    def __init__(self, path: str, name: str, problem_type: str, eval_metric: Union[str, metrics.Scorer] = None, num_classes=None, stopping_metric=None, model=None, hyperparameters=None, features=None, feature_metadata: FeatureMetadata = None, debug=0, **kwargs):
         """ Creates a new model.
             Args:
                 path (str): directory where to store all outputs.
@@ -68,7 +41,7 @@ class AbstractModel:
                 problem_type (str): type of problem this model will handle. Valid options: ['binary', 'multiclass', 'regression'].
                 eval_metric (str or autogluon.utils.tabular.metrics.Scorer): objective function the model intends to optimize. If None, will be inferred based on problem_type.
                 hyperparameters (dict): various hyperparameters that will be used by model (can be search spaces instead of fixed values).
-                feature_types_metadata (autogluon.utils.tabular.features.feature_types_metadata.FeatureTypesMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime.
+                feature_metadata (autogluon.utils.tabular.features.feature_metadata.FeatureMetadata): contains feature type information that can be used to identify special features such as text ngrams and datetime as well as which features are numerical vs categorical
         """
         self.name = name
         self.path_root = path
@@ -108,7 +81,7 @@ class AbstractModel:
         else:
             self.stopping_metric_needs_y_pred = True
 
-        self.feature_types_metadata = feature_types_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
+        self.feature_metadata = feature_metadata  # TODO: Should this be passed to a model on creation? Should it live in a Dataset object and passed during fit? Currently it is being updated prior to fit by trainer
         self.features = features
         self.debug = debug
 
@@ -133,15 +106,15 @@ class AbstractModel:
         self.params_trained = dict()
 
     # Checks if model is capable of inference on new data (if normal model) or has produced out-of-fold predictions (if bagged model)
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return self.is_fit()
 
     # Checks if model is capable of inference on new data
-    def can_infer(self):
+    def can_infer(self) -> bool:
         return self.is_valid()
 
     # Checks if a model has been fit
-    def is_fit(self):
+    def is_fit(self) -> bool:
         return self.model is not None
 
     def _set_default_params(self):
@@ -163,8 +136,8 @@ class AbstractModel:
             # max_early_stopping_rounds=None,
             # use_orig_features=True,  # TODO: Only for stackers
             # TODO: add option for only top-k ngrams
-            ignored_feature_types_special=[],  # List, drops any features in `self.feature_types_metadata.feature_types_special[type]` for type in `ignored_feature_types_special`. | Currently undocumented in task.
-            ignored_feature_types_raw=[],  # List, drops any features in `self.feature_types_metadata.feature_types_raw[type]` for type in `ignored_feature_types_raw`. | Currently undocumented in task.
+            ignored_type_group_special=[],  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
+            ignored_type_group_raw=[],  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -210,7 +183,8 @@ class AbstractModel:
         path = path_context
         return path
 
-    def rename(self, name):
+    def rename(self, name: str):
+        """Renames the model and updates self.path to reflect the updated name."""
         self.path = self.path[:-len(self.name) - 1] + name + os.path.sep
         self.name = name
 
@@ -224,19 +198,14 @@ class AbstractModel:
                 return X[self.features]
         else:
             self.features = list(X.columns)  # TODO: add fit and transform versions of preprocess instead of doing this
-            ignored_feature_types_raw = self.params_aux.get('ignored_feature_types_raw', [])
-            if ignored_feature_types_raw:
-                for ignored_feature_type in ignored_feature_types_raw:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_raw[ignored_feature_type]]
-            ignored_feature_types_special = self.params_aux.get('ignored_feature_types_special', [])
-            if ignored_feature_types_special:
-                for ignored_feature_type in ignored_feature_types_special:
-                    self.features = [feature for feature in self.features if feature not in self.feature_types_metadata.feature_types_special[ignored_feature_type]]
+            ignored_type_group_raw = self.params_aux.get('ignored_type_group_raw', [])
+            ignored_type_group_special = self.params_aux.get('ignored_type_group_special', [])
+            valid_features = self.feature_metadata.get_features(invalid_raw_types=ignored_type_group_raw, invalid_special_types=ignored_type_group_special)
+            self.features = [feature for feature in self.features if feature in valid_features]
             if not self.features:
                 raise NoValidFeatures
-            if ignored_feature_types_raw or ignored_feature_types_special:
-                if list(X.columns) != self.features:
-                    X = X[self.features]
+            if list(X.columns) != self.features:
+                X = X[self.features]
         return X
 
     def _preprocess_fit_args(self, **kwargs):
@@ -282,6 +251,7 @@ class AbstractModel:
         y_pred_proba = self._predict_proba(X=X, preprocess=preprocess)
         if normalize:
             y_pred_proba = normalize_pred_probas(y_pred_proba, self.problem_type)
+        y_pred_proba = y_pred_proba.astype(np.float32)
         return y_pred_proba
 
     def _predict_proba(self, X, preprocess=True):
@@ -327,29 +297,70 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    def save(self, file_prefix="", directory=None, return_filename=False, verbose=True, compression_fn=None,
-             compression_fn_kwargs=None):
-        if directory is None:
-            directory = self.path
-        file_name = directory + file_prefix + self.model_file_name
-        save_pkl.save(path=file_name, object=self, verbose=verbose, compression_fn=compression_fn,
+    def save(self, path: str = None, verbose=True, compression_fn=None, compression_fn_kwargs=None) -> str:
+        """
+        Saves the model to disk.
+
+        Parameters
+        ----------
+        path : str, default None
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            If None, self.path is used.
+            The final model file is typically saved to path + self.model_file_name.
+        verbose : bool, default True
+            Whether to log the location of the saved file.
+
+        Returns
+        -------
+        path : str
+            Path to the saved model, minus the file name.
+            Use this value to load the model from disk via cls.load(path), cls being the class of the model object, such as model = RFModel.load(path)
+        """
+        if path is None:
+            path = self.path
+        file_path = path + self.model_file_name
+        save_pkl.save(path=file_path, object=self, verbose=verbose, compression_fn=compression_fn,
                       compression_fn_kwargs=compression_fn_kwargs)
-        if return_filename:
-            return file_name
+        return path
 
     @classmethod
-    def load(cls, path, file_prefix="", reset_paths=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
-        load_path = path + file_prefix + cls.model_file_name
-        if not reset_paths:
-            return load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
-        else:
-            obj = load_pkl.load(path=load_path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
-            obj.set_contexts(path)
-            return obj
+    def load(cls, path: str, reset_paths=True, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+        """
+        Loads the model from disk to memory.
+
+        Parameters
+        ----------
+        path : str
+            Path to the saved model, minus the file name.
+            This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
+            The model file is typically located in path + cls.model_file_name.
+        reset_paths : bool, default True
+            Whether to reset the self.path value of the loaded model to be equal to path.
+            It is highly recommended to keep this value as True unless accessing the original self.path value is important.
+            If False, the actual valid path and self.path may differ, leading to strange behaviour and potential exceptions if the model needs to load any other files at a later time.
+        verbose : bool, default True
+            Whether to log the location of the loaded file.
+
+        Returns
+        -------
+        model : cls
+            Loaded model object.
+        """
+        file_path = path + cls.model_file_name
+        model = load_pkl.load(path=file_path, verbose=verbose, compression_fn=compression_fn,
+                      compression_fn_kwargs=compression_fn_kwargs)
+        if reset_paths:
+            model.set_contexts(path)
+        return model
 
     # TODO: Consider disabling feature pruning when num_features is high (>1000 for example), or using a faster feature importance calculation method
-    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs):
+    def compute_feature_importance(self, X, y, features_to_use=None, preprocess=True, subsample_size=10000, silent=False, **kwargs) -> pd.Series:
         if (subsample_size is not None) and (len(X) > subsample_size):
+            # Reset index to avoid error if duplicated indices.
+            X = X.reset_index(drop=True)
+            y = y.reset_index(drop=True)
+
             X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
         else:
@@ -465,7 +476,7 @@ class AbstractModel:
         return dict()
 
     # Hyperparameters of trained model
-    def get_trained_params(self):
+    def get_trained_params(self) -> dict:
         trained_params = self.params.copy()
         trained_params.update(self.params_trained)
         return trained_params
@@ -595,7 +606,7 @@ class AbstractModel:
     #  Has not been tested on Windows
     #  Does not work if model is located in S3
     #  Does not work if called before model was saved to disk (Will output 0)
-    def get_disk_size(self):
+    def get_disk_size(self) -> int:
         # Taken from https://stackoverflow.com/a/1392549
         from pathlib import Path
         model_path = Path(self.path)
@@ -606,7 +617,8 @@ class AbstractModel:
     #  If the model takes ~40%+ of memory, this may result in an OOM error.
     #  This is generally not an issue because the model already needed to do this when being saved to disk, so the error would have been triggered earlier.
     #  Consider using Pympler package for memory efficiency: https://pympler.readthedocs.io/en/latest/asizeof.html#asizeof
-    def get_memory_size(self):
+    def get_memory_size(self) -> int:
+        gc.collect()  # Try to avoid OOM error
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     # Removes non-essential objects from the model to reduce memory and disk footprint.
@@ -627,7 +639,7 @@ class AbstractModel:
         # TODO: Report errors?
         shutil.rmtree(path=model_path, ignore_errors=True)
 
-    def get_info(self):
+    def get_info(self) -> dict:
         info = dict(
             name=self.name,
             model_type=type(self).__name__,
@@ -640,13 +652,16 @@ class AbstractModel:
             hyperparameters=self.params,
             hyperparameters_fit=self.params_trained,  # TODO: Explain in docs that this is for hyperparameters that differ in final model from original hyperparameters, such as epochs (from early stopping)
             hyperparameters_nondefault=self.nondefault_params,
+            AG_args_fit=self.params_aux,
+            num_features=len(self.features) if self.features else None,
+            features=self.features,
             # disk_size=self.get_disk_size(),
             memory_size=self.get_memory_size(),  # Memory usage of model in bytes
         )
         return info
 
     @classmethod
-    def load_info(cls, path, load_model_if_required=True):
+    def load_info(cls, path, load_model_if_required=True) -> dict:
         load_path = path + cls.model_info_name
         try:
             return load_pkl.load(path=load_path)
@@ -657,18 +672,10 @@ class AbstractModel:
             else:
                 raise
 
-    def save_info(self):
+    def save_info(self) -> dict:
         info = self.get_info()
 
         save_pkl.save(path=self.path + self.model_info_name, object=info)
         json_path = self.path + self.model_info_json_name
         save_json.save(path=json_path, obj=info)
         return info
-
-
-class SKLearnModel(AbstractModel):
-    """Abstract model for all Sklearn models."""
-
-    def preprocess(self, X):
-        X = convert_categorical_to_int(X)
-        return super().preprocess(X)

@@ -4,8 +4,8 @@ import pickle
 from collections import OrderedDict
 import numpy as np
 
+from .bayesopt.autogluon.debug_log import DebugLogPrinter
 from ..utils import DeprecationHelper
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
 
 __all__ = ['BaseSearcher',
            'RandomSearcher',
@@ -52,7 +52,7 @@ class BaseSearcher(object):
                 Scheduler the searcher is used with.
 
         """
-        from autogluon.scheduler.fifo import FIFOScheduler
+        from ..scheduler.fifo import FIFOScheduler
 
         if isinstance(scheduler, FIFOScheduler):
             self._reward_attribute = scheduler._reward_attr
@@ -319,7 +319,7 @@ class RandomSearcher(BaseSearcher):
                 Scheduler the searcher is used with.
 
         """
-        from autogluon.scheduler.hyperband import HyperbandScheduler
+        from ..scheduler.hyperband import HyperbandScheduler
 
         super().configure_scheduler(scheduler)
         self._resource_attribute = None

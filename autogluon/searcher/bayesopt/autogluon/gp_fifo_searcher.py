@@ -4,38 +4,23 @@ import copy
 import logging
 import ConfigSpace as CS
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import CandidateEvaluation, \
-    Candidate, candidate_for_print, PendingEvaluation
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import HyperparameterRanges
-from autogluon.searcher.bayesopt.models.gpmxnet import GPModel, GPMXNetModel
-from autogluon.searcher.bayesopt.models.gpmxnet_transformers import \
-    GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
-from autogluon.searcher.bayesopt.models.gpmxnet_skipopt import \
-    SkipOptimizationPredicate
-from autogluon.searcher.bayesopt.tuning_algorithms.common import \
-    RandomStatefulCandidateGenerator, compute_blacklisted_candidates
-from autogluon.searcher.bayesopt.tuning_algorithms.bo_algorithm_components import \
-    IndependentThompsonSampling
-from autogluon.searcher.bayesopt.tuning_algorithms.bo_algorithm import \
-    BayesianOptimizationAlgorithm
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    dictionarize_objective, DEFAULT_METRIC, \
-    DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, \
-    DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    LocalOptimizer, AcquisitionFunction, ScoringFunction
-from autogluon.searcher.bayesopt.utils.duplicate_detector import \
-    DuplicateDetectorIdentical
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from .debug_log import DebugLogPrinter
+from .gp_profiling import GPMXNetSimpleProfiler
+from .hp_ranges import HyperparameterRanges_CS
+from ..datatypes.common import CandidateEvaluation, Candidate, candidate_for_print, PendingEvaluation
+from ..datatypes.hp_ranges import HyperparameterRanges
+from ..datatypes.tuning_job_state import TuningJobState
+from ..models.gpmxnet import GPModel, GPMXNetModel
+from ..models.gpmxnet_skipopt import SkipOptimizationPredicate
+from ..models.gpmxnet_transformers import GPMXNetPendingCandidateStateTransformer, GPMXNetModelArgs
+from ..tuning_algorithms.base_classes import LocalOptimizer, AcquisitionFunction, ScoringFunction
+from ..tuning_algorithms.bo_algorithm import BayesianOptimizationAlgorithm
+from ..tuning_algorithms.bo_algorithm_components import IndependentThompsonSampling
+from ..tuning_algorithms.common import RandomStatefulCandidateGenerator, compute_blacklisted_candidates
+from ..tuning_algorithms.default_algorithm import dictionarize_objective, DEFAULT_METRIC, DEFAULT_LOCAL_OPTIMIZER_CLASS, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
+from ..utils.duplicate_detector import DuplicateDetectorIdentical
 
 logger = logging.getLogger(__name__)
-
 
 GET_CONFIG_RANDOM_RETRIES = 50
 

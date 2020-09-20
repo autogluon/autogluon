@@ -4,6 +4,7 @@ from typing import List
 import networkx as nx
 import numpy as np
 import pandas as pd
+import psutil
 from pandas import DataFrame, Series
 from collections import defaultdict
 
@@ -39,12 +40,12 @@ class AbstractTrainer:
     distill_stackname = 'distill'  # name of stack-level for distilled student models
 
     def __init__(self, path: str, problem_type: str, scheduler_options=None, eval_metric=None, stopping_metric=None,
-                 num_classes=None, low_memory=False, feature_types_metadata=None, kfolds=0, n_repeats=1,
+                 num_classes=None, low_memory=False, feature_metadata=None, kfolds=0, n_repeats=1,
                  stack_ensemble_levels=0, time_limit=None, save_data=False, save_bagged_folds=True, random_seed=0, verbosity=2,
                  compression_fn=None, compression_fn_kwargs=None):
         self.path = path
         self.problem_type = problem_type
-        self.feature_types_metadata = feature_types_metadata
+        self.feature_metadata = feature_metadata
         self.save_data = save_data
         self.random_seed = random_seed  # Integer value added to the stack level to get the random_seed for kfold splits or the train/val split if bagging is disabled
         self.verbosity = verbosity
@@ -64,12 +65,12 @@ class AbstractTrainer:
             self.stopping_metric = self.eval_metric
 
         self.eval_metric_expects_y_pred = scorer_expects_y_pred(scorer=self.eval_metric)
-        logger.log(25, "AutoGluon will gauge predictive performance using evaluation metric: %s" % self.eval_metric.name)
+        logger.log(25, f"AutoGluon will gauge predictive performance using evaluation metric: '{self.eval_metric.name}'")
         if not self.eval_metric_expects_y_pred:
-            logger.log(25, "This metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
+            logger.log(25, "\tThis metric expects predicted probabilities rather than predicted class labels, so you'll need to use predict_proba() instead of predict()")
 
-        logger.log(20, "To change this, specify the eval_metric argument of fit()")
-        logger.log(25, "AutoGluon will early stop models using evaluation metric: %s" % self.stopping_metric.name)
+        logger.log(20, "\tTo change this, specify the eval_metric argument of fit()")
+        logger.log(25, f"AutoGluon will early stop models using evaluation metric: '{self.stopping_metric.name}'")
         self.num_classes = num_classes
         self.feature_prune = False # will be set to True if feature-pruning is turned on.
         self.low_memory = low_memory
@@ -239,8 +240,8 @@ class AbstractTrainer:
             kfolds = self.kfolds
         if n_repeats is None:
             n_repeats = self.n_repeats
-        if model.feature_types_metadata is None:
-            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: move this into model creation process?
+        if model.feature_metadata is None:
+            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: move this into model creation process?
         model_fit_kwargs = {}
         if self.scheduler_options is not None:
             model_fit_kwargs = {'verbosity': self.verbosity,
@@ -340,7 +341,7 @@ class AbstractTrainer:
     def train_single_full(self, X_train, y_train, X_val, y_val, model: AbstractModel, feature_prune=False,
                           hyperparameter_tune=True, stack_name='core', kfolds=None, k_fold_start=0, k_fold_end=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
         if (n_repeat_start == 0) and (k_fold_start == 0):
-            model.feature_types_metadata = copy.deepcopy(self.feature_types_metadata)  # TODO: Don't set feature_types_metadata here
+            model.feature_metadata = copy.deepcopy(self.feature_metadata)  # TODO: Don't set feature_metadata here
         if feature_prune:
             if n_repeat_start != 0:
                 raise ValueError('n_repeat_start must be 0 to feature_prune, value = ' + str(n_repeat_start))
@@ -591,7 +592,7 @@ class AbstractTrainer:
             extra_params = {}
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
                                                         base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
-                                                        eval_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs, **extra_params)
+                                                        eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs, **extra_params)
 
         self.train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
@@ -912,10 +913,10 @@ class AbstractTrainer:
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
     def refit_ensemble_full(self, model='all'):
-        if model is 'all':
+        if model == 'all':
             ensemble_set = self.get_model_names_all()
         else:
-            if model is 'best':
+            if model == 'best':
                 model = self.get_model_best()
             ensemble_set = self.get_minimum_model_set(model)
         models_trained_full = self.refit_single_full(models=ensemble_set)
@@ -991,12 +992,50 @@ class AbstractTrainer:
             self.models[model.name] = model
 
     def save(self):
+        models = self.models
+        if self.low_memory:
+            self.models = {}
         save_pkl.save(path=self.path + self.trainer_file_name, object=self, compression_fn=self.compression_fn,
                       compression_fn_kwargs=self.compression_fn_kwargs)
+        if self.low_memory:
+            self.models = models
 
-    def load_models_into_memory(self, model_names=None):
-        if model_names is None:
+    def persist_models(self, model_names='all', with_ancestors=False, max_memory=None) -> list:
+        if model_names == 'all':
             model_names = self.get_model_names_all()
+        elif model_names == 'best':
+            if self.model_best is not None:
+                model_names = [self.model_best]
+            else:
+                model_names = [self.get_model_best(can_infer=True)]
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
+        if with_ancestors:
+            model_names = self.get_minimum_models_set(model_names)
+        model_names_already_persisted = [model_name for model_name in model_names if model_name in self.models]
+        if model_names_already_persisted:
+            logger.log(30, f'The following {len(model_names_already_persisted)} models were already persisted and will be ignored in the model loading process: {model_names_already_persisted}')
+        model_names = [model_name for model_name in model_names if model_name not in model_names_already_persisted]
+        if not model_names:
+            logger.log(30, f'No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.')
+            return []
+        if max_memory is not None:
+            info = self.get_models_info(model_names)
+            model_mem_size_map = {model: info[model]['memory_size'] for model in model_names}
+            for model in model_mem_size_map:
+                if 'children_info' in info[model]:
+                    for child in info[model]['children_info'].values():
+                        model_mem_size_map[model] += child['memory_size']
+            total_mem_required = sum(model_mem_size_map.values())
+            available_mem = psutil.virtual_memory().available
+            memory_proportion = total_mem_required / available_mem
+            if memory_proportion > max_memory:
+                logger.log(30, f'Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory*100, 2)}%.')
+                logger.log(30, f'\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.')
+                return []
+            else:
+                logger.log(20, f'Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion*100, 2)}% of memory.')
+
         models = []
         for model_name in model_names:
             model = self.load_model(model_name)
@@ -1004,15 +1043,12 @@ class AbstractTrainer:
             models.append(model)
 
         for model in models:
-            if isinstance(model, StackerEnsembleModel):
-                for base_model_name in model.base_model_names:
-                    if base_model_name not in model.base_models_dict.keys():
-                        if base_model_name in self.models.keys():
-                            model.base_models_dict[base_model_name] = self.models[base_model_name]
+            # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
+        return model_names
 
     # TODO: model_name change to model in params
     def load_model(self, model_name: str, path: str = None, model_type=None) -> AbstractModel:
@@ -1026,6 +1062,22 @@ class AbstractTrainer:
             if model_type is None:
                 model_type = self.model_types[model_name]
             return model_type.load(path=path, reset_paths=self.reset_paths, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
+
+    def unpersist_models(self, model_names='all') -> list:
+        if model_names == 'all':
+            model_names = list(self.models.keys())
+        if not isinstance(model_names, list):
+            raise ValueError(f'model_names must be a list of model names. Invalid value: {model_names}')
+        unpersisted_models = []
+        for model in model_names:
+            if model in self.models:
+                self.models.pop(model)
+                unpersisted_models.append(model)
+        if unpersisted_models:
+            logger.log(20, f'Unpersisted {len(unpersisted_models)} models: {unpersisted_models}')
+        else:
+            logger.log(30, f'No valid persisted models were specified to be unpersisted, so no change in model persistence was performed.')
+        return unpersisted_models
 
     def _get_dummy_stacker(self, level, model_levels=None, use_orig_features=True):
         if model_levels is None:
@@ -1116,6 +1168,10 @@ class AbstractTrainer:
             logger.log(20, f'Computing raw permutation importance for {feature_count} features on {model.name} ...')
 
         if (subsample_size is not None) and (len(X) > subsample_size):
+            # Reset index to avoid error if duplicated indices.
+            X = X.reset_index(drop=True)
+            y = y.reset_index(drop=True)
+
             X = X.sample(subsample_size, random_state=0)
             y = y.loc[X.index]
 
@@ -1165,16 +1221,33 @@ class AbstractTrainer:
 
     # Sums the attribute value across all models that the provided model depends on, including itself.
     # For instance, this function can return the expected total predict_time of a model.
-    # attribute is the name of the desired attribute to be summed.
-    def get_model_attribute_full(self, model, attribute):
+    # attribute is the name of the desired attribute to be summed, or a dictionary of model name -> attribute value if the attribute is not present in the graph.
+    def get_model_attribute_full(self, model, attribute, func=sum):
         base_model_set = self.get_minimum_model_set(model)
+        if isinstance(attribute, dict):
+            is_dict = True
+        else:
+            is_dict = False
         if len(base_model_set) == 1:
-            return self.model_graph.nodes[base_model_set[0]][attribute]
-        attribute_full = 0
+            if is_dict:
+                return attribute[model]
+            else:
+                return self.model_graph.nodes[base_model_set[0]][attribute]
+        # attribute_full = 0
+        attribute_lst = []
         for base_model in base_model_set:
-            if self.model_graph.nodes[base_model][attribute] is None:
+            if is_dict:
+                attribute_base_model = attribute[base_model]
+            else:
+                attribute_base_model = self.model_graph.nodes[base_model][attribute]
+            if attribute_base_model is None:
                 return None
-            attribute_full += self.model_graph.nodes[base_model][attribute]
+            attribute_lst.append(attribute_base_model)
+            # attribute_full += attribute_base_model
+        if attribute_lst:
+            attribute_full = func(attribute_lst)
+        else:
+            attribute_full = 0
         return attribute_full
 
     # Returns dictionary of model name -> attribute value for the provided attribute
@@ -1183,12 +1256,20 @@ class AbstractTrainer:
 
     # Gets the minimum set of models that the provided model depends on, including itself
     # Returns a list of model names
-    def get_minimum_model_set(self, model):
+    def get_minimum_model_set(self, model) -> list:
         if not isinstance(model, str):
             model = model.name
         return list(nx.bfs_tree(self.model_graph, model, reverse=True))
 
-    def leaderboard(self):
+    # Gets the minimum set of models that the provided models depend on, including themselves
+    # Returns a list of model names
+    def get_minimum_models_set(self, models: list) -> list:
+        models_set = set()
+        for model in models:
+            models_set = models_set.union(self.get_minimum_model_set(model))
+        return list(models_set)
+
+    def leaderboard(self, extra_info=False):
         model_names = self.get_model_names_all()
         score_val = []
         fit_time_marginal = []
@@ -1197,6 +1278,7 @@ class AbstractTrainer:
         fit_time = []
         pred_time_val = []
         can_infer = []
+        fit_order = list(range(1,len(model_names)+1))
         score_val_dict = self.get_model_attributes_dict('val_score')
         fit_time_marginal_dict = self.get_model_attributes_dict('fit_time')
         predict_time_marginal_dict = self.get_model_attributes_dict('predict_time')
@@ -1208,6 +1290,56 @@ class AbstractTrainer:
             pred_time_val.append(self.get_model_attribute_full(model=model_name, attribute='predict_time'))
             stack_level.append(self.get_model_level(model_name))
             can_infer.append(self.model_graph.nodes[model_name]['can_infer'])
+
+        model_info_dict = defaultdict(list)
+        if extra_info:
+            # TODO: feature_metadata
+            # TODO: disk size
+            # TODO: load time
+            # TODO: Add persist_if_mem_safe() function to persist in memory all models if reasonable memory size (or a specific model+ancestors)
+            # TODO: Add is_persisted() function to check which models are persisted in memory
+            # TODO: package_dependencies, package_dependencies_full
+
+            info = self.get_info(include_model_info=True)
+            model_info = info['model_info']
+            custom_model_info = {}
+            for model_name in model_info:
+                custom_info = {}
+                bagged_info = model_info[model_name].get('bagged_info', {})
+                custom_info['num_models'] = bagged_info.get('num_child_models', 1)
+                custom_info['memory_size'] = bagged_info.get('max_memory_size', model_info[model_name]['memory_size'])
+                custom_info['memory_size_min'] = bagged_info.get('min_memory_size', model_info[model_name]['memory_size'])
+                custom_info['child_model_type'] = bagged_info.get('child_model_type', None)
+                custom_info['child_hyperparameters'] = bagged_info.get('child_hyperparameters', None)
+                custom_info['child_hyperparameters_fit'] = bagged_info.get('child_hyperparameters_fit', None)
+                custom_info['child_AG_args_fit'] = bagged_info.get('child_AG_args_fit', None)
+                custom_model_info[model_name] = custom_info
+
+            model_info_keys = ['num_features', 'model_type', 'hyperparameters', 'hyperparameters_fit', 'AG_args_fit', 'features']
+            model_info_sum_keys = []
+            for key in model_info_keys:
+                model_info_dict[key] = [model_info[model_name][key] for model_name in model_names]
+                if key in model_info_sum_keys:
+                    key_dict = {model_name: model_info[model_name][key] for model_name in model_names}
+                    model_info_dict[key + '_full'] = [self.get_model_attribute_full(model=model_name, attribute=key_dict) for model_name in model_names]
+
+            model_info_keys = ['num_models', 'memory_size', 'memory_size_min', 'child_model_type', 'child_hyperparameters', 'child_hyperparameters_fit', 'child_AG_args_fit']
+            model_info_full_keys = {'memory_size': [('memory_size_w_ancestors', sum)], 'memory_size_min': [('memory_size_min_w_ancestors', max)], 'num_models': [('num_models_w_ancestors', sum)]}
+            for key in model_info_keys:
+                model_info_dict[key] = [custom_model_info[model_name][key] for model_name in model_names]
+                if key in model_info_full_keys:
+                    key_dict = {model_name: custom_model_info[model_name][key] for model_name in model_names}
+                    for column_name, func in model_info_full_keys[key]:
+                        model_info_dict[column_name] = [self.get_model_attribute_full(model=model_name, attribute=key_dict, func=func) for model_name in model_names]
+
+            ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
+            descendants = [list(nx.dag.descendants(self.model_graph, model_name)) for model_name in model_names]
+
+            model_info_dict['num_ancestors'] = [len(ancestor_lst) for ancestor_lst in ancestors]
+            model_info_dict['num_descendants'] = [len(descendant_lst) for descendant_lst in descendants]
+            model_info_dict['ancestors'] = ancestors
+            model_info_dict['descendants'] = descendants
+
         df = pd.DataFrame(data={
             'model': model_names,
             'score_val': score_val,
@@ -1217,8 +1349,39 @@ class AbstractTrainer:
             'fit_time_marginal': fit_time_marginal,
             'stack_level': stack_level,
             'can_infer': can_infer,
+            'fit_order': fit_order,
+            **model_info_dict,
         })
         df_sorted = df.sort_values(by=['score_val', 'pred_time_val', 'model'], ascending=[False, True, False]).reset_index(drop=True)
+
+        df_columns_lst = df_sorted.columns.tolist()
+        explicit_order = [
+            'model',
+            'score_val',
+            'pred_time_val',
+            'fit_time',
+            'pred_time_val_marginal',
+            'fit_time_marginal',
+            'stack_level',
+            'can_infer',
+            'fit_order',
+            'num_features',
+            'num_models',
+            'num_models_w_ancestors',
+            'memory_size',
+            'memory_size_w_ancestors',
+            'memory_size_min',
+            'memory_size_min_w_ancestors',
+            'num_ancestors',
+            'num_descendants',
+            'model_type',
+            'child_model_type'
+        ]
+        explicit_order = [column for column in explicit_order if column in df_columns_lst]
+        df_columns_other = [column for column in df_columns_lst if column not in explicit_order]
+        df_columns_new = explicit_order + df_columns_other
+        df_sorted = df_sorted[df_columns_new]
+
         return df_sorted
 
     def get_info(self, include_model_info=False):
@@ -1226,13 +1389,21 @@ class AbstractTrainer:
         if self.model_best is not None:
             best_model = self.model_best
         else:
-            best_model = self.get_model_best()
-        best_model_score_val = self.model_performance.get(best_model)
+            try:
+                best_model = self.get_model_best()
+            except AssertionError:
+                best_model = None
+        if best_model is not None:
+            best_model_score_val = self.model_performance.get(best_model)
+            best_model_stack_level = self.get_model_level(best_model)
+        else:
+            best_model_score_val = None
+            best_model_stack_level = None
         # fit_time = None
         num_bagging_folds = self.kfolds
         max_core_stack_level = self.get_max_level('core')
         max_stack_level = self.get_max_level_all()
-        best_model_stack_level = self.get_model_level(best_model)
+
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
         stopping_metric = self.stopping_metric.name
@@ -1571,7 +1742,7 @@ class AbstractTrainer:
                 else:
                     y_train = pd.Series(y_train)
         else:
-            X_aug = augment_data(X_train=X_train, feature_types_metadata=self.feature_types_metadata,
+            X_aug = augment_data(X_train=X_train, feature_metadata=self.feature_metadata,
                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
             if len(X_aug) > 0:
                 if teacher_preds == 'hard':

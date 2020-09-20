@@ -4,12 +4,10 @@ from mxnet.ndarray import NDArray
 import numpy as np
 import logging
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    SurrogateModel
-from autogluon.searcher.bayesopt.gpmxnet.constants import DATA_TYPE
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from ..autogluon.debug_log import DebugLogPrinter
+from ..datatypes.tuning_job_state import TuningJobState
+from ..gpmxnet.constants import DATA_TYPE
+from ..tuning_algorithms.base_classes import SurrogateModel
 
 logger = logging.getLogger(__name__)
 

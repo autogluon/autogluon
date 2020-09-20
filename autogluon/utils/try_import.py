@@ -1,5 +1,5 @@
 __all__ = ['try_import_catboost', 'try_import_lightgbm', 'try_import_mxboard', 'try_import_mxnet',
-           'try_import_cv2', 'try_import_gluonnlp']
+           'try_import_cv2', 'try_import_gluonnlp', 'try_import_fastai_v1']
 
 def try_import_catboost():
     try:
@@ -33,22 +33,23 @@ def try_import_mxboard():
             "A quick tip is to install via `pip install mxboard`. ")
 
 def try_import_mxnet():
-    mx_version = '1.4.1'
+    mx_version = '1.6.0'
     try:
         import mxnet as mx
         from distutils.version import LooseVersion
 
         if LooseVersion(mx.__version__) < LooseVersion(mx_version):
             msg = (
-                "Legacy mxnet-mkl=={} detected, some new modules may not work properly. "
-                "mxnet-mkl>={} is required. You can use pip to upgrade mxnet "
-                "`pip install mxnet-mkl --pre --upgrade` "
-                "or `pip install mxnet-cu90mkl --pre --upgrade`").format(mx.__version__, mx_version)
-            raise ImportError(msg)
+                "Legacy mxnet=={} detected, some new modules will not work properly. "
+                "mxnet>={} is required. You can use pip to upgrade mxnet "
+                "`pip install mxnet --upgrade` "
+                "or `pip install mxnet_cu101 --upgrade`").format(mx.__version__, mx_version)
+            raise ValueError(msg)
     except ImportError:
         raise ImportError(
             "Unable to import dependency mxnet. "
-            "A quick tip is to install via `pip install mxnet-mkl/mxnet-cu90mkl --pre`. ")
+            "A quick tip is to install via `pip install mxnet --upgrade`, "
+            "or `pip install mxnet_cu101 --upgrade`")
 
 def try_import_cv2():
     try:
@@ -74,3 +75,21 @@ def try_import_gluonnlp():
             "without installing gluonnlp. "
             "A quick tip is to install via `pip install gluonnlp==0.8.1`. ")
     return gluonnlp
+
+def try_import_faiss():
+    try:
+        import faiss
+    except ImportError:
+        raise ImportError(
+            "Unable to import dependency faiss"
+            "A quick tip is to install via `pip install faiss-cpu`. ")
+
+def try_import_fastai_v1():
+    try:
+        from pkg_resources import parse_version  # pylint: disable=import-outside-toplevel
+        import fastai
+        fastai_version = parse_version(fastai.__version__)
+        assert parse_version('1.0.61') <= fastai_version < parse_version('2.0.0'), 'Currently, we only support 1.0.61<=fastai<2.0.0'
+    except ModuleNotFoundError as e:
+        raise ImportError("Import fastai failed. A quick tip is to install via `pip install fastai==1.*`. "
+                          "If you are using Mac OSX, please use this torch version to avoid compatibility issues: `pip install torch==1.6.0`.")

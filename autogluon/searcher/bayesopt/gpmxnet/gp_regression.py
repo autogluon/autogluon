@@ -3,24 +3,17 @@ from mxnet import autograd
 from typing import Optional, List
 import logging
 
-from autogluon.searcher.bayesopt.gpmxnet.gp_model import GaussianProcessModel
-from autogluon.searcher.bayesopt.gpmxnet.utils import param_to_pretty_string
-from autogluon.searcher.bayesopt.gpmxnet.optimization_utils import \
-    apply_lbfgs_with_multiple_starts
-from autogluon.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
-from autogluon.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction, \
-    MeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.constants import OptimizationConfig, \
-    DEFAULT_OPTIMIZATION_CONFIG
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.gpmxnet.debug_gp_regression import \
-    DebugGPRegression
+from .constants import OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
+from .debug_gp_regression import DebugGPRegression
+from .gluon_blocks_helpers import encode_unwrap_parameter
+from .gp_model import GaussianProcessModel
+from .kernel import KernelFunction
+from .likelihood import MarginalLikelihood
+from .mean import ScalarMeanFunction, MeanFunction
+from .optimization_utils import apply_lbfgs_with_multiple_starts
+from .posterior_state import GaussProcPosteriorState
+from .utils import param_to_pretty_string
+from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
 
 logger = logging.getLogger(__name__)
 
