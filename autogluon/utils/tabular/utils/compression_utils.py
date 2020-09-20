@@ -1,4 +1,3 @@
-import os
 import gzip
 import bz2
 import lzma
@@ -26,7 +25,7 @@ compression_fn_map = {
 
 def get_validated_path(filename, compression_fn=None):
     if compression_fn is not None:
-        filename_root = os.path.splitext(filename)[0]
+        filename_root = filename.rsplit('.')[0]
         validated_path = f"{filename_root}.{compression_fn_map[compression_fn]['extension']}"
     else:
         validated_path = filename
