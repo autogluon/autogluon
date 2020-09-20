@@ -101,7 +101,7 @@ class DefaultLearner(AbstractLearner):
         if self.stopping_metric is None:
             self.stopping_metric = trainer.stopping_metric
 
-        self.save(compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+        self.save()
         trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
                       hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
         self.save_trainer(trainer=trainer)

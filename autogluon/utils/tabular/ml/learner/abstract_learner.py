@@ -493,15 +493,15 @@ class AbstractLearner:
     def infer_problem_type(y: Series):
         return infer_problem_type(y=y)
 
-    def save(self, compression_fn=None, compression_fn_kwargs=None):
+    def save(self):
         trainer = None
         if self.trainer is not None:
             if not self.is_trainer_present:
                 self.trainer.save()
                 trainer = self.trainer
                 self.trainer = None
-        save_pkl.save(path=self.save_path, object=self, compression_fn=compression_fn,
-                      compression_fn_kwargs=compression_fn_kwargs)
+        save_pkl.save(path=self.save_path, object=self, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
         self.trainer = trainer
 
     # reset_paths=True if the learner files have changed location since fitting.
