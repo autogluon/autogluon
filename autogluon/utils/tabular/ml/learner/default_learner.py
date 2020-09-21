@@ -31,10 +31,11 @@ class DefaultLearner(AbstractLearner):
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None,scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2, unlabeled_data=None):
+            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
+                X_unlabeled (DataFrame): data used for pretraining a model. Mostly used in semi-supervised situations.
                 hyperparameter_tune (bool): whether to tune hyperparameters or simply use default values
                 feature_prune (bool): whether to perform feature selection
                 scheduler_options (tuple: (search_strategy, dict): Options for scheduler
