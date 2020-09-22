@@ -21,7 +21,7 @@ from torchvision import transforms
     learning_rate=ag.space.Real(lower=1e-6, upper=1, log=True),
     batch_size=ag.space.Int(lower=8, upper=128),
     wd=ag.space.Real(lower=1e-8, upper=1, log=True),
-    epochs=27,
+    epochs=27
 )
 def objective_function(args, reporter, **kwargs):
     ts_start = time.time()
@@ -111,10 +111,10 @@ def objective_function(args, reporter, **kwargs):
         ts_now = time.time()
         eval_time = ts_start - ts_now
         reporter(
-            epoch=epoch + 1,
+            epochs=epoch + 1,
             performance=float(curr_best),
             eval_time=eval_time,
-            time_step=ts_now)
+            time_step=ts_now, **config)
 
 
 def callback(training_history, start_timestamp):
@@ -211,9 +211,8 @@ if __name__ == "__main__":
                                                 reward_attr='performance',
                                                 # The metric along we make scheduling decision. Needs to be also
                                                 # reported back to AutoGluon in the objective function.
-                                                time_attr='epoch',
+                                                time_attr='epochs',
                                                 brackets=brackets,
-                                                max_t=27,  # maximum number of epochs to train the network
                                                 checkpoint=None,
                                                 searcher="bayesopt",  # Defines searcher for new configurations
                                                 dist_ip_addrs=dist_ip_addrs,
