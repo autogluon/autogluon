@@ -876,7 +876,7 @@ class AbstractTrainer:
                         X_train_stack_preds = self.get_inputs_to_stacker_v2(X, base_models=base_models, fit=True, use_orig_features=False)
                         y_input = y
                     else:
-                        X_train_stack_preds = self.get_inputs_to_stacker_v2(X, base_models=base_models, fit=False, use_orig_features=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
+                        X_train_stack_preds = self.get_inputs_to_stacker_v2(X_val, base_models=base_models, fit=False, use_orig_features=False)  # TODO: May want to cache this during original fit, as we do with OOF preds
                         y_input = y_val
 
                     # TODO: Remove child_hyperparameters, make this cleaner
