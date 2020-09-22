@@ -111,7 +111,7 @@ def objective_function(args, reporter, **kwargs):
         ts_now = time.time()
         eval_time = ts_start - ts_now
         reporter(
-            epochs=epoch + 1,
+            epoch=epoch + 1,
             performance=float(curr_best),
             eval_time=eval_time,
             time_step=ts_now, **config)
@@ -211,7 +211,7 @@ if __name__ == "__main__":
                                                 reward_attr='performance',
                                                 # The metric along we make scheduling decision. Needs to be also
                                                 # reported back to AutoGluon in the objective function.
-                                                time_attr='epochs',
+                                                time_attr='epoch',
                                                 brackets=brackets,
                                                 checkpoint=None,
                                                 searcher="bayesopt",  # Defines searcher for new configurations
