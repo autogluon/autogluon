@@ -321,11 +321,15 @@ To reduce memory usage during training, you may try each of the following strate
 
 - In `fit()`, set `hyperparameters = ‘light’` or `hyperparameters = 'very_light'`.
 
-- Text fields in your table require substantial memory for N-gram featurization. To mitigate this in `fit()`, you can either: (1) add `'ignore_text'` to your `presets` list (to ignore text features), or specify:
+- Text fields in your table require substantial memory for N-gram featurization. To mitigate this in `fit()`, you can either: (1) add `'ignore_text'` to your `presets` list (to ignore text features), or (2) specify the argument:
 
-`feature_generator = autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))`
+```
+feature_generator = autogluon.utils.tabular.features.generators.auto_ml_pipeline.AutoMLPipelineFeatureGenerator(vectorizer=CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=MAX_NGRAM, dtype=np.uint8))
+```
 
-where `MAX_NGRAM = 1000` say (try various values under 10000) and [CountVectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text` (to reduce the number of N-grams used to represent each text field).
+where `MAX_NGRAM = 1000` say (try various values under 10000 to reduce the number of N-gram features used to represent each text field) and [CountVectorizer](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.CountVectorizer.html) is imported from `sklearn.feature_extraction.text`.
+
+In addition to reducing memory usage, many of the above strategies can also be used to reduce training times.
 
 To reduce memory usage during inference:
 
