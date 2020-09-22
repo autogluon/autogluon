@@ -85,7 +85,6 @@ class DefaultLearner(AbstractLearner):
             n_repeats=num_bagging_sets,
             stack_ensemble_levels=stack_ensemble_levels,
             scheduler_options=scheduler_options,
-            time_limit=time_limit_trainer,
             save_data=save_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
@@ -100,7 +99,7 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
         trainer.train(X, y, X_val, y_val, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
-                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
+                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limit_trainer)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
         self.time_fit_training = time_end - time_preprocessing_end
