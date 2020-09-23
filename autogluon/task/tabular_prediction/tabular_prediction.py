@@ -218,7 +218,10 @@ class TabularPrediction(BaseTask):
             Default:
                 hyperparameters = {
                     'NN': {},
-                    'GBM': {},
+                    'GBM': [
+                        {},
+                        {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+                    ],
                     'CAT': {},
                     'RF': [
                         {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
