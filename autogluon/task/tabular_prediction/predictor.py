@@ -803,7 +803,7 @@ class TabularPredictor(BasePredictor):
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_train_stack_preds = trainer.get_inputs_to_stacker_v2(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_train_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
 
         models = []
 
