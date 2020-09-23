@@ -32,7 +32,7 @@ def get_kwargs(**kw):
                 'freq': 1,
                 'pretrain_freq': 100,
                 'feature_dim': 64,
-                'epochs': 50,
+                'epochs': 3,
                 'pretrain_epochs': 200}
       
 

@@ -256,8 +256,6 @@ class TabTransformer_fix_attention(TabModelBase):
 
             out = torch.cat([last_layer, max, mean], dim=1)
 
-
-
         elif self.readout == 'all_feat_embs':
             out = feat_embs
         elif self.readout == 'mean_feat_embs':

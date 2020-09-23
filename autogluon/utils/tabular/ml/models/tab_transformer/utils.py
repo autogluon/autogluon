@@ -31,11 +31,9 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
         for data, target in data_bar:
             data, target = pretext.get(data, target)
 
-            # TODO: This is a work in progress to get CUDA working for TT inside AutoGluon
-            # if torch.cuda.is_available(): ???
-            #data, target = data.cuda(), target.cuda() # TODO: Similar to .to('cuda:0') except it figures out default GPU device.
-            #data, target = data.to('cuda'), target.to('cuda')
-            #data, target = data.to(device), target.to(device) # TODO: Hard coded device
+            # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+            if torch.cuda.is_available():
+                data, target = data.cuda(), target.cuda()
 
             if state in [None, 'finetune']:
                 data, target = augmentation(data,target, **aug_kwargs)

@@ -1,6 +1,8 @@
 """ TabTransformer model """
 import time
 
+from torch.autograd import Variable
+
 from ..abstract.abstract_model import AbstractModel
 from ....ml.utils import infer_problem_type
 from ....utils.loaders import load_pkl
@@ -163,6 +165,9 @@ class TabTransformerModel(AbstractModel):
 
     def get_model(self):
         self.model=TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
+        # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+        if torch.cuda.is_available():
+            self.model = self.model.cuda()
 
     def _get_no_period_columns(self, X): 
         # Latest pytorch does not support . in module names. Therefore, we must replace the . with some other symbol
@@ -204,7 +209,6 @@ class TabTransformerModel(AbstractModel):
                 unlab_data.fit_feat_encoders()
                 self.fe = unlab_data.feature_encoders
 
-
         data.encode(self.fe)
 
         if X_val is not None:
@@ -217,7 +221,6 @@ class TabTransformerModel(AbstractModel):
             unlab_data.encode(self.fe)
 
         return data, val_data, unlab_data
-
 
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, **kwargs):
@@ -261,17 +264,39 @@ class TabTransformerModel(AbstractModel):
             # Need to remove periods on test data columns.
             X = X.rename(columns = self._get_no_period_columns(X))
 
+        loader = X.build_loader()
+
         self.model.eval()
         softmax=nn.Softmax(dim=1)
-        with torch.no_grad():
-            out, _ = self.model(X.cat_data)
-            prob=softmax(out)
-        prob=prob.detach().numpy()
 
-        if prob.shape[1]==2:
-            prob=prob[:,1]
-        
-        return prob
+        # TODO: Pre-allocate outputs and index into it for additional performance.
+        #outputs = torch.zeros([len(X), 1])
+        outputs = []
+
+        #iter = 0
+        for data, _ in loader:
+            # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+            if torch.cuda.is_available():
+                data = data.cuda()
+            with torch.no_grad():
+                data = Variable(data)
+                out, _ = self.model(data)
+                #batch_size = len(out)
+                prob = softmax(out)
+
+                # If binary classification
+                if prob.shape[1] == 2:
+                    prob = prob[:, 1]
+
+            outputs.append(prob)
+            #outputs[iter:(iter+batch_size)] = prob
+            #iter += batch_size
+
+        outputs = torch.cat(outputs, dim=0)
+        preds = outputs.cpu().numpy()
+
+        return preds
+
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
         """
