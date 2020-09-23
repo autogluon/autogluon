@@ -76,7 +76,7 @@ We can also save the trained model, and use it later.
 savefile = 'model.pkl'
 detector.save(savefile)
 
-from autogluon import Detector
+from autogluon.vision import Detector
 new_detector = Detector.load(savefile)
 ```
 
