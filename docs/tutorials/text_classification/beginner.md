@@ -18,8 +18,8 @@ AutoGluon will automatically train many models under thousands of different hype
 We begin by specifying `TextClassification` as our task of interest:
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TextClassification as task
+import autogluon.core as ag
+from autogluon.text.task.text_classification import TextClassification as task
 ```
 
 

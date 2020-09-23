@@ -12,7 +12,7 @@ AutoGluon: AutoML Toolkit for Deep Learning
 
    Example using AutoGluon to train and deploy high-performance model on a tabular dataset:
    
-   >>> from autogluon import TabularPrediction as task
+   >>> from autogluon.tabular.task.tabular_prediction import TabularPrediction as task
    >>> predictor = task.fit(train_data=task.Dataset(file_path=TRAIN_DATA.csv), label=COLUMN_NAME)
    >>> predictions = predictor.predict(task.Dataset(file_path=TEST_DATA.csv))
    
@@ -95,10 +95,10 @@ Advanced Topics
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
-   api/autogluon.space
+   api/autogluon.core.space
    api/autogluon.core
-   api/autogluon.task
-   api/autogluon.scheduler
-   api/autogluon.searcher
-   api/autogluon.utils
+   api/autogluon.core.task
+   api/autogluon.core.scheduler
+   api/autogluon.core.searcher
+   api/autogluon.core.utils
    model_zoo/index

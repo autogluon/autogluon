@@ -6,8 +6,8 @@ Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predi
 To start, import autogluon and TabularPrediction module as your task:
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TabularPrediction as task
+import autogluon.core as ag
+from autogluon.tabular.task.tabular_prediction import TabularPrediction as task
 ```
 
 Load training data from a CSV file into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
@@ -58,7 +58,7 @@ Now you're ready to try AutoGluon on your own tabular datasets!
 As long as they're stored in a popular format like CSV, you should be able to achieve strong predictive performance with just 2 lines of code:
 
 ```
-from autogluon import TabularPrediction as task
+from autogluon.tabular.task.tabular_prediction import TabularPrediction as task
 predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
 ```
 

@@ -1,13 +1,13 @@
 .. role:: hidden
     :class: hidden-section
 
-autogluon.utils
-===============
+autogluon.core.utils
+====================
 
 Various built-in utility functions and objects that are used throughout AutoGluon.
 
-.. automodule:: autogluon.utils
-.. currentmodule:: autogluon.utils
+.. automodule:: autogluon.core.utils
+.. currentmodule:: autogluon.core.utils
 
 Utils
 -----

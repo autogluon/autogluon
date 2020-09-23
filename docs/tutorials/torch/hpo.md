@@ -109,7 +109,7 @@ Let's define a 'dynamic' network with searchable configurations by simply adding
 More info about searchable space is available at :meth:`autogluon.space`.
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 
 @ag.obj(
     hidden_conv=ag.space.Int(6, 12),

@@ -1,16 +1,16 @@
 .. role:: hidden
     :class: hidden-section
 
-autogluon.task
+autogluon.core.task
 ===============
 
 .. admonition:: Example (image classification task):
    
    Tell AutoGluon that task is image classification:
    
-   >>> import autogluon as ag
-   >>> from autogluon import ImageClassification as task
-   
+   >>> import autogluon.core as ag
+   >>> from autogluon.vision import ImageClassification as task
+
    Load a toy image dataset:
    
    >>> filename = ag.download('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
@@ -27,7 +27,7 @@ autogluon.task
    >>> test_acc = classifier.evaluate(test_dataset)
 
 
-.. automodule:: autogluon.task
+.. automodule:: autogluon.core.task
 
 AutoGluon Tasks
 -----------------
@@ -102,7 +102,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 Additional Tabular Prediction APIs
 ----------------------------------
 
-.. automodule:: autogluon.task.tabular_prediction
+.. automodule:: autogluon.core.task.tabular_prediction
 
 :hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -131,7 +131,7 @@ Additional Tabular Prediction APIs
 Additional Image Classification APIs
 ------------------------------------
 
-.. automodule:: autogluon.task.image_classification
+.. automodule:: autogluon.core.task.image_classification
 
 :hidden:`Classifier`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -193,7 +193,7 @@ Additional Image Classification APIs
 Additional Object Detection APIs
 --------------------------------
 
-.. automodule:: autogluon.task.object_detection
+.. automodule:: autogluon.core.task.object_detection
 
 :hidden:`Detector`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,7 +211,7 @@ Additional Object Detection APIs
     .. autoautosummary:: Detector
         :attributes:
 
-.. automodule:: autogluon.task.object_detection.dataset
+.. automodule:: autogluon.core.task.object_detection.dataset
 
 :hidden:`get_dataset`
 ~~~~~~~~~~~~~~~~~~~~~
@@ -271,7 +271,7 @@ Additional Object Detection APIs
 Additional Text Prediction APIs
 -----------------------------------
 
-.. automodule:: autogluon.task.text_prediction.models.basic_v1
+.. automodule:: autogluon.text.task.text_prediction.models.basic_v1
 
 :hidden:`BertForTextPredictionBasic`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -7,7 +7,7 @@ The Tabular Dataset API works with pandas Dataframes, which supports chunking da
 Here's an example of one such chunk-based inference:
 
 ```{.python .input}
-from autogluon import TabularPrediction as task
+from autogluon.tabular.task.tabular_prediction import TabularPrediction as task
 import pandas as pd
 import requests
 

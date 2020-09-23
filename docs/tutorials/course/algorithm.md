@@ -22,7 +22,7 @@ In this section, we compare the different behaviors of a sequential First In, Fi
 
 ```{.python .input}
 import numpy as np
-import autogluon as ag
+import autogluon.core as ag
 
 @ag.args(
     lr=ag.space.Real(1e-3, 1e-2, log=True),

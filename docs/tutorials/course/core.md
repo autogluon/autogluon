@@ -10,7 +10,7 @@ simple search spaces (Int, Real, and Categorical) and nested search spaces
 ### Simple Search Space
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 ```
 
 #### Integer Space :class:`autogluon.space.Int`

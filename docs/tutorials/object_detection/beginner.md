@@ -10,8 +10,8 @@ Our goal is to detect motorbike in images by [YOLOv3 model](https://pjreddie.com
 To start, import autogluon and ObjectDetection module as your task: 
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import ObjectDetection as task
+import autogluon.core as ag
+from autogluon.vision.task import ObjectDetection as task
 ```
 
 ## Tiny_motorbike Dataset

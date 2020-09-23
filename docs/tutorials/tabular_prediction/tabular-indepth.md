@@ -8,8 +8,8 @@ This tutorial describes how you can exert greater control when using AutoGluon's
 Start by importing AutoGluon, specifying TabularPrediction as the task, and loading the data.
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TabularPrediction as task
+import autogluon.core as ag
+from autogluon.tabular.task.tabular_prediction import TabularPrediction as task
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 train_data = train_data.head(500) # subsample 500 data points for faster demo (comment this out to run on full dataset instead)

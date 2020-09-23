@@ -1,15 +1,15 @@
 .. role:: hidden
     :class: hidden-section
 
-autogluon.scheduler
-===================
+autogluon.core.scheduler
+========================
 
 .. admonition:: Example
 
    Define a toy training function with searchable spaces:
 
    >>> import numpy as np
-   >>> import autogluon as ag
+   >>> import autogluon.core as ag
    >>> @ag.args(
    ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
    ...     wd=ag.space.Real(1e-3, 1e-2),
@@ -50,7 +50,7 @@ autogluon.scheduler
 Schedulers
 ----------
 
-.. currentmodule:: autogluon.scheduler
+.. currentmodule:: autogluon.core.scheduler
 
 .. autosummary::
    :nosignatures:
