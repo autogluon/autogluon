@@ -27,6 +27,18 @@ See ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.
 See ["If you encounter disk space issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-disk-space-issues).
 
 
+### How can I reduce the time required for training?
+
+Specify the `time_limits` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`. If a particular type of model is taking much longer to train on your data than the other types of models, you can tell AutoGluon not to train any models of this particular type by specifying its short-name in the `excluded_model_types` argument of `fit()`.
+
+Since many of the strategies to reduce memory usage also reduce training times, also check out: ["If you encounter memory issues" in the In Depth Tutorial](tabular-indepth.html#if-you-encounter-memory-issues).
+
+
+### How can I reduce the time required for prediction?
+
+See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
+
+
 ### How does TabularPrediction work internally?
 
 Details are provided in the following paper:
@@ -37,16 +49,6 @@ Details are provided in the following paper:
 ### How to view more detailed logs of what is happening during fit?
 
 Specify the argument `verbosity = 4` in `fit()`.
-
-
-### How can I reduce the time required for training?
-
-Specify the `time_limits` argument in `fit()` to the number of seconds you are willing to wait (longer time limits generally result in superior predictive performance). You may also try other settings of the `presets` argument in `fit()`, and can also subsample your data for a quick trial run via `train_data.sample(n=SUBSAMPLE_SIZE)`.
-
-
-### How can I reduce the time required for prediction?
-
-See ["Accelerating inference" in the In Depth Tutorial](tabular-indepth.html#accelerating-inference).
 
 
 ### What model is AutoGluon using for prediction?
