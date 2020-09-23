@@ -542,7 +542,7 @@ class AbstractTrainer:
         self._time_limit = None
         self.save()
 
-    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0,  base_model_names=None, hyperparameter_tune=False, feature_prune=False, time_limit_core=None, time_limit_aux=None):
+    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0, base_model_names=None, hyperparameter_tune=False, feature_prune=False, time_limit_core=None, time_limit_aux=None):
         core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, models=models, level=level, base_model_names=base_model_names, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core)
         if self.bagged_mode:
             aux_models = self.stack_new_level_aux(X=X, y=y, level=level+1, base_model_names=core_models, time_limit=time_limit_aux)
@@ -582,8 +582,7 @@ class AbstractTrainer:
 
         return self._train_multi(X_train=X_train_init, y_train=y, X_val=X_val, y_val=y_val, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level=level, stack_name=stack_name, kfolds=kfolds, n_repeats=n_repeats, time_limit=time_limit)
 
-    def stack_new_level_aux(self, X, y, level, base_model_names=None, fit=True, time_limit=None):
-        stack_name = 'aux1'
+    def stack_new_level_aux(self, X, y, level, base_model_names=None, fit=True, stack_name='aux1', time_limit=None):
         X_train_stack_preds = self.get_inputs_to_stacker(X, base_models=base_model_names, fit=fit)
         return self.generate_weighted_ensemble(X=X_train_stack_preds, y=y, level=level, base_model_names=base_model_names, kfolds=0, n_repeats=1, stack_name=stack_name, time_limit=time_limit)
 
