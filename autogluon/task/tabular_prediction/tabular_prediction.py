@@ -221,6 +221,7 @@ class TabularPrediction(BaseTask):
                     'GBM': [
                         {},
                         {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+                        {'boosting_type': 'dart', 'AG_args': {'name_suffix': 'DART', 'priority': -5}},
                     ],
                     'CAT': {},
                     'RF': [
