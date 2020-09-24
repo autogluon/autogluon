@@ -488,6 +488,11 @@ class TabularPrediction(BaseTask):
             tuning_features = np.array([column for column in tuning_data.columns if column != label])
             if np.any(train_features != tuning_features):
                 raise ValueError("Column names must match between training and tuning data")
+        if unlabeled_data is not None:
+            train_features = np.array([column for column in train_data.columns if column != label])
+            unlabeled_features = np.array([column for column in unlabeled_data.columns if column != label])
+            if np.any(train_features != unlabeled_features):
+                raise ValueError("Column names must match between training and unlabeled data")
 
         if feature_prune:
             feature_prune = False  # TODO: Fix feature pruning to add back as an option

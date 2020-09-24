@@ -1,7 +1,7 @@
 """ TabTransformer model """
 import time
 
-from autogluon.utils.tabular.ml.constants import BINARY
+from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION, MULTICLASS
 from torch.autograd import Variable
 
 from ..abstract.abstract_model import AbstractModel
@@ -148,11 +148,11 @@ class TabTransformerModel(AbstractModel):
     def set_default_params(self, y_train):
         if self.problem_type is None:
             self.problem_type = infer_problem_type(y=y_train)  # Infer problem type (or else specify directly)
-        if self.problem_type=='regression':
+        if self.problem_type==REGRESSION:
             self.num_class=1
-        elif self.problem_type=='binary':
+        elif self.problem_type==BINARY:
             self.num_class=2
-        elif self.problem_type=='multiclass':
+        elif self.problem_type==MULTICLASS:
             self.num_class=y_train.nunique()
 
         # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'

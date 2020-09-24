@@ -61,6 +61,7 @@ DEFAULT_MODEL_NAMES = {
     CatboostModel: 'Catboost',
     TabularNeuralNetModel: 'NeuralNet',
     LinearModel: 'LinearModel',
+    TabTransformerModel: 'Transformer',
 }
 
 
