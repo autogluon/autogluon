@@ -31,7 +31,7 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
         for data, target in data_bar:
             data, target = pretext.get(data, target)
 
-            # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+            # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
             if torch.cuda.is_available():
                 data, target = data.cuda(), target.cuda()
 
@@ -171,7 +171,7 @@ class TabTransformerDataset(Dataset):
 
     def build_loader(self):
         loader = DataLoader(self, batch_size=self.kwargs['batch_size'], 
-                            shuffle=False, num_workers=16, 
+                            shuffle=False, num_workers=16,
                             pin_memory=True)
 
         loader.cat_feat_origin_cards=self.cat_feat_origin_cards 

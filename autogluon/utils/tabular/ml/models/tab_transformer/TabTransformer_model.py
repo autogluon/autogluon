@@ -1,6 +1,7 @@
 """ TabTransformer model """
 import time
 
+from autogluon.utils.tabular.ml.constants import BINARY
 from torch.autograd import Variable
 
 from ..abstract.abstract_model import AbstractModel
@@ -154,18 +155,18 @@ class TabTransformerModel(AbstractModel):
         elif self.problem_type=='multiclass':
             self.num_class=y_train.nunique()
 
-        # TODO: This is a work in progress to get TabTransformer working on CUDA inside AutoGluon.
-        #device = torch.device("cuda:{}".format(args.device_num) if torch.cuda.is_available() else "cpu")
-        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #device = torch.device("cuda")
-        device = torch.device("cpu")
+        # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
 
         #gets default kwargs for TabTransformer model.
         self.kwargs=get_kwargs(**{'problem_type': self.problem_type, 'n_classes': self.num_class, 'device': device})
 
     def get_model(self):
         self.model=TabNet(self.num_class, self.kwargs, self.cat_feat_origin_cards)
-        # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+        # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
         if torch.cuda.is_available():
             self.model = self.model.cuda()
 
@@ -227,7 +228,7 @@ class TabTransformerModel(AbstractModel):
         self.set_default_params(y_train)
 
         train, val, unlab = self.preprocess(X_train, X_val, X_unlabeled)
-   
+
         if self.problem_type=='regression':
             train.targets = torch.FloatTensor(list(y_train))
             val.targets   = torch.FloatTensor(list(y_val))
@@ -269,33 +270,26 @@ class TabTransformerModel(AbstractModel):
         self.model.eval()
         softmax=nn.Softmax(dim=1)
 
-        # TODO: Pre-allocate outputs and index into it for additional performance.
-        #outputs = torch.zeros([len(X), 1])
-        outputs = []
+        outputs = torch.zeros([len(X), self.num_classes])
 
-        #iter = 0
+        iter = 0
         for data, _ in loader:
-            # TODO: Should this instead be a user-defined arg, like 'num_gpus'?
+            # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
             if torch.cuda.is_available():
                 data = data.cuda()
             with torch.no_grad():
                 data = Variable(data)
                 out, _ = self.model(data)
-                #batch_size = len(out)
+                batch_size = len(out)
                 prob = softmax(out)
 
-                # If binary classification
-                if prob.shape[1] == 2:
-                    prob = prob[:, 1]
+            outputs[iter:(iter+batch_size)] = prob
+            iter += batch_size
 
-            outputs.append(prob)
-            #outputs[iter:(iter+batch_size)] = prob
-            #iter += batch_size
+        if self.problem_type == BINARY:
+            return outputs[:,1].cpu().numpy()
 
-        outputs = torch.cat(outputs, dim=0)
-        preds = outputs.cpu().numpy()
-
-        return preds
+        return outputs.cpu().numpy()
 
 
     def save(self, file_prefix="", directory=None, return_filename=False, verbose=True):
