@@ -421,11 +421,10 @@ class TabularPredictor(BasePredictor):
                 print("*** Details of Hyperparameter optimization ***")
                 for model_type in hpo_results:
                     hpo_model = hpo_results[model_type]
-                    print("HPO for %s model:  Num. configurations tried = %s, Time spent = %s, Search strategy = %s"
-                          % (model_type, len(hpo_model['trial_info']), hpo_model['total_time'], hpo_model['search_strategy']))
-                    print("Best hyperparameter-configuration (validation-performance: %s = %s):"
-                          % (self.eval_metric, hpo_model['validation_performance']))
-                    print(hpo_model['best_config'])
+                    if 'trial_info' in hpo_model:
+                        print(f"HPO for {model_type} model:  Num. configurations tried = {len(hpo_model['trial_info'])}, Time spent = {hpo_model['total_time']}s, Search strategy = {hpo_model['search_strategy']}")
+                        print(f"Best hyperparameter-configuration (validation-performance: {self.eval_metric} = {hpo_model['validation_performance']}):")
+                        print(hpo_model['best_config'])
             """
             if bagging_used:
                 pass # TODO: print detailed bagging info
