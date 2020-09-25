@@ -1,5 +1,5 @@
 """ TabTransformer model """
-import time
+import time, logging
 
 from autogluon.utils.tabular.ml.constants import BINARY, REGRESSION, MULTICLASS
 from torch.autograd import Variable
@@ -19,6 +19,8 @@ import torch.optim as optim
 import torch
 import pandas as pd
 import os
+
+logger = logging.getLogger(__name__)
 
 class TabNet(nn.Module):
     def __init__(self, num_class, kwargs, cat_feat_origin_cards):
@@ -40,7 +42,7 @@ class TabNet(nn.Module):
         out = self.fc(out)
         return out, features
 
-    def fit(self, trainloader, valloader=None, state=None):
+    def fit(self, trainloader, valloader=None, state=None, time_limit=None):
         """
         Main training function for TabTransformer
         "state" must be one of [None, 'pretrain', 'finetune']
@@ -49,6 +51,7 @@ class TabNet(nn.Module):
         finetune: same as superised learning except that the model base has
                   exponentially decaying learning rate.
         """
+        start_time = time.time()
         pretext_tasks=pretexts.__dict__
         optimizers=[]
         lr=self.kwargs['tab_kwargs']['lr']
@@ -92,6 +95,14 @@ class TabNet(nn.Module):
                         loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])
                     if val_accuracy>old_val_accuracy:
                         torch.save(self,'tab_trans_temp.pth')
+
+            if time_limit:
+                time_elapsed = time.time() - start_time
+                time_left = time_limit - time_elapsed
+                if time_left <= 0:
+                    logger.log(20, "\tRan out of time, stopping training early.")
+                    break
+
         if valloader is not None:
             try:
                 self=torch.load('tab_trans_temp.pth')
@@ -224,7 +235,7 @@ class TabTransformerModel(AbstractModel):
         return data, val_data, unlab_data
 
 
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, X_unlabeled=None, time_limit=None, **kwargs):
         self.set_default_params(y_train)
 
         train, val, unlab = self.preprocess(X_train, X_val, X_unlabeled)
@@ -243,10 +254,10 @@ class TabTransformerModel(AbstractModel):
         self.get_model()
 
         if X_unlabeled is not None:
-            self.model.fit(unlabloader, valloader, state='pretrain') 
-            self.model.fit(trainloader, valloader, state='finetune')
+            self.model.fit(unlabloader, valloader, state='pretrain', time_limit=time_limit)
+            self.model.fit(trainloader, valloader, state='finetune', time_limit=time_limit)
         else:
-            self.model.fit(trainloader, valloader)
+            self.model.fit(trainloader, valloader, time_limit=time_limit)
 
         """
         #TODO: If no X_train is passed, but X_unlabeled is, assume that the user wants to 
