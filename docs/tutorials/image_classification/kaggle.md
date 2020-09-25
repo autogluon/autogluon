@@ -105,7 +105,7 @@ where the images that fall into the validation set are randomly chosen from the 
 
 ## Step 3: Use AutoGluon fit to generate a classification model
 
-Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.core.task.html#autogluon.core.task.ImageClassification.fit) function.
+Now that we have a `Dataset` object, we can use AutoGluon's default configuration to obtain an image classification model using the [`fit`](/api/autogluon.task.html#autogluon.core.task.ImageClassification.fit) function.
 
 Due to the large size of the Kaggle dataset,
 calling `fit` without specifying a time limit may result in long waiting times.

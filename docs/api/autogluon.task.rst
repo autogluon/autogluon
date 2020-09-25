@@ -2,7 +2,7 @@
     :class: hidden-section
 
 autogluon.core.task
-===============
+===================
 
 .. admonition:: Example (image classification task):
    
@@ -40,7 +40,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    TabularPrediction
    ImageClassification
    ObjectDetection
-   TextPrediction
+       TextPrediction
 
 
 :hidden:`TabularPrediction`

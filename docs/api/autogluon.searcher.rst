@@ -116,7 +116,7 @@ Searchers
 
 
 :hidden:`GPMultiFidelitySearcher`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: GPMultiFidelitySearcher
    :members:

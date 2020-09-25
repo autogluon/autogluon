@@ -95,10 +95,10 @@ Advanced Topics
    tutorials/course/index
    tutorials/nas/index
    tutorials/torch/index
-   api/autogluon.core.space
+   api/autogluon.space
    api/autogluon.core
-   api/autogluon.core.task
-   api/autogluon.core.scheduler
-   api/autogluon.core.searcher
-   api/autogluon.core.utils
+   api/autogluon.task
+   api/autogluon.scheduler
+   api/autogluon.searcher
+   api/autogluon.utils
    model_zoo/index
