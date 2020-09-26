@@ -355,7 +355,7 @@ class TabularPredictor(BasePredictor):
             'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
-            'num_bagging_folds': self._trainer.kfolds,
+            'num_bagging_folds': self._trainer.k_fold,
             'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,

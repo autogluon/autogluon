@@ -85,7 +85,7 @@ class DefaultLearner(AbstractLearner):
             num_classes=self.label_cleaner.num_classes,
             feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
-            kfolds=num_bagging_folds,  # TODO: Consider moving to fit call
+            k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
             stack_ensemble_levels=stack_ensemble_levels,  # TODO: Consider moving to fit call
             scheduler_options=scheduler_options,
