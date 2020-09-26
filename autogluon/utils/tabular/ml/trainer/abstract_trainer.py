@@ -250,9 +250,9 @@ class AbstractTrainer:
                 for key_model_type in hyperparameters[key_outer]:
                     for model_hyperparams in hyperparameters[key_outer][key_model_type]:
                         if 'AG_args' in model_hyperparams:
-                            model_hyperparams['AG_args']['name_suffix'] = model_hyperparams['AG_args'].get('name_suffix', '') + '_alt'
+                            model_hyperparams['AG_args']['name_suffix'] = model_hyperparams['AG_args'].get('name_suffix', '') + name_suffix
                         else:
-                            model_hyperparams['AG_args'] = dict(name_suffix='_alt')
+                            model_hyperparams['AG_args'] = dict(name_suffix=name_suffix)
 
         model_names_fit = []
         for level in range(max(0, level_start), level_end + 1):
