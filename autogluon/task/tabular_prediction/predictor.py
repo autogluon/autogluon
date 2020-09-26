@@ -333,8 +333,10 @@ class TabularPredictor(BasePredictor):
             Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
-        model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
-        model_innertypenames = {key: self._trainer.model_types_inner[key].__name__ for key in self._trainer.model_types if key in self._trainer.model_types_inner}
+        model_types = self._trainer.get_models_attribute_dict(attribute='type')
+        model_inner_types = self._trainer.get_models_attribute_dict(attribute='type_inner')
+        model_typenames = {key: model_types[key].__name__ for key in model_types}
+        model_innertypenames = {key: model_inner_types[key].__name__ for key in model_types if key in model_inner_types}
         MODEL_STR = 'Model'
         ENSEMBLE_STR = 'Ensemble'
         for model in model_typenames:
@@ -350,7 +352,7 @@ class TabularPredictor(BasePredictor):
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
             'model_performance': self._trainer.get_models_attribute_dict('val_score'),  # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
-            'model_paths': self._trainer.model_paths,  # dict with key = model-name, value = path to model file
+            'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
             'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
             'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bagging_folds': self._trainer.kfolds,
