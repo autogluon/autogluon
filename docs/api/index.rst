@@ -8,7 +8,7 @@ describing what they are and what they do. The APIs are grouped into the followi
 
    .. card::
       :title: Prediction Tasks
-      :link: autogluon.core.task.html
+      :link: autogluon.task.html
 
       Automatically train/deploy models with 1 line of code for these prediction tasks.
 
@@ -40,8 +40,8 @@ describing what they are and what they do. The APIs are grouped into the followi
    :maxdepth: 2
    :hidden:
 
-   autogluon.core.space
+   autogluon.space
    autogluon.core
-   autogluon.core.task
-   autogluon.core.scheduler
-   autogluon.core.searcher
+   autogluon.task
+   autogluon.scheduler
+   autogluon.searcher

@@ -27,7 +27,7 @@ autogluon.core.task
    >>> test_acc = classifier.evaluate(test_dataset)
 
 
-.. automodule:: autogluon.core.task
+.. automodule:: autogluon.task
 
 AutoGluon Tasks
 -----------------
@@ -102,7 +102,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 Additional Tabular Prediction APIs
 ----------------------------------
 
-.. automodule:: autogluon.core.task.tabular_prediction
+.. automodule:: autogluon.task.tabular_prediction
 
 :hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -131,7 +131,7 @@ Additional Tabular Prediction APIs
 Additional Image Classification APIs
 ------------------------------------
 
-.. automodule:: autogluon.core.task.image_classification
+.. automodule:: autogluon.task.image_classification
 
 :hidden:`Classifier`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -193,7 +193,7 @@ Additional Image Classification APIs
 Additional Object Detection APIs
 --------------------------------
 
-.. automodule:: autogluon.core.task.object_detection
+.. automodule:: autogluon.task.object_detection
 
 :hidden:`Detector`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,7 +211,7 @@ Additional Object Detection APIs
     .. autoautosummary:: Detector
         :attributes:
 
-.. automodule:: autogluon.core.task.object_detection.dataset
+.. automodule:: autogluon.task.object_detection.dataset
 
 :hidden:`get_dataset`
 ~~~~~~~~~~~~~~~~~~~~~
@@ -274,7 +274,7 @@ Additional Text Prediction APIs
 .. automodule:: autogluon.text.task.text_prediction.models.basic_v1
 
 :hidden:`BertForTextPredictionBasic`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: BertForTextPredictionBasic
    :members: predict, predict_proba, evaluate, save, load

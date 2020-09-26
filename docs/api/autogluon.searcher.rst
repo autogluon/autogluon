@@ -103,7 +103,7 @@ Searchers
 
 
 :hidden:`GPFIFOSearcher`
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: GPFIFOSearcher
    :members:

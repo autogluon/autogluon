@@ -12,7 +12,7 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.core.task.ImageClassification) is the task of interest: 
+We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.task.ImageClassification) is the task of interest: 
 
 ```{.python .input}
 import autogluon.core as ag
@@ -162,4 +162,4 @@ print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.
-For more options using `fit`, see :class:`autogluon.core.task.ImageClassification`.
+For more options using `fit`, see :class:`autogluon.vision.task.ImageClassification`.
