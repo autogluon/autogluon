@@ -94,7 +94,6 @@ class AbstractTrainer:
 
         self.model_best = None
 
-        self.model_performance = {}  # TODO: Remove in future, use networkx.
         self.model_paths = {}
         self.model_types = {}  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
         self.model_types_inner = {}  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
@@ -325,7 +324,7 @@ class AbstractTrainer:
         else:
             extra_params = {}
         weighted_ensemble_model = WeightedEnsembleModel(path=self.path, name='weighted_ensemble' + name_suffix + '_k' + str(kfolds) + '_l' + str(level), base_model_names=base_model_names,
-                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.model_performance, hyperparameters=hyperparameters,
+                                                        base_model_paths_dict=self.model_paths, base_model_types_dict=self.model_types, base_model_types_inner_dict=self.model_types_inner, base_model_performances_dict=self.get_models_attribute_dict(attribute='val_score', models=base_model_names), hyperparameters=hyperparameters,
                                                         eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed, **extra_params)
 
         self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, models=[weighted_ensemble_model], kfolds=kfolds, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
@@ -333,8 +332,8 @@ class AbstractTrainer:
             if self.model_best is None:
                 self.model_best = weighted_ensemble_model.name
             else:
-                best_score = self.model_performance[self.model_best]
-                cur_score = self.model_performance[weighted_ensemble_model.name]
+                best_score = self.get_model_attribute(self.model_best, 'val_score')
+                cur_score = self.get_model_attribute(weighted_ensemble_model.name, 'val_score')
                 if cur_score > best_score:
                     # new best model
                     self.model_best = weighted_ensemble_model.name
@@ -583,7 +582,7 @@ class AbstractTrainer:
                         model_loaded = self.load_model(model_weighted_ensemble)
                         model_loaded.val_score = None
                         model_loaded.predict_time = None
-                        self.model_performance[model_weighted_ensemble] = None
+                        self.set_model_attribute(model=model_weighted_ensemble, attribute='val_score', val=None)
                         self.save_model(model_loaded)
                 else:
                     models_trained = self.stack_new_level_core(X=X_full, y=y_full, models=[model_full], level=level, stack_name=REFIT_FULL_NAME, hyperparameter_tune=False, feature_prune=False, kfolds=0, n_repeats=1, save_bagged_folds=True, stacker_type=stacker_type)
@@ -654,7 +653,8 @@ class AbstractTrainer:
                     trainer.best_single_model('distill', 0)
         """
         models = self.models_level[stack_name][stack_level]
-        perfs = [(m, self.model_performance[m]) for m in models if self.model_performance[m] is not None]
+        model_performances = self.get_models_attribute_dict(attribute='val_score')
+        perfs = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
         if not perfs:
             raise AssertionError('No fit models exist with a validation score to choose the best model.')
         return max(perfs, key=lambda i: i[1])[0]
@@ -664,11 +664,12 @@ class AbstractTrainer:
         models = self.get_model_names_all(can_infer=can_infer)
         if not models:
             raise AssertionError('Trainer has no fit models that can infer.')
-        perfs = [(m, self.model_performance[m]) for m in models if self.model_performance[m] is not None]
+        model_performances = self.get_models_attribute_dict(attribute='val_score')
+        perfs = [(m, model_performances[m]) for m in models if model_performances[m] is not None]
         if not perfs:
             model_full_dict_inverse = {full: orig for orig, full in self.model_full_dict.items()}
             models = [m for m in models if m in model_full_dict_inverse]
-            perfs = [(m, self.model_performance[model_full_dict_inverse[m]]) for m in models if self.model_performance[model_full_dict_inverse[m]] is not None]
+            perfs = [(m, model_performances[model_full_dict_inverse[m]]) for m in models if model_performances[model_full_dict_inverse[m]] is not None]
             if not perfs:
                 raise AssertionError('No fit models that can infer exist with a validation score to choose the best model.')
             elif not allow_full:
@@ -869,7 +870,6 @@ class AbstractTrainer:
             The model's base_models (if it has any) must all be a lower level than the model.
         """
         stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have _train_multi handle this
-        self.model_performance[model.name] = model.val_score
         self.model_paths[model.name] = model.path
         self.model_types[model.name] = type(model)
         if isinstance(model, BaggedEnsembleModel):
@@ -1322,8 +1322,27 @@ class AbstractTrainer:
         return attribute_full
 
     # Returns dictionary of model name -> attribute value for the provided attribute
-    def get_model_attributes_dict(self, attribute):
-        return nx.get_node_attributes(self.model_graph, attribute)
+    def get_models_attribute_dict(self, attribute, models: list = None) -> dict:
+        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        if models is not None:
+            model_names = []
+            for model in models:
+                if not isinstance(model, str):
+                    model = model.name
+                model_names.append(model)
+            models_attribute_dict = {key: val for key, val in models_attribute_dict.items() if key in model_names}
+        return models_attribute_dict
+
+    # Returns attribute value for the given model
+    def get_model_attribute(self, model, attribute: str):
+        if not isinstance(model, str):
+            model = model.name
+        return self.model_graph.nodes[model][attribute]
+
+    def set_model_attribute(self, model, attribute: str, val):
+        if not isinstance(model, str):
+            model = model.name
+        self.model_graph.nodes[model][attribute] = val
 
     # Gets the minimum set of models that the provided model depends on, including itself
     # Returns a list of model names
@@ -1350,9 +1369,9 @@ class AbstractTrainer:
         pred_time_val = []
         can_infer = []
         fit_order = list(range(1,len(model_names)+1))
-        score_val_dict = self.get_model_attributes_dict('val_score')
-        fit_time_marginal_dict = self.get_model_attributes_dict('fit_time')
-        predict_time_marginal_dict = self.get_model_attributes_dict('predict_time')
+        score_val_dict = self.get_models_attribute_dict('val_score')
+        fit_time_marginal_dict = self.get_models_attribute_dict('fit_time')
+        predict_time_marginal_dict = self.get_models_attribute_dict('predict_time')
         for model_name in model_names:
             score_val.append(score_val_dict[model_name])
             fit_time_marginal.append(fit_time_marginal_dict[model_name])
@@ -1465,7 +1484,7 @@ class AbstractTrainer:
             except AssertionError:
                 best_model = None
         if best_model is not None:
-            best_model_score_val = self.model_performance.get(best_model)
+            best_model_score_val = self.get_model_attribute(model=best_model, attribute='val_score')
             best_model_stack_level = self.get_model_level(best_model)
         else:
             best_model_score_val = None
@@ -1875,7 +1894,6 @@ class AbstractTrainer:
                                              hyperparameter_tune=False, stack_name=self.distill_stackname, time_limit=time_left)
             for model_name in models:  # finally measure original metric on validation data and overwrite stored val_scores
                 model_score = self.score(X_val, y_val_og, model=model_name)
-                self.model_performance[model_name] = model_score
                 model_obj = self.load_model(model_name)
                 model_obj.val_score = model_score
                 model_obj.save()  # TODO: consider omitting for sake of efficiency

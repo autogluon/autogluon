@@ -100,7 +100,7 @@ class TabularPredictor(BasePredictor):
     @property
     def model_performance(self):
         logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
-        return self._trainer.model_performance
+        return self._trainer.get_models_attribute_dict(attribute='val_score')
 
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
@@ -348,11 +348,11 @@ class TabularPredictor(BasePredictor):
         # all fit() information that is returned:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self._trainer.get_model_attributes_dict('val_score'),  # dict with key = model-name, value = validation performance
+            'model_performance': self._trainer.get_models_attribute_dict('val_score'),  # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
             'model_paths': self._trainer.model_paths,  # dict with key = model-name, value = path to model file
-            'model_fit_times': self._trainer.get_model_attributes_dict('fit_time'),
-            'model_pred_times': self._trainer.get_model_attributes_dict('predict_time'),
+            'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
+            'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
             'num_bagging_folds': self._trainer.kfolds,
             'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
             'feature_prune': self._trainer.feature_prune,
