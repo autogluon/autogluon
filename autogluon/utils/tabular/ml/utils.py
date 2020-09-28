@@ -205,7 +205,7 @@ def normalize_multi_probas(y_predprob, eps):
     return y_predprob
 
 
-def infer_problem_type(y: Series):
+def infer_problem_type(y: Series, silent=False) -> str:
     """ Identifies which type of prediction problem we are interested in (if user has not specified).
         Ie. binary classification, multi-class classification, or regression.
     """
@@ -256,22 +256,23 @@ def infer_problem_type(y: Series):
             reason = "dtype of label-column == int and many unique label-values observed"
     else:
         raise NotImplementedError(f'label dtype {y.dtype} not supported!')
-    logger.log(25, f"AutoGluon infers your prediction problem is: '{problem_type}' (because {reason}).")
+    if not silent:
+        logger.log(25, f"AutoGluon infers your prediction problem is: '{problem_type}' (because {reason}).")
 
-    # TODO: Move this outside of this function so it is visible even if problem type was not inferred.
-    if problem_type in [BINARY, MULTICLASS]:
-        if unique_count > 10:
-            logger.log(20, f'\tFirst 10 (of {unique_count}) unique label values:  {list(unique_values[:10])}')
-        else:
-            logger.log(20, f'\t{unique_count} unique label values:  {list(unique_values)}')
-    elif problem_type == REGRESSION:
-        y_max = y.max()
-        y_min = y.min()
-        y_mean = y.mean()
-        y_stddev = y.std()
-        logger.log(20, f'\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})')
+        # TODO: Move this outside of this function so it is visible even if problem type was not inferred.
+        if problem_type in [BINARY, MULTICLASS]:
+            if unique_count > 10:
+                logger.log(20, f'\tFirst 10 (of {unique_count}) unique label values:  {list(unique_values[:10])}')
+            else:
+                logger.log(20, f'\t{unique_count} unique label values:  {list(unique_values)}')
+        elif problem_type == REGRESSION:
+            y_max = y.max()
+            y_min = y.min()
+            y_mean = y.mean()
+            y_stddev = y.std()
+            logger.log(20, f'\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})')
 
-    logger.log(25, f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type argument in fit() (You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})")
+        logger.log(25, f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type argument in fit() (You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})")
     return problem_type
 
 

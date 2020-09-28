@@ -228,7 +228,7 @@ class AbstractTrainer:
     # TODO: Enable feature prune on levels > 0
     # TODO: Remove name_suffix, hacked in
     # TODO: Enable easier re-mapping of trained models -> hyperparameters input (They don't share a key since name can change)
-    def train_multi_levels(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, level_start=0, level_end=0, stack_name_core='core', stack_name_aux='aux1', time_limit=None, name_suffix='') -> List[str]:
+    def train_multi_levels(self, X_train, y_train, X_val, y_val, hyperparameters: dict = None, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, core_kwargs: dict = None, level_start=0, level_end=0, stack_name_core='core', stack_name_aux='aux1', time_limit=None, name_suffix='') -> List[str]:
         """
         Trains a multi-layer stack ensemble using the input data on the hyperparameters dict input.
         If continuing a stack ensemble with level_start>0, ensure that base_model_names is set to the appropriate base models that will be used by the level_start level models.
@@ -277,6 +277,7 @@ class AbstractTrainer:
                 models=models, level=level, base_model_names=base_model_names,
                 hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                 stack_name_core=stack_name_core, stack_name_aux=stack_name_aux,
+                core_kwargs=core_kwargs,
                 time_limit_core=time_limit_core, time_limit_aux=time_limit_aux,
                 name_suffix_aux=name_suffix,  # TODO: Remove name_suffix_aux, hack
             )
@@ -286,11 +287,13 @@ class AbstractTrainer:
         return model_names_fit
 
     # TODO: Remove name_suffix_aux, hacked in
-    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, stack_name_core='core', stack_name_aux='aux1', time_limit_core=None, time_limit_aux=None, name_suffix_aux='') -> (List[str], List[str]):
+    def stack_new_level(self, X, y, models: List[AbstractModel], X_val=None, y_val=None, level=0, base_model_names: List[str] = None, hyperparameter_tune=False, feature_prune=False, stack_name_core='core', stack_name_aux='aux1', core_kwargs: dict = None, time_limit_core=None, time_limit_aux=None, name_suffix_aux='') -> (List[str], List[str]):
         """
         Similar to calling self.stack_new_level_core, except auxiliary models will also be trained via a call to self.stack_new_level_aux, with the models trained from self.stack_new_level_core used as base models.
         """
-        core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, models=models, level=level, base_model_names=base_model_names, stack_name=stack_name_core, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core)
+        if core_kwargs is None:
+            core_kwargs = {}
+        core_models = self.stack_new_level_core(X=X, y=y, X_val=X_val, y_val=y_val, models=models, level=level, base_model_names=base_model_names, stack_name=stack_name_core, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit=time_limit_core, **core_kwargs)
         aux_args = dict(base_model_names=core_models, level=level+1, stack_name=stack_name_aux, time_limit=time_limit_aux, name_suffix=name_suffix_aux)
         if self.bagged_mode:
             aux_models = self.stack_new_level_aux(X=X, y=y, **aux_args)
