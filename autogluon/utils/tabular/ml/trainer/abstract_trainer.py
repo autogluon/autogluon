@@ -910,31 +910,30 @@ class AbstractTrainer:
         if model.predict_time is not None:
             logger.log(20, '\t' + str(round(model.predict_time, 2)) + 's' + '\t = Validation runtime')
         # TODO: Add to HPO
-        # TODO/FIXME: what if it isn't valid?
-        if model.is_valid():
-            if isinstance(model, BaggedEnsembleModel):
-                type_inner = model._child_type
-            else:
-                type_inner = type(model)
-            self.model_graph.add_node(
-                model.name,
-                fit_time=model.fit_time,
-                predict_time=model.predict_time,
-                val_score=model.val_score,
-                path=model.path,
-                type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
-                type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
-                can_infer=model.can_infer(),
-            )
-            if isinstance(model, StackerEnsembleModel):
-                # TODO: raise exception if any base models are of equal or higher level?
-                # TODO: raise exception if no base models and level != 0?
-                for stack_column_prefix in model.stack_column_prefix_lst:
-                    base_model_name = model.stack_column_prefix_to_model_map[stack_column_prefix]
-                    self.model_graph.add_edge(base_model_name, model.name)
-            stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have _train_multi handle this
-            if model.name not in stack_loc[level]:
-                stack_loc[level].append(model.name)
+        if isinstance(model, BaggedEnsembleModel):
+            type_inner = model._child_type
+        else:
+            type_inner = type(model)
+        self.model_graph.add_node(
+            model.name,
+            fit_time=model.fit_time,
+            predict_time=model.predict_time,
+            val_score=model.val_score,
+            path=model.path,
+            type=type(model),  # Outer type, can be BaggedEnsemble, StackEnsemble (Type that is able to load the model)
+            type_inner=type_inner,  # Inner type, if Ensemble then it is the type of the inner model (May not be able to load with this type)
+            can_infer=model.can_infer(),
+            is_valid=model.is_valid(),
+        )
+        if isinstance(model, StackerEnsembleModel):
+            # TODO: raise exception if any base models are of equal or higher level?
+            # TODO: raise exception if no base models and level != 0?
+            for stack_column_prefix in model.stack_column_prefix_lst:
+                base_model_name = model.stack_column_prefix_to_model_map[stack_column_prefix]
+                self.model_graph.add_edge(base_model_name, model.name)
+        stack_loc = self.models_level[stack_name]  # TODO: Consider removing, have _train_multi handle this
+        if model.name not in stack_loc[level]:
+            stack_loc[level].append(model.name)
         if self.low_memory:
             del model
 
@@ -982,7 +981,10 @@ class AbstractTrainer:
                 model_names_trained = []
                 for model_hpo_name, model_path in hpo_models.items():
                     model_hpo = self.load_model(model_hpo_name, path=model_path, model_type=type(model))
+                    print('===========')
+                    print(list(self.model_graph.nodes))
                     self._add_model(model=model_hpo, stack_name=stack_name, level=level)
+                    print(list(self.model_graph.nodes))
                     model_names_trained.append(model_hpo.name)
         else:
             model_fit_kwargs = dict(
@@ -1376,6 +1378,8 @@ class AbstractTrainer:
 
     # Returns attribute value for the given model
     def get_model_attribute(self, model, attribute: str):
+        print(list(self.model_graph.nodes))
+
         if not isinstance(model, str):
             model = model.name
         return self.model_graph.nodes[model][attribute]
