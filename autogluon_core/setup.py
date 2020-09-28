@@ -2,12 +2,16 @@
 import os
 import shutil
 import subprocess
+import codecs
+import os.path
 
 from setuptools import setup, find_packages, find_namespace_packages
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-version = '0.0.14'
+with open(os.path.join('..', 'VERSION')) as version_file:
+    version = version_file.read().strip()
+
 """
 To release a new stable version on PyPi, simply tag the release on github, and the Github CI will automatically publish 
 a new stable version to PyPi using the configurations in .github/workflows/pypi_release.yml . 

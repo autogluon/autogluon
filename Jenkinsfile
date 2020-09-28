@@ -16,45 +16,48 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+        python3 -m pip install pytest
+
+        pip uninstall -y autogluon
+        pip uninstall -y autogluon.vision
+        pip uninstall -y autogluon.text
+        pip uninstall -y autogluon.mxnet
+        pip uninstall -y autogluon.extra
+        pip uninstall -y autogluon.tabular
+        pip uninstall -y autogluon.core
 
         cd autogluon_core/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon_tabular/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon_mxnet/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon_extra/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon_text/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon_vision/
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
 
         cd autogluon/
-        python3 -m pip install --upgrade --force-reinstall -e .
+        python3 -m pip install --upgrade -e .
         cd ..
         """
       }
