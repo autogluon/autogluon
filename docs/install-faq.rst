@@ -21,10 +21,10 @@
    .. code-block::
 
      # For CPU users
-     python3 -m pip install mxnet
+     python3 -m pip install "mxnet<2.0.0"
 
      # For GPU users, CUDA 101
-     python3 -m pip install mxnet_cu101
+     python3 -m pip install "mxnet_cu101<2.0.0"
 
 * While running AutoGluon, I get error message "Check failed: e == cudaSuccess: CUDA: initialization error".
 
