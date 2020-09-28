@@ -644,7 +644,8 @@ class AbstractTrainer:
             model_loaded.save()  # TODO: Avoid this!
 
             # Remove old edges and add new edges
-            self.model_graph.remove_edges_from(self.model_graph.edges(model_loaded.name))
+            edges_to_remove = list(self.model_graph.in_edges(model_loaded.name))
+            self.model_graph.remove_edges_from(edges_to_remove)
             if isinstance(model_loaded, StackerEnsembleModel):
                 for stack_column_prefix in model_loaded.stack_column_prefix_lst:
                     base_model_name = model_loaded.stack_column_prefix_to_model_map[stack_column_prefix]
@@ -1665,6 +1666,11 @@ class AbstractTrainer:
             logger.log(30, f'To perform the deletion, set dry_run=False')
             return
 
+        if delete_from_disk:
+            for model in models_to_remove:
+                model = self.load_model(model)
+                model.delete_from_disk()
+
         self.model_graph.remove_nodes_from(models_to_remove)
         for model in models_to_remove:
             if model in self.models:
@@ -1684,10 +1690,6 @@ class AbstractTrainer:
 
         # TODO: Delete from all the other model dicts
         self.save()
-        if delete_from_disk:
-            for model in models_to_remove:
-                model = self.load_model(model)
-                model.delete_from_disk()
 
     @classmethod
     def load(cls, path, reset_paths=False):
