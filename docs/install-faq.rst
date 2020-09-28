@@ -1,3 +1,16 @@
+* Which version of MXNet does AutoGluon support?
+
+   Currently, AutoGluon supports MXNet>=1.7.0. In order to ensure that you are installing mxnet
+   larger than 1.7.0, you can use
+
+   .. code-block::
+
+     # For CPU
+     python3 -m pip install "mxnet<2.0.0, >=1.7.0"
+
+     # For GPU users, CUDA 101
+     python3 -m pip install "mxnet_cu101<2.0.0, >=1.7.0"
+
 * I cannot install the package and it reports the error "XXX is not a supported wheel on this platform".
 
    One possibility is that you are using an older version of pip. Try to upgrade your pip to a version later than "19.0.0", e.g., use the following command:
