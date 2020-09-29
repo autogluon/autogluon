@@ -115,15 +115,8 @@ class AbstractTrainer:
             self.scheduler_func = None
             self.scheduler_options = None
 
-        self.time_limit = time_limit
-        if self.time_limit is None:
-            self.time_limit = 1e7
-            self.ignore_time_limit = True
-        else:
-            self.ignore_time_limit = False
-        self.time_train_start = None
-        self.time_train_level_start = None
-        self.time_limit_per_level = self.time_limit / (self.stack_ensemble_levels + 1)
+        self._time_limit = None  # Internal float of the total time limit allowed for a given fit call. Used in logging statements.
+        self._time_train_start = None  # Internal timestamp of the time training started for a given fit call. Used in logging statements.
 
         self.num_rows_train = None
         self.num_cols_train = None
@@ -261,7 +254,10 @@ class AbstractTrainer:
                 if time_limit <= 0:
                     logging.log(15, 'Skipping ' + str(model.name) + ' due to lack of time remaining.')
                     return model_names_trained
-                time_left_total = self.time_limit - (fit_start_time - self.time_train_start)
+                if self._time_limit is not None and self._time_train_start is not None:
+                    time_left_total = self._time_limit - (fit_start_time - self._time_train_start)
+                else:
+                    time_left_total = time_limit
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...' + ' Training model for up to ' + str(round(time_limit, 2)) + 's of the ' + str(round(time_left_total, 2)) + 's of remaining time.')
             else:
                 logging.log(20, 'Fitting model: ' + str(model.name) + ' ...')
@@ -384,7 +380,9 @@ class AbstractTrainer:
     # TODO: Time allowance can be made better by only using time taken during final model training and not during HPO and feature pruning.
     # TODO: Time allowance not accurate if running from fit_continue
     # Takes trained bagged ensemble models and fits additional k-fold bags.
-    def train_multi_repeats(self, X_train, y_train, X_val, y_val, models, kfolds, n_repeats, n_repeat_start=1, stack_name='core', level=0, time_limit=None):
+    def train_multi_repeats(self, X_train, y_train, X_val, y_val, models, kfolds, n_repeats, n_repeat_start=1, stack_name='core', level=0, time_limit=None, time_limit_total_level=None):
+        if time_limit_total_level is None:
+            time_limit_total_level = time_limit
         models_valid = models
         models_valid_next = []
         repeats_completed = 0
@@ -394,7 +392,7 @@ class AbstractTrainer:
                 time_start_repeat = time.time()
                 time_left = time_limit - (time_start_repeat - time_start)
                 if n == n_repeat_start:
-                    time_required = self.time_limit_per_level * 0.575  # Require slightly over 50% to be safe
+                    time_required = time_limit_total_level * 0.575  # Require slightly over 50% to be safe
                 else:
                     time_required = (time_start_repeat - time_start) / repeats_completed * (0.575/0.425)
                 if time_left < time_required:
@@ -471,6 +469,7 @@ class AbstractTrainer:
         return models_valid
 
     def train_multi(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, stack_name='core', kfolds=None, n_repeats=None, n_repeat_start=0, level=0, time_limit=None):
+        time_limit_total_level = time_limit
         if kfolds is None:
             kfolds = self.kfolds
         if n_repeats is None:
@@ -492,10 +491,10 @@ class AbstractTrainer:
             model_names_trained = models
         if (n_repeats > 1) and self.bagged_mode and (n_repeat_start < n_repeats):
             model_names_trained = self.train_multi_repeats(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, models=model_names_trained,
-                                                           kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, stack_name=stack_name, level=level, time_limit=time_limit)
+                                                           kfolds=kfolds, n_repeats=n_repeats, n_repeat_start=n_repeat_start, stack_name=stack_name, level=level, time_limit=time_limit, time_limit_total_level=time_limit_total_level)
         return model_names_trained
 
-    def train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False):
+    def train_multi_and_ensemble(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, time_limit=None):
         if self.save_data and not self.is_data_saved:
             self.save_X_train(X_train)
             self.save_y_train(y_train)
@@ -509,26 +508,30 @@ class AbstractTrainer:
         if X_val is not None:
             self.num_rows_train += len(X_val)
         self.num_cols_train = len(list(X_train.columns))
-        self.time_train_start = time.time()
-        self.train_multi_levels(X_train, y_train, X_val, y_val, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels)
+        self.train_multi_levels(X_train, y_train, X_val, y_val, models=models, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, level_start=0, level_end=self.stack_ensemble_levels, time_limit=time_limit)
         if len(self.get_model_names_all()) == 0:
             raise ValueError('AutoGluon did not successfully train any models')
 
-    def train_multi_levels(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0, level_end=0):
+    def train_multi_levels(self, X_train, y_train, X_val, y_val, models: List[AbstractModel], hyperparameter_tune=True, feature_prune=False, level_start=0, level_end=0, time_limit=None):
+        if time_limit is not None:
+            self._time_limit = time_limit
+        self._time_train_start = time.time()
+        time_train_start = self._time_train_start
         for level in range(max(0, level_start), level_end + 1):
-            self.time_train_level_start = time.time()
-            self.time_limit_per_level = (self.time_limit - (self.time_train_level_start - self.time_train_start)) / (level_end + 1 - level)
-            if self.ignore_time_limit:
+            if time_limit is None:
                 time_limit_core = None
                 time_limit_aux = None
             else:
-                time_limit_core = self.time_limit_per_level
-                time_limit_aux = max(self.time_limit_per_level * 0.1, min(self.time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
+                time_train_level_start = time.time()
+                time_limit_for_level = (time_limit - (time_train_level_start - time_train_start)) / (level_end + 1 - level)
+                time_limit_core = time_limit_for_level
+                time_limit_aux = max(time_limit_for_level * 0.1, min(time_limit, 360))  # Allows aux to go over time_limit, but only by a small amount
             if level == 0:
                 self.stack_new_level(X=X_train, y=y_train, X_val=X_val, y_val=y_val, models=models, level=level, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, time_limit_core=time_limit_core, time_limit_aux=time_limit_aux)
             else:
                 self.stack_new_level(X=X_train, y=y_train, X_val=X_val, y_val=y_val, level=level, time_limit_core=time_limit_core, time_limit_aux=time_limit_aux)
 
+        self._time_limit = None
         self.save()
 
     def stack_new_level(self, X, y, X_val=None, y_val=None, level=0, models=None, hyperparameter_tune=False, feature_prune=False, time_limit_core=None, time_limit_aux=None):
@@ -1407,7 +1410,7 @@ class AbstractTrainer:
         problem_type = self.problem_type
         eval_metric = self.eval_metric.name
         stopping_metric = self.stopping_metric.name
-        time_train_start = self.time_train_start
+        time_train_start = self._time_train_start
         num_rows_train = self.num_rows_train
         num_cols_train = self.num_cols_train
         num_classes = self.num_classes
@@ -1791,14 +1794,13 @@ class AbstractTrainer:
             if self.problem_type != REGRESSION:
                 self.regress_preds_asprobas = True
 
-        self.time_train_start = time.time()
-        self.time_limit = time_limits
+        time_train_start = time.time()
         distilled_model_names = []
         for model in models_distill:
             time_left = None
             if time_limits is not None:
                 time_start_model = time.time()
-                time_left = time_limits - (time_start_model - self.time_train_start)
+                time_left = time_limits - (time_start_model - time_train_start)
 
             logger.log(15, f"Distilling student {str(model.name)} with teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)}...")
             models = self.train_single_full(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, model=model,
