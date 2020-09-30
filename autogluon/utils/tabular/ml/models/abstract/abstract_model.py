@@ -297,7 +297,7 @@ class AbstractModel:
         else:
             return eval_metric(y, y_pred_proba)
 
-    def save(self, path: str = None, verbose=True, compression_fn=None, compression_fn_kwargs=None) -> str:
+    def save(self, path: str = None, verbose=True, **kwargs) -> str:
         """
         Saves the model to disk.
 
@@ -320,12 +320,11 @@ class AbstractModel:
         if path is None:
             path = self.path
         file_path = path + self.model_file_name
-        save_pkl.save(path=file_path, object=self, verbose=verbose, compression_fn=compression_fn,
-                      compression_fn_kwargs=compression_fn_kwargs)
+        save_pkl.save(path=file_path, object=self, verbose=verbose, **kwargs)
         return path
 
     @classmethod
-    def load(cls, path: str, reset_paths=True, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+    def load(cls, path: str, reset_paths=True, verbose=True, **kwargs):
         """
         Loads the model from disk to memory.
 
@@ -348,8 +347,7 @@ class AbstractModel:
             Loaded model object.
         """
         file_path = path + cls.model_file_name
-        model = load_pkl.load(path=file_path, verbose=verbose, compression_fn=compression_fn,
-                      compression_fn_kwargs=compression_fn_kwargs)
+        model = load_pkl.load(path=file_path, verbose=verbose, **kwargs)
         if reset_paths:
             model.set_contexts(path)
         return model

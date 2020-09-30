@@ -373,8 +373,8 @@ class BaggedEnsembleModel(AbstractModel):
             self.predict_time += model.predict_time
 
     @classmethod
-    def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True, compression_fn=None, compression_fn_kwargs=None):
-        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+    def load(cls, path: str, reset_paths=True, low_memory=True, load_oof=False, verbose=True, **kwargs):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose, **kwargs)
         if not low_memory:
             model.persist_child_models(reset_paths=reset_paths)
         if load_oof:
@@ -415,7 +415,7 @@ class BaggedEnsembleModel(AbstractModel):
     def save_model_base(self, model_base):
         save_pkl.save(path=self.path + 'utils' + os.path.sep + 'model_template.pkl', object=model_base)
 
-    def save(self, path=None, verbose=True, save_oof=True, save_children=False, compression_fn=None, compression_fn_kwargs=None) -> str:
+    def save(self, path=None, verbose=True, save_oof=True, save_children=False, **kwargs) -> str:
         if path is None:
             path = self.path
 
@@ -432,11 +432,11 @@ class BaggedEnsembleModel(AbstractModel):
             save_pkl.save(path=path + 'utils' + os.path.sep + self._oof_filename, object={
                     '_oof_pred_proba': self._oof_pred_proba,
                     '_oof_pred_model_repeats': self._oof_pred_model_repeats,
-            }, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+            }, **kwargs)
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
 
-        return super().save(path=path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+        return super().save(path=path, verbose=verbose, **kwargs)
 
     # If `remove_fit_stack=True`, variables will be removed that are required to fit more folds and to fit new stacker models which use this model as a base model.
     #  This includes OOF variables.

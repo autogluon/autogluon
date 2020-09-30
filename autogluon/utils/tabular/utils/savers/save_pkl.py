@@ -9,7 +9,10 @@ logger = logging.getLogger(__name__)
 compression_fn_map = compression_utils.get_compression_map()
 
 
-def save(path, object, format=None, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+def save(path, object, format=None, verbose=True, **kwargs):
+    compression_fn = kwargs.get('compression_fn', None)
+    compression_fn_kwargs = kwargs.get('compression_fn_kwargs', None)
+
     if compression_fn in compression_fn_map:
         validated_path = compression_utils.get_validated_path(path, compression_fn)
     else:

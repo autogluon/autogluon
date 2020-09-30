@@ -155,24 +155,16 @@ class AbstractTrainer:
         return load_pkl.load(path=path)
 
     def save_X_train(self, X, verbose=True):
-        path = self.path_data + 'X_train.pkl'
-        save_pkl.save(path=path, object=X, verbose=verbose, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+        self._save_data(self.path_data + 'X_train.pkl', X, verbose)
 
     def save_X_val(self, X, verbose=True):
-        path = self.path_data + 'X_val.pkl'
-        save_pkl.save(path=path, object=X, verbose=verbose, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+        self._save_data(self.path_data + 'X_val.pkl', X, verbose)
 
     def save_y_train(self, y, verbose=True):
-        path = self.path_data + 'y_train.pkl'
-        save_pkl.save(path=path, object=y, verbose=verbose, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+        self._save_data(self.path_data + 'y_train.pkl', y, verbose)
 
     def save_y_val(self, y, verbose=True):
-        path = self.path_data + 'y_val.pkl'
-        save_pkl.save(path=path, object=y, verbose=verbose, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+        self._save_data(self.path_data + 'y_val.pkl', y, verbose)
 
     def get_model_names_all(self, can_infer=None):
         model_names_all = list(self.model_graph.nodes)
@@ -822,6 +814,7 @@ class AbstractTrainer:
                     cols_to_drop = dummy_stackers[level].stack_columns
                 else:
                     cols_to_drop = []
+                # TODO: pass dict of model name -> compression settings tuple instead of singular compression setting
                 X = dummy_stackers[level+1].preprocess(X=X, preprocess=False, fit=False, compute_base_preds=True,
                                                        compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
                 if len(cols_to_drop) > 0:
@@ -990,6 +983,7 @@ class AbstractTrainer:
         if reduce_memory:
             model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
         if self.low_memory:
+            # TODO: save compression settings to model DAG node.
             model.save(compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
         else:
             self.models[model.name] = model
@@ -1560,12 +1554,12 @@ class AbstractTrainer:
                 model.delete_from_disk()
 
     @classmethod
-    def load(cls, path, reset_paths=False, compression_fn=None, compression_fn_kwargs=None):
+    def load(cls, path, reset_paths=False, **kwargs):
         load_path = path + cls.trainer_file_name
         if not reset_paths:
-            return load_pkl.load(path=load_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+            return load_pkl.load(path=load_path, **kwargs)
         else:
-            obj = load_pkl.load(path=load_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+            obj = load_pkl.load(path=load_path, **kwargs)
             obj.set_contexts(path)
             obj.reset_paths = reset_paths
             return obj
@@ -1588,6 +1582,10 @@ class AbstractTrainer:
         save_pkl.save(path=self.path + self.trainer_info_name, object=info)
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
+
+    def _save_data(self, path, data, verbose):
+        save_pkl.save(path=path, object=data, verbose=verbose, compression_fn=self.compression_fn,
+                      compression_fn_kwargs=self.compression_fn_kwargs)
 
     def _process_hyperparameters(self, hyperparameters, ag_args_fit=None, excluded_model_types=None):
         if ag_args_fit is None:

@@ -6,7 +6,7 @@ import lzma
 compression_fn_map = {
     None: {
         'open': open,
-        'extension': 'pkl',
+        'extension': '',
     },
     'gzip': {
         'open': gzip.open,
@@ -25,8 +25,7 @@ compression_fn_map = {
 
 def get_validated_path(filename, compression_fn=None):
     if compression_fn is not None:
-        filename_root = filename.rsplit('.')[0]
-        validated_path = f"{filename_root}.{compression_fn_map[compression_fn]['extension']}"
+        validated_path = f"{filename}.{compression_fn_map[compression_fn]['extension']}"
     else:
         validated_path = filename
     return validated_path

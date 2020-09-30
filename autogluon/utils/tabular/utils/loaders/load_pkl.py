@@ -7,7 +7,10 @@ from .. import compression_utils
 logger = logging.getLogger(__name__)
 
 
-def load(path, format=None, verbose=True, compression_fn=None, compression_fn_kwargs=None):
+def load(path, format=None, verbose=True, **kwargs):
+    compression_fn = kwargs.get('compression_fn', None)
+    compression_fn_kwargs = kwargs.get('compression_fn_kwargs', None)
+
     if path.endswith('.pointer'):
         format = 'pointer'
     elif s3_utils.is_s3_url(path):
@@ -35,7 +38,7 @@ def load(path, format=None, verbose=True, compression_fn=None, compression_fn_kw
         with compression_fn_map[compression_fn]['open'](validated_path, 'rb', **compression_fn_kwargs) as fin:
             object = pickle.load(fin)
     else:
-        raise ValueError(f'compression_fn={compression_fn} is not a valid compression_fn. Valid values: {compression_fn_map.keys()}')
+        raise ValueError(f'compression_fn={compression_fn} or compression_fn_kwargs={compression_fn_kwargs} are not valid. Valid function values: {compression_fn_map.keys()}')
 
     return object
 

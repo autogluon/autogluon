@@ -219,13 +219,13 @@ class StackerEnsembleModel(BaggedEnsembleModel):
         # TODO: hpo_results likely not correct because no renames
         return stackers, stackers_performance, hpo_results
 
-    def load_base_model(self, model_name, compression_fn=None, compression_fn_kwargs=None):
+    def load_base_model(self, model_name, **kwargs):
         if model_name in self.base_models_dict.keys():
             model = self.base_models_dict[model_name]
         else:
             model_type = self.base_model_types_dict[model_name]
             model_path = self.base_model_paths_dict[model_name]
-            model = model_type.load(model_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+            model = model_type.load(model_path, **kwargs)
         return model
 
     def get_info(self):

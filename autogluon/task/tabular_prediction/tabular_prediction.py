@@ -434,8 +434,9 @@ class TabularPrediction(BaseTask):
                 If `random_seed=None`, a random integer is used.
             compression_fn : str, default = None
                 Compression algorithm used to compress pickle files saved/loaded on disk.
-                valid values are: 'gzip', 'bz2' and 'lzma'.  'gzip' corresponds to the gzip format and will result in pickle files with extension *.gz, 'bz2' corresponds to the bzip2 compression algorithm and
-                will store files with extension *.bz2, 'lzma' corresponds to LZMA compression algorithm and will create pickle files with extension *.lzma.
+                valid values are: 'gzip', 'bz2', 'lzma' and None.  'gzip' corresponds to the gzip format and will result in pickle files with added extension *.gz, 'bz2' corresponds to the bzip2 compression algorithm and
+                will store files with added extension *.bz2, 'lzma' corresponds to LZMA compression algorithm and will create pickle files with added extension *.lzma.
+                None will create pickle files with no compression.
             compression_fn_kwargs : dict, default = None
                 Keyword arguments to be passed into specified compression_fn open operation. For descriptions and
                 supported arguments for each compression function, see https://docs.python.org/3/library/gzip.html#gzip.open for gzip,

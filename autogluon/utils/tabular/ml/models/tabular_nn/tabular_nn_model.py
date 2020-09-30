@@ -697,14 +697,14 @@ class TabularNeuralNetModel(AbstractModel):
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
-    def save(self, path: str = None, verbose=True, compression_fn=None, compression_fn_kwargs=None) -> str:
+    def save(self, path: str = None, verbose=True, **kwargs) -> str:
         if self.model is not None:
             self._architecture_desc = self.model.architecture_desc
         temp_model = self.model
         temp_sw = self.summary_writer
         self.model = None
         self.summary_writer = None
-        path_final = super().save(path=path, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+        path_final = super().save(path=path, verbose=verbose, **kwargs)
         self.model = temp_model
         self.summary_writer = temp_sw
         self._architecture_desc = None
@@ -718,8 +718,8 @@ class TabularNeuralNetModel(AbstractModel):
         return path_final
 
     @classmethod
-    def load(cls, path: str, reset_paths=True, verbose=True, compression_fn=None, compression_fn_kwargs=None):
-        model: TabularNeuralNetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
+    def load(cls, path: str, reset_paths=True, verbose=True, **kwargs):
+        model: TabularNeuralNetModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose, **kwargs)
         if model._architecture_desc is not None:
             model.model = EmbedNet(architecture_desc=model._architecture_desc, ctx=model.ctx)  # recreate network from architecture description
             model._architecture_desc = None
