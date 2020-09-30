@@ -74,7 +74,7 @@ AutoGluon also provides state-of-the-art tools for neural hyperparameter and arc
 
 - [General introduction into HNAS](https://www.youtube.com/watch?v=pB1LmZWK_N8&feature=youtu.be)
 - [Introduction into HNAS with AutoGluon](https://www.youtube.com/watch?v=GJVwUyVWZas)
-- [Examples](https://github.com/awslabs/autogluon/tree/master/examples/nas/hnas)
+- [Examples](https://github.com/awslabs/autogluon/tree/master/examples/hnas)
 - [Example notebook](https://github.com/zhanghang1989/HPO2NAS-Tutorial-CVPR-ECCV2020/blob/master/mlp.ipynb)
 
 Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neural Architecture Search"](https://arxiv.org/abs/2003.10865) arXiv preprint arXiv:2003.10865 (2020).
