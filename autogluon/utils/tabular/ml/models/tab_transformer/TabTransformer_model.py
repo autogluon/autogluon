@@ -19,6 +19,7 @@ import torch.optim as optim
 import torch
 import pandas as pd
 import os
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class TabNet(nn.Module):
         else:
             loss_criterion = nn.CrossEntropyLoss()
 
-        old_val_accuracy=0.0
+        old_val_accuracy = 0.0
 
         epochs = self.kwargs['pretrain_epochs'] if state=='pretrain' else self.kwargs['epochs']
         freq   = self.kwargs['pretrain_freq'] if state=='pretrain' else self.kwargs['freq']
@@ -93,6 +94,9 @@ class TabNet(nn.Module):
                 if e % freq == 0:
                     _, val_accuracy = utils.epoch(self, valloader, optimizers=None, \
                         loss_criterion=loss_criterion, pretext=pretext, state=state, scheduler=None, epoch=1, epochs=1, aug_kwargs=self.kwargs['augmentation'])
+
+                    # TODO: Replace this whole section with self.score() call.
+                    #val_metric = self.score(X)
                     if val_accuracy>old_val_accuracy:
                         torch.save(self,'tab_trans_temp.pth')
 

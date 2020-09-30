@@ -16,8 +16,7 @@ def augmentation(data, target, mask_prob=0.4, num_augs=1):
     return cat_data, target
 
 
-
-def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, aug_kwargs=None):    
+def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, scheduler, epoch, epochs, aug_kwargs=None):
     is_train = (optimizers is not None)
     net.train() if is_train else net.eval()
     total_loss, total_correct, total_num, data_bar = 0.0, 0.0, 0, tqdm(data_loader)
@@ -34,6 +33,7 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
             # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
             if torch.cuda.is_available():
                 data, target = data.cuda(), target.cuda()
+                pretext = pretext.cuda() # Model needed in GPU for semi-supervised.
 
             if state in [None, 'finetune']:
                 data, target = augmentation(data,target, **aug_kwargs)
@@ -43,16 +43,20 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
                 _, out    = net(data)
             else:
                 raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
+
+
+            #if torch.cuda.is_available():
+            #    pretext = pretext.cuda()
         
             loss, correct  = pretext(out, target)
-   
+
             if is_train:
                 for optimizer in optimizers:
                     optimizer.zero_grad()
                 loss.backward()
                 for optimizer in optimizers:
                     optimizer.step()
-    
+
             total_num += 1
             total_loss += loss.item() 
 

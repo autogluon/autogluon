@@ -28,8 +28,9 @@ class SUPERVISED_pretext(nn.Module):
         return loss, correct
 
     def get(self, data, target):
-        data   = data.to(self.kwargs['device'], non_blocking=True) 
+        data   = data.to(self.kwargs['device'], non_blocking=True)
         target = target.to(self.kwargs['device'], non_blocking=True)
+
         return data, target
 
 

@@ -1,5 +1,6 @@
 from torch import nn
-from autogluon.utils.tabular.ml.models.tab_transformer.TabTransformerEncoder import EmbeddingInitializer
+
+from .TabTransformerEncoder import EmbeddingInitializer
 
 class TabModelBase(nn.Module):
     """
