@@ -1,4 +1,5 @@
 from typing import Set
+import numpy as np
 
 from .debug_log import DebugLogPrinter
 from .gp_fifo_searcher import GPFIFOSearcher, map_reward, MapReward, DEFAULT_INITIAL_SCORING, SUPPORTED_INITIAL_SCORING
@@ -207,7 +208,7 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
     mandatory = set()
 
     default_options = {
-        'random_seed': 31415927,
+        'random_seed': np.random.randint(10000),
         'opt_skip_init_length': 150,
         'opt_skip_period': 1,
         'profiler': False,
@@ -217,6 +218,7 @@ def _common_defaults(is_hyperband: bool) -> (Set[str], dict, dict):
         'opt_verbose': False,
         'opt_debug_writer': False,
         'num_fantasy_samples': 20,
+        'scheduler': 'fifo',
         'num_init_random': DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS,
         'num_init_candidates': DEFAULT_NUM_INITIAL_CANDIDATES,
         'initial_scoring': DEFAULT_INITIAL_SCORING,
