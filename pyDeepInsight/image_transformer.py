@@ -11,12 +11,7 @@ class ImageTransformer:
     """Transform features to an image matrix using dimensionality reduction
 
     This class takes in data normalized between 0 and 1 and converts it to a
-
-    Attributes:
-        pixels:
-
-
-
+    CNN compatible 'image' matrix
 
     """
 
@@ -66,7 +61,7 @@ class ImageTransformer:
         if isinstance(pixels, int):
             pixels = (pixels, pixels)
         self._pixels = pixels
-        self._X_rot = None
+        self._xrot = None
 
     def fit(self, X, y=None, plot=False):
         """Train the image transformer from the training set (X)
@@ -74,37 +69,38 @@ class ImageTransformer:
         Args:
             X: {array-like, sparse matrix} of shape (n_samples, n_features)
             y: Ignored. Present for continuity with scikit-learn
+            plot: boolean of whether to produce a scatter plot showing the
+                feature reduction, hull points, and minimum bounding rectangle
 
         Returns:
             self: object
-
         """
         # perform dimensionality reduction
-        X_new = self._fe.fit_transform(X.T)
+        x_new = self._fe.fit_transform(X.T)
         # get the convex hull for the points
-        chvertices = ConvexHull(X_new).vertices
-        hull_points = X_new[chvertices]
+        chvertices = ConvexHull(x_new).vertices
+        hull_points = x_new[chvertices]
         # determine the minimum bounding rectangle
         mbr, mbr_rot = self._minimum_bounding_rectangle(hull_points)
         # rotate the matrix
         # save the rotated matrix in case user wants to change the pixel size
-        self._X_rot = np.dot(mbr_rot, X_new.T).T
+        self._xrot = np.dot(mbr_rot, x_new.T).T
         # determine feature coordinates based on pixel dimension
         self._calculate_coords()
         # plot rotation diagram if requested
         if plot is True:
-            plt.scatter(X_new[:, 0], X_new[:, 1],
-                        cmap=plt.cm.get_cmap("jet", 10), alpha=0.5)
-            plt.fill(X_new[chvertices, 0], X_new[chvertices, 1],
+            plt.scatter(x_new[:, 0], x_new[:, 1], s=1,
+                        cmap=plt.cm.get_cmap("jet", 10), alpha=0.2)
+            plt.fill(x_new[chvertices, 0], x_new[chvertices, 1],
                      edgecolor='r', fill=False)
-            plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='b', fill=False)
+            plt.fill(mbr[:, 0], mbr[:, 1], edgecolor='g', fill=False)
             plt.gca().set_aspect('equal', adjustable='box')
             plt.show()
         return self
 
     @property
     def pixels(self):
-        """
+        """The image matrix dimensions
 
         Returns:
             tuple: the image matrix dimensions (height, width)
@@ -114,13 +110,11 @@ class ImageTransformer:
 
     @pixels.setter
     def pixels(self, pixels):
-        """
+        """Set the image matrix dimension
 
         Args:
             pixels: int or tuple with the dimensions (height, width)
             of the image matrix
-
-        Returns:
 
         """
         if isinstance(pixels, int):
@@ -133,13 +127,13 @@ class ImageTransformer:
     def _calculate_coords(self):
         """"""
         ax0_coord = np.digitize(
-            self._X_rot[:, 0],
-            bins=np.linspace(min(self._X_rot[:, 0]), max(self._X_rot[:, 0]),
+            self._xrot[:, 0],
+            bins=np.linspace(min(self._xrot[:, 0]), max(self._xrot[:, 0]),
                              self._pixels[0])
         ) - 1
         ax1_coord = np.digitize(
-            self._X_rot[:, 1],
-            bins=np.linspace(min(self._X_rot[:, 1]), max(self._X_rot[:, 1]),
+            self._xrot[:, 1],
+            bins=np.linspace(min(self._xrot[:, 1]), max(self._xrot[:, 1]),
                              self._pixels[1])
         ) - 1
         self._coords = np.stack((ax0_coord, ax1_coord))
@@ -148,7 +142,7 @@ class ImageTransformer:
         """"""
         img_coords = pd.DataFrame(np.vstack((
             self._coords,
-            X.clip(0,1)
+            X.clip(0, 1)
         )).T).groupby([0, 1], as_index=False).mean()
 
         img_matrices = []
@@ -176,14 +170,15 @@ class ImageTransformer:
         """
         fdmat = np.zeros(self._pixels)
         coord_cnt = (pd.DataFrame(self._coords.T)
-                       .assign(count = 1)
+                       .assign(count=1)
                        .groupby([0, 1], as_index=False)
                        .count())
         fdmat[coord_cnt[0].astype(int),
               coord_cnt[1].astype(int)] = coord_cnt['count']
         return fdmat
 
-    def _minimum_bounding_rectangle(self, hull_points):
+    @staticmethod
+    def _minimum_bounding_rectangle(hull_points):
         """Find the smallest bounding rectangle for a set of points.
 
         Modified from JesseBuesking at https://stackoverflow.com/a/33619018
@@ -235,4 +230,31 @@ class ImageTransformer:
         coords[2] = np.dot([x2, y1], rotmat)
         coords[3] = np.dot([x1, y1], rotmat)
 
-        return (coords, rotmat)
+        return coords, rotmat
+
+
+class LogScaler:
+    """Log normalize and scale data
+
+    Log normalization and scaling procedure as described as norm-2 in the
+    DeepInsight paper supplementary information.
+    """
+
+    def __init__(self):
+        self._min0 = None
+        self._max = None
+        pass
+
+    def fit(self, X, y=None):
+        self._min0 = X.min(axis=0)
+        self._max = np.log(X + np.abs(self._min0) + 1).max()
+
+    def fit_transform(self, X, y=None):
+        self._min0 = X.min(axis=0)
+        X_norm = np.log(X + np.abs(self._min0) + 1)
+        self._max = X_norm.max()
+        return X_norm / self._max
+
+    def transform(self, X, y=None):
+        X_norm = np.log(X + np.abs(self._min0) + 1).clip(0, None)
+        return (X_norm / self._max).clip(0, 1)

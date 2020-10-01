@@ -1,11 +1,8 @@
 from setuptools import setup
 
 install_requires = [
-    'numpy',
-    'scipy'
     'scikit-learn',
     'pandas',
-    'matplotlib'
 ]
 
 setup(
@@ -16,6 +13,10 @@ setup(
     license='MIT',
     author='Keith A. Boroevich',
     author_email='kaboroevich@gmail.com',
-    description='A methodology to transform a non-image data to an image for convolution neural network architecture',
-    install_requires=install_requires
+    description='A methodology to transform a non-image data to an image for'
+                ' convolution neural network architecture',
+    install_requires=install_requires,
+    extras_require={
+        'ImageTransformer_fit_plot': ['matplotlib']
+    }
 )
