@@ -13,11 +13,14 @@ sudo pip install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsigh
 The following is a walkthrough of standard usage of the ImageTransformer class
 
 ```python
-from pyDeepInsight import ImageTransformer
+from pyDeepInsight import ImageTransformer, LogScaler
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
+
 from matplotlib import pyplot as plt
+import matplotlib.ticker as ticker
+import seaborn as sns
 ```
 Load example TCGA data
 
@@ -36,14 +39,9 @@ Normalize data to values between 0 and 1. The following normalization procedure 
 
 ```python
 
-gene_min = X_train.min(axis=0)
-
-X_train_norm = np.log(X_train + np.abs(gene_min) + 1)
-norm_max = X_train_norm.max()
-X_train_norm = X_train_norm/norm_max
-
-X_test_norm = np.log(X_test + np.abs(gene_min) + 1).clip(0,None)
-X_test_norm = (X_test_norm/norm_max).clip(0, 1)
+ln = LogScaler()
+X_train_norm = ln.fit_transform(X_train)
+X_test_norm = ln.transform(X_test)
 
 ```
 Initialize image transformer.
@@ -69,15 +67,35 @@ The feature density matrix can be extracted from the trained transformer in orde
 fdm = it.feature_density_matrix()
 fdm[fdm == 0] = np.nan
 
-fig = plt.figure(figsize=(5, 5))
-ax = fig.add_subplot(111)
-cax = ax.matshow(fdm, vmin=1)
-fig.colorbar(cax)
-plt.gca().set_aspect('equal', adjustable='box')
-plt.show()
+plt.figure(figsize=(10, 7))
+
+ax = sns.heatmap(fdm, cmap="viridis", linewidths=0.01, 
+                 linecolor="lightgrey", square=True)
+for _, spine in ax.spines.items():
+    spine.set_visible(True)
 ```
 
 ![png](./data/output_9_0.png)
+
+It is possible to update the pixel size without retraining.
+
+```python
+px_sizes = [25, (25, 50), 50, 100]
+
+fig, ax = plt.subplots(1, len(px_sizes), figsize=(25, 7))
+for ix, px in enumerate(px_sizes):
+    it.pixels = px
+    fdm = it.feature_density_matrix()
+    fdm[fdm == 0] = np.nan
+    cax = sns.heatmap(fdm, cmap="viridis", linewidth=0.01, square=True, ax=ax[ix], cbar=False)
+    cax.set_title('Dim {} x {}'.format(*it.pixels))
+    for _, spine in cax.spines.items():
+        spine.set_visible(True)
+
+it.pixels = 50
+```
+
+![png](./data/output_9_5.png)
 
 The trained transformer can then be used to transform sample data to image matricies.
 
@@ -93,12 +111,11 @@ mat_train = it.fit_transform(X_train_norm)
 The following are showing plots for the image matrices first four samples of the training set. 
 
 ```python
-fig, ax = plt.subplots(1, 4, figsize=(15, 10))
-
+fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    ax[i].matshow(mat_train[i])
-    ax[i].axis('off')
-plt.show()
+    cax = sns.heatmap(mat_test[i], cmap='hot', linewidth=0.01, linecolor='dimgrey', square=True, ax=ax[i], cbar=False)
+    cax.axis('off')
+plt.tight_layout()
 ```
 
 ![png](./data/output_14_0.png)
@@ -108,12 +125,11 @@ Transforming the testing data is done the same as transforming the training data
 ```python
 mat_test = it.transform(X_test_norm)
 
-fig, ax = plt.subplots(1, 4, figsize=(15, 10))
-
+fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    ax[i].matshow(mat_test[i])
-    ax[i].axis('off')
-plt.show()
+    cax = sns.heatmap(mat_test[i], cmap='hot', linewidth=0.01, linecolor='dimgrey', square=True, ax=ax[i], cbar=False)
+    cax.axis('off')
+plt.tight_layout()
 ```
 
 ![png](./data/output_17_0.png)
