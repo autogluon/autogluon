@@ -52,7 +52,7 @@ it = ImageTransformer(feature_extractor='tsne',
                       n_jobs=-1)
 ```
 
-Train image transformer on training data. Setting plot=True results in at a plot showing the reduced features (blue points), convex full (red), and minimum bounding rectagle (blue box) prior to rotation.
+Train image transformer on training data. Setting plot=True results in at a plot showing the reduced features (blue points), convex full (red), and minimum bounding rectagle (green) prior to rotation.
 
 ```python
 plt.figure(figsize=(5, 5))
