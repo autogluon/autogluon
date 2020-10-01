@@ -30,8 +30,7 @@ class DefaultLearner(AbstractLearner):
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
     def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
             feature_prune=False, holdout_frac=0.1, num_bagging_folds=0, num_bagging_sets=1, stack_ensemble_levels=0,
-            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2,
-            compression_fn=None, compression_fn_kwargs=None):
+            hyperparameters=None, ag_args_fit=None, excluded_model_types=None, time_limit=None, save_data=False, save_bagged_folds=True, verbosity=2):
         """ Arguments:
                 X (DataFrame): training data
                 X_val (DataFrame): data used for hyperparameter tuning. Note: final model may be trained using this data as well as training data
@@ -90,8 +89,8 @@ class DefaultLearner(AbstractLearner):
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
             verbosity=verbosity,
-            compression_fn=compression_fn,
-            compression_fn_kwargs=compression_fn_kwargs
+            compression_fn=self.compression_fn,
+            compression_fn_kwargs=self.compression_fn_kwargs,
         )
 
         self.trainer_path = trainer.path

@@ -659,13 +659,13 @@ class AbstractModel:
         return info
 
     @classmethod
-    def load_info(cls, path, load_model_if_required=True) -> dict:
+    def load_info(cls, path, load_model_if_required=True, **kwargs) -> dict:
         load_path = path + cls.model_info_name
         try:
             return load_pkl.load(path=load_path)
         except:
             if load_model_if_required:
-                model = cls.load(path=path, reset_paths=True)
+                model = cls.load(path=path, reset_paths=True, **kwargs)
                 return model.get_info()
             else:
                 raise
