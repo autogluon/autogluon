@@ -79,7 +79,7 @@ class TabularNeuralNetModel(AbstractModel):
         self.types_of_features = None
         self.feature_arraycol_map = None
         self.feature_type_map = None
-        self.features_to_drop = []  # may change between different bagging folds
+        self.features_to_drop = []  # may change between different bagging folds. TODO: consider just removing these from self.features if it works with bagging
         self.processor = None  # data processor
         self.summary_writer = None
         self.ctx = mx.cpu()
@@ -276,7 +276,7 @@ class TabularNeuralNetModel(AbstractModel):
         epochs_wo_improve = params['epochs_wo_improve']
         loss_scaling_factor = 1.0  # we divide loss by this quantity to stabilize gradients
         loss_torescale = [key for key in self.rescale_losses if isinstance(loss_func, key)]
-        if len(loss_torescale) > 0:
+        if loss_torescale:
             loss_torescale = loss_torescale[0]
             if self.rescale_losses[loss_torescale] == 'std':
                 loss_scaling_factor = np.std(train_dataset.get_labels())/5.0 + EPS  # std-dev of labels
@@ -479,9 +479,9 @@ class TabularNeuralNetModel(AbstractModel):
         if (self.processor is None or self.types_of_features is None
            or self.feature_arraycol_map is None or self.feature_type_map is None):
             raise ValueError("Need to process training data before test data")
-        if len(self.features_to_drop) > 0:
+        if self.features_to_drop:
             drop_cols = [col for col in df.columns if col in self.features_to_drop]
-            if len(drop_cols) > 0:
+            if drop_cols:
                 df = df.drop(columns=drop_cols)
 
         df = self.processor.transform(df) # 2D numpy array. self.feature_arraycol_map, self.feature_type_map have been previously set while processing training data.
@@ -579,7 +579,7 @@ class TabularNeuralNetModel(AbstractModel):
             self.features = list(df.columns)
 
         self.features_to_drop = df.columns[df.isna().all()].tolist()  # drop entirely NA columns which may arise after train/val split
-        if len(self.features_to_drop) > 0:
+        if self.features_to_drop:
             logger.log(15, f"TabularNeuralNetModel will additionally ignore the following columns: {self.features_to_drop}")
             df = df.drop(columns=self.features_to_drop)
 
@@ -661,30 +661,30 @@ class TabularNeuralNetModel(AbstractModel):
         embed_features = self.types_of_features['embed']
         language_features = self.types_of_features['language']
         transformers = []  # order of various column transformers in this list is important!
-        if len(continuous_features) > 0:
+        if continuous_features:
             continuous_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy=impute_strategy)),
                 ('scaler', StandardScaler())])
             transformers.append( ('continuous', continuous_transformer, continuous_features) )
-        if len(skewed_features) > 0:
+        if skewed_features:
             power_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy=impute_strategy)),
                 ('quantile', QuantileTransformer(output_distribution='normal')) ])  # Or output_distribution = 'uniform'
             transformers.append( ('skewed', power_transformer, skewed_features) )
-        if len(onehot_features) > 0:
+        if onehot_features:
             onehot_transformer = Pipeline(steps=[
                 # TODO: Consider avoiding converting to string for improved memory efficiency
                 ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
                 ('onehot', OneHotMergeRaresHandleUnknownEncoder(max_levels=max_category_levels, sparse=False))])  # test-time unknown values will be encoded as all zeros vector
             transformers.append( ('onehot', onehot_transformer, onehot_features) )
-        if len(embed_features) > 0:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
+        if embed_features:  # Ordinal transformer applied to convert to-be-embedded categorical features to integer levels
             ordinal_transformer = Pipeline(steps=[
                 ('to_str', FunctionTransformer(self.convert_df_dtype_to_str)),
                 ('imputer', SimpleImputer(strategy='constant', fill_value=self.unique_category_str)),
                 ('ordinal', OrdinalMergeRaresHandleUnknownEncoder(max_levels=max_category_levels))])  # returns 0-n when max_category_levels = n-1. category n is reserved for unknown test-time categories.
             transformers.append( ('ordinal', ordinal_transformer, embed_features) )
-        if len(language_features) > 0:
+        if language_features:
             raise NotImplementedError("language_features cannot be used at the moment")
         return ColumnTransformer(transformers=transformers)  # numeric features are processed in the same order as in numeric_features vector, so feature-names remain the same.
 
