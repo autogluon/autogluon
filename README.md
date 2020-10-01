@@ -113,7 +113,9 @@ The following are showing plots for the image matrices first four samples of the
 ```python
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    cax = sns.heatmap(mat_test[i], cmap='hot', linewidth=0.01, linecolor='dimgrey', square=True, ax=ax[i], cbar=False)
+    cax = sns.heatmap(mat_test[i], cmap='hot',
+                      linewidth=0.01, linecolor='dimgrey',
+                      square=True, ax=ax[i], cbar=False)
     cax.axis('off')
 plt.tight_layout()
 ```
@@ -127,7 +129,9 @@ mat_test = it.transform(X_test_norm)
 
 fig, ax = plt.subplots(1, 4, figsize=(25, 7))
 for i in range(0,4):
-    cax = sns.heatmap(mat_test[i], cmap='hot', linewidth=0.01, linecolor='dimgrey', square=True, ax=ax[i], cbar=False)
+    cax = sns.heatmap(mat_test[i], cmap='hot',
+                      linewidth=0.01, linecolor='dimgrey',
+                      square=True, ax=ax[i], cbar=False)
     cax.axis('off')
 plt.tight_layout()
 ```
