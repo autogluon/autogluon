@@ -60,11 +60,6 @@ class AbstractLearner:
         self.trainer_path = None
         self.reset_paths = False
 
-        self.time_fit_total = None
-        self.time_fit_preprocessing = None
-        self.time_fit_training = None
-        self.time_limit = None
-
         try:
             from .....version import __version__
             self.version = __version__
@@ -145,10 +140,10 @@ class AbstractLearner:
             dataset_preprocessed = self.transform_features(dataset)
             fit = False
         if base_models is not None:
-            dataset_preprocessed = trainer.get_inputs_to_stacker_v2(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
+            dataset_preprocessed = trainer.get_inputs_to_stacker(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
         elif model is not None:
             base_models = list(trainer.model_graph.predecessors(model))
-            dataset_preprocessed = trainer.get_inputs_to_stacker_v2(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
+            dataset_preprocessed = trainer.get_inputs_to_stacker(X=dataset_preprocessed, base_models=base_models, fit=fit, use_orig_features=use_orig_features)
             # Note: Below doesn't quite work here because weighted_ensemble has unique input format returned that isn't a DataFrame.
             # dataset_preprocessed = trainer.get_inputs_to_model(model=model_to_get_inputs_for, X=dataset_preprocessed, fit=fit)
 
@@ -158,8 +153,7 @@ class AbstractLearner:
     # If model is specified, will fit all _FULL models that are ancestors of the provided model, automatically linking them.
     # If no model is specified, all models are refit and linked appropriately.
     def refit_ensemble_full(self, model='all'):
-        trainer = self.load_trainer()
-        return trainer.refit_ensemble_full(model=model)
+        return self.load_trainer().refit_ensemble_full(model=model)
 
     def fit_transform_features(self, X, y=None):
         for feature_generator in self.feature_generators:
@@ -281,21 +275,6 @@ class AbstractLearner:
         df_merged = df_merged[df_columns_new]
 
         return df_merged
-
-    def get_pred_probas_models_and_time(self, X, trainer: AbstractTrainer, model_names):
-        pred_probas_lst = []
-        pred_probas_time_lst = []
-        for model_name in model_names:
-            model = trainer.load_model(model_name)
-            time_start = time.time()
-            pred_probas = trainer.pred_proba_predictions(models=[model], X=X)
-            if (self.problem_type == MULTICLASS) and (not trainer.eval_metric_expects_y_pred):
-                # Handles case where we need to add empty columns to represent classes that were not used for training
-                pred_probas = [self.label_cleaner.inverse_transform_proba(pred_proba) for pred_proba in pred_probas]
-            time_diff = time.time() - time_start
-            pred_probas_lst += pred_probas
-            pred_probas_time_lst.append(time_diff)
-        return pred_probas_lst, pred_probas_time_lst
 
     def _remove_missing_labels(self, y_true, y_pred):
         """Removes missing labels and produces warning if any are found."""
@@ -467,25 +446,6 @@ class AbstractLearner:
             X = X.loc[y.index]
         return X, y
 
-    # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
-    # TODO: Add feature inference / feature engineering info to get_info output
-    def get_info(self, include_model_info=False):
-        trainer = self.load_trainer()
-        trainer_info = trainer.get_info(include_model_info=include_model_info)
-        learner_info = {
-            'path': self.path,
-            'label': self.label,
-            'time_fit_preprocessing': self.time_fit_preprocessing,
-            'time_fit_training': self.time_fit_training,
-            'time_fit_total': self.time_fit_total,
-            'time_limit': self.time_limit,
-            'random_seed': self.random_seed,
-            'version': self.version,
-        }
-
-        learner_info.update(trainer_info)
-        return learner_info
-
     @staticmethod
     def infer_problem_type(y: Series):
         return infer_problem_type(y=y)
@@ -502,7 +462,7 @@ class AbstractLearner:
 
     # reset_paths=True if the learner files have changed location since fitting.
     # TODO: Potentially set reset_paths=False inside load function if it is the same path to avoid re-computing paths on all models
-    # TODO: path_context -> path
+    # TODO: path_context -> path for v0.1
     @classmethod
     def load(cls, path_context, reset_paths=True):
         load_path = path_context + cls.learner_file_name
@@ -541,25 +501,6 @@ class AbstractLearner:
         else:
             return []
 
-    @classmethod
-    def load_info(cls, path, reset_paths=True, load_model_if_required=True):
-        load_path = path + cls.learner_info_name
-        try:
-            return load_pkl.load(path=load_path)
-        except Exception as e:
-            if load_model_if_required:
-                learner = cls.load(path_context=path, reset_paths=reset_paths)
-                return learner.get_info()
-            else:
-                raise e
-
-    def save_info(self, include_model_info=False):
-        info = self.get_info(include_model_info=include_model_info)
-
-        save_pkl.save(path=self.path + self.learner_info_name, object=info)
-        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
-        return info
-
     def distill(self, X=None, y=None, X_val=None, y_val=None, time_limits=None, hyperparameters=None, holdout_frac=None,
                 verbosity=None, models_name_suffix=None, teacher_preds='soft',
                 augmentation_data=None, augment_method='spunge', augment_args={'size_factor':5,'max_size':int(1e5)}):
@@ -593,3 +534,34 @@ class AbstractLearner:
                                                 augmentation_data=augmentation_data, augment_method=augment_method, augment_args=augment_args)
         self.save_trainer(trainer=trainer)
         return distilled_model_names
+
+    @classmethod
+    def load_info(cls, path, reset_paths=True, load_model_if_required=True):
+        load_path = path + cls.learner_info_name
+        try:
+            return load_pkl.load(path=load_path)
+        except Exception as e:
+            if load_model_if_required:
+                learner = cls.load(path_context=path, reset_paths=reset_paths)
+                return learner.get_info()
+            else:
+                raise e
+
+    def save_info(self, include_model_info=False):
+        info = self.get_info(include_model_info=include_model_info)
+
+        save_pkl.save(path=self.path + self.learner_info_name, object=info)
+        save_json.save(path=self.path + self.learner_info_json_name, obj=info)
+        return info
+
+    # TODO: Add data info gathering at beginning of .fit() that is used by all learners to add to get_info output
+    # TODO: Add feature inference / feature engineering info to get_info output
+    def get_info(self, **kwargs):
+        learner_info = {
+            'path': self.path,
+            'label': self.label,
+            'random_seed': self.random_seed,
+            'version': self.version,
+        }
+
+        return learner_info

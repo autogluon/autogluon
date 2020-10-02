@@ -100,7 +100,7 @@ class TabularPredictor(BasePredictor):
     @property
     def model_performance(self):
         logger.warning('WARNING: `predictor.model_performance` is a deprecated `predictor` variable. Use `predictor.leaderboard()` instead. Use of `predictor.model_performance` will result in an exception starting in autogluon==0.1')
-        return self._trainer.model_performance
+        return self._trainer.get_models_attribute_dict(attribute='val_score')
 
     def predict(self, dataset, model=None, as_pandas=False):
         """ Use trained models to produce predicted labels (in classification) or response values (in regression).
@@ -333,8 +333,10 @@ class TabularPredictor(BasePredictor):
             Dict containing various detailed information. We do not recommend directly printing this dict as it may be very large.
         """
         hpo_used = len(self._trainer.hpo_results) > 0
-        model_typenames = {key: self._trainer.model_types[key].__name__ for key in self._trainer.model_types}
-        model_innertypenames = {key: self._trainer.model_types_inner[key].__name__ for key in self._trainer.model_types if key in self._trainer.model_types_inner}
+        model_types = self._trainer.get_models_attribute_dict(attribute='type')
+        model_inner_types = self._trainer.get_models_attribute_dict(attribute='type_inner')
+        model_typenames = {key: model_types[key].__name__ for key in model_types}
+        model_innertypenames = {key: model_inner_types[key].__name__ for key in model_types if key in model_inner_types}
         MODEL_STR = 'Model'
         ENSEMBLE_STR = 'Ensemble'
         for model in model_typenames:
@@ -348,12 +350,12 @@ class TabularPredictor(BasePredictor):
         # all fit() information that is returned:
         results = {
             'model_types': model_typenames,  # dict with key = model-name, value = type of model (class-name)
-            'model_performance': self._trainer.get_model_attributes_dict('val_score'),  # dict with key = model-name, value = validation performance
+            'model_performance': self._trainer.get_models_attribute_dict('val_score'),  # dict with key = model-name, value = validation performance
             'model_best': self._trainer.model_best,  # the name of the best model (on validation data)
-            'model_paths': self._trainer.model_paths,  # dict with key = model-name, value = path to model file
-            'model_fit_times': self._trainer.get_model_attributes_dict('fit_time'),
-            'model_pred_times': self._trainer.get_model_attributes_dict('predict_time'),
-            'num_bagging_folds': self._trainer.kfolds,
+            'model_paths': self._trainer.get_models_attribute_dict('path'),  # dict with key = model-name, value = path to model file
+            'model_fit_times': self._trainer.get_models_attribute_dict('fit_time'),
+            'model_pred_times': self._trainer.get_models_attribute_dict('predict_time'),
+            'num_bagging_folds': self._trainer.k_fold,
             'stack_ensemble_levels': self._trainer.stack_ensemble_levels,
             'feature_prune': self._trainer.feature_prune,
             'hyperparameter_tune': hpo_used,
@@ -803,7 +805,7 @@ class TabularPredictor(BasePredictor):
         if base_models is None:
             base_models = trainer.get_model_names(stack_name='core')
 
-        X_train_stack_preds = trainer.get_inputs_to_stacker_v2(X=X, base_models=base_models, fit=fit, use_orig_features=False)
+        X_train_stack_preds = trainer.get_inputs_to_stacker(X=X, base_models=base_models, fit=fit, use_orig_features=False)
 
         models = []
 
