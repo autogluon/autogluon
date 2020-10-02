@@ -87,7 +87,9 @@ for ix, px in enumerate(px_sizes):
     it.pixels = px
     fdm = it.feature_density_matrix()
     fdm[fdm == 0] = np.nan
-    cax = sns.heatmap(fdm, cmap="viridis", linewidth=0.01, square=True, ax=ax[ix], cbar=False)
+    cax = sns.heatmap(fdm, cmap="viridis", linewidth=0.01, 
+                      linecolor="lightgrey", square=True, 
+                      ax=ax[ix], cbar=False)
     cax.set_title('Dim {} x {}'.format(*it.pixels))
     for _, spine in cax.spines.items():
         spine.set_visible(True)
