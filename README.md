@@ -5,7 +5,7 @@ This repository contains a python version of the image transformation procedure 
 ## Installation
 
 ```
-sudo pip install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
+pip install git+git://github.com/alok-ai-lab/DeepInsight.git#egg=DeepInsight
 ```
 
 ## Usage
