@@ -125,7 +125,9 @@ class ImageTransformer:
             self._calculate_coords()
 
     def _calculate_coords(self):
-        """"""
+        """Calculate the matrix coordinates of each feature based on the
+        pixel dimensions.
+        """
         ax0_coord = np.digitize(
             self._xrot[:, 0],
             bins=np.linspace(min(self._xrot[:, 0]), max(self._xrot[:, 0]),
@@ -139,7 +141,18 @@ class ImageTransformer:
         self._coords = np.stack((ax0_coord, ax1_coord))
 
     def transform(self, X, empty_value=0):
-        """"""
+        """Transform the input matrix into image matrices
+
+        Args:
+            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+                where n_features matches the training set.
+            empty_value: numeric value to fill elements where no features are
+                mapped. Default = 0.
+
+        Returns:
+            A list of n_samples numpy matrices of dimensions set by
+            the pixel parameter
+        """
         img_coords = pd.DataFrame(np.vstack((
             self._coords,
             X.clip(0, 1)
@@ -158,7 +171,16 @@ class ImageTransformer:
         return img_matrices
 
     def fit_transform(self, X):
-        """"""
+        """Train the image transformer from the training set (X) and return
+        the transformed data.
+
+        Args:
+            X: {array-like, sparse matrix} of shape (n_samples, n_features)
+
+        Returns:
+            A list of n_samples numpy matrices of dimensions set by
+            the pixel parameter
+        """
         self.fit(X)
         return self.transform(X)
 
