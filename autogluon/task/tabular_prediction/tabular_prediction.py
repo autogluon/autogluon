@@ -65,20 +65,13 @@ class TabularPrediction(BaseTask):
             stopping_metric=None,
             auto_stack=False,
             hyperparameter_tune=False,
-            feature_prune=False,
+            hyperparameters=None,
             holdout_frac=None,
             num_bagging_folds=0,
             num_bagging_sets=None,
             stack_ensemble_levels=0,
-            hyperparameters=None,
             num_trials=None,
-            scheduler_options=None,
             search_strategy='random',
-            search_options=None,
-            nthreads_per_trial=None,
-            ngpus_per_trial=None,
-            dist_ip_addrs=None,
-            visualizer='none',
             verbosity=2,
             **kwargs):
         """
@@ -184,8 +177,6 @@ class TabularPrediction(BaseTask):
             Whether to tune hyperparameters or just use fixed hyperparameter values for each model. Setting as True will increase `fit()` runtimes.
             It is currently not recommended to use `hyperparameter_tune` with `auto_stack` due to potential overfitting.
             Use `auto_stack` to maximize predictive accuracy; use `hyperparameter_tune` if you prefer to deploy just a single model rather than an ensemble.
-        feature_prune : bool, default = False
-            Whether or not to perform feature selection.
         hyperparameters : str or dict, default = 'default'
             Determines the hyperparameters used by the models.
             If `str` is passed, will use a preset hyperparameter configuration.
@@ -302,24 +293,9 @@ class TabularPrediction(BaseTask):
         num_trials : int, default = None
             Maximal number of different hyperparameter settings of each model type to evaluate during HPO (only matters if `hyperparameter_tune = True`).
             If both `time_limits` and `num_trials` are specified, `time_limits` takes precedent.
-        scheduler_options : dict, default = None
-            Extra arguments passed to __init__ of scheduler, to configure the orchestration of training jobs during hyperparameter-tuning.
-            Ignored if `hyperparameter_tune=False`.
         search_strategy : str, default = 'random'
             Which hyperparameter search algorithm to use (only matters if `hyperparameter_tune=True`).
             Options include: 'random' (random search), 'bayesopt' (Gaussian process Bayesian optimization), 'skopt' (SKopt Bayesian optimization), 'grid' (grid search).
-        search_options : dict, default = None
-            Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
-        nthreads_per_trial : int, default = None
-            How many CPUs to use in each training run of an individual model.
-            This is automatically determined by AutoGluon when left as None (based on available compute).
-        ngpus_per_trial : int, default = None
-            How many GPUs to use in each trial (ie. single training run of a model).
-            This is automatically determined by AutoGluon when left as None.
-        dist_ip_addrs : list, default = None
-            List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
-        visualizer : str, default = 'none'
-            How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', 'none'].
         verbosity : int, default = 2
             Verbosity levels range from 0 to 4 and control how much information is printed during fit().
             Higher levels correspond to more detailed print statements (you can set verbosity = 0 to suppress warnings).
@@ -432,6 +408,23 @@ class TabularPrediction(BaseTask):
                     The seed used for stack level L is equal to `seed+L`.
                     This means `random_seed=1` will have the same split indices at L=0 as `random_seed=0` will have at L=1.
                 If `random_seed=None`, a random integer is used.
+            feature_prune : bool, default = False
+                Whether or not to perform feature selection.
+            scheduler_options : dict, default = None
+                Extra arguments passed to __init__ of scheduler, to configure the orchestration of training jobs during hyperparameter-tuning.
+                Ignored if `hyperparameter_tune=False`.
+            search_options : dict, default = None
+                Auxiliary keyword arguments to pass to the searcher that performs hyperparameter optimization.
+            nthreads_per_trial : int, default = None
+                How many CPUs to use in each training run of an individual model.
+                This is automatically determined by AutoGluon when left as None (based on available compute).
+            ngpus_per_trial : int, default = None
+                How many GPUs to use in each trial (ie. single training run of a model).
+                This is automatically determined by AutoGluon when left as None.
+            dist_ip_addrs : list, default = None
+                List of IP addresses corresponding to remote workers, in order to leverage distributed computation.
+            visualizer : str, default = None
+                How to visualize the neural network training progress during `fit()`. Options: ['mxboard', 'tensorboard', None].
 
         Returns
         -------
@@ -466,8 +459,8 @@ class TabularPrediction(BaseTask):
         logger.setLevel(verbosity2loglevel(verbosity))
         allowed_kwarg_names = {
             'feature_generator',
-            'feature_generator_type',  # TODO: Remove on 0.1.0 release
-            'feature_generator_kwargs',  # TODO: Remove on 0.1.0 release
+            'feature_generator_type',  # TODO: Remove on v0.1 release
+            'feature_generator_kwargs',  # TODO: Remove on v0.1 release
             'trainer_type',
             'AG_args_fit',
             'excluded_model_types',
@@ -480,13 +473,34 @@ class TabularPrediction(BaseTask):
             'cache_data',
             'refit_full',
             'random_seed',
-            'enable_fit_continuation'  # TODO: Remove on 0.1.0 release
+            'enable_fit_continuation',  # TODO: Remove on v0.1 release
+            'feature_prune',
+            'scheduler_options',
+            'search_options',
+            'nthreads_per_trial',
+            'ngpus_per_trial',
+            'dist_ip_addrs',
+            'visualizer',
         }
         for kwarg_name in kwargs.keys():
             if kwarg_name not in allowed_kwarg_names:
                 raise ValueError("Unknown keyword argument specified: %s" % kwarg_name)
 
-        if isinstance(train_data,  str):
+        # TODO: v0.1 - time_limits -> time_limit?
+        # TODO: v0.1 - stack_ensemble_levels -> num_stack_levels / num_stack_layers?
+        # TODO: v0.1 - id_columns -> ignored_columns?
+        # TODO: v0.1 - nthreads_per_trial/ngpus_per_trial -> rename/rework
+        # TODO: v0.1 - visualizer -> consider reworking/removing
+
+        feature_prune = kwargs.get('feature_prune', False)
+        scheduler_options = kwargs.get('scheduler_options', None)
+        search_options = kwargs.get('search_options', None)
+        nthreads_per_trial = kwargs.get('nthreads_per_trial', None)
+        ngpus_per_trial = kwargs.get('ngpus_per_trial', None)
+        dist_ip_addrs = kwargs.get('dist_ip_addrs', None)
+        visualizer = kwargs.get('visualizer', None)
+
+        if isinstance(train_data, str):
             train_data = TabularDataset(file_path=train_data)
         if tuning_data is not None and isinstance(tuning_data, str):
             tuning_data = TabularDataset(file_path=tuning_data)
@@ -503,6 +517,9 @@ class TabularPrediction(BaseTask):
             feature_prune = False  # TODO: Fix feature pruning to add back as an option
             # Currently disabled, needs to be updated to align with new model class functionality
             logger.log(30, 'Warning: feature_prune does not currently work, setting to False.')
+        # TODO: Fix or remove in v0.1
+        if dist_ip_addrs is not None:
+            logger.log(30, 'Warning: dist_ip_addrs does not currently work. Distributed instances will not be utilized.')
 
         cache_data = kwargs.get('cache_data', True)
         refit_full = kwargs.get('refit_full', False)
