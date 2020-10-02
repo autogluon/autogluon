@@ -52,8 +52,8 @@ class ImageTransformer:
                 raise ValueError(("Feature extraction method '{}' not accepted"
                                   ).format(feature_extractor))
             self._fe = fe
-        elif hasattr(tsne, 'fit_transform') \
-                and inspect.ismethod(tsne.fit_transform):
+        elif hasattr(tsne, 'fit_transform') and \
+                inspect.ismethod(tsne.fit_transform):
             self._fe = feature_extractor
         else:
             raise TypeError('Parameter feature_extractor is not a '
