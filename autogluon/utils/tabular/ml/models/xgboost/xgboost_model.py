@@ -47,6 +47,11 @@ class XGBoostModel(AbstractModel):
 
     def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
         start_time = time.time()
+        
+        invalid_params = ['num_threads', 'num_gpus']
+        for invalid in invalid_params:
+            if invalid in self.params:
+                self.params.pop(invalid)
         params = self.params.copy()
         params['n_jobs'] = -1
         
