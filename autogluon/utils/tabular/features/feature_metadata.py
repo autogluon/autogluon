@@ -324,7 +324,7 @@ class FeatureMetadata:
 
         return feature_metadata_dict
 
-    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20, max_list_len=3, return_str=False):
+    def print_feature_metadata_full(self, log_prefix='', print_only_one_special=False, log_level=20, max_list_len=5, return_str=False):
         feature_metadata_dict = self.to_dict(inverse=True)
         if not feature_metadata_dict:
             if return_str:

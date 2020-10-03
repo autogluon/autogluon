@@ -31,3 +31,6 @@ class LabelEncoderFeatureGenerator(AbstractFeatureGenerator):
         # TODO: add inplace option?
         X = X.apply(lambda x: x.cat.codes)
         return X
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

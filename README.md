@@ -10,12 +10,15 @@
 [![Pypi Version](https://img.shields.io/pypi/v/autogluon.svg)](https://pypi.org/project/autogluon/#history)
 ![Upload Python Package](https://github.com/awslabs/autogluon/workflows/Upload%20Python%20Package/badge.svg)
 
-AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy deep learning models on tabular, image, and text data. 
+AutoGluon automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy deep learning models on tabular, image, and text data.
 
 ## Example
 
 ```python
-# First install package from terminal:  pip install mxnet autogluon
+# First install package from terminal:
+# python3 -m pip install --upgrade pip
+# python3 -m pip install --upgrade "mxnet<2.0.0"
+# python3 -m pip install autogluon
 
 from autogluon import TabularPrediction as task
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
@@ -29,7 +32,7 @@ performance = predictor.evaluate(test_data)
 See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documentation](https://autogluon.mxnet.io/api/index.html) and instructions on:
 - [Installing AutoGluon](http://autogluon.mxnet.io/index.html#installation)
 - [Learning with tabular data](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html)
-  - [Tips to maximize accuracy](https://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-indepth.html#maximizing-predictive-performance)
+  - [Tips to maximize accuracy](http://autogluon.mxnet.io/tutorials/tabular_prediction/tabular-quickstart.html#maximizing-predictive-performance)
 - [Learning with image data](http://autogluon.mxnet.io/tutorials/image_classification/beginner.html)
 - [Learning with text data](http://autogluon.mxnet.io/tutorials/text_prediction/beginner.html)
 - More advanced topics such as [Neural Architecture Search](http://autogluon.mxnet.io/tutorials/nas/index.html)
@@ -42,9 +45,14 @@ See the [AutoGluon Website](http://autogluon.mxnet.io/index.html) for [documenta
 - [Accurate image classification in 3 lines of code with AutoGluon](https://medium.com/@zhanghang0704/image-classification-on-kaggle-using-autogluon-fc896e74d7e8) (*Medium*, Feb 2020)
 - [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
 
-### Train/Deploy AutoGluon in the Cloud 
+### Hands-on Tutorials
+- [From HPO to NAS: Automated Deep Learning (CVPR 2020)](http://hangzhang.org/CVPR2020/)
+- [Practical Automated Machine Learning with Tabular, Text, and Image Data (KDD 2020)](https://jwmueller.github.io/KDD20-tutorial/)
+
+### Train/Deploy AutoGluon in the Cloud
 - [AutoGluon-Tabular on AWS Marketplace](https://aws.amazon.com/marketplace/pp/prodview-n4zf5pmjt7ism)
-- [Notebook: Running AutoGluon-Tabular on Amazon SageMaker](https://github.com/awslabs/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular/AutoGluon_Tabular_SageMaker.ipynb)
+- [Running AutoGluon-Tabular on Amazon SageMaker](https://github.com/awslabs/amazon-sagemaker-examples/blob/master/advanced_functionality/autogluon-tabular/AutoGluon_Tabular_SageMaker.ipynb)
+- [Running AutoGluon Image Classification on Amazon SageMaker](https://github.com/zhanghang1989/AutoGluon-Docker)
 
 ## Citing AutoGluon
 
@@ -76,7 +84,7 @@ Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neur
 ```bibtex
 @article{abohb,
   title={Model-based Asynchronous Hyperparameter and Neural Architecture Search},
-  author={Klein, Aaron and Tiao, Louis and Lienart, Thibaut and Archambeau, Cedric and Seeger, Matthias} 
+  author={Klein, Aaron and Tiao, Louis and Lienart, Thibaut and Archambeau, Cedric and Seeger, Matthias}
   journal={arXiv preprint arXiv:2003.10865},
   year={2020}
 }

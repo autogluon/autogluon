@@ -113,9 +113,10 @@ class GPFIFOSearcher(BaseSearcher):
     ...     train_fn, searcher='bayesopt', searcher_options=searcher_options,
     ...     num_trials=10, reward_attr='accuracy')
     """
-    def __init__(self, **kwargs):
+    def __init__(self, configspace, **kwargs):
         _gp_searcher = kwargs.get('_gp_searcher')
         if _gp_searcher is None:
+            kwargs['configspace'] = configspace
             _kwargs = check_and_merge_defaults(
                 kwargs, *gp_fifo_searcher_defaults(),
                 dict_name='search_options')

@@ -50,7 +50,7 @@ class CatboostModel(AbstractModel):
 
     # TODO: Use Pool in preprocess, optimize bagging to do Pool.split() to avoid re-computing pool for each fold! Requires stateful + y
     #  Pool is much more memory efficient, avoids copying data twice in memory
-    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train, y_train, X_val=None, y_val=None, time_limit=None, num_gpus=0, **kwargs):
         try_import_catboost()
         from catboost import CatBoostClassifier, CatBoostRegressor, Pool
         if self.problem_type == SOFTCLASS:
@@ -146,6 +146,11 @@ class CatboostModel(AbstractModel):
 
         params = self.params.copy()
         num_features = len(self.features)
+        if num_gpus != 0:
+            if 'task_type' not in params:
+                params['task_type'] = 'GPU'
+                # TODO: Confirm if GPU is used in HPO (Probably not)
+                # TODO: Adjust max_bins to 254?
 
         if params.get('task_type', None) == 'GPU':
             if 'colsample_bylevel' in params:

@@ -29,9 +29,19 @@ DEFAULT_MODEL_PRIORITY = dict(
     CAT=60,
     XGB=55,
     NN=50,
+    FASTAI=45,
     LR=40,
     custom=0,
 )
+
+# Problem type specific model priority overrides (will update default values in DEFAULT_MODEL_PRIORITY)
+PROBLEM_TYPE_MODEL_PRIORITY = {
+    MULTICLASS: dict(
+        NN=120,
+        FASTAI=115,
+        KNN=110,
+    ),
+}
 
 DEFAULT_SOFTCLASS_PRIORITY = dict(
     GBM=100,
@@ -101,9 +111,13 @@ DEFAULT_MODEL_TYPE_SUFFIX['regressor'].update({LinearModel: ''})
 # TODO: Add option to update hyperparameters with only added keys, so disabling CatBoost would just be {'CAT': []}, which keeps the other models as is.
 # TODO: special optional AG arg for only training model if eval_metric in list / not in list. Useful for F1 and 'is_unbalanced' arg in LGBM.
 def get_preset_models(path, problem_type, eval_metric, hyperparameters, stopping_metric=None, num_classes=None, hyperparameter_tune=False,
-                      level='default', extra_ag_args_fit=None, name_suffix='', default_priorities=DEFAULT_MODEL_PRIORITY):
+                      level='default', extra_ag_args_fit=None, name_suffix='', default_priorities=None):
     if problem_type not in [BINARY, MULTICLASS, REGRESSION, SOFTCLASS]:
         raise NotImplementedError
+    if default_priorities is None:
+        default_priorities = copy.deepcopy(DEFAULT_MODEL_PRIORITY)
+        if problem_type in PROBLEM_TYPE_MODEL_PRIORITY:
+            default_priorities.update(PROBLEM_TYPE_MODEL_PRIORITY[problem_type])
 
     if level in hyperparameters.keys():
         level_key = level

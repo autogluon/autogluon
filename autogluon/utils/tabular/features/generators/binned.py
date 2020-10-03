@@ -1,6 +1,7 @@
 import copy
 import logging
 
+import pandas as pd
 from pandas import DataFrame
 
 from .abstract import AbstractFeatureGenerator
@@ -41,7 +42,22 @@ class BinnedFeatureGenerator(AbstractFeatureGenerator):
         if self._bin_map:
             if not self.inplace:
                 X = X.copy(deep=True)
-            for column in self._bin_map:
-                X[column] = binning.bin_column(series=X[column], mapping=self._bin_map[column])
-            X = X.astype(self._astype_map)
+            with pd.option_context('mode.chained_assignment', None):
+                # Pandas complains about SettingWithCopyWarning, but this should be valid.
+                for column in self._bin_map:
+                    X[column] = binning.bin_column(series=X[column], mapping=self._bin_map[column], dtype=self._astype_map[column])
         return X
+
+    def _remove_features_in(self, features: list):
+        super()._remove_features_in(features)
+        if self._bin_map:
+            for feature in features:
+                if feature in self._bin_map:
+                    self._bin_map.pop(feature)
+        if self._astype_map:
+            for feature in features:
+                if feature in self._astype_map:
+                    self._astype_map.pop(feature)
+
+    def _more_tags(self):
+        return {'feature_interactions': False}

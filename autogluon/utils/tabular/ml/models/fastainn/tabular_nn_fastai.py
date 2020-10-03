@@ -102,7 +102,7 @@ class NNFastAiTabularModel(AbstractModel):
         from fastai.tabular import FillMissing, Categorify, Normalize
 
         self.cat_columns = X_train.select_dtypes([
-            'category', 'object', 'bool', 'bool_', 'str', 'string_', 'unicode_'
+            'category', 'object', 'bool', 'bool_'
         ]).columns.values.tolist()
 
         self.cont_columns = X_train.select_dtypes([
@@ -293,7 +293,7 @@ class NNFastAiTabularModel(AbstractModel):
             objective_func_name_to_monitor = monitor_obj_func[objective_func_name]
         return objective_func_name_to_monitor
 
-    def predict_proba(self, X, preprocess=True):
+    def _predict_proba(self, X, preprocess=True):
         from fastai.basic_data import DatasetType
         from fastai.tabular import TabularList
         from fastai.utils.mod_display import progress_disabled_ctx
@@ -315,21 +315,22 @@ class NNFastAiTabularModel(AbstractModel):
         else:
             return preds.numpy()
 
-    def save(self, file_prefix='', directory=None, return_filename=False, verbose=True):
-        # Export model
-        save_pkl.save_with_fn(f'{self.path}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+    def save(self, path: str = None, verbose=True) -> str:
         __model = self.model
-        self.model = {}
-        file_name = super().save(file_prefix=file_prefix, directory=directory, return_filename=return_filename, verbose=verbose)
+        self.model = None
+        path_final = super().save(path=path, verbose=verbose)
         self.model = __model
-        return file_name
+
+        # Export model
+        save_pkl.save_with_fn(f'{path_final}{self.model_internals_file_name}', self.model, lambda m, buffer: m.export(buffer), verbose=verbose)
+        return path_final
 
     @classmethod
-    def load(cls, path: str, file_prefix='', reset_paths=False, verbose=True):
+    def load(cls, path: str, reset_paths=True, verbose=True):
         from fastai.basic_train import load_learner
-        obj = super().load(path, file_prefix=file_prefix, reset_paths=reset_paths, verbose=verbose)
-        obj.model = load_pkl.load_with_fn(f'{obj.path}{obj.model_internals_file_name}', lambda p: load_learner(obj.path, p), verbose=verbose)
-        return obj
+        model = super().load(path, reset_paths=reset_paths, verbose=verbose)
+        model.model = load_pkl.load_with_fn(f'{model.path}{model.model_internals_file_name}', lambda p: load_learner(model.path, p), verbose=verbose)
+        return model
 
     def _set_default_params(self):
         """ Specifies hyperparameter values to use by default """
