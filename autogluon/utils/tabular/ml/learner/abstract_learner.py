@@ -90,8 +90,7 @@ class AbstractLearner:
         return self._fit(X=X, X_val=X_val, **kwargs)
 
     def _fit(self, X: DataFrame, X_val: DataFrame = None, scheduler_options=None, hyperparameter_tune=False,
-            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2, compression_fn=None,
-            compression_fn_kwargs=None):
+            feature_prune=False, holdout_frac=0.1, hyperparameters=None, verbosity=2):
         raise NotImplementedError
 
     def predict_proba(self, X: DataFrame, model=None, as_pandas=False, as_multiclass=False, inverse_transform=True):
@@ -500,8 +499,7 @@ class AbstractLearner:
                 self.trainer.save()
                 trainer = self.trainer
                 self.trainer = None
-        save_pkl.save(path=self.save_path, object=self, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+        save_pkl.save(path=self.save_path, object=self)
         self.trainer = trainer
 
     # reset_paths=True if the learner files have changed location since fitting.

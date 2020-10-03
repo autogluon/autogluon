@@ -86,7 +86,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
                     if fit:
                         base_model_type = self.base_model_types_dict[base_model_name]
                         base_model_path = self.base_model_paths_dict[base_model_name]
-                        y_pred_proba = base_model_type.load_oof(path=base_model_path)
+                        y_pred_proba = base_model_type.load_oof(path=base_model_path, compression_fn=compression_fn, compression_fn_kwargs=compression_fn_kwargs)
                     elif model_pred_proba_dict and base_model_name in model_pred_proba_dict:
                         y_pred_proba = model_pred_proba_dict[base_model_name]
                     else:
@@ -159,6 +159,11 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             else:
                 self.feature_metadata = self.feature_metadata.join_metadata(stacker_feature_metadata)
         self.model_base.feature_metadata = self.feature_metadata  # TODO: Move this
+        compression_kwargs = {}
+        if 'compression_fn' in kwargs:
+            compression_kwargs['compression_fn'] = kwargs['compression_fn']
+        if 'compression_fn_kwargs' in kwargs:
+            compression_kwargs['compression_fn_kwargs'] = kwargs['compression_fn_kwargs']
 
         # TODO: Preprocess data here instead of repeatedly
         X = self.preprocess(X=X, preprocess=False, fit=True, compute_base_preds=compute_base_preds)
@@ -212,7 +217,7 @@ class StackerEnsembleModel(BaggedEnsembleModel):
             stacker.val_score = child.val_score
             stacker._add_child_times_to_bag(model=child)
 
-            stacker.save()
+            stacker.save(**compression_kwargs)
             stackers[stacker.name] = stacker.path
             stackers_performance[stacker.name] = stacker.val_score
 

@@ -36,6 +36,7 @@ class BaggedEnsembleModel(AbstractModel):
         self.low_memory = True
         self.bagged_mode = None
         self.save_bagged_folds = save_bagged_folds
+        self._child_cache_kwargs: dict = {}  # kwargs to use when saving and loading child models
 
         try:
             feature_metadata = self.model_base.feature_metadata
@@ -106,6 +107,15 @@ class BaggedEnsembleModel(AbstractModel):
             raise ValueError(f'k_fold_end must equal k_fold when (n_repeats - n_repeat_start) > 1, values: ({k_fold_end}, {k_fold})')
         if self._k is not None and self._k != k_fold:
             raise ValueError(f'k_fold must equal previously fit k_fold value for the current n_repeat, values: (({k_fold}, {self._k})')
+        if not self.is_fit():
+            # TODO: rework in v0.1 to potentially be defined in init.
+            if 'compression_fn' in kwargs:
+                self._child_cache_kwargs['compression_fn'] = kwargs['compression_fn']
+            if 'compression_fn_kwargs' in kwargs:
+                self._child_cache_kwargs['compression_fn_kwargs'] = kwargs['compression_fn_kwargs']
+        kwargs.pop('compression_fn', None)
+        kwargs.pop('compression_fn_kwargs', None)
+
         fold_start = n_repeat_start * k_fold + k_fold_start
         fold_end = (n_repeats - 1) * k_fold + k_fold_end
         time_start = time.time()
@@ -300,17 +310,17 @@ class BaggedEnsembleModel(AbstractModel):
 
         return feature_importance
 
-    def load_child(self, model, verbose=False) -> AbstractModel:
+    def load_child(self, model, reset_paths=True, verbose=False) -> AbstractModel:
         if isinstance(model, str):
             child_path = self.create_contexts(self.path + model + os.path.sep)
-            return self._child_type.load(path=child_path, verbose=verbose)
+            return self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=verbose, **self._child_cache_kwargs)
         else:
             return model
 
     def save_child(self, model, verbose=False):
         child = self.load_child(model)
         child.set_contexts(self.path + child.name + os.path.sep)
-        child.save(verbose=verbose)
+        child.save(verbose=verbose, **self._child_cache_kwargs)
 
     # TODO: Multiply epochs/n_iterations by some value (such as 1.1) to account for having more training data than bagged models
     def convert_to_refitfull_template(self):
@@ -382,13 +392,13 @@ class BaggedEnsembleModel(AbstractModel):
         return model
 
     @classmethod
-    def load_oof(cls, path, verbose=True):
+    def load_oof(cls, path, verbose=True, **kwargs):
         try:
             oof = load_pkl.load(path=path + 'utils' + os.path.sep + cls._oof_filename, verbose=verbose)
             oof_pred_proba = oof['_oof_pred_proba']
             oof_pred_model_repeats = oof['_oof_pred_model_repeats']
         except FileNotFoundError:
-            model = cls.load(path=path, reset_paths=True, verbose=verbose)
+            model = cls.load(path=path, reset_paths=True, verbose=verbose, **kwargs)
             model._load_oof()
             oof_pred_proba = model._oof_pred_proba
             oof_pred_model_repeats = model._oof_pred_model_repeats
@@ -402,12 +412,9 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba = oof['_oof_pred_proba']
             self._oof_pred_model_repeats = oof['_oof_pred_model_repeats']
 
-    def persist_child_models(self, reset_paths=True):
+    def persist_child_models(self, reset_paths=True, verbose=True):
         for i, model_name in enumerate(self.models):
-            if isinstance(model_name, str):
-                child_path = self.create_contexts(self.path + model_name + os.path.sep)
-                child_model = self._child_type.load(path=child_path, reset_paths=reset_paths, verbose=True)
-                self.models[i] = child_model
+            self.models[i] = self.load_child(model=model_name, reset_paths=reset_paths, verbose=verbose)
 
     def load_model_base(self):
         return load_pkl.load(path=self.path + 'utils' + os.path.sep + 'model_template.pkl')
@@ -432,7 +439,7 @@ class BaggedEnsembleModel(AbstractModel):
             save_pkl.save(path=path + 'utils' + os.path.sep + self._oof_filename, object={
                     '_oof_pred_proba': self._oof_pred_proba,
                     '_oof_pred_model_repeats': self._oof_pred_model_repeats,
-            }, **kwargs)
+            })
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
 
@@ -531,7 +538,7 @@ class BaggedEnsembleModel(AbstractModel):
         for model in self.models:
             if isinstance(model, str):
                 child_path = self.create_contexts(self.path + model + os.path.sep)
-                child_info_dict[model] = self._child_type.load_info(child_path)
+                child_info_dict[model] = self._child_type.load_info(child_path, **self._child_cache_kwargs)
             else:
                 child_info_dict[model.name] = model.get_info()
         return child_info_dict

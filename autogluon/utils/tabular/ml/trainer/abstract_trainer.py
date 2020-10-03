@@ -139,20 +139,16 @@ class AbstractTrainer:
         return self.path_utils + 'data' + os.path.sep
 
     def load_X_train(self):
-        path = self.path_data + 'X_train.pkl'
-        return load_pkl.load(path=path)
+        return self._load_data(self.path_data + 'X_train.pkl')
 
     def load_X_val(self):
-        path = self.path_data + 'X_val.pkl'
-        return load_pkl.load(path=path)
+        return self._load_data(self.path_data + 'X_val.pkl')
 
     def load_y_train(self):
-        path = self.path_data + 'y_train.pkl'
-        return load_pkl.load(path=path)
+        return self._load_data(self.path_data + 'y_train.pkl')
 
     def load_y_val(self):
-        path = self.path_data + 'y_val.pkl'
-        return load_pkl.load(path=path)
+        return self._load_data(self.path_data + 'y_val.pkl')
 
     def save_X_train(self, X, verbose=True):
         self._save_data(self.path_data + 'X_train.pkl', X, verbose)
@@ -233,7 +229,8 @@ class AbstractTrainer:
                                 'num_cpus': self.scheduler_options['resource']['num_cpus'],
                                 'num_gpus': self.scheduler_options['resource']['num_gpus']}  # Additional configurations for model.fit
         if self.bagged_mode or isinstance(model, WeightedEnsembleModel):
-            model.fit(X=X_train, y=y_train, k_fold=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start, compute_base_preds=False, time_limit=time_limit, **model_fit_kwargs)
+            model.fit(X=X_train, y=y_train, k_fold=kfolds, k_fold_start=k_fold_start, k_fold_end=k_fold_end, n_repeats=n_repeats, n_repeat_start=n_repeat_start,
+                      compute_base_preds=False, time_limit=time_limit, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs, **model_fit_kwargs)
         else:
             model.fit(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, time_limit=time_limit, **model_fit_kwargs)
         return model
@@ -346,9 +343,9 @@ class AbstractTrainer:
             # hpo_models (dict): keys = model_names, values = model_paths
             try:
                 if isinstance(model, BaggedEnsembleModel):
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=kfolds, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X=X_train, y=y_train, k_fold=kfolds, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
                 else:
-                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity)
+                    hpo_models, hpo_model_performances, hpo_results = model.hyperparameter_tune(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val, scheduler_options=(self.scheduler_func, self.scheduler_options), verbosity=self.verbosity, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
             except Exception as err:
                 if self.verbosity >= 1:
                     traceback.print_tb(err.__traceback__)
@@ -743,7 +740,7 @@ class AbstractTrainer:
                 model_type = self.model_types[model_name]
                 if issubclass(model_type, BaggedEnsembleModel):
                     model_path = self.model_paths[model_name]
-                    model_pred_proba_dict[model_name] = model_type.load_oof(path=model_path)
+                    model_pred_proba_dict[model_name] = model_type.load_oof(path=model_path, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
                 else:
                     raise AssertionError(f'Model {model.name} must be a BaggedEnsembleModel to return oof_pred_proba')
             else:
@@ -1454,7 +1451,7 @@ class AbstractTrainer:
             if isinstance(model, str):
                 model_type = self.model_types[model]
                 model_path = self.model_paths[model]
-                model_info_dict[model] = model_type.load_info(path=model_path)
+                model_info_dict[model] = model_type.load_info(path=model_path, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
             else:
                 model_info_dict[model.name] = model.get_info()
         return model_info_dict
@@ -1565,13 +1562,13 @@ class AbstractTrainer:
             return obj
 
     @classmethod
-    def load_info(cls, path, reset_paths=False, load_model_if_required=True):
+    def load_info(cls, path, reset_paths=False, load_model_if_required=True, **kwargs):
         load_path = path + cls.trainer_info_name
         try:
             return load_pkl.load(path=load_path)
         except:
             if load_model_if_required:
-                trainer = cls.load(path=path, reset_paths=reset_paths)
+                trainer = cls.load(path=path, reset_paths=reset_paths, **kwargs)
                 return trainer.get_info()
             else:
                 raise
@@ -1583,9 +1580,11 @@ class AbstractTrainer:
         save_json.save(path=self.path + self.trainer_info_json_name, obj=info)
         return info
 
-    def _save_data(self, path, data, verbose):
-        save_pkl.save(path=path, object=data, verbose=verbose, compression_fn=self.compression_fn,
-                      compression_fn_kwargs=self.compression_fn_kwargs)
+    def _load_data(self, path, verbose=False):
+        return load_pkl.load(path=path, verbose=verbose, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
+
+    def _save_data(self, path, data, verbose=False):
+        save_pkl.save(path=path, object=data, verbose=verbose, compression_fn=self.compression_fn, compression_fn_kwargs=self.compression_fn_kwargs)
 
     def _process_hyperparameters(self, hyperparameters, ag_args_fit=None, excluded_model_types=None):
         if ag_args_fit is None:

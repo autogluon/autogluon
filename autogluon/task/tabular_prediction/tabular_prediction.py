@@ -632,8 +632,7 @@ class TabularPrediction(BaseTask):
                     hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune,
                     holdout_frac=holdout_frac, num_bagging_folds=num_bagging_folds, num_bagging_sets=num_bagging_sets, stack_ensemble_levels=stack_ensemble_levels,
                     hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limits_orig,
-                    save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity, compression_fn=compression_fn,
-                    compression_fn_kwargs=compression_fn_kwargs)
+                    save_data=cache_data, save_bagged_folds=save_bagged_folds, verbosity=verbosity)
 
         predictor = TabularPredictor(learner=learner)
 
