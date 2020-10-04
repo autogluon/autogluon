@@ -1,7 +1,7 @@
 import pickle
 import logging
 
-from autogluon.core.utils import warning_filter
+from ..utils import warning_filter
 with warning_filter():
     from skopt import Optimizer
     from skopt.space import Integer, Real, Categorical
@@ -117,7 +117,7 @@ class SKoptSearcher(BaseSearcher):
         return {k: v for k, v in kwargs.items() if k in keys}
 
     def configure_scheduler(self, scheduler):
-        from autogluon.core.scheduler import FIFOScheduler
+        from ..scheduler import FIFOScheduler
 
         assert isinstance(scheduler, FIFOScheduler), \
             "This searcher requires FIFOScheduler scheduler"

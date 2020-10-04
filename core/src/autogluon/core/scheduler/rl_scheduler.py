@@ -10,13 +10,13 @@ from collections import OrderedDict
 import mxnet as mx
 
 from .resource import DistributedResource
-from autogluon.core.utils import (load, tqdm)
-from autogluon.core import Task
-from autogluon.core.decorator import _autogluon_method
-from autogluon.core.searcher import RLSearcher
+from ..utils import (load, tqdm)
+from .. import Task
+from ..decorator import _autogluon_method
+from ..searcher import RLSearcher
 from .fifo import FIFOScheduler
 from .reporter import DistStatusReporter
-from autogluon.core.utils.default_arguments import check_and_merge_defaults, \
+from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Float, String, filter_by_key
 
 __all__ = ['RLScheduler']

@@ -14,12 +14,12 @@ from tqdm.auto import tqdm
 from .reporter import DistStatusReporter, FakeReporter
 from .resource import DistributedResource
 from .scheduler import TaskScheduler
-from autogluon.core import Task
-from autogluon.core.decorator import _autogluon_method
-from autogluon.core.searcher import BaseSearcher
-from autogluon.core.searcher import searcher_factory
-from autogluon.core.utils import save, load, mkdir, try_import_mxboard
-from autogluon.core.utils.default_arguments import check_and_merge_defaults, \
+from .. import Task
+from ..decorator import _autogluon_method
+from ..searcher import BaseSearcher
+from ..searcher import searcher_factory
+from ..utils import save, load, mkdir, try_import_mxboard
+from ..utils.default_arguments import check_and_merge_defaults, \
     Float, Integer, String, Boolean, assert_no_invalid_options
 
 __all__ = ['FIFOScheduler']

@@ -5,7 +5,7 @@ from collections import OrderedDict
 import numpy as np
 
 from .bayesopt.autogluon.debug_log import DebugLogPrinter
-from autogluon.core.utils import DeprecationHelper
+from ..utils import DeprecationHelper
 
 __all__ = ['BaseSearcher',
            'RandomSearcher',
@@ -52,7 +52,7 @@ class BaseSearcher(object):
                 Scheduler the searcher is used with.
 
         """
-        from autogluon.core.scheduler import FIFOScheduler
+        from ..scheduler import FIFOScheduler
 
         if isinstance(scheduler, FIFOScheduler):
             self._reward_attribute = scheduler._reward_attr
@@ -319,7 +319,7 @@ class RandomSearcher(BaseSearcher):
                 Scheduler the searcher is used with.
 
         """
-        from autogluon.core.scheduler import HyperbandScheduler
+        from ..scheduler import HyperbandScheduler
 
         super().configure_scheduler(scheduler)
         self._resource_attribute = None

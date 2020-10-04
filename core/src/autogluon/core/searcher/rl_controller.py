@@ -5,9 +5,9 @@ import mxnet.ndarray as F
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 
-from autogluon.core.space import *
+from ..space import *
 from .searcher import BaseSearcher
-from autogluon.core.utils import keydefaultdict, update_params
+from ..utils import keydefaultdict, update_params
 from collections import OrderedDict
 
 __all__ = ['RLSearcher', 'LSTMController']

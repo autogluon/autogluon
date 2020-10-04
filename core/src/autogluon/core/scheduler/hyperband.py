@@ -8,8 +8,8 @@ from .fifo import FIFOScheduler
 from .hyperband_stopping import HyperbandStopping_Manager
 from .hyperband_promotion import HyperbandPromotion_Manager
 from .reporter import DistStatusReporter
-from autogluon.core.utils import load
-from autogluon.core.utils.default_arguments import check_and_merge_defaults, \
+from ..utils import load
+from ..utils.default_arguments import check_and_merge_defaults, \
     Integer, Boolean, Categorical, filter_by_key
 
 __all__ = ['HyperbandScheduler', 'HyperbandPromotion_Manager', 'HyperbandStopping_Manager']

@@ -3,7 +3,7 @@ import multiprocessing as mp
 
 from .bayesopt.autogluon.searcher_factory import gp_fifo_searcher_factory, gp_multifidelity_searcher_factory, gp_fifo_searcher_defaults, gp_multifidelity_searcher_defaults
 from .searcher import BaseSearcher
-from autogluon.core.utils.default_arguments import check_and_merge_defaults
+from ..utils.default_arguments import check_and_merge_defaults
 
 __all__ = ['GPFIFOSearcher',
            'GPMultiFidelitySearcher']
@@ -130,7 +130,7 @@ class GPFIFOSearcher(BaseSearcher):
         self._gp_lock = mp.Lock()
 
     def configure_scheduler(self, scheduler):
-        from autogluon.core.scheduler import FIFOScheduler
+        from ..scheduler import FIFOScheduler
 
         assert isinstance(scheduler, FIFOScheduler), \
             "This searcher requires FIFOScheduler scheduler"
@@ -329,7 +329,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
         self._gp_lock = mp.Lock()
 
     def configure_scheduler(self, scheduler):
-        from autogluon.core.scheduler import HyperbandScheduler
+        from ..scheduler import HyperbandScheduler
 
         assert isinstance(scheduler, HyperbandScheduler), \
             "This searcher requires HyperbandScheduler scheduler"

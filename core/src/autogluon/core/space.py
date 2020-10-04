@@ -2,7 +2,7 @@ import copy
 from collections import OrderedDict
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-from autogluon.core.utils import DeprecationHelper, EasyDict, classproperty
+from .utils import DeprecationHelper, EasyDict, classproperty
 
 __all__ = ['Space', 'NestedSpace', 'AutoGluonObject', 'List', 'Dict',
            'Categorical', 'Choice', 'Real', 'Int', 'Bool']

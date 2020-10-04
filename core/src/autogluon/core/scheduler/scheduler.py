@@ -10,9 +10,9 @@ from collections import OrderedDict
 
 from .remote import RemoteManager
 from .resource import DistributedResourceManager
-from autogluon.core import Task
+from .. import Task
 from .reporter import *
-from autogluon.core.utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
+from ..utils import AutoGluonWarning, AutoGluonEarlyStop, CustomProcess
 
 logger = logging.getLogger(__name__)
 

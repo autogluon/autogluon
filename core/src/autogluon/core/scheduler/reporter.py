@@ -1,11 +1,10 @@
 import os
-import sys
 import time
 import json
 import logging
 import threading
 import multiprocessing as mp
-from autogluon.core.utils import save, load, AutoGluonEarlyStop
+from ..utils import save, load, AutoGluonEarlyStop
 import distributed
 from distributed import Queue, Variable
 from distributed.comm.core import CommClosedError

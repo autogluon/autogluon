@@ -1,7 +1,7 @@
 # TODO: Standardize / unify this code with ag.save()
 import os, pickle, tempfile, logging, boto3
 
-from autogluon.core.utils import s3_utils
+from ...utils import s3_utils
 
 logger = logging.getLogger(__name__)
 

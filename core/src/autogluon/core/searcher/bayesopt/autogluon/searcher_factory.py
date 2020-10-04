@@ -17,7 +17,7 @@ from ..models.gpmxnet_skipopt import SkipNoMaxResourcePredicate, SkipPeriodicall
 from ..models.gpmxnet_transformers import GPMXNetModelArgs
 from ..models.nphead_acqfunc import EIAcquisitionFunction
 from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC, DEFAULT_NUM_INITIAL_CANDIDATES, DEFAULT_NUM_INITIAL_RANDOM_EVALUATIONS
-from autogluon.core.utils.default_arguments import Integer, Categorical, Boolean
+from ....utils.default_arguments import Integer, Categorical, Boolean
 
 __all__ = ['gp_fifo_searcher_factory',
            'gp_multifidelity_searcher_factory',

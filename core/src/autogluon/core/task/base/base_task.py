@@ -5,8 +5,8 @@ from abc import abstractmethod
 
 import mxnet as mx
 
-from autogluon.core.scheduler import *
-from autogluon.core.utils import in_ipynb
+from ...scheduler import *
+from ...utils import in_ipynb
 
 __all__ = [
     'BaseDataset',

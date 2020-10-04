@@ -19,7 +19,7 @@ import logging
 import pickle
 from abc import ABC, abstractmethod
 
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models
+from ...utils import plot_performance_vs_trials, plot_summary_of_models
 
 logger = logging.getLogger(__name__)
 
