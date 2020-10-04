@@ -16,7 +16,7 @@ from .model_trial import model_trial
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE
 from ...tuning.feature_pruner import FeaturePruner
 from autogluon.core.utils import shuffle_df_rows
-from autogluon.tabular.utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
+from ...utils import get_pred_from_proba, generate_train_test_split,  normalize_pred_probas, infer_eval_metric
 from .... import metrics
 from ....features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures

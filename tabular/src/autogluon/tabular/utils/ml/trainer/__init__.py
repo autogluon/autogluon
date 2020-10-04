@@ -1,1 +1,1 @@
-from autogluon.tabular.utils.ml.trainer.auto_trainer import *
+from ....utils.ml.trainer.auto_trainer import *

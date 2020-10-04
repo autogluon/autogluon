@@ -12,7 +12,7 @@ from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_json, save_pkl
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NotEnoughMemoryError, NoValidFeatures
 from autogluon.core.utils import dd_list, shuffle_df_rows, default_holdout_frac
-from autogluon.tabular.utils import get_pred_from_proba, generate_train_test_split, infer_eval_metric
+from ... import get_pred_from_proba, generate_train_test_split, infer_eval_metric
 from ..models.abstract.abstract_model import AbstractModel
 from ...metrics import log_loss, scorer_expects_y_pred
 from ..models.ensemble.bagged_ensemble_model import BaggedEnsembleModel

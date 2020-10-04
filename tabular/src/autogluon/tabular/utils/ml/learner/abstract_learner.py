@@ -18,7 +18,7 @@ from ..constants import BINARY, MULTICLASS, REGRESSION
 from ..trainer.abstract_trainer import AbstractTrainer
 from ..tuning.ensemble_selection import EnsembleSelection
 from autogluon.core.utils import get_leaderboard_pareto_frontier, augment_rare_classes
-from autogluon.tabular.utils import get_pred_from_proba, infer_problem_type
+from ..utils import get_pred_from_proba, infer_problem_type
 from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.generators import PipelineFeatureGenerator
 from autogluon.core.utils.loaders import load_pkl
