@@ -2,9 +2,9 @@
 import time
 
 from autogluon import TabularPrediction as task
-from autogluon.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
-from autogluon.utils.tabular.data.label_cleaner import LabelCleaner
-from autogluon.utils.tabular.ml.models.abstract.abstract_model import AbstractModel
+from autogluon.tabular.task.tabular_prediction.hyperparameter_configs import get_hyperparameter_config
+from autogluon.utils.tabular import LabelCleaner
+from autogluon.tabular.utils.ml.models import AbstractModel
 from autogluon.core.utils.utils import infer_problem_type
 
 #########################

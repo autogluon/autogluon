@@ -14,7 +14,7 @@ from . import constants as _C
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type,\
     get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
-from .. import tabular_prediction
+from ...tabular.task import tabular_prediction
 from autogluon.core.scheduler.task.base import BaseTask
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
 from ...core import space
