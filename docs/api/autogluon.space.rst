@@ -1,8 +1,8 @@
 .. role:: hidden
     :class: hidden-section
 
-autogluon.space
-===============
+autogluon.core.space
+====================
 
 Search space of possible hyperparameter values to consider.
 
@@ -11,7 +11,7 @@ Search space of possible hyperparameter values to consider.
    Define a dummy training function with searchable spaces for hyperparameters `lr` and `wd`:
 
    >>> import numpy as np
-   >>> import autogluon as ag
+   >>> import autogluon.core as ag
    >>> @ag.args(
    >>>     lr=ag.space.Real(1e-3, 1e-2, log=True),
    ...     wd=ag.space.Real(1e-3, 1e-2),
@@ -44,8 +44,8 @@ Search space of possible hyperparameter values to consider.
 Search Space
 ------------
 
-.. automodule:: autogluon.space
-.. currentmodule:: autogluon.space
+.. automodule:: autogluon.core.space
+.. currentmodule:: autogluon.core.space
 
 .. autosummary::
    :nosignatures:

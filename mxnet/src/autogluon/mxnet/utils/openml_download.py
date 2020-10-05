@@ -25,7 +25,7 @@ def load_and_split_openml_data(
         # We download the data from the AutoGluon S3 bucket, avoiding a
         # download from OpenML, which fails too often
         src_url = 'https://autogluon.s3.amazonaws.com/'
-        trg_path = '/'
+        trg_path = './'
         data_path = 'org/openml/www/datasets/{}/'.format(openml_task_id)
         task_path = 'org/openml/www/tasks/{}/'.format(openml_task_id)
         data_files = [

@@ -49,7 +49,7 @@ An example shell script to download the dataset to `./data/shopeeiet/` can be fo
 After downloading this script to your machine, run it with:
 
 ```
-import autogluon as ag
+import autogluon.core as ag
 ag.download('https://raw.githubusercontent.com/zhanghang1989/AutoGluonWebdata/master/docs/tutorial/download_shopeeiet.sh')
 !sh download_shopeeiet.sh
 ```
@@ -91,7 +91,7 @@ each neural network requires the user to specify many hyperparameters (e.g., lea
 AutoGluon automatically does Training/Validation split:
 
 ```
-from autogluon import ImageClassification as task
+from autogluon.vision import ImageClassification as task
 dataset = task.Dataset('./data/shopeeiet/train')
 ```
 
@@ -148,7 +148,7 @@ Here are the results of AutoGluon's default `fit` and `predict` under different 
 If you wish to upload the model's predictions to Kaggle, here is how to convert them into a format suitable for a submission into the Kaggle competition:
 
 ```
-import autogluon as ag
+import autogluon.core as ag
 ag.utils.generate_csv(inds, './data/shopeeiet/submission.csv')
 ```
 

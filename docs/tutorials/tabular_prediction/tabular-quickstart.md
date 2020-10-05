@@ -3,11 +3,11 @@
 
 Via a simple `fit()` call, AutoGluon can produce highly-accurate models to predict the values in one column of a data table based on the rest of the columns' values. Use AutoGluon with tabular data for both classification and regression problems. This tutorial demonstrates how to use AutoGluon to produce a classification model that predicts whether or not a person's income exceeds $50,000.
 
-To start, import autogluon and TabularPrediction module as your task:
+To start, import autogluon.tabular and TabularPrediction module as your task:
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TabularPrediction as task
+import autogluon.core as ag
+from autogluon.tabular import TabularPrediction as task
 ```
 
 Load training data from a [CSV file](https://en.wikipedia.org/wiki/Comma-separated_values) into an AutoGluon Dataset object. This object is essentially equivalent to a [Pandas DataFrame](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html) and the same methods can be applied to both.
@@ -59,7 +59,7 @@ Now you're ready to try AutoGluon on your own tabular datasets!
 As long as they're stored in a popular format like CSV, you should be able to achieve strong predictive performance with just 2 lines of code:
 
 ```
-from autogluon import TabularPrediction as task
+from autogluon.tabular import TabularPrediction as task
 predictor = task.fit(train_data=task.Dataset(file_path=<file-name>), label_column=<variable-name>)
 ```
 

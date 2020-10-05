@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['unzip', 'download', 'mkdir', 'check_sha1', 'raise_num_file']
 
-def unzip(zip_file_path, root=os.path.expanduser('../../../../../autogluon/utils/')):
+def unzip(zip_file_path, root=os.path.expanduser('./')):
     """Unzips files located at `zip_file_path` into parent directory specified by `root`.
     """
     folders = []

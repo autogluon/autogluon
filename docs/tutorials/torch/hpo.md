@@ -106,10 +106,10 @@ In this section, we cover how to define a searchable network architecture, conve
 
 Let's define a 'dynamic' network with searchable configurations by simply adding a decorator :func:`autogluon.obj`. In this example, we only search two arguments `hidden_conv` and
 `hidden_fc`, which represent the hidden channels in convolutional layer and fully connected layer. 
-More info about searchable space is available at :meth:`autogluon.space`.
+More info about searchable space is available at :meth:`autogluon.core.space`.
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 
 @ag.obj(
     hidden_conv=ag.space.Int(6, 12),

@@ -18,7 +18,7 @@ np.random.seed(123)
 ## Load Data
 
 ```{.python .input}
-from autogluon.utils.tabular.utils.loaders import load_pd
+from autogluon.core.utils.loaders import load_pd
 
 train_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/train.parquet')
 dev_data = load_pd.load('https://autogluon-text.s3-accelerate.amazonaws.com/glue/sts/dev.parquet')
@@ -30,8 +30,8 @@ Let's try to predict the **score** based on the other features: `sentence1`, `se
 
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import TextPrediction as task
+import autogluon.core as ag
+from autogluon.text import TextPrediction as task
 
 predictor_score = task.fit(train_data, label='score',
                            time_limits=60, ngpus_per_trial=1, seed=123,

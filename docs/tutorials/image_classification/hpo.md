@@ -12,11 +12,11 @@ The advanced functionalities of AutoGluon enable you to use your external knowle
 
 **Tip**: If you are new to AutoGluon, review :ref:`sec_imgquick` to learn the basics of the AutoGluon API.
 
-We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.task.ImageClassification) is the task of interest: 
+We begin by letting AutoGluon know that [ImageClassification](/api/autogluon.task.html#autogluon.vision.ImageClassification) is the task of interest: 
 
 ```{.python .input}
-import autogluon as ag
-from autogluon import ImageClassification as task
+import autogluon.core as ag
+from autogluon.vision import ImageClassification as task
 ```
 
 ## Create AutoGluon Dataset
@@ -37,7 +37,7 @@ dataset = task.Dataset('data/train')
 
 We start with specifying the pretrained neural network candidates.
 Given such a list, AutoGluon tries to train different networks from this list to identify the best-performing candidate.
-This is an example of a :class:`autogluon.space.Categorical` search space, in which there are a limited number of values to choose from.
+This is an example of a :class:`autogluon.core.space.Categorical` search space, in which there are a limited number of values to choose from.
 
 ```{.python .input}
 import gluoncv as gcv
@@ -56,7 +56,7 @@ print(net)
 
 Similarly, we can manually specify the optimizer candidates.
 We can construct another search space to identify which optimizer works best for our task, and also identify the best hyperparameter configurations for this optimizer.
-Additionally, we can customize the optimizer-specific hyperparameters search spaces, such as learning rate and weight decay using :class:`autogluon.space.Real`.
+Additionally, we can customize the optimizer-specific hyperparameters search spaces, such as learning rate and weight decay using :class:`autogluon.core.space.Real`.
 
 
 ```{.python .input}
@@ -76,22 +76,22 @@ print(optimizer)
 
 ## Search Algorithms
 
-In AutoGluon, `autogluon.searcher` supports different search search strategies for both hyperparameter optimization and architecture search.
+In AutoGluon, `autogluon.core.searcher` supports different search search strategies for both hyperparameter optimization and architecture search.
 Beyond simply specifying the space of hyperparameter configurations to search over, you can also tell AutoGluon what strategy it should employ to actually search through this space. 
 This process of finding good hyperparameters from a given search space is commonly referred to as *hyperparameter optimization* (HPO) or *hyperparameter tuning*. 
-`autogluon.scheduler` orchestrates how individual training jobs are scheduled.
+`autogluon.core.scheduler` orchestrates how individual training jobs are scheduled.
 We currently support FIFO (standard) and Hyperband scheduling, along with search
 by random sampling or Bayesian optimization. These basic techniques are rendered
 surprisingly powerful by AutoGluon's support of asynchronous parallel execution.
 
 ### Bayesian Optimization
 
-Here is an example of using Bayesian Optimization using :class:`autogluon.searcher.SKoptSearcher`.
+Here is an example of using Bayesian Optimization using :class:`autogluon.core.searcher.SKoptSearcher`.
 
 Bayesian Optimization fits a probabilistic *surrogate model* to estimate the function that relates each hyperparameter configuration to the resulting performance of a model trained under this hyperparameter configuration.
 
 You can specify what kind of surrogate model to use (e.g., Gaussian Process, Random Forest, etc.), in addition to which acquisition function to employ (e.g., Expected Improvement, Lower Confidence Bound, etc.).  In the following, we tell `fit` to perform Bayesian optimization using a Random Forest surrogate model with acquisitions based on Expected Improvement.
-For more information, see :class:`autogluon.searcher.SKoptSearcher`.
+For more information, see :class:`autogluon.core.searcher.SKoptSearcher`.
 
 ```{.python .input}
 time_limits = 2*60
@@ -128,7 +128,7 @@ AutoGluon currently supports scheduling trials in serial order and with early
 stopping (e.g., if the performance of the model early within training already
 looks bad, the trial may be terminated early to free up resources).
 Here is an example of using an early stopping scheduler
-:class:`autogluon.scheduler.HyperbandScheduler`. `scheduler_options` is used
+:class:`autogluon.core.scheduler.HyperbandScheduler`. `scheduler_options` is used
 to configure the scheduler. In this example, we run Hyperband with a single
 bracket, and stop/go decisions are made after 1 and 2 epochs (`grace_period`,
 `grace_period * reduction_factor`):
@@ -162,4 +162,4 @@ print('Top-1 test acc: %.3f' % test_acc)
 ```
 
 For a comparison of different search algorithms and scheduling strategies, see :ref:`course_alg`.
-For more options using `fit`, see :class:`autogluon.task.ImageClassification`.
+For more options using `fit`, see :class:`autogluon.vision.ImageClassification`.

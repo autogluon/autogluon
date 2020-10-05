@@ -13,7 +13,7 @@ A Toy Example
 
     >>> import time
     >>> import numpy as np
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
 
     Construct a fake training function for demo
 

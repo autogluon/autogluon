@@ -48,7 +48,7 @@ We can define any function with a decorator `@ag.args`, which converts the funct
 AutoGluon searchable. The `reporter` is used to communicate with AutoGluon search algorithms.
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 
 @ag.args(
     x=ag.space.Categorical(*list(range(100))),

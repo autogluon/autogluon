@@ -10,10 +10,10 @@ simple search spaces (Int, Real, and Categorical) and nested search spaces
 ### Simple Search Space
 
 ```{.python .input}
-import autogluon as ag
+import autogluon.core as ag
 ```
 
-#### Integer Space :class:`autogluon.space.Int`
+#### Integer Space :class:`autogluon.core.space.Int`
 
 An integer is chosen between lower and upper value during the
 searcher sampling.
@@ -30,7 +30,7 @@ a.default
 ```
 
 Change default value, which is the first configuration that a random searcher
-:class:`autogluon.searcher.RandomSearcher` will try:
+:class:`autogluon.core.searcher.RandomSearcher` will try:
 
 ```{.python .input}
 a = ag.space.Int(lower=0, upper=10, default=2)
@@ -43,7 +43,7 @@ Pick a random value.
 a.rand
 ```
 
-#### Real Space :class:`autogluon.space.Real`
+#### Real Space :class:`autogluon.core.space.Real`
 
 A real number is chosen between lower and upper value during the
 searcher sampling.
@@ -60,7 +60,7 @@ c = ag.space.Real(lower=1e-4, upper=1e-2, log=True)
 print(c)
 ```
 
-#### Categorical Space :class:`autogluon.space.Categorical`
+#### Categorical Space :class:`autogluon.core.space.Categorical`
 
 Categorical Space chooses one value from all the possible values during
 the searcher sampling.
@@ -72,13 +72,13 @@ print(d)
 
 ### Nested Search Space
 
-#### Categorical Space :class:`autogluon.space.Categorical`
+#### Categorical Space :class:`autogluon.core.space.Categorical`
 
 Categorical Space can also be used as a nested search space.
 For an example, see NestedExampleObj_.
 
 
-#### List Space :class:`autogluon.space.List`
+#### List Space :class:`autogluon.core.space.List`
 
 List Space returns a list of sampled results.
 
@@ -100,7 +100,7 @@ Get one example configuration:
 f.rand
 ```
 
-#### Dict Space :class:`autogluon.space.Dict`
+#### Dict Space :class:`autogluon.core.space.Dict`
 
 Dict Space returns a dict of sampled results.
 
@@ -162,7 +162,7 @@ h.rand
 
 .. _NestedExampleObj:
 
-We can also use it within a Nested Space such as :class:`autogluon.space.Categorical`.
+We can also use it within a Nested Space such as :class:`autogluon.core.space.Categorical`.
 In this example, the resulting nested space will be sampled from: 
 
 ```{.python .input}
