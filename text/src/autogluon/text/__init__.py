@@ -1,3 +1,3 @@
-from autogluon.text.text_classification import *
-from autogluon.text.text_prediction import *
+from .text_classification import *
+from .text_prediction import *
 

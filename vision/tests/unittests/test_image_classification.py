@@ -1,4 +1,3 @@
-import autogluon as ag
 from autogluon.vision import ImageClassification as task
 
 

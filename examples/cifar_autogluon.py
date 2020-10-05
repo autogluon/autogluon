@@ -9,7 +9,7 @@ from gluoncv.model_zoo import get_model
 from gluoncv.utils import LRScheduler
 from gluoncv.data import transforms as gcv_transforms
 
-import autogluon as ag
+import autogluon.core as ag
 
 
 # CLI
@@ -37,9 +37,9 @@ def parse_args():
     num_gpus=1,
     model='cifar_resnet20_v1',
     j=4,
-    lr=autogluon.core.space.Real(1e-2, 1e-1, log=True),
+    lr=ag.space.Real(1e-2, 1e-1, log=True),
     momentum=0.9,
-    wd=autogluon.core.space.Real(1e-5, 1e-3, log=True),
+    wd=ag.space.Real(1e-5, 1e-3, log=True),
     epochs=20,
 )
 def train_cifar(args, reporter):

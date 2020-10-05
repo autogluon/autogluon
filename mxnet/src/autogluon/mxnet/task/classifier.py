@@ -28,7 +28,8 @@ class Classifier(BasePredictor):
 
     Examples
     --------
-    >>> from autogluon import ImageClassification as task
+    >>> import autogluon.core as ag
+    >>> from autogluon.vision import ImageClassification as task
     >>> dataset = task.Dataset(train_path='data/train',
     >>>                        test_path='data/test')
     >>> classifier = task.fit(dataset,
@@ -108,7 +109,8 @@ class Classifier(BasePredictor):
 
         Examples
         --------
-        >>> from autogluon import ImageClassification as task
+        >>> import autogluon.core as ag
+        >>> from autogluon.vision import ImageClassification as task
         >>> train_data = task.Dataset(train_path='~/data/train')
         >>> classifier = task.fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],
@@ -229,7 +231,8 @@ class Classifier(BasePredictor):
         
         Examples
         --------
-        >>> from autogluon import ImageClassification as task
+        >>> import autogluon.core as ag
+        >>> from autogluon.vision import ImageClassification as task
         >>> train_data = task.Dataset(train_path='~/data/train')
         >>> classifier = task.fit(train_data,
         >>>                       nets=ag.space.Categorical['resnet18_v1', 'resnet34_v1'],

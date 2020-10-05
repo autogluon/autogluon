@@ -3,7 +3,7 @@ import numpy as np
 
 from .catboost_utils import CustomMetric
 from ....metrics import soft_log_loss
-from autogluon.utils.try_import import try_import_catboost, try_import_catboostdev
+from .....utils.try_import import try_import_catboost, try_import_catboostdev
 
 
 # Ojectives for SOFTCLASS problem_type

@@ -20,7 +20,7 @@ except ImportError:
 from mxnet.gluon.data import sampler as _sampler
 from mxnet import nd, context
 #from mxnet.util import is_np_shape, is_np_array, set_np
-from mxnet.gluon.data.dataloader import default_mp_batchify_fn, default_batchify_fn
+from mxnet.gluon.data.dataloader import default_mp_batchify_fn, default_batchify_fn, _as_in_context
 
 _worker_dataset = None
 def _worker_initializer(dataset, active_shape, active_array):

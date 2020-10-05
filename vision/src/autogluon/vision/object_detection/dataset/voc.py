@@ -14,7 +14,6 @@ from gluoncv.data.base import VisionDataset
 
 from autogluon.core import *
 from .base import DatasetBase
-import autogluon as ag
 
 from gluoncv import data as gdata
 from gluoncv.utils.metrics.voc_detection import VOC07MApMetric

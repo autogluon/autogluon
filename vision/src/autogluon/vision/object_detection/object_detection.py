@@ -8,7 +8,7 @@ from .dataset import get_dataset
 from .detector import Detector
 from .pipeline import train_object_detection
 from .utils import get_network
-from autogluon.core.scheduler.task.base import BaseTask, compile_scheduler_options
+from autogluon.core.task.base import BaseTask, compile_scheduler_options
 from autogluon.core.decorator import sample_config
 from autogluon.core.space import Categorical
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
@@ -197,7 +197,7 @@ class ObjectDetection(BaseTask):
         
         Examples
         --------
-        >>> from autogluon import ObjectDetection as task
+        >>> from autogluon.vision.object_detection import ObjectDetection as task
         >>> detector = task.fit(dataset = 'voc', net = 'mobilenet1.0',
         >>>                     time_limits = 600, ngpus_per_trial = 1, num_trials = 1)
         """

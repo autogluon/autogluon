@@ -3,7 +3,7 @@ import logging
 from .tabular_nn_dataset import TabularNNDataset
 from ..abstract import model_trial
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from ......core import args
+from autogluon.core import args
 
 logger = logging.getLogger(__name__)
 

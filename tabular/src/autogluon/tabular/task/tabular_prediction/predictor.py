@@ -59,7 +59,7 @@ class TabularPredictor(BasePredictor):
 
         Examples
         --------
-        >>> from autogluon import TabularPrediction as task
+        >>> from autogluon.tabular import TabularPrediction as task
         >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
         >>> predictor = task.fit(train_data=train_data, label='class')
         >>> results = predictor.fit_summary()
@@ -498,7 +498,7 @@ class TabularPredictor(BasePredictor):
 
         Examples
         --------
-        >>> from autogluon import TabularPrediction as task
+        >>> from autogluon.tabular import TabularPrediction as task
         >>> train_data = task.Dataset('train.csv')
         >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
         >>> model = 'weighted_ensemble_k0_l1'
@@ -1081,7 +1081,7 @@ class TabularPredictor(BasePredictor):
 
         Examples
         --------
-        >>> from autogluon import TabularPrediction as task
+        >>> from autogluon.tabular import TabularPrediction as task
         >>> train_data = task.Dataset('train.csv')
         >>> predictor = task.fit(train_data=train_data, label='class', auto_stack=True, cache_data=True)  # predictor is in bagged mode and `cache_data=True`.
         >>> distilled_model_names = predictor.distill()

@@ -21,8 +21,8 @@ from .... import metrics
 from ....features.feature_metadata import FeatureMetadata
 from autogluon.core.utils.exceptions import TimeLimitExceeded, NoValidFeatures
 from autogluon.core.utils.loaders import load_pkl
-from ......core.utils.savers import save_json, save_pkl
-from ......core import Space
+from autogluon.core.utils.savers import save_json, save_pkl
+from autogluon.core import Space
 from autogluon.core.scheduler import FIFOScheduler
 from autogluon.core.task.base import BasePredictor
 

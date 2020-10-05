@@ -52,7 +52,7 @@ class TabularDataset(pd.DataFrame):
 
     Examples
     --------
-    >>> from autogluon import TabularPrediction as task  # Note: TabularPrediction.Dataset == TabularDataset.
+    >>> from autogluon.tabular import TabularPrediction as task  # Note: TabularPrediction.Dataset == TabularDataset.
     >>> train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
     >>> test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
     >>> train_data.head(30)

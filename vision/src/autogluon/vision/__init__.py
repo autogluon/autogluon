@@ -1,1 +1,1 @@
-from autogluon.vision.image_classification import *
+from .image_classification import *

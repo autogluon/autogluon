@@ -128,7 +128,7 @@ def args(default=None, **kwvars):
 
     Examples
     --------
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(batch_size=10, lr=ag.Real(0.01, 0.1))
     >>> def train_func(args):
     ...     print('Batch size is {}, LR is {}'.format(args.batch_size, arg.lr))
@@ -160,7 +160,7 @@ def func(**kwvars):
 
     Examples
     --------
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> from gluoncv.model_zoo import get_model
     >>> 
     >>> @ag.func(pretrained=ag.space.Categorical(True, False))
@@ -231,7 +231,7 @@ def obj(**kwvars):
 
     Examples
     --------
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> from mxnet import optimizer as optim
     >>> @ag.obj(
     >>>     learning_rate=ag.space.Real(1e-4, 1e-1, log=True),

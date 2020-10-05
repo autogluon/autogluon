@@ -101,7 +101,7 @@ class GPFIFOSearcher(BaseSearcher):
 
     Examples
     --------
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
     >>> def train_fn(args, reporter):
@@ -289,7 +289,7 @@ class GPMultiFidelitySearcher(BaseSearcher):
     Examples
     --------
     >>> import numpy as np
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>>
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True),

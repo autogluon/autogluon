@@ -1,6 +1,6 @@
 """ Default hyperparameter search spaces used in CatBoost Boosting model """
 from ....constants import BINARY, MULTICLASS, REGRESSION
-from .......core import Real, Int
+from autogluon.core import Real, Int
 
 
 def get_default_searchspace(problem_type, num_classes=None):

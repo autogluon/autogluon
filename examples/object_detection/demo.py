@@ -1,5 +1,5 @@
-import autogluon as ag
-from autogluon import ObjectDetection as task
+import autogluon.core as ag
+from autogluon.vision.object_detection import ObjectDetection as task
 import os
 
 root = './'

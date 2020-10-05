@@ -1,7 +1,7 @@
 import logging
 
 import mxnet as mx
-from autogluon.text.utils import try_import_gluonnlp
+from ..utils import try_import_gluonnlp
 
 import copy
 

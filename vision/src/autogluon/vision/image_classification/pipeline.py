@@ -8,7 +8,7 @@ from autogluon.mxnet.task.metrics import get_metric_instance
 from .processing_params import Sample_params, Getmodel_kwargs
 from autogluon.mxnet.task.utils import *
 from autogluon.core.utils import tqdm
-from autogluon.vision.utils.learning_rate import LR_params
+from ..utils.learning_rate import LR_params
 from autogluon.core.utils.mxutils import collect_params
 import autogluon.core as ag
 

@@ -379,7 +379,7 @@ class AugmentationBlock(Block):
 
     Example
     -------
-    >>> from autogluon.utils.augment import AugmentationBlock, autoaug_imagenet_policies
+    >>> from autogluon.vision.utils.augment import AugmentationBlock, autoaug_imagenet_policies
     >>> aa_transform = AugmentationBlock(autoaug_imagenet_policies())
     """
     def __init__(self, policies):

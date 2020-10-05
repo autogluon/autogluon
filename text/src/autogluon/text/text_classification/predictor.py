@@ -7,7 +7,7 @@ from autogluon.core import AutoGluonObject
 
 __all__ = ['TextClassificationPredictor']
 
-from autogluon.text.utils import try_import_gluonnlp
+from ..utils import try_import_gluonnlp
 
 
 class TextClassificationPredictor(Classifier):

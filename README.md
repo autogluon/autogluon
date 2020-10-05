@@ -20,7 +20,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 # python3 -m pip install --upgrade "mxnet<2.0.0"
 # python3 -m pip install autogluon
 
-from autogluon import TabularPrediction as task
+from autogluon.tabular import TabularPrediction as task
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/train.csv')
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/Inc/test.csv')
 predictor = task.fit(train_data=train_data, label='class')
@@ -84,7 +84,7 @@ Also have a look at our paper ["Model-based Asynchronous Hyperparameter and Neur
 ```bibtex
 @article{abohb,
   title={Model-based Asynchronous Hyperparameter and Neural Architecture Search},
-  author={Klein, Aaron and Tiao, Louis and Lienart, Thibaut and Archambeau, Cedric and Seeger, Matthias}
+  author={Klein, Aaron and Tiao, Louis and Lienart, Thibaut and Archambeau, Cedric and Seeger, Matthias},
   journal={arXiv preprint arXiv:2003.10865},
   year={2020}
 }

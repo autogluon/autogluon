@@ -10,7 +10,7 @@ class GridSearcher(BaseSearcher):
 
     Examples
     --------
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(
     ...     x=ag.space.Categorical(0, 1, 2),
     ...     y=ag.space.Categorical('a', 'b', 'c'))

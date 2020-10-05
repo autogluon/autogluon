@@ -5,8 +5,8 @@ NOTE: To distill CatBoost models in multiclass classification, you need to firs
 """
 
 import os
-from autogluon import TabularPrediction as task
-from autogluon.utils.tabular import MULTICLASS
+from autogluon.tabular import TabularPrediction as task
+from autogluon.tabular.utils import MULTICLASS
 
 subsample_size = 500
 time_limits = 60

@@ -1,7 +1,7 @@
 
 import logging
 
-from .....core import Space, Categorical, List, NestedSpace
+from autogluon.core import Space, Categorical, List, NestedSpace
 
 logger = logging.getLogger(__name__)
 

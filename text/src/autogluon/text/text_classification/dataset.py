@@ -3,7 +3,7 @@ import pandas as pd
 
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
-from autogluon.text.utils import try_import_gluonnlp
+from ..utils import try_import_gluonnlp
 from autogluon.core import *
 from autogluon.mxnet.utils.dataset import get_split_samplers, SampledDataset
 

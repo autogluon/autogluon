@@ -262,7 +262,7 @@ class RandomSearcher(BaseSearcher):
     --------
     By default, the searcher is created along with the scheduler. For example:
 
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
     >>> def train_fn(args, reporter):

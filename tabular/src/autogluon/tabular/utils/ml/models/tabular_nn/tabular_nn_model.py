@@ -31,7 +31,7 @@ from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....features.feature_metadata import R_INT, R_FLOAT, R_CATEGORY, R_OBJECT
 from ....metrics import log_loss, roc_auc
-from ......core import Space
+from autogluon.core import Space
 from autogluon.core.utils.try_import import try_import_mxboard
 
 warnings.filterwarnings("ignore", module='sklearn.preprocessing')  # sklearn processing n_quantiles warning

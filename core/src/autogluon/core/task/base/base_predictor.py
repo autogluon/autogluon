@@ -34,7 +34,7 @@ class BasePredictor(ABC):
     Base object returned by task.fit() for each task implemented in AutoGluon.
     Example user workflow for say image classification applications:
         # Training time:
-        >>> from autogluon import image_classification as task
+        >>> from autogluon.vision import image_classification as task
         >>> train_data = task.Dataset(traindata_filepath)
         >>> output_directory = '~/temp/' # any directory name specifying where to store all results
         >>> predictor = task.fit(train_data=train_data, output_directory=output_directory)

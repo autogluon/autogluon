@@ -19,7 +19,7 @@ An advanced user may wish to create a custom feature generator to:
 # Loading Data #
 ################
 
-from autogluon import TabularPrediction as task
+from autogluon.tabular import TabularPrediction as task
 
 train_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/train_data.csv')  # can be local CSV file as well, returns Pandas DataFrame
 test_data = task.Dataset(file_path='https://autogluon.s3.amazonaws.com/datasets/AdultIncomeBinaryClassification/test_data.csv')  # another Pandas DataFrame

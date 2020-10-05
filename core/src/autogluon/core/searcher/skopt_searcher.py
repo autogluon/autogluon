@@ -41,7 +41,7 @@ class SKoptSearcher(BaseSearcher):
     --------
     By default, the searcher is created along with the scheduler. For example:
 
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True))
     >>> def train_fn(args, reporter):
@@ -54,7 +54,7 @@ class SKoptSearcher(BaseSearcher):
     This would result in a SKoptSearcher with cs = train_fn.cs. You can also
     create a SKoptSearcher by hand:
 
-    >>> import autogluon as ag
+    >>> import autogluon.core as ag
     >>> @ag.args(
     ...     lr=ag.space.Real(1e-3, 1e-2, log=True),
     ...     wd=ag.space.Real(1e-3, 1e-2))

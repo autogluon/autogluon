@@ -13,9 +13,9 @@ from mxnet.gluon.data import RecordFileDataset
 from mxnet.gluon.data.vision import ImageFolderDataset as MXImageFolderDataset
 from mxnet.gluon.data.vision import ImageRecordDataset, transforms
 
-from ...core import *
+from autogluon.core import *
 from autogluon.core.utils import get_data_rec
-from autogluon.mxnet.utils.pil_transforms import *
+from ..utils.pil_transforms import *
 
 _is_osx = platform.system() == "Darwin"
 

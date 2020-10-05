@@ -6,7 +6,7 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, autograd
-from autogluon.text.utils import try_import_gluonnlp
+from ..utils import try_import_gluonnlp
 import autogluon.core as ag
 
 from .network import get_network

@@ -1,5 +1,5 @@
 import os
-import autogluon as ag
+import autogluon.core as ag
 from mxnet import optimizer as optim
 
 def download_shopee(dataset, data_path):
@@ -15,24 +15,24 @@ def config_choice(data_path, dataset):
     global kaggle_choice
     dataset_path = os.path.join(data_path, dataset, 'images')
     if dataset == 'dogs-vs-cats-redux-kernels-edition':
-        net_cat = autogluon.core.space.Categorical('resnet34_v1b') #resnet34_v1
+        net_cat = ag.space.Categorical('resnet34_v1b') #resnet34_v1
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(0.3, 0.5),
-            momentum=autogluon.core.space.Real(0.86, 0.99),
-            wd=autogluon.core.space.Real(1e-5, 1e-3, log=True)
+            learning_rate=ag.space.Real(0.3, 0.5),
+            momentum=ag.space.Real(0.86, 0.99),
+            wd=ag.space.Real(1e-5, 1e-3, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
 
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='step',
                     lr_decay=0.1,
                     lr_decay_period=0,
                     lr_decay_epoch='40,80',
                     warmup_lr=0.0,
                     warmup_epochs=5)
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -55,23 +55,23 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 16}
     elif dataset == 'aerial-cactus-identification':
-        net_aeri = autogluon.core.space.Categorical('resnet34_v1b')
+        net_aeri = ag.space.Categorical('resnet34_v1b')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(0.3, 0.5),
-            momentum=autogluon.core.space.Real(0.88, 0.95),
-            wd=autogluon.core.space.Real(1e-5, 1e-3, log=True)
+            learning_rate=ag.space.Real(0.3, 0.5),
+            momentum=ag.space.Real(0.88, 0.95),
+            wd=ag.space.Real(1e-5, 1e-3, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='step',
                     lr_decay=0.1,
                     lr_decay_period=0,
                     lr_decay_epoch='60,120',
                     warmup_lr=0.0,
                     warmup_epochs=5)
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -94,23 +94,23 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'plant-seedlings-classification':
-        net_plant = autogluon.core.space.Categorical('resnet50_v1')
+        net_plant = ag.space.Categorical('resnet50_v1')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(0.3, 0.5),
-            momentum=autogluon.core.space.Real(0.85, 0.95),
-            wd=autogluon.core.space.Real(1e-6, 1e-4, log=True)
+            learning_rate=ag.space.Real(0.3, 0.5),
+            momentum=ag.space.Real(0.85, 0.95),
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='cosine',
                     lr_decay=0.1,
                     lr_decay_period=0,
                     lr_decay_epoch='40,80',
                     warmup_lr=0.0,
                     warmup_epochs=5)
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -133,23 +133,23 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'fisheries_Monitoring':
-        net_fish = autogluon.core.space.Categorical('resnet50_v1')
+        net_fish = ag.space.Categorical('resnet50_v1')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(0.3, 0.5),
-            momentum=autogluon.core.space.Real(0.85, 0.95),
-            wd=autogluon.core.space.Real(1e-6, 1e-4, log=True)
+            learning_rate=ag.space.Real(0.3, 0.5),
+            momentum=ag.space.Real(0.85, 0.95),
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='cosine',
                     lr_decay=0.1,
                     lr_decay_period=0,
                     lr_decay_epoch='40,80',
                     warmup_lr=0.0,
                     warmup_epochs=5)
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -172,23 +172,23 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'dog-breed-identification':
-        net_dog = autogluon.core.space.Categorical('resnext101_64x4d')
+        net_dog = ag.space.Categorical('resnext101_64x4d')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(0.3, 0.5),
-            momentum=autogluon.core.space.Real(0.85, 0.95),
-            wd=autogluon.core.space.Real(1e-6, 1e-4, log=True)
+            learning_rate=ag.space.Real(0.3, 0.5),
+            momentum=ag.space.Real(0.85, 0.95),
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='cosine',
                     lr_decay=0.1,
                     lr_decay_period=0,
                     lr_decay_epoch='60,120',
                     warmup_lr=0.0,
                     warmup_epochs=5)
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -211,16 +211,16 @@ def config_choice(data_path, dataset):
                          'tricks': tricks,
                          'num_trials': 30}
     elif dataset == 'shopee-iet-machine-learning-competition':
-        net_shopee = autogluon.core.space.Categorical('resnet152_v1d')
+        net_shopee = ag.space.Categorical('resnet152_v1d')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(1e-2, 1e-1, log=True),
-            momentum=autogluon.core.space.Real(0.85, 0.95),
-            wd=autogluon.core.space.Real(1e-6, 1e-4, log=True)
+            learning_rate=ag.space.Real(1e-2, 1e-1, log=True),
+            momentum=ag.space.Real(0.85, 0.95),
+            wd=ag.space.Real(1e-6, 1e-4, log=True)
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='cosine',
                     lr_decay=0.1,
                     lr_decay_period=0,
@@ -228,7 +228,7 @@ def config_choice(data_path, dataset):
                     warmup_lr=0.0,
                     warmup_epochs=5)
 
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,
@@ -254,18 +254,18 @@ def config_choice(data_path, dataset):
     elif dataset == 'shopee-iet':
         download_shopee(dataset, data_path)
         dataset_path = os.path.join(data_path, dataset, 'data', 'train')
-        net_shopee = autogluon.core.space.Categorical('resnet18_v1')
+        net_shopee = ag.space.Categorical('resnet18_v1')
         @ag.obj(
-            learning_rate=autogluon.core.space.Real(1e-4, 1e-2, log=True),
-            momentum=autogluon.core.space.Real(0.85, 0.95),
-            wd=autogluon.core.space.Real(1e-6, 1e-2, log=True),
+            learning_rate=ag.space.Real(1e-4, 1e-2, log=True),
+            momentum=ag.space.Real(0.85, 0.95),
+            wd=ag.space.Real(1e-6, 1e-2, log=True),
             multi_precision=True
         )
         class NAG(optim.NAG):
             pass
         optimizer = NAG()
 
-        lr_config = autogluon.core.space.Dict(
+        lr_config = ag.space.Dict(
                     lr_mode='cosine',
                     lr_decay=0.1,
                     lr_decay_period=0,
@@ -273,7 +273,7 @@ def config_choice(data_path, dataset):
                     warmup_lr=0.0,
                     warmup_epochs=5)
 
-        tricks = autogluon.core.space.Dict(
+        tricks = ag.space.Dict(
                     last_gamma=True,
                     use_pretrained=True,
                     use_se=False,

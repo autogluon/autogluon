@@ -46,8 +46,8 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
 
     Examples
     --------
-    >>> from autogluon import TabularPrediction as task
-    >>> from autogluon.utils.tabular.features.generators import AutoMLPipelineFeatureGenerator
+    >>> from autogluon.tabular import TabularPrediction as task
+    >>> from autogluon.tabular.utils.features.generators import AutoMLPipelineFeatureGenerator
     >>>
     >>> feature_generator = AutoMLPipelineFeatureGenerator()
     >>>
