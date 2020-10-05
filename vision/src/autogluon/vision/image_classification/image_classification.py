@@ -8,13 +8,16 @@ from autogluon.mxnet.task.dataset import get_dataset
 from autogluon.mxnet.task.nets import *
 from .pipeline import train_image_classification
 from autogluon.mxnet.task.utils import *
-from autogluon.core.scheduler.task.base import BaseTask, compile_scheduler_options, create_scheduler
+from autogluon.core.task.base import BaseTask, compile_scheduler_options, create_scheduler
 from autogluon.core.loss import *
 from autogluon.core.optimizer import *
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
-from ...utils import update_params
+from autogluon.core.utils import update_params
+import autogluon.core as ag
 
 __all__ = ['ImageClassification']
+
+from autogluon.core import sample_config
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +64,10 @@ class ImageClassification(BaseTask):
 
     @staticmethod
     def fit(dataset,
-            net=Categorical('ResNet50_v1b', 'ResNet18_v1b'),
+            net=ag.Categorical('ResNet50_v1b', 'ResNet18_v1b'),
             optimizer=NAG(
-                learning_rate=Real(1e-3, 1e-2, log=True),
-                wd=Real(1e-4, 1e-3, log=True),
+                learning_rate=ag.Real(1e-3, 1e-2, log=True),
+                wd=ag.Real(1e-4, 1e-3, log=True),
                 multi_precision=False
             ),
             loss=SoftmaxCrossEntropyLoss(),
@@ -90,7 +93,7 @@ class ImageClassification(BaseTask):
             visualizer='none',
             dist_ip_addrs=None,
             auto_search=True,
-            lr_config=Dict(
+            lr_config=ag.Dict(
                 lr_mode='cosine',
                 lr_decay=0.1,
                 lr_decay_period=0,
@@ -98,7 +101,7 @@ class ImageClassification(BaseTask):
                 warmup_lr=0.0,
                 warmup_epochs=0
             ),
-            tricks=Dict(
+            tricks=ag.Dict(
                 last_gamma=False,
                 use_pretrained=True,
                 use_se=False,
@@ -184,7 +187,7 @@ class ImageClassification(BaseTask):
 
         Examples
         --------
-        >>> from autogluon import ImageClassification as task
+        >>> from autogluon.vision import ImageClassification as task
         >>> dataset = task.Dataset(train_path='data/train',
         >>>                        test_path='data/test')
         >>> classifier = task.fit(dataset,

@@ -12,7 +12,7 @@ from autogluon.core.scheduler.task.base import BaseTask, compile_scheduler_optio
 from autogluon.core.decorator import sample_config
 from autogluon.core.space import Categorical
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
-from ...utils import update_params
+from autogluon.core.utils import update_params
 
 __all__ = ['ObjectDetection']
 

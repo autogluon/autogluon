@@ -12,7 +12,7 @@ except ImportError:
 import mxnet as mx
 from gluoncv.data.base import VisionDataset
 
-from ....core import *
+from autogluon.core import *
 from .base import DatasetBase
 import autogluon as ag
 

@@ -7,14 +7,15 @@ from mxnet import gluon, nd
 from autogluon.mxnet.task.metrics import get_metric_instance
 from .processing_params import Sample_params, Getmodel_kwargs
 from autogluon.mxnet.task.utils import *
-from ...utils import tqdm
-from ...utils.learning_rate import LR_params
+from autogluon.core.utils import tqdm
+from autogluon.vision.utils.learning_rate import LR_params
 from autogluon.core.utils.mxutils import collect_params
+import autogluon.core as ag
 
 __all__ = ['train_image_classification']
 
 
-@args()
+@ag.args()
 def train_image_classification(args, reporter):
     logging.basicConfig()
     logger = logging.getLogger(__name__)
