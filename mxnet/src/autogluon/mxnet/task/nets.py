@@ -3,8 +3,7 @@ import mxnet as mx
 from mxnet import gluon, init
 from mxnet.gluon import nn
 
-from ...model_zoo.model_zoo import get_model
-from ...core import *
+from autogluon.model_zoo.model_zoo import get_model
 
 logger = logging.getLogger(__name__)
 

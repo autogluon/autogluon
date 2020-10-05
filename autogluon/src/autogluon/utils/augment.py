@@ -1,13 +1,12 @@
 # code adapted from:
 # https://github.com/kakaobrain/fast-autoaugment
 # https://github.com/rpmcruz/autoaugment
-import math
 import random
 
 import numpy as np
 from collections import defaultdict
 import PIL, PIL.ImageOps, PIL.ImageEnhance, PIL.ImageDraw
-from .pil_transforms import ToPIL, ToNDArray
+from autogluon.mxnet.utils.pil_transforms import ToPIL, ToNDArray
 
 from mxnet.gluon.block import Block
 

@@ -21,7 +21,7 @@ from .data_parallel import ForwardBackwardTask
 from .utils import get_lr_scheduler, get_yolo3_metrics, get_faster_rcnn_metrics, get_rcnn_losses, \
     rcnn_split_and_load
 # TODO: move it to general util.py
-from ..image_classification.utils import _train_val_split
+from autogluon.mxnet.task.utils import _train_val_split
 from ...core import args
 from autogluon.core.utils.mxutils import collect_params
 

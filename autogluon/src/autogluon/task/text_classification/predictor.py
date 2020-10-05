@@ -1,17 +1,8 @@
-import os
-import math
-import pickle
-import copy
 import numpy as np
-from collections import OrderedDict
 import mxnet as mx
-import matplotlib.pyplot as plt
-from ...utils.try_import import try_import_gluonnlp
 from ...utils import *
-from .network import *
-from .pipeline import *
 from .dataset import *
-from ..image_classification.classifier import Classifier
+from autogluon.mxnet.task.classifier import Classifier
 from ...core import AutoGluonObject
 
 __all__ = ['TextClassificationPredictor']

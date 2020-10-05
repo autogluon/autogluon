@@ -7,8 +7,8 @@ import mxnet as mx
 
 from autogluon.core.searcher import RLSearcher
 from autogluon.core.scheduler import get_gpu_count, get_cpu_count
-from ...task.image_classification.dataset import get_built_in_dataset
-from ...task.image_classification.utils import *
+from autogluon.mxnet.task.dataset import get_built_in_dataset
+from autogluon.mxnet.task.utils import *
 from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, tqdm, in_ipynb)
 from .enas_utils import *
 

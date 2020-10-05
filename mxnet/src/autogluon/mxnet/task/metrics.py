@@ -1,7 +1,4 @@
 import mxnet
-import gluoncv
-
-#from ...metric import autogluon_metrics, Metric
 
 __all__ = ['get_metric_instance']
 
