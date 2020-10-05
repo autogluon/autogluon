@@ -2,7 +2,9 @@ import numpy as np
 
 import mxnet as mx
 import mxnet.gluon.nn as nn
-from autogluon.contrib.enas import *
+from autogluon.extra.contrib.enas import *
+import autogluon.core as ag
+
 
 class Identity(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
@@ -34,11 +36,11 @@ class ResUnit(mx.gluon.HybridBlock):
 
 def test_enas_net():
     mynet = ENAS_Sequential(
-        ResUnit(1, 8, hidden_channels=autogluon.core.space.Categorical(4, 8), kernel=autogluon.core.space.Categorical(3, 5), stride=2),
-        ResUnit(8, 8, hidden_channels=8, kernel=autogluon.core.space.Categorical(3, 5), stride=2),
-        ResUnit(8, 16, hidden_channels=8, kernel=autogluon.core.space.Categorical(3, 5), stride=2),
-        ResUnit(16, 16, hidden_channels=8, kernel=autogluon.core.space.Categorical(3, 5), stride=1, with_zero=True),
-        ResUnit(16, 16, hidden_channels=8, kernel=autogluon.core.space.Categorical(3, 5), stride=1, with_zero=True),
+        ResUnit(1, 8, hidden_channels=ag.space.Categorical(4, 8), kernel=ag.space.Categorical(3, 5), stride=2),
+        ResUnit(8, 8, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
+        ResUnit(8, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=2),
+        ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
+        ResUnit(16, 16, hidden_channels=8, kernel=ag.space.Categorical(3, 5), stride=1, with_zero=True),
         nn.GlobalAvgPool2D(),
         nn.Flatten(),
         nn.Activation('relu'),

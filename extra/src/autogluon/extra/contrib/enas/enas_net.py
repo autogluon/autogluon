@@ -1,6 +1,6 @@
 from mxnet import gluon
-from ...model_zoo.models.utils import *
-from ...model_zoo.models.mbconv import MBConvBlock
+from autogluon.extra.model_zoo.models.utils import *
+from autogluon.extra.model_zoo.models.mbconv import MBConvBlock
 from autogluon.core.space import *
 from .enas import enas_unit, ENAS_Sequential
 

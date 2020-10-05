@@ -9,7 +9,8 @@ from autogluon.core.searcher import RLSearcher
 from autogluon.core.scheduler import get_gpu_count, get_cpu_count
 from autogluon.mxnet.task.dataset import get_built_in_dataset
 from autogluon.mxnet.task.utils import *
-from ...utils import (mkdir, save, load, update_params, collect_params, DataLoader, tqdm, in_ipynb)
+from autogluon.core.utils import (mkdir, save, load, update_params, collect_params, tqdm, in_ipynb)
+from autogluon.mxnet.utils import DataLoader
 from .enas_utils import *
 
 __all__ = ['ENAS_Scheduler']

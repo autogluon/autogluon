@@ -1,7 +1,7 @@
 import mxnet as mx
 import pytest
 
-from autogluon.model_zoo import get_model
+from autogluon.extra.model_zoo import get_model
 
 x = mx.nd.random.uniform(shape=(1, 3, 224, 224))
 

@@ -1,5 +1,4 @@
 import math
-import mxnet as mx
 from mxnet.gluon import nn
 from mxnet.gluon.block import HybridBlock
 

@@ -1,13 +1,13 @@
 import time
-import multiprocessing # to count the number of CPUs available
+import multiprocessing  # to count the number of CPUs available
 import pandas as pd
 import mxnet as mx
 from mxnet import gluon, autograd
 from mxnet.gluon import nn
-import autogluon as ag
+import autogluon.core as ag
 import pytest
 
-from autogluon.utils import load_and_split_openml_data
+from autogluon.mxnet.utils import load_and_split_openml_data
 
 
 OPENML_TASK_ID = 6                # describes the problem we will tackle
@@ -17,14 +17,14 @@ REWARD_ATTR_NAME = 'objective'    # how do we measure performance (will become c
 
 
 def create_train_fn(X_train, X_valid, y_train, y_valid, n_classes, epochs=9):
-    @ag.args(n_units_1=autogluon.core.space.Int(lower=16, upper=128),
-             n_units_2=autogluon.core.space.Int(lower=16, upper=128),
-             dropout_1=autogluon.core.space.Real(lower=0, upper=.75),
-             dropout_2=autogluon.core.space.Real(lower=0, upper=.75),
-             learning_rate=autogluon.core.space.Real(lower=1e-6, upper=1, log=True),
-             batch_size=autogluon.core.space.Int(lower=8, upper=128),
-             scale_1=autogluon.core.space.Real(lower=0.001, upper=10, log=True),
-             scale_2=autogluon.core.space.Real(lower=0.001, upper=10, log=True),
+    @ag.args(n_units_1=ag.space.Int(lower=16, upper=128),
+             n_units_2=ag.space.Int(lower=16, upper=128),
+             dropout_1=ag.space.Real(lower=0, upper=.75),
+             dropout_2=ag.space.Real(lower=0, upper=.75),
+             learning_rate=ag.space.Real(lower=1e-6, upper=1, log=True),
+             batch_size=ag.space.Int(lower=8, upper=128),
+             scale_1=ag.space.Real(lower=0.001, upper=10, log=True),
+             scale_2=ag.space.Real(lower=0.001, upper=10, log=True),
              epochs=epochs)
     def run_mlp_openml(args, reporter):
         # Time stamp for elapsed_time
