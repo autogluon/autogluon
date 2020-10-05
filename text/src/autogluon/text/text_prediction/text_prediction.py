@@ -14,12 +14,12 @@ from . import constants as _C
 from .dataset import random_split_train_val, TabularDataset, infer_problem_type,\
     get_column_properties
 from .models.basic_v1 import BertForTextPredictionBasic
-from ...tabular.task import tabular_prediction
-from autogluon.core.scheduler.task.base import BaseTask
+from autogluon.tabular.task import tabular_prediction
+from autogluon.core.task.base import BaseTask
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
-from ...core import space
-from ...utils import in_ipynb
-from ...core.utils.loaders import load_pd
+from autogluon.core import space
+from autogluon.core.utils import in_ipynb
+from autogluon.core.utils.loaders import load_pd
 from autogluon.core.utils.utils import default_holdout_frac
 from autogluon.core.utils.miscs import verbosity2loglevel
 

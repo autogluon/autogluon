@@ -6,12 +6,12 @@ import numpy as np
 
 import mxnet as mx
 from mxnet import gluon, autograd
-from ...utils.try_import import try_import_gluonnlp
-
+from autogluon.text.utils import try_import_gluonnlp
+import autogluon.core as ag
 
 from .network import get_network
 from .transforms import BERTDatasetTransform
-from ...utils import tqdm
+from autogluon.core.utils import tqdm
 from autogluon.core.utils.mxutils import collect_params
 
 __all__ = ['train_text_classification', 'preprocess_data']
@@ -96,7 +96,7 @@ def preprocess_data(tokenizer, task, batch_size, dev_batch_size, max_len, vocab,
     #    loader_test_list.append((segment, loader_test))
     return loader_train, loader_dev_list, len(data_train), trans, test_trans
 
-@args()
+@ag.args()
 def train_text_classification(args, reporter=None):
     # Step 1: add scripts every function and python objects in the original training script except for the training function
     # at the beginning of the decorated function

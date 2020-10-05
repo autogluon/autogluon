@@ -2,6 +2,8 @@ import logging
 import mxnet as mx
 from mxnet import gluon, init
 from mxnet.gluon import nn
+import autogluon.core as ag
+from autogluon.core import AutoGluonObject
 
 from autogluon.extra.model_zoo.model_zoo import get_model
 
@@ -48,7 +50,7 @@ class ResUnit(mx.gluon.HybridBlock):
     def hybrid_forward(self, F, x):
         return self.conv2(self.conv1(x)) + self.shortcut(x)
 
-@func()
+@ag.func()
 def mnist_net():
     mnist_net = gluon.nn.Sequential()
     mnist_net.add(ResUnit(1, 8, hidden_channels=8, kernel=3, stride=2))
@@ -72,7 +74,7 @@ def auto_suggest_network(dataset, net):
         return net
     dataset_name = dataset_name.lower()
     if 'mnist' in dataset_name:
-        if isinstance(net, str) or isinstance(net, Categorical):
+        if isinstance(net, str) or isinstance(net, ag.Categorical):
             net = mnist_net()
             logger.info('Auto suggesting network net for dataset {}'.format(net, dataset_name))
             return net
@@ -80,7 +82,7 @@ def auto_suggest_network(dataset, net):
         if isinstance(net, str):
             if 'cifar' not in net:
                 net = 'cifar_resnet20_v1'
-        elif isinstance(net, Categorical):
+        elif isinstance(net, ag.Categorical):
             newdata = []
             for x in net.data:
                 if 'cifar' in x:

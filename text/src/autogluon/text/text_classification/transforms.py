@@ -17,7 +17,7 @@
 __all__ = ['BERTDatasetTransform']
 
 import numpy as np
-from ...utils.try_import import try_import_gluonnlp
+from autogluon.text.utils import try_import_gluonnlp
 
 
 class BERTDatasetTransform:

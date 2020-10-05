@@ -1,11 +1,14 @@
 import numpy as np
 import mxnet as mx
-from ...utils import *
+from autogluon.core.utils import *
 from .dataset import *
 from autogluon.mxnet.task.classifier import Classifier
-from ...core import AutoGluonObject
+from autogluon.core import AutoGluonObject
 
 __all__ = ['TextClassificationPredictor']
+
+from autogluon.text.utils import try_import_gluonnlp
+
 
 class TextClassificationPredictor(Classifier):
     """Trained Text Classifier returned by `fit()` that can be used to make predictions on new text data.
@@ -76,7 +79,7 @@ class TextClassificationPredictor(Classifier):
         
          Examples
          --------
-        >>> from autogluon import TextClassification as task
+        >>> from autogluon.text import TextClassification as task
         >>> dataset = task.Dataset(test_path='~/data/test')
         >>> test_performance = predictor.evaluate(dataset)
         """

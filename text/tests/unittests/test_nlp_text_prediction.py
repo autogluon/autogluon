@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from autogluon import TextPrediction as task
+from autogluon.text import TextPrediction as task
 from autogluon.core.utils.loaders import load_pd
 
 test_hyperparameters = {

@@ -6,4 +6,5 @@ from . import dataset
 from . import fields
 from . import preprocessing
 from . import text_prediction
+from .metrics import *
 from .text_prediction import TextPrediction

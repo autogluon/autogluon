@@ -1,13 +1,14 @@
 import logging
 
 import mxnet as mx
-from ...utils.try_import import try_import_gluonnlp
+from autogluon.text.utils import try_import_gluonnlp
 
 import copy
 
+import autogluon.core as ag
 from autogluon.core.scheduler import get_cpu_count, get_gpu_count
-from autogluon.core.scheduler.task.base import BaseTask, compile_scheduler_options
-from ...utils import update_params
+from autogluon.core.task.base import BaseTask, compile_scheduler_options
+from autogluon.core.utils import update_params
 
 from .network import get_network
 from .dataset import get_dataset
@@ -15,6 +16,8 @@ from .pipeline import *
 from .predictor import TextClassificationPredictor
 
 __all__ = ['TextClassification']
+
+from autogluon.core import sample_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +34,10 @@ class TextClassification(BaseTask):
 
     @staticmethod
     def fit(dataset='SST',
-            net=Categorical('bert_12_768_12'),
-            pretrained_dataset=Categorical('book_corpus_wiki_en_uncased',
+            net=ag.Categorical('bert_12_768_12'),
+            pretrained_dataset=ag.Categorical('book_corpus_wiki_en_uncased',
                                            'openwebtext_book_corpus_wiki_en_uncased'),
-            lr=Real(2e-05, 2e-04, log=True),
+            lr=ag.space.Real(2e-05, 2e-04, log=True),
             warmup_ratio=0.01,
             lr_scheduler='cosine',
             log_interval=100,
@@ -141,7 +144,7 @@ class TextClassification(BaseTask):
         
         Examples
         --------
-        >>> from autogluon import TextClassification as task
+        >>> from autogluon.text import TextClassification as task
         >>> dataset = task.Dataset(name='ToySST')
         >>> predictor = task.fit(dataset)
         """

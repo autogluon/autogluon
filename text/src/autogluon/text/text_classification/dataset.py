@@ -3,8 +3,8 @@ import pandas as pd
 
 from mxnet import gluon
 from mxnet.metric import Accuracy, F1, MCC, PearsonCorrelation, CompositeEvalMetric
-from ...utils.try_import import try_import_gluonnlp
-from ...core import *
+from autogluon.text.utils import try_import_gluonnlp
+from autogluon.core import *
 from autogluon.mxnet.utils.dataset import get_split_samplers, SampledDataset
 
 __all__ = ['MRPCTask', 'QQPTask', 'QNLITask', 'RTETask', 'STSBTask', 'CoLATask', 'MNLITask',

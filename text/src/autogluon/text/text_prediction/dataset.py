@@ -3,7 +3,7 @@ import collections.abc
 import numpy as np
 import pandas as pd
 import json
-from ...core.utils.loaders import load_pd
+from autogluon.core.utils.loaders import load_pd
 from . import constants as _C
 from .column_property import CategoricalColumnProperty, TextColumnProperty, NumericalColumnProperty,\
     get_column_properties_from_metadata
