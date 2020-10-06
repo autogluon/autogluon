@@ -1,7 +1,7 @@
 .. role:: hidden
     :class: hidden-section
 
-autogluon.task
+AutoGluon Tasks
 ===============
 
 .. admonition:: Example (image classification task):
@@ -27,24 +27,35 @@ autogluon.task
    >>> test_acc = classifier.evaluate(test_dataset)
 
 
-.. automodule:: autogluon.core.task
 
 AutoGluon Tasks
 -----------------
 
 Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
 
+.. automodule:: autogluon.tabular
 .. autosummary::
    :nosignatures:
 
    TabularPrediction
+
+.. automodule:: autogluon.vision
+.. autosummary::
+   :nosignatures:
+
    ImageClassification
    ObjectDetection
+
+.. automodule:: autogluon.text
+.. autosummary::
+   :nosignatures:
+
    TextPrediction
 
 
 :hidden:`TabularPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.tabular
 
 .. autoclass:: TabularPrediction
    :members: fit, load, Predictor, Dataset
@@ -59,6 +70,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 :hidden:`ImageClassification`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.vision
 
 .. autoclass:: ImageClassification
    :members:
@@ -73,6 +85,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 :hidden:`ObjectDetection`
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.vision
 
 .. autoclass:: ObjectDetection
    :members:
@@ -87,6 +100,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
 
 :hidden:`TextPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.text
 
 .. autoclass:: TextPrediction
    :members:
@@ -106,6 +120,7 @@ Additional Tabular Prediction APIs
 
 :hidden:`TabularPredictor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. automodule:: autogluon.tabular
 
 .. autoclass:: TabularPredictor
    :members:
@@ -131,7 +146,7 @@ Additional Tabular Prediction APIs
 Additional Image Classification APIs
 ------------------------------------
 
-.. automodule:: autogluon.vision.image_classification
+.. automodule:: autogluon.mxnet
 
 :hidden:`Classifier`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -193,7 +208,7 @@ Additional Image Classification APIs
 Additional Object Detection APIs
 --------------------------------
 
-.. automodule:: autogluon.vision.object_detection
+.. automodule:: autogluon.vision
 
 :hidden:`Detector`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -213,11 +228,6 @@ Additional Object Detection APIs
 
 .. automodule:: autogluon.vision.object_detection.dataset
 
-:hidden:`get_dataset`
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction::
-   get_dataset
 
 :hidden:`CustomVOCDetection`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
