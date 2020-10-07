@@ -82,7 +82,43 @@ stage("Build Docs") {
         git clean -fx
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
-        python3 -m pip install --upgrade --force-reinstall -e .
+
+       pip uninstall -y autogluon
+        pip uninstall -y autogluon.vision
+        pip uninstall -y autogluon.text
+        pip uninstall -y autogluon.mxnet
+        pip uninstall -y autogluon.extra
+        pip uninstall -y autogluon.tabular
+        pip uninstall -y autogluon.core
+
+        cd core/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd tabular/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd mxnet/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd extra/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd text/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd vision/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
+        cd autogluon/
+        python3 -m pip install --upgrade -e .
+        cd ..
+
         cd docs && bash build_doc.sh
         if [[ ${env.BRANCH_NAME} == master ]]; then
             aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
