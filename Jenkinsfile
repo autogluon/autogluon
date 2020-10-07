@@ -18,7 +18,48 @@ stage("Unit Test") {
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
         python3 -m pip install --upgrade --force-reinstall -e .
         python3 -m pip install pytest
+
+        pip uninstall -y autogluon
+        pip uninstall -y autogluon.vision
+        pip uninstall -y autogluon.text
+        pip uninstall -y autogluon.mxnet
+        pip uninstall -y autogluon.extra
+        pip uninstall -y autogluon.tabular
+        pip uninstall -y autogluon.core
+
+        cd core/
+        python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd tabular/
+        python3 -m pip install --upgrade -e .
+        python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd mxnet/
+        python3 -m pip install --upgrade -e .
+        python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd extra/
+        python3 -m pip install --upgrade -e .
+        python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd text/
+        python3 -m pip install --upgrade -e .
+        python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd vision/
+        python3 -m pip install --upgrade -e .
+        python3 -m pytest --junitxml=results.xml --runslow tests
+        cd ..
+
+        cd autogluon/
+        python3 -m pip install --upgrade -e .
+        cd ..
         """
       }
     }

@@ -30,5 +30,31 @@ jobs:
         TWINE_PASSWORD: ${{ secrets. PYPI_PASSWORD }}
         RELEASE: 1
       run: |
+        cd core/
         python setup.py sdist bdist_wheel
         twine upload dist/* --verbose
+        cd ..
+        cd tabular/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
+        cd mxnet/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
+        cd extra/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
+        cd text/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
+        cd vision/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
+        cd autogluon/
+        python setup.py sdist bdist_wheel
+        twine upload dist/* --verbose
+        cd ..
