@@ -33,7 +33,7 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
             # TODO: This could be a user-defined arg instead like 'num_gpus' or 'use_gpu'
             if torch.cuda.is_available():
                 data, target = data.cuda(), target.cuda()
-                pretext = pretext.cuda() # Model needed in GPU for semi-supervised.
+                pretext = pretext.cuda()
 
             if state in [None, 'finetune']:
                 data, target = augmentation(data,target, **aug_kwargs)
@@ -43,10 +43,6 @@ def epoch(net, data_loader, optimizers, loss_criterion, pretext, state, schedule
                 _, out    = net(data)
             else:
                 raise NotImplementedError("state must be one of [None, 'pretrain', 'finetune']")
-
-
-            #if torch.cuda.is_available():
-            #    pretext = pretext.cuda()
         
             loss, correct  = pretext(out, target)
 
