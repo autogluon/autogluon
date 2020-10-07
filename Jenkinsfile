@@ -83,7 +83,7 @@ stage("Build Docs") {
         python3 -m pip install git+https://github.com/zhanghang1989/d2l-book
         python3 -m pip install --force-reinstall ipython==7.16
 
-       pip uninstall -y autogluon
+        pip uninstall -y autogluon
         pip uninstall -y autogluon.vision
         pip uninstall -y autogluon.text
         pip uninstall -y autogluon.mxnet
