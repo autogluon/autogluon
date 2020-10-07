@@ -83,7 +83,7 @@ def config_choice(dataset, data_path, tricks):
 @pytest.mark.parametrize("combination", tricks_combination)
 def test_tricks(combination):
     dataset = 'shopee-iet'
-    data_dir = '/'
+    data_dir = './'
     download_shopee(data_dir, dataset)
 
     target = config_choice(dataset, data_dir, combination)
