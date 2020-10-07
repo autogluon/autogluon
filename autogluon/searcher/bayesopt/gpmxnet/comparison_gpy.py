@@ -3,6 +3,7 @@ import numpy as np
 from scipy.linalg import solve_triangular
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
+import copy
 
 from ..autogluon.hp_ranges import HyperparameterRanges_CS
 from ..datatypes.common import CandidateEvaluation
@@ -70,7 +71,8 @@ def evaluate_blackbox(bb_func, inputs: np.ndarray) -> np.ndarray:
 # only scaled to their native ranges (linearly) when evaluations of the
 # blackbox are done. This avoids silly errors.
 def sample_data(
-        bb_cls, num_train: int, num_grid: int) -> dict:
+        bb_cls, num_train: int, num_grid: int,
+        expand_datadct: bool = True) -> dict:
     bb_func = bb_cls()
     ss_limits = bb_func.search_space
     num_dims = len(ss_limits)
@@ -92,14 +94,25 @@ def sample_data(
         'test_inputs': test_inputs,
         'grid_shape': grids2[0].shape,
         'true_targets': true_targets}
-    # Make sure that ours and GPy below receive exactly the same inputs
-    state = data_to_state(data)
-    data_internal = get_internal_candidate_evaluations(
-        state, active_metric=DEFAULT_METRIC, normalize_targets=True,
-        num_fantasize_samples=20)
-    data['state'] = state
-    data['train_inputs'] = data_internal.X
-    data['train_targets_normalized'] = data_internal.y
+    if expand_datadct:
+        # Make sure that ours and GPy below receive exactly the same inputs
+        data = expand_data(data)
+    return data
+
+
+def expand_data(data: dict) -> dict:
+    """
+    Appends derived entries to data dict, which have non-elementary types.
+    """
+    if 'state' not in data:
+        data = copy.copy(data)
+        state = data_to_state(data)
+        data_internal = get_internal_candidate_evaluations(
+            state, active_metric=DEFAULT_METRIC, normalize_targets=True,
+            num_fantasize_samples=20)
+        data['state'] = state
+        data['train_inputs'] = data_internal.X
+        data['train_targets_normalized'] = data_internal.y
     return data
 
 

@@ -19,6 +19,7 @@ from autogluon.searcher.bayesopt.gpmxnet.constants import \
     NOISE_VARIANCE_UPPER_BOUND, OptimizationConfig, DEFAULT_OPTIMIZATION_CONFIG
 #from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import Branin, \
 #    ThreeHumpCamel, Ackley, sample_data, compare_gpy_predict_posterior_marginals
+from autogluon.searcher.bayesopt.gpmxnet.comparison_gpy import expand_data
 from autogluon.utils.files import download
 
 
@@ -147,7 +148,8 @@ def download_pickle_file(fname):
     if not os.path.exists(trg_fname):
         download(os.path.join(SRC_URL, 'numcomp', fname), path=trg_fname)
     with open(trg_fname, 'rb') as handle:
-        return pickle.load(handle)
+        data = pickle.load(handle)
+    return expand_data(data)
 
 
 # Main testing function
@@ -173,13 +175,16 @@ def test_comparison_gpy():
         branin_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
         # bb_cls = Branin
-        # branin = sample_data(bb_cls, num_train, num_grid)
-        # branin_gpy = fit_predict_gpy(branin, random_seed, optimization_config)
-        #
+        # branin = sample_data(bb_cls, num_train, num_grid,
+        #     expand_datadct=False)
         # fname = os.path.join(
-        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'data')
+        #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train,
+        #     'data')
         # with open(fname, 'wb') as handle:
         #     pickle.dump(branin, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # branin = expand_data(branin)
+        #
+        # branin_gpy = fit_predict_gpy(branin, random_seed, optimization_config)
         # fname = os.path.join(
         #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
         # with open(fname, 'wb') as handle:
@@ -223,14 +228,16 @@ def test_comparison_gpy():
         threehump_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
         # bb_cls = ThreeHumpCamel
-        # threehump = sample_data(bb_cls, num_train, num_grid)
-        # threehump_gpy = fit_predict_gpy(
-        #     threehump, random_seed, optimization_config)
-        #
+        # threehump = sample_data(bb_cls, num_train, num_grid,
+        #     expand_datadct=False)
         # fname = os.path.join(
         #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'data')
         # with open(fname, 'wb') as handle:
         #     pickle.dump(threehump, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # threehump = expand_data(threehump)
+        #
+        # threehump_gpy = fit_predict_gpy(
+        #     threehump, random_seed, optimization_config)
         # fname = os.path.join(
         #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
         # with open(fname, 'wb') as handle:
@@ -271,13 +278,15 @@ def test_comparison_gpy():
         ackley_gpy = download_pickle_file(fname)
         # --------------------------------------------------------------------
         # bb_cls = Ackley
-        # ackley = sample_data(bb_cls, num_train, num_grid)
-        # ackley_gpy = fit_predict_gpy(ackley, random_seed, optimization_config)
-        #
+        # ackley = sample_data(bb_cls, num_train, num_grid,
+        #     expand_datadct=False)
         # fname = os.path.join(
         #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'data')
         # with open(fname, 'wb') as handle:
         #     pickle.dump(ackley, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # ackley = expand_data(ackley)
+        #
+        # ackley_gpy = fit_predict_gpy(ackley, random_seed, optimization_config)
         # fname = os.path.join(
         #     TRG_PATH, 'numcomp', fname_msk.format(data_name, num_train, 'gpy')
         # with open(fname, 'wb') as handle:
