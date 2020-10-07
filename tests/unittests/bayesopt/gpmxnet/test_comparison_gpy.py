@@ -149,7 +149,9 @@ def download_pickle_file(fname):
         download(os.path.join(SRC_URL, 'numcomp', fname), path=trg_fname)
     with open(trg_fname, 'rb') as handle:
         data = pickle.load(handle)
-    return expand_data(data)
+    if 'ss_limits' in data:
+        data = expand_data(data)
+    return data
 
 
 # Main testing function
