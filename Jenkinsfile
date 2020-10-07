@@ -16,8 +16,6 @@ stage("Unit Test") {
         export LD_LIBRARY_PATH=/usr/local/cuda-10.1/lib64
         export MPLBACKEND=Agg
         export MXNET_CUDNN_AUTOTUNE_DEFAULT=0
-        python3 -m pip install --upgrade --force-reinstall -e .
-        python3 -m pip install pytest
 
         pip uninstall -y autogluon
         pip uninstall -y autogluon.vision
