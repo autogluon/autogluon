@@ -67,13 +67,6 @@ def generate_train_test_split(X: DataFrame, y: Series, problem_type: str, test_s
     return X_train, X_test, y_train, y_test
 
 
-def convert_categorical_to_int(X):
-    X = X.copy()
-    cat_columns = X.select_dtypes(include=['category']).columns
-    X[cat_columns] = X[cat_columns].apply(lambda x: x.cat.codes)
-    return X
-
-
 def setup_outputdir(output_directory):
     if output_directory is None:
         utcnow = datetime.utcnow()
@@ -106,7 +99,7 @@ def setup_compute(nthreads_per_trial, ngpus_per_trial):
     return nthreads_per_trial, ngpus_per_trial
 
 
-def setup_trial_limits(time_limits, num_trials, hyperparameters={'NN': None}):
+def setup_trial_limits(time_limits, num_trials, hyperparameters):
     """ Adjust default time limits / num_trials """
     if num_trials is None:
         if time_limits is None:
@@ -212,7 +205,7 @@ def normalize_multi_probas(y_predprob, eps):
     return y_predprob
 
 
-def infer_problem_type(y: Series):
+def infer_problem_type(y: Series, silent=False) -> str:
     """ Identifies which type of prediction problem we are interested in (if user has not specified).
         Ie. binary classification, multi-class classification, or regression.
     """
@@ -222,11 +215,6 @@ def infer_problem_type(y: Series):
     num_rows = len(y)
 
     unique_values = y.unique()
-    unique_count = len(unique_values)
-    if unique_count > 10:
-        logger.log(20, f'Here are the first 10 unique label values in your data:  {list(unique_values[:10])}')
-    else:
-        logger.log(20, f'Here are the {unique_count} unique label values in your data:  {list(unique_values)}')
 
     MULTICLASS_LIMIT = 1000  # if numeric and class count would be above this amount, assume it is regression
     if num_rows > 1000:
@@ -234,6 +222,7 @@ def infer_problem_type(y: Series):
     else:
         REGRESS_THRESHOLD = 0.1
 
+    unique_count = len(unique_values)
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
@@ -267,9 +256,23 @@ def infer_problem_type(y: Series):
             reason = "dtype of label-column == int and many unique label-values observed"
     else:
         raise NotImplementedError(f'label dtype {y.dtype} not supported!')
-    logger.log(25, f"AutoGluon infers your prediction problem is: {problem_type}  (because {reason}).")
-    logger.log(25, f"If this is wrong, please specify `problem_type` argument in fit() instead "
-                   f"(You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})\n")
+    if not silent:
+        logger.log(25, f"AutoGluon infers your prediction problem is: '{problem_type}' (because {reason}).")
+
+        # TODO: Move this outside of this function so it is visible even if problem type was not inferred.
+        if problem_type in [BINARY, MULTICLASS]:
+            if unique_count > 10:
+                logger.log(20, f'\tFirst 10 (of {unique_count}) unique label values:  {list(unique_values[:10])}')
+            else:
+                logger.log(20, f'\t{unique_count} unique label values:  {list(unique_values)}')
+        elif problem_type == REGRESSION:
+            y_max = y.max()
+            y_min = y.min()
+            y_mean = y.mean()
+            y_stddev = y.std()
+            logger.log(20, f'\tLabel info (max, min, mean, stddev): ({y_max}, {y_min}, {round(y_mean, 5)}, {round(y_stddev, 5)})')
+
+        logger.log(25, f"\tIf '{problem_type}' is not the correct problem_type, please manually specify the problem_type argument in fit() (You may specify problem_type as one of: {[BINARY, MULTICLASS, REGRESSION]})")
     return problem_type
 
 

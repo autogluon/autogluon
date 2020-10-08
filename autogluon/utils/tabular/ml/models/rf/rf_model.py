@@ -4,21 +4,24 @@ import pickle
 import sys
 import time
 
+import numpy as np
 import psutil
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesClassifier, ExtraTreesRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from ..abstract import model_trial
-from ..abstract.abstract_model import SKLearnModel
+from ..abstract.abstract_model import AbstractModel
 from ...constants import MULTICLASS, REGRESSION
+from ....features.generators import LabelEncoderFeatureGenerator
 from ....utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 
 logger = logging.getLogger(__name__)
 
 
-class RFModel(SKLearnModel):
+class RFModel(AbstractModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._model_type = self._get_model_type()
+        self._feature_generator = None
 
     def _get_model_type(self):
         if self.problem_type == REGRESSION:
@@ -28,13 +31,21 @@ class RFModel(SKLearnModel):
 
     # TODO: X.fillna -inf? Add extra is_missing column?
     def preprocess(self, X):
-        X = super().preprocess(X).fillna(0)
+        X = super().preprocess(X)
+        if self._feature_generator is None:
+            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
+            self._feature_generator.fit(X=X)
+        if self._feature_generator.features_in:
+            X = X.copy()
+            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = X.fillna(0).to_numpy(dtype=np.float32)
         return X
 
     def _set_default_params(self):
         default_params = {
             'n_estimators': 300,
             'n_jobs': -1,
+            'random_state': 0,
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -77,7 +88,7 @@ class RFModel(SKLearnModel):
         expected_memory_usage = bytes_per_estimator * n_estimators_final / available_mem
         expected_min_memory_usage = bytes_per_estimator * n_estimators_minimum / available_mem
         if expected_min_memory_usage > (0.5 * max_memory_usage_ratio):  # if minimum estimated size is greater than 50% memory
-            logger.warning(f'\tWarning: Model is expected to require {expected_min_memory_usage * 100} percent of available memory (Estimated before training)...')
+            logger.warning(f'\tWarning: Model is expected to require {round(expected_min_memory_usage * 100, 2)}% of available memory (Estimated before training)...')
             raise NotEnoughMemoryError
 
         if n_estimators_final > n_estimators_test * 2:
@@ -106,14 +117,14 @@ class RFModel(SKLearnModel):
                 available_mem = psutil.virtual_memory().available
                 model_memory_ratio = expected_final_model_size_bytes / available_mem
 
-                ideal_memory_ratio = 0.25 * max_memory_usage_ratio
+                ideal_memory_ratio = 0.15 * max_memory_usage_ratio
                 n_estimators_ideal = min(n_estimators_final, math.floor(ideal_memory_ratio / model_memory_ratio * n_estimators_final))
 
                 if n_estimators_final > n_estimators_ideal:
                     if n_estimators_ideal < n_estimators_minimum:
-                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio*100, 1)}% of available memory...')
+                        logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio*100, 2)}% of available memory...')
                         raise NotEnoughMemoryError  # don't train full model to avoid OOM error
-                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 1)}% -> {round(ideal_memory_ratio*100, 1)}% of available memory...')
+                    logger.warning(f'\tWarning: Reducing model \'n_estimators\' from {n_estimators_final} -> {n_estimators_ideal} due to low memory. Expected memory usage reduced from {round(model_memory_ratio*100, 2)}% -> {round(ideal_memory_ratio*100, 2)}% of available memory...')
 
                 if time_limit is not None:
                     time_expected = time_train_start - time_start + (time_elapsed * n_estimators_ideal / n_estimators)

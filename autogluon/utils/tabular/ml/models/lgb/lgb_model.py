@@ -16,12 +16,12 @@ from .hyperparameters.lgb_trial import lgb_trial
 from .hyperparameters.parameters import get_param_baseline
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lgb_utils import construct_dataset
-from ..abstract.abstract_model import AbstractModel, fixedvals_from_searchspaces
+from ..abstract.abstract_model import AbstractModel
+from ..utils import fixedvals_from_searchspaces
 from ...constants import BINARY, MULTICLASS, REGRESSION, SOFTCLASS
 from ....utils.savers import save_pkl
 from .....try_import import try_import_lightgbm
 from ......core import Int, Space
-
 
 warnings.filterwarnings("ignore", category=UserWarning, message="Starting from version")  # lightGBM brew libomp warning
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class LGBModel(AbstractModel):
             eval_metric_name = eval_metric
         return eval_metric, eval_metric_name
 
-    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, **kwargs):
+    def _fit(self, X_train=None, y_train=None, X_val=None, y_val=None, dataset_train=None, dataset_val=None, time_limit=None, num_gpus=0, **kwargs):
         start_time = time.time()
         params = self.params.copy()
 
@@ -74,6 +74,15 @@ class LGBModel(AbstractModel):
         gc.collect()
 
         num_boost_round = params.pop('num_boost_round', 1000)
+        dart_retrain = params.pop('dart_retrain', False)  # Whether to retrain the model to get optimal iteration if model is trained in 'dart' mode.
+        if num_gpus != 0:
+            if 'device' not in params:
+                # TODO: lightgbm must have a special install to support GPU: https://github.com/Microsoft/LightGBM/tree/master/python-package#build-gpu-version
+                #  Before enabling GPU, we should add code to detect that GPU-enabled version is installed and that a valid GPU exists.
+                #  GPU training heavily alters accuracy, often in a negative manner. We will have to be careful about when to use GPU.
+                # TODO: Confirm if GPU is used in HPO (Probably not)
+                # params['device'] = 'gpu'
+                pass
         logger.log(15, f'Training Gradient Boosting Model for {num_boost_round} rounds...')
         logger.log(15, "with the following hyperparameter settings:")
         logger.log(15, params)
@@ -136,8 +145,28 @@ class LGBModel(AbstractModel):
         # Train LightGBM model:
         try_import_lightgbm()
         import lightgbm as lgb
-        self.model = lgb.train(**train_params)
-        if dataset_val is not None:
+        with warnings.catch_warnings():
+            # Filter harmless warnings introduced in lightgbm 3.0, future versions plan to remove: https://github.com/microsoft/LightGBM/issues/3379
+            warnings.filterwarnings('ignore', message='Overriding the parameters from Reference Dataset.')
+            warnings.filterwarnings('ignore', message='categorical_column in param dict is overridden.')
+            self.model = lgb.train(**train_params)
+            retrain = False
+            if train_params['params'].get('boosting_type', '') == 'dart':
+                if dataset_val is not None and dart_retrain and (self.model.best_iteration != num_boost_round):
+                    retrain = True
+                    if time_limit is not None:
+                        time_left = time_limit + start_time - time.time()
+                        if time_left < 0.5 * time_limit:
+                            retrain = False
+                    if retrain:
+                        logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                        train_params.pop('callbacks')
+                        train_params['num_boost_round'] = self.model.best_iteration
+                        self.model = lgb.train(**train_params)
+                    else:
+                        logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+
+        if dataset_val is not None and not retrain:
             self.params_trained['num_boost_round'] = self.model.best_iteration
         else:
             self.params_trained['num_boost_round'] = self.model.current_iteration()

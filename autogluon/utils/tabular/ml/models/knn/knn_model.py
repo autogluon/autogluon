@@ -10,6 +10,7 @@ from ..abstract import model_trial
 from ..abstract.abstract_model import AbstractModel
 from ...constants import REGRESSION
 from ....utils.exceptions import NotEnoughMemoryError
+from ....features.feature_metadata import R_CATEGORY, R_OBJECT, S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ class KNNModel(AbstractModel):
 
     def _set_default_auxiliary_params(self):
         default_auxiliary_params = dict(
-            ignored_feature_types_special=['text_ngram', 'text_special'],
-            ignored_feature_types_raw=['category', 'object'],  # TODO: Eventually use category features
+            ignored_type_group_raw=[R_CATEGORY, R_OBJECT],  # TODO: Eventually use category features
+            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_SPECIAL, S_DATETIME_AS_INT],
         )
         for key, value in default_auxiliary_params.items():
             self._set_default_param_value(key, value, params=self.params_aux)
@@ -65,9 +66,9 @@ class KNNModel(AbstractModel):
         if expected_final_model_size_bytes > 10000000:  # Only worth checking if expected model size is >10MB
             available_mem = psutil.virtual_memory().available
             model_memory_ratio = expected_final_model_size_bytes / available_mem
-            if model_memory_ratio > (0.30 * max_memory_usage_ratio):
-                logger.warning(f'\tWarning: Model is expected to require {model_memory_ratio * 100} percent of available memory...')
-            if model_memory_ratio > (0.40 * max_memory_usage_ratio):
+            if model_memory_ratio > (0.15 * max_memory_usage_ratio):
+                logger.warning(f'\tWarning: Model is expected to require {round(model_memory_ratio * 100, 2)}% of available memory...')
+            if model_memory_ratio > (0.20 * max_memory_usage_ratio):
                 raise NotEnoughMemoryError  # don't train full model to avoid OOM error
 
     def hyperparameter_tune(self, X_train, y_train, X_val, y_val, scheduler_options=None, **kwargs):

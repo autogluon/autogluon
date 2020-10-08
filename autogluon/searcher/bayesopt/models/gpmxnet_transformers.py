@@ -2,20 +2,14 @@ from typing import List, Callable, NamedTuple, Optional
 import logging
 import copy
 
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import \
-    Candidate, PendingEvaluation, CandidateEvaluation
-from autogluon.searcher.bayesopt.tuning_algorithms.base_classes import \
-    PendingCandidateStateTransformer
-from autogluon.searcher.bayesopt.tuning_algorithms.default_algorithm import \
-    DEFAULT_METRIC
-from autogluon.searcher.bayesopt.models.gpmxnet import GPMXNetModel, GPModel
-from autogluon.searcher.bayesopt.models.gpmxnet_skipopt import \
-    SkipOptimizationPredicate, NeverSkipPredicate
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from .gpmxnet import GPMXNetModel, GPModel
+from .gpmxnet_skipopt import SkipOptimizationPredicate, NeverSkipPredicate
+from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from ..autogluon.debug_log import DebugLogPrinter
+from ..datatypes.tuning_job_state import TuningJobState
+from ..datatypes.common import Candidate, PendingEvaluation, CandidateEvaluation
+from ..tuning_algorithms.base_classes import PendingCandidateStateTransformer
+from ..tuning_algorithms.default_algorithm import DEFAULT_METRIC
 
 logger = logging.getLogger(__name__)
 

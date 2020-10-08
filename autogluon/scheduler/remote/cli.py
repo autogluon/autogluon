@@ -1,6 +1,6 @@
 import click
 
-from autogluon.scheduler.remote.remote import DaskRemoteService
+from .remote import DaskRemoteService
 
 @click.command(
     help="""Launch an AutoGluon Remote from terminal, example:

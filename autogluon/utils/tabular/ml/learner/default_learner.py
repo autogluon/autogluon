@@ -27,6 +27,11 @@ class DefaultLearner(AbstractLearner):
         super().__init__(**kwargs)
         self.trainer_type = trainer_type
 
+        self._time_fit_total = None
+        self._time_fit_preprocessing = None
+        self._time_fit_training = None
+        self._time_limit = None
+
     # TODO: Add trainer_kwargs to simplify parameter count and extensibility
 
     def fit(self, X: DataFrame, X_val: DataFrame = None, X_unlabeled: DataFrame = None,scheduler_options=None, hyperparameter_tune=False,
@@ -51,27 +56,26 @@ class DefaultLearner(AbstractLearner):
         if hyperparameters is None:
             hyperparameters = {'NN': {}, 'GBM': {}}
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
+        self._time_limit = time_limit
         if time_limit:
-            self.time_limit = time_limit
             logger.log(20, f'Beginning AutoGluon training ... Time limit = {time_limit}s')
         else:
-            self.time_limit = 1e7
             logger.log(20, 'Beginning AutoGluon training ...')
         logger.log(20, f'AutoGluon will save models to {self.path}')
         logger.log(20, f'AutoGluon Version:  {self.version}')
         logger.log(20, f'Train Data Rows:    {len(X)}')
-        logger.log(20, f'Train Data Columns: {len(X.columns)}')
+        logger.log(20, f'Train Data Columns: {len([column for column in X.columns if column != self.label])}')
         if X_val is not None:
             logger.log(20, f'Tuning Data Rows:    {len(X_val)}')
-            logger.log(20, f'Tuning Data Columns: {len(X_val.columns)}')
+            logger.log(20, f'Tuning Data Columns: {len([column for column in X_val.columns if column != self.label])}')
         time_preprocessing_start = time.time()
         logger.log(20, 'Preprocessing data ...')
         X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds = self.general_data_processing(X, X_val, X_unlabeled, holdout_frac, num_bagging_folds)
         time_preprocessing_end = time.time()
-        self.time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
-        logger.log(20, f'\tData preprocessing and feature engineering runtime = {round(self.time_fit_preprocessing, 2)}s ...')
+        self._time_fit_preprocessing = time_preprocessing_end - time_preprocessing_start
+        logger.log(20, f'Data preprocessing and feature engineering runtime = {round(self._time_fit_preprocessing, 2)}s ...')
         if time_limit:
-            time_limit_trainer = time_limit - self.time_fit_preprocessing
+            time_limit_trainer = time_limit - self._time_fit_preprocessing
         else:
             time_limit_trainer = None
 
@@ -81,13 +85,12 @@ class DefaultLearner(AbstractLearner):
             eval_metric=self.eval_metric,
             stopping_metric=self.stopping_metric,
             num_classes=self.label_cleaner.num_classes,
-            feature_types_metadata=self.feature_generator.feature_types_metadata,
+            feature_metadata=self.feature_generator.feature_metadata,
             low_memory=True,
-            kfolds=num_bagging_folds,
-            n_repeats=num_bagging_sets,
-            stack_ensemble_levels=stack_ensemble_levels,
+            k_fold=num_bagging_folds,  # TODO: Consider moving to fit call
+            n_repeats=num_bagging_sets,  # TODO: Consider moving to fit call
+            stack_ensemble_levels=stack_ensemble_levels,  # TODO: Consider moving to fit call
             scheduler_options=scheduler_options,
-            time_limit=time_limit_trainer,
             save_data=save_data,
             save_bagged_folds=save_bagged_folds,
             random_seed=self.random_seed,
@@ -102,12 +105,12 @@ class DefaultLearner(AbstractLearner):
 
         self.save()
         trainer.train(X, y, X_val, y_val, X_unlabeled, hyperparameter_tune=hyperparameter_tune, feature_prune=feature_prune, holdout_frac=holdout_frac,
-                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types)
+                      hyperparameters=hyperparameters, ag_args_fit=ag_args_fit, excluded_model_types=excluded_model_types, time_limit=time_limit_trainer)
         self.save_trainer(trainer=trainer)
         time_end = time.time()
-        self.time_fit_training = time_end - time_preprocessing_end
-        self.time_fit_total = time_end - time_preprocessing_start
-        logger.log(20, f'AutoGluon training complete, total runtime = {round(self.time_fit_total, 2)}s ...')
+        self._time_fit_training = time_end - time_preprocessing_end
+        self._time_fit_total = time_end - time_preprocessing_start
+        logger.log(20, f'AutoGluon training complete, total runtime = {round(self._time_fit_total, 2)}s ...')
 
     def general_data_processing(self, X: DataFrame, X_val: DataFrame, X_unlabeled: DataFrame, holdout_frac: float, num_bagging_folds: int):
         """ General data processing steps used for all models. """
@@ -117,8 +120,6 @@ class DefaultLearner(AbstractLearner):
         #     X[self.label] = X[self.label].fillna('')
 
         # Remove all examples with missing labels from this dataset:
-        
-        
         missinglabel_inds = [index for index, x in X[self.label].isna().iteritems() if x]
         if len(missinglabel_inds) > 0:
             logger.warning(f"Warning: Ignoring {len(missinglabel_inds)} (out of {len(X)}) training examples for which the label value in column '{self.label}' is missing")
@@ -147,7 +148,7 @@ class DefaultLearner(AbstractLearner):
         self.label_cleaner = LabelCleaner.construct(problem_type=self.problem_type, y=y, y_uncleaned=y_uncleaned)
         y = self.label_cleaner.transform(y)
 
-        if self.label_cleaner.num_classes is not None:
+        if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f'Train Data Class Count: {self.label_cleaner.num_classes}')
 
         if X_val is not None and self.label in X_val.columns:
@@ -161,26 +162,46 @@ class DefaultLearner(AbstractLearner):
                 y_val = self.label_cleaner.transform(y_val)
         else:
             y_val = None
+
+        if self.id_columns:
+            logger.log(20, f'Dropping ID columns: {self.id_columns}')
+            X = X.drop(self.id_columns, axis=1, errors='ignore')
+            if X_val is not None:
+                X_val = X_val.drop(self.id_columns, axis=1, errors='ignore')
+
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
+        logger.log(20, f'Using Feature Generators to preprocess the data ...')
         if X_val is not None:
             # Do this if working with SKLearn models, otherwise categorical features may perform very badly on the test set
             logger.log(15, 'Performing general data preprocessing with merged train & validation data, so validation performance may not accurately reflect performance on new test data')
             X_super = pd.concat([X, X_val, X_unlabeled], ignore_index=True)
-            X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X_super = self.feature_generator.transform(X_super)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X_super = self.feature_generator.fit_transform(X_super)
             X = X_super.head(len(X)).set_index(X.index)
-            
+
             X_val = X_super.head(len(X)+len(X_val)).tail(len(X_val)).set_index(X_val.index)
-            
+
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
         else:
             X_super = pd.concat([X, X_unlabeled], ignore_index=True)
-            X_super = self.feature_generator.fit_transform(X_super, banned_features=self.submission_columns, drop_duplicates=False)
+            if self.feature_generator.is_fit():
+                logger.log(20, f'{self.feature_generator.__class__.__name__} is already fit, so the training data will be processed via .transform() instead of .fit_transform().')
+                X_super = self.feature_generator.transform(X_super)
+                self.feature_generator.print_feature_metadata_info()
+            else:
+                X_super = self.feature_generator.fit_transform(X_super)
+
             X = X_super.head(len(X)).set_index(X.index)
             if X_unlabeled is not None:
                 X_unlabeled = X_super.tail(len(X_unlabeled)).set_index(X_unlabeled.index)
             del X_super
+
 
         return X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bagging_folds
 
@@ -249,3 +270,16 @@ class DefaultLearner(AbstractLearner):
 
         return new_threshold, holdout_frac, num_bagging_folds
 
+    def get_info(self, include_model_info=False, **kwargs):
+        learner_info = super().get_info(**kwargs)
+        trainer = self.load_trainer()
+        trainer_info = trainer.get_info(include_model_info=include_model_info)
+        learner_info.update({
+            'time_fit_preprocessing': self._time_fit_preprocessing,
+            'time_fit_training': self._time_fit_training,
+            'time_fit_total': self._time_fit_total,
+            'time_limit': self._time_limit,
+        })
+
+        learner_info.update(trainer_info)
+        return learner_info

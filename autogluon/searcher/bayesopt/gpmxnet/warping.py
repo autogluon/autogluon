@@ -1,14 +1,11 @@
 import mxnet as mx
 from mxnet import gluon
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import DEFAULT_ENCODING, \
-    INITIAL_WARPING, WARPING_LOWER_BOUND, WARPING_UPPER_BOUND, NUMERICAL_JITTER
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding, \
-    register_parameter
-from autogluon.searcher.bayesopt.gpmxnet.distribution import LogNormal
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter
+from .constants import DEFAULT_ENCODING, INITIAL_WARPING, WARPING_LOWER_BOUND, WARPING_UPPER_BOUND, NUMERICAL_JITTER
+from .distribution import LogNormal
+from .kernel import KernelFunction
+from .gluon_blocks_helpers import encode_unwrap_parameter
+from .utils import create_encoding, register_parameter
 
 
 class OneDimensionalWarping(gluon.HybridBlock):

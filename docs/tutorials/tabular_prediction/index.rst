@@ -24,6 +24,12 @@ For standard datasets that are represented as tables (stored as CSV file, parque
 
       How to use AutoGluon for Kaggle competitions.
 
+   .. card::
+      :title: FAQ
+      :link: tabular-faq.html
+
+      Frequently Asked Questions
+
 .. toctree::
    :maxdepth: 1
    :hidden:
@@ -31,3 +37,4 @@ For standard datasets that are represented as tables (stored as CSV file, parque
    tabular-quickstart
    tabular-indepth
    tabular-kaggle
+   tabular-faq

@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 import mxnet as mx
 from mxnet import gluon
 
-from autogluon.searcher.bayesopt.gpmxnet.distribution import Normal
-from autogluon.searcher.bayesopt.gpmxnet.constants import INITIAL_MEAN_VALUE
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    IdentityScalarEncoding, encode_unwrap_parameter
-from autogluon.searcher.bayesopt.gpmxnet.utils import register_parameter
+from .constants import INITIAL_MEAN_VALUE
+from .distribution import Normal
+from .gluon_blocks_helpers import IdentityScalarEncoding, encode_unwrap_parameter
+from .utils import register_parameter
 
 __all__ = [
     'MeanFunction',

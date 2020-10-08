@@ -3,31 +3,21 @@ import mxnet as mx
 import numpy as np
 import logging
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import MCMCConfig, \
-    OptimizationConfig
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
-    GaussianProcessRegression
-from autogluon.searcher.bayesopt.gpmxnet.gpr_mcmc import GPRegressionMCMC
-from autogluon.searcher.bayesopt.gpmxnet.kernel import Matern52, KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.warping import WarpedKernel, Warping
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
-from autogluon.searcher.bayesopt.datatypes.hp_ranges import \
-    HyperparameterRanges, HyperparameterRangeCategorical, \
-    HyperparameterRangeContinuous, HyperparameterRangeInteger
-from autogluon.searcher.bayesopt.datatypes.tuning_job_state import \
-    TuningJobState
-from autogluon.searcher.bayesopt.datatypes.common import \
-    FantasizedPendingEvaluation, Candidate, candidate_for_print
-from autogluon.searcher.bayesopt.autogluon.hp_ranges import \
-    HyperparameterRanges_CS
-from autogluon.searcher.bayesopt.autogluon.gp_profiling import \
-    GPMXNetSimpleProfiler
-from autogluon.searcher.bayesopt.models.mxnet_base import SurrogateModelMXNet
-from autogluon.searcher.bayesopt.autogluon.debug_log import DebugLogPrinter
+from .mxnet_base import SurrogateModelMXNet
+from ..autogluon.debug_log import DebugLogPrinter
+from ..autogluon.gp_profiling import GPMXNetSimpleProfiler
+from ..autogluon.hp_ranges import HyperparameterRanges_CS
+from ..datatypes.common import FantasizedPendingEvaluation, Candidate, candidate_for_print
+from ..datatypes.hp_ranges import HyperparameterRanges, HyperparameterRangeCategorical, HyperparameterRangeContinuous, HyperparameterRangeInteger
+from ..datatypes.tuning_job_state import TuningJobState
+from ..gpmxnet.constants import MCMCConfig, OptimizationConfig
+from ..gpmxnet.gp_regression import GaussianProcessRegression
+from ..gpmxnet.gpr_mcmc import GPRegressionMCMC
+from ..gpmxnet.kernel import Matern52, KernelFunction
+from ..gpmxnet.posterior_state import GaussProcPosteriorState
+from ..gpmxnet.warping import WarpedKernel, Warping
 
 logger = logging.getLogger(__name__)
-
 
 GPModel = Union[GaussianProcessRegression, GPRegressionMCMC]
 

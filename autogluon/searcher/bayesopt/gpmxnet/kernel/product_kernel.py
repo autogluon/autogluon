@@ -1,4 +1,4 @@
-from autogluon.searcher.bayesopt.gpmxnet.kernel.base import KernelFunction
+from .base import KernelFunction
 
 __all__ = ['ProductKernelFunction']
 

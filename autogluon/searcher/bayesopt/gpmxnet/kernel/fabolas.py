@@ -1,12 +1,9 @@
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel.base import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding, \
-    register_parameter
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
-    COVARIANCE_SCALE_LOWER_BOUND, COVARIANCE_SCALE_UPPER_BOUND, DEFAULT_ENCODING
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter, IdentityScalarEncoding
+from .base import KernelFunction
+from ..constants import COVARIANCE_SCALE_LOWER_BOUND, COVARIANCE_SCALE_UPPER_BOUND, DEFAULT_ENCODING
+from ..gluon_blocks_helpers import encode_unwrap_parameter, IdentityScalarEncoding
+from ..utils import create_encoding, register_parameter
 
 __all__ = ['FabolasKernelFunction']
 

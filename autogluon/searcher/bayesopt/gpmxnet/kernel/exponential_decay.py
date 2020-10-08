@@ -1,12 +1,10 @@
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel.base import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.mean import MeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding, \
-    register_parameter, get_name_internal
-from autogluon.searcher.bayesopt.gpmxnet.constants import DEFAULT_ENCODING
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    unwrap_parameter, IdentityScalarEncoding
+from .base import KernelFunction
+from ..constants import DEFAULT_ENCODING
+from ..gluon_blocks_helpers import unwrap_parameter, IdentityScalarEncoding
+from ..mean import MeanFunction
+from ..utils import create_encoding, register_parameter, get_name_internal
 
 __all__ = ['ExponentialDecayResourcesKernelFunction',
            'ExponentialDecayResourcesMeanFunction']

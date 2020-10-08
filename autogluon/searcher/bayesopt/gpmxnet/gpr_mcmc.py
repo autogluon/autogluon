@@ -3,19 +3,15 @@ import mxnet as mx
 import numpy as np
 from mxnet import Context
 
-from autogluon.searcher.bayesopt.gpmxnet.constants import DEFAULT_MCMC_CONFIG, \
-    MCMCConfig
-from autogluon.searcher.bayesopt.gpmxnet.gp_model import GaussianProcessModel
-from autogluon.searcher.bayesopt.gpmxnet.kernel import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.likelihood import MarginalLikelihood
-from autogluon.searcher.bayesopt.gpmxnet.mean import ScalarMeanFunction
-from autogluon.searcher.bayesopt.gpmxnet.posterior_state import \
-    GaussProcPosteriorState
-from autogluon.searcher.bayesopt.gpmxnet.slice import SliceSampler
-from autogluon.searcher.bayesopt.gpmxnet.gp_regression import \
-    negative_log_posterior
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    encode_unwrap_parameter
+from .constants import DEFAULT_MCMC_CONFIG, MCMCConfig
+from .gluon_blocks_helpers import encode_unwrap_parameter
+from .gp_model import GaussianProcessModel
+from .gp_regression import negative_log_posterior
+from .kernel import KernelFunction
+from .likelihood import MarginalLikelihood
+from .mean import ScalarMeanFunction
+from .posterior_state import GaussProcPosteriorState
+from .slice import SliceSampler
 
 
 class GPRegressionMCMC(GaussianProcessModel):

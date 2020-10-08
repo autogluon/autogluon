@@ -1,12 +1,9 @@
 import mxnet as mx
 
-from autogluon.searcher.bayesopt.gpmxnet.kernel.base import KernelFunction
-from autogluon.searcher.bayesopt.gpmxnet.utils import create_encoding
-from autogluon.searcher.bayesopt.gpmxnet.constants import \
-    INITIAL_NOISE_VARIANCE, NOISE_VARIANCE_LOWER_BOUND, \
-    NOISE_VARIANCE_UPPER_BOUND, DATA_TYPE, DEFAULT_ENCODING
-from autogluon.searcher.bayesopt.gpmxnet.gluon_blocks_helpers import \
-    unwrap_parameter, IdentityScalarEncoding
+from .base import KernelFunction
+from ..constants import INITIAL_NOISE_VARIANCE, NOISE_VARIANCE_LOWER_BOUND, NOISE_VARIANCE_UPPER_BOUND, DATA_TYPE, DEFAULT_ENCODING
+from ..gluon_blocks_helpers import unwrap_parameter, IdentityScalarEncoding
+from ..utils import create_encoding
 
 __all__ = ['Coregionalization']
 

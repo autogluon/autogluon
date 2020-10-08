@@ -6,6 +6,7 @@ from .. import s3_utils
 logger = logging.getLogger(__name__)
 
 
+# TODO: object -> obj?
 def save(path, object, format=None, verbose=True):
     pickle_fn = lambda o, buffer: pickle.dump(o, buffer, protocol=4)
     save_with_fn(path, object, pickle_fn, format=format, verbose=verbose)

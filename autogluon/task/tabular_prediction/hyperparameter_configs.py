@@ -7,7 +7,10 @@ hyperparameter_config_dict = dict(
     # Default AutoGluon hyperparameters intended to maximize accuracy without significant regard to inference time or disk usage.
     default={
         'NN': {},
-        'GBM': {},
+        'GBM': [
+            {},
+            {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+        ],
         'CAT': {},
         'RF': [
             {'criterion': 'gini', 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
@@ -28,7 +31,10 @@ hyperparameter_config_dict = dict(
     # Results in smaller models. Generally will make inference speed much faster and disk usage much lower, but with worse accuracy.
     light={
         'NN': {},
-        'GBM': {},
+        'GBM': [
+            {},
+            {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+        ],
         'CAT': {},
         'RF': [
             {'criterion': 'gini', 'max_depth': 15, 'AG_args': {'name_suffix': 'Gini', 'problem_types': ['binary', 'multiclass']}},
@@ -45,7 +51,10 @@ hyperparameter_config_dict = dict(
     # Results in much smaller models. Behaves similarly to 'light', but in many cases with over 10x less disk usage and a further reduction in accuracy.
     very_light={
         'NN': {},
-        'GBM': {},
+        'GBM': [
+            {},
+            {'extra_trees': True, 'AG_args': {'name_suffix': 'XT'}},
+        ],
         'CAT': {},
     },
     # Results in extremely quick to train models. Only use this when prototyping, as the model accuracy will be severely reduced.

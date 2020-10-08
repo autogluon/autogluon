@@ -5,24 +5,24 @@ autogluon.task
 ===============
 
 .. admonition:: Example (image classification task):
-   
+
    Tell AutoGluon that task is image classification:
-   
+
    >>> import autogluon as ag
    >>> from autogluon import ImageClassification as task
-   
+
    Load a toy image dataset:
-   
+
    >>> filename = ag.download('http://autogluon-hackathon.s3.amazonaws.com/data.zip')
    >>> ag.unzip(filename)
    >>> dataset = task.Dataset(train_path='data/train')
-   
+
    Fit classification models:
-   
+
    >>> classifier = task.fit(dataset, epochs=2)
-   
+
    Evaluate predictions on test data:
-   
+
    >>> test_dataset = task.Dataset('data/test', train=False)
    >>> test_acc = classifier.evaluate(test_dataset)
 
@@ -40,7 +40,7 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
    TabularPrediction
    ImageClassification
    ObjectDetection
-   TextClassification
+   TextPrediction
 
 
 :hidden:`TabularPrediction`
@@ -85,21 +85,21 @@ Prediction tasks built into AutoGluon such that a single call to `fit()` can pro
         :methods:
 
 
-:hidden:`TextClassification`
+:hidden:`TextPrediction`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TextClassification
+.. autoclass:: TextPrediction
    :members:
    :inherited-members:
    :exclude-members: run_fit
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TextClassification
+    .. autoautosummary:: TextPrediction
         :methods:
 
 
-Additional Tabular Prediction APIs
+Additional Tabular Prediction APIs
 ----------------------------------
 
 .. automodule:: autogluon.task.tabular_prediction
@@ -268,29 +268,24 @@ Additional Object Detection APIs
         :attributes:
 
 
-Additional Text Classification APIs
+Additional Text Prediction APIs
 -----------------------------------
 
-.. automodule:: autogluon.task.text_classification
+.. automodule:: autogluon.task.text_prediction.models.basic_v1
 
-:hidden:`TextClassificationPredictor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+:hidden:`BertForTextPredictionBasic`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: TextClassificationPredictor
-   :members: predict, predict_proba, evaluate
+.. autoclass:: BertForTextPredictionBasic
+   :members: predict, predict_proba, evaluate, save, load
 
     .. rubric:: Methods
 
-    .. autoautosummary:: TextClassificationPredictor
+    .. autoautosummary:: BertForTextPredictionBasic
         :methods:
 
     .. rubric:: Attributes
 
-    .. autoautosummary:: TextClassificationPredictor
+    .. autoautosummary:: BertForTextPredictionBasic
         :attributes:
 
-:hidden:`get_dataset`
-~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction::
-   get_dataset

@@ -34,7 +34,7 @@ class EncBase:
 
     def clean_data(self, data, dtype=None) -> list:
         if isinstance(data, pd.Series):
-            data = data.replace({pd.np.nan: None}).to_list()
+            data = data.replace({np.nan: None}).to_list()
             if dtype == 'float':
                 unclean_data = data
                 data = []

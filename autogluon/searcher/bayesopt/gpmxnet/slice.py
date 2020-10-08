@@ -1,8 +1,7 @@
 from typing import Callable, Tuple, List
 import numpy as np
 
-from autogluon.searcher.bayesopt.gpmxnet import SliceException
-
+from . import SliceException
 
 MAX_STEP_OUT = 200
 MAX_STEP_LOOP = 200
