@@ -295,7 +295,8 @@ class ObjectDetection(BaseTask):
         args = sample_config(train_object_detection.args, results['best_config'])
         logger.info('The best config: {}'.format(results['best_config']))
 
-        ctx = [mx.gpu(i) for i in range(get_gpu_count())]
+        ngpus = get_gpu_count()
+        ctx = [mx.gpu(i) for i in range(ngpus)] if ngpus > 0 else [mx.cpu()]
         model = get_network(args.meta_arch, args.net, dataset.init().get_classes(), transfer, ctx,
                             syncbn=args.syncbn)
         update_params(model, results.pop('model_params'))
