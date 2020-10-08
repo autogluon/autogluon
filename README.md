@@ -23,7 +23,6 @@ import pandas as pd
 import numpy as np
 
 from matplotlib import pyplot as plt
-import matplotlib.ticker as ticker
 import seaborn as sns
 ```
 Load example TCGA data
