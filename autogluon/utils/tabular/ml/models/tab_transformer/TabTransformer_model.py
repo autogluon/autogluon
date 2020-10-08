@@ -130,7 +130,6 @@ class TabTransformerModel(AbstractModel):
         if self.types_of_features is not None:
             Warning("Attempting to _get_types_of_features for TabTransformerModel, but previously already did this.")
 
-        #feature_types = self.feature_types_metadata.feature_types_raw
         feature_types = self.feature_metadata.get_type_group_map_raw()
 
         categorical_featnames = feature_types['category'] + feature_types['object'] + feature_types['bool']
@@ -325,8 +324,8 @@ class TabTransformerModel(AbstractModel):
         if self.model is not None:
             torch.save(self.model, params_filepath)
 
-        modelobj_filepath = super().save(file_prefix=file_prefix, directory=directory, return_filename=True, verbose=verbose)
-        
+        modelobj_filepath = super().save(path=path, verbose=verbose)
+
         if return_filename:
             return modelobj_filepath
 
