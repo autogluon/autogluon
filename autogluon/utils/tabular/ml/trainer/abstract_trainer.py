@@ -797,7 +797,6 @@ class AbstractTrainer:
             hyperparameters=hyperparameters, eval_metric=self.eval_metric, stopping_metric=self.eval_metric, num_classes=self.num_classes, save_bagged_folds=save_bagged_folds, random_state=level + self.random_seed,
             **extra_params
         )
-
         self._train_multi(X_train=X, y_train=y, X_val=None, y_val=None, X_unlabeled=None, models=[weighted_ensemble_model], k_fold=k_fold, n_repeats=n_repeats, hyperparameter_tune=False, feature_prune=False, stack_name=stack_name, level=level, time_limit=time_limit)
         if check_if_best and weighted_ensemble_model.name in self.get_model_names_all():
             if self.model_best is None:
@@ -1053,7 +1052,7 @@ class AbstractTrainer:
                 else:
                     time_start_model = time.time()
                     time_left = time_limit - (time_start_model - time_start)
-                models_valid_next += self._train_single_full(X_train, y_train, model, X_val, y_val, X_unlabeled, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
+                models_valid_next += self._train_single_full(X_train, y_train, X_unlabeled, model, X_val, y_val, stack_name=stack_name, k_fold=k_fold, k_fold_start=0, k_fold_end=None, n_repeats=n + 1, n_repeat_start=n, level=level, time_limit=time_left)
             models_valid = copy.deepcopy(models_valid_next)
             models_valid_next = []
             repeats_completed += 1
