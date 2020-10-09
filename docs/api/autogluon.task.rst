@@ -28,8 +28,8 @@ AutoGluon Tasks
 
 
 
-AutoGluon Tasks
------------------
+Tasks
+-----
 
 Prediction tasks built into AutoGluon such that a single call to `fit()` can produce high-quality trained models. For other applications, you can still use AutoGluon to tune the hyperparameters of your own custom models and training scripts.
 

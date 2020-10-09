@@ -33,6 +33,7 @@ stage("Unit Test") {
         cd tabular/
         python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
+        pip uninstall -y autogluon.tabular
         cd ..
 
         cd mxnet/
@@ -48,12 +49,20 @@ stage("Unit Test") {
         cd text/
         python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
+        pip uninstall -y autogluon.text
         cd ..
 
         cd vision/
         python3 -m pip install --upgrade -e .
         python3 -m pytest --junitxml=results.xml --runslow tests
         cd ..
+
+
+        cd tabular/
+        python3 -m pip install --upgrade -e .
+        cd ../text/
+        python3 -m pip install --upgrade -e .
+        cd ../
 
         cd autogluon/
         python3 -m pip install --upgrade -e .
