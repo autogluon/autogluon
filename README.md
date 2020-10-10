@@ -17,6 +17,7 @@ AutoGluon automates machine learning tasks enabling you to easily achieve strong
 ```python
 # First install package from terminal:
 # python3 -m pip install --upgrade pip
+# python3 -m pip install --upgrade setuptools
 # python3 -m pip install --upgrade "mxnet<2.0.0"
 # python3 -m pip install autogluon
 
