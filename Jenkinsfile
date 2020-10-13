@@ -79,6 +79,22 @@ stage("Build Docs") {
       timeout(time: max_time, unit: 'MINUTES') {
         checkout scm
         VISIBLE_GPU=env.EXECUTOR_NUMBER.toInteger() % 8
+
+        if (env.BRANCH_NAME.startsWith("PR-")) {
+            bucket = 'autogluon-staging'
+            path = "${env.BRANCH_NAME}/${env.BUILD_NUMBER}/"
+            site = "${bucket}.s3-website-us-west-2.amazonaws.com/${path}/index.html"
+            flags = '--delete'
+            cacheControl = ''
+        } else {
+            isMaster = env.BRANCH_NAME == 'master'
+            bucket = 'autogluon.mxnet.io'
+            path = isMaster ? '' : "${env.BRANCH_NAME}/"
+            site = "${bucket}/${path}"
+            flags = isMaster ? '' : '--delete'
+            cacheControl = '--cache-control max-age=7200'
+        }
+
         sh """#!/bin/bash
         set -ex
         conda env update -n autogluon_docs -f docs/build_contrib.yml
@@ -128,14 +144,8 @@ stage("Build Docs") {
         python3 -m pip install --upgrade -e .
         cd ..
 
-        cd docs && bash build_doc.sh
-        if [[ ${env.BRANCH_NAME} == master ]]; then
-            aws s3 sync --delete _build/html/ s3://autogluon.mxnet.io/ --acl public-read --cache-control max-age=7200
-            echo "Uploaded doc to http://autogluon.mxnet.io"
-        else
-            aws s3 sync --delete _build/html/ s3://autogluon-staging/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/ --acl public-read
-            echo "Uploaded doc to http://autogluon-staging.s3-website-us-west-2.amazonaws.com/${env.BRANCH_NAME}/${env.BUILD_NUMBER}/index.html"
-        fi
+        aws s3 sync ${flags} _build/html/ s3://${bucket}/${path} --acl public-read ${cacheControl}
+        echo "Uploaded doc to http://${site}"
         """
 
         if (env.BRANCH_NAME.startsWith("PR-")) {
